@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import {
+  type CardPreviewResponse,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
   type ProfileDocument,
@@ -10,9 +11,10 @@ import {
 import { AppError } from "../lib/errors.ts";
 import { listApprovedPhotos } from "../media/index.ts";
 import { track } from "../research/index.ts";
-import { type CardDeps, completenessOf } from "./card.ts";
+import { buildCard, type CardDeps, completenessOf } from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
+import { tips } from "./tips.ts";
 
 /**
  * Which fields of the update need the explicit consent, given a registry of
@@ -77,7 +79,18 @@ export async function readProfile(deps: CardDeps, accountId: string): Promise<Pr
   return {
     profile: row ? toDocument(row) : null,
     completeness: await completenessOf(deps, accountId, row, photos.length),
+    tips: tips({ approvedPhotos: photos.length }),
   };
+}
+
+export async function previewCard(deps: CardDeps, accountId: string): Promise<CardPreviewResponse> {
+  const { card, completeness } = await buildCard(deps, {
+    viewerAccountId: accountId,
+    subjectAccountId: accountId,
+  });
+  const approvedPhotos =
+    card?.photos.length ?? (await listApprovedPhotos(deps.db, accountId)).length;
+  return { card, completeness, tips: tips({ approvedPhotos }) };
 }
 
 export async function saveProfile(
@@ -118,7 +131,11 @@ export async function saveProfile(
     complete: completenessNow.complete,
     approvedPhotos: photos.length,
   });
-  return { profile: toDocument(row), completeness: completenessNow };
+  return {
+    profile: toDocument(row),
+    completeness: completenessNow,
+    tips: tips({ approvedPhotos: photos.length }),
+  };
 }
 
 /** Erasure (#51): the profile row, inside the caller's transaction. */

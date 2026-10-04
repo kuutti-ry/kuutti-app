@@ -96,6 +96,22 @@ export const Completeness = z
   .meta({ id: "Completeness" });
 export type Completeness = z.infer<typeof Completeness>;
 
+/**
+ * Advisory profile tips for the owner (#56). One tip at a time; never gates
+ * completeness, moderation, or matching. Kinds grow as label rules land.
+ */
+export const TipKind = z.enum(["fewer_photos"]).meta({ id: "TipKind" });
+export type TipKind = z.infer<typeof TipKind>;
+
+export const Tips = z
+  .object({
+    /** Highest-priority tip, or null when none apply. */
+    tip: TipKind.nullable(),
+  })
+  .strict()
+  .meta({ id: "Tips" });
+export type Tips = z.infer<typeof Tips>;
+
 /** The stored profile, as the owner reads it back. */
 export const ProfileDocument = z
   .object({
@@ -117,6 +133,7 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
+    tips: Tips,
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;
@@ -161,6 +178,7 @@ export const CardPreviewResponse = z
   .object({
     card: ProfileCard.nullable(),
     completeness: Completeness,
+    tips: Tips,
   })
   .meta({ id: "CardPreviewResponse" });
 export type CardPreviewResponse = z.infer<typeof CardPreviewResponse>;
