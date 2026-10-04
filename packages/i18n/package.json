@@ -21,8 +21,8 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "0.129.0",
-    "@types/node": "^22.20.2",
+    "@anthropic-ai/sdk": "0.131.0",
+    "@types/node": "^22.20.4",
     "@types/react": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
