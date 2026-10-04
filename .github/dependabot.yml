@@ -39,6 +39,18 @@ updates:
       # range). Remove this once a release of the plugin accepts 12 (#117).
       - dependency-name: "intl-messageformat"
         update-types: ["version-update:semver-major"]
+      # The types follow the runtime. Node 22 is the project's engine
+      # (package.json) and the API image's base, so the types of a newer major
+      # would let code compile that the runtime does not have (#119).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # jest-expo 57 and React Native 0.86's jest preset are built on Jest 29:
+      # their babel-jest, environments and snapshot packages are ^29. Jest 30
+      # arrives with the Expo SDK whose jest-expo is built on it (#121).
+      - dependency-name: "jest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/jest"
+        update-types: ["version-update:semver-major"]
 
   # The API image's base image (apps/api/Dockerfile). Node 22 is the
   # project's engine (package.json), and newer Node images drop Corepack, so
