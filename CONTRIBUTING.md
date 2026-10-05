@@ -32,6 +32,8 @@ A DCO check runs on every push and pull request and fails on any commit without 
 git config core.hooksPath .githooks
 ```
 
+The same setting turns on a second hook: before each commit, Biome checks the staged files (format, lint, import order), which is what the `lint` job checks on the pull request. `pnpm format` fixes most of what it names. The job stays the rule; the hook only tells you earlier. `pnpm env:doctor` says whether the hooks are on.
+
 If you forgot, sign off after the fact:
 
 ```bash

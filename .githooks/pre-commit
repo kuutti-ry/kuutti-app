@@ -1,0 +1,20 @@
+#!/bin/sh
+# Refuses a commit whose staged files Biome would refuse (format, lint,
+# import order), before it ever leaves your machine: the check of `pnpm lint`
+# and of the `lint` job, on the staged files only, so it takes a moment.
+# The job stays the rule; this is the early word. Enable once per clone,
+# together with the sign-off hook:
+#
+#   git config core.hooksPath .githooks
+#
+# `pnpm format` fixes most of what it names. `git commit --no-verify` skips it
+# for the commit that has to go out as it is.
+biome=node_modules/.bin/biome
+if [ ! -x "$biome" ]; then
+  echo "pre-commit: Biome is not installed here (pnpm install), so the staged files go unchecked." >&2
+  exit 0
+fi
+if ! "$biome" check --staged --no-errors-on-unmatched --files-ignore-unknown=true; then
+  echo "pre-commit: Biome refuses the staged files. Run 'pnpm format', look at what is left, stage and commit again." >&2
+  exit 1
+fi
