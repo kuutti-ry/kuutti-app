@@ -88,6 +88,11 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 - Comments explain why, not what. Reference the TD or ADR number when the why is a decision.
 - English for code, comments, commits, and docs. User-facing strings go through i18n keys, never inline.
 - Do not add infrastructure, caching layers, queues, or abstractions for scale that is not coming (5,000 users, one box).
+- Understand first, then write the least. Read what the change touches and trace the flow end to end; then stop at the first of these that holds: it does not need to exist (say so in one line); it is already in this codebase (reuse it, through the slice's `index.ts` or `src/lib/`); the standard library or the platform does it (a database constraint over application code); a dependency that is already installed does it; otherwise the least code that works. The testing, accessibility, i18n and security rules of this file are part of "works".
+- No structure on speculation: no interface with one implementation, no factory for one product, nothing scaffolded for later. Deleting beats adding, boring beats clever. A tunable in `matching_config` is a product rule, not speculation.
+- A bug fix goes to the root cause. Look at every caller of the function you are about to change, and fix it once, where they all pass through.
+- A deliberate shortcut with a known ceiling carries a comment that starts `shortcut:` and names the ceiling and what would lift it (`// shortcut: one global lock; per-account locks if throughput matters`). `git grep 'shortcut:'` lists what was put off.
+- A pull request names what was left out on purpose and what would make it needed.
 - Prefer the vendor's agent docs over training data for API details: Expo through the official Claude Code plugin and MCP (`claude plugin install expo@claude-plugins-official`), then `https://hono.dev/llms.txt`, `https://orm.drizzle.team/llms.txt`, `https://zod.dev/llms.txt`, `https://www.nativewind.dev/llms.txt`, `https://docs.dokploy.com/llms.txt`, `https://docs.sentry.io/llms.txt`, `https://www.i18next.com/llms.txt`.
 
 ## Testing
