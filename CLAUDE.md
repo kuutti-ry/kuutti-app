@@ -41,7 +41,7 @@ Before pushing: typecheck, lint, and tests pass locally. Do not push red.
 ## Git
 
 - `main` only, and only through a pull request (TD-2, switched on 2026-09-25 when the `contributors` team got write): squash merge, the fourteen checks that run on every pull request green, one approving review for anyone who is not a repository admin (admins bypass), one more for changes attributed to no person. A contributor's preview deploys only after the maintainer has approved the run (ADR-004).
-- Every commit is signed off (`git commit -s`). Enable the hook once per clone: `git config core.hooksPath .githooks`. The DCO workflow fails on unsigned commits.
+- Every commit is signed off (`git commit -s`). Enable the hooks once per clone: `git config core.hooksPath .githooks` (the sign-off check, and Biome on the staged files before a commit). The DCO workflow fails on unsigned commits.
 - Linear history: no merge commits, no force-push, never touch the branch ruleset or repository settings.
 - Subject line imperative and under 72 characters; the body says what and why. Cite the TD or ADR when a change follows one.
 - Every pull request body carries `Refs #n` for each issue it works on, so GitHub links the issue and the pull request both ways. Never a closing keyword (`Closes`, `Fixes`, `Resolves`): an issue closes when the maintainer has tested it, not when a merge happens. The `issue-link` CI job refuses both a missing reference and a closing keyword.

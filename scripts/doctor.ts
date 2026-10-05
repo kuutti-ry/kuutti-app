@@ -1,8 +1,8 @@
 /**
  * doctor: is this machine ready for `pnpm env:up`?
  *
- * Checks Node, pnpm through Corepack, Docker with compose, the root .env, a
- * reachable database path, and the local ports. Prints the exact fix for each
+ * Checks Node, pnpm through Corepack, the git hooks, Docker with compose, the
+ * root .env, a reachable database path, and the local ports. Prints the exact fix for each
  * failure. Exit 1 when something required is missing.
  *
  *   pnpm env:doctor   (pnpm doctor is pnpm's own command)
@@ -55,6 +55,17 @@ else
   bad(
     "pnpm not found",
     "run `corepack enable` once (Corepack ships with Node) and open a new shell",
+  );
+
+// The repository's hooks: the sign-off check and Biome on the staged files.
+// Not required to run anything, so a warning; CI checks both in any case.
+const hooks = sh("git", ["-C", ROOT, "config", "--get", "core.hooksPath"]);
+if (hooks.code === 0 && hooks.out === ".githooks") ok("git hooks on (.githooks)");
+else
+  bad(
+    "git hooks are off: an unsigned or unformatted commit is only refused by CI",
+    "git config core.hooksPath .githooks",
+    false,
   );
 
 // Docker with compose
