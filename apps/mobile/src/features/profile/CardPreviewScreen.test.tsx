@@ -57,7 +57,7 @@ describe("CardPreviewScreen", () => {
         return json({
           card,
           completeness: { complete: false, missing: ["seeks", "age_window"] },
-          tips: { tip: null },
+          tip: null,
         });
       }
       if (path.startsWith("/photos/")) {
@@ -101,7 +101,7 @@ describe("CardPreviewScreen", () => {
       json({
         card: null,
         completeness: { complete: false, missing: ["display_name"] },
-        tips: { tip: "fewer_photos" },
+        tip: null,
       }),
     ) as unknown as typeof fetch;
     await act(async () => {

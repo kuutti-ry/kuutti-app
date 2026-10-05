@@ -1343,7 +1343,7 @@ export interface paths {
         };
         /**
          * The caller's profile and what it still needs
-         * @description The profile as saved (null before the first save), the completeness rule's verdict (what is missing before a round), and one advisory tip for the owner when one applies (#56).
+         * @description The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and one advisory tip for the owner when one applies.
          */
         get: {
             parameters: {
@@ -1391,7 +1391,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Saved; the profile as stored, with its completeness and one advisory tip when one applies (#56). */
+                /** @description Saved; the profile as stored, with its completeness and one advisory tip when one applies. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1454,7 +1454,7 @@ export interface paths {
         };
         /**
          * The caller's own card, as others will see it
-         * @description The card built the way a round builds it for someone else, with the age from the bank-verified year and month, the approved photos in order (bytes through GET /photos/{id}/{variant}), what is still missing, and one advisory tip when one applies (#56). Nothing is recorded: this is the owner looking at themselves.
+         * @description The card built the way a round builds it for someone else, with the age from the bank-verified year and month, the approved photos in order (bytes through GET /photos/{id}/{variant}), what is still missing, and one advisory tip when one applies. Nothing is recorded: this is the owner looking at themselves.
          */
         get: {
             parameters: {
@@ -2514,7 +2514,7 @@ export interface components {
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
-            tips: components["schemas"]["Tips"];
+            tip: components["schemas"]["TipKind"];
         };
         Completeness: {
             complete: boolean;
@@ -2522,11 +2522,8 @@ export interface components {
         };
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
-        Tips: {
-            tip: components["schemas"]["TipKind"];
-        };
         /** @enum {string|null} */
-        TipKind: "fewer_photos" | null;
+        TipKind: "few_photos" | null;
         ProfileUpdate: {
             displayName: string;
             bio: string | null;
@@ -2540,7 +2537,7 @@ export interface components {
         CardPreviewResponse: {
             card: components["schemas"]["ProfileCard"];
             completeness: components["schemas"]["Completeness"];
-            tips: components["schemas"]["Tips"];
+            tip: components["schemas"]["TipKind"];
         };
         ProfileCard: {
             /** Format: uuid */

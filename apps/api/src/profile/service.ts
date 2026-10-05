@@ -14,7 +14,7 @@ import { track } from "../research/index.ts";
 import { buildCard, type CardDeps, completenessOf } from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
-import { tips } from "./tips.ts";
+import { tipFor } from "./tips.ts";
 
 /**
  * Which fields of the update need the explicit consent, given a registry of
@@ -79,7 +79,7 @@ export async function readProfile(deps: CardDeps, accountId: string): Promise<Pr
   return {
     profile: row ? toDocument(row) : null,
     completeness: await completenessOf(deps, accountId, row, photos.length),
-    tips: tips({ approvedPhotos: photos.length }),
+    tip: tipFor({ approvedPhotos: photos.length }),
   };
 }
 
@@ -90,7 +90,7 @@ export async function previewCard(deps: CardDeps, accountId: string): Promise<Ca
   });
   const approvedPhotos =
     card?.photos.length ?? (await listApprovedPhotos(deps.db, accountId)).length;
-  return { card, completeness, tips: tips({ approvedPhotos }) };
+  return { card, completeness, tip: tipFor({ approvedPhotos }) };
 }
 
 export async function saveProfile(
@@ -134,7 +134,7 @@ export async function saveProfile(
   return {
     profile: toDocument(row),
     completeness: completenessNow,
-    tips: tips({ approvedPhotos: photos.length }),
+    tip: tipFor({ approvedPhotos: photos.length }),
   };
 }
 

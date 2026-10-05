@@ -86,7 +86,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1999, month: 1, day: 9 },
     individual: 905,
     group: "history",
-    note: "Onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing.",
+    note: "Onboarded, with a profile; one photo only once the photo loader has run, so the profile says what is missing.",
   },
   {
     key: "kerttu",

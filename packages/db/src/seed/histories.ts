@@ -89,7 +89,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       prompts: [{ key: "hidden_talent", answer: "I can name a tree by its bark." }],
       specialCategoryConsent: null,
     },
-    photos: 2,
+    // One short of what completeness asks for (two, since #56).
+    photos: 1,
     afterwards: "nothing",
   },
   {

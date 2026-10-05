@@ -1570,14 +1570,14 @@
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
           },
-          "tips": {
-            "$ref": "#/components/schemas/Tips"
+          "tip": {
+            "$ref": "#/components/schemas/TipKind"
           }
         },
         "required": [
           "profile",
           "completeness",
-          "tips"
+          "tip"
         ]
       },
       "Completeness": {
@@ -1609,23 +1609,11 @@
           "age_window"
         ]
       },
-      "Tips": {
-        "type": "object",
-        "properties": {
-          "tip": {
-            "$ref": "#/components/schemas/TipKind"
-          }
-        },
-        "required": [
-          "tip"
-        ],
-        "additionalProperties": false
-      },
       "TipKind": {
         "type": "string",
         "nullable": true,
         "enum": [
-          "fewer_photos",
+          "few_photos",
           null
         ]
       },
@@ -1691,14 +1679,14 @@
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
           },
-          "tips": {
-            "$ref": "#/components/schemas/Tips"
+          "tip": {
+            "$ref": "#/components/schemas/TipKind"
           }
         },
         "required": [
           "card",
           "completeness",
-          "tips"
+          "tip"
         ]
       },
       "ProfileCard": {
@@ -3304,7 +3292,7 @@
     "/profile": {
       "get": {
         "summary": "The caller's profile and what it still needs",
-        "description": "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before a round), and one advisory tip for the owner when one applies (#56).",
+        "description": "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and one advisory tip for the owner when one applies.",
         "security": [
           {
             "session": []
@@ -3353,7 +3341,7 @@
         },
         "responses": {
           "200": {
-            "description": "Saved; the profile as stored, with its completeness and one advisory tip when one applies (#56).",
+            "description": "Saved; the profile as stored, with its completeness and one advisory tip when one applies.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3408,7 +3396,7 @@
     "/profile/card": {
       "get": {
         "summary": "The caller's own card, as others will see it",
-        "description": "The card built the way a round builds it for someone else, with the age from the bank-verified year and month, the approved photos in order (bytes through GET /photos/{id}/{variant}), what is still missing, and one advisory tip when one applies (#56). Nothing is recorded: this is the owner looking at themselves.",
+        "description": "The card built the way a round builds it for someone else, with the age from the bank-verified year and month, the approved photos in order (bytes through GET /photos/{id}/{variant}), what is still missing, and one advisory tip when one applies. Nothing is recorded: this is the owner looking at themselves.",
         "security": [
           {
             "session": []

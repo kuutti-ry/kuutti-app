@@ -15,7 +15,8 @@ describe("the completeness rule", () => {
   it.each([
     ["everything there", ready, []],
     ["no name", { ...ready, displayName: null }, ["display_name"]],
-    ["two photos", { ...ready, approvedPhotos: 2 }, ["photos"]],
+    ["one photo", { ...ready, approvedPhotos: 1 }, ["photos"]],
+    ["two photos are enough", { ...ready, approvedPhotos: 2 }, []],
     [
       "a short bio and one prompt",
       { ...ready, bio: "x".repeat(49), answeredPrompts: 1 },
