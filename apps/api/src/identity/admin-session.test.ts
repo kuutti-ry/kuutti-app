@@ -39,7 +39,7 @@ function fakeBroker(hetu: string): IdentityBroker {
         subject: "STAFFSUBJECT",
         sessionIndex: null,
         tokenId: null,
-        authenticatedAt: NOW,
+        authenticatedAt: new Date(),
         acr: "http://ftn.ficora.fi/2017/loatest2",
         amr: [],
       };

@@ -109,8 +109,11 @@ const Env = z.object({
   // The key of HMAC-SHA256(hetu), 32 bytes as hex, from /kuutti/<env>/hetu-hmac-key
   // (rule 2: fetched at boot, never rotated, one offline copy). Without it the
   // auth routes answer 503; the login never runs with a key from anywhere else.
+  // Trimmed first: a parameter loaded from a file (`--value file://…`) carries
+  // the file's trailing newline, and the box must not refuse to boot over it.
   HETU_HMAC_KEY: z
     .string()
+    .trim()
     .regex(/^[0-9a-f]{64}$/i, "32 bytes as hex")
     .optional(),
   // Error reporting (#11). A DSN is public by design: /kuutti/<env>/sentry-dsn
@@ -237,11 +240,23 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   // The same for photos (#48, ADR-005): staging's bucket and signing key
   // would make a preview a writer of staging's objects, refcounted against
   // the wrong database; a preview has no media and its photo routes answer 503.
+  // And for the bank login (ADR-014 §1, docs/vendors/telia.md): a preview may
+  // never use the real broker, and no mock bank is deployed beside it, so the
+  // Telia client and both private keys stay out of its memory and its auth
+  // routes answer 503. The HMAC key goes with them: with no login there is
+  // nothing to derive.
   if (preview) {
     env.DB_APP_PASSWORD = undefined;
     env.MEDIA_URL_BASE = undefined;
     env.CLOUDFRONT_KEY_PAIR_ID = undefined;
     env.CLOUDFRONT_SIGNING_KEY = undefined;
+    env.OIDC_ISSUER = undefined;
+    env.OIDC_CLIENT_ID = undefined;
+    env.OIDC_REDIRECT_URI = undefined;
+    env.OIDC_ACR_VALUES = undefined;
+    env.TELIA_SIGNING_KEY = undefined;
+    env.TELIA_ENCRYPTION_KEY = undefined;
+    env.HETU_HMAC_KEY = undefined;
   }
   const trustedProxy: TrustedProxy =
     env.TRUSTED_PROXY ??

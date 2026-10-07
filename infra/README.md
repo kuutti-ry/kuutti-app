@@ -269,7 +269,7 @@ Each environment composes the three modules (#7, TD-19):
 | `data` | RDS PostgreSQL 17 single-AZ, gp3 20→100 GB, 35-day PITR, `rds.force_ssl=1`, Extended Support declined, master password held by AWS | staging `db.t4g.micro`, prod `db.t4g.small` with deletion protection and a final snapshot |
 | `compute` | t4g.small Ubuntu 24.04 arm64, Elastic IP, IMDSv2, instance role `kuutti-api-<env>` under the boundary, log group `/kuutti/<env>/api`, first-boot script installing Dokploy | staging also owns the account-wide Session Manager preferences, `/kuutti/ssm-sessions`, and the `kuutti-staging-preview-database` Run Command document (#9) |
 
-The composition then writes the non-secret parameters `app-env`, `log-level`, `db-host`, `db-port`, `db-name`, `db-user` under `/kuutti/<env>/`; the API turns them into `APP_ENV`, `DB_HOST` and so on at boot and composes `DATABASE_URL` with `sslmode=require`.
+The composition then writes the non-secret parameters `app-env`, `log-level`, `db-host`, `db-port`, `db-name`, `db-user` under `/kuutti/<env>/`, and, once `telia_client_id` has a value, `oidc-issuer`, `oidc-client-id`, `oidc-redirect-uri` and `oidc-acr-values` (#32, `docs/vendors/telia.md`); the API turns them into `APP_ENV`, `DB_HOST` and so on at boot and composes `DATABASE_URL` with `sslmode=require`.
 
 Every IAM role declared in an environment or module sets `permissions_boundary` to the bootstrap output `permissions_boundary_arn`; the apply role refuses to create a role without it. The plan role cannot read secrets, logs, or object data, only resource metadata and state.
 
@@ -389,7 +389,7 @@ gh api -X PUT "$R/environments/preview" --input - <<'JSON'
 JSON
 ```
 
-Related, for the milestones that touch it: the Dokploy member never gets the volume or mount permissions (a bind mount of the Docker socket is root on the box); updates are not code-signed (ADR-004: Expo sells signing with its paid plans only), so the `EXPO_TOKEN` in `preview` could publish to any branch, the ones behind `staging` and `production` included, from a pull request's edited workflow or from anything its install and `eas` steps execute: that is why a preview is as trusted as a push to `main`, why the reviewer goes on with the first non-owner, and why approving a run then means having read the whole diff, the lockfile and `apps/mobile`'s build configuration included (the native lane bundles in a step without the token for the same reason); and at M2 previews must keep running against the mock IdP (rules/mobile.md), so `parseConfig` will refuse `APP_ENV=preview` with a real Telia issuer. The release path's own gap, that a pull request holding `packages: write` can push any tag of the API image and a later release tag would retag it, predates previews and is tracked separately (build provenance attestation, #8 follow-up).
+Related, for the milestones that touch it: the Dokploy member never gets the volume or mount permissions (a bind mount of the Docker socket is root on the box); updates are not code-signed (ADR-004: Expo sells signing with its paid plans only), so the `EXPO_TOKEN` in `preview` could publish to any branch, the ones behind `staging` and `production` included, from a pull request's edited workflow or from anything its install and `eas` steps execute: that is why a preview is as trusted as a push to `main`, why the reviewer goes on with the first non-owner, and why approving a run then means having read the whole diff, the lockfile and `apps/mobile`'s build configuration included (the native lane bundles in a step without the token for the same reason); and a preview may never use the real broker (ADR-014 §1), so `parseConfig` drops the Telia client, both private keys and the HMAC key from a preview's configuration at boot: bank identification is off there, whatever `/kuutti/staging/*` holds. The release path's own gap, that a pull request holding `packages: write` can push any tag of the API image and a later release tag would retag it, predates previews and is tracked separately (build provenance attestation, #8 follow-up).
 
 Once, after staging is applied and its Dokploy is configured:
 
@@ -462,27 +462,25 @@ All are `SecureString` under the default `aws/ssm` key. The plan role is denied 
 The hetu HMAC key is never rotated (TD-1) and never leaves SSM except for one offline backup taken at creation. Generate it straight onto the offline medium so the value never sits in a shell history or a cloud drive, then load it:
 
 ```sh
-openssl rand -hex 32 > /Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt
+openssl rand -hex 32 | tr -d '\n' > /Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt
 aws ssm put-parameter --name /kuutti/prod/hetu-hmac-key --type SecureString \
-  --value "$(cat /Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt)"
+  --value file:///Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt
 ```
+
+`file://` makes the CLI read the value itself, so the key never appears in the shell history or in the argument list another process could list. It also stores the file byte for byte, newline included: `tr -d '\n'` keeps the parameter to the 64 digits (the API trims the value as well, since 2026-10-07, when the staging preview refused to boot on a key with a newline).
 
 `<offline-medium>` is an encrypted volume whose passphrase the association holds separately. Eject it afterwards; the association keeps it, not the maintainer's desk drawer.
 
-The two Telia keys are RSA, 3072 bits (Telia's minimum is 2048), one for signing (`sig`) and one for encryption (`enc`), generated onto the same offline medium; the private halves go to SSM, the public halves to Telia as JWKs (`docs/vendors/telia.md`, section 2.1 of the guide). The `kid` of each JWK is the key's RFC 7638 thumbprint, nothing chosen: Telia names our `enc` key by it in every ID token's JWE header (guide 2.6.3) and the API computes the same value from the private key at boot (`keyIdOf`) and logs both kids under "bank identification", so what Telia registered and what the API decrypts with cannot disagree. Keep the registered kids in `docs/vendors/telia.md`.
+The two Telia keys are RSA, 3072 bits (Telia's minimum is 2048), one for signing (`sig`) and one for encryption (`enc`), generated onto the same offline medium by `scripts/telia-keys.sh`; the private halves go to SSM, the public halves to Telia as JWKs (`docs/vendors/telia.md`, section 2.1 of the guide). The `kid` of each JWK is the key's RFC 7638 thumbprint, nothing chosen: Telia names our `enc` key by it in every ID token's JWE header (guide 2.6.3) and the API computes the same value from the private key at boot (`keyIdOf`) and logs both kids under "bank identification", so what Telia registered and what the API decrypts with cannot disagree. Keep the registered kids in `docs/vendors/telia.md`.
 
 ```sh
-for use in sig enc; do
-  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /Volumes/<offline-medium>/kuutti-staging-telia-$use.pem
-  openssl pkey -in /Volumes/<offline-medium>/kuutti-staging-telia-$use.pem -pubout -out /Volumes/<offline-medium>/kuutti-staging-telia-$use.pub.pem
-done
-aws ssm put-parameter --name /kuutti/staging/telia-signing-key --type SecureString --value "$(cat /Volumes/<offline-medium>/kuutti-staging-telia-sig.pem)"
-aws ssm put-parameter --name /kuutti/staging/telia-encryption-key --type SecureString --value "$(cat /Volumes/<offline-medium>/kuutti-staging-telia-enc.pem)"
-# The public keys as JWKs for Telia; the kid is the RFC 7638 thumbprint (the API logs the same value at boot):
-node -e 'const c=require("node:crypto");const [pem,use]=process.argv.slice(1);const j=c.createPublicKey(require("node:fs").readFileSync(pem)).export({format:"jwk"});const kid=c.createHash("sha256").update(JSON.stringify({e:j.e,kty:j.kty,n:j.n})).digest("base64url");console.log(JSON.stringify({...j,use,kid,alg:use==="sig"?"RS256":"RSA-OAEP"}))' /Volumes/<offline-medium>/kuutti-staging-telia-sig.pub.pem sig
+infra/scripts/telia-keys.sh staging /Volumes/<offline-medium>        # both keys onto the medium, plus kuutti-staging-telia-jwks.json for Telia
+infra/scripts/telia-keys.sh staging /Volumes/<offline-medium> --put  # the private halves into SSM, by file reference, never on a command line
 ```
 
-`db-app-password` is created by `scripts/db-app-role.sh`; rotating it is `ALTER ROLE kuutti_app PASSWORD '…'` through the same tunnel, `put-parameter --overwrite`, and a restart of the API. The two signing keys are not random bytes: the CloudFront key is an RSA key pair whose public half becomes a CloudFront public-key resource (M3), and the Telia key is whatever the broker contract specifies (M2); their creation steps land with those milestones. The RDS master password is not managed here at all: `manage_master_user_password = true` leaves it with AWS so it never enters state.
+The script refuses to overwrite a key and `put-parameter` runs without `--overwrite`: a Telia key is replaced by rotation (new pair, new JWKs to Telia, then `--overwrite` by hand, then a restart; `docs/runbooks/custody.md`), never in place.
+
+`db-app-password` is created by `scripts/db-app-role.sh`; rotating it is `ALTER ROLE kuutti_app PASSWORD '…'` through the same tunnel, `put-parameter --overwrite`, and a restart of the API. The signing keys are not random bytes: the CloudFront key is an RSA key pair whose public half becomes a CloudFront public-key resource (ADR-005, above), and the two Telia keys are the RSA pairs `telia-keys.sh` generates. The RDS master password is not managed here at all: `manage_master_user_password = true` leaves it with AWS so it never enters state.
 
 ## The website
 
