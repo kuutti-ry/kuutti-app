@@ -62,10 +62,14 @@ case "$env" in
   staging) redirect="https://api.staging.kuutti.app/auth/callback" ;;
   prod) redirect="https://api.kuutti.app/auth/callback" ;;
 esac
-node - "$prefix" "$redirect" "${KUUTTI_TELIA_CONTACT:-}" <<'EOF'
+# A metadata file that exists is kept when no contact is given, so a later
+# run (--put, say) cannot replace a finished file with a placeholder.
+keep_client=0
+if [ -z "${KUUTTI_TELIA_CONTACT:-}" ] && [ -e "$prefix-client.json" ]; then keep_client=1; fi
+node - "$prefix" "$redirect" "${KUUTTI_TELIA_CONTACT:-}" "$keep_client" <<'EOF'
 const { createHash, createPublicKey } = require("node:crypto");
 const { readFileSync, writeFileSync } = require("node:fs");
-const [prefix, redirect, contact] = process.argv.slice(2);
+const [prefix, redirect, contact, keepClient] = process.argv.slice(2);
 const keys = ["sig", "enc"].map((use) => {
   const jwk = createPublicKey(readFileSync(`${prefix}-${use}.pub.pem`)).export({ format: "jwk" });
   const kid = createHash("sha256")
@@ -94,10 +98,14 @@ const client = {
   jwks: { keys },
 };
 writeFileSync(`${prefix}-jwks.json`, `${JSON.stringify({ keys }, null, 2)}\n`);
-writeFileSync(`${prefix}-client.json`, `${JSON.stringify(client, null, 2)}\n`);
+if (keepClient !== "1") writeFileSync(`${prefix}-client.json`, `${JSON.stringify(client, null, 2)}\n`);
 EOF
 echo "for Telia: $prefix-client.json (the client metadata with both public keys; $prefix-jwks.json holds the keys alone)"
-[ -n "${KUUTTI_TELIA_CONTACT:-}" ] || echo "  contacts is a placeholder: set KUUTTI_TELIA_CONTACT to the association's mailbox and run again, or edit the file"
+if [ "$keep_client" = 1 ]; then
+  echo "  kept as it was: KUUTTI_TELIA_CONTACT is unset and the file exists"
+elif [ -z "${KUUTTI_TELIA_CONTACT:-}" ]; then
+  echo "  contacts is a placeholder: set KUUTTI_TELIA_CONTACT to the association's mailbox and run again, or edit the file"
+fi
 node -e 'for (const k of require(process.argv[1]).keys) console.log(`  ${k.use}  kid ${k.kid}`)' "$prefix-jwks.json"
 
 if [ "$put" = "--put" ]; then
