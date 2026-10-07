@@ -50,6 +50,8 @@ export type Misbehaviour = {
   wrongAudience?: boolean;
   /** A non-Finnish method (guide 2.6.5): no personal identity code. */
   omitHetu?: boolean;
+  /** No auth_time in the ID token, against 2.6.4. */
+  omitAuthTime?: boolean;
 };
 
 type Seen = {
@@ -72,6 +74,8 @@ export type FakeTelia = {
   encryptionKeyPem: string;
   person: Person;
   misbehave: Misbehaviour;
+  /** The JWE content encryption: the guide's A128CBC-HS256, or the A128GCM Telia's metadata also lists. */
+  enc: "A128CBC-HS256" | "A128GCM";
   userCancels: boolean;
   seen: Seen;
   /** The browser's trip to the authorization endpoint: the URL Telia sends it back to. */
@@ -121,6 +125,7 @@ export async function fakeTelia(options: { person?: Person } = {}): Promise<Fake
       dateOfBirth: "1970-01-01",
     },
     misbehave: {},
+    enc: "A128CBC-HS256",
     userCancels: false,
     seen: {
       requestObject: null,
@@ -300,6 +305,7 @@ export async function fakeTelia(options: { person?: Person } = {}): Promise<Fake
       "bank-tupasid": "Aktia-saastopankit-paikallisosuuspankit-tupasid",
     };
     if (!misbehave.omitHetu) claims["urn:oid:1.2.246.21"] = person.hetu;
+    if (misbehave.omitAuthTime) delete claims.auth_time;
     const signer = misbehave.rogueKey ? rogue.privateKey : teliaSig.privateKey;
     const jws = await new SignJWT(claims)
       .setProtectedHeader({ alg: "RS256", kid: teliaKid, typ: "JWT" })
@@ -309,7 +315,7 @@ export async function fakeTelia(options: { person?: Person } = {}): Promise<Fake
       : await new CompactEncrypt(new TextEncoder().encode(jws))
           .setProtectedHeader({
             alg: "RSA-OAEP",
-            enc: "A128CBC-HS256",
+            enc: telia.enc,
             cty: "JWT",
             kid: clientEncKid,
           })

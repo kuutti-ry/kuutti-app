@@ -78,6 +78,7 @@ describe("OidcBroker against Telia's guide", () => {
       state,
       nonce,
       ui_locales: "fi",
+      prompt: "login", // ADR-016
     });
     const { jti, exp, iat } = telia.seen.requestObject ?? {};
     expect(typeof jti).toBe("string");
@@ -126,6 +127,23 @@ describe("OidcBroker against Telia's guide", () => {
     expect(Object.keys(answer).sort()).toEqual(
       ["acr", "amr", "authenticatedAt", "hetu", "sessionIndex", "subject", "tokenId"].sort(),
     );
+  });
+
+  it("decrypts an ID token under either content encryption Telia's metadata lists (A128GCM too)", async () => {
+    // tunnistus-pp.telia.fi and tunnistus.telia.fi both publish
+    // id_token_encryption_enc_values_supported: A128GCM, A128CBC-HS256 (read 2026-10-07).
+    telia.enc = "A128GCM";
+    const broker = await brokerFor(telia);
+    const { identity } = await login(broker, telia);
+    const answer = await identity();
+    expect(answer).toMatchObject({ hetu: "010170-999R", acr: LOATEST2 });
+  });
+
+  it("refuses an ID token without auth_time (2.6.4), which the freshness check of ADR-016 stands on", async () => {
+    telia.misbehave.omitAuthTime = true;
+    const broker = await brokerFor(telia);
+    const { identity } = await login(broker, telia);
+    await expect(identity()).rejects.toMatchObject({ detail: { detail: "no auth_time" } });
   });
 
   it("refuses an ID token that is not encrypted, is signed by a stranger, names another nonce or another audience", async () => {

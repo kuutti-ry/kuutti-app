@@ -256,4 +256,50 @@ describe("ssmPrefix", () => {
     expect(JSON.stringify(config)).not.toContain("staging-secret");
     expect(new URL(config.databaseUrl).username).toBe("kuutti_preview");
   });
+
+  it("drops the Telia client, both private keys and the HMAC key from a preview's config (ADR-014 §1)", () => {
+    const config = parseConfig({
+      APP_ENV: "preview",
+      PR_NUMBER: "42",
+      DB_HOST: "rds.internal",
+      DB_NAME: "kuutti",
+      DB_USER: "kuutti_app",
+      DB_PREVIEW_USER: "kuutti_preview",
+      DB_PREVIEW_PASSWORD: "preview-secret",
+      OIDC_ISSUER: "https://tunnistus-pp.telia.fi/uas",
+      OIDC_CLIENT_ID: "0043b426-2e6d-466d-b82f-33bb7d3cb6ea",
+      OIDC_REDIRECT_URI: "https://api.staging.kuutti.app/auth/callback",
+      OIDC_ACR_VALUES: "http://ftn.ficora.fi/2017/loatest2",
+      TELIA_SIGNING_KEY: "-----BEGIN PRIVATE KEY-----\nsig-material\n-----END PRIVATE KEY-----",
+      TELIA_ENCRYPTION_KEY: "-----BEGIN PRIVATE KEY-----\nenc-material\n-----END PRIVATE KEY-----",
+      HETU_HMAC_KEY: "a".repeat(64),
+    });
+    expect(config.OIDC_ISSUER).toBeUndefined();
+    expect(config.OIDC_CLIENT_ID).toBeUndefined();
+    expect(config.OIDC_REDIRECT_URI).toBeUndefined();
+    expect(config.OIDC_ACR_VALUES).toBeUndefined();
+    expect(config.TELIA_SIGNING_KEY).toBeUndefined();
+    expect(config.TELIA_ENCRYPTION_KEY).toBeUndefined();
+    expect(config.HETU_HMAC_KEY).toBeUndefined();
+    const serialised = JSON.stringify(config);
+    expect(serialised).not.toContain("sig-material");
+    expect(serialised).not.toContain("enc-material");
+    expect(serialised).not.toContain("a".repeat(64));
+  });
+
+  it("leaves the Telia configuration to staging and production", () => {
+    const config = parseConfig({
+      APP_ENV: "staging",
+      DATABASE_URL: "postgres://kuutti_app:x@rds.internal:5432/kuutti",
+      ADMIN_APP_URL: "https://admin.staging.kuutti.app",
+      OIDC_ISSUER: "https://tunnistus-pp.telia.fi/uas",
+      OIDC_CLIENT_ID: "0043b426-2e6d-466d-b82f-33bb7d3cb6ea",
+      OIDC_REDIRECT_URI: "https://api.staging.kuutti.app/auth/callback",
+      OIDC_ACR_VALUES: "http://ftn.ficora.fi/2017/loatest2",
+      HETU_HMAC_KEY: "a".repeat(64),
+    });
+    expect(config.OIDC_ISSUER).toBe("https://tunnistus-pp.telia.fi/uas");
+    expect(config.OIDC_REDIRECT_URI).toBe("https://api.staging.kuutti.app/auth/callback");
+    expect(config.HETU_HMAC_KEY).toBe("a".repeat(64));
+  });
 });

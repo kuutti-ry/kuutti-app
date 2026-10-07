@@ -15,6 +15,14 @@ import { deriveIdentity, InvalidHetuError } from "./hetu.ts";
 import { decideRegistration } from "./registration.ts";
 import * as repo from "./repo.ts";
 
+/**
+ * How much earlier than the attempt's own start an `auth_time` may read and
+ * still be this login (ADR-016). The broker's clock and the database's are
+ * both disciplined by NTP and differ by seconds; a reused web session is
+ * minutes or hours old.
+ */
+export const AUTH_TIME_TOLERANCE_MS = 2 * 60_000;
+
 export type LoginDeps = {
   db: Queryable;
   broker: IdentityBroker;
@@ -93,6 +101,16 @@ async function finishLogin(
   }
 
   const derived = await deriveFromBroker(deps, input.callbackUrl, request, now);
+  // ADR-016: the request object asks for the bank every time (prompt=login),
+  // so the authentication the broker reports happened after this attempt
+  // began. One that predates it is a web session reused for somebody else, or
+  // a broker that ignored the ask; either way it is no login of this person.
+  if (
+    derived.reference.authenticatedAt.getTime() <
+    request.createdAt.getTime() - AUTH_TIME_TOLERANCE_MS
+  ) {
+    throw new BrokerError("authentication predates this login attempt");
+  }
   if (!derived.adult) {
     throw new AppError(403, "auth_under_18", "Kuutti is for adults only");
   }

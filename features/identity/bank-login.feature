@@ -31,6 +31,11 @@ Feature: Bank login through the identification broker
     Then the browser is sent to the app with auth_cancelled
     And the attempt cannot be completed later
 
+  Scenario: An authentication that predates the login attempt is refused
+    Given the broker reports an authentication from before the app asked for this login
+    Then the browser is sent to the app with auth_provider_error
+    And no identity is created
+
   Scenario: A minor is refused and nothing is stored
     Given the bank identifies a person under 18
     Then the browser is sent to the app with auth_under_18

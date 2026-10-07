@@ -24,7 +24,10 @@ const ADULT_HETU = generateHetu(rngFrom(7), { at: NOW, minAge: 25, maxAge: 40 })
 const MINOR_HETU = generateHetu(rngFrom(8), { at: NOW, minAge: 15, maxAge: 17 });
 
 /** Answers like a broker whose person is `hetu`; records what it was asked. */
-function fakeBroker(hetu: string): IdentityBroker & { started: string[]; completed: string[] } {
+function fakeBroker(
+  hetu: string,
+  authenticatedAt = new Date(),
+): IdentityBroker & { started: string[]; completed: string[] } {
   const started: string[] = [];
   const completed: string[] = [];
   return {
@@ -46,7 +49,7 @@ function fakeBroker(hetu: string): IdentityBroker & { started: string[]; complet
         subject: "2BY5CDNFBEOSUFSKNGFSY4Y3DZISGL4I",
         sessionIndex: "_cb08aaa8",
         tokenId: "72b11a11",
-        authenticatedAt: NOW,
+        authenticatedAt,
         acr: "http://ftn.ficora.fi/2017/loatest2",
         amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1"],
       };
@@ -54,9 +57,13 @@ function fakeBroker(hetu: string): IdentityBroker & { started: string[]; complet
   };
 }
 
-async function appWith(ctx: { client: Parameters<typeof createApp>[0]["db"] }, hetu: string) {
+async function appWith(
+  ctx: { client: Parameters<typeof createApp>[0]["db"] },
+  hetu: string,
+  authenticatedAt?: Date,
+) {
   const { logger, lines } = await captureLogger();
-  const broker = fakeBroker(hetu);
+  const broker = fakeBroker(hetu, authenticatedAt);
   const app = createApp({
     config: testConfig({
       HETU_HMAC_KEY: KEY_HEX,
@@ -127,6 +134,24 @@ describe("bank login", () => {
       [state],
     );
     expect(rows.rows[0]).toEqual({ platform: "ios", locale: "fi" });
+  });
+
+  test("An authentication that predates the login attempt is refused", async ({ ctx }) => {
+    // ADR-016: the request object asked for the bank (prompt=login); an
+    // auth_time from before the attempt began is a reused web session, not
+    // the login of this person. Nothing is created.
+    const anHourAgo = new Date(Date.now() - 60 * 60_000);
+    const { app } = await appWith(ctx, ADULT_HETU, anHourAgo);
+    const state = await start(app);
+    expect(refusal(await callback(app, state))).toEqual({
+      error: "auth_provider_error",
+      until: null,
+    });
+    const { hetuHmac } = deriveIdentity(ADULT_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+    const identity = await ctx.client.query("SELECT id FROM identity WHERE hetu_hmac = $1", [
+      hetuHmac,
+    ]);
+    expect(identity.rowCount).toBe(0);
   });
 
   test("A first login creates the identity and the account and the code is exchanged once", async ({

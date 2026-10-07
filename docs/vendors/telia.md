@@ -1,12 +1,19 @@
 # Telia Tunnistus (Finnish Trust Network broker)
 
-What Telia's identification broker is to us, what we owe them, what they owe us, and the answers we are still waiting for. Source: *Telia Tunnistus – Integration guide to the identification broker service* v2.36 (2026-02-06) and the *Key Rotation* note (2026-01-07), both published at https://github.com/telia-oss/tunnistus. No credentials in this file (#32).
+What Telia's identification broker is to us, what we owe them, what they owe us, and the answers we are still waiting for. Source: *Telia Tunnistus – Integration guide to the identification broker service* v2.36 (2026-02-06) and the *Key Rotation* note (2026-01-07), both published at https://github.com/telia-oss/tunnistus. Telia's offer of 2026-10-07 links two Salesforce files: the same guide at v2.34 (approved 29.10.2025; the viewer's title line still says v2.12) and the general terms of service (English, 19.11.2020, twelve pages). The GitHub copy is the newer one and the one this file and the tests follow. No credentials in this file (#32).
 
 ## The relationship
 
-Telia Tunnistus is a contracted service, not a self-service API. Access begins with a **Telia Identification Service Agreement** between the association and Telia Finland Oyj (business ID 1475607-9); its Appendix 4 names the **technical contact**, the one person allowed to exchange keys with Telia. The pre-production environment (`tunnistus-pp.telia.fi`) is opened under the same agreement, and a client that passes there is moved to production (`tunnistus.telia.fi`) by Telia.
+Telia Tunnistus is a contracted service, not a self-service API. The **Telia Identification Service Agreement** between the association and Telia Finland Oyj (business ID 1475607-9) must be signed before the move to production; its Appendix 4 names the **technical contact**, the one person allowed to exchange keys with Telia. The pre-production environment (`tunnistus-pp.telia.fi`) is different: Telia's offer of 2026-10-07 says it is free of charge, needs no agreement, and is provisioned within one to two working days of the metadata reaching id-maintenance. A client that passes there is moved to production (`tunnistus.telia.fi`) by Telia within one working day once the agreement is signed, and billing starts with production.
 
-Sales entry: https://www.telia.fi/yrityksille/palvelut/tietoturva/tunnistautuminen (*Telia Tunnistus*, "ota yhteyttä"). Ask for OIDC with the FTN bank methods, pre-production first.
+Where things stand (2026-10-07):
+
+- The offer came from Telia's business manager for the service (the thread is in the association's mailbox) and is valid thirty days. The price list is in the association's mailbox, not here. Kuutti answered the same day: the test environment now, the **S package** in production. One `SP-Name` per agreement; each further name is charged. A package change asked for before the middle of a month takes effect at the start of the next.
+- Telia's CRM did not yet know Kuutti ry; the agreement is expected for review on **19.10.2026**. The test bed does not wait for it.
+- No support or discount programme for non-profits at Telia. The other FTN brokers Telia named, should the association want to ask them: Idura, OP, In Groupe (Nets), Signicat, Elisa, Nordea.
+- Contacts: provisioning, metadata and technical questions, **id-maintenance@teliacompany.com**; faults 24/7, 0200 20 300; the commercial contact is in the offer thread.
+
+Sales entry, for the record: https://www.telia.fi/yrityksille/palvelut/tietoturva/tunnistautuminen (*Telia Tunnistus*, "ota yhteyttä").
 
 ## What Telia needs from us (guide section 2.1)
 
@@ -19,11 +26,26 @@ Sales entry: https://www.telia.fi/yrityksille/palvelut/tietoturva/tunnistautumin
 
 Production keys are confirmed through Telia's e-signature service: the technical contact signs the offered keys (or the entity statement) with strong identification.
 
+### The test-bed request
+
+What the offer asks for, in one mail from the project mailbox to id-maintenance@teliacompany.com:
+
+1. Protocol: **OIDC**, with `private_key_jwt`, signed request objects and the encrypted ID token (guide 2.4–2.6). Pre-production first.
+2. `ftn_spname`: **Kuutti**, shown as "Tunnistuspyyntö 12345, lähettäjä Kuutti".
+3. The client metadata, `kuutti-staging-telia-client.json`, written by `infra/scripts/telia-keys.sh staging <offline-medium>` in the shape of the Python sample's `client.json` (`KUUTTI_TELIA_CONTACT` supplies the contact address, so none is in the repository): the redirect URI `https://api.staging.kuutti.app/auth/callback` (Telia's whitelist; only that one for pre-production, since production's `https://api.kuutti.app/auth/callback` is registered with the production client and its own keys), `client_name#fi/sv/en` and `ftn_spname`, the organisation and contact, the algorithms (`private_key_jwt`, RS256 request objects and ID tokens, `RSA-OAEP` with `A128CBC-HS256`), and the two public keys as JWKs: `use: sig` (signs request objects and client assertions) and `use: enc` (the ID token is encrypted to it). The offer's wording mentions one key pair for `private_key_jwt`; the guide (2.1.1, 2.6.3) has two, and the API refuses an ID token that arrives in the clear, so the mail says which key is which and asks Telia to confirm that the ID token is encrypted to the `enc` key.
+4. The open questions of the confirmations table below, in the same mail.
+
+Telia answers with the `client_id`. It is public (every authorization URL carries it): set it as the default of `telia_client_id` in `infra/envs/staging/variables.tf` and merge; CI's apply then writes `oidc-issuer`, `oidc-client-id`, `oidc-redirect-uri` and `oidc-acr-values` under `/kuutti/staging/`. The two private keys must be in SSM before that (`telia-keys.sh … --put`): the API refuses to boot against a Telia issuer without them. Redeploy the API in Dokploy and read the boot line "bank identification": the two kids it logs must equal the kids of the JWKs Telia registered. A pull-request preview never gets any of this: `parseConfig` drops the Telia client, both keys and the HMAC key from a preview's configuration (ADR-014 §1).
+
+At the first login on the test bed, watch three things: the `kid` in the ID token's JWE header (guide 2.6.3's sample names one that is not the sample JWKS's `enc` kid of 2.3.1; see the confirmations), the `acr` that comes back (`loatest2`), and that `prompt=login` is honoured with a fresh bank authentication and an `auth_time` to match (ADR-016; the adapter refuses a Telia token without `auth_time`). The outer authorization query is `client_id` and `request`, which is more than the guide asks: 2.4.1 lists `request` as the only required query parameter.
+
 ## What Telia gives us
 
 - `client_id` (generated by Telia at registration) and the endpoints:
   pre-production issuer `https://tunnistus-pp.telia.fi/uas`, discovery `/uas/.well-known/openid-configuration`, authorization `/uas/oauth2/authorization`, token `/uas/oauth2/token`, JWKS `/uas/oauth2/metadata.jwks`, entity statement `/.well-known/openid-federation`; production the same under `https://tunnistus.telia.fi`.
-- Telia's signing keys rotate on Telia's schedule; the next keys are published in the metadata endpoints in advance (Key Rotation note, guide 2.7.1). The API reads the JWKS by URL and pins nothing: `openid-client` keeps the set for five minutes and fetches it again when a token names a `kid` it does not hold (once the cached set is a minute old), so a key published in advance is used without a restart. The entity statements' SHA-256 fingerprints in the guide allow out-of-band checks.
+- Checked live on 2026-10-07: both hosts' discovery documents name exactly these endpoints, offer `private_key_jwt`, RS256 for request objects and ID tokens, and encrypt ID tokens with `RSA-OAEP` and `A128GCM` or `A128CBC-HS256` (the adapter accepts both since then); neither publishes `acr_values_supported` or `ui_locales_supported`. The pre-production JWKS carries one `sig` and one `enc` key.
+- Telia's signing keys rotate on Telia's schedule; the next keys are published in the metadata endpoints in advance (Key Rotation note, guide 2.7.1).
+- Production disruptions are announced at `https://tunnistus.telia.fi/uas/resource/maintenance.txt`, one line in three languages separated by `|` (guide 1.3); nothing reads it yet. The API reads the JWKS by URL and pins nothing: `openid-client` keeps the set for five minutes and fetches it again when a token names a `kid` it does not hold (once the cached set is a minute old), so a key published in advance is used without a restart. The entity statements' SHA-256 fingerprints in the guide allow out-of-band checks.
 
 ## The flow as Telia specifies it (section 2.4–2.6)
 
@@ -47,7 +69,7 @@ What the guide requires, where the API does it, and which test proves it. Levels
 | 2.4.1–2.4.3 | signed request object (RS256) with `iss`=`client_id`, `aud`=issuer, `response_type`, `scope`, `client_id`, `redirect_uri`, `acr_values`, `state`, `nonce`, `jti`, `exp`, `ui_locales` | `startLogin` → `buildAuthorizationUrlWithJAR` | telia test "sends the authentication request…" (the fake verifies the signature and every claim) |
 | 2.5 | `code` and `state` back; `error=access_denied` on cancel | `completeLogin` in `login.ts` → `auth_cancelled` | telia test "sends the person who cancels…"; `routes.test.ts` "A person who cancels at the bank…" |
 | 2.6.1–2.6.2 | `private_key_jwt`: `iss`=`sub`=`client_id`, `aud`=token endpoint, `jti`, `exp` ≤ 60 min | `PrivateKeyJwt` with the `aud` hook | telia test "authenticates the token request…" |
-| 2.6.3–2.6.4 | ID token = JWE (RSA-OAEP, A128CBC-HS256, `kid` = our enc key's thumbprint) around an RS256 JWS; verify the signature against the JWKS, `iss`, `aud` (array + `azp`), `exp`, `nonce`, `acr`; read the FTN claims; a token that arrives unencrypted is refused | `enableDecryptingResponses` with the key's kid, `enableNonRepudiationChecks`, `authorizationCodeGrant` with expected state and nonce, `identityFromClaims` | telia test "…decrypts and verifies…", "refuses an ID token that is not encrypted…", "refuses a level other than…" |
+| 2.6.3–2.6.4 | ID token = JWE (RSA-OAEP with A128CBC-HS256, or the A128GCM Telia's metadata also lists; `kid` = our enc key's thumbprint) around an RS256 JWS; verify the signature against the JWKS, `iss`, `aud` (array + `azp`), `exp`, `nonce`, `acr`; read the FTN claims; a token that arrives unencrypted is refused | `enableDecryptingResponses` with the key's kid and both encryptions, `enableNonRepudiationChecks`, `authorizationCodeGrant` with expected state and nonce, `identityFromClaims` | telia test "…decrypts and verifies…", "decrypts an ID token under either content encryption…", "refuses an ID token that is not encrypted…", "refuses a level other than…" |
 | 2.6.5 | non-Finnish methods carry no personal identity code | refused as `no identity code` | telia test "…a token without the identity code" |
 | Traficom 213/2023 S | `acr_values` mandatory; the answer's `acr` is the one asked for | `OIDC_ACR_VALUES`; `expectedAcr` | `oidc-broker.test.ts` "accepts only the level…"; both provider tests |
 | rules 1 and 3 | the code becomes an HMAC and a year and month, nothing else is kept | `deriveIdentity`, `deriveFromBroker` | `hetu.test.ts` (fast-check), `routes.test.ts` "A first login…", `pii-in-logs.test.ts` |
@@ -61,17 +83,19 @@ Per bank: Nordea `DEMOUSER1`–`DEMOUSER4`; Danske `88888888` / `4545`; Aktia an
 
 ## The four confirmations we need in writing
 
-Asked of Telia at onboarding; the answers decide #34 and the privacy notice. Fill in the date and the answer.
+Asked of Telia at onboarding; the answers decide #34 and the privacy notice. The maintainer put the first four to the commercial contact on 2026-10-07; that side answered the retention question and sent the rest to id-maintenance, so they go into the test-bed request above. Fill in the date and the answer.
 
 | question | why it matters | answer |
 |---|---|---|
-| Which identifier does Telia answer a **police request** with (hetu, `sub`, `session_index`, bank id), and against what record? | our police-traceability line and the erasure table | – |
-| Is **`sub` stable** per person across banks, across time, and between pre-production and production? | whether `sub` may be stored as an identifier or only as the event reference (#34) | – |
-| What does the broker **retain** of an identification event under section 24 of the Act on Strong Electronic Identification, and for how long? | the privacy notice must say what a third party keeps | – |
-| Do pre-production `sub` values and test hetus ever appear in production, and are test users' events retained the same way? | so staging data can never be mistaken for a person | – |
-| Is the `kid` in the ID token's JWE header the `kid` of the `enc` JWK we registered (its RFC 7638 thumbprint), as the Python sample assumes? | `openid-client` decrypts only with the key whose kid the header names; a kid Telia assigns itself would fail every login with `no applicable decryption key selected` | – (verify at the first pre-production login) |
-| Should the request object carry `prompt=login` or `max_age=0`, so a second login from the same browser within Telia's web session goes through the bank again? | otherwise `auth_time` may predate the login; an identity-flow change, so an ADR or TD citation | – |
+| Which identifier does Telia answer a **police request** with (hetu, `sub`, `session_index`, bank id), and against what record? | our police-traceability line and the erasure table | 2026-10-07, in part: the logs are opened on a police request only. Which identifier they are keyed by is still open; asked of id-maintenance |
+| Is **`sub` stable** per person across banks, across time, and between pre-production and production, and is it pairwise per client? | whether `sub` may be stored as an identifier or only as the event reference (#34) | 2026-10-07: referred to the guide and id-maintenance; asked there |
+| What does the broker **retain** of an identification event under section 24 of the Act on Strong Electronic Identification, and for how long? | the privacy notice must say what a third party keeps | 2026-10-07, Telia's commercial contact: Traficom has every FTN broker keep the logs **five years**; they are cleared from the platform and kept in a sealed environment, accessible on a police request only |
+| Do pre-production `sub` values and test hetus ever appear in production, and are test users' events retained the same way? | so staging data can never be mistaken for a person | – (asked with the test-bed request) |
+| Which `acr` and `amr` values tell a bank login from Mobiilivarmenne, and what is the signing-key rotation schedule? | the log line per login names the method; rotation is read from the JWKS without a restart | 2026-10-07: referred to the guide. Guide 2.6.4: `amr` carries the method as a URI under `/uas/saml2/names/ac/` (`oidc.<bank>.1`, `mpki.telia.1`); keys rotate per the Key Rotation note and are published in advance at `/uas/oauth2/metadata.jwks` |
+| Is the `kid` in the ID token's JWE header the `kid` of the `enc` JWK we registered (its RFC 7638 thumbprint), as the Python sample assumes? | `openid-client` decrypts only with the key whose kid the header names; a kid Telia assigns itself would fail every login with `no applicable decryption key selected` | – (asked; verify at the first pre-production login) |
+| Is the ID token encrypted to our `enc` key on the test bed too, and with which `enc` (`A128CBC-HS256` per the guide, or `A128GCM`, both in the metadata)? | the adapter refuses an ID token that arrives in the clear; the offer's wording mentions only the signing key | – (asked; the adapter accepts both encryptions) |
+| Should the request object carry `prompt=login` or `max_age=0`, so a second login from the same browser within Telia's web session goes through the bank again? | otherwise `auth_time` may predate the login; an identity-flow change, so an ADR or TD citation | – (asked) |
 
 ## Custody
 
-The agreement, the contact, and the two private keys are rows in `docs/runbooks/custody.md`. Keys are generated onto the offline medium and put into SSM from there; they never sit in a shell history, a mailbox or a chat.
+The agreement, the contact, and the two private keys are rows in `docs/runbooks/custody.md`. Keys are generated onto the offline medium by `infra/scripts/telia-keys.sh` and put into SSM from there (`--put`, by file reference); they never sit in a shell history, a command line, a mailbox or a chat. Only the JWKs file it writes leaves the medium, and that holds public keys.
