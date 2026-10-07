@@ -162,7 +162,7 @@ resource "aws_cloudwatch_metric_alarm" "five_xx" {
 }
 
 # Every moderated photo is one log line with the number of Rekognition calls it
-# cost ({"msg":"photo moderated","rekognitionCalls":2,...}, #49). Summed, that
+# cost ({"msg":"photo moderated","rekognitionCalls":3,...}, #49). Summed, that
 # is the bill's driver besides the box; the billing alarm covers the rest.
 resource "aws_cloudwatch_log_metric_filter" "rekognition_calls" {
   name           = "${local.name}-rekognition-calls"

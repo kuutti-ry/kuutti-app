@@ -11,7 +11,9 @@ import {
   NO_FACE,
   NOT_CHECKED,
   RECHECK_AFTER_MS,
+  storedLabels,
   sweepPendingPhotos,
+  tipLabelsFrom,
 } from "./moderation.ts";
 import { objectKey } from "./store.ts";
 
@@ -20,7 +22,11 @@ import { objectKey } from "./store.ts";
 // upload with a moderator that answers what Rekognition would, recorded, and
 // never a real call.
 
-const inspection = (labels: string, faces: string): Inspection => ({
+const inspection = (
+  labels: string,
+  faces: string,
+  tipLabels: Inspection["tipLabels"] = [],
+): Inspection => ({
   checked: labels !== "unchecked",
   labels:
     labels === "none" || labels === "unchecked"
@@ -30,9 +36,10 @@ const inspection = (labels: string, faces: string): Inspection => ({
           if (!match) throw new Error(`bad label ${part}`);
           return { name: match[1] ?? "", parentName: "", confidence: Number(match[2]) };
         }),
+  tipLabels,
   faceConfidences: faces === "none" ? [] : faces.split(",").map(Number),
   modelVersion: "7.0",
-  calls: 2,
+  calls: 3,
 });
 
 describe("Automatic moderation decision", () => {
@@ -63,6 +70,61 @@ describe("Automatic moderation decision", () => {
       faceThreshold: 90,
     });
     expect(decided.flagged).toEqual(["Suggestive"]);
+  });
+
+  it("ignores tip signals when deciding the queue", () => {
+    const decided = decideModeration(
+      inspection("none", "99", [
+        { name: "Mirror", parentName: "", confidence: 99 },
+        { name: "TightCrop", parentName: "Face", confidence: 80 },
+        { name: "Group", parentName: "Face", confidence: 100 },
+      ]),
+      { labelThreshold: 60, faceThreshold: 90 },
+    );
+    expect(decided).toEqual({ decision: "approved", flagged: [], faces: 1 });
+  });
+});
+
+describe("tip signals for photo_review", () => {
+  it("maps scene labels and face attributes without inventing Gender", () => {
+    expect(
+      tipLabelsFrom(
+        [{ Name: "Mirror", Parents: [{ Name: "Furniture" }], Confidence: 88.4 }],
+        [
+          {
+            Confidence: 99,
+            BoundingBox: { Width: 0.7, Height: 0.7, Left: 0.1, Top: 0.1 },
+            Sunglasses: { Value: true, Confidence: 91 },
+            Quality: { Brightness: 40.2, Sharpness: 12.5 },
+          },
+          { Confidence: 80, BoundingBox: { Width: 0.1, Height: 0.1 } },
+        ],
+      ),
+    ).toEqual([
+      { name: "Mirror", parentName: "Furniture", confidence: 88.4 },
+      { name: "Sunglasses", parentName: "Face", confidence: 91 },
+      { name: "TightCrop", parentName: "Face", confidence: 49 },
+      { name: "Brightness", parentName: "Face", confidence: 40.2 },
+      { name: "Sharpness", parentName: "Face", confidence: 12.5 },
+      { name: "Group", parentName: "Face", confidence: 100 },
+    ]);
+  });
+
+  it("stores moderation labels ahead of tip signals, capped", () => {
+    const labels = Array.from({ length: 48 }, (_, i) => ({
+      name: `M${i}`,
+      parentName: "",
+      confidence: 50,
+    }));
+    const tipLabels = [
+      { name: "Mirror", parentName: "", confidence: 90 },
+      { name: "Bathroom", parentName: "", confidence: 80 },
+      { name: "Group", parentName: "Face", confidence: 100 },
+    ];
+    expect(storedLabels({ ...inspection("none", "99", tipLabels), labels })).toHaveLength(50);
+    expect(storedLabels({ ...inspection("none", "99", tipLabels), labels }).at(-1)?.name).toBe(
+      "Bathroom",
+    );
   });
 });
 
@@ -264,7 +326,38 @@ describe("moderation of uploads", () => {
       labels: 1,
       flagged: 1,
       faces: 1,
-      rekognitionCalls: 2,
+      rekognitionCalls: 3,
+    });
+  });
+
+  test("Tip signals are recorded with the review and do not queue the photo", async ({ ctx }) => {
+    const moderator = scripted(
+      inspection("none", "99", [
+        { name: "Bathroom", parentName: "", confidence: 77 },
+        { name: "Brightness", parentName: "Face", confidence: 20 },
+      ]),
+    );
+    const { app } = await appWith(ctx, moderator);
+    const me = await signedInAccount(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 900, height: 1200, exif: false })),
+    });
+    expect(res.status).toBe(201);
+    const photo = await res.json();
+    expect(photo.state).toBe("approved");
+    const review = await ctx.client.query(
+      "SELECT decision, flagged, labels FROM photo_review WHERE photo_id = $1",
+      [photo.id],
+    );
+    expect(review.rows[0]).toEqual({
+      decision: "approved",
+      flagged: [],
+      labels: [
+        { name: "Bathroom", parentName: "", confidence: 77 },
+        { name: "Brightness", parentName: "Face", confidence: 20 },
+      ],
     });
   });
 
