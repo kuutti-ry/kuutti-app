@@ -84,6 +84,25 @@ describe("parseConfig", () => {
     ).toBe(true);
   });
 
+  it("accepts an HMAC key with the trailing newline a file-loaded parameter carries", () => {
+    // `openssl rand -hex 32 > file` and `put-parameter --value file://…` store
+    // 64 hex digits plus a newline; the staging preview of 2026-10-07 refused
+    // to boot on it. The key itself is the 64 digits.
+    const staging = {
+      APP_ENV: "staging",
+      DB_HOST: "rds.internal",
+      DB_NAME: "kuutti",
+      DB_USER: "kuutti_app",
+      DB_APP_PASSWORD: "app-secret",
+      ADMIN_APP_URL: "https://admin.staging.kuutti.app",
+    };
+    const config = parseConfig({ ...staging, HETU_HMAC_KEY: `${"a".repeat(64)}\n` });
+    expect(config.HETU_HMAC_KEY).toBe("a".repeat(64));
+    expect(() => parseConfig({ ...staging, HETU_HMAC_KEY: `${"a".repeat(63)}\n` })).toThrow(
+      ConfigError,
+    );
+  });
+
   it("takes the placeholder HMAC key in development only", () => {
     const zeros = "0".repeat(64);
     expect(parseConfig({ DATABASE_URL: "postgres://x", HETU_HMAC_KEY: zeros }).HETU_HMAC_KEY).toBe(

@@ -109,8 +109,11 @@ const Env = z.object({
   // The key of HMAC-SHA256(hetu), 32 bytes as hex, from /kuutti/<env>/hetu-hmac-key
   // (rule 2: fetched at boot, never rotated, one offline copy). Without it the
   // auth routes answer 503; the login never runs with a key from anywhere else.
+  // Trimmed first: a parameter loaded from a file (`--value file://…`) carries
+  // the file's trailing newline, and the box must not refuse to boot over it.
   HETU_HMAC_KEY: z
     .string()
+    .trim()
     .regex(/^[0-9a-f]{64}$/i, "32 bytes as hex")
     .optional(),
   // Error reporting (#11). A DSN is public by design: /kuutti/<env>/sentry-dsn

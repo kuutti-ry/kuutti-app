@@ -462,12 +462,12 @@ All are `SecureString` under the default `aws/ssm` key. The plan role is denied 
 The hetu HMAC key is never rotated (TD-1) and never leaves SSM except for one offline backup taken at creation. Generate it straight onto the offline medium so the value never sits in a shell history or a cloud drive, then load it:
 
 ```sh
-openssl rand -hex 32 > /Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt
+openssl rand -hex 32 | tr -d '\n' > /Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt
 aws ssm put-parameter --name /kuutti/prod/hetu-hmac-key --type SecureString \
   --value file:///Volumes/<offline-medium>/kuutti-prod-hetu-hmac-key.txt
 ```
 
-`file://` makes the CLI read the value itself, so the key never appears in the shell history or in the argument list another process could list.
+`file://` makes the CLI read the value itself, so the key never appears in the shell history or in the argument list another process could list. It also stores the file byte for byte, newline included: `tr -d '\n'` keeps the parameter to the 64 digits (the API trims the value as well, since 2026-10-07, when the staging preview refused to boot on a key with a newline).
 
 `<offline-medium>` is an encrypted volume whose passphrase the association holds separately. Eject it afterwards; the association keeps it, not the maintainer's desk drawer.
 
