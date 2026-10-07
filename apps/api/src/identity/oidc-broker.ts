@@ -117,7 +117,9 @@ export class OidcBroker implements IdentityBroker {
     // against the issuer's JWKS, which is also what makes a rotated key visible.
     client.enableNonRepudiationChecks(configuration);
     if (encryptionKey && options.encryptionKeyPem) {
-      client.enableDecryptingResponses(configuration, ["A128CBC-HS256", "A256GCM"], {
+      // The content encryptions Telia's metadata offers (id_token_encryption_enc_values_supported
+      // on both hosts, read 2026-10-07): the guide's A128CBC-HS256 and A128GCM.
+      client.enableDecryptingResponses(configuration, ["A128CBC-HS256", "A128GCM"], {
         key: encryptionKey,
         kid: keyIdOf(options.encryptionKeyPem),
       });
@@ -138,6 +140,10 @@ export class OidcBroker implements IdentityBroker {
       response_type: "code",
       state: input.state,
       nonce: input.nonce,
+      // ADR-016: the bank, every time. The broker keeps a web session in the
+      // system browser, and on a shared phone the second person must never be
+      // let in under the first one's identity (guide 2.4.3: prompt=login).
+      prompt: "login",
     };
     if (this.options.acrValues) parameters.acr_values = this.options.acrValues;
     if (input.locale) parameters.ui_locales = input.locale;
@@ -176,6 +182,11 @@ export class OidcBroker implements IdentityBroker {
         throw new BrokerError("ID token was not encrypted");
       }
       claims = tokens.claims();
+      // Telia sends auth_time (guide 2.6.4) and ADR-016 stands on it: a token
+      // without it would make the freshness check read the issue time instead.
+      if (this.expectsEncryptedIdToken && typeof claims?.auth_time !== "number") {
+        throw new BrokerError("no auth_time");
+      }
     } catch (error) {
       if (error instanceof BrokerError) throw error;
       // The library's messages name codes and checks, never claims.

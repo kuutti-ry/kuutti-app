@@ -54,6 +54,12 @@ variable "cors_allowed_origins" {
   default     = "http://localhost:5173"
 }
 
+variable "telia_client_id" {
+  description = "The client_id Telia Tunnistus assigned to Kuutti on its pre-production bed (#32, docs/vendors/telia.md): /kuutti/staging/oidc-client-id. Public by OIDC design (it travels in every authorization URL), so it is a default here once Telia's provisioning mail has arrived. Null keeps bank identification off: the issuer, the registered redirect URI and the acr value are written only together with it, because the API refuses half a configuration at boot. The two private keys are /kuutti/staging/telia-signing-key and -encryption-key, never resources (infra/README.md, Secrets)."
+  type        = string
+  default     = null
+}
+
 variable "media_enabled" {
   description = "Photos (#48, ADR-005): the media bucket, the CloudFront distribution in front of the API and the bucket, and the signed-URL key group. Flipped to true in the cutover commit, after the maintainer has created /kuutti/<env>/cloudfront-signing-key in SSM, committed its public half as cloudfront-signing-key.pub.pem next to this file, and given the api application the origin.api.<env> domain in Dokploy (infra/README.md, Media)."
   type        = bool
