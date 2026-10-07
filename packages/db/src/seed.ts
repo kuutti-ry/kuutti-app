@@ -38,6 +38,14 @@ export const MATCHING_CONFIG_V1 = {
   // and a photo needs one face found at or above this confidence to be approved without one.
   photo_moderation_label_threshold: 60,
   photo_moderation_face_threshold: 90,
+  // #56: profile photo tips; the tips rule reads these against photo_review signals.
+  photo_tip_mirror_confidence_min: 50,
+  photo_tip_bathroom_confidence_min: 50,
+  photo_tip_sunglasses_confidence_min: 50,
+  photo_tip_tight_crop_face_area_min: 0.4,
+  photo_tip_brightness_below: 40,
+  photo_tip_sharpness_below: 20,
+  photo_tip_group_photo_min_faces: 2,
   // #52 (TD-6, ADR-008): the exposure budget. Cards an account may be served
   // per day (the card route of #47 counts against it; a round of 12 and up to
   // 10 pending likes fit several times over) and signed photo URLs per
