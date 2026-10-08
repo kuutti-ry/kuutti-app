@@ -5,6 +5,7 @@
 export { inEachOthersPool, type PoolPerson, passesFiltersOf } from "./pool.ts";
 export {
   deletePreferencesOfAccount,
+  deleteSeeksOfAccount,
   preferencesFrom,
   readPreferences,
   savePreferences,

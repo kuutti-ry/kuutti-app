@@ -2,43 +2,91 @@ import { CONSENT_VERSIONS, type PlainMessageKey } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
-  AgeWindow,
+  BIO_MAX,
+  BIO_MIN_FOR_COMPLETENESS,
   type ConsentKind,
+  DISPLAY_NAME_MAX,
   GENDERS,
   type Gender,
   type OnboardingStatus,
-  type PondSummary,
+  PROFILE_FIELDS,
+  type ProfileFields,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
+import Minus from "lucide-react-native/icons/minus";
+import Plus from "lucide-react-native/icons/plus";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
+import { optionKey, PromptsEditor, useProfile } from "@/features/profile";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { choosePond, consentLocale, declareGender, giveConsent, savePreferences } from "./client";
+import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
 import { useOnboarding } from "./useOnboarding";
 
-type Step = "consents" | "gender" | "seeks" | "age" | "pond" | "research" | "done";
-const STEPS: Step[] = ["consents", "gender", "seeks", "age", "pond", "research"];
+type Step =
+  | "welcome"
+  | "name"
+  | "gender"
+  | "identityLabel"
+  | "seeks"
+  | "intent"
+  | "age"
+  | "photos"
+  | "prompts"
+  | "research"
+  | "stuck"
+  | "done";
+
+/** The screens, for "Step x of n"; the identity label shares the gender's number. */
+const STEPS: Step[] = [
+  "welcome",
+  "name",
+  "gender",
+  "seeks",
+  "intent",
+  "age",
+  "photos",
+  "prompts",
+  "research",
+];
+
+/** What the screen keeps between two status reads: the answers the API takes together with a later one. */
+export type LocalAnswers = {
+  researchOffered: boolean;
+  /** The seek screen was left with its answer, which is saved with the age window (one PUT /preferences, ADR-010 §2). */
+  seeksDone: boolean;
+  /** A non-binary gender was just declared: the label is offered once, before the next step. */
+  labelPending: boolean;
+};
 
 /**
- * The next question, from what the API says is missing. The two consents
- * come first: nothing personal is asked before the person has read what
- * happens to it (#46 review, ADR-010 §9). Research is offered once and
- * never required.
+ * The next question, from what the API says is missing, in the sheet's
+ * order (#146, ADR-010 §10): the welcome screen with both consents first,
+ * so nothing personal is asked before the person has read what happens to
+ * it (ADR-010 §9); then the name, the gender, whom one seeks, the intent,
+ * the age window, the photos, the prompts; research once, never required.
+ * A step the screen cannot ask (a pond without a default) is "stuck".
  */
-export function nextStep(status: OnboardingStatus, researchOffered: boolean): Step {
+export function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   const missing = new Set(status.missing);
-  if (missing.has("terms") || missing.has("privacy")) return "consents";
+  if (missing.has("terms") || missing.has("privacy")) return "welcome";
+  if (missing.has("name")) return "name";
   if (missing.has("gender")) return "gender";
-  if (missing.has("seeks")) return "seeks";
-  if (missing.has("age_window")) return "age";
-  if (missing.has("pond")) return "pond";
-  if (!status.consents.research && !researchOffered) return "research";
+  if (local.labelPending) return "identityLabel";
+  if (missing.has("seeks") && !local.seeksDone) return "seeks";
+  if (missing.has("intent")) return "intent";
+  if (missing.has("age_window") || missing.has("seeks")) return "age";
+  if (missing.has("photos")) return "photos";
+  if (missing.has("prompts_or_bio")) return "prompts";
+  if (!status.consents.research && !local.researchOffered) return "research";
+  if (missing.size > 0) return "stuck";
   return "done";
 }
 
@@ -50,6 +98,14 @@ export function nextStep(status: OnboardingStatus, researchOffered: boolean): St
  */
 export function bundledVersion(kind: ConsentKind): string {
   return CONSENT_VERSIONS[kind] ?? "";
+}
+
+/** The age window the steppers start from: the person's own age, five years each way, inside the bounds. */
+export function defaultAgeWindow(age: number): { min: number; max: number } {
+  return {
+    min: Math.min(Math.max(AGE_MIN, age - 5), AGE_MAX),
+    max: Math.max(Math.min(AGE_MAX, age + 5), AGE_MIN),
+  };
 }
 
 const GENDER_TEXT: Record<Gender, PlainMessageKey> = {
@@ -83,34 +139,106 @@ function Chip({
   );
 }
 
+/** One end of the age window: a number between a minus and a plus, every answer a button (ADR-010 §9). */
+function Stepper({
+  label,
+  value,
+  downLabel,
+  upLabel,
+  canDown,
+  canUp,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  downLabel: string;
+  upLabel: string;
+  canDown: boolean;
+  canUp: boolean;
+  onChange: (next: number) => void;
+}) {
+  const { t } = useT();
+  const tap = useHapticTap();
+  return (
+    <View className="flex-1 items-center gap-1">
+      <Text variant="small">{label}</Text>
+      <View className="flex-row items-center gap-2">
+        <Button
+          variant="outline"
+          size="icon"
+          accessibilityLabel={downLabel}
+          disabled={!canDown}
+          onPress={() => {
+            tap();
+            onChange(value - 1);
+          }}
+        >
+          <Icon as={Minus} />
+        </Button>
+        <Text variant="h2" accessibilityLiveRegion="polite">
+          {t("onboarding.age.years", { years: value })}
+        </Text>
+        <Button
+          variant="outline"
+          size="icon"
+          accessibilityLabel={upLabel}
+          disabled={!canUp}
+          onPress={() => {
+            tap();
+            onChange(value + 1);
+          }}
+        >
+          <Icon as={Plus} />
+        </Button>
+      </View>
+    </View>
+  );
+}
+
 /**
- * The first minutes after the bank login (#46, ADR-010): one question per
- * screen, every answer a button, the consents shown as the exact version the
- * person accepts, the research opt-in on its own. The API decides what is
- * still missing; this screen asks the next thing and leaves when nothing is.
+ * The first minutes after the bank login (#46, #146, ADR-010): one question
+ * per screen in the field sheet's order, every answer a button, the consents
+ * shown as the exact version the person accepts, the article 9 consent on
+ * the screen that collects whom one seeks, the research opt-in on its own.
+ * The API decides what is still missing; this screen asks the next thing and
+ * leaves when nothing is. The profile's own draft carries the name, the
+ * label, the intent and the prompts (#47).
  */
 export function OnboardingScreen() {
   const { t, locale } = useT();
   const router = useRouter();
   const tap = useHapticTap();
   const { state, busy, failed, reload, step } = useOnboarding();
+  const profile = useProfile();
   const [researchOffered, setResearchOffered] = useState(false);
   const [seeks, setSeeks] = useState<Gender[]>([]);
+  const [seeksDone, setSeeksDone] = useState(false);
+  const [labelPending, setLabelPending] = useState(false);
   const [gender, setGender] = useState<Gender | null>(null);
-  const [ages, setAges] = useState<{ min: string; max: string }>({ min: "", max: "" });
-  // Seeks and the age window are saved together, so the API cannot tell the
-  // two screens apart: the move from the first to the second is this flag.
-  const [afterSeeks, setAfterSeeks] = useState(false);
+  const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
 
-  const computed: Step | null =
-    state.status === "ready" ? nextStep(state.onboarding, researchOffered) : null;
   const current: Step | null =
-    computed === "seeks" && afterSeeks && seeks.length > 0 ? "age" : computed;
+    state.status === "ready"
+      ? nextStep(state.onboarding, { researchOffered, seeksDone, labelPending })
+      : null;
   useEffect(() => {
     if (current === "done") router.replace("/");
   }, [current, router]);
+  const age = state.status === "ready" ? state.onboarding.age : null;
+  useEffect(() => {
+    if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
+  }, [current, ages, age]);
 
-  if (state.status === "loading") {
+  const setField = (key: keyof ProfileFields, value: string | undefined) => {
+    const fields: Record<string, unknown> = { ...profile.draft.fields };
+    if (value === undefined) delete fields[key];
+    else fields[key] = value;
+    profile.update({ fields: fields as ProfileFields });
+  };
+  /** A profile step: the draft is saved, then the status read again. */
+  const saveProfileStep = () => step(() => profile.save());
+
+  if (state.status === "loading" || profile.status === "loading") {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center p-6">
@@ -119,19 +247,36 @@ export function OnboardingScreen() {
       </SafeAreaView>
     );
   }
-  if (state.status === "error" || current === null) {
+  if (
+    state.status === "error" ||
+    profile.status === "error" ||
+    current === null ||
+    current === "stuck"
+  ) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
           <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>
-          <Button onPress={() => void reload()}>{t("onboarding.retry")}</Button>
+          <Button
+            onPress={() => {
+              void reload();
+              void profile.reload();
+            }}
+          >
+            {t("onboarding.retry")}
+          </Button>
         </View>
       </SafeAreaView>
     );
   }
-  const { onboarding, ponds } = state;
-  const ageWindow = AgeWindow.safeParse({ min: Number(ages.min), max: Number(ages.max) });
-  const position = STEPS.indexOf(current) + 1;
+  const { onboarding } = state;
+  const { draft, update } = profile;
+  const position = STEPS.indexOf(current === "identityLabel" ? "gender" : current) + 1;
+  const specialConsented =
+    onboarding.consents.specialCategory === bundledVersion("special_category");
+  const specialOutdated =
+    bundledVersion("special_category") !== onboarding.currentVersions.special_category;
+  const profileFailed = profile.notice?.kind === "error";
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -147,143 +292,19 @@ export function OnboardingScreen() {
             {t("onboarding.progress", { step: position, total: STEPS.length })}
           </Text>
         )}
-        {failed && <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>}
-
-        {current === "gender" && (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.gender.title")}</Text>
-            <Text>{t("onboarding.gender.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {GENDERS.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(GENDER_TEXT[option])}
-                  selected={gender === option}
-                  onPress={() => {
-                    tap();
-                    setGender(option);
-                  }}
-                />
-              ))}
-            </View>
-            <Button
-              disabled={busy || gender === null}
-              onPress={() => {
-                tap();
-                if (gender) void step(() => declareGender(gender));
-              }}
-            >
-              {t("onboarding.continue")}
-            </Button>
-          </View>
+        {(failed || profileFailed) && (
+          <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>
         )}
 
-        {current === "seeks" && (
+        {current === "welcome" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.seeks.title")}</Text>
-            <Text>{t("onboarding.seeks.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {GENDERS.map((option) => (
-                <Chip
-                  key={option}
-                  label={t(SEEKS_TEXT[option])}
-                  selected={seeks.includes(option)}
-                  onPress={() => {
-                    tap();
-                    setSeeks((s) =>
-                      s.includes(option) ? s.filter((g) => g !== option) : [...s, option],
-                    );
-                  }}
-                />
-              ))}
-              <Chip
-                label={t("onboarding.seeks.anyone")}
-                selected={seeks.length === GENDERS.length}
-                onPress={() => {
-                  tap();
-                  setSeeks([...GENDERS]);
-                }}
-              />
+            <Text variant="h2">{t("onboarding.welcome.title")}</Text>
+            <View className="gap-2">
+              <Text>{t("onboarding.welcome.norm1")}</Text>
+              <Text>{t("onboarding.welcome.norm2")}</Text>
+              <Text>{t("onboarding.welcome.norm3")}</Text>
+              <Text>{t("onboarding.welcome.norm4")}</Text>
             </View>
-            {/* Seeks and the age window are one save: this button only moves on. */}
-            <Button
-              disabled={seeks.length === 0}
-              onPress={() => {
-                tap();
-                setAfterSeeks(true);
-              }}
-            >
-              {t("onboarding.continue")}
-            </Button>
-          </View>
-        )}
-
-        {current === "age" && (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.age.title")}</Text>
-            <Text>{t("onboarding.age.explain", { min: AGE_MIN, max: AGE_MAX })}</Text>
-            <View className="flex-row gap-3">
-              <View className="flex-1 gap-1">
-                <Text variant="small">{t("onboarding.age.youngest")}</Text>
-                <Input
-                  accessibilityLabel={t("onboarding.age.youngest")}
-                  keyboardType="number-pad"
-                  value={ages.min}
-                  onChangeText={(min) => setAges((a) => ({ ...a, min }))}
-                />
-              </View>
-              <View className="flex-1 gap-1">
-                <Text variant="small">{t("onboarding.age.oldest")}</Text>
-                <Input
-                  accessibilityLabel={t("onboarding.age.oldest")}
-                  keyboardType="number-pad"
-                  value={ages.max}
-                  onChangeText={(max) => setAges((a) => ({ ...a, max }))}
-                />
-              </View>
-            </View>
-            {(ages.min || ages.max) && !ageWindow.success && (
-              <Text variant="muted">
-                {t("onboarding.age.invalid", { min: AGE_MIN, max: AGE_MAX })}
-              </Text>
-            )}
-            <Button
-              disabled={busy || !ageWindow.success || seeks.length === 0}
-              onPress={() => {
-                tap();
-                if (ageWindow.success) {
-                  void step(() => savePreferences({ seeks, ageWindow: ageWindow.data }));
-                }
-              }}
-            >
-              {t("onboarding.continue")}
-            </Button>
-          </View>
-        )}
-
-        {current === "pond" && (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.pond.title")}</Text>
-            <Text>{t("onboarding.pond.explain")}</Text>
-            <View className="flex-row flex-wrap gap-2">
-              {ponds.ponds.map((pond: PondSummary) => (
-                <Chip
-                  key={pond.id}
-                  label={pond.name}
-                  selected={onboarding.pond?.id === pond.id}
-                  onPress={() => {
-                    tap();
-                    void step(() => choosePond(pond.id));
-                  }}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {current === "consents" && (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.consents.title")}</Text>
             <Text>{t("onboarding.consents.explain")}</Text>
             {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
             {(["terms", "privacy"] as const).map((kind) => (
@@ -319,9 +340,302 @@ export function OnboardingScreen() {
                   });
                 }}
               >
-                {t("onboarding.consents.accept")}
+                {t("onboarding.welcome.accept")}
               </Button>
             )}
+          </View>
+        )}
+
+        {current === "name" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.name.title")}</Text>
+            <Text>{t("onboarding.name.explain")}</Text>
+            <Input
+              accessibilityLabel={t("profile.displayName.label")}
+              value={draft.displayName}
+              maxLength={DISPLAY_NAME_MAX}
+              autoCapitalize="words"
+              onChangeText={(displayName) => update({ displayName })}
+            />
+            <Button
+              disabled={busy || profile.saving || draft.displayName.trim().length === 0}
+              onPress={() => {
+                tap();
+                void saveProfileStep();
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
+          </View>
+        )}
+
+        {current === "gender" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.gender.title")}</Text>
+            <Text>{t("onboarding.gender.explain")}</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {GENDERS.map((option) => (
+                <Chip
+                  key={option}
+                  label={t(GENDER_TEXT[option])}
+                  selected={gender === option}
+                  onPress={() => {
+                    tap();
+                    setGender(option);
+                  }}
+                />
+              ))}
+            </View>
+            <Button
+              disabled={busy || gender === null}
+              onPress={() => {
+                tap();
+                if (!gender) return;
+                // The label is offered after a non-binary gender only, by design (ADR-019 §1).
+                setLabelPending(gender === "non_binary");
+                void step(() => declareGender(gender));
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
+          </View>
+        )}
+
+        {current === "identityLabel" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.identityLabel.title")}</Text>
+            <Text>{t("onboarding.identityLabel.explain")}</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {PROFILE_FIELDS.identityLabel.options.map((option) => (
+                <Chip
+                  key={option}
+                  label={t(optionKey("identityLabel", option))}
+                  selected={draft.fields.identityLabel === option}
+                  onPress={() => {
+                    tap();
+                    setField(
+                      "identityLabel",
+                      draft.fields.identityLabel === option ? undefined : option,
+                    );
+                  }}
+                />
+              ))}
+            </View>
+            <Button
+              disabled={busy || profile.saving || draft.fields.identityLabel === undefined}
+              onPress={() => {
+                tap();
+                setLabelPending(false);
+                void saveProfileStep();
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
+            <Button
+              variant="outline"
+              disabled={busy}
+              onPress={() => {
+                tap();
+                setField("identityLabel", undefined);
+                setLabelPending(false);
+              }}
+            >
+              {t("onboarding.identityLabel.skip")}
+            </Button>
+          </View>
+        )}
+
+        {current === "seeks" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.seeks.title")}</Text>
+            <Text>{t("onboarding.seeks.explain")}</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {GENDERS.map((option) => (
+                <Chip
+                  key={option}
+                  label={t(SEEKS_TEXT[option])}
+                  selected={seeks.includes(option)}
+                  onPress={() => {
+                    tap();
+                    setSeeks((s) =>
+                      s.includes(option) ? s.filter((g) => g !== option) : [...s, option],
+                    );
+                  }}
+                />
+              ))}
+              <Chip
+                label={t("onboarding.seeks.anyone")}
+                selected={seeks.length === GENDERS.length}
+                onPress={() => {
+                  tap();
+                  setSeeks([...GENDERS]);
+                }}
+              />
+            </View>
+            {/* Article 9: the consent on the screen that collects the answer (ADR-019 §4). */}
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("legal.special_category.title")}</CardTitle>
+              </CardHeader>
+              <CardContent className="gap-2">
+                <Text>{t("legal.special_category.summary")}</Text>
+                {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
+                <Text variant="muted">
+                  {t("onboarding.consents.version", {
+                    version: bundledVersion("special_category"),
+                  })}
+                </Text>
+                {specialOutdated ? (
+                  <Text accessibilityLiveRegion="polite">
+                    {t("onboarding.consents.outdatedApp")}
+                  </Text>
+                ) : (
+                  <View className="flex-row items-center justify-between gap-3">
+                    <Text variant="small" className="flex-1">
+                      {t("onboarding.seeks.allow")}
+                    </Text>
+                    <Switch
+                      accessibilityLabel={t("onboarding.seeks.allow")}
+                      checked={specialConsented}
+                      disabled={busy || specialConsented}
+                      onCheckedChange={(on) => {
+                        tap();
+                        // Recorded as soon as it is given, like the research opt-in; the account card withdraws it.
+                        if (on && !specialConsented) {
+                          void step(() =>
+                            giveConsent(
+                              "special_category",
+                              bundledVersion("special_category"),
+                              consentLocale(locale),
+                            ),
+                          );
+                        }
+                      }}
+                    />
+                  </View>
+                )}
+              </CardContent>
+            </Card>
+            {/* Seeks and the age window are one save: this button only moves on. */}
+            <Button
+              disabled={busy || seeks.length === 0 || !specialConsented}
+              onPress={() => {
+                tap();
+                setSeeksDone(true);
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
+          </View>
+        )}
+
+        {current === "intent" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.intent.title")}</Text>
+            <Text>{t("onboarding.intent.explain")}</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {PROFILE_FIELDS.intent.options.map((option) => (
+                <Chip
+                  key={option}
+                  label={t(optionKey("intent", option))}
+                  selected={draft.fields.intent === option}
+                  onPress={() => {
+                    tap();
+                    setField("intent", option);
+                  }}
+                />
+              ))}
+            </View>
+            <Button
+              disabled={busy || profile.saving || draft.fields.intent === undefined}
+              onPress={() => {
+                tap();
+                void saveProfileStep();
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
+          </View>
+        )}
+
+        {current === "age" && ages && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.age.title")}</Text>
+            <Text>{t("onboarding.age.explain", { min: AGE_MIN, max: AGE_MAX })}</Text>
+            <View className="flex-row gap-3">
+              <Stepper
+                label={t("onboarding.age.youngest")}
+                value={ages.min}
+                downLabel={t("onboarding.age.youngestDown")}
+                upLabel={t("onboarding.age.youngestUp")}
+                canDown={ages.min > AGE_MIN}
+                canUp={ages.min < ages.max}
+                onChange={(min) => setAges({ ...ages, min })}
+              />
+              <Stepper
+                label={t("onboarding.age.oldest")}
+                value={ages.max}
+                downLabel={t("onboarding.age.oldestDown")}
+                upLabel={t("onboarding.age.oldestUp")}
+                canDown={ages.max > ages.min}
+                canUp={ages.max < AGE_MAX}
+                onChange={(max) => setAges({ ...ages, max })}
+              />
+            </View>
+            <Button
+              disabled={busy || seeks.length === 0}
+              onPress={() => {
+                tap();
+                void step(() => savePreferences({ seeks, ageWindow: ages }));
+              }}
+            >
+              {t("onboarding.continue")}
+            </Button>
+          </View>
+        )}
+
+        {current === "photos" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.photos.title")}</Text>
+            <Text>{t("onboarding.photos.explain")}</Text>
+            <Button
+              onPress={() => {
+                tap();
+                router.push("/photos");
+              }}
+            >
+              {t("onboarding.photos.open")}
+            </Button>
+          </View>
+        )}
+
+        {current === "prompts" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.prompts.title")}</Text>
+            <Text>{t("onboarding.prompts.explain", { min: BIO_MIN_FOR_COMPLETENESS })}</Text>
+            <View className="gap-2">
+              <Text variant="small">{t("profile.bio.label")}</Text>
+              <Input
+                accessibilityLabel={t("profile.bio.label")}
+                value={draft.bio ?? ""}
+                maxLength={BIO_MAX}
+                multiline
+                numberOfLines={4}
+                onChangeText={(text) =>
+                  update({ bio: text.length > 0 ? text : null, bioPreset: null })
+                }
+              />
+            </View>
+            <PromptsEditor draft={draft} update={update} />
+            <Button
+              disabled={busy || profile.saving}
+              onPress={() => {
+                tap();
+                void saveProfileStep();
+              }}
+            >
+              {t("onboarding.prompts.save")}
+            </Button>
           </View>
         )}
 

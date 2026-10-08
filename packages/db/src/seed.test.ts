@@ -25,11 +25,8 @@ describe("seed", () => {
           `SELECT c.slug, p.slug AS parent, c.name_inessive AS inessive
            FROM ponds c LEFT JOIN ponds p ON p.id = c.parent_id ORDER BY c.slug`,
         );
-        expect(tree.rows).toEqual([
-          { slug: "espoo", parent: "paakaupunkiseutu", inessive: "Espoossa" },
-          { slug: "otaniemi", parent: "espoo", inessive: "Otaniemessä" },
-          { slug: "paakaupunkiseutu", parent: null, inessive: "Pääkaupunkiseudulla" },
-        ]);
+        // One country-wide pond for now (#146); the tree is ready for the postal-code ponds later.
+        expect(tree.rows).toEqual([{ slug: "suomi", parent: null, inessive: "Suomessa" }]);
 
         const config = await pool.query<{ key: string; value: number; version: number }>(
           "SELECT key, value, version FROM matching_config ORDER BY key",
@@ -56,6 +53,7 @@ describe("seed", () => {
           exposure_cards_per_day: 60,
           photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
           waitlist_k: 10,
+          default_pond: "suomi",
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
       } finally {

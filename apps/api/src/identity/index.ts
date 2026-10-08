@@ -14,7 +14,9 @@ export { wellKnownRoutes } from "./links.ts";
 // hetu.ts stays inside the slice: nothing outside it may hold a hetu (rules/api.md).
 export { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.ts";
 export {
+  activationWaitsFor,
   CURRENT_CONSENT_VERSIONS,
+  DEFAULT_POND_KEY,
   exportConsents,
   missingSteps,
   onboardingStatus,

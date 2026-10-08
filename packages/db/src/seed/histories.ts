@@ -21,6 +21,7 @@ export type PersonaHistory = {
     gender: Gender;
     seeks: Gender[];
     ageWindow: { min: number; max: number };
+    /** The one pond for now (#146): named here as the API would assign it, so the story reads as the person's. */
     pond: string;
   } | null;
   profile: ProfileUpdate | null;
@@ -39,8 +40,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 42, max: 56 },
-      pond: "espoo",
+      ageWindow: { min: 32, max: 44 },
+      pond: "suomi",
     },
     profile: {
       displayName: "Sanna",
@@ -77,8 +78,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "non_binary",
       seeks: ["woman", "man", "non_binary"],
-      ageWindow: { min: 36, max: 48 },
-      pond: "otaniemi",
+      ageWindow: { min: 24, max: 34 },
+      pond: "suomi",
     },
     profile: {
       displayName: "Noa",
@@ -107,8 +108,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["woman", "man"],
-      ageWindow: { min: 40, max: 55 },
-      pond: "espoo",
+      ageWindow: { min: 35, max: 50 },
+      pond: "suomi",
     },
     profile: {
       displayName: "Kerttu",
@@ -136,8 +137,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "man",
       seeks: ["woman"],
-      ageWindow: { min: 46, max: 62 },
-      pond: "espoo",
+      ageWindow: { min: 38, max: 55 },
+      pond: "suomi",
     },
     profile: null,
     photos: 0,
@@ -149,8 +150,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 48, max: 62 },
-      pond: "otaniemi",
+      ageWindow: { min: 28, max: 40 },
+      pond: "suomi",
     },
     profile: {
       displayName: "Ilona",

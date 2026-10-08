@@ -134,6 +134,20 @@
       "when": 1790594421514,
       "tag": "0018_gate",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791471292500,
+      "tag": "0019_special_category_consent",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791471352548,
+      "tag": "0020_default_pond",
+      "breakpoints": true
     }
   ]
 }

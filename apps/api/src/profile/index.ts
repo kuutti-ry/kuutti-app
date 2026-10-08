@@ -15,5 +15,7 @@ export { profileRoutes } from "./routes.ts";
 export {
   eraseProfileOfAccount,
   exportProfile,
+  readProfile,
   SPECIAL_CATEGORY_CONSENT_VERSION,
+  withdrawSpecialCategoryAnswers,
 } from "./service.ts";

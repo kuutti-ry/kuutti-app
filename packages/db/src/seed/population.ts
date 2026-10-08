@@ -26,10 +26,10 @@ import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from ".
  * anybody: the generator and its word lists are all there is.
  *
  * It is made to cross the product's thresholds, not only to fill screens:
- * one pond under the gate, one over the majority share, one where the public
- * counter shows a total and no split. The shares are exact counts, not draws,
- * so the thresholds are crossed by construction and not by luck; what is
- * drawn is who gets which age, name and words.
+ * the one pond is over the gate, over the majority share and, from enough
+ * people up, shows the counter's split. The shares are exact counts, not
+ * draws, so the thresholds are crossed by construction and not by luck; what
+ * is drawn is who gets which age, name and words.
  *
  * Pure: no clock, no database. Every date derives from the epoch.
  */
@@ -55,25 +55,18 @@ export type PondPlan = {
   why: string;
 };
 
-/** Who lives where, and why: the data dictionary of docs/demo/population.md in code. */
+/**
+ * Who lives where, and why: the data dictionary of docs/demo/population.md in
+ * code. One country-wide pond for now (#146): it has to show everything at
+ * once, so it is over the gate, has men over the majority share (the line the
+ * admission rule draws) and, from enough people up, every counter cell at k.
+ */
 export const POND_PLANS: readonly PondPlan[] = [
   {
-    slug: "paakaupunkiseutu",
-    people: { fixed: 24 },
-    genders: { woman: 9 / 24, man: 13 / 24, non_binary: 2 / 24 },
-    why: "under gate_k (30), so matching has not opened for anybody here; nine women, so the counter says the total and no split",
-  },
-  {
-    slug: "otaniemi",
-    people: { share: 0.62 },
-    genders: { woman: 0.42, man: 0.5, non_binary: 0.08 },
-    why: "the launch pond: over the gate, the largest gender at half, and at three hundred people every cell over ten, so the counter shows a split",
-  },
-  {
-    slug: "espoo",
-    people: { share: 0.38 },
-    genders: { woman: 0.3, man: 0.64, non_binary: 0.06 },
-    why: "men are 64 %, over majority_share_max (0.6): the pond the admission rule has to hold back",
+    slug: "suomi",
+    people: { share: 1 },
+    genders: { woman: 0.32, man: 0.62, non_binary: 0.06 },
+    why: "over gate_k (30); men are 62 %, over majority_share_max (0.6), so the admission rule holds them back; from 174 people up every gender cell is at ten or more, so the counter shows the split",
   },
 ];
 
@@ -213,12 +206,7 @@ function drawAge(random: Random): number {
 /** How many of those with a profile answered each field; docs/demo/population.md says the same in words. */
 const SPECIAL_CATEGORY_CONSENT_SHARE = 0.35;
 
-function drawFields(
-  random: Random,
-  language: Language,
-  pond: string,
-  consented: boolean,
-): ProfileFields {
+function drawFields(random: Random, language: Language, consented: boolean): ProfileFields {
   const fields: ProfileFields = {};
   // Intent is an onboarding step (#146): everybody with a profile has one.
   fields.intent = random.weighted({ long_term: 55, casual: 20, open_to_either: 25 });
@@ -248,7 +236,7 @@ function drawFields(
       .weighted({ none: 35, dog: 25, cat: 25, "dog,cat": 8, other: 4, allergic: 3 })
       .split(",") as ProfileFields["pets"];
   }
-  if (random.chance(pond === "otaniemi" ? 0.6 : 0.35)) {
+  if (random.chance(0.45)) {
     fields.field = random.pick(PROFILE_FIELDS.field.options);
     if (random.chance(0.15)) fields.hideFromField = true;
   }
@@ -267,7 +255,6 @@ function drawProfile(
   random: Random,
   gender: Gender,
   language: Language,
-  pond: string,
   agreedAt: Date,
 ): SyntheticProfile {
   const consentedAt = random.chance(SPECIAL_CATEGORY_CONSENT_SHARE) ? agreedAt : null;
@@ -280,7 +267,7 @@ function drawProfile(
     displayName: random.pick(NAMES[gender]),
     bio: kind === "bio" ? random.pick(BIOS[language]) : null,
     bioPreset: kind === "preset" ? random.pick(BIO_PRESETS) : null,
-    fields: drawFields(random, language, pond, consentedAt !== null),
+    fields: drawFields(random, language, consentedAt !== null),
     prompts,
     specialCategoryConsentedAt: consentedAt,
   };
@@ -324,7 +311,7 @@ function onboarded(
     gender,
     preferences: { seeks, ageWindow },
     consents,
-    profile: random.chance(0.88) ? drawProfile(random, gender, language, pond, agreedAt) : null,
+    profile: random.chance(0.88) ? drawProfile(random, gender, language, agreedAt) : null,
   };
 }
 
@@ -393,30 +380,17 @@ export type Thresholds = { gateK: number; majorityShareMax: number; counterK: nu
 /**
  * What a population of this size does not show, in words; empty when it shows
  * everything it is there for. The shares cross the thresholds by construction
- * only when the ponds are large enough, which they are from 235 people up.
+ * only when the pond is large enough, which it is from 174 people up.
  */
 export function uncrossed(ponds: Record<string, PondSummary>, t: Thresholds): string[] {
   const missing: string[] = [];
-  const cells = (pond: PondSummary | undefined) =>
-    pond ? [pond.woman, pond.man, pond.non_binary] : [];
-  const small = ponds.paakaupunkiseutu;
-  if (!small || small.people >= t.gateK || small.people < t.counterK) {
-    missing.push("no pond under the gate that the counter still says a total of");
-  } else if (cells(small).every((n) => n >= t.counterK)) {
-    missing.push("the small pond's split is not hidden");
+  const pond = ponds.suomi;
+  if (!pond || pond.people < t.gateK) missing.push("the pond is under the gate");
+  if (!pond || pond.largestShare <= t.majorityShareMax) {
+    missing.push("the pond is not over the majority share");
   }
-  const launch = ponds.otaniemi;
-  if (!launch || launch.people < t.gateK) missing.push("the launch pond is under the gate");
-  if (launch && launch.largestShare > t.majorityShareMax) {
-    missing.push("the launch pond is over the majority share");
-  }
-  if (!cells(launch).every((n) => n >= t.counterK) || cells(launch).length === 0) {
-    missing.push("the launch pond has a cell under the counter's k, so no pond shows a split");
-  }
-  const skewed = ponds.espoo;
-  if (!skewed || skewed.people < t.gateK) missing.push("the skewed pond is under the gate");
-  if (!skewed || skewed.largestShare <= t.majorityShareMax) {
-    missing.push("no pond is over the majority share");
+  if (!pond || [pond.woman, pond.man, pond.non_binary].some((n) => n < t.counterK)) {
+    missing.push("the pond has a cell under the counter's k, so it shows no split");
   }
   return missing;
 }

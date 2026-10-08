@@ -156,3 +156,13 @@ export async function exportProfile(
   const row = await repo.findProfile(db, accountId);
   return row ? toDocument(row) : null;
 }
+
+/** The identity slice calls this when the special-category consent is withdrawn (#146). */
+export async function withdrawSpecialCategoryAnswers(
+  deps: Pick<CardDeps, "db" | "logger" | "now">,
+  accountId: string,
+): Promise<void> {
+  if (await repo.clearSpecialCategoryAnswers(deps.db, accountId, deps.now())) {
+    deps.logger.info({ accountId }, "special-category answers cleared");
+  }
+}

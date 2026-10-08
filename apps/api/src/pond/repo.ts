@@ -33,6 +33,12 @@ export async function listPonds(db: Queryable): Promise<PondSummary[]> {
   return rows.map(pondFrom);
 }
 
+/** A pond by its slug: the default pond of matching_config is named that way (#146). */
+export async function findPondBySlug(db: Queryable, slug: string): Promise<PondSummary | null> {
+  const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM ponds WHERE slug = $1`, [slug]);
+  return rows[0] ? pondFrom(rows[0]) : null;
+}
+
 export async function findPondOfAccount(
   db: Queryable,
   accountId: string,

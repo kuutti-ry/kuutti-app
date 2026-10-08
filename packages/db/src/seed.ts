@@ -4,16 +4,14 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "./pool.ts";
 import { account, identity, matchingConfig, ponds, preferences, profile } from "./schema/index.ts";
 
-/** Otaniemi first, then the city, then the region (project context §1). */
+/**
+ * One country-wide pond for now (#146, ADR-010 §10): everybody is in Suomi,
+ * assigned by the API from matching_config.default_pond, and the pond step
+ * does not exist. The postal-code ponds of the field sheet come later; the
+ * tree (parent_id) is ready for them.
+ */
 export const SEED_PONDS = [
-  {
-    slug: "paakaupunkiseutu",
-    nameNominative: "Pääkaupunkiseutu",
-    nameInessive: "Pääkaupunkiseudulla",
-    parent: null,
-  },
-  { slug: "espoo", nameNominative: "Espoo", nameInessive: "Espoossa", parent: "paakaupunkiseutu" },
-  { slug: "otaniemi", nameNominative: "Otaniemi", nameInessive: "Otaniemessä", parent: "espoo" },
+  { slug: "suomi", nameNominative: "Suomi", nameInessive: "Suomessa", parent: null },
 ] as const;
 
 /**
@@ -48,6 +46,9 @@ export const MATCHING_CONFIG_V1 = {
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,
+  // #146 (ADR-010 §10): the pond every account is put in when it has none;
+  // the slug of a row in ponds. Null once people choose among several.
+  default_pond: "suomi",
 } as const;
 
 /**

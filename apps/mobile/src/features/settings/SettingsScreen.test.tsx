@@ -49,7 +49,10 @@ beforeEach(async () => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/health") return json(ok);
     if (url.pathname === "/consents") {
-      return json({ consents: [], currentVersions: { terms: "t", privacy: "p", research: "r" } });
+      return json({
+        consents: [],
+        currentVersions: { terms: "t", privacy: "p", research: "r", special_category: "s" },
+      });
     }
     return json({ error: { code: "not_found" } }, 404);
   }) as unknown as typeof fetch;

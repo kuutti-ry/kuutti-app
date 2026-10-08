@@ -8,7 +8,7 @@ Data dictionary of `pnpm demo:population` (#73, ADR-014 §8 to §10). The popula
 pnpm demo:population
 ```
 
-Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The ponds come from the seed, which `pnpm env:up` has run.
+Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond comes from the seed, which `pnpm env:up` has run.
 
 After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /waitlist` and the card in the app show the ponds of the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's ponds. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
 
@@ -30,16 +30,16 @@ Three hundred accounts that look bank-verified, among real people, would enter t
 
 ## Who lives where, and why
 
+One country-wide pond for now (#146, ADR-010 §10): everybody who onboarded is in Suomi, and the pond has to show everything at once.
+
 | pond | people | women | men | non-binary | why |
 |---|---|---|---|---|---|
-| Pääkaupunkiseutu | 24 | 9 | 13 | 2 | under `gate_k` (30): matching has not opened for anybody here. Nine women: the public counter says the total and no split |
-| Otaniemi | 156 | 66 | 78 | 12 | the launch pond: over the gate, the largest gender at 50 %, every cell at ten or more, so the counter shows the split |
-| Espoo | 96 | 29 | 61 | 6 | men are 64 %, over `majority_share_max` (0.6): the pond the admission rule has to hold back |
+| Suomi | 276 | 88 | 171 | 17 | over `gate_k` (30); men are 62 %, over `majority_share_max` (0.6), so the admission rule holds them back; every cell at ten or more, so the counter shows the split |
 | none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no consent |
 
-These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 235 up (a test goes through every size). At another size the small pond keeps its 24 people (from 26 people up), 8 % never onboarded, and the rest is split 62 to 38 between Otaniemi and Espoo with the same gender shares.
+These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k, and under 33 people the pond is under the gate). At another size 8 % never onboarded and the rest is in Suomi with the same gender shares.
 
-Everybody with a pond has a gender, because the app asks for the gender before the pond.
+Everybody with a pond has a gender, because the app asks for the gender before the pond is assigned.
 
 ## What is drawn
 
@@ -55,7 +55,7 @@ Everybody with a pond has a gender, because the app asks for the gender before t
 | display name | a given name from the list of the person's gender; the lists hold names with å, ä and ö and one in another script (Юлия) |
 | bio | a bio 65 % (a few of the bios are too short to count for completeness, on purpose), a canned line 12 %, nothing 23 % |
 | prompts | none 25 %, one 20 %, two 35 %, three 20 % |
-| fields | the registry of `packages/schema` (ADR-019), options straight from it. Everybody with a profile has an intent (an onboarding step, #146): long-term 55 %, casual 20 %, open to either 25 %. Then, of those with a profile: monogamy 50 % (monogamous 85 %), kids 60 % (none 70 %, living with me 18 %, not with me 12 %), kids in the future 55 %, smoking 65 % (never 60 %, sometimes 20 %, regularly 12 %, quitting 8 %), languages 85 % (the person's own and up to two more), education 65 %, drinking 65 % (never 15 %, rarely 30 %, socially 45 %, often 10 %), attitude to drugs 40 %, one to five hobbies 70 %, a height of 152 to 198 cm 55 %, exercise 55 %, pets 50 % (none 35 %, a dog 25 %, a cat 25 %, both 8 %, other 4 %, allergic 3 %), a field of study or work for 60 % in Otaniemi and 35 % elsewhere (and 15 % of those hide themselves from their field), a line of work 50 %, a job title 30 % (titles only: no employer is named), a star sign 45 %. Politics (one to three parties, 70 %) and religion (60 %) only among the 35 % who gave the special-category consent, as the API would have it |
+| fields | the registry of `packages/schema` (ADR-019), options straight from it. Everybody with a profile has an intent (an onboarding step, #146): long-term 55 %, casual 20 %, open to either 25 %. Then, of those with a profile: monogamy 50 % (monogamous 85 %), kids 60 % (none 70 %, living with me 18 %, not with me 12 %), kids in the future 55 %, smoking 65 % (never 60 %, sometimes 20 %, regularly 12 %, quitting 8 %), languages 85 % (the person's own and up to two more), education 65 %, drinking 65 % (never 15 %, rarely 30 %, socially 45 %, often 10 %), attitude to drugs 40 %, one to five hobbies 70 %, a height of 152 to 198 cm 55 %, exercise 55 %, pets 50 % (none 35 %, a dog 25 %, a cat 25 %, both 8 %, other 4 %, allergic 3 %), a field of study or work 45 % (and 15 % of those hide themselves from their field), a line of work 50 %, a job title 30 % (titles only: no employer is named), a star sign 45 %. Politics (one to three parties, 70 %) and religion (60 %) only among the 35 % who gave the special-category consent, as the API would have it |
 
 Nobody has a photo until the photo loader of #73's later part, so nobody in the population has a complete profile yet.
 

@@ -1,16 +1,18 @@
-import type { OnboardingStatus, PondList } from "@kuutti/schema";
+import type { OnboardingStatus } from "@kuutti/schema";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchOnboarding, fetchPonds } from "./client";
+import { fetchOnboarding } from "./client";
 
 export type OnboardingState =
   | { status: "loading" }
   | { status: "error" }
-  | { status: "ready"; onboarding: OnboardingStatus; ponds: PondList };
+  | { status: "ready"; onboarding: OnboardingStatus };
 
 /**
- * The onboarding status and the pond list, reloaded after every step (#46):
- * the API decides what is still missing, the screen only shows the next
- * question. A step that fails leaves the status as it was and says so.
+ * The onboarding status, reloaded after every step and whenever the screen
+ * gets the focus back (#46, #146): the API decides what is still missing, the
+ * screen only shows the next question, and the photos are added on their own
+ * screen. A step that fails leaves the status as it was and says so.
  */
 export function useOnboarding() {
   const [state, setState] = useState<OnboardingState>({ status: "loading" });
@@ -26,15 +28,17 @@ export function useOnboarding() {
 
   const reload = useCallback(async () => {
     try {
-      const [onboarding, ponds] = await Promise.all([fetchOnboarding(), fetchPonds()]);
-      if (mounted.current) setState({ status: "ready", onboarding, ponds });
+      const onboarding = await fetchOnboarding();
+      if (mounted.current) setState({ status: "ready", onboarding });
     } catch {
       if (mounted.current) setState({ status: "error" });
     }
   }, []);
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
 
   /** Runs one step's call, then reads the status again. */
   const step = useCallback(

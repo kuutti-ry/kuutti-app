@@ -51,6 +51,12 @@ export async function giveHistory(
       });
     }
     await as("PUT", "/account/gender", { gender: history.onboarding.gender });
+    // The seek answer needs the special-category consent first (ADR-019 §4, #146).
+    await as("POST", "/consents", {
+      kind: "special_category",
+      version: currentVersions.special_category,
+      locale: history.locale,
+    });
     await as("PUT", "/preferences", {
       seeks: history.onboarding.seeks,
       ageWindow: history.onboarding.ageWindow,

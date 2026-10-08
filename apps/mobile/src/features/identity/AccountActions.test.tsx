@@ -175,7 +175,12 @@ describe("AccountActions", () => {
       givenAt: "2026-09-26T10:00:00.000Z",
       withdrawnAt: null,
     };
-    const versions = { terms: version, privacy: version, research: version };
+    const versions = {
+      terms: version,
+      privacy: version,
+      research: version,
+      special_category: "2026-10-draft-2",
+    };
     let consents = [given];
     fetchMock([
       (req) => {
@@ -200,6 +205,10 @@ describe("AccountActions", () => {
         false,
       ),
     );
+    // The special-category consent has its own switch, off here, and withdrawing it is a DELETE of its kind (#146).
+    expect(
+      screen.getByLabelText("Store my sensitive answers").props.accessibilityState?.checked,
+    ).toBe(false);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });

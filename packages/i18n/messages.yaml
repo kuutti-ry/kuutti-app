@@ -2122,13 +2122,13 @@ legal.special_category.title:
   en: "Sensitive answers"
   description: "Heading of the special-category consent (#145, ADR-019 §4): whom you seek, the parties you could vote for, your religion. Binding legal text; the Finnish is the wording that counts."
   fi: "Arkaluonteiset tiedot"
-  consent_version: "2026-10-draft-1"
+  consent_version: "2026-10-draft-2"
 
 legal.special_category.summary:
-  en: "DRAFT: Whom you seek, the parties you could vote for and your religion are special categories of personal data. If you say yes, Kuutti stores the answers you give to these questions and shows them on your card; it never puts them in a log or a research event, and you can remove them at any time. Without your yes these fields stay unanswered."
+  en: "DRAFT: Whom you seek, the parties you could vote for and your religion are special categories of personal data. If you say yes, Kuutti stores the answers you give to these questions: whom you seek only to match you, never shown to anyone; the parties and the religion on your card, when you choose to fill them in. None of them ever goes into a log or a research event, and you can withdraw this consent at any time, which removes the answers. Without your yes these questions stay unanswered."
   description: "The special-category consent the person accepts by version (#145, ADR-019 §4; GDPR art. 9(2)(a)). DRAFT wording for the association's counsel."
-  fi: "LUONNOS: Se, kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi ovat erityisiä henkilötietoryhmiä. Jos sanot kyllä, Kuutti tallentaa näihin kysymyksiin antamasi vastaukset ja näyttää ne kortillasi; se ei koskaan kirjoita niitä lokiin eikä tutkimustapahtumaan, ja voit poistaa ne milloin tahansa. Ilman kyllä-vastaustasi nämä kentät jäävät vastaamatta."
-  consent_version: "2026-10-draft-1"
+  fi: "LUONNOS: Se, kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi ovat erityisiä henkilötietoryhmiä. Jos sanot kyllä, Kuutti tallentaa näihin kysymyksiin antamasi vastaukset: kenen seuraa etsit vain yhdistämistä varten, eikä sitä näytetä kenellekään; puolueet ja uskonnon kortillasi, jos päätät täyttää ne. Mikään niistä ei koskaan päädy lokiin eikä tutkimustapahtumaan, ja voit perua tämän suostumuksen milloin tahansa, jolloin vastaukset poistetaan. Ilman kyllä-vastaustasi nämä kysymykset jäävät vastaamatta."
+  consent_version: "2026-10-draft-2"
 
 settings.open:
   en: Settings
@@ -2765,10 +2765,10 @@ onboarding.age.title:
   machine: { fi: true, sv: true }
 
 onboarding.age.explain:
-  en: "The youngest and the oldest you want to see, between {min, number} and {max, number}."
+  en: "Between {min, number} and {max, number}. We start around your own age; move the ends as you like."
   description: "Age window lead text; {min} and {max} are the bounds."
-  fi: "Nuorin ja vanhin, jotka haluat nähdä, välillä {min, number} ja {max, number}."
-  sv: "Den yngsta och den äldsta du vill se, mellan {min, number} och {max, number}."
+  fi: "Väliltä {min, number}–{max, number}. Aloitamme oman ikäsi ympäriltä; siirrä päitä kuten haluat."
+  sv: "Mellan {min, number} och {max, number}. Vi börjar kring din egen ålder; flytta ändarna som du vill."
   machine: { fi: true, sv: true }
 
 onboarding.age.youngest:
@@ -2785,39 +2785,11 @@ onboarding.age.oldest:
   sv: "Äldsta"
   machine: { fi: true, sv: true }
 
-onboarding.age.invalid:
-  en: "Both between {min, number} and {max, number}, the youngest at most the oldest."
-  description: "Shown when the age window does not validate."
-  fi: "Molemmat välillä {min, number} ja {max, number}, nuorin enintään vanhin."
-  sv: "Båda mellan {min, number} och {max, number}, den yngsta högst den äldsta."
-  machine: { fi: true, sv: true }
-
-onboarding.pond.title:
-  en: "Where do you want to meet people?"
-  description: "Pond step heading."
-  fi: "Missä haluat tavata ihmisiä?"
-  sv: "Var vill du träffa människor?"
-  machine: { fi: true, sv: true }
-
-onboarding.pond.explain:
-  en: "Matching happens inside the area you choose."
-  description: "Pond step lead text (TD-10)."
-  fi: "Yhdistäminen tapahtuu valitsemasi alueen sisällä."
-  sv: "Matchningen sker inom det område du väljer."
-  machine: { fi: true, sv: true }
-
-onboarding.consents.title:
-  en: "Two things to agree to"
-  description: "Consents step heading."
-  fi: "Kaksi asiaa hyväksyttäväksi"
-  sv: "Två saker att godkänna"
-  machine: { fi: true, sv: true }
-
 onboarding.consents.explain:
-  en: "Read both. You accept exactly this version of the text; if it changes, we ask you again."
+  en: "Read both. You accept exactly this version of each text; if one changes, we ask you again."
   description: "Consents step lead text (versioned consent)."
-  fi: "Lue molemmat. Hyväksyt juuri tämän tekstiversion; jos se muuttuu, kysymme uudelleen."
-  sv: "Läs båda. Du godkänner exakt den här versionen av texten; om den ändras frågar vi igen."
+  fi: "Lue molemmat. Hyväksyt juuri tämän version kummastakin tekstistä; jos jompikumpi muuttuu, kysymme uudelleen."
+  sv: "Läs båda. Du godkänner exakt den här versionen av varje text; om en ändras frågar vi igen."
   machine: { fi: true, sv: true }
 
 onboarding.consents.binding:
@@ -2832,13 +2804,6 @@ onboarding.consents.version:
   description: "The consent version under each legal text; {version} is the consent_version string."
   fi: "Versio {version}"
   sv: "Version {version}"
-  machine: { fi: true, sv: true }
-
-onboarding.consents.accept:
-  en: "I accept the terms and the privacy notice"
-  description: "The one button that gives both required consents."
-  fi: "Hyväksyn käyttöehdot ja tietosuojaselosteen"
-  sv: "Jag godkänner villkoren och integritetsmeddelandet"
   machine: { fi: true, sv: true }
 
 onboarding.consents.outdatedApp:
@@ -2877,10 +2842,185 @@ onboarding.research.later:
   machine: { fi: true, sv: true }
 
 onboarding.done:
-  en: "All set. Add a few photos and fill in your profile next."
+  en: "All set. Your place in line is on the home screen."
   description: "Last line before the flow closes."
-  fi: "Valmista. Lisää seuraavaksi muutama kuva ja täytä profiilisi."
-  sv: "Klart. Lägg till några foton och fyll i din profil härnäst."
+  fi: "Valmista. Paikkasi jonossa näkyy etusivulla."
+  sv: "Klart. Din plats i kön finns på startsidan."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.title:
+  en: "How we do things here"
+  description: "Heading of the welcome screen, the first after the bank login (#146): the norms and the two consents on one screen."
+  fi: "Näin täällä toimitaan"
+  sv: "Så här gör vi här"
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm1:
+  en: "Everybody here has shown a bank ID. Be the person you are."
+  description: "First norm of the welcome screen (#146)."
+  fi: "Jokainen täällä on tunnistautunut pankkitunnuksilla. Ole se, joka olet."
+  sv: "Alla här har visat bank-ID. Var den du är."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm2:
+  en: "You decide with buttons, one person at a time. Nobody here is swiped through."
+  description: "Second norm of the welcome screen (#146)."
+  fi: "Päätät painikkeilla, yksi ihminen kerrallaan. Ketään ei pyyhkäistä ohi."
+  sv: "Du bestämmer med knappar, en person i taget. Ingen här sveps förbi."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm3:
+  en: "No contact details before a match. Your photos stay inside Kuutti."
+  description: "Third norm of the welcome screen (#146)."
+  fi: "Ei yhteystietoja ennen matchia. Kuvasi pysyvät Kuutin sisällä."
+  sv: "Inga kontaktuppgifter före en match. Dina bilder stannar inne i Kuutti."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm4:
+  en: "One round a day. Nothing here is for sale."
+  description: "Fourth norm of the welcome screen (#146)."
+  fi: "Yksi kierros päivässä. Täällä ei myydä mitään."
+  sv: "En omgång om dagen. Ingenting här är till salu."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.accept:
+  en: "I'm in, and I accept both"
+  description: "The one button of the welcome screen: it records the terms and the privacy consent (#146, ADR-010 §9)."
+  fi: "Olen mukana ja hyväksyn molemmat"
+  sv: "Jag är med och godkänner båda"
+  machine: { fi: true, sv: true }
+
+onboarding.name.title:
+  en: "What should we call you?"
+  description: "Heading of the name step (#146)."
+  fi: "Miksi sinua kutsutaan?"
+  sv: "Vad ska vi kalla dig?"
+  machine: { fi: true, sv: true }
+
+onboarding.name.explain:
+  en: "The name on your card. Yours to choose, not the bank's."
+  description: "Explanation under the name step's heading (#146): typed, never prefilled from the bank."
+  fi: "Nimi kortillasi. Sinun valintasi, ei pankin."
+  sv: "Namnet på ditt kort. Ditt val, inte bankens."
+  machine: { fi: true, sv: true }
+
+onboarding.identityLabel.title:
+  en: "A word for it, if you like"
+  description: "Heading of the identity label step, shown after a non-binary gender only (#146)."
+  fi: "Sana sille, jos haluat"
+  sv: "Ett ord för det, om du vill"
+  machine: { fi: true, sv: true }
+
+onboarding.identityLabel.explain:
+  en: "Shown on your card, never used for matching. Skip it if non-binary says it."
+  description: "Explanation under the identity label step's heading (#146, ADR-019)."
+  fi: "Näytetään kortillasi, ei koskaan käytetä yhdistämiseen. Ohita, jos muunsukupuolinen riittää."
+  sv: "Visas på ditt kort, används aldrig för matchning. Hoppa över om ickebinär säger det."
+  machine: { fi: true, sv: true }
+
+onboarding.identityLabel.skip:
+  en: "Skip"
+  description: "Button of the identity label step that moves on without a label (#146)."
+  fi: "Ohita"
+  sv: "Hoppa över"
+  machine: { fi: true, sv: true }
+
+onboarding.seeks.allow:
+  en: "I consent to Kuutti storing whom I seek"
+  description: "Label of the switch on the seek step that gives the special-category consent (#146, ADR-019 §4); the text above it is the legal wording."
+  fi: "Annan Kuutille luvan tallentaa, kenen seuraa etsin"
+  sv: "Jag samtycker till att Kuutti lagrar vem jag söker"
+  machine: { fi: true, sv: true }
+
+onboarding.intent.title:
+  en: "What are you here for?"
+  description: "Heading of the intent step (#146)."
+  fi: "Mitä etsit täältä?"
+  sv: "Vad är du här för?"
+  machine: { fi: true, sv: true }
+
+onboarding.intent.explain:
+  en: "You both have to want the same thing, or be open to either. You can change this later."
+  description: "Explanation under the intent step's heading (#146, #147): intent is a hard filter both ways."
+  fi: "Teidän molempien on haluttava samaa tai oltava avoimia kummallekin. Voit muuttaa tätä myöhemmin."
+  sv: "Ni måste båda vilja samma sak, eller vara öppna för båda. Du kan ändra det här senare."
+  machine: { fi: true, sv: true }
+
+onboarding.age.youngestDown:
+  en: "Youngest, one year younger"
+  description: "Screen-reader label of the minus button of the age window's lower end (#146)."
+  fi: "Nuorin, vuotta nuorempi"
+  sv: "Yngsta, ett år yngre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.youngestUp:
+  en: "Youngest, one year older"
+  description: "Screen-reader label of the plus button of the age window's lower end (#146)."
+  fi: "Nuorin, vuotta vanhempi"
+  sv: "Yngsta, ett år äldre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.oldestDown:
+  en: "Oldest, one year younger"
+  description: "Screen-reader label of the minus button of the age window's upper end (#146)."
+  fi: "Vanhin, vuotta nuorempi"
+  sv: "Äldsta, ett år yngre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.oldestUp:
+  en: "Oldest, one year older"
+  description: "Screen-reader label of the plus button of the age window's upper end (#146)."
+  fi: "Vanhin, vuotta vanhempi"
+  sv: "Äldsta, ett år äldre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.years:
+  en: "{years, number}"
+  description: "The number shown between the stepper buttons of the age window (#146)."
+  fi: "{years, number}"
+  sv: "{years, number}"
+  machine: { fi: true, sv: true }
+
+onboarding.photos.title:
+  en: "Three photos of you"
+  description: "Heading of the photos step (#146)."
+  fi: "Kolme kuvaa sinusta"
+  sv: "Tre bilder på dig"
+  machine: { fi: true, sv: true }
+
+onboarding.photos.explain:
+  en: "Profiles with a face photo get seen; that is the honest reason. At least three, your face in each. They stay inside Kuutti."
+  description: "Explanation under the photos step's heading (#146): the honest reason first, as the sheet asks."
+  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kolme, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
+  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst tre, ditt ansikte i var och en. De stannar inne i Kuutti."
+  machine: { fi: true, sv: true }
+
+onboarding.photos.open:
+  en: "Add photos"
+  description: "Button of the photos step that opens the photos screen (#146)."
+  fi: "Lisää kuvia"
+  sv: "Lägg till bilder"
+  machine: { fi: true, sv: true }
+
+onboarding.prompts.title:
+  en: "A few words"
+  description: "Heading of the prompts step (#146)."
+  fi: "Muutama sana"
+  sv: "Några ord"
+  machine: { fi: true, sv: true }
+
+onboarding.prompts.explain:
+  en: "Answer two prompts, or write a bio of at least {min, number} characters. Your card leads with a photo and one answer."
+  description: "Explanation under the prompts step's heading (#146, ADR-009 §4)."
+  fi: "Vastaa kahteen kysymykseen tai kirjoita vähintään {min, number} merkin esittely. Korttisi alkaa kuvalla ja yhdellä vastauksella."
+  sv: "Svara på två frågor, eller skriv en presentation på minst {min, number} tecken. Ditt kort inleds med en bild och ett svar."
+  machine: { fi: true, sv: true }
+
+onboarding.prompts.save:
+  en: "Save and continue"
+  description: "Button of the prompts step: saves the profile and moves on (#146)."
+  fi: "Tallenna ja jatka"
+  sv: "Spara och fortsätt"
   machine: { fi: true, sv: true }
 
 photos.title:
@@ -3469,6 +3609,20 @@ account.research.failed:
   description: "Notice when giving or withdrawing the research consent failed."
   fi: "Tutkimusvalintaa ei voitu tallentaa. Yritä uudelleen."
   sv: "Forskningsvalet kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
+account.specialCategory.label:
+  en: "Store my sensitive answers"
+  description: "Label of the switch on the account card for the special-category consent (#146, ADR-019 §4)."
+  fi: "Tallenna arkaluonteiset vastaukseni"
+  sv: "Spara mina känsliga svar"
+  machine: { fi: true, sv: true }
+
+account.specialCategory.explain:
+  en: "Whom you seek, the parties you could vote for and your religion. Switching this off removes those answers, and you will be asked whom you seek again."
+  description: "Explanation under the special-category switch of the account card (#146)."
+  fi: "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset, ja sinulta kysytään uudelleen, kenen seuraa etsit."
+  sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort, och du får frågan om vem du söker igen."
   machine: { fi: true, sv: true }
 
 pond.waitlist.label:
