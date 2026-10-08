@@ -44,7 +44,7 @@ async function onboarded(ctx: TestContext, accountId: string) {
       JSON.stringify({
         intent: "long_term",
         languages: ["fi", "en"],
-        campus: "Guild of Secret Handshakes",
+        occupationTitle: "Secret handshake coach",
         smoking: "retired option",
       }),
     ],
@@ -210,7 +210,7 @@ describe("track", () => {
           displayName: "Aino",
           bio: null,
           bioPreset: null,
-          fields: { intent: "friends" },
+          fields: { intent: "casual" },
           prompts: [],
           specialCategoryConsent: null,
         }),
@@ -220,7 +220,7 @@ describe("track", () => {
     const rows = await eventsOf(ctx, a.accountId, "profile_saved");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.props).toEqual({ complete: false, approvedPhotos: 0 });
-    expect(rows[0]?.snapshot).toMatchObject({ fields: { intent: "friends" } });
+    expect(rows[0]?.snapshot).toMatchObject({ fields: { intent: "casual" } });
     const { rows: all } = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM events e JOIN research_subject s ON s.research_id = e.research_id WHERE s.account_id = $1",
       [b.accountId],

@@ -1,5 +1,11 @@
 import type { Queryable } from "@kuutti/db";
-import type { CardPhoto, Completeness, ProfileCard, ProfileUpdate } from "@kuutti/schema";
+import {
+  type CardPhoto,
+  type Completeness,
+  cardFields,
+  type ProfileCard,
+  type ProfileUpdate,
+} from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
@@ -142,7 +148,8 @@ export async function buildCard(
       age: { years: ageInYears(subject.birthYear, subject.birthMonth, at), verifiedByBank: true },
       pond,
       photos: cardPhotos,
-      fields: subject.profile.fields,
+      // What is there to be seen and what both sides matched on; a soft value or a setting stays on the profile (ADR-019 §2).
+      fields: cardFields(subject.profile.fields),
       bio: subject.profile.bio,
       bioPreset: subject.profile.bioPreset,
       prompts: subject.profile.prompts,

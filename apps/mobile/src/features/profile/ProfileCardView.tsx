@@ -1,4 +1,4 @@
-import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileCard } from "@kuutti/schema";
+import { CARD_FIELD_KEYS, PROFILE_FIELDS, type ProfileCard } from "@kuutti/schema";
 import { View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
@@ -58,16 +58,21 @@ export function ProfileCardView({
         )}
         {card.bio && <Text>{card.bio}</Text>}
         {!card.bio && card.bioPreset && <Text>{t(presetKey(card.bioPreset))}</Text>}
-        {PROFILE_FIELD_KEYS.map((key) => {
+        {CARD_FIELD_KEYS.map((key) => {
           const value = (card.fields as Record<string, unknown>)[key];
           if (value === undefined) return null;
           const spec = PROFILE_FIELDS[key];
+          // The card fields only (ADR-019 §2): a setting never comes this far, and the
+          // height is the one number, shown with its unit.
+          if (spec.kind === "flag") return null;
           const shown =
             spec.kind === "text"
               ? String(value)
-              : (Array.isArray(value) ? value : [value])
-                  .map((option) => t(optionKey(key, String(option))))
-                  .join(", ");
+              : spec.kind === "number"
+                ? t("profile.field.height.value", { cm: Number(value) })
+                : (Array.isArray(value) ? value : [value])
+                    .map((option) => t(optionKey(key, String(option))))
+                    .join(", ");
           return (
             <View key={key} className="gap-0.5">
               <Text variant="small">{t(fieldLabelKey(key))}</Text>

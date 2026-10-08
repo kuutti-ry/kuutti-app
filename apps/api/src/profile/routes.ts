@@ -46,8 +46,11 @@ const saveRoute = createRoute({
       "Validation failed, or text_contact_details (a field carries an e-mail, URL, phone number or handle).",
     ),
     401: unauthenticated,
-    403: errorContent("consent_required: a special-category field without the consent version."),
+    403: errorContent(
+      "consent_required: a politics or religion answer without the consent of the current wording (ADR-019); the detail names the fields and the current version.",
+    ),
     404: errorContent("No live account (erased meanwhile)."),
+    409: errorContent("agreement_outdated: a consent version that is not the current wording's."),
   },
 });
 

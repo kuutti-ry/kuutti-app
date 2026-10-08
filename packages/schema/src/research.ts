@@ -58,13 +58,18 @@ export function ageBandOf(age: number): AgeBand {
 
 /**
  * The profile fields an event may carry: the closed lists only (`single`,
- * `multi`), never a `text` field and never one flagged `specialCategory`
- * (ADR-009 §2). Computed from the registry, so a new field is out until it
- * is one of those kinds, and a flag on a field takes it out the same day.
+ * `multi`), never a text, a number or a setting, and never a field flagged
+ * `specialCategory` (ADR-009 §2, ADR-019 §4). Computed from the registry, so
+ * a new field is out until it is one of those kinds, and a flag on a field
+ * takes it out the same day.
  */
 export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => {
   const spec = PROFILE_FIELDS[key];
-  return spec.kind !== "text" && !spec.specialCategory;
+  return (
+    (spec.kind === "single" || spec.kind === "multi") &&
+    !spec.specialCategory &&
+    spec.role !== "hidden"
+  );
 });
 
 const researchFieldShape = Object.fromEntries(
