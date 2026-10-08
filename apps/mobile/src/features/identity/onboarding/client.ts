@@ -5,8 +5,8 @@ import {
   ErrorResponse,
   type Gender,
   OnboardingStatus,
-  PondList,
   type PreferencesUpdate,
+  type WithdrawableConsentKind,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
@@ -28,12 +28,6 @@ export async function fetchOnboarding(): Promise<OnboardingStatus> {
   return OnboardingStatus.parse(data);
 }
 
-export async function fetchPonds(): Promise<PondList> {
-  const { data, error, response } = await api.GET("/ponds");
-  if (!data) throw failed(response, error, "ponds");
-  return PondList.parse(data);
-}
-
 export async function declareGender(gender: Gender): Promise<void> {
   const { error, response } = await api.PUT("/account/gender", { body: { gender } });
   if (!response.ok) throw failed(response, error, "gender");
@@ -47,11 +41,6 @@ export async function savePreferences(update: PreferencesUpdate): Promise<void> 
   if (!response.ok) throw failed(response, error, "preferences");
 }
 
-export async function choosePond(pondId: string): Promise<void> {
-  const { error, response } = await api.PUT("/account/pond", { body: { pondId } });
-  if (!response.ok) throw failed(response, error, "pond");
-}
-
 /** The consent texts exist in fi, sv and en; the pseudo-locale reads the English. */
 export const consentLocale = (locale: string): "fi" | "sv" | "en" =>
   locale === "fi" || locale === "sv" ? locale : "en";
@@ -62,9 +51,12 @@ export async function fetchConsents(): Promise<ConsentsResponse> {
   return ConsentsResponse.parse(data);
 }
 
-export async function withdrawResearch(): Promise<ConsentsResponse> {
-  const { data, error, response } = await api.DELETE("/consents/research");
-  if (!data) throw failed(response, error, "research withdrawal");
+/** Research, or the special-category consent, which takes the seek answer with it (ADR-019 §4). */
+export async function withdrawConsent(kind: WithdrawableConsentKind): Promise<ConsentsResponse> {
+  const { data, error, response } = await api.DELETE("/consents/{kind}", {
+    params: { path: { kind } },
+  });
+  if (!data) throw failed(response, error, "consent withdrawal");
   return ConsentsResponse.parse(data);
 }
 

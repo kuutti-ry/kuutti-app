@@ -69,9 +69,22 @@ export type PondList = z.infer<typeof PondList>;
 export const PondChoice = z.object({ pondId: z.uuid() }).strict().meta({ id: "PondChoice" });
 export type PondChoice = z.infer<typeof PondChoice>;
 
-export const CONSENT_KINDS = ["terms", "privacy", "research"] as const;
+/**
+ * The kinds of consent: the two nothing may start without, the research
+ * opt-in, and the explicit consent for the special categories of article 9
+ * (whom one seeks, politics, religion; one wording, ADR-019 §4). Each names
+ * a legal.<kind>.* wording with a consent_version.
+ */
+export const CONSENT_KINDS = ["terms", "privacy", "research", "special_category"] as const;
 export const ConsentKind = z.enum(CONSENT_KINDS).meta({ id: "ConsentKind" });
 export type ConsentKind = z.infer<typeof ConsentKind>;
+
+/** The kinds a person withdraws; terms and privacy end with the account (ADR-010 §4). */
+export const WITHDRAWABLE_CONSENT_KINDS = ["research", "special_category"] as const;
+export const WithdrawableConsentKind = z
+  .enum(WITHDRAWABLE_CONSENT_KINDS)
+  .meta({ id: "WithdrawableConsentKind" });
+export type WithdrawableConsentKind = z.infer<typeof WithdrawableConsentKind>;
 
 /** The languages the texts exist in; the Finnish wording is the binding one (TD-17). */
 export const CONSENT_LOCALES = ["fi", "sv", "en"] as const;
@@ -99,7 +112,12 @@ export const ConsentRecord = z
 export type ConsentRecord = z.infer<typeof ConsentRecord>;
 
 export const ConsentVersions = z
-  .object({ terms: z.string().max(40), privacy: z.string().max(40), research: z.string().max(40) })
+  .object({
+    terms: z.string().max(40),
+    privacy: z.string().max(40),
+    research: z.string().max(40),
+    special_category: z.string().max(40),
+  })
   .meta({
     id: "ConsentVersions",
     description: "The consent_version of the current wording per kind.",
@@ -115,15 +133,48 @@ export const ConsentsResponse = z
   .meta({ id: "ConsentsResponse" });
 export type ConsentsResponse = z.infer<typeof ConsentsResponse>;
 
-/** What activation waits for; research is never one of them. */
-export const OnboardingStep = z
-  .enum(["gender", "seeks", "age_window", "pond", "terms", "privacy"])
-  .meta({ id: "OnboardingStep" });
+/**
+ * The steps of onboarding in the order the app asks them (#146, the field
+ * sheet): the two consents on the welcome screen, the name, the gender, whom
+ * one seeks (with the special-category consent), the intent, the age window,
+ * three photos, two prompts or a bio. The pond is assigned by the API from
+ * `matching_config.default_pond` and is a step only where no default exists.
+ * Research is never one of them.
+ */
+export const ONBOARDING_STEPS = [
+  "terms",
+  "privacy",
+  "name",
+  "gender",
+  "seeks",
+  "intent",
+  "age_window",
+  "photos",
+  "prompts_or_bio",
+  "pond",
+] as const;
+export const OnboardingStep = z.enum(ONBOARDING_STEPS).meta({ id: "OnboardingStep" });
 export type OnboardingStep = z.infer<typeof OnboardingStep>;
+
+/**
+ * What the account's state waits for (ADR-010 §6): the four answers matching
+ * cannot start without and the two consents. The profile steps are asked in
+ * the same flow and keep `complete` false, but an account is active without them.
+ */
+export const ACTIVATION_STEPS: readonly OnboardingStep[] = [
+  "gender",
+  "seeks",
+  "age_window",
+  "pond",
+  "terms",
+  "privacy",
+];
 
 export const OnboardingStatus = z
   .object({
     state: AccountState,
+    /** Whole years from the bank-verified year and month (rule 3): the age window's default is built around it. */
+    age: z.int().min(AGE_MIN).max(130),
     gender: Gender.nullable(),
     pond: PondSummary.nullable(),
     preferences: PreferencesResponse,
@@ -131,11 +182,15 @@ export const OnboardingStatus = z
       /** The version accepted, when it is the current one; an old consent reads as null. */
       terms: z.string().max(40).nullable(),
       privacy: z.string().max(40).nullable(),
+      /** The special-category consent given with the seek answer (ADR-019 §4), when its version is the current one. */
+      specialCategory: z.string().max(40).nullable(),
       /** The active research opt-in, when its version is the current one. */
       research: z.object({ version: z.string().max(40), givenAt: z.iso.datetime() }).nullable(),
     }),
     currentVersions: ConsentVersions,
-    missing: z.array(OnboardingStep).max(6),
+    /** In the order the app asks. */
+    missing: z.array(OnboardingStep).max(ONBOARDING_STEPS.length),
+    /** Nothing missing, the profile steps included; `state` says whether matching may start. */
     complete: z.boolean(),
   })
   .meta({ id: "OnboardingStatus" });

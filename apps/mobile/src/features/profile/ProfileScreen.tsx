@@ -6,9 +6,6 @@ import {
   DISPLAY_NAME_MAX,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
-  PROMPT_ANSWER_MAX,
-  PROMPT_KEYS,
-  PROMPTS_MAX,
   type ProfileFieldKey,
   type ProfileFields,
   SPECIAL_CATEGORY_FIELDS,
@@ -24,7 +21,8 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { completenessText, fieldLabelKey, optionKey, presetKey, promptKey } from "./keys";
+import { completenessText, fieldLabelKey, optionKey, presetKey } from "./keys";
+import { PromptsEditor } from "./PromptsEditor";
 import { type ProfileNotice, useProfile } from "./useProfile";
 
 /** The API's refusals the screen has its own words for; anything else is the generic line. */
@@ -84,7 +82,6 @@ export function ProfileScreen() {
     else fields[key] = value;
     update({ fields: fields as ProfileFields });
   };
-  const chosenPrompts = new Set(draft.prompts.map((p) => p.key));
 
   const consented = draft.specialCategoryConsent?.version === SPECIAL_CATEGORY_VERSION;
   const setConsent = (on: boolean) => {
@@ -306,59 +303,7 @@ export function ProfileScreen() {
           );
         })}
 
-        <View className="gap-3">
-          <Text variant="small">{t("profile.prompts.label")}</Text>
-          <Text variant="muted">{t("profile.prompts.hint", { max: PROMPTS_MAX })}</Text>
-          {draft.prompts.map((prompt) => {
-            const question = t(promptKey(prompt.key));
-            return (
-              <View key={prompt.key} className="gap-2">
-                <Text>{question}</Text>
-                <Input
-                  accessibilityLabel={t("profile.prompts.answer", { prompt: question })}
-                  value={prompt.answer}
-                  maxLength={PROMPT_ANSWER_MAX}
-                  multiline
-                  onChangeText={(answer) =>
-                    update({
-                      prompts: draft.prompts.map((p) =>
-                        p.key === prompt.key ? { ...p, answer } : p,
-                      ),
-                    })
-                  }
-                />
-                <Button
-                  variant="ghost"
-                  accessibilityLabel={t("profile.prompts.remove", { prompt: question })}
-                  onPress={() => {
-                    tap();
-                    update({ prompts: draft.prompts.filter((p) => p.key !== prompt.key) });
-                  }}
-                >
-                  <Text>{t("profile.prompts.removeButton")}</Text>
-                </Button>
-              </View>
-            );
-          })}
-          {draft.prompts.length < PROMPTS_MAX && (
-            <View className="gap-2">
-              <Text variant="small">{t("profile.prompts.pick")}</Text>
-              <View className="flex-row flex-wrap gap-2">
-                {PROMPT_KEYS.filter((key) => !chosenPrompts.has(key)).map((key) => (
-                  <Chip
-                    key={key}
-                    label={t(promptKey(key))}
-                    selected={false}
-                    onPress={() => {
-                      tap();
-                      update({ prompts: [...draft.prompts, { key, answer: "" }] });
-                    }}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
+        <PromptsEditor draft={draft} update={update} />
 
         {profile.notice && (
           <Text accessibilityLiveRegion="assertive">{noticeText(profile.notice, t)}</Text>

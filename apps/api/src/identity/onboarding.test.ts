@@ -1,17 +1,35 @@
 import { gender } from "@kuutti/db";
-import { AccountExport, ConsentsResponse, GENDERS, OnboardingStatus } from "@kuutti/schema";
+import {
+  AccountExport,
+  ConsentsResponse,
+  GENDERS,
+  ONBOARDING_STEPS,
+  OnboardingStatus,
+  ProfileResponse,
+} from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
+import { ageInYears, SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
 import { signedInAccount } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { CURRENT_CONSENT_VERSIONS, missingSteps, shownLocale } from "./onboarding.ts";
+import { fixturePng, testMediaDeps } from "../test/media.ts";
+import {
+  activationWaitsFor,
+  CURRENT_CONSENT_VERSIONS,
+  missingSteps,
+  shownLocale,
+} from "./onboarding.ts";
 import { CONSENT_CHURN_PER_DAY } from "./repo.ts";
 
-// features/identity/onboarding.feature (#46, ADR-010).
+// features/identity/onboarding.feature (#46, #146, ADR-010).
 
 async function appWith(ctx: TestContext) {
   const { logger, lines } = await captureLogger();
-  return { app: createApp({ config: testConfig(), logger, db: ctx.client }), logs: lines };
+  const media = testMediaDeps({ concurrency: 2 });
+  return {
+    app: createApp({ config: testConfig(), logger, db: ctx.client, media: media.deps }),
+    logs: lines,
+  };
 }
 type App = Awaited<ReturnType<typeof appWith>>["app"];
 type Headers = Record<string, string>;
@@ -40,7 +58,7 @@ async function pond(ctx: TestContext) {
   return rows[0]?.id ?? "";
 }
 
-/** Every required answer, in the order the app asks; returns the pond id. */
+/** Every answer activation needs, in the order the app asks (#146); returns the pond id. */
 async function onboard(
   ctx: TestContext,
   app: App,
@@ -48,11 +66,15 @@ async function onboard(
   options: { research?: boolean } = {},
 ) {
   const pondId = await pond(ctx);
+  await consent(app, headers, "terms", CURRENT_CONSENT_VERSIONS.terms);
+  await consent(app, headers, "privacy", CURRENT_CONSENT_VERSIONS.privacy);
   await app.request("/account/gender", {
     method: "PUT",
     headers: jsonHeaders(headers),
     body: JSON.stringify({ gender: "woman" }),
   });
+  // The seek answer needs the special-category consent (ADR-019 §4): the app records it on the same screen.
+  await consent(app, headers, "special_category", CURRENT_CONSENT_VERSIONS.special_category);
   await app.request("/preferences", {
     method: "PUT",
     headers: jsonHeaders(headers),
@@ -63,10 +85,32 @@ async function onboard(
     headers: jsonHeaders(headers),
     body: JSON.stringify({ pondId }),
   });
-  await consent(app, headers, "terms", CURRENT_CONSENT_VERSIONS.terms);
-  await consent(app, headers, "privacy", CURRENT_CONSENT_VERSIONS.privacy);
   if (options.research) await consent(app, headers, "research", CURRENT_CONSENT_VERSIONS.research);
   return pondId;
+}
+
+const PROFILE = {
+  displayName: "Aino",
+  bio: "A bio long enough to count for completeness, which is fifty characters.",
+  bioPreset: null,
+  fields: { intent: "casual" },
+  prompts: [],
+  specialCategoryConsent: null,
+};
+const putProfile = (app: App, headers: Headers, body: unknown) =>
+  app.request("/profile", {
+    method: "PUT",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify(body),
+  });
+async function uploadPhotos(app: App, headers: Headers, n: number) {
+  for (let i = 0; i < n; i += 1) {
+    const form = new FormData();
+    const bytes = await fixturePng(48 + i, 48);
+    form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "p.png");
+    const response = await app.request("/photos", { method: "POST", headers, body: form });
+    expect(response.status).toBe(201);
+  }
 }
 
 describe("onboarding and consents", () => {
@@ -124,10 +168,10 @@ describe("onboarding and consents", () => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     await consent(app, a.headers, "terms", CURRENT_CONSENT_VERSIONS.terms);
-    for (const kind of ["terms", "privacy"]) {
+    for (const kind of ["terms", "privacy", "anything"]) {
       expect(
         (await app.request(`/consents/${kind}`, { method: "DELETE", headers: a.headers })).status,
-      ).toBe(404);
+      ).toBe(400);
     }
     expect(await consentRows(ctx, a.accountId, "terms")).toBe(1);
   });
@@ -139,29 +183,29 @@ describe("onboarding and consents", () => {
     expect(before).toMatchObject({
       state: "registered",
       complete: false,
-      missing: ["gender", "seeks", "age_window", "pond", "terms", "privacy"],
+      missing: [...ONBOARDING_STEPS],
+      // signedInAccount registers the account as born 1990-06; the default age window is built around this.
+      age: ageInYears(1990, 6, new Date()),
     });
     await app.request("/account/gender", {
       method: "PUT",
       headers: jsonHeaders(a.headers),
       body: JSON.stringify({ gender: "non_binary" }),
     });
-    expect((await status(app, a.headers)).missing).toEqual([
-      "seeks",
-      "age_window",
-      "pond",
-      "terms",
-      "privacy",
-    ]);
+    expect((await status(app, a.headers)).missing).toEqual(
+      ONBOARDING_STEPS.filter((step) => step !== "gender"),
+    );
     const pondId = await onboard(ctx, app, a.headers);
     const after = await status(app, a.headers);
+    // Active on the six of ADR-010 §6; the profile steps of the sheet stay open (#146).
     expect(after).toMatchObject({
       state: "active",
-      complete: true,
-      missing: [],
+      complete: false,
+      missing: ["name", "intent", "photos", "prompts_or_bio"],
       gender: "woman",
       pond: { id: pondId, name: "Otaniemi", nameInessive: "Otaniemessä" },
       preferences: { seeks: ["man", "non_binary"], ageWindow: { min: 25, max: 35 } },
+      consents: { specialCategory: CURRENT_CONSENT_VERSIONS.special_category },
     });
     const { rows } = await ctx.client.query<{ state: string }>(
       "SELECT state FROM account WHERE id = $1",
@@ -191,7 +235,7 @@ describe("onboarding and consents", () => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
     await onboard(ctx, app, a.headers, { research: true });
-    expect(await consentRows(ctx, a.accountId)).toBe(3);
+    expect(await consentRows(ctx, a.accountId)).toBe(4);
     const deleted = await app.request("/account/delete", {
       method: "POST",
       headers: jsonHeaders(a.headers),
@@ -202,7 +246,7 @@ describe("onboarding and consents", () => {
       a.accountId,
     ]);
     expect(preferences.rows).toHaveLength(0);
-    expect(await consentRows(ctx, a.accountId)).toBe(3);
+    expect(await consentRows(ctx, a.accountId)).toBe(4);
     const { rows } = await ctx.client.query<{
       state: string;
       gender: string | null;
@@ -232,6 +276,7 @@ describe("onboarding and consents", () => {
     expect(exported.consents.map((c) => [c.kind, c.withdrawnAt !== null])).toEqual([
       ["terms", false],
       ["privacy", false],
+      ["special_category", false],
       ["research", true],
     ]);
   });
@@ -246,6 +291,7 @@ describe("onboarding and consents", () => {
       ["GET", "/consents"],
       ["POST", "/consents"],
       ["DELETE", "/consents/research"],
+      ["DELETE", "/consents/special_category"],
       ["GET", "/ponds"],
       ["PUT", "/account/pond"],
       ["GET", "/preferences"],
@@ -311,7 +357,7 @@ describe("onboarding and consents", () => {
       "too_many_changes",
     );
     expect(await consentRows(ctx, a.accountId, "research")).toBe(CONSENT_CHURN_PER_DAY);
-    // The list stays within the contract's cap however many rows exist.
+    // The list stays within the cap of the contract however many rows exist.
     const listed = ConsentsResponse.parse(
       await (await app.request("/consents", { headers: a.headers })).json(),
     );
@@ -368,22 +414,112 @@ describe("onboarding and consents", () => {
     expect([...GENDERS]).toEqual([...gender.enumValues]);
   });
 
-  it("missingSteps names what activation waits for, never research", () => {
+  it("missingSteps names the open steps in the sheet's order, never research, and activation waits for six of them", () => {
     const none = missingSteps({
       gender: null,
       preferences: { seeks: null, ageWindow: null },
       pond: null,
       terms: null,
       privacy: null,
+      specialCategory: null,
+      profile: { name: false, intent: false, photos: false, promptsOrBio: false },
     });
-    expect(none).toEqual(["gender", "seeks", "age_window", "pond", "terms", "privacy"]);
-    const all = missingSteps({
-      gender: "man",
-      preferences: { seeks: ["woman"], ageWindow: { min: 20, max: 30 } },
+    expect(none).toEqual([...ONBOARDING_STEPS]);
+    const answered = {
+      gender: "man" as const,
+      preferences: { seeks: ["woman" as const], ageWindow: { min: 20, max: 30 } },
       pond: { id: "p", slug: "s", name: "n", nameInessive: "i", parentId: null },
       terms: "v",
       privacy: "v",
+      specialCategory: "v",
+      profile: { name: true, intent: true, photos: true, promptsOrBio: true },
+    };
+    expect(missingSteps(answered)).toEqual([]);
+    // A seek answer without the special-category consent is no answer (ADR-019 §4);
+    // the profile steps keep the flow open and never hold the state (ADR-010 §6, §10).
+    const open = missingSteps({
+      ...answered,
+      specialCategory: null,
+      profile: { name: false, intent: false, photos: false, promptsOrBio: true },
     });
-    expect(all).toEqual([]);
+    expect(open).toEqual(["name", "seeks", "intent", "photos"]);
+    expect(activationWaitsFor(open)).toEqual(["seeks"]);
+  });
+
+  test("The onboarding lists the profile steps the sheet asks, in its order", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    await onboard(ctx, app, a.headers);
+    expect((await status(app, a.headers)).missing).toEqual([
+      "name",
+      "intent",
+      "photos",
+      "prompts_or_bio",
+    ]);
+    expect((await putProfile(app, a.headers, PROFILE)).status).toBe(200);
+    expect((await status(app, a.headers)).missing).toEqual(["photos"]);
+    // Uploaded counts here, with the moderator still to look (ADR-006); the card waits for approval.
+    await uploadPhotos(app, a.headers, 3);
+    const done = await status(app, a.headers);
+    expect(done.missing).toEqual([]);
+    expect(done.complete).toBe(true);
+    expect(done.state).toBe("active");
+  });
+
+  test("An account gets the default pond without a pond step", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    // The seed pond, which matching_config.default_pond names (migration 0020); the test database has no seed.
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('suomi', 'Suomi', 'Suomessa') RETURNING id",
+    );
+    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    const first = await status(app, a.headers);
+    expect(first.pond).toMatchObject({ id: rows[0]?.id, slug: "suomi", nameInessive: "Suomessa" });
+    expect(first.missing).not.toContain("pond");
+    expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(1);
+    const stored = await ctx.client.query<{ pond_id: string }>(
+      "SELECT pond_id FROM account WHERE id = $1",
+      [a.accountId],
+    );
+    expect(stored.rows[0]?.pond_id).toBe(rows[0]?.id);
+    // Assigned once: the next read finds it and says nothing.
+    await status(app, a.headers);
+    expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(1);
+  });
+
+  test("The seek consent is recorded with the answer and withdrawing it blanks the seek rows", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    await onboard(ctx, app, a.headers);
+    const saved = await putProfile(app, a.headers, {
+      ...PROFILE,
+      fields: { ...PROFILE.fields, politics: ["vihr"] },
+      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
+    });
+    expect(saved.status).toBe(200);
+    const withdrawn = await app.request("/consents/special_category", {
+      method: "DELETE",
+      headers: a.headers,
+    });
+    expect(withdrawn.status).toBe(200);
+    expect(
+      ConsentsResponse.parse(await withdrawn.json()).consents.find(
+        (c) => c.kind === "special_category",
+      )?.withdrawnAt,
+    ).not.toBeNull();
+    const after = await status(app, a.headers);
+    expect(after.preferences).toEqual({ seeks: null, ageWindow: { min: 25, max: 35 } });
+    expect(after.consents.specialCategory).toBeNull();
+    expect(after.missing).toContain("seeks");
+    const profile = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: a.headers })).json(),
+    );
+    expect(profile.profile?.fields).toEqual({ intent: "casual" });
+    expect(profile.profile?.specialCategoryConsent).toBeNull();
+    expect(logs().filter((l) => l.msg === "special-category answers cleared")).toHaveLength(1);
+    // The value never reached a log line (rule 5).
+    expect(JSON.stringify(logs())).not.toContain("vihr");
   });
 });

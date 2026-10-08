@@ -94,6 +94,34 @@ export async function savePreferences(
   });
 }
 
+/**
+ * Withdrawing the special-category consent takes the seek answer with it
+ * (ADR-019 §4, #146): the row goes, the age window stays, and onboarding asks
+ * again. The place at the gate follows the change of seeks like any other.
+ */
+export async function deleteSeeksOfAccount(db: Queryable, accountId: string): Promise<boolean> {
+  return transaction(db, async (tx) => {
+    const live = await tx.query<{ gender: string | null }>(
+      "SELECT gender FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
+      [accountId],
+    );
+    const account = live.rows[0];
+    if (!account) return false;
+    const before = await readPreferences(tx, accountId);
+    await tx.query("DELETE FROM preferences WHERE account_id = $1 AND field = $2", [
+      accountId,
+      SEEKS,
+    ]);
+    await admissionAnew(
+      tx,
+      accountId,
+      { gender: account.gender, seeks: before.seeks },
+      { gender: account.gender, seeks: null },
+    );
+    return true;
+  });
+}
+
 /** Erasure (TD-7, #51): every preference row of the account. */
 export async function deletePreferencesOfAccount(
   db: Queryable,

@@ -1510,8 +1510,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * What the caller has answered and what activation still waits for
-         * @description Gender, pond, the two hard preferences, the consents given for the current wordings and the current versions. When nothing required is missing and the account is still registered, it becomes active here.
+         * What the caller has answered and which steps of onboarding are still open
+         * @description The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.
          */
         get: {
             parameters: {
@@ -1658,7 +1658,7 @@ export interface paths {
         put?: never;
         /**
          * Record a consent for the current wording
-         * @description The kind, the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.
+         * @description The kind (terms, privacy, research, or special_category for whom one seeks, politics and religion), the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.
          */
         post: {
             parameters: {
@@ -1735,7 +1735,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/consents/research": {
+    "/consents/{kind}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1746,14 +1746,16 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Withdraw the research opt-in
-         * @description The one consent a person withdraws; terms and privacy end with the account. The rows stay as the record of what was agreed and when.
+         * Withdraw the research opt-in or the special-category consent
+         * @description The two consents a person withdraws; terms and privacy end with the account. Withdrawing special_category takes whom the person seeks and the politics and religion of the profile with it, and onboarding asks the seek question again. The rows stay as the record of what was agreed and when.
          */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    kind: components["schemas"]["WithdrawableConsentKind"];
+                };
                 cookie?: never;
             };
             requestBody?: never;
@@ -1765,6 +1767,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ConsentsResponse"];
+                    };
+                };
+                /** @description Validation failed: not a kind a person withdraws. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description unauthenticated, session_expired or session_revoked. */
@@ -2298,7 +2309,7 @@ export interface components {
             withdrawnAt: string | null;
         };
         /** @enum {string} */
-        ConsentKind: "terms" | "privacy" | "research";
+        ConsentKind: "terms" | "privacy" | "research" | "special_category";
         ProfileDocument: {
             displayName: string;
             bio: string | null;
@@ -2602,12 +2613,14 @@ export interface components {
         OnboardingStatus: {
             /** @enum {string} */
             state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
+            age: number;
             gender: components["schemas"]["Gender"];
             pond: components["schemas"]["PondSummary"];
             preferences: components["schemas"]["PreferencesResponse"];
             consents: {
                 terms: string | null;
                 privacy: string | null;
+                specialCategory: string | null;
                 research: {
                     version: string;
                     /** Format: date-time */
@@ -2623,9 +2636,10 @@ export interface components {
             terms: string;
             privacy: string;
             research: string;
+            special_category: string;
         };
         /** @enum {string} */
-        OnboardingStep: "gender" | "seeks" | "age_window" | "pond" | "terms" | "privacy";
+        OnboardingStep: "terms" | "privacy" | "name" | "gender" | "seeks" | "intent" | "age_window" | "photos" | "prompts_or_bio" | "pond";
         GenderUpdate: {
             gender: components["schemas"]["Gender"];
         };
@@ -2639,6 +2653,8 @@ export interface components {
             /** @enum {string} */
             locale: "fi" | "sv" | "en";
         };
+        /** @enum {string} */
+        WithdrawableConsentKind: "research" | "special_category";
         GateResponse: {
             state: components["schemas"]["GateState"];
             within: number | null;

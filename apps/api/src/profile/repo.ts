@@ -7,6 +7,7 @@ import {
   type ProfileFields,
   type ProfileUpdate,
   PromptAnswer,
+  SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 
 // Raw parameterised SQL as in the other slices: Deps.db is the Queryable seam
@@ -184,4 +185,27 @@ export async function findCardSubject(
     birthMonth: (r.birth_month as number | null) ?? null,
     profile: r.account_id ? profileFrom(r) : null,
   };
+}
+
+/**
+ * Withdrawing the special-category consent takes the article 9 answers with
+ * it (ADR-019 §4, #146): politics and religion leave the document and the
+ * consent columns are cleared; everything else stays. Under the account row's
+ * lock like every writer; a tombstone changes nothing.
+ */
+export async function clearSpecialCategoryAnswers(
+  db: Queryable,
+  accountId: string,
+  at: Date,
+): Promise<boolean> {
+  const result = await db.query(
+    `WITH live AS (SELECT id FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE)
+     UPDATE profile SET fields = fields - $2::text[],
+                        special_category_consent_version = NULL,
+                        special_category_consented_at = NULL,
+                        updated_at = $3
+     WHERE account_id IN (SELECT id FROM live)`,
+    [accountId, SPECIAL_CATEGORY_FIELDS, at],
+  );
+  return (result.rowCount ?? 0) > 0;
 }

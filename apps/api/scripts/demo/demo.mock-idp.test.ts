@@ -75,10 +75,9 @@ const lastDayOfMonth = (at: Date) =>
 
 async function world(ctx: TestContext) {
   const { logger, lines } = await captureLogger();
-  // The ponds the histories name: the test database has no seed.
+  // The pond the histories name, and the default pond (#146): the test database has no seed.
   await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES
-       ('espoo', 'Espoo', 'Espoossa'), ('otaniemi', 'Otaniemi', 'Otaniemessä')
+    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('suomi', 'Suomi', 'Suomessa')
      ON CONFLICT (slug) DO NOTHING`,
   );
   const config = testConfig({
@@ -677,24 +676,28 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
 
     const sanna = await as("sanna");
     expect(sanna.login.outcome).toBe("resumed");
-    expect(sanna.onboarding.missing).toEqual([]);
-    expect(sanna.profile.profile?.displayName).toBe("Sanna");
     // Everything but the photos, which the photo loader brings.
+    expect(sanna.onboarding.missing).toEqual(["photos"]);
+    expect(sanna.profile.profile?.displayName).toBe("Sanna");
     expect(sanna.profile.completeness.missing).toEqual(["photos"]);
 
+    // Registered and gone: nothing answered, and the first status read put the account in the one pond (#146).
     expect((await as("onni")).onboarding.missing).toEqual([
-      "gender",
-      "seeks",
-      "age_window",
-      "pond",
       "terms",
       "privacy",
+      "name",
+      "gender",
+      "seeks",
+      "intent",
+      "age_window",
+      "photos",
+      "prompts_or_bio",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
 
     // The wording moved on: an active account that is asked for the terms again, and only for them.
     const kerttu = await as("kerttu");
-    expect(kerttu.onboarding).toMatchObject({ state: "active", missing: ["terms"] });
+    expect(kerttu.onboarding).toMatchObject({ state: "active", missing: ["terms", "photos"] });
     const { rows: older } = await ctx.client.query<{ version: string }>(
       `SELECT c.version FROM consent c JOIN account a ON a.id = c.account_id
        JOIN identity i ON i.id = a.identity_id WHERE i.broker_subject = 'kerttu' AND c.kind = 'terms'`,
