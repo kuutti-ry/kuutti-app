@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   ageFromYearMonth,
   CENTURY_SIGNS,
+  checkCharacter,
   generateHetu,
+  hetuProblem,
   isAdult,
   parseHetu,
 } from "./hetu-format.ts";
