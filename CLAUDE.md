@@ -14,6 +14,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `packages/schema` | zod contracts shared by all apps; research event registry | `.claude/rules/schema.md` |
 | `packages/db` | Drizzle schema, generated migrations, seed | `.claude/rules/db.md` |
 | `packages/i18n` | `messages.yaml`, typed `t()`, i18next + ICU | `.claude/rules/i18n.md` |
+| `packages/tunnistus-oidc` | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; MIT, ADR-017 | `docs/vendors/telia.md` |
 | `services/mock-idp` | navikt/mock-oauth2-server with FTN-shaped claims for local dev; its login page names the twelve demo personas (ADR-014) | `.claude/rules/infra.md` |
 | `docs/` | security checklist, `adr/` | |
 | `features/` | Gherkin specs for the rules layer, one directory per slice | `.claude/rules/layout.md` |

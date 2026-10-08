@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { Gender, PreferencesUpdate, ProfileUpdate } from "@kuutti/schema";
+import { ageFromYearMonth } from "@kuutti/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
-import { ageFromYearMonth } from "../lib/hetu-format.ts";
 import { migrate } from "../migrate.ts";
 import { createPool } from "../pool.ts";
 import { MATCHING_CONFIG_V1, SEED_IDENTITIES, seed } from "../seed.ts";

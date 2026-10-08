@@ -58,27 +58,29 @@ The first login on the test bed (2026-10-08) showed what was left to watch: `acr
 - A person who backs out at the bank comes back with `error=access_denied` and no code (guide 2.5.2); the API sends them into the app as `auth_cancelled`, not as a failure.
 - Claims for a Finnish user through an FTN method: `sub` (opaque), `auth_time`, `acr`, `amr` (the bank, as a URI such as `https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1`), `urn:oid:1.2.246.21` = **hetu**, `urn:oid:1.3.6.1.5.5.7.9.1` = date of birth, `urn:oid:2.5.4.4` surname, `urn:oid:1.2.246.575.1.14` given names, `urn:oid:2.16.840.1.113730.3.1.241` display name, `bank-tupasid`, `session_index`. The API keeps `sub`, `auth_time`, `acr`, `amr` and the identifiers it derives (`hetu_hmac`, `birth_year`, `birth_month`); the rest is read and dropped (rules 1 and 3).
 
-The mock IdP in `services/mock-idp` issues the same claim names and `acr`/`amr` shapes, so local development exercises the real parser. The Telia dialect itself (request object, `private_key_jwt`, the JWE) is exercised against `apps/api/src/test/fake-telia.ts`, an in-process provider written to the guide under the real pre-production issuer; see Conformance below.
+The mock IdP in `services/mock-idp` issues the same claim names and `acr`/`amr` shapes, so local development exercises the real parser. The Telia dialect itself (request object, `private_key_jwt`, the JWE) is exercised against `packages/tunnistus-oidc/src/testing/fake-telia.ts`, an in-process provider written to the guide under the real pre-production issuer; see Conformance below.
 
 ## Conformance: guide clause → code → test
+
+Since ADR-017 the client, discovery, the key helpers, the hetu format and the double live in `packages/tunnistus-oidc` (MIT); the identity slice's `oidc-broker.ts` is the adapter that keeps Kuutti's part (`prompt=login`, what of the person is held, the API's error). The table's tests are the package's unless they name a route.
 
 What the guide requires, where the API does it, and which test proves it. Levels, as agreed: pure functions with property or example tests; the adapter against a provider written to the guide (in process); the routes end to end on real Postgres with a broker double; the plain dialect against the real mock IdP in the compose job; the whole thing by hand against the mock. On 2026-10-08 the whole of it ran against Telia's pre-production bed: the first complete login (Aktia's test person) went through the signed request object, the chooser, the encrypted ID token, the freshness check of ADR-016 and the identity derivation, and ended with a session on the phone (#32, #33).
 
 | guide | requirement | code | test |
 |---|---|---|---|
-| 2.1.1, 2.3 | two RSA keys, `sig` and `enc`, 2048+ | `infra/README.md` Secrets; `OidcBroker.create` refuses a Telia issuer without both | `oidc-broker.telia.test.ts` "does not boot…" |
-| 2.1.3 | redirect URI registered exactly, https, no wildcard | `registeredCallbackUrl` sends the registered value, never the Host header's | `oidc-broker.test.ts`, `oidc-broker.telia.test.ts` "uses the registered redirect URI…" |
+| 2.1.1, 2.3 | two RSA keys, `sig` and `enc`, 2048+ | `infra/README.md` Secrets; `createTunnistusClient` refuses a Telia issuer without both | `client.telia.test.ts` "does not start against a Telia issuer without both keys…"; the adapter names the SSM parameters, `apps/api/src/identity/oidc-broker.test.ts` "does not boot…, naming the parameters" |
+| 2.1.3 | redirect URI registered exactly, https, no wildcard | `registeredCallbackUrl` sends the registered value, never the Host header's | `client.test.ts`, `client.telia.test.ts` "uses the registered redirect URI…" |
 | 2.2, 2.7 | endpoints and keys from discovery; rotation without restart | `discoverProvider` at boot; JWKS by `jwks_uri`, refetched on an unknown `kid` | `discovery.test.ts`; telia test "picks up a rotated…" |
 | 2.4.1–2.4.3 | signed request object (RS256) with `iss`=`client_id`, `aud`=issuer, `response_type`, `scope`, `client_id`, `redirect_uri`, `acr_values`, `state`, `nonce`, `jti`, `exp`, `ui_locales` | `startLogin` → `buildAuthorizationUrlWithJAR` | telia test "sends the authentication request…" (the fake verifies the signature and every claim) |
 | 2.5 | `code` and `state` back; `error=access_denied` on cancel | `completeLogin` in `login.ts` → `auth_cancelled` | telia test "sends the person who cancels…"; `routes.test.ts` "A person who cancels at the bank…" |
 | 2.6.1–2.6.2 | `private_key_jwt`: `iss`=`sub`=`client_id`, `aud`=token endpoint, `jti`, `exp` ≤ 60 min | `PrivateKeyJwt` with the `aud` hook | telia test "authenticates the token request…" |
 | 2.6.3–2.6.4 | ID token = JWE (RSA-OAEP with A128CBC-HS256, or the A128GCM Telia's metadata also lists; `kid` = our enc key's thumbprint) around an RS256 JWS; verify the signature against the JWKS, `iss`, `aud` (array + `azp`), `exp`, `nonce`, `acr`; read the FTN claims; a token that arrives unencrypted is refused | `enableDecryptingResponses` with the key's kid and both encryptions, `enableNonRepudiationChecks`, `authorizationCodeGrant` with expected state and nonce, `identityFromClaims` | telia test "…decrypts and verifies…", "decrypts an ID token under either content encryption…", "refuses an ID token that is not encrypted…", "refuses a level other than…" |
 | 2.6.5 | non-Finnish methods carry no personal identity code | refused as `no identity code` | telia test "…a token without the identity code" |
-| Traficom 213/2023 S | `acr_values` mandatory; the answer's `acr` is the one asked for | `OIDC_ACR_VALUES`; `expectedAcr` | `oidc-broker.test.ts` "accepts only the level…"; both provider tests |
+| Traficom 213/2023 S | `acr_values` mandatory; the answer's `acr` is the one asked for | `OIDC_ACR_VALUES`; `expectedAcr` | `client.test.ts` "accepts only the level…"; both provider tests |
 | rules 1 and 3 | the code becomes an HMAC and a year and month, nothing else is kept | `deriveIdentity`, `deriveFromBroker` | `hetu.test.ts` (fast-check), `routes.test.ts` "A first login…", `pii-in-logs.test.ts` |
 | TD-7 | re-registration at the callback | `decideRegistration` | `features/identity/re-registration.feature` |
 | — | the routes, end to end | `routes.ts` | `features/identity/bank-login.feature`, `features/identity/sessions.feature` |
-| plain dialect | the mock IdP over http, no request object, no client secret | same adapter, decided by the issuer | `oidc-broker.mock-idp.test.ts` (compose job), `services/mock-idp/verify.ts` |
+| plain dialect | the mock IdP over http, no request object, no client secret | same adapter, decided by the issuer | `client.mock-idp.test.ts` (compose job), `services/mock-idp/verify.ts` |
 
 ## Pre-production test users (section 1.4)
 

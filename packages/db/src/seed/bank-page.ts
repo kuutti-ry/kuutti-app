@@ -1,4 +1,4 @@
-import { checkCharacter } from "../lib/hetu-format.ts";
+import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 import { assertArtificial, type DemoPersona, MOCK_BANK_ACR, MOCK_BANK_AMR } from "./personas.ts";
 
 /**

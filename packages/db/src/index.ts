@@ -1,14 +1,4 @@
 export { type JournalEntry, readJournal } from "./journal.ts";
-export {
-  ageFromYearMonth,
-  CENTURY_SIGNS,
-  generateHetu,
-  type HetuProblem,
-  hetuProblem,
-  isAdult,
-  type ParsedHetu,
-  parseHetu,
-} from "./lib/hetu-format.ts";
 export { MIGRATE_LOCK_KEY, type MigrateResult, migrate } from "./migrate.ts";
 export { type MigrationsStatus, migrationsStatus } from "./migrations.ts";
 export {

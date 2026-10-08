@@ -291,6 +291,9 @@ importers:
       '@kuutti/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@kuutti/tunnistus-oidc':
+        specifier: workspace:*
+        version: link:../../packages/tunnistus-oidc
       '@sentry/node':
         specifier: ^11.1.0
         version: 11.4.0
@@ -300,12 +303,6 @@ importers:
       hono:
         specifier: ^4.13.12
         version: 4.13.12
-      jose:
-        specifier: ^6.2.12
-        version: 6.2.12
-      openid-client:
-        specifier: ^6.8.8
-        version: 6.8.8
       p-limit:
         specifier: ^7.3.3
         version: 7.3.3
@@ -512,6 +509,9 @@ importers:
       '@kuutti/schema':
         specifier: workspace:*
         version: link:../schema
+      '@kuutti/tunnistus-oidc':
+        specifier: workspace:*
+        version: link:../tunnistus-oidc
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)
@@ -528,9 +528,6 @@ importers:
       drizzle-kit:
         specifier: ^0.31.11
         version: 0.31.11
-      fast-check:
-        specifier: ^4.10.0
-        version: 4.10.2
       tsx:
         specifier: ^4.23.15
         version: 4.23.15
@@ -596,6 +593,34 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@22.20.4)(jsdom@27.4.0(supports-color@8.1.1))(vite@8.3.2(@types/node@22.20.4)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/tunnistus-oidc:
+    dependencies:
+      jose:
+        specifier: ^6.2.12
+        version: 6.2.12
+      openid-client:
+        specifier: ^6.8.8
+        version: 6.8.8
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.4
+        version: 22.20.4
+      fast-check:
+        specifier: ^4.10.2
+        version: 4.10.2
+      hono:
+        specifier: ^4.13.12
+        version: 4.13.12
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.3(@opentelemetry/api@1.9.1)(@types/node@22.20.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@22.20.4)(esbuild@0.28.2)(jiti@1.21.7)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
 packages:
 

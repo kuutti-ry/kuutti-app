@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createContext, runInContext } from "node:vm";
+import { ageFromYearMonth, isAdult, parseHetu } from "@kuutti/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
-import { ageFromYearMonth, isAdult, parseHetu } from "../lib/hetu-format.ts";
 import { renderBankPage } from "./bank-page.ts";
 import {
   assertArtificial,

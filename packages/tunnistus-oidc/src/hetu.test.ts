@@ -8,7 +8,7 @@ import {
   hetuProblem,
   isAdult,
   parseHetu,
-} from "./hetu-format.ts";
+} from "./hetu.ts";
 
 /** A deterministic RNG driven by a fast-check array of unit floats. */
 function rngFrom(values: number[]): () => number {

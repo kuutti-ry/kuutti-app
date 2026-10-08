@@ -2,11 +2,12 @@
  * Finnish personal identity code (henkilötunnus) format: DDMMYY, a century
  * sign, a three-digit individual number, and a check character.
  *
- * This module knows the format only. It derives what the product needs (birth
- * year and month, the 18+ check) and nothing else: legal sex is encoded in the
- * individual number and is deliberately never derived (TD-14, rule 3). Real
- * codes exist only in memory inside the OIDC callback (rule 1); generated ones
- * feed seeds and tests.
+ * This module knows the format only. It derives what a relying party usually
+ * needs (birth year and month, an age check) and nothing else: legal sex is
+ * encoded in the individual number and is deliberately never derived. A real
+ * code belongs in memory for the length of one request; the generator feeds
+ * seeds and tests with codes nobody has (individual numbers 002–899 are a
+ * generator's choice; 900–999 are temporary and test identities).
  */
 
 const CHECK_CHARS = "0123456789ABCDEFHJKLMNPRSTUVWXY";
@@ -50,8 +51,8 @@ function daysInMonth(year: number, month: number): number {
 /**
  * Which check a refused code failed: the shape (eleven characters, a known
  * century sign), the check character, the date, or an individual number
- * below 002. Says nothing about the code itself, so it may be logged (rule 1);
- * without it a refusal on the test bed is a guess.
+ * below 002. Says nothing about the code itself, so it may be logged;
+ * without it a refusal from a test bank is a guess.
  */
 export type HetuProblem = "format" | "checksum" | "date" | "individual";
 
@@ -93,8 +94,8 @@ export function hetuProblem(input: string): HetuProblem | null {
 }
 
 /**
- * Age as if born on the last day of the birth month (TD-14): never overstates,
- * needs only year and month, self-updating.
+ * Age as if born on the last day of the birth month: never overstates, needs
+ * only year and month, self-updating.
  */
 export function ageFromYearMonth(birthYear: number, birthMonth: number, at: Date): number {
   const lastDay = daysInMonth(birthYear, birthMonth);
@@ -124,10 +125,10 @@ export function generateHetu(
   const maxAge = options.maxAge ?? 70;
   const age = minAge + Math.floor(rng() * (maxAge - minAge + 1));
   const birthMonth = 1 + Math.floor(rng() * 12);
-  // The product's age rule counts a birthday on the last day of the birth
-  // month. A month later in the year than `at` makes the person a year
-  // younger under that rule, so move the year back in that case: the result
-  // is `age` or `age + 1`, never below minAge.
+  // The age rule above counts a birthday on the last day of the birth month.
+  // A month later in the year than `at` makes the person a year younger
+  // under that rule, so move the year back in that case: the result is `age`
+  // or `age + 1`, never below minAge.
   let birthYear = at.getUTCFullYear() - age;
   if (ageFromYearMonth(birthYear, birthMonth, at) < age) birthYear -= 1;
   const maxDay = daysInMonth(birthYear, birthMonth);

@@ -222,6 +222,7 @@ jobs:
           S3_ACCESS_KEY: kuutti
           S3_SECRET_KEY: kuutti-dev-only
         run: |
+          pnpm --filter @kuutti/tunnistus-oidc test
           pnpm --filter @kuutti/db test
           pnpm --filter @kuutti/api test
 

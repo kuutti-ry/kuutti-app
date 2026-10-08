@@ -1,18 +1,18 @@
 import { z } from "zod";
 
 /**
- * The part of an OpenID provider's metadata the bank login needs (#32,
- * docs/vendors/telia.md). Read at boot from `<issuer>/.well-known/openid-configuration`
- * so that Telia's endpoints and rotating keys are never configuration: what the
- * broker publishes is what the process uses. The mock IdP publishes the same
- * document, so the check runs locally too.
+ * The part of an OpenID provider's metadata a relying party checks at boot:
+ * read from `<issuer>/.well-known/openid-configuration` so that the broker's
+ * endpoints and rotating keys are never configuration. What the broker
+ * publishes is what the process uses. A mock publishes the same document, so
+ * the check runs locally too.
  */
 export const ProviderMetadata = z.object({
   issuer: z.url(),
   authorization_endpoint: z.url(),
   token_endpoint: z.url(),
   jwks_uri: z.url(),
-  // Telia authenticates clients with private_key_jwt only (guide 2.6); the mock
+  // Telia authenticates clients with private_key_jwt only (guide 2.6); a mock
   // lists several. Anything that does not offer it cannot be the broker.
   token_endpoint_auth_methods_supported: z.array(z.string()).optional(),
   acr_values_supported: z.array(z.string()).optional(),
@@ -60,7 +60,7 @@ export async function discoverProvider(
   return parsed.data;
 }
 
-/** Telia's pre-production and production hosts, where private_key_jwt is the only method. */
+/** Telia's pre-production and production hosts, where the Telia dialect is the only one. */
 export function isTeliaIssuer(issuer: string): boolean {
   return /^https:\/\/tunnistus(-pp)?\.telia\.fi\//.test(issuer);
 }
