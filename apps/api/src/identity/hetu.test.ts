@@ -72,6 +72,10 @@ describe("deriveIdentity", () => {
   it("refuses an invalid code and a malformed key", () => {
     expect(() => deriveIdentity("010190-123B", key, AT)).toThrow(InvalidHetuError);
     expect(() => deriveIdentity("not a code", key, AT)).toThrow(InvalidHetuError);
+    // The message names the failing check (what the callback logs), never the code.
+    expect(() => deriveIdentity("010190-123B", key, AT)).toThrow(/\(checksum\)$/);
+    expect(() => deriveIdentity("not a code", key, AT)).toThrow(/\(format\)$/);
+    expect(() => deriveIdentity("not a code", key, AT)).not.toThrow(/not a code/);
     expect(() => hmacKeyFromHex("abc")).toThrow(/32 bytes/);
     expect(hmacKeyFromHex("ff".repeat(32))).toHaveLength(32);
   });

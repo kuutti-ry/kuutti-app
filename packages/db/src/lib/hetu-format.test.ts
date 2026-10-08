@@ -64,6 +64,20 @@ describe("hetu format", () => {
     expect(parseHetu("")).toBeNull();
   });
 
+  it("names the check a refused code fails, and nothing else", () => {
+    // A code whose check character is right, so a later check is what fails.
+    const withCheck = (ddmmyy: string, sign: string, individual: string) =>
+      `${ddmmyy}${sign}${individual}${checkCharacter(ddmmyy, individual)}`;
+    expect(hetuProblem("not a code")).toBe("format");
+    expect(hetuProblem("0101901234A")).toBe("format");
+    expect(hetuProblem("010190-123B")).toBe("checksum");
+    expect(hetuProblem(withCheck("310290", "-", "123"))).toBe("date");
+    expect(hetuProblem(withCheck("011390", "-", "123"))).toBe("date");
+    expect(hetuProblem(withCheck("010190", "-", "001"))).toBe("individual");
+    expect(hetuProblem(withCheck("010170", "-", "999"))).toBeNull();
+    expect(hetuProblem(" 010170-999r ")).toBeNull();
+  });
+
   it("never exposes sex", () => {
     const parsed = parseHetu(generateHetu(rngFrom([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])));
     expect(parsed && Object.keys(parsed)).not.toContain("sex");

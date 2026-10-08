@@ -47,10 +47,17 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
-/** Returns null for anything that is not a well-formed, checksum-valid code with a real date. */
-export function parseHetu(input: string): ParsedHetu | null {
+/**
+ * Which check a refused code failed: the shape (eleven characters, a known
+ * century sign), the check character, the date, or an individual number
+ * below 002. Says nothing about the code itself, so it may be logged (rule 1);
+ * without it a refusal on the test bed is a guess.
+ */
+export type HetuProblem = "format" | "checksum" | "date" | "individual";
+
+function analyse(input: string): { parsed: ParsedHetu } | { problem: HetuProblem } {
   const m = HETU.exec(input.trim().toUpperCase());
-  if (!m) return null;
+  if (!m) return { problem: "format" };
   const [, dd, mm, yy, sign, individual, check] = m as unknown as [
     string,
     string,
@@ -61,16 +68,28 @@ export function parseHetu(input: string): ParsedHetu | null {
     string,
   ];
   const century = CENTURY_SIGNS[sign];
-  if (century === undefined) return null;
-  if (checkCharacter(`${dd}${mm}${yy}`, individual) !== check) return null;
+  if (century === undefined) return { problem: "format" };
+  if (checkCharacter(`${dd}${mm}${yy}`, individual) !== check) return { problem: "checksum" };
   const birthYear = century + Number.parseInt(yy, 10);
   const birthMonth = Number.parseInt(mm, 10);
   const birthDay = Number.parseInt(dd, 10);
-  if (birthMonth < 1 || birthMonth > 12) return null;
-  if (birthDay < 1 || birthDay > daysInMonth(birthYear, birthMonth)) return null;
+  if (birthMonth < 1 || birthMonth > 12) return { problem: "date" };
+  if (birthDay < 1 || birthDay > daysInMonth(birthYear, birthMonth)) return { problem: "date" };
   const individualNumber = Number.parseInt(individual, 10);
-  if (individualNumber < 2) return null;
-  return { birthYear, birthMonth, birthDay, centurySign: sign, individualNumber };
+  if (individualNumber < 2) return { problem: "individual" };
+  return { parsed: { birthYear, birthMonth, birthDay, centurySign: sign, individualNumber } };
+}
+
+/** Returns null for anything that is not a well-formed, checksum-valid code with a real date. */
+export function parseHetu(input: string): ParsedHetu | null {
+  const result = analyse(input);
+  return "parsed" in result ? result.parsed : null;
+}
+
+/** The check a code fails, or null for a code `parseHetu` accepts. */
+export function hetuProblem(input: string): HetuProblem | null {
+  const result = analyse(input);
+  return "problem" in result ? result.problem : null;
 }
 
 /**
