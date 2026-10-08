@@ -55,9 +55,9 @@ variable "cors_allowed_origins" {
 }
 
 variable "telia_client_id" {
-  description = "The client_id Telia Tunnistus assigned to Kuutti on its pre-production bed (#32, docs/vendors/telia.md): /kuutti/staging/oidc-client-id. Public by OIDC design (it travels in every authorization URL), so it is a default here once Telia's provisioning mail has arrived. Null keeps bank identification off: the issuer, the registered redirect URI and the acr value are written only together with it, because the API refuses half a configuration at boot. The two private keys are /kuutti/staging/telia-signing-key and -encryption-key, never resources (infra/README.md, Secrets)."
+  description = "The client_id Telia Tunnistus assigned to Kuutti on its pre-production bed (#32, docs/vendors/telia.md): /kuutti/staging/oidc-client-id. Public by OIDC design (it travels in every authorization URL), so it is a default here; Telia's provisioning mail of 2026-10-08 (ticket 01121315) carries it. Null keeps bank identification off: the issuer, the registered redirect URI and the acr value are written only together with it, because the API refuses half a configuration at boot. The two private keys are /kuutti/staging/telia-signing-key and -encryption-key, never resources (infra/README.md, Secrets)."
   type        = string
-  default     = null
+  default     = "b9b08a7a-ebb4-4a8c-a3e7-52824d3231e5"
 }
 
 variable "media_enabled" {
