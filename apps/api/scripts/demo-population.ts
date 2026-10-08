@@ -37,6 +37,7 @@ import { CURRENT_CONSENT_VERSIONS } from "../src/identity/index.ts";
 import { countGates } from "../src/jobs/pond-gate.ts";
 import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
 import { createLogger } from "../src/lib/logger.ts";
+import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../src/profile/index.ts";
 
 function fail(message: string, code = 1): never {
   console.error(`✖ ${message}`);
@@ -81,7 +82,10 @@ try {
     console.log(JSON.stringify({ msg: "demo population removed", env, ...result }));
   } else {
     const people = generatePopulation({ size, seed });
-    const result = await writePopulation(pool, people, CURRENT_CONSENT_VERSIONS);
+    const result = await writePopulation(pool, people, {
+      ...CURRENT_CONSENT_VERSIONS,
+      special_category: SPECIAL_CATEGORY_CONSENT_VERSION,
+    });
     console.log(JSON.stringify({ msg: "demo population", env, size, seed, ...result, notShown }));
   }
   // The figures the counter stood on are of the ponds as they were: gone, and

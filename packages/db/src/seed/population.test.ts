@@ -28,7 +28,11 @@ import {
 // valid against the contracts, and across the thresholds on purpose.
 
 const MIGRATIONS = resolve(import.meta.dirname, "../..", "drizzle");
-const VERSIONS = { terms: "test-terms-1", privacy: "test-privacy-1" };
+const VERSIONS = {
+  terms: "test-terms-1",
+  privacy: "test-privacy-1",
+  special_category: "test-special-1",
+};
 const THRESHOLDS = {
   gateK: MATCHING_CONFIG_V1.gate_k,
   majorityShareMax: MATCHING_CONFIG_V1.majority_share_max,
@@ -164,12 +168,26 @@ describe("the synthetic population", () => {
       // No research consent: the product writes it with its mapping row, and nobody here takes part.
       expect(person.consents.map((c) => c.kind)).toEqual(["terms", "privacy"]);
       if (person.profile) {
-        const parsed = ProfileUpdate.safeParse({ ...person.profile, specialCategoryConsent: null });
+        const { specialCategoryConsentedAt, ...document } = person.profile;
+        const specialCategoryConsent = specialCategoryConsentedAt
+          ? { version: VERSIONS.special_category }
+          : null;
+        const parsed = ProfileUpdate.safeParse({ ...document, specialCategoryConsent });
         expect(parsed.success, `${person.label}: ${JSON.stringify(parsed.error?.issues)}`).toBe(
           true,
         );
         // Stored as it would be after the API's own trim: nothing to trim.
-        expect(parsed.data).toEqual({ ...person.profile, specialCategoryConsent: null });
+        expect(parsed.data).toEqual({ ...document, specialCategoryConsent });
+        // An article 9 answer only behind the consent, given with the others (ADR-019 §4).
+        if (document.fields.politics !== undefined || document.fields.religion !== undefined) {
+          expect(specialCategoryConsentedAt, person.label).not.toBeNull();
+        }
+        if (specialCategoryConsentedAt) {
+          expect(specialCategoryConsentedAt.getTime()).toBeGreaterThan(
+            person.registeredAt.getTime(),
+          );
+          expect(specialCategoryConsentedAt.getTime()).toBeLessThanOrEqual(DEMO_EPOCH.getTime());
+        }
       }
     }
   });
@@ -218,6 +236,15 @@ describe("the synthetic population", () => {
     expect(profiles.some((p) => p.prompts.length === 3)).toBe(true);
     expect(people.some((p) => p.pond !== null && p.profile === null)).toBe(true);
     expect(profiles.some((p) => /[åäöÅÄÖ]/.test(p.displayName))).toBe(true);
+    // The fields of ADR-019, each answered by some and left by others.
+    expect(profiles.every((p) => p.fields.intent !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.politics !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.religion !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.specialCategoryConsentedAt === null)).toBe(true);
+    expect(profiles.some((p) => p.fields.hideFromField === true)).toBe(true);
+    expect(profiles.some((p) => p.fields.height !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.occupationTitle !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.hobbies === undefined)).toBe(true);
   });
 });
 

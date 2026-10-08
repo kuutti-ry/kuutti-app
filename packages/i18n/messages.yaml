@@ -174,32 +174,11 @@ profile.field.intent:
   sv: "Söker"
   machine: { fi: true, sv: true }
 
-profile.field.relationship:
-  en: "Relationship type"
-  description: "Label of the relationship field of the profile registry (#47)."
-  fi: "Suhteen tyyppi"
-  sv: "Typ av relation"
-  machine: { fi: true, sv: true }
-
-profile.field.kids:
-  en: "Kids"
-  description: "Label of the kids field of the profile registry (#47)."
-  fi: "Lapset"
-  sv: "Barn"
-  machine: { fi: true, sv: true }
-
 profile.field.smoking:
   en: "Smoking"
   description: "Label of the smoking field of the profile registry (#47)."
   fi: "Tupakointi"
   sv: "Rökning"
-  machine: { fi: true, sv: true }
-
-profile.field.alcohol:
-  en: "Alcohol"
-  description: "Label of the alcohol field of the profile registry (#47)."
-  fi: "Alkoholi"
-  sv: "Alkohol"
   machine: { fi: true, sv: true }
 
 profile.field.education:
@@ -216,102 +195,137 @@ profile.field.field:
   sv: "Bransch"
   machine: { fi: true, sv: true }
 
-profile.field.campus:
-  en: "Campus or guild"
-  description: "Label of the campus field of the profile registry (#47)."
-  fi: "Kampus tai kilta"
-  sv: "Campus eller gille"
+profile.field.identityLabel:
+  en: "Identity"
+  description: "Label of the identityLabel field of the profile registry (#145, ADR-019)."
+  fi: "Identiteetti"
+  sv: "Identitet"
   machine: { fi: true, sv: true }
 
-profile.campus.hint:
+profile.field.monogamy:
+  en: "Relationship structure"
+  description: "Label of the monogamy field of the profile registry (#145, ADR-019)."
+  fi: "Suhteen muoto"
+  sv: "Relationsform"
+  machine: { fi: true, sv: true }
+
+profile.field.hasKids:
+  en: "Kids"
+  description: "Label of the hasKids field of the profile registry (#145, ADR-019)."
+  fi: "Lapset"
+  sv: "Barn"
+  machine: { fi: true, sv: true }
+
+profile.field.wantsKids:
+  en: "Kids in the future"
+  description: "Label of the wantsKids field of the profile registry (#145, ADR-019)."
+  fi: "Lapset tulevaisuudessa"
+  sv: "Barn i framtiden"
+  machine: { fi: true, sv: true }
+
+profile.field.drinking:
+  en: "Drinking"
+  description: "Label of the drinking field of the profile registry (#145, ADR-019)."
+  fi: "Alkoholi"
+  sv: "Alkohol"
+  machine: { fi: true, sv: true }
+
+profile.field.drugsAttitude:
+  en: "Drugs, your attitude"
+  description: "Label of the drugsAttitude field of the profile registry (#145, ADR-019)."
+  fi: "Suhtautuminen huumeisiin"
+  sv: "Inställning till droger"
+  machine: { fi: true, sv: true }
+
+profile.field.hobbies:
+  en: "Hobbies"
+  description: "Label of the hobbies field of the profile registry (#145, ADR-019)."
+  fi: "Harrastukset"
+  sv: "Hobbyer"
+  machine: { fi: true, sv: true }
+
+profile.field.height:
+  en: "Height"
+  description: "Label of the height field of the profile registry (#145, ADR-019)."
+  fi: "Pituus"
+  sv: "Längd"
+  machine: { fi: true, sv: true }
+
+profile.field.exercise:
+  en: "Exercise"
+  description: "Label of the exercise field of the profile registry (#145, ADR-019)."
+  fi: "Liikunta"
+  sv: "Motion"
+  machine: { fi: true, sv: true }
+
+profile.field.pets:
+  en: "Pets"
+  description: "Label of the pets field of the profile registry (#145, ADR-019)."
+  fi: "Lemmikit"
+  sv: "Husdjur"
+  machine: { fi: true, sv: true }
+
+profile.field.hideFromField:
+  en: "Hide me from people in my field"
+  description: "Label of the hideFromField field of the profile registry (#145, ADR-019)."
+  fi: "Piilota minut oman alani ihmisiltä"
+  sv: "Dölj mig för folk inom mitt område"
+  machine: { fi: true, sv: true }
+
+profile.field.occupation:
+  en: "Work"
+  description: "Label of the occupation field of the profile registry (#145, ADR-019)."
+  fi: "Työ"
+  sv: "Arbete"
+  machine: { fi: true, sv: true }
+
+profile.field.occupationTitle:
+  en: "Job title, without the employer's name"
+  description: "Label of the occupationTitle field of the profile registry (#145, ADR-019)."
+  fi: "Tehtävänimike ilman työnantajan nimeä"
+  sv: "Yrkestitel utan arbetsgivarens namn"
+  machine: { fi: true, sv: true }
+
+profile.field.politics:
+  en: "Parties you could vote for"
+  description: "Label of the politics field of the profile registry (#145, ADR-019)."
+  fi: "Puolueet, joita voisit äänestää"
+  sv: "Partier du kunde rösta på"
+  machine: { fi: true, sv: true }
+
+profile.field.religion:
+  en: "Religion"
+  description: "Label of the religion field of the profile registry (#145, ADR-019)."
+  fi: "Uskonto"
+  sv: "Religion"
+  machine: { fi: true, sv: true }
+
+profile.field.zodiac:
+  en: "Star sign"
+  description: "Label of the zodiac field of the profile registry (#145, ADR-019)."
+  fi: "Horoskooppimerkki"
+  sv: "Stjärntecken"
+  machine: { fi: true, sv: true }
+
+profile.field.height.value:
+  en: "{cm, number} cm"
+  description: "A height on the card and under the field: centimetres, display only (#145, ADR-019)."
+  fi: "{cm, number} cm"
+  sv: "{cm, number} cm"
+  machine: { fi: true, sv: true }
+
+profile.text.hint:
   en: "In your own words, up to {max, number} characters."
-  description: "Hint under the campus or guild field."
+  description: "Hint under a free-text field of the registry (the job title)."
   fi: "Omin sanoin, enintään {max, number} merkkiä."
   sv: "Med egna ord, högst {max, number} tecken."
   machine: { fi: true, sv: true }
 
-profile.option.languages.fi:
-  en: "Finnish"
-  description: "Option fi of the languages field (#47 registry)."
-  fi: "suomi"
-  sv: "finska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.sv:
-  en: "Swedish"
-  description: "Option sv of the languages field (#47 registry)."
-  fi: "ruotsi"
-  sv: "svenska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.en:
-  en: "English"
-  description: "Option en of the languages field (#47 registry)."
-  fi: "englanti"
-  sv: "engelska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.ru:
-  en: "Russian"
-  description: "Option ru of the languages field (#47 registry)."
-  fi: "venäjä"
-  sv: "ryska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.et:
-  en: "Estonian"
-  description: "Option et of the languages field (#47 registry)."
-  fi: "viro"
-  sv: "estniska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.uk:
-  en: "Ukrainian"
-  description: "Option uk of the languages field (#47 registry)."
-  fi: "ukraina"
-  sv: "ukrainska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.ar:
-  en: "Arabic"
-  description: "Option ar of the languages field (#47 registry)."
-  fi: "arabia"
-  sv: "arabiska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.so:
-  en: "Somali"
-  description: "Option so of the languages field (#47 registry)."
-  fi: "somali"
-  sv: "somaliska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.de:
-  en: "German"
-  description: "Option de of the languages field (#47 registry)."
-  fi: "saksa"
-  sv: "tyska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.fr:
-  en: "French"
-  description: "Option fr of the languages field (#47 registry)."
-  fi: "ranska"
-  sv: "franska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.es:
-  en: "Spanish"
-  description: "Option es of the languages field (#47 registry)."
-  fi: "espanja"
-  sv: "spanska"
-  machine: { fi: true, sv: true }
-
-profile.option.languages.other:
-  en: "Another language"
-  description: "Option other of the languages field (#47 registry)."
-  fi: "Muu kieli"
-  sv: "Ett annat språk"
+profile.number.hint:
+  en: "A whole number from {min, number} to {max, number}."
+  description: "Hint under a number field of the registry (the height, in centimetres)."
+  fi: "Kokonaisluku väliltä {min, number}–{max, number}."
+  sv: "Ett heltal från {min, number} till {max, number}."
   machine: { fi: true, sv: true }
 
 profile.option.intent.long_term:
@@ -321,186 +335,11 @@ profile.option.intent.long_term:
   sv: "Något långvarigt"
   machine: { fi: true, sv: true }
 
-profile.option.intent.short_term:
-  en: "Something short-term"
-  description: "Option short_term of the intent field (#47 registry)."
-  fi: "Jotain lyhytaikaista"
-  sv: "Något kortvarigt"
-  machine: { fi: true, sv: true }
-
-profile.option.intent.figuring_out:
-  en: "Still figuring it out"
-  description: "Option figuring_out of the intent field (#47 registry)."
-  fi: "Selvittelen vielä"
-  sv: "Håller på att lista ut det"
-  machine: { fi: true, sv: true }
-
-profile.option.intent.friends:
-  en: "Friends"
-  description: "Option friends of the intent field (#47 registry)."
-  fi: "Ystäviä"
-  sv: "Vänner"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.monogamous:
-  en: "Monogamous"
-  description: "Option monogamous of the relationship field (#47 registry)."
-  fi: "Monogaminen"
-  sv: "Monogam"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.open:
-  en: "Open relationship"
-  description: "Option open of the relationship field (#47 registry)."
-  fi: "Avoin suhde"
-  sv: "Öppen relation"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.polyamorous:
-  en: "Polyamorous"
-  description: "Option polyamorous of the relationship field (#47 registry)."
-  fi: "Polyamorinen"
-  sv: "Polyamorös"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.lat:
-  en: "Living apart together"
-  description: "Option lat of the relationship field (#47 registry)."
-  fi: "Erillissuhde"
-  sv: "Särbo"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.undecided:
-  en: "Undecided"
-  description: "Option undecided of the relationship field (#47 registry)."
-  fi: "En ole päättänyt"
-  sv: "Obestämd"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.have_want_more:
-  en: "Have kids, want more"
-  description: "Option have_want_more of the kids field (#47 registry)."
-  fi: "On lapsia, haluan lisää"
-  sv: "Har barn, vill ha fler"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.have_done:
-  en: "Have kids, that is enough"
-  description: "Option have_done of the kids field (#47 registry)."
-  fi: "On lapsia, se riittää"
-  sv: "Har barn, det räcker"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.want_someday:
-  en: "Want kids someday"
-  description: "Option want_someday of the kids field (#47 registry)."
-  fi: "Haluan lapsia joskus"
-  sv: "Vill ha barn någon gång"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.dont_want:
-  en: "Do not want kids"
-  description: "Option dont_want of the kids field (#47 registry)."
-  fi: "En halua lapsia"
-  sv: "Vill inte ha barn"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.not_sure:
-  en: "Not sure"
-  description: "Option not_sure of the kids field (#47 registry)."
-  fi: "En ole varma"
-  sv: "Inte säker"
-  machine: { fi: true, sv: true }
-
-profile.option.smoking.no:
-  en: "No"
-  description: "Option no of the smoking field (#47 registry)."
-  fi: "En"
-  sv: "Nej"
-  machine: { fi: true, sv: true }
-
 profile.option.smoking.sometimes:
   en: "Sometimes"
   description: "Option sometimes of the smoking field (#47 registry)."
   fi: "Joskus"
   sv: "Ibland"
-  machine: { fi: true, sv: true }
-
-profile.option.smoking.yes:
-  en: "Yes"
-  description: "Option yes of the smoking field (#47 registry)."
-  fi: "Kyllä"
-  sv: "Ja"
-  machine: { fi: true, sv: true }
-
-profile.option.smoking.snus:
-  en: "Snus"
-  description: "Option snus of the smoking field (#47 registry)."
-  fi: "Nuuskaa"
-  sv: "Snus"
-  machine: { fi: true, sv: true }
-
-profile.option.alcohol.never:
-  en: "Never"
-  description: "Option never of the alcohol field (#47 registry)."
-  fi: "En koskaan"
-  sv: "Aldrig"
-  machine: { fi: true, sv: true }
-
-profile.option.alcohol.sometimes:
-  en: "Sometimes"
-  description: "Option sometimes of the alcohol field (#47 registry)."
-  fi: "Joskus"
-  sv: "Ibland"
-  machine: { fi: true, sv: true }
-
-profile.option.alcohol.often:
-  en: "Often"
-  description: "Option often of the alcohol field (#47 registry)."
-  fi: "Usein"
-  sv: "Ofta"
-  machine: { fi: true, sv: true }
-
-profile.option.education.secondary:
-  en: "Upper secondary"
-  description: "Option secondary of the education field (#47 registry)."
-  fi: "Toinen aste"
-  sv: "Gymnasium"
-  machine: { fi: true, sv: true }
-
-profile.option.education.vocational:
-  en: "Vocational"
-  description: "Option vocational of the education field (#47 registry)."
-  fi: "Ammatillinen"
-  sv: "Yrkesutbildning"
-  machine: { fi: true, sv: true }
-
-profile.option.education.bachelor:
-  en: "Bachelor's degree"
-  description: "Option bachelor of the education field (#47 registry)."
-  fi: "Kandidaatti"
-  sv: "Kandidat"
-  machine: { fi: true, sv: true }
-
-profile.option.education.master:
-  en: "Master's degree"
-  description: "Option master of the education field (#47 registry)."
-  fi: "Maisteri"
-  sv: "Magister"
-  machine: { fi: true, sv: true }
-
-profile.option.education.doctorate:
-  en: "Doctorate"
-  description: "Option doctorate of the education field (#47 registry)."
-  fi: "Tohtori"
-  sv: "Doktor"
-  machine: { fi: true, sv: true }
-
-profile.option.education.other:
-  en: "Other"
-  description: "Option other of the education field (#47 registry)."
-  fi: "Muu"
-  sv: "Annat"
   machine: { fi: true, sv: true }
 
 profile.option.field.tech:
@@ -585,6 +424,1420 @@ profile.option.field.other:
   description: "Option other of the field field (#47 registry)."
   fi: "Muu"
   sv: "Annat"
+  machine: { fi: true, sv: true }
+
+profile.option.intent.casual:
+  en: "Something casual"
+  description: "Option casual of the intent field (#145 registry, ADR-019)."
+  fi: "Jotain rentoa"
+  sv: "Något avslappnat"
+  machine: { fi: true, sv: true }
+
+profile.option.intent.open_to_either:
+  en: "Open to either"
+  description: "Option open_to_either of the intent field (#145 registry, ADR-019)."
+  fi: "Avoin kummallekin"
+  sv: "Öppen för båda"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.agender:
+  en: "Agender"
+  description: "Option agender of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Agender"
+  sv: "Agender"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.genderfluid:
+  en: "Genderfluid"
+  description: "Option genderfluid of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Genderfluid"
+  sv: "Genderfluid"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.genderqueer:
+  en: "Genderqueer"
+  description: "Option genderqueer of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Genderqueer"
+  sv: "Genderqueer"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.bigender:
+  en: "Bigender"
+  description: "Option bigender of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Bigender"
+  sv: "Bigender"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.two_spirit:
+  en: "Two-spirit"
+  description: "Option two_spirit of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Two-spirit"
+  sv: "Two-spirit"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.questioning:
+  en: "Questioning"
+  description: "Option questioning of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Pohdin vielä"
+  sv: "Funderar ännu"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.non_binary:
+  en: "Just non-binary"
+  description: "Option non_binary of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Ihan vain muunsukupuolinen"
+  sv: "Helt enkelt ickebinär"
+  machine: { fi: true, sv: true }
+
+profile.option.monogamy.monogamous:
+  en: "Monogamous"
+  description: "Option monogamous of the monogamy field (#145 registry, ADR-019)."
+  fi: "Monogaminen"
+  sv: "Monogam"
+  machine: { fi: true, sv: true }
+
+profile.option.monogamy.non_monogamous:
+  en: "Non-monogamous"
+  description: "Option non_monogamous of the monogamy field (#145 registry, ADR-019)."
+  fi: "Ei-monogaminen"
+  sv: "Icke-monogam"
+  machine: { fi: true, sv: true }
+
+profile.option.hasKids.no:
+  en: "No kids"
+  description: "Option no of the hasKids field (#145 registry, ADR-019)."
+  fi: "Ei lapsia"
+  sv: "Inga barn"
+  machine: { fi: true, sv: true }
+
+profile.option.hasKids.yes_with_me:
+  en: "Yes, living with me"
+  description: "Option yes_with_me of the hasKids field (#145 registry, ADR-019)."
+  fi: "Kyllä, asuvat kanssani"
+  sv: "Ja, bor hos mig"
+  machine: { fi: true, sv: true }
+
+profile.option.hasKids.yes_not_with_me:
+  en: "Yes, not living with me"
+  description: "Option yes_not_with_me of the hasKids field (#145 registry, ADR-019)."
+  fi: "Kyllä, eivät asu kanssani"
+  sv: "Ja, bor inte hos mig"
+  machine: { fi: true, sv: true }
+
+profile.option.wantsKids.want:
+  en: "Want kids"
+  description: "Option want of the wantsKids field (#145 registry, ADR-019)."
+  fi: "Haluan lapsia"
+  sv: "Vill ha barn"
+  machine: { fi: true, sv: true }
+
+profile.option.wantsKids.dont_want:
+  en: "Don't want kids"
+  description: "Option dont_want of the wantsKids field (#145 registry, ADR-019)."
+  fi: "En halua lapsia"
+  sv: "Vill inte ha barn"
+  machine: { fi: true, sv: true }
+
+profile.option.wantsKids.not_sure:
+  en: "Not sure"
+  description: "Option not_sure of the wantsKids field (#145 registry, ADR-019)."
+  fi: "En ole varma"
+  sv: "Inte säker"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.never:
+  en: "Never"
+  description: "Option never of the smoking field (#145 registry, ADR-019)."
+  fi: "En koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.regularly:
+  en: "Regularly"
+  description: "Option regularly of the smoking field (#145 registry, ADR-019)."
+  fi: "Säännöllisesti"
+  sv: "Regelbundet"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.quitting:
+  en: "Quitting"
+  description: "Option quitting of the smoking field (#145 registry, ADR-019)."
+  fi: "Lopettamassa"
+  sv: "Håller på att sluta"
+  machine: { fi: true, sv: true }
+
+profile.option.education.peruskoulu:
+  en: "Comprehensive school"
+  description: "Option peruskoulu of the education field (#145 registry, ADR-019)."
+  fi: "Peruskoulu"
+  sv: "Grundskola"
+  machine: { fi: true, sv: true }
+
+profile.option.education.toinen_aste:
+  en: "Upper secondary or vocational"
+  description: "Option toinen_aste of the education field (#145 registry, ADR-019)."
+  fi: "Toinen aste"
+  sv: "Andra stadiet"
+  machine: { fi: true, sv: true }
+
+profile.option.education.amk:
+  en: "University of applied sciences"
+  description: "Option amk of the education field (#145 registry, ADR-019)."
+  fi: "AMK"
+  sv: "Yrkeshögskola"
+  machine: { fi: true, sv: true }
+
+profile.option.education.kandi:
+  en: "Bachelor's"
+  description: "Option kandi of the education field (#145 registry, ADR-019)."
+  fi: "Kandi"
+  sv: "Kandidat"
+  machine: { fi: true, sv: true }
+
+profile.option.education.maisteri:
+  en: "Master's or YAMK"
+  description: "Option maisteri of the education field (#145 registry, ADR-019)."
+  fi: "Maisteri tai YAMK"
+  sv: "Magister eller högre YH"
+  machine: { fi: true, sv: true }
+
+profile.option.education.tohtori:
+  en: "Doctorate"
+  description: "Option tohtori of the education field (#145 registry, ADR-019)."
+  fi: "Tohtori"
+  sv: "Doktor"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.never:
+  en: "Never"
+  description: "Option never of the drinking field (#145 registry, ADR-019)."
+  fi: "En koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.rarely:
+  en: "Rarely"
+  description: "Option rarely of the drinking field (#145 registry, ADR-019)."
+  fi: "Harvoin"
+  sv: "Sällan"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.socially:
+  en: "Socially"
+  description: "Option socially of the drinking field (#145 registry, ADR-019)."
+  fi: "Seurassa"
+  sv: "I sällskap"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.often:
+  en: "Often"
+  description: "Option often of the drinking field (#145 registry, ADR-019)."
+  fi: "Usein"
+  sv: "Ofta"
+  machine: { fi: true, sv: true }
+
+profile.option.drugsAttitude.not_my_thing:
+  en: "Not my thing"
+  description: "Option not_my_thing of the drugsAttitude field (#145 registry, ADR-019)."
+  fi: "Ei minun juttuni"
+  sv: "Inte min grej"
+  machine: { fi: true, sv: true }
+
+profile.option.drugsAttitude.dont_mind:
+  en: "Don't mind"
+  description: "Option dont_mind of the drugsAttitude field (#145 registry, ADR-019)."
+  fi: "Ei haittaa"
+  sv: "Stör mig inte"
+  machine: { fi: true, sv: true }
+
+profile.option.drugsAttitude.fine_with_it:
+  en: "Fine with it"
+  description: "Option fine_with_it of the drugsAttitude field (#145 registry, ADR-019)."
+  fi: "Ihan ok"
+  sv: "Helt okej"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.hiking:
+  en: "Hiking"
+  description: "Option hiking of the hobbies field (#145 registry, ADR-019)."
+  fi: "Vaellus"
+  sv: "Vandring"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cycling:
+  en: "Cycling"
+  description: "Option cycling of the hobbies field (#145 registry, ADR-019)."
+  fi: "Pyöräily"
+  sv: "Cykling"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.running:
+  en: "Running"
+  description: "Option running of the hobbies field (#145 registry, ADR-019)."
+  fi: "Juoksu"
+  sv: "Löpning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.skiing:
+  en: "Skiing"
+  description: "Option skiing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Hiihto"
+  sv: "Skidåkning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.swimming:
+  en: "Swimming"
+  description: "Option swimming of the hobbies field (#145 registry, ADR-019)."
+  fi: "Uinti"
+  sv: "Simning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.sailing:
+  en: "Sailing"
+  description: "Option sailing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Purjehdus"
+  sv: "Segling"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.foraging:
+  en: "Mushrooms and berries"
+  description: "Option foraging of the hobbies field (#145 registry, ADR-019)."
+  fi: "Sienet ja marjat"
+  sv: "Svamp och bär"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.fishing:
+  en: "Fishing"
+  description: "Option fishing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kalastus"
+  sv: "Fiske"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.climbing:
+  en: "Climbing"
+  description: "Option climbing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kiipeily"
+  sv: "Klättring"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.gym:
+  en: "Gym"
+  description: "Option gym of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kuntosali"
+  sv: "Gym"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.football:
+  en: "Football"
+  description: "Option football of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jalkapallo"
+  sv: "Fotboll"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.floorball:
+  en: "Floorball"
+  description: "Option floorball of the hobbies field (#145 registry, ADR-019)."
+  fi: "Salibandy"
+  sv: "Innebandy"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.ice_hockey:
+  en: "Ice hockey"
+  description: "Option ice_hockey of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jääkiekko"
+  sv: "Ishockey"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.yoga:
+  en: "Yoga"
+  description: "Option yoga of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jooga"
+  sv: "Yoga"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.dance:
+  en: "Dance"
+  description: "Option dance of the hobbies field (#145 registry, ADR-019)."
+  fi: "Tanssi"
+  sv: "Dans"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.martial_arts:
+  en: "Martial arts"
+  description: "Option martial_arts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kamppailulajit"
+  sv: "Kampsport"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.padel:
+  en: "Padel"
+  description: "Option padel of the hobbies field (#145 registry, ADR-019)."
+  fi: "Padel"
+  sv: "Padel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.photography:
+  en: "Photography"
+  description: "Option photography of the hobbies field (#145 registry, ADR-019)."
+  fi: "Valokuvaus"
+  sv: "Fotografering"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.drawing:
+  en: "Drawing"
+  description: "Option drawing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Piirtäminen"
+  sv: "Teckning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.making_music:
+  en: "Making music"
+  description: "Option making_music of the hobbies field (#145 registry, ADR-019)."
+  fi: "Musiikin tekeminen"
+  sv: "Att göra musik"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.writing:
+  en: "Writing"
+  description: "Option writing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kirjoittaminen"
+  sv: "Skrivande"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.crafts:
+  en: "Crafts"
+  description: "Option crafts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Käsityöt"
+  sv: "Handarbete"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.theatre:
+  en: "Theatre"
+  description: "Option theatre of the hobbies field (#145 registry, ADR-019)."
+  fi: "Teatteri"
+  sv: "Teater"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cooking:
+  en: "Cooking"
+  description: "Option cooking of the hobbies field (#145 registry, ADR-019)."
+  fi: "Ruoanlaitto"
+  sv: "Matlagning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.baking:
+  en: "Baking"
+  description: "Option baking of the hobbies field (#145 registry, ADR-019)."
+  fi: "Leipominen"
+  sv: "Bakning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.coffee:
+  en: "Coffee"
+  description: "Option coffee of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kahvi"
+  sv: "Kaffe"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.wine_and_beer:
+  en: "Wine and beer"
+  description: "Option wine_and_beer of the hobbies field (#145 registry, ADR-019)."
+  fi: "Viini ja olut"
+  sv: "Vin och öl"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.reading:
+  en: "Reading"
+  description: "Option reading of the hobbies field (#145 registry, ADR-019)."
+  fi: "Lukeminen"
+  sv: "Läsning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cinema:
+  en: "Cinema"
+  description: "Option cinema of the hobbies field (#145 registry, ADR-019)."
+  fi: "Elokuvat"
+  sv: "Film"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.museums:
+  en: "Museums"
+  description: "Option museums of the hobbies field (#145 registry, ADR-019)."
+  fi: "Museot"
+  sv: "Museer"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.concerts:
+  en: "Concerts"
+  description: "Option concerts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Konsertit"
+  sv: "Konserter"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.podcasts:
+  en: "Podcasts"
+  description: "Option podcasts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Podcastit"
+  sv: "Poddar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.board_games:
+  en: "Board games"
+  description: "Option board_games of the hobbies field (#145 registry, ADR-019)."
+  fi: "Lautapelit"
+  sv: "Brädspel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.video_games:
+  en: "Video games"
+  description: "Option video_games of the hobbies field (#145 registry, ADR-019)."
+  fi: "Videopelit"
+  sv: "Tv-spel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.chess:
+  en: "Chess"
+  description: "Option chess of the hobbies field (#145 registry, ADR-019)."
+  fi: "Shakki"
+  sv: "Schack"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.puzzles:
+  en: "Puzzles"
+  description: "Option puzzles of the hobbies field (#145 registry, ADR-019)."
+  fi: "Pulmat"
+  sv: "Pussel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.gardening:
+  en: "Gardening"
+  description: "Option gardening of the hobbies field (#145 registry, ADR-019)."
+  fi: "Puutarhanhoito"
+  sv: "Trädgård"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.sauna:
+  en: "Sauna"
+  description: "Option sauna of the hobbies field (#145 registry, ADR-019)."
+  fi: "Sauna"
+  sv: "Bastu"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cottage:
+  en: "The cottage"
+  description: "Option cottage of the hobbies field (#145 registry, ADR-019)."
+  fi: "Mökkeily"
+  sv: "Stugliv"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.diy:
+  en: "DIY"
+  description: "Option diy of the hobbies field (#145 registry, ADR-019)."
+  fi: "Nikkarointi"
+  sv: "Gör det själv"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.travelling:
+  en: "Travelling"
+  description: "Option travelling of the hobbies field (#145 registry, ADR-019)."
+  fi: "Matkustelu"
+  sv: "Resor"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.road_trips:
+  en: "Road trips"
+  description: "Option road_trips of the hobbies field (#145 registry, ADR-019)."
+  fi: "Automatkat"
+  sv: "Bilsemester"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.learning_languages:
+  en: "Learning languages"
+  description: "Option learning_languages of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kielten opiskelu"
+  sv: "Språkinlärning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.dogs:
+  en: "Dogs"
+  description: "Option dogs of the hobbies field (#145 registry, ADR-019)."
+  fi: "Koirat"
+  sv: "Hundar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cats:
+  en: "Cats"
+  description: "Option cats of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kissat"
+  sv: "Katter"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.horses:
+  en: "Horses"
+  description: "Option horses of the hobbies field (#145 registry, ADR-019)."
+  fi: "Hevoset"
+  sv: "Hästar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.birdwatching:
+  en: "Birdwatching"
+  description: "Option birdwatching of the hobbies field (#145 registry, ADR-019)."
+  fi: "Lintujen tarkkailu"
+  sv: "Fågelskådning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.programming:
+  en: "Programming"
+  description: "Option programming of the hobbies field (#145 registry, ADR-019)."
+  fi: "Ohjelmointi"
+  sv: "Programmering"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.electronics:
+  en: "Electronics"
+  description: "Option electronics of the hobbies field (#145 registry, ADR-019)."
+  fi: "Elektroniikka"
+  sv: "Elektronik"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.astronomy:
+  en: "Astronomy"
+  description: "Option astronomy of the hobbies field (#145 registry, ADR-019)."
+  fi: "Tähtitiede"
+  sv: "Astronomi"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.volunteering:
+  en: "Volunteering"
+  description: "Option volunteering of the hobbies field (#145 registry, ADR-019)."
+  fi: "Vapaaehtoistyö"
+  sv: "Frivilligarbete"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.karaoke:
+  en: "Karaoke"
+  description: "Option karaoke of the hobbies field (#145 registry, ADR-019)."
+  fi: "Karaoke"
+  sv: "Karaoke"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.pub_quiz:
+  en: "Pub quiz"
+  description: "Option pub_quiz of the hobbies field (#145 registry, ADR-019)."
+  fi: "Pubivisa"
+  sv: "Pubquiz"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.dinner_parties:
+  en: "Dinner parties"
+  description: "Option dinner_parties of the hobbies field (#145 registry, ADR-019)."
+  fi: "Illalliskutsut"
+  sv: "Middagsbjudningar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.meditation:
+  en: "Meditation"
+  description: "Option meditation of the hobbies field (#145 registry, ADR-019)."
+  fi: "Meditaatio"
+  sv: "Meditation"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.winter_swimming:
+  en: "Winter swimming"
+  description: "Option winter_swimming of the hobbies field (#145 registry, ADR-019)."
+  fi: "Avantouinti"
+  sv: "Vinterbad"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.forest_walks:
+  en: "Forest walks"
+  description: "Option forest_walks of the hobbies field (#145 registry, ADR-019)."
+  fi: "Metsäkävelyt"
+  sv: "Skogspromenader"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.slow_mornings:
+  en: "Slow mornings"
+  description: "Option slow_mornings of the hobbies field (#145 registry, ADR-019)."
+  fi: "Hitaat aamut"
+  sv: "Långsamma morgnar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.other:
+  en: "Something else"
+  description: "Option other of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jotain muuta"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.never:
+  en: "Never"
+  description: "Option never of the exercise field (#145 registry, ADR-019)."
+  fi: "En koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.sometimes:
+  en: "Sometimes"
+  description: "Option sometimes of the exercise field (#145 registry, ADR-019)."
+  fi: "Joskus"
+  sv: "Ibland"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.weekly:
+  en: "Weekly"
+  description: "Option weekly of the exercise field (#145 registry, ADR-019)."
+  fi: "Viikoittain"
+  sv: "Varje vecka"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.daily:
+  en: "Daily"
+  description: "Option daily of the exercise field (#145 registry, ADR-019)."
+  fi: "Päivittäin"
+  sv: "Dagligen"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.dog:
+  en: "Dog"
+  description: "Option dog of the pets field (#145 registry, ADR-019)."
+  fi: "Koira"
+  sv: "Hund"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.cat:
+  en: "Cat"
+  description: "Option cat of the pets field (#145 registry, ADR-019)."
+  fi: "Kissa"
+  sv: "Katt"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.other:
+  en: "Other pet"
+  description: "Option other of the pets field (#145 registry, ADR-019)."
+  fi: "Muu lemmikki"
+  sv: "Annat husdjur"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.none:
+  en: "No pets"
+  description: "Option none of the pets field (#145 registry, ADR-019)."
+  fi: "Ei lemmikkejä"
+  sv: "Inga husdjur"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.allergic:
+  en: "Allergic"
+  description: "Option allergic of the pets field (#145 registry, ADR-019)."
+  fi: "Allerginen"
+  sv: "Allergisk"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.student:
+  en: "Student"
+  description: "Option student of the occupation field (#145 registry, ADR-019)."
+  fi: "Opiskelija"
+  sv: "Studerande"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.tech:
+  en: "Tech"
+  description: "Option tech of the occupation field (#145 registry, ADR-019)."
+  fi: "Teknologia"
+  sv: "Teknik"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.healthcare:
+  en: "Health care"
+  description: "Option healthcare of the occupation field (#145 registry, ADR-019)."
+  fi: "Terveydenhuolto"
+  sv: "Hälsovård"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.education:
+  en: "Education"
+  description: "Option education of the occupation field (#145 registry, ADR-019)."
+  fi: "Opetus"
+  sv: "Utbildning"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.business:
+  en: "Business"
+  description: "Option business of the occupation field (#145 registry, ADR-019)."
+  fi: "Liike-elämä"
+  sv: "Affärsliv"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.arts_culture:
+  en: "Arts and culture"
+  description: "Option arts_culture of the occupation field (#145 registry, ADR-019)."
+  fi: "Taide ja kulttuuri"
+  sv: "Konst och kultur"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.science:
+  en: "Science and research"
+  description: "Option science of the occupation field (#145 registry, ADR-019)."
+  fi: "Tiede ja tutkimus"
+  sv: "Vetenskap och forskning"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.trades_construction:
+  en: "Trades and construction"
+  description: "Option trades_construction of the occupation field (#145 registry, ADR-019)."
+  fi: "Rakentaminen ja asennus"
+  sv: "Hantverk och bygg"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.service_hospitality:
+  en: "Service and hospitality"
+  description: "Option service_hospitality of the occupation field (#145 registry, ADR-019)."
+  fi: "Palvelut ja ravintolat"
+  sv: "Service och restaurang"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.public_sector:
+  en: "Public sector"
+  description: "Option public_sector of the occupation field (#145 registry, ADR-019)."
+  fi: "Julkinen sektori"
+  sv: "Offentlig sektor"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.transport:
+  en: "Transport and logistics"
+  description: "Option transport of the occupation field (#145 registry, ADR-019)."
+  fi: "Kuljetus ja logistiikka"
+  sv: "Transport och logistik"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.agriculture:
+  en: "Agriculture and nature"
+  description: "Option agriculture of the occupation field (#145 registry, ADR-019)."
+  fi: "Maatalous ja luonto"
+  sv: "Jordbruk och natur"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.media:
+  en: "Media and communication"
+  description: "Option media of the occupation field (#145 registry, ADR-019)."
+  fi: "Media ja viestintä"
+  sv: "Media och kommunikation"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.law_finance:
+  en: "Law and finance"
+  description: "Option law_finance of the occupation field (#145 registry, ADR-019)."
+  fi: "Laki ja rahoitus"
+  sv: "Juridik och finans"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.sports:
+  en: "Sports and wellbeing"
+  description: "Option sports of the occupation field (#145 registry, ADR-019)."
+  fi: "Liikunta ja hyvinvointi"
+  sv: "Idrott och välmående"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.entrepreneur:
+  en: "Entrepreneur"
+  description: "Option entrepreneur of the occupation field (#145 registry, ADR-019)."
+  fi: "Yrittäjä"
+  sv: "Företagare"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.between_jobs:
+  en: "Between jobs"
+  description: "Option between_jobs of the occupation field (#145 registry, ADR-019)."
+  fi: "Työnhaussa"
+  sv: "Mellan jobb"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.retired:
+  en: "Retired"
+  description: "Option retired of the occupation field (#145 registry, ADR-019)."
+  fi: "Eläkkeellä"
+  sv: "Pensionerad"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.other:
+  en: "Something else"
+  description: "Option other of the occupation field (#145 registry, ADR-019)."
+  fi: "Jotain muuta"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kok:
+  en: "National Coalition Party"
+  description: "Option kok of the politics field (#145 registry, ADR-019)."
+  fi: "Kokoomus"
+  sv: "Samlingspartiet"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.ps:
+  en: "Finns Party"
+  description: "Option ps of the politics field (#145 registry, ADR-019)."
+  fi: "Perussuomalaiset"
+  sv: "Sannfinländarna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.sdp:
+  en: "Social Democrats"
+  description: "Option sdp of the politics field (#145 registry, ADR-019)."
+  fi: "SDP"
+  sv: "Socialdemokraterna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kesk:
+  en: "Centre Party"
+  description: "Option kesk of the politics field (#145 registry, ADR-019)."
+  fi: "Keskusta"
+  sv: "Centern"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.vihr:
+  en: "Greens"
+  description: "Option vihr of the politics field (#145 registry, ADR-019)."
+  fi: "Vihreät"
+  sv: "De Gröna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.vas:
+  en: "Left Alliance"
+  description: "Option vas of the politics field (#145 registry, ADR-019)."
+  fi: "Vasemmistoliitto"
+  sv: "Vänsterförbundet"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.rkp:
+  en: "Swedish People's Party"
+  description: "Option rkp of the politics field (#145 registry, ADR-019)."
+  fi: "RKP"
+  sv: "SFP"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kd:
+  en: "Christian Democrats"
+  description: "Option kd of the politics field (#145 registry, ADR-019)."
+  fi: "Kristillisdemokraatit"
+  sv: "Kristdemokraterna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.liik:
+  en: "Movement Now"
+  description: "Option liik of the politics field (#145 registry, ADR-019)."
+  fi: "Liike Nyt"
+  sv: "Rörelse Nu"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.none_of_them:
+  en: "None of them"
+  description: "Option none_of_them of the politics field (#145 registry, ADR-019)."
+  fi: "Ei mikään näistä"
+  sv: "Inget av dem"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kahvipuolue:
+  en: "The Coffee Party"
+  description: "Option kahvipuolue of the politics field (#145 registry, ADR-019)."
+  fi: "Kahvipuolue"
+  sv: "Kaffepartiet"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.lutheran:
+  en: "Lutheran"
+  description: "Option lutheran of the religion field (#145 registry, ADR-019)."
+  fi: "Luterilainen"
+  sv: "Lutheran"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.orthodox:
+  en: "Orthodox"
+  description: "Option orthodox of the religion field (#145 registry, ADR-019)."
+  fi: "Ortodoksi"
+  sv: "Ortodox"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.other_christian:
+  en: "Other Christian"
+  description: "Option other_christian of the religion field (#145 registry, ADR-019)."
+  fi: "Muu kristitty"
+  sv: "Annan kristen"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.muslim:
+  en: "Muslim"
+  description: "Option muslim of the religion field (#145 registry, ADR-019)."
+  fi: "Muslimi"
+  sv: "Muslim"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.jewish:
+  en: "Jewish"
+  description: "Option jewish of the religion field (#145 registry, ADR-019)."
+  fi: "Juutalainen"
+  sv: "Judisk"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.buddhist:
+  en: "Buddhist"
+  description: "Option buddhist of the religion field (#145 registry, ADR-019)."
+  fi: "Buddhalainen"
+  sv: "Buddhist"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.hindu:
+  en: "Hindu"
+  description: "Option hindu of the religion field (#145 registry, ADR-019)."
+  fi: "Hindu"
+  sv: "Hindu"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.spiritual:
+  en: "Spiritual"
+  description: "Option spiritual of the religion field (#145 registry, ADR-019)."
+  fi: "Henkinen"
+  sv: "Andlig"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.agnostic:
+  en: "Agnostic"
+  description: "Option agnostic of the religion field (#145 registry, ADR-019)."
+  fi: "Agnostikko"
+  sv: "Agnostiker"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.atheist:
+  en: "Atheist"
+  description: "Option atheist of the religion field (#145 registry, ADR-019)."
+  fi: "Ateisti"
+  sv: "Ateist"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.other:
+  en: "Something else"
+  description: "Option other of the religion field (#145 registry, ADR-019)."
+  fi: "Jokin muu"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.aries:
+  en: "Aries"
+  description: "Option aries of the zodiac field (#145 registry, ADR-019)."
+  fi: "Oinas"
+  sv: "Väduren"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.taurus:
+  en: "Taurus"
+  description: "Option taurus of the zodiac field (#145 registry, ADR-019)."
+  fi: "Härkä"
+  sv: "Oxen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.gemini:
+  en: "Gemini"
+  description: "Option gemini of the zodiac field (#145 registry, ADR-019)."
+  fi: "Kaksoset"
+  sv: "Tvillingarna"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.cancer:
+  en: "Cancer"
+  description: "Option cancer of the zodiac field (#145 registry, ADR-019)."
+  fi: "Rapu"
+  sv: "Kräftan"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.leo:
+  en: "Leo"
+  description: "Option leo of the zodiac field (#145 registry, ADR-019)."
+  fi: "Leijona"
+  sv: "Lejonet"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.virgo:
+  en: "Virgo"
+  description: "Option virgo of the zodiac field (#145 registry, ADR-019)."
+  fi: "Neitsyt"
+  sv: "Jungfrun"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.libra:
+  en: "Libra"
+  description: "Option libra of the zodiac field (#145 registry, ADR-019)."
+  fi: "Vaaka"
+  sv: "Vågen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.scorpio:
+  en: "Scorpio"
+  description: "Option scorpio of the zodiac field (#145 registry, ADR-019)."
+  fi: "Skorpioni"
+  sv: "Skorpionen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.sagittarius:
+  en: "Sagittarius"
+  description: "Option sagittarius of the zodiac field (#145 registry, ADR-019)."
+  fi: "Jousimies"
+  sv: "Skytten"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.capricorn:
+  en: "Capricorn"
+  description: "Option capricorn of the zodiac field (#145 registry, ADR-019)."
+  fi: "Kauris"
+  sv: "Stenbocken"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.aquarius:
+  en: "Aquarius"
+  description: "Option aquarius of the zodiac field (#145 registry, ADR-019)."
+  fi: "Vesimies"
+  sv: "Vattumannen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.pisces:
+  en: "Pisces"
+  description: "Option pisces of the zodiac field (#145 registry, ADR-019)."
+  fi: "Kalat"
+  sv: "Fiskarna"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.corgi:
+  en: "Corgi"
+  description: "Option corgi of the zodiac field (#145 registry, ADR-019)."
+  fi: "Corgi"
+  sv: "Corgi"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fi:
+  en: "suomi"
+  description: "Option fi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "suomi"
+  sv: "suomi"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.sv:
+  en: "svenska"
+  description: "Option sv of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "svenska"
+  sv: "svenska"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.en:
+  en: "English"
+  description: "Option en of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "English"
+  sv: "English"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.se:
+  en: "davvisámegiella"
+  description: "Option se of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "davvisámegiella"
+  sv: "davvisámegiella"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.et:
+  en: "eesti"
+  description: "Option et of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "eesti"
+  sv: "eesti"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ru:
+  en: "русский"
+  description: "Option ru of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "русский"
+  sv: "русский"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.uk:
+  en: "українська"
+  description: "Option uk of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "українська"
+  sv: "українська"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ar:
+  en: "العربية"
+  description: "Option ar of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "العربية"
+  sv: "العربية"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.so:
+  en: "Soomaali"
+  description: "Option so of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Soomaali"
+  sv: "Soomaali"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fa:
+  en: "فارسی"
+  description: "Option fa of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "فارسی"
+  sv: "فارسی"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ku:
+  en: "Kurdî"
+  description: "Option ku of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Kurdî"
+  sv: "Kurdî"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.zh:
+  en: "中文"
+  description: "Option zh of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "中文"
+  sv: "中文"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.sq:
+  en: "shqip"
+  description: "Option sq of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "shqip"
+  sv: "shqip"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.vi:
+  en: "Tiếng Việt"
+  description: "Option vi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Tiếng Việt"
+  sv: "Tiếng Việt"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.th:
+  en: "ไทย"
+  description: "Option th of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "ไทย"
+  sv: "ไทย"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.tr:
+  en: "Türkçe"
+  description: "Option tr of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Türkçe"
+  sv: "Türkçe"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.es:
+  en: "español"
+  description: "Option es of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "español"
+  sv: "español"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.de:
+  en: "Deutsch"
+  description: "Option de of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Deutsch"
+  sv: "Deutsch"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fr:
+  en: "français"
+  description: "Option fr of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "français"
+  sv: "français"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.tl:
+  en: "Tagalog"
+  description: "Option tl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Tagalog"
+  sv: "Tagalog"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.pl:
+  en: "polski"
+  description: "Option pl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "polski"
+  sv: "polski"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.it:
+  en: "italiano"
+  description: "Option it of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "italiano"
+  sv: "italiano"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.pt:
+  en: "português"
+  description: "Option pt of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "português"
+  sv: "português"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.hi:
+  en: "हिन्दी"
+  description: "Option hi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "हिन्दी"
+  sv: "हिन्दी"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ne:
+  en: "नेपाली"
+  description: "Option ne of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "नेपाली"
+  sv: "नेपाली"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.bn:
+  en: "বাংলা"
+  description: "Option bn of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "বাংলা"
+  sv: "বাংলা"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ur:
+  en: "اردو"
+  description: "Option ur of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "اردو"
+  sv: "اردو"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ro:
+  en: "română"
+  description: "Option ro of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "română"
+  sv: "română"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.hu:
+  en: "magyar"
+  description: "Option hu of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "magyar"
+  sv: "magyar"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ja:
+  en: "日本語"
+  description: "Option ja of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "日本語"
+  sv: "日本語"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.lt:
+  en: "lietuvių"
+  description: "Option lt of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "lietuvių"
+  sv: "lietuvių"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.lv:
+  en: "latviešu"
+  description: "Option lv of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "latviešu"
+  sv: "latviešu"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.nl:
+  en: "Nederlands"
+  description: "Option nl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Nederlands"
+  sv: "Nederlands"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ko:
+  en: "한국어"
+  description: "Option ko of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "한국어"
+  sv: "한국어"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.other:
+  en: "Another language"
+  description: "Option other of the languages field (#145 registry)."
+  fi: "Muu kieli"
+  sv: "Ett annat språk"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.outdoors:
+  en: "Outdoors"
+  description: "Heading of the outdoors group of the hobby chip grid (#145, #148)."
+  fi: "Ulkoilu"
+  sv: "Friluftsliv"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.sports:
+  en: "Sports"
+  description: "Heading of the sports group of the hobby chip grid (#145, #148)."
+  fi: "Urheilu"
+  sv: "Sport"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.creative:
+  en: "Creative"
+  description: "Heading of the creative group of the hobby chip grid (#145, #148)."
+  fi: "Luovaa"
+  sv: "Kreativt"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.food:
+  en: "Food and drink"
+  description: "Heading of the food group of the hobby chip grid (#145, #148)."
+  fi: "Ruoka ja juoma"
+  sv: "Mat och dryck"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.culture:
+  en: "Culture"
+  description: "Heading of the culture group of the hobby chip grid (#145, #148)."
+  fi: "Kulttuuri"
+  sv: "Kultur"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.games:
+  en: "Games"
+  description: "Heading of the games group of the hobby chip grid (#145, #148)."
+  fi: "Pelit"
+  sv: "Spel"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.home:
+  en: "Home"
+  description: "Heading of the home group of the hobby chip grid (#145, #148)."
+  fi: "Koti"
+  sv: "Hemma"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.travel:
+  en: "Travel"
+  description: "Heading of the travel group of the hobby chip grid (#145, #148)."
+  fi: "Matkailu"
+  sv: "Resor"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.animals:
+  en: "Animals"
+  description: "Heading of the animals group of the hobby chip grid (#145, #148)."
+  fi: "Eläimet"
+  sv: "Djur"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.tech:
+  en: "Tech and science"
+  description: "Heading of the tech group of the hobby chip grid (#145, #148)."
+  fi: "Tekniikka ja tiede"
+  sv: "Teknik och vetenskap"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.social:
+  en: "Social"
+  description: "Heading of the social group of the hobby chip grid (#145, #148)."
+  fi: "Seuraelämä"
+  sv: "Socialt"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.wellbeing:
+  en: "Wellbeing"
+  description: "Heading of the wellbeing group of the hobby chip grid (#145, #148)."
+  fi: "Hyvinvointi"
+  sv: "Välmående"
   machine: { fi: true, sv: true }
 
 profile.prompt.sunday:
@@ -864,6 +2117,18 @@ legal.research.summary:
   description: "The research opt-in the person accepts by version and can withdraw (#46, #50). DRAFT wording."
   fi: "LUONNOS: Jos sanot kyllä, anonymisoituja tapahtumia Kuutin käytöstäsi (esimerkiksi että kierros näytettiin tai tykkäys lähetettiin; ei koskaan viestien tekstiä eikä sitä, kuka olet) säilytetään erillisellä tutkimustunnisteella enintään 90 päivää, ja yhdistyksen tutkimuskumppani käyttää niitä yhdistämisen toiminnan tutkimiseen. Voit perua milloin tahansa; peruminen poistaa yhteyden sinun ja tapahtumien välillä."
   consent_version: "2026-09-draft-1"
+
+legal.special_category.title:
+  en: "Sensitive answers"
+  description: "Heading of the special-category consent (#145, ADR-019 §4): whom you seek, the parties you could vote for, your religion. Binding legal text; the Finnish is the wording that counts."
+  fi: "Arkaluonteiset tiedot"
+  consent_version: "2026-10-draft-1"
+
+legal.special_category.summary:
+  en: "DRAFT: Whom you seek, the parties you could vote for and your religion are special categories of personal data. If you say yes, Kuutti stores the answers you give to these questions and shows them on your card; it never puts them in a log or a research event, and you can remove them at any time. Without your yes these fields stay unanswered."
+  description: "The special-category consent the person accepts by version (#145, ADR-019 §4; GDPR art. 9(2)(a)). DRAFT wording for the association's counsel."
+  fi: "LUONNOS: Se, kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi ovat erityisiä henkilötietoryhmiä. Jos sanot kyllä, Kuutti tallentaa näihin kysymyksiin antamasi vastaukset ja näyttää ne kortillasi; se ei koskaan kirjoita niitä lokiin eikä tutkimustapahtumaan, ja voit poistaa ne milloin tahansa. Ilman kyllä-vastaustasi nämä kentät jäävät vastaamatta."
+  consent_version: "2026-10-draft-1"
 
 settings.open:
   en: Settings

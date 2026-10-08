@@ -94,7 +94,7 @@ describe("ProfileScreen", () => {
     await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
     await type(screen.getByLabelText("Name on your card"), "Aino");
     await press(screen.getByRole("button", { name: "Something long-term" }));
-    await press(screen.getByRole("button", { name: "Finnish" }));
+    await press(screen.getByRole("button", { name: "suomi" }));
     await press(screen.getByRole("button", { name: "English" }));
     await press(screen.getByRole("button", { name: "My ideal Sunday" }));
     await type(screen.getByLabelText("Your answer to: My ideal Sunday"), "A long breakfast.");

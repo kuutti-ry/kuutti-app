@@ -32,7 +32,8 @@ export const DEMO_SUBJECT_PREFIX = "kuutti-demo:";
 export const demoHetuHmac = (label: string): string =>
   createHash("sha256").update(`kuutti demo identity: ${label}`).digest("hex");
 
-export type ConsentVersions = Readonly<Record<"terms" | "privacy", string>>;
+/** The versions the rows name: the two consents of onboarding and the special-category wording of the profile (ADR-019 §4). */
+export type ConsentVersions = Readonly<Record<"terms" | "privacy" | "special_category", string>>;
 
 /** `spared`: identities that carry the mark and are not synthetic; never touched. */
 export type RemoveResult = { removed: number; spared: number };
@@ -174,10 +175,12 @@ export async function writePopulation(
         }
       }
       if (person.profile) {
+        const consentedAt = person.profile.specialCategoryConsentedAt;
         await tx.query(
           `INSERT INTO profile
-             (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $7)`,
+             (account_id, display_name, bio, bio_preset, fields, prompts,
+              special_category_consent_version, special_category_consented_at, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $9)`,
           [
             accountId,
             person.profile.displayName,
@@ -185,6 +188,8 @@ export async function writePopulation(
             person.profile.bioPreset,
             JSON.stringify(person.profile.fields),
             JSON.stringify(person.profile.prompts),
+            consentedAt ? consentVersions.special_category : null,
+            consentedAt,
             person.registeredAt,
           ],
         );
