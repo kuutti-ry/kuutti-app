@@ -4,7 +4,7 @@ import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { type TestContext, test } from "../test/harness.ts";
 
 // features/matching/preferences.feature (#149): the deal-breakers under the
-// disclose-to-filter rule. Hard rows beside onboarding's two; #87 applies them.
+// disclose-to-filter rule. Hard rows beside the two of onboarding; #87 applies them.
 
 type App = TestContext["app"];
 type Headers = Record<string, string>;
@@ -136,7 +136,7 @@ describe("deal-breakers", () => {
     );
     expect(await readDealBreakers(ctx.app, a.headers)).toEqual(asStored);
 
-    // The set replaced by a smaller one: the other row goes, onboarding's two stand.
+    // The set replaced by a smaller one: the other row goes, the two rows of onboarding stand.
     expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [kids] })).status).toBe(200);
     expect(await storedRows(ctx, a.accountId)).toEqual([
       { field: "age_window", mode: "hard" },
