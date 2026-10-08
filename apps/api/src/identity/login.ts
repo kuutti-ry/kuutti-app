@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import type { AuthCallbackQuery, AuthExchangeResponse, AuthPlatform } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
+import type { Logger } from "../lib/logger.ts";
 import { ADMIN_PLATFORM, completeAdminLogin } from "./admin-session.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 import {
@@ -28,6 +29,8 @@ export type LoginDeps = {
   broker: IdentityBroker;
   hmacKey: Buffer;
   now: () => Date;
+  /** Bound to the request (its id is in it): a login leaves one line, method and decision, nothing of the person. */
+  logger: Logger;
   /** Where an admin login's browser is sent back to (#49). */
   adminAppUrl: string;
 };
@@ -138,7 +141,15 @@ async function finishLogin(
       accountId,
       outcome,
     });
-    if (attached) return new URL(appReturnUrl(code));
+    if (attached) {
+      // The one line a login leaves (#33): the level, the method as the broker
+      // names it, and what was decided. No claim, no code, no token.
+      deps.logger.info(
+        { acr: derived.reference.acr, amr: derived.reference.amr, outcome },
+        "bank login",
+      );
+      return new URL(appReturnUrl(code));
+    }
   }
   throw new Error("account erased twice during one login");
 }
