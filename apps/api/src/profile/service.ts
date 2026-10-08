@@ -1,4 +1,5 @@
 import type { Queryable } from "@kuutti/db";
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import {
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
@@ -15,16 +16,31 @@ import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
 
 /**
+ * The consent_version of the special-category wording as built
+ * (legal.special_category.* in messages.yaml, ADR-010 §4): a politics or
+ * religion answer counts only with the consent of this version (ADR-019 §4).
+ */
+function specialCategoryVersion(): string {
+  const version = CONSENT_VERSIONS.special_category;
+  if (!version) {
+    throw new Error("messages.yaml has no legal.special_category.* wording with a consent_version");
+  }
+  return version;
+}
+export const SPECIAL_CATEGORY_CONSENT_VERSION: string = specialCategoryVersion();
+
+/**
  * Which fields of the update need the explicit consent, given a registry of
- * special-category fields (#47, ADR-009): a value for one of them without the
- * consent version is refused before anything is written. Pure, so the gate is
- * tested with a registry that has such a field while the real one has none.
+ * special-category fields and the current wording's version (#47, ADR-009 §2,
+ * ADR-019 §4): a value for one of them without the consent of that version is
+ * refused before anything is written. Pure, so the gate is tested with any registry.
  */
 export function consentMissingFor(
   update: Pick<ProfileUpdate, "fields" | "specialCategoryConsent">,
   specialFields: readonly string[] = SPECIAL_CATEGORY_FIELDS,
+  currentVersion: string = SPECIAL_CATEGORY_CONSENT_VERSION,
 ): string[] {
-  if (update.specialCategoryConsent) return [];
+  if (update.specialCategoryConsent?.version === currentVersion) return [];
   return specialFields.filter(
     (key) => (update.fields as Record<string, unknown>)[key] !== undefined,
   );
@@ -98,14 +114,20 @@ export async function saveProfile(
   if (missing.length > 0) {
     throw new AppError(403, "consent_required", "These fields need the explicit consent first", {
       fields: missing,
+      currentVersion: SPECIAL_CATEGORY_CONSENT_VERSION,
     });
   }
-  // Nothing is flagged today (ADR-009 §2), so a consent version has nothing
-  // to bind to and is not stored: a row that looks like consent given for a
-  // text nobody can point at would be worse than none. The issue that flags
-  // a field (#46 for seeks) binds the version and lifts this.
-  if (update.specialCategoryConsent && SPECIAL_CATEGORY_FIELDS.length === 0) {
-    throw new AppError(400, "validation_failed", "No field takes a special-category consent yet");
+  // A consent for any other wording than the current one is not stored: a row
+  // that looks like consent given for a text nobody can point at would be
+  // worse than none (ADR-009 §2). The app sends the version it rendered, and
+  // asks for an update when the two differ, as it does for the terms (ADR-010 §4).
+  if (
+    update.specialCategoryConsent &&
+    update.specialCategoryConsent.version !== SPECIAL_CATEGORY_CONSENT_VERSION
+  ) {
+    throw new AppError(409, "agreement_outdated", "The wording has a newer version", {
+      kind: "special_category",
+    });
   }
   const row = await repo.upsertProfile(deps.db, accountId, update, deps.now());
   // No row, no profile: the account was erased between the guard and here (#51).

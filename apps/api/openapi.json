@@ -712,6 +712,58 @@
       "ProfileFields": {
         "type": "object",
         "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "long_term",
+              "casual",
+              "open_to_either"
+            ]
+          },
+          "identityLabel": {
+            "type": "string",
+            "enum": [
+              "agender",
+              "genderfluid",
+              "genderqueer",
+              "bigender",
+              "two_spirit",
+              "questioning",
+              "non_binary"
+            ]
+          },
+          "monogamy": {
+            "type": "string",
+            "enum": [
+              "monogamous",
+              "non_monogamous"
+            ]
+          },
+          "hasKids": {
+            "type": "string",
+            "enum": [
+              "no",
+              "yes_with_me",
+              "yes_not_with_me"
+            ]
+          },
+          "wantsKids": {
+            "type": "string",
+            "enum": [
+              "want",
+              "dont_want",
+              "not_sure"
+            ]
+          },
+          "smoking": {
+            "type": "string",
+            "enum": [
+              "never",
+              "sometimes",
+              "regularly",
+              "quitting"
+            ]
+          },
           "languages": {
             "type": "array",
             "items": {
@@ -720,76 +772,168 @@
                 "fi",
                 "sv",
                 "en",
-                "ru",
+                "se",
                 "et",
+                "ru",
                 "uk",
                 "ar",
                 "so",
+                "fa",
+                "ku",
+                "zh",
+                "sq",
+                "vi",
+                "th",
+                "tr",
+                "es",
                 "de",
                 "fr",
-                "es",
+                "tl",
+                "pl",
+                "it",
+                "pt",
+                "hi",
+                "ne",
+                "bn",
+                "ur",
+                "ro",
+                "hu",
+                "ja",
+                "lt",
+                "lv",
+                "nl",
+                "ko",
                 "other"
               ]
             },
             "minItems": 1,
             "maxItems": 5
           },
-          "intent": {
+          "education": {
             "type": "string",
             "enum": [
-              "long_term",
-              "short_term",
-              "figuring_out",
-              "friends"
+              "peruskoulu",
+              "toinen_aste",
+              "amk",
+              "kandi",
+              "maisteri",
+              "tohtori"
             ]
           },
-          "relationship": {
+          "drinking": {
             "type": "string",
             "enum": [
-              "monogamous",
-              "open",
-              "polyamorous",
-              "lat",
-              "undecided"
+              "never",
+              "rarely",
+              "socially",
+              "often"
             ]
           },
-          "kids": {
+          "drugsAttitude": {
             "type": "string",
             "enum": [
-              "have_want_more",
-              "have_done",
-              "want_someday",
-              "dont_want",
-              "not_sure"
+              "not_my_thing",
+              "dont_mind",
+              "fine_with_it"
             ]
           },
-          "smoking": {
-            "type": "string",
-            "enum": [
-              "no",
-              "sometimes",
-              "yes",
-              "snus"
-            ]
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hiking",
+                "cycling",
+                "running",
+                "skiing",
+                "swimming",
+                "sailing",
+                "foraging",
+                "fishing",
+                "climbing",
+                "gym",
+                "football",
+                "floorball",
+                "ice_hockey",
+                "yoga",
+                "dance",
+                "martial_arts",
+                "padel",
+                "photography",
+                "drawing",
+                "making_music",
+                "writing",
+                "crafts",
+                "theatre",
+                "cooking",
+                "baking",
+                "coffee",
+                "wine_and_beer",
+                "reading",
+                "cinema",
+                "museums",
+                "concerts",
+                "podcasts",
+                "board_games",
+                "video_games",
+                "chess",
+                "puzzles",
+                "gardening",
+                "sauna",
+                "cottage",
+                "diy",
+                "travelling",
+                "road_trips",
+                "learning_languages",
+                "dogs",
+                "cats",
+                "horses",
+                "birdwatching",
+                "programming",
+                "electronics",
+                "astronomy",
+                "volunteering",
+                "karaoke",
+                "pub_quiz",
+                "dinner_parties",
+                "meditation",
+                "winter_swimming",
+                "forest_walks",
+                "slow_mornings",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
-          "alcohol": {
+          "height": {
+            "type": "integer",
+            "minimum": 140,
+            "maximum": 220
+          },
+          "exercise": {
             "type": "string",
             "enum": [
               "never",
               "sometimes",
-              "often"
+              "weekly",
+              "daily"
             ]
           },
-          "education": {
-            "type": "string",
-            "enum": [
-              "secondary",
-              "vocational",
-              "bachelor",
-              "master",
-              "doctorate",
-              "other"
-            ]
+          "pets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dog",
+                "cat",
+                "other",
+                "none",
+                "allergic"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
           "field": {
             "type": "string",
@@ -808,10 +952,92 @@
               "other"
             ]
           },
-          "campus": {
+          "hideFromField": {
+            "type": "boolean"
+          },
+          "occupation": {
+            "type": "string",
+            "enum": [
+              "student",
+              "tech",
+              "healthcare",
+              "education",
+              "business",
+              "arts_culture",
+              "science",
+              "trades_construction",
+              "service_hospitality",
+              "public_sector",
+              "transport",
+              "agriculture",
+              "media",
+              "law_finance",
+              "sports",
+              "entrepreneur",
+              "between_jobs",
+              "retired",
+              "other"
+            ]
+          },
+          "occupationTitle": {
             "type": "string",
             "minLength": 1,
             "maxLength": 40
+          },
+          "politics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "kok",
+                "ps",
+                "sdp",
+                "kesk",
+                "vihr",
+                "vas",
+                "rkp",
+                "kd",
+                "liik",
+                "none_of_them",
+                "kahvipuolue"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 11
+          },
+          "religion": {
+            "type": "string",
+            "enum": [
+              "lutheran",
+              "orthodox",
+              "other_christian",
+              "muslim",
+              "jewish",
+              "buddhist",
+              "hindu",
+              "spiritual",
+              "agnostic",
+              "atheist",
+              "other"
+            ]
+          },
+          "zodiac": {
+            "type": "string",
+            "enum": [
+              "aries",
+              "taurus",
+              "gemini",
+              "cancer",
+              "leo",
+              "virgo",
+              "libra",
+              "scorpio",
+              "sagittarius",
+              "capricorn",
+              "aquarius",
+              "pisces",
+              "corgi"
+            ]
           }
         },
         "additionalProperties": false
@@ -1111,6 +1337,58 @@
       "ResearchFields": {
         "type": "object",
         "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "long_term",
+              "casual",
+              "open_to_either"
+            ]
+          },
+          "identityLabel": {
+            "type": "string",
+            "enum": [
+              "agender",
+              "genderfluid",
+              "genderqueer",
+              "bigender",
+              "two_spirit",
+              "questioning",
+              "non_binary"
+            ]
+          },
+          "monogamy": {
+            "type": "string",
+            "enum": [
+              "monogamous",
+              "non_monogamous"
+            ]
+          },
+          "hasKids": {
+            "type": "string",
+            "enum": [
+              "no",
+              "yes_with_me",
+              "yes_not_with_me"
+            ]
+          },
+          "wantsKids": {
+            "type": "string",
+            "enum": [
+              "want",
+              "dont_want",
+              "not_sure"
+            ]
+          },
+          "smoking": {
+            "type": "string",
+            "enum": [
+              "never",
+              "sometimes",
+              "regularly",
+              "quitting"
+            ]
+          },
           "languages": {
             "type": "array",
             "items": {
@@ -1119,76 +1397,163 @@
                 "fi",
                 "sv",
                 "en",
-                "ru",
+                "se",
                 "et",
+                "ru",
                 "uk",
                 "ar",
                 "so",
+                "fa",
+                "ku",
+                "zh",
+                "sq",
+                "vi",
+                "th",
+                "tr",
+                "es",
                 "de",
                 "fr",
-                "es",
+                "tl",
+                "pl",
+                "it",
+                "pt",
+                "hi",
+                "ne",
+                "bn",
+                "ur",
+                "ro",
+                "hu",
+                "ja",
+                "lt",
+                "lv",
+                "nl",
+                "ko",
                 "other"
               ]
             },
             "minItems": 1,
             "maxItems": 5
           },
-          "intent": {
+          "education": {
             "type": "string",
             "enum": [
-              "long_term",
-              "short_term",
-              "figuring_out",
-              "friends"
+              "peruskoulu",
+              "toinen_aste",
+              "amk",
+              "kandi",
+              "maisteri",
+              "tohtori"
             ]
           },
-          "relationship": {
+          "drinking": {
             "type": "string",
             "enum": [
-              "monogamous",
-              "open",
-              "polyamorous",
-              "lat",
-              "undecided"
+              "never",
+              "rarely",
+              "socially",
+              "often"
             ]
           },
-          "kids": {
+          "drugsAttitude": {
             "type": "string",
             "enum": [
-              "have_want_more",
-              "have_done",
-              "want_someday",
-              "dont_want",
-              "not_sure"
+              "not_my_thing",
+              "dont_mind",
+              "fine_with_it"
             ]
           },
-          "smoking": {
-            "type": "string",
-            "enum": [
-              "no",
-              "sometimes",
-              "yes",
-              "snus"
-            ]
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hiking",
+                "cycling",
+                "running",
+                "skiing",
+                "swimming",
+                "sailing",
+                "foraging",
+                "fishing",
+                "climbing",
+                "gym",
+                "football",
+                "floorball",
+                "ice_hockey",
+                "yoga",
+                "dance",
+                "martial_arts",
+                "padel",
+                "photography",
+                "drawing",
+                "making_music",
+                "writing",
+                "crafts",
+                "theatre",
+                "cooking",
+                "baking",
+                "coffee",
+                "wine_and_beer",
+                "reading",
+                "cinema",
+                "museums",
+                "concerts",
+                "podcasts",
+                "board_games",
+                "video_games",
+                "chess",
+                "puzzles",
+                "gardening",
+                "sauna",
+                "cottage",
+                "diy",
+                "travelling",
+                "road_trips",
+                "learning_languages",
+                "dogs",
+                "cats",
+                "horses",
+                "birdwatching",
+                "programming",
+                "electronics",
+                "astronomy",
+                "volunteering",
+                "karaoke",
+                "pub_quiz",
+                "dinner_parties",
+                "meditation",
+                "winter_swimming",
+                "forest_walks",
+                "slow_mornings",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
-          "alcohol": {
+          "exercise": {
             "type": "string",
             "enum": [
               "never",
               "sometimes",
-              "often"
+              "weekly",
+              "daily"
             ]
           },
-          "education": {
-            "type": "string",
-            "enum": [
-              "secondary",
-              "vocational",
-              "bachelor",
-              "master",
-              "doctorate",
-              "other"
-            ]
+          "pets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dog",
+                "cat",
+                "other",
+                "none",
+                "allergic"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
           "field": {
             "type": "string",
@@ -1205,6 +1570,48 @@
               "trades",
               "service",
               "other"
+            ]
+          },
+          "occupation": {
+            "type": "string",
+            "enum": [
+              "student",
+              "tech",
+              "healthcare",
+              "education",
+              "business",
+              "arts_culture",
+              "science",
+              "trades_construction",
+              "service_hospitality",
+              "public_sector",
+              "transport",
+              "agriculture",
+              "media",
+              "law_finance",
+              "sports",
+              "entrepreneur",
+              "between_jobs",
+              "retired",
+              "other"
+            ]
+          },
+          "zodiac": {
+            "type": "string",
+            "enum": [
+              "aries",
+              "taurus",
+              "gemini",
+              "cancer",
+              "leo",
+              "virgo",
+              "libra",
+              "scorpio",
+              "sagittarius",
+              "capricorn",
+              "aquarius",
+              "pisces",
+              "corgi"
             ]
           }
         },
@@ -3355,7 +3762,7 @@
             }
           },
           "403": {
-            "description": "consent_required: a special-category field without the consent version.",
+            "description": "consent_required: a politics or religion answer without the consent of the current wording (ADR-019); the detail names the fields and the current version.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3366,6 +3773,16 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "agreement_outdated: a consent version that is not the current wording's.",
             "content": {
               "application/json": {
                 "schema": {

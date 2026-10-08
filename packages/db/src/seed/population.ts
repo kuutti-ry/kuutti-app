@@ -5,7 +5,10 @@ import {
   type BioPreset,
   GENDERS,
   type Gender,
+  HOBBIES,
+  HOBBIES_MAX,
   LANGUAGES_MAX,
+  POLITICS_OPTIONS,
   PROFILE_FIELDS,
   PROMPT_KEYS,
   PROMPTS_MAX,
@@ -14,7 +17,7 @@ import {
 } from "@kuutti/schema";
 import { ageFromYearMonth } from "@kuutti/tunnistus-oidc/hetu";
 import { createRandom, type Random } from "./rng.ts";
-import { BIOS, CAMPUSES, type Language, NAMES, PROMPT_ANSWERS } from "./words.ts";
+import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from "./words.ts";
 
 /**
  * The synthetic population (#73, ADR-014): a few hundred people who never
@@ -121,6 +124,8 @@ export type SyntheticProfile = {
   bioPreset: BioPreset | null;
   fields: ProfileFields;
   prompts: PromptAnswer[];
+  /** When the special-category consent was given, with the other consents; null for most. A politics or religion answer needs it (ADR-019 §4). */
+  specialCategoryConsentedAt: Date | null;
 };
 
 export type SyntheticPerson = {
@@ -205,21 +210,56 @@ function drawAge(random: Random): number {
   return random.int(from, to);
 }
 
-function drawFields(random: Random, language: Language, pond: string): ProfileFields {
+/** How many of those with a profile answered each field; docs/demo/population.md says the same in words. */
+const SPECIAL_CATEGORY_CONSENT_SHARE = 0.35;
+
+function drawFields(
+  random: Random,
+  language: Language,
+  pond: string,
+  consented: boolean,
+): ProfileFields {
   const fields: ProfileFields = {};
+  // Intent is an onboarding step (#146): everybody with a profile has one.
+  fields.intent = random.weighted({ long_term: 55, casual: 20, open_to_either: 25 });
+  if (random.chance(0.5)) fields.monogamy = random.weighted({ monogamous: 85, non_monogamous: 15 });
+  if (random.chance(0.6)) {
+    fields.hasKids = random.weighted({ no: 70, yes_with_me: 18, yes_not_with_me: 12 });
+  }
+  if (random.chance(0.55)) fields.wantsKids = random.pick(PROFILE_FIELDS.wantsKids.options);
+  if (random.chance(0.65)) {
+    fields.smoking = random.weighted({ never: 60, sometimes: 20, regularly: 12, quitting: 8 });
+  }
   const others = PROFILE_FIELDS.languages.options.filter((l) => l !== language && l !== "other");
   if (random.chance(0.85)) {
     const more = random.sample(others, random.int(0, Math.min(2, LANGUAGES_MAX - 1)));
     fields.languages = [language, ...more];
   }
-  if (random.chance(0.8)) fields.intent = random.pick(PROFILE_FIELDS.intent.options);
-  if (random.chance(0.6)) fields.relationship = random.pick(PROFILE_FIELDS.relationship.options);
-  if (random.chance(0.55)) fields.kids = random.pick(PROFILE_FIELDS.kids.options);
-  if (random.chance(0.6)) fields.smoking = random.pick(PROFILE_FIELDS.smoking.options);
-  if (random.chance(0.6)) fields.alcohol = random.pick(PROFILE_FIELDS.alcohol.options);
-  if (random.chance(0.7)) fields.education = random.pick(PROFILE_FIELDS.education.options);
-  if (random.chance(0.7)) fields.field = random.pick(PROFILE_FIELDS.field.options);
-  if (random.chance(pond === "otaniemi" ? 0.6 : 0.2)) fields.campus = random.pick(CAMPUSES);
+  if (random.chance(0.65)) fields.education = random.pick(PROFILE_FIELDS.education.options);
+  if (random.chance(0.65)) {
+    fields.drinking = random.weighted({ never: 15, rarely: 30, socially: 45, often: 10 });
+  }
+  if (random.chance(0.4)) fields.drugsAttitude = random.pick(PROFILE_FIELDS.drugsAttitude.options);
+  if (random.chance(0.7)) fields.hobbies = random.sample(HOBBIES, random.int(1, HOBBIES_MAX));
+  if (random.chance(0.55)) fields.height = random.int(152, 198);
+  if (random.chance(0.55)) fields.exercise = random.pick(PROFILE_FIELDS.exercise.options);
+  if (random.chance(0.5)) {
+    fields.pets = random
+      .weighted({ none: 35, dog: 25, cat: 25, "dog,cat": 8, other: 4, allergic: 3 })
+      .split(",") as ProfileFields["pets"];
+  }
+  if (random.chance(pond === "otaniemi" ? 0.6 : 0.35)) {
+    fields.field = random.pick(PROFILE_FIELDS.field.options);
+    if (random.chance(0.15)) fields.hideFromField = true;
+  }
+  if (random.chance(0.5)) fields.occupation = random.pick(PROFILE_FIELDS.occupation.options);
+  if (random.chance(0.3)) fields.occupationTitle = random.pick(OCCUPATION_TITLES[language]);
+  // Article 9 answers only behind the consent (ADR-019 §4), as the API would have it.
+  if (consented) {
+    if (random.chance(0.7)) fields.politics = random.sample(POLITICS_OPTIONS, random.int(1, 3));
+    if (random.chance(0.6)) fields.religion = random.pick(PROFILE_FIELDS.religion.options);
+  }
+  if (random.chance(0.45)) fields.zodiac = random.pick(PROFILE_FIELDS.zodiac.options);
   return fields;
 }
 
@@ -228,7 +268,9 @@ function drawProfile(
   gender: Gender,
   language: Language,
   pond: string,
+  agreedAt: Date,
 ): SyntheticProfile {
+  const consentedAt = random.chance(SPECIAL_CATEGORY_CONSENT_SHARE) ? agreedAt : null;
   const kind = random.weighted({ bio: 65, preset: 12, none: 23 });
   const answered = Number(random.weighted({ "0": 25, "1": 20, "2": 35, "3": 20 }));
   const prompts = random
@@ -238,8 +280,9 @@ function drawProfile(
     displayName: random.pick(NAMES[gender]),
     bio: kind === "bio" ? random.pick(BIOS[language]) : null,
     bioPreset: kind === "preset" ? random.pick(BIO_PRESETS) : null,
-    fields: drawFields(random, language, pond),
+    fields: drawFields(random, language, pond, consentedAt !== null),
     prompts,
+    specialCategoryConsentedAt: consentedAt,
   };
 }
 
@@ -281,7 +324,7 @@ function onboarded(
     gender,
     preferences: { seeks, ageWindow },
     consents,
-    profile: random.chance(0.88) ? drawProfile(random, gender, language, pond) : null,
+    profile: random.chance(0.88) ? drawProfile(random, gender, language, pond, agreedAt) : null,
   };
 }
 
