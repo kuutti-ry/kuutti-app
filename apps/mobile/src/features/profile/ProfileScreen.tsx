@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
 import {
   FieldEditor,
   isConsented,
@@ -221,6 +222,15 @@ export function ProfileScreen() {
           }}
         >
           {t("profile.later.open")}
+        </Button>
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            router.push(DEAL_BREAKERS_PATH);
+          }}
+        >
+          {t("profile.dealBreakers.open")}
         </Button>
       </ScrollView>
     </SafeAreaView>

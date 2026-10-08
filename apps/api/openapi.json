@@ -428,6 +428,13 @@
           "preferences": {
             "$ref": "#/components/schemas/PreferencesResponse"
           },
+          "dealBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoredDealBreaker"
+            },
+            "maxItems": 5
+          },
           "consents": {
             "type": "array",
             "items": {
@@ -543,6 +550,7 @@
           "exportedAt",
           "account",
           "preferences",
+          "dealBreakers",
           "consents",
           "identity",
           "sessions",
@@ -640,6 +648,47 @@
           "max"
         ],
         "additionalProperties": false
+      },
+      "StoredDealBreaker": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "accept": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "minItems": 1,
+            "maxItems": 60
+          },
+          "includeUnknown": {
+            "type": "boolean"
+          },
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field",
+          "accept",
+          "includeUnknown",
+          "paused"
+        ],
+        "additionalProperties": false
+      },
+      "DealBreakerField": {
+        "type": "string",
+        "enum": [
+          "monogamy",
+          "hasKids",
+          "wantsKids",
+          "smoking",
+          "languages"
+        ]
       },
       "ConsentRecord": {
         "type": "object",
@@ -2606,6 +2655,70 @@
         ],
         "additionalProperties": false
       },
+      "DealBreakersResponse": {
+        "type": "object",
+        "properties": {
+          "dealBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoredDealBreaker"
+            },
+            "maxItems": 5
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "dealBreakers",
+          "max"
+        ]
+      },
+      "DealBreakersUpdate": {
+        "type": "object",
+        "properties": {
+          "dealBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealBreaker"
+            },
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "dealBreakers"
+        ],
+        "additionalProperties": false
+      },
+      "DealBreaker": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "accept": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "minItems": 1,
+            "maxItems": 60
+          },
+          "includeUnknown": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field",
+          "accept",
+          "includeUnknown"
+        ],
+        "additionalProperties": false
+      },
       "PreferencesUpdate": {
         "type": "object",
         "properties": {
@@ -4434,6 +4547,110 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/preferences/deal-breakers": {
+      "get": {
+        "summary": "The caller's deal-breakers",
+        "description": "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The deal-breakers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealBreakersResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Set the caller's deal-breakers",
+        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealBreakersUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the deal-breakers as stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealBreakersResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: more than allowed, a field twice, or an answer the field has not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "filter_unanswered: a deal-breaker on a field the person has not answered themselves (the log names the field, the screen knows it).",
             "content": {
               "application/json": {
                 "schema": {

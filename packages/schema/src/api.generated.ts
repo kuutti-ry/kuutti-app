@@ -2139,6 +2139,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preferences/deal-breakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's deal-breakers
+         * @description Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The deal-breakers. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DealBreakersResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Set the caller's deal-breakers
+         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DealBreakersUpdate"];
+                };
+            };
+            responses: {
+                /** @description Saved; the deal-breakers as stored. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DealBreakersResponse"];
+                    };
+                };
+                /** @description Validation failed: more than allowed, a field twice, or an answer the field has not. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description filter_unanswered: a deal-breaker on a field the person has not answered themselves (the log names the field, the screen knows it). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences": {
         parameters: {
             query?: never;
@@ -2395,6 +2506,7 @@ export interface components {
                 email: string | null;
             };
             preferences: components["schemas"]["PreferencesResponse"];
+            dealBreakers: components["schemas"]["StoredDealBreaker"][];
             consents: components["schemas"]["ConsentRecord"][];
             identity: {
                 /** Format: date-time */
@@ -2446,6 +2558,14 @@ export interface components {
             min: number;
             max: number;
         } | null;
+        StoredDealBreaker: {
+            field: components["schemas"]["DealBreakerField"];
+            accept: string[];
+            includeUnknown: boolean;
+            paused: boolean;
+        };
+        /** @enum {string} */
+        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages";
         ConsentRecord: {
             kind: components["schemas"]["ConsentKind"];
             version: string;
@@ -2840,6 +2960,18 @@ export interface components {
         PondChoice: {
             /** Format: uuid */
             pondId: string;
+        };
+        DealBreakersResponse: {
+            dealBreakers: components["schemas"]["StoredDealBreaker"][];
+            max: number;
+        };
+        DealBreakersUpdate: {
+            dealBreakers: components["schemas"]["DealBreaker"][];
+        };
+        DealBreaker: {
+            field: components["schemas"]["DealBreakerField"];
+            accept: string[];
+            includeUnknown: boolean;
         };
         PreferencesUpdate: {
             seeks: components["schemas"]["Gender"][];

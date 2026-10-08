@@ -39,6 +39,7 @@ const exported = {
   sessions: [],
   profile: null,
   preferences: { seeks: null, ageWindow: null },
+  dealBreakers: [],
   consents: [],
   photos: [],
   photoAccessLog: [],

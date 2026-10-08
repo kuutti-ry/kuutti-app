@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AccountState } from "./account-state.ts";
+import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedGate } from "./gate.ts";
 import { AuthPlatform } from "./identity.ts";
 import { Photo, PhotoRejectionReason, PhotoVariant } from "./media.ts";
@@ -92,6 +93,8 @@ export const AccountExport = z
     }),
     /** The two hard rows onboarding writes (#46): whom the person seeks and the age window. */
     preferences: PreferencesResponse,
+    /** The person's deal-breakers (#149), each with its pause. */
+    dealBreakers: z.array(StoredDealBreaker).max(DEAL_BREAKERS_CAP),
     /** Every consent ever given, withdrawn ones included: the proof of consent (#46, ADR-010). Bounded by the churn cap, not by a page. */
     consents: z.array(ConsentRecord).max(10_000),
     identity: z.object({

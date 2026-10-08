@@ -169,6 +169,13 @@
       "when": 1791483182561,
       "tag": "0023_account_email",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791483892079,
+      "tag": "0024_deal_breakers_max",
+      "breakpoints": true
     }
   ]
 }

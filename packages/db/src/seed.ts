@@ -52,6 +52,9 @@ export const MATCHING_CONFIG_V1 = {
   // #147 (the field sheet, ADR-015 §9): a change of gender or of whom one
   // seeks is possible once in this many days, effective from the next count.
   change_cadence_days: 30,
+  // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
+  // may set; two at launch, so a small pond is not cut to nothing.
+  deal_breakers_max: 2,
 } as const;
 
 /**

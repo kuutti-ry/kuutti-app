@@ -2,7 +2,11 @@ import { type Queryable, transaction } from "@kuutti/db";
 import type { AccountExport } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { deletePreferencesOfAccount, readPreferences } from "../matching/index.ts";
+import {
+  deletePreferencesOfAccount,
+  readDealBreakers,
+  readPreferences,
+} from "../matching/index.ts";
 import {
   deleteOrphanedObjects,
   erasePhotosOfAccount,
@@ -127,12 +131,13 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
     : { db: deps.db, logger: deps.logger, now: deps.now };
   const photos = await exportPhotos(media, accountId);
   const profile = await exportProfile(deps.db, accountId);
-  const [pond, preferences, consents, research, gate] = await Promise.all([
+  const [pond, preferences, consents, research, gate, dealBreakers] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
     exportConsents(deps.db, accountId),
     exportResearch(deps.db, accountId),
     exportGate(deps.db, accountId),
+    readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
   ]);
   return {
     exportedAt: deps.now().toISOString(),
@@ -149,6 +154,7 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
       email: account.email,
     },
     preferences,
+    dealBreakers,
     consents,
     identity: {
       firstSeenAt: identity.createdAt.toISOString(),

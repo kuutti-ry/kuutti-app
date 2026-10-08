@@ -356,6 +356,104 @@ profile.clear:
   sv: "Rensa svaret"
   machine: { fi: true, sv: true }
 
+profile.dealBreakers.title:
+  en: "Deal-breakers"
+  description: "Heading of the deal-breakers screen (#149)."
+  fi: "Ehdottomat rajat"
+  sv: "Absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.explain:
+  en: "Up to {max, number}. Only on what you answered yourself, and both ways: yours apply to others, theirs to you."
+  description: "Explanation of the deal-breakers (#149, the disclose-to-filter rule)."
+  fi: "Enintään {max, number}. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua."
+  sv: "Högst {max, number}. Bara om det du själv svarat på, och åt båda hållen: dina gäller andra, deras gäller dig."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.gated:
+  en: "To filter on this, share yours first."
+  description: "Shown under a field the person has not answered: a deal-breaker needs the own answer (#149)."
+  fi: "Suodattaaksesi tällä kerro ensin omasi."
+  sv: "För att filtrera på det här, dela ditt eget först."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.answer:
+  en: "Answer it"
+  description: "Button under a gated field that opens its screen (#149)."
+  fi: "Vastaa"
+  sv: "Svara"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.switch:
+  en: "Deal-breaker: {field}"
+  description: "Label of the switch that makes a field a deal-breaker (#149); {field} is the field's label, after a colon so nothing is inflected."
+  fi: "Ehdoton raja: {field}"
+  sv: "Absolut gräns: {field}"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.pickOne:
+  en: "Pick at least one answer that is fine with you."
+  description: "Shown while a deal-breaker is switched on with nothing accepted; saving waits (#149)."
+  fi: "Valitse ainakin yksi vastaus, joka sopii sinulle."
+  sv: "Välj minst ett svar som är okej för dig."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.accept:
+  en: "Fine with me"
+  description: "Heading over the answers of others the person accepts (#149)."
+  fi: "Sopii minulle"
+  sv: "Okej för mig"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.includeUnknown:
+  en: "Also people who did not answer"
+  description: "Label of the switch that lets an unanswered field pass (#149)."
+  fi: "Myös ne, jotka eivät vastanneet"
+  sv: "Även de som inte svarade"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.paused:
+  en: "Paused until you answer it yourself."
+  description: "Said under a deal-breaker whose own answer was taken back (#149)."
+  fi: "Tauolla, kunnes vastaat siihen itse."
+  sv: "Pausad tills du själv svarar på det."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.limit:
+  en: "That is {max, number} already."
+  description: "Said when the person tries to switch on one more deal-breaker than allowed (#149)."
+  fi: "Niitä on jo {max, number}."
+  sv: "Det är redan {max, number}."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.save:
+  en: "Save the deal-breakers"
+  description: "Button that saves the deal-breakers (#149)."
+  fi: "Tallenna rajat"
+  sv: "Spara gränserna"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.saved:
+  en: "Saved."
+  description: "Said after the deal-breakers were saved (#149)."
+  fi: "Tallennettu."
+  sv: "Sparat."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.failed:
+  en: "They could not be saved. Try again."
+  description: "Said when saving the deal-breakers failed (#149)."
+  fi: "Rajoja ei voitu tallentaa. Yritä uudelleen."
+  sv: "Gränserna kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.open:
+  en: "Your deal-breakers"
+  description: "Button on the home screen, the profile and the e-mail screen that opens the deal-breakers (#149)."
+  fi: "Ehdottomat rajasi"
+  sv: "Dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
 profile.later.title:
   en: "While you wait"
   description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
@@ -2548,6 +2646,13 @@ errors.change_too_soon:
   description: "PUT /account/gender or PUT /preferences (429): the gender or whom one seeks was changed less than change_cadence_days ago (#147, ADR-015 §9). No hostile wording: somebody transitioning must not hit a wall."
   fi: "Muutit tätä äskettäin. Muutos on mahdollinen, kun odotusaika on kulunut; etusivu kertoo, mistä alkaen."
   sv: "Du ändrade det här nyligen. En ändring är möjlig när väntetiden gått; startsidan säger från när."
+  machine: { fi: true, sv: true }
+
+errors.filter_unanswered:
+  en: "To filter on this, share your own answer first."
+  description: "PUT /preferences/deal-breakers (409): a deal-breaker on a field the person has not answered themselves (#149, the disclose-to-filter rule)."
+  fi: "Suodattaaksesi tällä kerro ensin oma vastauksesi."
+  sv: "För att filtrera på det här, dela ditt eget svar först."
   machine: { fi: true, sv: true }
 
 errors.pond_unknown:

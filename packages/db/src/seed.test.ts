@@ -55,6 +55,7 @@ describe("seed", () => {
           waitlist_k: 10,
           default_pond: "suomi",
           change_cadence_days: 30,
+          deal_breakers_max: 2,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
       } finally {
