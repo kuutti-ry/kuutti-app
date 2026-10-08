@@ -170,6 +170,36 @@ describe("deal-breakers", () => {
     expect(await readDealBreakers(ctx.app, b.headers)).toEqual({ dealBreakers: [], max: 2 });
   });
 
+  test("a max above the ceiling and an option that left the registry are read within the contract", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 9 });
+    const a = await signedInAccount(ctx.client);
+    expect((await answer(ctx.app, a.headers, { smoking: "never", hasKids: "no" })).status).toBe(
+      200,
+    );
+    // Rows as a retired option would leave them: one still has an option, the other none.
+    for (const [field, value] of [
+      ["smoking", ["never", "cigars"]],
+      ["hasKids", ["adopted"]],
+    ] as const) {
+      await ctx.client.query(
+        `INSERT INTO preferences (account_id, field, value, mode, include_unknown, created_at, updated_at)
+         VALUES ($1, $2, $3::jsonb, 'hard', false, now(), now())`,
+        [a.accountId, field, JSON.stringify(value)],
+      );
+    }
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [{ ...smoking, paused: false }],
+      max: 5,
+    });
+    // The next save sends the set as read: the row with nothing left goes with it.
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [smoking] })).status).toBe(
+      200,
+    );
+    expect((await storedRows(ctx, a.accountId)).map((r) => r.field)).toEqual(["smoking"]);
+  });
+
   test("the deal-breaker routes need a session", async ({ ctx }) => {
     expect((await ctx.app.request(PATH)).status).toBe(401);
     expect((await ctx.app.request(PATH, { method: "PUT" })).status).toBe(401);

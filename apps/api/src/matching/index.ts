@@ -4,6 +4,7 @@
 
 export {
   DEAL_BREAKERS_MAX_KEY,
+  dealBreakersMax,
   invalidAccept,
   type OwnFieldsReader,
   pausedOf,

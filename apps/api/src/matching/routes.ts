@@ -11,9 +11,8 @@ import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
-import { matchingConfigNumber } from "../lib/matching-config.ts";
 import {
-  DEAL_BREAKERS_MAX_KEY,
+  dealBreakersMax,
   type OwnFieldsReader,
   readDealBreakers,
   saveDealBreakers,
@@ -104,7 +103,7 @@ export function preferencesRoutes(
   }
   const dealBreakersOf = async (accountId: string) => ({
     dealBreakers: await readDealBreakers(deps.db, accountId, await readOwnFields(accountId)),
-    max: await matchingConfigNumber(deps.db, DEAL_BREAKERS_MAX_KEY),
+    max: await dealBreakersMax(deps.db),
   });
 
   app.openapi(dealBreakersRoute, async (c) => {
@@ -114,7 +113,7 @@ export function preferencesRoutes(
   app.openapi(saveDealBreakersRoute, async (c) => {
     const { accountId } = callerOf(c);
     const own = await readOwnFields(accountId);
-    const max = await matchingConfigNumber(deps.db, DEAL_BREAKERS_MAX_KEY);
+    const max = await dealBreakersMax(deps.db);
     if (!(await saveDealBreakers(deps.db, accountId, c.req.valid("json"), own, max, new Date()))) {
       throw new AppError(404, "not_found", "No live account");
     }

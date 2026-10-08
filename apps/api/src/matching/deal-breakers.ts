@@ -1,6 +1,7 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import {
   DEAL_BREAKER_FIELDS,
+  DEAL_BREAKERS_CAP,
   type DealBreaker,
   type DealBreakersUpdate,
   PROFILE_FIELDS,
@@ -8,6 +9,7 @@ import {
 } from "@kuutti/schema";
 import { z } from "zod";
 import { AppError } from "../lib/errors.ts";
+import { matchingConfigNumber } from "../lib/matching-config.ts";
 
 // Deal-breakers (#149, TD-16, the field sheet's disclose-to-filter rule):
 // hard rows of `preferences` on a whitelisted field, beside the two rows of
@@ -23,7 +25,17 @@ export const DEAL_BREAKERS_MAX_KEY = "deal_breakers_max";
 export type OwnFieldsReader = (accountId: string) => Promise<Record<string, unknown>>;
 
 const WHITELIST = DEAL_BREAKER_FIELDS as readonly string[];
-const Accept = z.array(z.string()).min(1);
+const Accept = z.array(z.string());
+
+/** How many a person may have: the tunable, bounded by the contract's ceiling so a larger row never breaks a client. */
+export async function dealBreakersMax(db: Queryable): Promise<number> {
+  return Math.min(await matchingConfigNumber(db, DEAL_BREAKERS_MAX_KEY), DEAL_BREAKERS_CAP);
+}
+
+const optionsOf = (field: DealBreaker["field"]): readonly string[] => {
+  const spec = PROFILE_FIELDS[field];
+  return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
+};
 
 /** A filter waits while the person's own answer on its field is missing: read, never stored. */
 export const pausedOf = (field: string, own: Record<string, unknown>): boolean =>
@@ -31,9 +43,7 @@ export const pausedOf = (field: string, own: Record<string, unknown>): boolean =
 
 /** The first accepted answer that is no option of the field, or null when every one is. */
 export function invalidAccept(dealBreaker: DealBreaker): string | null {
-  const spec = PROFILE_FIELDS[dealBreaker.field];
-  const options: readonly string[] =
-    spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
+  const options = optionsOf(dealBreaker.field);
   return dealBreaker.accept.find((option) => !options.includes(option)) ?? null;
 }
 
@@ -51,11 +61,16 @@ export async function readDealBreakers(
   );
   const out: StoredDealBreaker[] = [];
   for (const row of rows) {
-    const accept = Accept.safeParse(row.value).data;
-    // A row whose value no longer parses, or whose field left the whitelist, reads as none.
-    if (!accept || !WHITELIST.includes(row.field)) continue;
+    // A field that left the whitelist reads as none; so does an option that
+    // left the registry (ADR-009 §1), and a row with no option left: the next
+    // save removes it, since it is not in the set sent.
+    if (!WHITELIST.includes(row.field)) continue;
+    const field = row.field as DealBreaker["field"];
+    const options = optionsOf(field);
+    const accept = (Accept.safeParse(row.value).data ?? []).filter((o) => options.includes(o));
+    if (accept.length === 0) continue;
     out.push({
-      field: row.field as DealBreaker["field"],
+      field,
       accept,
       includeUnknown: row.include_unknown,
       paused: pausedOf(row.field, own),
