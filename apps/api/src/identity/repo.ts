@@ -43,6 +43,8 @@ const accountFrom = (r: Row): Account => ({
   birthMonth: (r.birth_month as number | null) ?? null,
   gender: (r.gender as Account["gender"]) ?? null,
   pondId: (r.pond_id as string | null) ?? null,
+  genderChangedAt: (r.gender_changed_at as Date | null) ?? null,
+  seeksChangedAt: (r.seeks_changed_at as Date | null) ?? null,
   registeredAt: r.registered_at as Date,
   deletedAt: (r.deleted_at as Date | null) ?? null,
 });
@@ -602,7 +604,8 @@ export async function tombstoneAccount(
 ): Promise<boolean> {
   const result = await db.query(
     `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
-       birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL
+       birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL,
+       gender_changed_at = NULL, seeks_changed_at = NULL
      WHERE id = $1 AND state <> 'deleted'`,
     [accountId, at],
   );
@@ -643,28 +646,32 @@ export async function lockAccountForErasure(
 // caller's account id (rule 6); a consent row is never rewritten, only
 // withdrawn, because it is the proof of what was agreed.
 
+/** Sets the gender; `changedAt` is the time of a change from an earlier answer (#147), null when it is none. */
 export async function setGender(
   db: Queryable,
   accountId: string,
   gender: string,
+  changedAt: Date | null,
 ): Promise<boolean> {
   const result = await db.query(
-    "UPDATE account SET gender = $2 WHERE id = $1 AND state <> 'deleted'",
-    [accountId, gender],
+    `UPDATE account SET gender = $2, gender_changed_at = COALESCE($3, gender_changed_at)
+     WHERE id = $1 AND state <> 'deleted'`,
+    [accountId, gender, changedAt],
   );
   return result.rowCount === 1;
 }
 
-/** The gender as declared so far, under the lock erasure takes first; undefined for no live account. */
+/** The gender as declared so far, and when it last changed, under the lock erasure takes first; undefined for no live account. */
 export async function lockGender(
   db: Queryable,
   accountId: string,
-): Promise<string | null | undefined> {
-  const { rows } = await db.query<{ gender: string | null }>(
-    "SELECT gender FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
+): Promise<{ gender: string | null; changedAt: Date | null } | undefined> {
+  const { rows } = await db.query<{ gender: string | null; gender_changed_at: Date | null }>(
+    "SELECT gender, gender_changed_at FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
     [accountId],
   );
-  return rows[0] ? rows[0].gender : undefined;
+  const row = rows[0];
+  return row ? { gender: row.gender, changedAt: row.gender_changed_at ?? null } : undefined;
 }
 
 /** registered becomes active once (the onboarding rule decides when); nothing else changes here. */

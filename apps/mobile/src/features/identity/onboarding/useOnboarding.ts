@@ -1,6 +1,7 @@
 import type { OnboardingStatus } from "@kuutti/schema";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError } from "@/lib/api";
 import { fetchOnboarding } from "./client";
 
 export type OnboardingState =
@@ -17,7 +18,8 @@ export type OnboardingState =
 export function useOnboarding() {
   const [state, setState] = useState<OnboardingState>({ status: "loading" });
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  /** The code of the API's refusal of the last step, "unknown" for anything else; null while nothing failed. */
+  const [failedCode, setFailedCode] = useState<string | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -44,12 +46,14 @@ export function useOnboarding() {
   const step = useCallback(
     async (call: () => Promise<unknown>) => {
       setBusy(true);
-      setFailed(false);
+      setFailedCode(null);
       try {
         await call();
         await reload();
-      } catch {
-        if (mounted.current) setFailed(true);
+      } catch (error) {
+        if (mounted.current) {
+          setFailedCode(error instanceof ApiError ? (error.code ?? "unknown") : "unknown");
+        }
       } finally {
         if (mounted.current) setBusy(false);
       }
@@ -57,5 +61,5 @@ export function useOnboarding() {
     [reload],
   );
 
-  return { state, busy, failed, reload, step };
+  return { state, busy, failed: failedCode !== null, failedCode, reload, step };
 }

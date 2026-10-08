@@ -144,6 +144,8 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
       birthMonth: account.birthMonth,
       gender: account.gender,
       pond,
+      genderChangedAt: account.genderChangedAt?.toISOString() ?? null,
+      seeksChangedAt: account.seeksChangedAt?.toISOString() ?? null,
     },
     preferences,
     consents,

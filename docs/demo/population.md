@@ -50,7 +50,7 @@ Everybody with a pond has a gender, because the app asks for the gender before t
 | language | Finnish 70 %, Swedish 8 %, English 22 %: the language the consents were shown in and the profile is written in |
 | seeks | by own gender. Women: men 78 %, women 8 %, several 14 %. Men: women 82 %, men 7 %, several 11 %. Non-binary people: all three 50 %, two of them 40 %, non-binary only 10 % |
 | age window | from 2 to 8 years under the person's age (never under 18) to 2 to 10 years over it (never over 99) |
-| consents | terms and privacy for everybody who onboarded; the special-category consent (ADR-019 §4) for 35 % of those with a profile, given with the others. No research consent: the product writes it together with its mapping row, synthetic people emit no events, and theirs would muddy the first real numbers |
+| consents | terms, privacy and the special-category consent of the seek screen for everybody who onboarded (#146); the profile's own record of that consent, the one politics and religion need (ADR-019 §4), for 35 % of those with a profile, given with the others. No research consent: the product writes it together with its mapping row, synthetic people emit no events, and theirs would muddy the first real numbers |
 | profile | 88 % of those who onboarded have one |
 | display name | a given name from the list of the person's gender; the lists hold names with å, ä and ö and one in another script (Юлия) |
 | bio | a bio 65 % (a few of the bios are too short to count for completeness, on purpose), a canned line 12 %, nothing 23 % |

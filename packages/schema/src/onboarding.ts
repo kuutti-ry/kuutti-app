@@ -188,6 +188,15 @@ export const OnboardingStatus = z
       research: z.object({ version: z.string().max(40), givenAt: z.iso.datetime() }).nullable(),
     }),
     currentVersions: ConsentVersions,
+    /**
+     * From when the gender, or whom one seeks, may be changed again (#147,
+     * ADR-015 §9): a change is possible once in `change_cadence_days`; null
+     * when it is possible now.
+     */
+    nextChange: z.object({
+      gender: z.iso.datetime().nullable(),
+      seeks: z.iso.datetime().nullable(),
+    }),
     /** In the order the app asks. */
     missing: z.array(OnboardingStep).max(ONBOARDING_STEPS.length),
     /** Nothing missing, the profile steps included; `state` says whether matching may start. */

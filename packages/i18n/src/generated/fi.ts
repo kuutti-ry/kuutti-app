@@ -34,6 +34,7 @@ export const fi: Readonly<Record<string, string>> = {
   "errors.auth_suspended": "Tämä tili on toistaiseksi jäädytetty.",
   "errors.auth_under_18": "Kuutti on vain täysi-ikäisille.",
   "errors.card_budget_exceeded": "Olet nähnyt tänään paljon profiileja. Uusia tulee keskiyön jälkeen.",
+  "errors.change_too_soon": "Muutit tätä äskettäin. Muutos on mahdollinen, kun odotusaika on kulunut; etusivu kertoo, mistä alkaen.",
   "errors.http_error": "Pyyntö epäonnistui.",
   "errors.internal_error": "Jokin meni vikaan meidän päässämme.",
   "errors.media_busy": "Kuvia käsitellään juuri nyt paljon. Yritä hetken kuluttua uudelleen.",

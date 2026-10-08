@@ -2438,6 +2438,13 @@ errors.too_many_changes:
   sv: "Du har ändrat det här många gånger i dag. Försök igen i morgon."
   machine: { fi: true, sv: true }
 
+errors.change_too_soon:
+  en: "You changed this recently. A change is possible once the waiting time has passed; the home screen says from when."
+  description: "PUT /account/gender or PUT /preferences (429): the gender or whom one seeks was changed less than change_cadence_days ago (#147, ADR-015 §9). No hostile wording: somebody transitioning must not hit a wall."
+  fi: "Muutit tätä äskettäin. Muutos on mahdollinen, kun odotusaika on kulunut; etusivu kertoo, mistä alkaen."
+  sv: "Du ändrade det här nyligen. En ändring är möjlig när väntetiden gått; startsidan säger från när."
+  machine: { fi: true, sv: true }
+
 errors.pond_unknown:
   en: "That area is not on the list."
   description: "Pond choice (400), the pond id names no pond (#46)."

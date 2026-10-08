@@ -281,6 +281,33 @@ describe("onboarding and consents", () => {
     ]);
   });
 
+  test("A change of gender is possible once in the cadence", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const declare = (gender: string) =>
+      app.request("/account/gender", {
+        method: "PUT",
+        headers: jsonHeaders(a.headers),
+        body: JSON.stringify({ gender }),
+      });
+    expect((await declare("woman")).status).toBe(204);
+    expect((await status(app, a.headers)).nextChange.gender).toBeNull();
+    expect((await declare("man")).status).toBe(204);
+    const from = (await status(app, a.headers)).nextChange.gender;
+    expect(from).not.toBeNull();
+    expect(Date.parse(from as string)).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+    const refused = await declare("non_binary");
+    expect(refused.status).toBe(429);
+    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
+      "change_too_soon",
+    );
+    expect((await status(app, a.headers)).gender).toBe("man");
+    expect((await declare("man")).status).toBe(204);
+    expect((await status(app, a.headers)).nextChange.gender).toBe(from);
+    // The values stay out of the log, the refusal included.
+    expect(JSON.stringify(logs())).not.toContain("non_binary");
+  });
+
   test("unauthenticated: 401 on every onboarding, consent, pond and preference route", async ({
     ctx,
   }) => {

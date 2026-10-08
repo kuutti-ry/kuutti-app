@@ -18,6 +18,7 @@ const NIGHT_1 = new Date("2026-10-05T01:00:00Z"); // 04:00 in Helsinki
 const NIGHT_2 = new Date("2026-10-06T01:00:00Z");
 const NIGHT_3 = new Date("2026-10-07T01:00:00Z");
 const NIGHT_4 = new Date("2026-10-08T01:00:00Z");
+const NIGHT_5 = new Date("2026-10-09T01:00:00Z");
 
 /** Women who seek women: they wait with nobody, and every two of them are in the pool of the other. */
 const ALIKE: PeopleOptions = {
@@ -579,66 +580,89 @@ describe("the person's own gate", () => {
     expect((await askedBy(ctx, she)).gate).toMatchObject({ state: "closed", needed: 20 });
   });
 
-  test("Admission is decided anew for a person who joins a group that waits", async ({ ctx }) => {
+  test("Admission is decided anew for a person who joins a contest that waits", async ({ ctx }) => {
     const pond = await setUp(ctx, "test-gate-anew");
-    await people(ctx.client, pond, 6, MEN);
-    await people(ctx.client, pond, 4, WOMEN);
+    // Women seeking men are the larger group: the contest for men is at its ratio.
+    // Registered on separate days: now() is one instant for the whole test transaction.
+    await people(ctx.client, pond, 6, { ...WOMEN, registeredAt: new Date("2026-09-01") });
+    await people(ctx.client, pond, 4, { ...MEN, registeredAt: new Date("2026-09-02") });
     await counted(ctx, NIGHT_1);
-    // Two more of the larger group; the one who came first keeps to what he declared.
-    const [honest, other] = await people(ctx.client, pond, 2, MEN);
+    // She competes for nobody and is let in at once; two more women seeking men wait.
+    const [alike] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      registeredAt: new Date("2026-09-03"),
+    });
+    const [first, second] = await people(ctx.client, pond, 2, {
+      ...WOMEN,
+      registeredAt: new Date("2026-09-04"),
+    });
     await counted(ctx, NIGHT_2);
-    expect(await rowOf(ctx, honest)).toMatchObject({ admitted_at: null, place_said: 10 });
-    expect(await rowOf(ctx, other)).toMatchObject({ admitted_at: null, place_said: 10 });
+    expect(await rowOf(ctx, alike)).toMatchObject({ admitted_at: NIGHT_2 });
+    expect(await rowOf(ctx, first)).toMatchObject({ admitted_at: null, place_said: 10 });
+    expect(await rowOf(ctx, second)).toMatchObject({ admitted_at: null, place_said: 10 });
 
-    // The other declares that he seeks his own gender too: nobody like that waits.
-    const both = { seeks: ["woman", "man"], ageWindow: WINDOW };
-    expect((await put(ctx, other, "/preferences", both)).status).toBe(200);
+    // She declares that she seeks men too: a contest she was not in, and one that waits.
+    const wider = { seeks: ["woman", "man"], ageWindow: WINDOW };
+    expect((await put(ctx, alike, "/preferences", wider)).status).toBe(200);
+    expect(await rowOf(ctx, alike)).toMatchObject({ account_id: alike, pond_id: pond, ...EMPTIED });
+    expect((await askedBy(ctx, alike)).gate.state).toBe("pending");
     await counted(ctx, NIGHT_3);
-    expect(await rowOf(ctx, other)).toMatchObject({ admitted_at: NIGHT_3 });
+    // In the line by her registration: before the two who came after her.
+    expect(await rowOf(ctx, alike)).toMatchObject({ admitted_at: null, place_said: 10 });
+    expect(await rowOf(ctx, first)).toMatchObject({ admitted_at: null, place_said: 10 });
 
-    // And takes it back. What he was given for it goes with it, then and there.
-    const back = { seeks: ["woman"], ageWindow: WINDOW };
-    expect((await put(ctx, other, "/preferences", back)).status).toBe(200);
-    expect(await rowOf(ctx, other)).toMatchObject({ account_id: other, pond_id: pond, ...EMPTIED });
-    expect((await askedBy(ctx, other)).gate.state).toBe("pending");
-
-    // A newcomer of the smaller group makes room for one: for the one who came first.
-    await people(ctx.client, pond, 1, WOMEN);
+    // A newcomer of the other side makes room for one: the one who registered first.
+    await people(ctx.client, pond, 1, { ...MEN, registeredAt: new Date("2026-09-05") });
     await counted(ctx, NIGHT_4);
-    expect(await rowOf(ctx, honest)).toMatchObject({ admitted_at: NIGHT_4 });
-    expect(await rowOf(ctx, other)).toMatchObject({ admitted_at: null, place_said: 10 });
+    expect(await rowOf(ctx, alike)).toMatchObject({ admitted_at: NIGHT_4 });
+    expect(await rowOf(ctx, first)).toMatchObject({ admitted_at: null, place_said: 10 });
+    expect(await rowOf(ctx, second)).toMatchObject({ admitted_at: null, place_said: 10 });
+
+    // Seeking the own gender too opens no door: the contest for men is the same.
+    const own = { seeks: ["woman", "man"], ageWindow: WINDOW };
+    expect((await put(ctx, first, "/preferences", own)).status).toBe(200);
+    expect(await rowOf(ctx, first)).toMatchObject({ admitted_at: null, place_said: 10 });
+    await counted(ctx, NIGHT_5);
+    expect(await rowOf(ctx, first)).toMatchObject({ admitted_at: null, place_said: 10 });
   });
 
-  test("a change of gender into a group that waits is decided anew, a change within the group is not", async ({
+  test("a change of gender that keeps the same contests is not decided anew, a wider seek that adds one is", async ({
     ctx,
   }) => {
     const pond = await setUp(ctx, "test-gate-gender");
-    await people(ctx.client, pond, 6, MEN);
-    await people(ctx.client, pond, 4, WOMEN);
-    const [they] = await people(ctx.client, pond, 1, {
-      ...ALIKE,
-      gender: "non_binary",
-      seeks: ["woman"],
-    });
+    await people(ctx.client, pond, 6, { ...MEN, registeredAt: new Date("2026-09-01") });
+    await people(ctx.client, pond, 4, { ...WOMEN, registeredAt: new Date("2026-09-02") });
     const [he] = await people(ctx.client, pond, 1, {
       ...MEN,
       registeredAt: new Date("2026-01-01"),
     });
     await counted(ctx, NIGHT_1);
-    expect(await rowOf(ctx, they)).toMatchObject({ admitted_at: NIGHT_1 });
     expect(await rowOf(ctx, he)).toMatchObject({ admitted_at: NIGHT_1 });
+    // A non-binary person who seeks women competes with the men for women, and waits with them (#147).
+    const [they] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      gender: "non_binary",
+      seeks: ["woman"],
+      registeredAt: new Date("2026-09-03"),
+    });
+    await counted(ctx, NIGHT_2);
+    expect(await rowOf(ctx, they)).toMatchObject({ admitted_at: null, place_said: 10 });
 
+    // Declaring themselves a man keeps the one contest they are in: nothing is taken back or given.
     expect((await put(ctx, they, "/account/gender", { gender: "man" })).status).toBe(204);
-    expect(await rowOf(ctx, they)).toMatchObject({ account_id: they, pond_id: pond, ...EMPTIED });
+    expect(await rowOf(ctx, they)).toMatchObject({ admitted_at: null, place_said: 10 });
 
-    // He seeks non-binary people too from now on: the group he waits with is the same.
+    // He seeks non-binary people too from now on: a contest he was not in, decided anew.
     const wider = { seeks: ["woman", "non_binary"], ageWindow: WINDOW };
     expect((await put(ctx, he, "/preferences", wider)).status).toBe(200);
-    expect(await rowOf(ctx, he)).toMatchObject({ admitted_at: NIGHT_1 });
-    // And a narrower window of ages takes nothing back either.
+    expect(await rowOf(ctx, he)).toMatchObject({ account_id: he, pond_id: pond, ...EMPTIED });
+    await counted(ctx, NIGHT_3);
+    // Nobody competes for non-binary people yet, and he registered before everybody: let in again.
+    expect(await rowOf(ctx, he)).toMatchObject({ admitted_at: NIGHT_3 });
+    // A narrower window of ages takes nothing back; whom he seeks is unchanged.
     const narrow = { seeks: ["woman", "non_binary"], ageWindow: { min: 30, max: 31 } };
     expect((await put(ctx, he, "/preferences", narrow)).status).toBe(200);
-    expect(await rowOf(ctx, he)).toMatchObject({ admitted_at: NIGHT_1 });
+    expect(await rowOf(ctx, he)).toMatchObject({ admitted_at: NIGHT_3 });
   });
 
   test("a row that a change of pond or an erasure left behind is put right by the next count", async ({
@@ -740,15 +764,15 @@ describe("a count and a change of declaration at once", () => {
         const pond = await pondNamed(pool, "test-gate-parallel");
         await people(pool, pond, 6, MEN);
         await people(pool, pond, 4, WOMEN);
-        // He seeks his own gender too, so he waits with nobody and is let in.
-        const [he] = await people(pool, pond, 1, { ...MEN, seeks: ["woman", "man"] });
+        // He seeks only his own gender, so he competes for nobody and is let in.
+        const [he] = await people(pool, pond, 1, { ...MEN, seeks: ["man"] });
         await countGates({ db: pool, logger, now: () => NIGHT_1 });
         const row = async () =>
           (await pool.query<Row>(`SELECT ${COLUMNS} FROM gate WHERE account_id = $1`, [he]))
             .rows[0];
         expect(await row()).toMatchObject({ admitted_at: NIGHT_1 });
 
-        // He takes it back, and the night's count begins before he has committed.
+        // He seeks women instead, and the night begins before he has committed.
         const writer = await pool.connect();
         let count: Promise<unknown>;
         try {
@@ -764,7 +788,7 @@ describe("a count and a change of declaration at once", () => {
         }
         await count;
         // Read before the change, the count would have found him let in and
-        // written that over the emptied row. Seven of eleven is over the share: he waits.
+        // written that over the emptied row. Seven competing for four is over the ratio: he waits.
         expect(await row()).toMatchObject({
           admitted_at: null,
           place_said: 10,

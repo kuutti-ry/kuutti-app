@@ -76,6 +76,7 @@ export const en: Readonly<Record<string, string>> = {
   "errors.auth_suspended": "This account is suspended for now.",
   "errors.auth_under_18": "Kuutti is for adults only.",
   "errors.card_budget_exceeded": "You have seen many profiles today. New ones come after midnight.",
+  "errors.change_too_soon": "You changed this recently. A change is possible once the waiting time has passed; the home screen says from when.",
   "errors.http_error": "The request failed.",
   "errors.internal_error": "Something went wrong on our side.",
   "errors.media_busy": "Many photos are being processed right now. Try again in a moment.",

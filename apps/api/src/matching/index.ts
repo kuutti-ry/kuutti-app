@@ -4,8 +4,10 @@
 
 export { inEachOthersPool, type PoolPerson, passesFiltersOf } from "./pool.ts";
 export {
+  CHANGE_CADENCE_KEY,
   deletePreferencesOfAccount,
   deleteSeeksOfAccount,
+  nextChangeFrom,
   preferencesFrom,
   readPreferences,
   savePreferences,

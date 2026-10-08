@@ -1,23 +1,27 @@
 import type { Queryable } from "@kuutti/db";
-import type { ExportedGate, Gender } from "@kuutti/schema";
+import { type ExportedGate, GENDERS, type Gender } from "@kuutti/schema";
 
 /**
- * The pond gate's rules (#94, ADR-015; TD-10, TD-13, TD-14), pure, and the
- * rows they are kept in. Two things happen to a person with a complete
+ * The pond gate's rules (#94, #147, ADR-015; TD-10, TD-13, TD-14), pure, and
+ * the rows they are kept in. Two things happen to a person with a complete
  * profile, in this order:
  *
- * 1. **Admission.** Most are let into the pond at once. Where one gender is
- *    the larger group among those who seek another gender than their own, its
- *    newcomers wait in the order they registered once it would be more than
- *    its share (`majority_share_max`). Nobody is let out when the pond drifts.
+ * 1. **Admission.** Most are let into the pond at once. A person competes for
+ *    every gender they seek but their own, and each such contest is kept to
+ *    its ratio: while the people competing for a gender are more than that
+ *    gender can bear (`majority_share_max`, read as a ratio), its newcomers
+ *    wait in the order they registered. Nobody is let out when the pond
+ *    drifts.
  * 2. **The gate.** Matching opens for an admitted person when the people who
  *    could be shown to them, and they to those, number `gate_k`. It does not
  *    close again: a pool that shrinks makes shorter rounds (TD-11).
  *
- * The rules name no gender: they speak of the larger group, whichever it is
- * (TD-14). What a person is told of either is said in steps, never exactly
- * (`sayPool`, `sayPlace`), and only that is kept. The counting itself reads
- * across slices and lives with the nightly jobs (`jobs/pond-gate.ts`).
+ * The rules name no gender: they speak of whom one competes for, whichever
+ * it is (TD-14), and of the label a person chose nothing follows (ADR-015
+ * §4, amended by #147). What a person is told of either is said in steps,
+ * never exactly (`sayPool`, `sayPlace`), and only that is kept. The counting
+ * itself reads across slices and lives with the nightly jobs
+ * (`jobs/pond-gate.ts`).
  */
 
 /** A person as admission sees them. */
@@ -30,23 +34,28 @@ export type Applicant = {
   admitted: boolean;
 };
 
-/** The two groups the share is kept between; everybody else is admitted at once. */
-export type ContestedGroup = "woman" | "man";
-
 /**
- * The group a person waits with, or null when they wait with nobody: people
- * who seek their own gender too, and non-binary people, are admitted at once
- * (TD-13, TD-14).
+ * The genders a person competes for: whom they seek, their own left out,
+ * since seeking one's own gender is no contest (the same people stand on
+ * both sides, TD-13). A person with no contest waits with nobody.
  */
-export function contestedGroup(person: Pick<Applicant, "gender" | "seeks">): ContestedGroup | null {
-  if (person.gender === "non_binary") return null;
-  return person.seeks.includes(person.gender) ? null : person.gender;
+export function contestsOf(person: Pick<Applicant, "gender" | "seeks">): Gender[] {
+  return GENDERS.filter((gender) => gender !== person.gender && person.seeks.includes(gender));
+}
+
+/** Whether two people stand in one line: they compete for a gender in common. */
+export function competeAlike(
+  a: Pick<Applicant, "gender" | "seeks">,
+  b: Pick<Applicant, "gender" | "seeks">,
+): boolean {
+  const theirs = contestsOf(b);
+  return contestsOf(a).some((gender) => theirs.includes(gender));
 }
 
 export type Admission = {
   /** Newly let in by this count, in the order they were. */
   admitted: string[];
-  /** Who waits, with their place among those of their group: 1 is next. */
+  /** Who waits, with their place among those who compete alike: 1 is next. */
   waiting: Map<string, number>;
 };
 
@@ -54,58 +63,74 @@ const byRegistration = (a: Applicant, b: Applicant) =>
   a.registeredAt.getTime() - b.registeredAt.getTime() || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
- * Who of one pond is let in now. The larger of the two groups is admitted
- * while it is at most `shareMax` of both; the smaller, and either while they
- * are equal, always. Within a group the order is the order of registration,
- * and between the two the earlier registration goes first, so a newcomer of
- * the smaller group opens the way for those who waited.
+ * The contest ratio behind the share (ADR-015 §4): a group kept to at most
+ * `shareMax` of two groups is a ratio of at most shareMax / (1 - shareMax)
+ * between the two (0.6 is three to two).
+ */
+const ratioOf = (shareMax: number): number => shareMax / (1 - shareMax);
+
+/** Per gender: how many let-in people compete for it, and how many of it are there to compete for. */
+type Tally = { competitors: Record<Gender, number>; supply: Record<Gender, number> };
+
+const tally = (): Tally => ({
+  competitors: { woman: 0, man: 0, non_binary: 0 },
+  supply: { woman: 0, man: 0, non_binary: 0 },
+});
+
+/** A person let in counts for every contest they are in, and as one of their gender for those who compete for it. */
+function count(t: Tally, person: Pick<Applicant, "gender" | "seeks">): void {
+  const contests = contestsOf(person);
+  for (const gender of contests) t.competitors[gender] += 1;
+  if (contests.length > 0) t.supply[person.gender] += 1;
+}
+
+/**
+ * Whether a contest has room for one more: while the competitors are at
+ * most those they compete for, always; beyond that, while one more keeps
+ * the ratio. An empty pond has room for the first of anybody.
+ */
+const hasRoom = (t: Tally, gender: Gender, ratio: number): boolean =>
+  t.competitors[gender] <= t.supply[gender] ||
+  t.competitors[gender] + 1 <= ratio * t.supply[gender];
+
+const mayEnter = (t: Tally, person: Applicant, ratio: number): boolean =>
+  contestsOf(person).every((gender) => hasRoom(t, gender, ratio));
+
+/**
+ * Who of one pond is let in now. People who compete for nobody are let in at
+ * once. Of the rest, in the order of registration, whoever's every contest
+ * has room is let in and counted, and the line is read again from its head,
+ * so a newcomer who is competed for opens the way for those who waited.
  *
- * At small numbers the share can stand above `shareMax` (two of three is
- * more than 60 %): the rule is about who is let in next, not a promise about
- * the ratio, which also drifts as people leave (TD-13).
+ * At small numbers a contest can stand above its ratio (two of three is
+ * more than three to two): the rule is about who is let in next, not a
+ * promise about the ratio, which also drifts as people leave (TD-13).
  */
 export function admit(people: readonly Applicant[], shareMax: number): Admission {
-  const count: Record<ContestedGroup, number> = { woman: 0, man: 0 };
-  const queue: Record<ContestedGroup, Applicant[]> = { woman: [], man: [] };
+  const ratio = ratioOf(shareMax);
+  const t = tally();
   const admitted: Applicant[] = [];
+  const line: Applicant[] = [];
   for (const person of people) {
-    const group = contestedGroup(person);
-    if (person.admitted) {
-      if (group) count[group] += 1;
-    } else if (group) {
-      queue[group].push(person);
-    } else {
-      admitted.push(person);
-    }
+    if (person.admitted) count(t, person);
+    else if (contestsOf(person).length === 0) admitted.push(person);
+    else line.push(person);
   }
-  queue.woman.sort(byRegistration);
-  queue.man.sort(byRegistration);
-
-  const other = (group: ContestedGroup): ContestedGroup => (group === "woman" ? "man" : "woman");
-  const mayEnter = (group: ContestedGroup) =>
-    count[group] <= count[other(group)] ||
-    (count[group] + 1) / (count.woman + count.man + 1) <= shareMax;
-
+  line.sort(byRegistration);
   for (;;) {
-    const heads = (["woman", "man"] as const)
-      .flatMap((group) => {
-        const head = queue[group][0];
-        return head && mayEnter(group) ? [{ group, head }] : [];
-      })
-      .sort((a, b) => byRegistration(a.head, b.head));
-    const next = heads[0];
+    const index = line.findIndex((person) => mayEnter(t, person, ratio));
+    if (index < 0) break;
+    const [next] = line.splice(index, 1);
     if (!next) break;
-    queue[next.group].shift();
-    count[next.group] += 1;
-    admitted.push(next.head);
+    count(t, next);
+    admitted.push(next);
   }
 
   const waiting = new Map<string, number>();
-  for (const group of ["woman", "man"] as const) {
-    queue[group].forEach((person, index) => {
-      waiting.set(person.id, index + 1);
-    });
-  }
+  line.forEach((person, index) => {
+    const before = line.slice(0, index).filter((other) => competeAlike(other, person)).length;
+    waiting.set(person.id, before + 1);
+  });
   return { admitted: admitted.sort(byRegistration).map((person) => person.id), waiting };
 }
 
@@ -117,22 +142,21 @@ export function admit(people: readonly Applicant[], shareMax: number): Admission
  * would stand when those never come about: somebody who registered later
  * would be inside, and the one before them in the line.
  *
- * So: people who wait with nobody are let in. Of the two groups, a person
- * is let in when nobody of their group who is not let in registered before
- * them, and their group may enter counting only those who are let in
+ * So: people who compete for nobody are let in. Otherwise a person is let
+ * in when nobody who competes alike and is not let in registered before
+ * them, and their contests have room counting only those who are let in
  * already. Everybody else is told that the night will say.
  */
 export function admitsAlone(people: readonly Applicant[], id: string, shareMax: number): boolean {
   const person = people.find((candidate) => candidate.id === id);
   if (!person) return false;
   if (person.admitted) return true;
-  const group = contestedGroup(person);
-  if (group === null) return true;
+  if (contestsOf(person).length === 0) return true;
   const passes = people.some(
     (other) =>
       !other.admitted &&
       other.id !== id &&
-      contestedGroup(other) === group &&
+      competeAlike(other, person) &&
       byRegistration(other, person) < 0,
   );
   if (passes) return false;
@@ -142,23 +166,22 @@ export function admitsAlone(people: readonly Applicant[], id: string, shareMax: 
 
 /**
  * A person's place in the line as the recorded admissions stand: behind
- * everybody of their group who is not let in and registered before them.
+ * everybody who competes alike, is not let in and registered before them.
  * For the same count as `admitsAlone`, and for the same reason: `admit`
  * takes out of the line whoever it would let in, and a place that counted
  * on that would be better than what is written. Said in steps it is "among
  * the next twenty" where the night may find "among the next ten"; it is
- * never the other way round. Null for somebody who waits with nobody.
+ * never the other way round. Null for somebody who competes for nobody.
  */
 export function placeAlone(people: readonly Applicant[], id: string): number | null {
   const person = people.find((candidate) => candidate.id === id);
   if (!person) return null;
-  const group = contestedGroup(person);
-  if (group === null) return null;
+  if (contestsOf(person).length === 0) return null;
   const before = people.filter(
     (other) =>
       !other.admitted &&
       other.id !== id &&
-      contestedGroup(other) === group &&
+      competeAlike(other, person) &&
       byRegistration(other, person) < 0,
   );
   return before.length + 1;
@@ -200,10 +223,10 @@ export function sayPool(said: number | null, pool: number, step: number): number
 
 /**
  * The place in the line as it is said: among the next ten, the next twenty.
- * The line is of people who do not seek their own gender, so an exact place
- * that moved by one would say that of the one person who came or went. A
- * place said under another step is read in this one the same way, never
- * finer than it.
+ * The line is of people who compete for a gender, so an exact place that
+ * moved by one would say that of the one person who came or went. A place
+ * said under another step is read in this one the same way, never finer
+ * than it.
  */
 export function sayPlace(place: number, step: number): number {
   return Math.ceil(Math.max(1, place) / step) * step;
@@ -263,27 +286,33 @@ export const GATE_EMPTIED =
 /** What a person declares of themselves, as far as admission reads it. */
 export type Declared = { gender: string | null; seeks: readonly string[] | null };
 
-const groupOf = (declared: Declared): ContestedGroup | null | undefined => {
+const isGender = (value: string): value is Gender => (GENDERS as readonly string[]).includes(value);
+
+const contestsDeclared = (declared: Declared): Gender[] | undefined => {
   if (declared.gender === null || declared.seeks === null) return undefined;
-  if (declared.gender === "non_binary") return null;
-  if (declared.gender !== "woman" && declared.gender !== "man") return undefined;
-  return declared.seeks.includes(declared.gender) ? null : declared.gender;
+  if (!isGender(declared.gender)) return undefined;
+  return contestsOf({ gender: declared.gender, seeks: declared.seeks.filter(isGender) });
 };
 
-/** Whether a change of gender or of whom one seeks brings the person into a group that may have to wait. */
-export function joinsAGroupThatWaits(before: Declared, after: Declared): boolean {
-  const group = groupOf(after);
-  return group !== null && group !== undefined && groupOf(before) !== group;
+/**
+ * Whether a change of gender or of whom one seeks brings the person into a
+ * contest they were not in: one that may have to wait. Seeking one's own
+ * gender too, or no longer, is no contest and changes nothing here.
+ */
+export function joinsAContest(before: Declared, after: Declared): boolean {
+  const now = contestsDeclared(after);
+  if (!now || now.length === 0) return false;
+  const then = contestsDeclared(before) ?? [];
+  return now.some((gender) => !then.includes(gender));
 }
 
 /**
- * Admission is decided anew for a person who joins one of the two groups
- * the share is kept between (ADR-015 §9). Without it a person of the larger
- * group would declare that they seek their own gender too, be let in at
- * once, and take the declaration back: past everybody who waits, and counted
- * into the share they wait behind. Called in the transaction that writes
- * the change, for the caller's own row (rule 6). Leaving such a group, or
- * changing anything else, takes nothing back.
+ * Admission is decided anew for a person who joins a contest (ADR-015 §9).
+ * Without it a person would compete for one gender, be let in, and declare
+ * that they seek another too: past everybody who waits for that one, and
+ * counted into the ratio they wait behind. Called in the transaction that
+ * writes the change, for the caller's own row (rule 6). Leaving a contest,
+ * or changing anything else, takes nothing back.
  */
 export async function admissionAnew(
   db: Queryable,
@@ -291,7 +320,7 @@ export async function admissionAnew(
   before: Declared,
   after: Declared,
 ): Promise<boolean> {
-  if (!joinsAGroupThatWaits(before, after)) return false;
+  if (!joinsAContest(before, after)) return false;
   const result = await db.query(`UPDATE gate SET ${GATE_EMPTIED} WHERE account_id = $1`, [
     accountId,
   ]);

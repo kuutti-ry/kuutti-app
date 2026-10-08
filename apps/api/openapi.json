@@ -368,6 +368,16 @@
               },
               "pond": {
                 "$ref": "#/components/schemas/PondSummary"
+              },
+              "genderChangedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "seeksChangedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
               }
             },
             "required": [
@@ -377,7 +387,9 @@
               "birthYear",
               "birthMonth",
               "gender",
-              "pond"
+              "pond",
+              "genderChangedAt",
+              "seeksChangedAt"
             ]
           },
           "preferences": {
@@ -2259,6 +2271,25 @@
           "currentVersions": {
             "$ref": "#/components/schemas/ConsentVersions"
           },
+          "nextChange": {
+            "type": "object",
+            "properties": {
+              "gender": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "seeks": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "gender",
+              "seeks"
+            ]
+          },
           "missing": {
             "type": "array",
             "items": {
@@ -2278,6 +2309,7 @@
           "preferences",
           "consents",
           "currentVersions",
+          "nextChange",
           "missing",
           "complete"
         ]

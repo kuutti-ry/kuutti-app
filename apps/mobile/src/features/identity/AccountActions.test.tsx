@@ -26,6 +26,8 @@ const exported = {
     birthMonth: 6,
     gender: null,
     pond: null,
+    genderChangedAt: null,
+    seeksChangedAt: null,
   },
   identity: {
     firstSeenAt: "2026-09-01T00:00:00.000Z",

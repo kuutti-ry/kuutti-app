@@ -49,6 +49,9 @@ export const MATCHING_CONFIG_V1 = {
   // #146 (ADR-010 §10): the pond every account is put in when it has none;
   // the slug of a row in ponds. Null once people choose among several.
   default_pond: "suomi",
+  // #147 (the field sheet, ADR-015 §9): a change of gender or of whom one
+  // seeks is possible once in this many days, effective from the next count.
+  change_cadence_days: 30,
 } as const;
 
 /**

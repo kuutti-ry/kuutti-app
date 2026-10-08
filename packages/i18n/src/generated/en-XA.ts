@@ -76,6 +76,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "errors.auth_suspended": "［Thííš ááççóóúúñt ííš šúúšpééñdééd fóór ñóów.］",
   "errors.auth_under_18": "［Kúúúúttíí ííš fóór áádúúltš óóñlýý.］",
   "errors.card_budget_exceeded": "［ÝÝóóúú háávéé šééééñ mááñýý próófíílééš tóódááýý. Ñééw óóñééš çóóméé ááftéér míídñííght.］",
+  "errors.change_too_soon": "［ÝÝóóúú çhááñgééd thííš rééçééñtlýý. ÁÁ çhááñgéé ííš póóššííbléé óóñçéé théé wááíítííñg tííméé hááš pááššééd; théé hóóméé šçrééééñ šááýýš fróóm whééñ.］",
   "errors.http_error": "［Théé rééqúúééšt fááíílééd.］",
   "errors.internal_error": "［Šóómééthííñg wééñt wróóñg óóñ óóúúr šíídéé.］",
   "errors.media_busy": "［Mááñýý phóótóóš ááréé bééííñg próóçééššééd rííght ñóów. Trýý áágááííñ ííñ áá móómééñt.］",
