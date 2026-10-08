@@ -14,14 +14,14 @@ import {
 import type * as client from "openid-client";
 
 /**
- * Telia Tunnistus as its integration guide describes it (docs/vendors/telia.md,
- * guide v2.36 sections 2.2–2.7), in process: an OpenID provider under the real
- * pre-production issuer that answers through a `fetch` function, so the API's
- * Telia dialect (signed request object, private_key_jwt, encrypted ID token,
- * key rotation) is exercised without a network, a port or a contract. Every
- * requirement the guide states is checked here and refused with a reason;
- * the toggles in `misbehave` make it answer wrongly on purpose so the API's
- * own verification is seen to refuse.
+ * Telia Tunnistus as its integration guide describes it (v2.36 sections
+ * 2.2–2.7), in process: an OpenID provider under the real pre-production
+ * issuer that answers through a `fetch` function, so the Telia dialect
+ * (signed request object, private_key_jwt, encrypted ID token, key rotation)
+ * is exercised without a network, a port or a contract. Every requirement
+ * the guide states is checked here and refused with a reason; the toggles in
+ * `misbehave` make it answer wrongly on purpose so a client's own
+ * verification is seen to refuse. Needs `hono`, an optional peer dependency.
  */
 export const TELIA_ISSUER = "https://tunnistus-pp.telia.fi/uas";
 export const TELIA_AUTHORIZATION_ENDPOINT = `${TELIA_ISSUER}/oauth2/authorization`;
@@ -31,7 +31,7 @@ export const LOATEST2 = "http://ftn.ficora.fi/2017/loatest2";
 export const AKTIA = "https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1";
 export const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
 
-/** Guide 2.6.4: what an FTN method returns for a Finnish person (test code, not a real one). */
+/** Guide 2.6.4: what an FTN method returns for a Finnish person (a test code, not a real one). */
 export type Person = {
   hetu: string;
   dateOfBirth: string;
@@ -95,8 +95,8 @@ export async function fakeTelia(options: { person?: Person } = {}): Promise<Fake
   const rogue = await generateKeyPair("RS256", { extractable: true });
   let teliaSig = await generateKeyPair("RS256", { extractable: true });
   let teliaKid = "telia-2026-1";
-  // Telia names our enc key by the kid of the JWK we registered (guide 2.6.3);
-  // ours is the key's RFC 7638 thumbprint (infra/README.md).
+  // Telia names the client's enc key by the kid of the JWK it registered
+  // (guide 2.6.3, confirmed 2026-10-08); the kit's is the RFC 7638 thumbprint.
   const clientEncKid = await calculateJwkThumbprint(await exportJWK(clientEnc.publicKey));
 
   const pending = new Map<

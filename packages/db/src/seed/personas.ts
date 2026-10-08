@@ -1,4 +1,4 @@
-import { checkCharacter } from "../lib/hetu-format.ts";
+import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
  * The people of the mock bank (#73, ADR-014): twelve named persons the local

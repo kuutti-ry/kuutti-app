@@ -1,0 +1,47 @@
+{
+  "name": "@kuutti/tunnistus-oidc",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Telia Tunnistus relying-party kit for Node: the OpenID Connect client the broker's integration guide asks for (signed request object, private_key_jwt, encrypted ID token), discovery, key helpers, the Finnish personal identity code format, and an in-process test double of the broker.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./hetu": "./src/hetu.ts",
+    "./testing": "./src/testing/fake-telia.ts"
+  },
+  "files": [
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jose": "^6.2.12",
+    "openid-client": "^6.8.8",
+    "zod": "^4.6.5"
+  },
+  "peerDependencies": {
+    "hono": "^4.13.12"
+  },
+  "peerDependenciesMeta": {
+    "hono": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "fast-check": "^4.10.2",
+    "hono": "^4.13.12",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

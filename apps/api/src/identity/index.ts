@@ -9,7 +9,6 @@ export {
   sweepAdminSessions,
 } from "./admin-session.ts";
 export { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
-export { DiscoveryError, discoverProvider, isTeliaIssuer } from "./discovery.ts";
 export { type ErasureSummary, eraseAccount, exportAccount } from "./erasure.ts";
 export { wellKnownRoutes } from "./links.ts";
 // hetu.ts stays inside the slice: nothing outside it may hold a hetu (rules/api.md).

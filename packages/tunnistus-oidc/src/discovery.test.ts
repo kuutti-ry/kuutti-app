@@ -20,7 +20,7 @@ const answering =
     });
   };
 
-describe("OpenID discovery at boot", () => {
+describe("OpenID discovery", () => {
   it("reads the broker's endpoints from its well-known document", async () => {
     const metadata = await discoverProvider(issuer, answering(200, document));
     expect(metadata.token_endpoint).toBe(`${issuer}/oauth2/token`);

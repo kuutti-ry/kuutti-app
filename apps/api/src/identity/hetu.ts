@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { type HetuProblem, hetuProblem, isAdult, parseHetu } from "@kuutti/db";
+import { type HetuProblem, hetuProblem, isAdult, parseHetu } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
  * What the callback keeps of a personal identity code (rules 1–3, TD-1): its
