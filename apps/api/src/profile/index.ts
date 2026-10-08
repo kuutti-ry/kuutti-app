@@ -12,4 +12,8 @@ export {
 export { type CompletenessSnapshot, completeness } from "./completeness.ts";
 export { answeredPromptsOf } from "./repo.ts";
 export { profileRoutes } from "./routes.ts";
-export { eraseProfileOfAccount, exportProfile } from "./service.ts";
+export {
+  eraseProfileOfAccount,
+  exportProfile,
+  SPECIAL_CATEGORY_CONSENT_VERSION,
+} from "./service.ts";

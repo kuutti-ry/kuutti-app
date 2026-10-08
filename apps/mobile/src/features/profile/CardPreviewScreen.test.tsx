@@ -29,7 +29,12 @@ const card = {
     { id: PHOTO_A, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
     { id: PHOTO_B, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
   ],
-  fields: { languages: ["fi", "en"], intent: "long_term", campus: "Otaniemi" },
+  fields: {
+    languages: ["fi", "en"],
+    intent: "long_term",
+    occupationTitle: "Architect",
+    height: 171,
+  },
   bio: null,
   bioPreset: "photos_speak",
   prompts: [{ key: "sunday", answer: "A long breakfast." }],
@@ -74,9 +79,11 @@ describe("CardPreviewScreen", () => {
     await waitFor(() => expect(screen.getByText("Aino")).toBeTruthy());
     expect(screen.getByText("36, age verified by your bank")).toBeTruthy();
     expect(screen.getByText("Espoo")).toBeTruthy();
-    expect(screen.getByText("Finnish, English")).toBeTruthy();
+    // Languages by their own names, the same in every catalogue (ADR-019 §3).
+    expect(screen.getByText("suomi, English")).toBeTruthy();
     expect(screen.getByText("Something long-term")).toBeTruthy();
-    expect(screen.getByText("Otaniemi")).toBeTruthy();
+    expect(screen.getByText("Architect")).toBeTruthy();
+    expect(screen.getByText("171 cm")).toBeTruthy();
     expect(screen.getByText("The photos say it. The rest over coffee.")).toBeTruthy();
     expect(screen.getByText("A long breakfast.")).toBeTruthy();
     expect(screen.getByText("Whom you are looking for (set in onboarding)")).toBeTruthy();

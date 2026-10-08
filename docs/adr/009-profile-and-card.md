@@ -1,6 +1,6 @@
 # ADR-009: The profile registry, the plain-text rule, completeness, and one card builder
 
-- Status: accepted
+- Status: accepted; amended by ADR-019 on 2026-10-08 (every field carries its roles, the special-category flag is set on politics and religion and the gate compares the consent's version, the card carries info and hard fields only, the fields and options are the field sheet's)
 - Date: 2026-09-26
 - Follows: TD-16 (the profile), TD-6 (what a verified stranger learns before a match), TD-8 (`contact_details` as a refusal reason), CLAUDE.md rules 3, 5 and 6 and Product constraints (no pre-match links; every tunable in `matching_config`), `.claude/rules/schema.md` (strict contracts; the card carries nothing about anyone else), `.claude/rules/db.md` (the erasure table), ADR-005 clause 4, ADR-006 (an automatic approval requires a face), ADR-007 §4 (the erasure join), ADR-008 §3 (the shown record and the card budget); issue #47
 

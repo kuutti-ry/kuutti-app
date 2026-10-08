@@ -1,6 +1,7 @@
 import {
   AccountExport,
   CardPreviewResponse,
+  HOBBIES,
   Photo,
   ProfileResponse,
   type ProfileUpdate,
@@ -11,7 +12,7 @@ import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import { ageInYears, buildCard } from "./card.ts";
-import { consentMissingFor } from "./service.ts";
+import { consentMissingFor, SPECIAL_CATEGORY_CONSENT_VERSION } from "./service.ts";
 
 // The profile routes end to end (#47, ADR-009): real Postgres in a rolled-back
 // transaction, photos through the API with a memory store. Happy path,
@@ -30,7 +31,12 @@ const update: ProfileUpdate = {
   displayName: "Aino",
   bio: null,
   bioPreset: "lazy_nice_fellow",
-  fields: { languages: ["fi", "en"], intent: "long_term", smoking: "no", campus: "Otaniemi" },
+  fields: {
+    languages: ["fi", "en"],
+    intent: "long_term",
+    smoking: "never",
+    occupationTitle: "Architect",
+  },
   prompts: [
     { key: "sunday", answer: "A long breakfast and a longer walk." },
     { key: "hidden_talent", answer: "I can whistle with my mouth full." },
@@ -122,6 +128,9 @@ describe("profile routes", () => {
       { ...update, fields: { ...update.fields, smoking: "cigars" } },
       { ...update, fields: { ...update.fields, religion: "x" } },
       { ...update, fields: { ...update.fields, languages: ["fi", "sv", "en", "ru", "et", "uk"] } },
+      { ...update, fields: { ...update.fields, height: 139 } },
+      { ...update, fields: { ...update.fields, hobbies: HOBBIES.slice(0, 6) } },
+      { ...update, fields: { ...update.fields, campus: "Otaniemi" } },
       { ...update, prompts: [update.prompts[0], update.prompts[0]] },
       { ...update, bio: "Hello there", bioPreset: "photos_speak" },
       { ...update, displayName: "" },
@@ -140,7 +149,7 @@ describe("profile routes", () => {
     for (const body of [
       { ...update, displayName: "@aino" },
       { ...update, bio: "Write to aino@example.com please", bioPreset: null },
-      { ...update, fields: { ...update.fields, campus: "Otaniemi, 040 1234567" } },
+      { ...update, fields: { ...update.fields, occupationTitle: "Nokia, 040 1234567" } },
       { ...update, prompts: [{ key: "ask_me", answer: "Ask me on instagram" }] },
     ]) {
       const response = await put(app, a.headers, body);
@@ -156,33 +165,103 @@ describe("profile routes", () => {
     expect(JSON.stringify(logs())).not.toContain("040 1234567");
   });
 
-  test("PUT /profile refuses a consent version while no field takes one", async ({ ctx }) => {
+  test("PUT /profile refuses a politics or religion answer without the consent of the current wording, and stores both with it", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const answered = { ...update, fields: { ...update.fields, politics: ["vihr", "vas"] } };
+    for (const consent of [null, { version: "2026-01-older" }]) {
+      const response = await put(app, a.headers, { ...answered, specialCategoryConsent: consent });
+      expect(response.status).toBe(403);
+      // The detail (the fields, the current version) goes to the log, never the body (lib/errors.ts).
+      expect(await errorCode(response)).toBe("consent_required");
+    }
+    const { rows: none } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    expect(none).toHaveLength(0);
+    const saved = await put(app, a.headers, {
+      ...answered,
+      fields: { ...answered.fields, religion: "agnostic" },
+      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
+    });
+    expect(saved.status).toBe(200);
+    const stored = ProfileResponse.parse(await saved.json());
+    expect(stored.profile?.fields).toMatchObject({
+      politics: ["vihr", "vas"],
+      religion: "agnostic",
+    });
+    expect(stored.profile?.specialCategoryConsent?.version).toBe(SPECIAL_CATEGORY_CONSENT_VERSION);
+    // Shown on the card, as an answered info field is (ADR-019 §2).
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    expect(CardPreviewResponse.parse(await preview.json()).card?.fields).toMatchObject({
+      politics: ["vihr", "vas"],
+      religion: "agnostic",
+    });
+  });
+
+  test("PUT /profile refuses a consent version that is not the current wording's", async ({
+    ctx,
+  }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     const response = await put(app, a.headers, {
       ...update,
-      specialCategoryConsent: { version: "x" },
+      specialCategoryConsent: { version: "2026-01-older" },
     });
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
+    expect(await errorCode(response)).toBe("agreement_outdated");
     const { rows } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
       a.accountId,
     ]);
     expect(rows).toHaveLength(0);
   });
 
-  it("the consent gate refuses a special-category value without the version", () => {
-    const fields = { ...update.fields, religion: "x" } as ProfileUpdate["fields"];
-    expect(consentMissingFor({ fields, specialCategoryConsent: null }, ["religion"])).toEqual([
-      "religion",
-    ]);
+  test("the card leaves a soft value and a setting on the profile", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const saved = await put(app, a.headers, {
+      ...update,
+      fields: { ...update.fields, education: "amk", drinking: "rarely", hideFromField: true },
+    });
+    expect(saved.status).toBe(200);
+    expect(ProfileResponse.parse(await saved.json()).profile?.fields).toMatchObject({
+      education: "amk",
+      drinking: "rarely",
+      hideFromField: true,
+    });
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    const card = CardPreviewResponse.parse(await preview.json()).card;
+    expect(card?.fields).toEqual(update.fields);
+  });
+
+  it("the consent gate refuses a special-category value without the version of the current wording", () => {
+    const fields = { ...update.fields, religion: "agnostic" } as ProfileUpdate["fields"];
+    expect(consentMissingFor({ fields, specialCategoryConsent: null }, ["religion"], "v2")).toEqual(
+      ["religion"],
+    );
     expect(
-      consentMissingFor({ fields, specialCategoryConsent: { version: "2026-09" } }, ["religion"]),
+      consentMissingFor({ fields, specialCategoryConsent: { version: "v1" } }, ["religion"], "v2"),
+    ).toEqual(["religion"]);
+    expect(
+      consentMissingFor({ fields, specialCategoryConsent: { version: "v2" } }, ["religion"], "v2"),
     ).toEqual([]);
     expect(
-      consentMissingFor({ fields: update.fields, specialCategoryConsent: null }, ["religion"]),
+      consentMissingFor(
+        { fields: update.fields, specialCategoryConsent: null },
+        ["religion"],
+        "v2",
+      ),
     ).toEqual([]);
-    // The real registry has no such field today (ADR-009).
-    expect(consentMissingFor({ fields, specialCategoryConsent: null })).toEqual([]);
+    // The real registry flags politics and religion (ADR-019 §4).
+    expect(
+      consentMissingFor({
+        fields: { ...fields, politics: ["none_of_them"] },
+        specialCategoryConsent: null,
+      }),
+    ).toEqual(["politics", "religion"]);
+    expect(consentMissingFor({ fields: update.fields, specialCategoryConsent: null })).toEqual([]);
   });
 
   test("unauthenticated: 401 on every profile route", async ({ ctx }) => {

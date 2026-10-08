@@ -71,7 +71,7 @@ export const SEED_IDENTITIES = [
 export const SEED_PROFILE = {
   displayName: "Seed",
   bio: "A seeded profile for local development: long enough to count as a bio, short enough to read.",
-  fields: { languages: ["fi", "en"], intent: "long_term", campus: "Otaniemi" },
+  fields: { languages: ["fi", "en"], intent: "long_term", occupationTitle: "Seed gardener" },
   prompts: [{ key: "sunday", answer: "Sauna, then a long breakfast." }],
 } as const;
 
