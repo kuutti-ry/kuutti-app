@@ -10,22 +10,22 @@ Local stand-in for the Telia ID Broker (Finnish Trust Network): [navikt/mock-oau
 
 One tap logs a persona in. Nothing in the API or the app knows about them: the bank says who the person is, and the whole product path runs as for anybody (the OIDC exchange, the parsing of the code, the HMAC, the age rule, the re-registration rule). ADR-014 says why the shortcut lives here and nowhere else.
 
-| persona | born | what it is for |
-|---|---|---|
-| Aino Virtanen | 14/03/1997 | the walkthrough: registers, onboards, fills in a profile, uploads photos |
-| Mikael Lindqvist | 02/08/1992 | a second newcomer, for the walkthrough in Swedish |
-| Sanna Korhonen | 23/11/1989 | onboarded, with a profile that lacks only its photos until the photo loader has run |
-| Onni Mäkelä | 30/05/1995 | registered and never onboarded |
-| Noa Salmi | 09/01/1999 | onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing |
-| Kerttu Åkerlund | 17/06/1985 | accepted an older wording of the terms: the app asks again |
-| Tapio Heikkinen | 05/02/1978 | a banned identity: the login is refused |
-| Ilona Öhman | 27/09/1993 | deleted her account: refused until the waiting time is over |
-| Eetu Laine | the 1st of last month, 18 years ago | the youngest who gets in |
-| Venla Nieminen | the 1st of this month, 18 years ago | refused until the last day of the month: age is counted from the end of the birth month (TD-14) |
-| Lauri Hämäläinen | the 1st of last month, 17 years ago | refused |
-| Helmi Koskinen | the 1st of last month, 99 years ago | the upper end of the age window |
+| persona | born | on staging: Telia's test bank and user | what it is for |
+|---|---|---|---|
+| Aino Virtanen | 29/12/1992 | Nordea, DEMOUSER2 | the walkthrough: registers, onboards, fills in a profile, uploads photos |
+| Mikael Lindqvist | 01/01/1970 | Ålandsbanken, 12345678 (password 123456, code card 1234; S-Pankki returns the same person) | a second newcomer, for the walkthrough in Swedish |
+| Sanna Korhonen | 17/06/1977 | Nordea, DEMOUSER4 | onboarded, with a profile that lacks only its photos until the photo loader has run |
+| Onni Korhonen | 01/02/2000 | Nordea, DEMOUSER1 | registered and never onboarded |
+| Noa Salmi | 03/08/1983 | Nordea, DEMOUSER3 | onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing |
+| Kerttu Åkerlund | 01/02/1980 | Säästöpankki, 22222222 (password 123456; POP, OmaSP and Handelsbanken return the same person) | accepted an older wording of the terms: the app asks again |
+| Tapio Heikkinen | 07/07/1970 | OP, prefilled | a banned identity: the login is refused |
+| Ilona Öhman | 01/01/1970 | Aktia, prefilled | deleted her account: refused until the waiting time is over |
+| Eetu Laine | the 1st of last month, 18 years ago | mock bank only | the youngest who gets in |
+| Venla Nieminen | the 1st of this month, 18 years ago | mock bank only | refused until the last day of the month: age is counted from the end of the birth month (TD-14) |
+| Lauri Hämäläinen | the 1st of last month, 17 years ago | mock bank only | refused |
+| Siiri Koskinen | the 1st of last month, 99 years ago | mock bank only | the upper end of the age window |
 
-The first eight are the same identity on every day. What Kuutti holds about the six "with a history" is given by `pnpm demo:reset`; before it has run they are newcomers like Aino and Mikael. The last four are born relative to today, so their age holds whenever this runs and their identity changes as the months pass; they carry no history.
+The first eight are the same identity on every day, and the same person as a test user of Telia's pre-production bed (#140, `docs/vendors/telia.md` section 1.4): this page issues locally the very code the test bank returns on staging, so a story given on staging is the persona's, whether they sign in at Nordea or here. The bank's own name for the person (Nordea calls DEMOUSER2 Aino Olivia Virtanen, OP calls its user Väinö Tunnistus) is in the claims and stored nowhere; what the app calls the persona is the display name of the story. What Kuutti holds about the six "with a history" is given by `pnpm demo:reset`; before it has run they are newcomers like Aino and Mikael. The last four are born relative to today, so their age holds whenever this runs and their identity changes as the months pass; they carry no history.
 
 ## Resetting
 
@@ -45,7 +45,7 @@ Three things to know:
 - The forgetting is one transaction: everybody is reset or nobody is. The personas' identities are locked while it runs, so a role granted at that moment waits and then finds the persona gone.
 - A persona that holds a staff row is left alone, whole, and named at the end. That happens when a persona was made a moderator on this machine (the moderator's command line grants the role to the identity that just logged in). Take the role away (`pnpm --filter @kuutti/db moderator -- revoke <hetu_hmac>`) and reset again: taking it away ends the persona's staff sessions, and the reset deletes ended sessions itself rather than wait for the nightly sweep. A persona that has looked at a photo or decided on one as a moderator stays until the database is made anew: both are lines in the audit log, which is never deleted from.
 
-Their personal identity codes are artificial: the individual number is in 900 to 999, which the population register does not give to a person. The page computes a code when its button is pressed, and the generator refuses a persona with any other number.
+Their personal identity codes are artificial: the individual number is in 900 to 999, which the population register does not give to a person; the bed's test codes are, by the same rule (905 to 999 here). The page computes a code when its button is pressed, and the generator refuses a persona with any other number.
 
 The source is `packages/db/src/seed/personas.ts`. After a change there, `pnpm demo:bank` writes `login.html`, which is committed (docker compose mounts it, and a clean checkout must start); a test in `packages/db` fails when the two disagree, and another runs the page's script against `personaClaims` for every persona on a range of days. The container reads the page at every login, so a new page needs no restart, a switch of branches included (docker compose mounts this directory, not single files); a change of `config.json` does (`docker compose restart mock-idp`).
 

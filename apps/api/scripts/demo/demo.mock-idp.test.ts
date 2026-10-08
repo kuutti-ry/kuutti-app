@@ -6,6 +6,7 @@ import {
   MOCK_BANK_AMR,
   OLDER_TERMS_VERSION,
   PERSONA_HISTORIES,
+  personaBirth,
   personaHetu,
 } from "@kuutti/db/demo";
 import {
@@ -614,7 +615,8 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       `SELECT a.birth_year, a.birth_month FROM account a JOIN identity i ON i.id = a.identity_id
        WHERE i.broker_subject = 'aino'`,
     );
-    expect(rows).toEqual([{ birth_year: 1997, birth_month: 3 }]);
+    const born = personaBirth(persona("aino"), new Date());
+    expect(rows).toEqual([{ birth_year: born.year, birth_month: born.month }]);
   });
 
   test("the ages are let in and refused by the product's own rule, on whatever day this runs", async ({
@@ -622,7 +624,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
   }) => {
     const { bank } = await world(ctx);
     expect(await loginAs(persona("eetu"), bank)).toMatchObject({ kind: "session" });
-    expect(await loginAs(persona("helmi"), bank)).toMatchObject({ kind: "session" });
+    expect(await loginAs(persona("siiri"), bank)).toMatchObject({ kind: "session" });
     expect(await loginAs(persona("lauri"), bank)).toEqual({
       kind: "refused",
       error: "auth_under_18",

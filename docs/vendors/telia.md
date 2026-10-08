@@ -84,7 +84,7 @@ What the guide requires, where the API does it, and which test proves it. Levels
 
 ## Pre-production test users (section 1.4)
 
-Per bank: Nordea `DEMOUSER1`–`DEMOUSER4`; Danske `88888888` / `4545`; Aktia and OP prefilled; Ålandsbanken and S-Pankki `12345678` / `123456` / `1234` (code card); Säästöpankki and OmaSP `11111111` / `123456`; POP `12345678` / `0000`; Mobiilivarmenne emulator prefilled (`acr` `mpki.telia.emulator.1`). The hetu they return is a test code (for example `220750-999Y`, `141002A909X`).
+Per bank: Nordea `DEMOUSER1`–`DEMOUSER4`; Danske `88888888` / `4545`; Aktia and OP prefilled; Ålandsbanken and S-Pankki `12345678` / `123456` / `1234` (code card); Säästöpankki and OmaSP `11111111` / `123456`; POP `12345678` / `0000`; Mobiilivarmenne emulator prefilled (`acr` `mpki.telia.emulator.1`). The hetu they return is a test code (for example `220750-999Y`, `141002A909X`). The published codes of the test persons (integrator documentation, 2024; verified on the bed by #139) are the identities of the demo personas of the mock bank (#140, `services/mock-idp/README.md`); of them Danske's `280453-111A` and Samlink's first person `010100A001N` fail the check character and are refused by `deriveIdentity`.
 
 ## The four confirmations we need in writing
 

@@ -61,6 +61,30 @@ describe("the personas of the mock bank", () => {
     }
   });
 
+  it("are, when born on a fixed day, the test persons of Telia's pre-production bed (#140)", () => {
+    // The published codes of the bed's test users (docs/vendors/telia.md 1.4),
+    // character for character: the mock bank issues what the test bank returns.
+    const bed: Record<string, string> = {
+      aino: "291292-918R",
+      mikael: "010170-960F",
+      sanna: "170677-924F",
+      onni: "010200A9618",
+      noa: "030883-925M",
+      kerttu: "010280-952L",
+      tapio: "070770-905D",
+      ilona: "010170-999R",
+    };
+    for (const [key, code] of Object.entries(bed)) {
+      const p = persona(key);
+      expect(hasFixedIdentity(p), key).toBe(true);
+      expect(p.bank, key).toBeDefined();
+      for (const at of DAYS) expect(personaHetu(p, at), key).toBe(code);
+    }
+    for (const p of DEMO_PERSONAS) {
+      expect(p.bank !== undefined, p.key).toBe(hasFixedIdentity(p));
+    }
+  });
+
   it("keep their identity when they were born on a fixed day, and only then", () => {
     const [first, later] = [new Date(Date.UTC(2026, 8, 27)), new Date(Date.UTC(2031, 3, 2))];
     for (const p of DEMO_PERSONAS) {
@@ -79,7 +103,7 @@ describe("the personas of the mock bank", () => {
     for (const at of DAYS) {
       expect(ageOf("eetu", at), `eetu on ${at.toISOString()}`).toBe(18);
       expect(ageOf("lauri", at)).toBe(17);
-      expect(ageOf("helmi", at)).toBe(99);
+      expect(ageOf("siiri", at)).toBe(99);
       // Turns 18 this month: 17 until the month's last day, as TD-14 counts.
       const lastDay = new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 0)).getUTCDate();
       expect(ageOf("venla", at)).toBe(at.getUTCDate() >= lastDay ? 18 : 17);
@@ -94,7 +118,7 @@ describe("the personas of the mock bank", () => {
     const claims = personaClaims(persona("kerttu"), DAYS[0] as Date);
     expect(claims).toEqual({
       "urn:oid:1.2.246.21": personaHetu(persona("kerttu"), DAYS[0] as Date),
-      "urn:oid:1.3.6.1.5.5.7.9.1": "1985-06-17",
+      "urn:oid:1.3.6.1.5.5.7.9.1": "1980-02-01",
       "urn:oid:2.5.4.4": "Åkerlund",
       "urn:oid:1.2.246.575.1.14": "Kerttu",
       "urn:oid:2.16.840.1.113730.3.1.241": "Kerttu Åkerlund",
@@ -116,6 +140,7 @@ describe("the login page of the mock bank", () => {
   it("has a button for every persona and the form the server reads", () => {
     for (const p of DEMO_PERSONAS) {
       expect(page).toContain(`data-persona="${p.key}"`);
+      if (p.bank) expect(page).toContain(`On staging: ${p.bank.name}, ${p.bank.user}`);
     }
     expect(page).toMatch(/<form method="post" id="login">/);
     expect(page).toMatch(/name="username"/);

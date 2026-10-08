@@ -1,16 +1,25 @@
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, ADR-014): twelve named persons the local
- * identity provider can log in as with one tap, so that a demo or a test of
- * the first ten minutes does not start with typing claims into a form. They
- * exist at the mock bank only. The whole product path runs for them as for
- * anybody: the OIDC exchange, the parsing of the code, the HMAC, the age rule,
- * the re-registration rule. Nothing in the API or the app knows their names.
+ * The people of the mock bank (#73, #140, ADR-014): twelve named persons the
+ * local identity provider can log in as with one tap, so that a demo or a
+ * test of the first ten minutes does not start with typing claims into a
+ * form. The whole product path runs for them as for anybody: the OIDC
+ * exchange, the parsing of the code, the HMAC, the age rule, the
+ * re-registration rule. Nothing in the API or the app knows their names.
+ *
+ * The eight born on a fixed day carry the codes of the test persons of
+ * Telia's pre-production bed (#140, docs/vendors/telia.md 1.4): the mock bank
+ * issues locally the very code a test bank returns on staging, so a persona
+ * is one identity in each environment and a story given on staging is the
+ * same person's. The bank's name for the person is in the claims, as the real
+ * broker sends it, and is stored nowhere; what the app calls the persona is
+ * the display name the story gives.
  *
  * Their codes are artificial: the individual number is in 900 to 999, which
  * the population register does not give to a person (rule 1 is about real
- * codes). `personaHetu` refuses any other number.
+ * codes); the bed's are, by the same rule. `personaHetu` refuses any other
+ * number.
  *
  * Not exported from the package's index, on purpose: the API imports
  * `@kuutti/db`, and nothing of the personas belongs on its import graph. The
@@ -28,6 +37,15 @@ export type FixedBirth = { year: number; month: number; day: number };
  */
 export type RelativeBirth = { yearsAgo: number; monthsAgo: number };
 
+/** The test bank of Telia's pre-production bed that returns the persona's code, and how to log in there. */
+export type TestBank = {
+  name: string;
+  /** What is typed at the bank: a user name, or "prefilled" where the bank's test page needs nothing. */
+  user: string;
+  /** A bank that shares its test person with others, or a code card to choose. */
+  note?: string;
+};
+
 export type DemoPersona = {
   /** The name typed at the bank, and the `sub` of the token. */
   key: string;
@@ -40,6 +58,8 @@ export type DemoPersona = {
   group: "walkthrough" | "history" | "ages";
   /** What the persona is for, shown under the name. */
   note: string;
+  /** Where the same person is on Telia's bed; absent for the ages, who exist at the mock bank only. */
+  bank?: TestBank;
 };
 
 export const DEMO_PERSONAS: readonly DemoPersona[] = [
@@ -47,73 +67,89 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     key: "aino",
     given: "Aino",
     family: "Virtanen",
-    born: { year: 1997, month: 3, day: 14 },
-    individual: 901,
+    born: { year: 1992, month: 12, day: 29 },
+    individual: 918,
     group: "walkthrough",
     note: "The walkthrough: registers, onboards, fills in a profile, uploads photos.",
+    bank: { name: "Nordea", user: "DEMOUSER2" },
   },
   {
     key: "mikael",
     given: "Mikael",
     family: "Lindqvist",
-    born: { year: 1992, month: 8, day: 2 },
-    individual: 902,
+    born: { year: 1970, month: 1, day: 1 },
+    individual: 960,
     group: "walkthrough",
     note: "A second newcomer, for the walkthrough in Swedish.",
+    bank: {
+      name: "Ålandsbanken",
+      user: "12345678",
+      note: "password 123456, code card 1234; S-Pankki returns the same person",
+    },
   },
   {
     key: "sanna",
     given: "Sanna",
     family: "Korhonen",
-    born: { year: 1989, month: 11, day: 23 },
-    individual: 903,
+    born: { year: 1977, month: 6, day: 17 },
+    individual: 924,
     group: "history",
     note: "Onboarded, with a profile that lacks only its photos until the photo loader has run.",
+    bank: { name: "Nordea", user: "DEMOUSER4" },
   },
   {
     key: "onni",
     given: "Onni",
-    family: "Mäkelä",
-    born: { year: 1995, month: 5, day: 30 },
-    individual: 904,
+    family: "Korhonen",
+    born: { year: 2000, month: 2, day: 1 },
+    individual: 961,
     group: "history",
     note: "Registered and never onboarded: the app starts at the first step.",
+    bank: { name: "Nordea", user: "DEMOUSER1" },
   },
   {
     key: "noa",
     given: "Noa",
     family: "Salmi",
-    born: { year: 1999, month: 1, day: 9 },
-    individual: 905,
+    born: { year: 1983, month: 8, day: 3 },
+    individual: 925,
     group: "history",
     note: "Onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing.",
+    bank: { name: "Nordea", user: "DEMOUSER3" },
   },
   {
     key: "kerttu",
     given: "Kerttu",
     family: "Åkerlund",
-    born: { year: 1985, month: 6, day: 17 },
-    individual: 906,
+    born: { year: 1980, month: 2, day: 1 },
+    individual: 952,
     group: "history",
     note: "Accepted an older wording of the terms: the app asks again.",
+    bank: {
+      name: "Säästöpankki",
+      user: "22222222",
+      note: "password 123456; POP, OmaSP and Handelsbanken return the same person",
+    },
   },
   {
     key: "tapio",
     given: "Tapio",
     family: "Heikkinen",
-    born: { year: 1978, month: 2, day: 5 },
-    individual: 907,
+    born: { year: 1970, month: 7, day: 7 },
+    individual: 905,
     group: "history",
     note: "A banned identity: the login is refused.",
+    bank: { name: "OP", user: "prefilled" },
   },
   {
     key: "ilona",
     given: "Ilona",
     family: "Öhman",
-    born: { year: 1993, month: 9, day: 27 },
-    individual: 908,
+    born: { year: 1970, month: 1, day: 1 },
+    individual: 999,
     group: "history",
     note: "Deleted her account: refused until the waiting time is over.",
+    bank: { name: "Aktia", user: "prefilled", note: "or 12345678, password 123456, code 1234" },
   },
   {
     key: "eetu",
@@ -143,8 +179,8 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     note: "17: refused.",
   },
   {
-    key: "helmi",
-    given: "Helmi",
+    key: "siiri",
+    given: "Siiri",
     family: "Koskinen",
     born: { yearsAgo: 99, monthsAgo: 1 },
     individual: 912,
