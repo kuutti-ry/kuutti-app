@@ -7,10 +7,14 @@ import {
   Platform,
   useColorScheme as useSystemColorScheme,
 } from "react-native";
+import { readPreference, writePreference } from "@/lib/preferences";
 import { cn } from "@/lib/utils";
 import { useMotionDuration } from "./useReducedMotion";
 
 export type SchemePreference = "system" | "light" | "dark";
+
+const isScheme = (value: string | null): value is SchemePreference =>
+  value === "system" || value === "light" || value === "dark";
 
 type Theme = {
   /** What is on screen now. */
@@ -52,7 +56,8 @@ function useSystemHighContrast(): boolean {
  * Applies the token sets of tokens.css (#12, TD-9). Light and dark follow the
  * system through NativeWind's .dark; high contrast is a second token set that
  * this root view hands down as CSS variables, following the OS setting until
- * the user chooses. The portal host sits inside the root view so dialogs
+ * the user chooses. Both choices survive a restart (#143, the settings sheet);
+ * the OS is the default. The portal host sits inside the root view so dialogs
  * inherit the same tokens. A change of theme fades in briefly, instantly under
  * reduce-motion.
  */
@@ -72,13 +77,38 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (Platform.OS === "web") setColorScheme(preference === "system" ? system : preference);
   }, [preference, system, setColorScheme]);
 
-  const setPreference = React.useCallback(
+  const applyPreference = React.useCallback(
     (next: SchemePreference) => {
       setPreferenceState(next);
       if (Platform.OS !== "web") setColorScheme(next);
     },
     [setColorScheme],
   );
+  const setPreference = React.useCallback(
+    (next: SchemePreference) => {
+      applyPreference(next);
+      void writePreference("scheme", next === "system" ? null : next);
+    },
+    [applyPreference],
+  );
+  const setHighContrast = React.useCallback((on: boolean) => {
+    setChosenHighContrast(on);
+    void writePreference("highContrast", on ? "true" : "false");
+  }, []);
+
+  // What was chosen last time, read once; nothing stored is the OS's setting.
+  React.useEffect(() => {
+    let mounted = true;
+    void readPreference("scheme").then((stored) => {
+      if (mounted && isScheme(stored)) applyPreference(stored);
+    });
+    void readPreference("highContrast").then((stored) => {
+      if (mounted && stored !== null) setChosenHighContrast(stored === "true");
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [applyPreference]);
 
   // Web dialogs are portalled to <body>, outside the root view below, so the
   // high-contrast set also goes on <body> there (not on <html>, where
@@ -117,9 +147,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       preference,
       setPreference,
       highContrast,
-      setHighContrast: setChosenHighContrast,
+      setHighContrast,
     }),
-    [scheme, preference, setPreference, highContrast],
+    [scheme, preference, setPreference, highContrast, setHighContrast],
   );
 
   return (

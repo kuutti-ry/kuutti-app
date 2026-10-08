@@ -1,22 +1,16 @@
 import { LOCALE_NAMES, type PlainMessageKey } from "@kuutti/i18n";
-import * as Sentry from "@sentry/react-native";
-import Settings from "lucide-react-native/icons/settings";
-import { useState } from "react";
-import { View } from "react-native";
+import { useRouter } from "expo-router";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import { useEffect, useState } from "react";
+import { ScrollView, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { useSession } from "@/features/identity";
+import { AccountActions, useSession } from "@/features/identity";
+import { fetchHealth } from "@/lib/api";
 import {
   LOCALE_FLAGS,
   type LocalePreference,
@@ -24,7 +18,9 @@ import {
   useLocaleSettings,
   useT,
 } from "@/lib/locale";
+import { useHapticTap } from "@/theme/haptics";
 import { type SchemePreference, useTheme } from "@/theme/ThemeProvider";
+import { SourceOffer } from "./SourceOffer";
 
 const SCHEMES: ReadonlyArray<{ value: SchemePreference; label: PlainMessageKey }> = [
   { value: "system", label: "settings.theme.system" },
@@ -57,16 +53,32 @@ function Choice(props: { label: string; flag?: string; chosen: boolean; onPress:
 }
 
 /**
- * Theme, high contrast and language for builds that are not production (#12,
- * #13): how every token set and every locale, en-XA included, is looked at on
- * a device. The language choice is the in-app override that beats the phone's.
+ * The person's own settings, after login, in every build (#143; the team's
+ * notes of 08/10): theme and high contrast (the OS's by default, kept across
+ * restarts), the language (the phone's by default), this device's session,
+ * the account (export, deletion, the research opt-in; #51) and the source
+ * offer of AGPL-3.0 section 13, which stays visible to everybody. What is
+ * technical (commits, the API, a test error) is the tech config screen and
+ * exists outside production only.
  */
-export function DevSettings() {
+export function SettingsScreen() {
   const { t } = useT();
+  const router = useRouter();
+  const tap = useHapticTap();
   const theme = useTheme();
   const locale = useLocaleSettings();
   const session = useSession();
-  const [errorSent, setErrorSent] = useState(false);
+  // The address of the running service's source, as /health names it (AGPL §13).
+  const [source, setSource] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchHealth()
+      .then((health) => live && setSource(health.source))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
   const languages: ReadonlyArray<{ value: LocalePreference; label: string; flag?: string }> = [
     { value: "system", label: t("settings.language.system") },
     // A language is listed under its own name, whatever the app's language is.
@@ -78,20 +90,29 @@ export function DevSettings() {
   ];
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" accessibilityLabel={t("settings.open")}>
-          <Icon as={Settings} />
-        </Button>
-      </DialogTrigger>
-      <DialogContent closeLabel={t("settings.close")}>
-        <DialogHeader>
-          <DialogTitle>{t("settings.title")}</DialogTitle>
-          <DialogDescription>{t("settings.devOnly")}</DialogDescription>
-        </DialogHeader>
+    <SafeAreaView className="flex-1 bg-background">
+      <ScrollView contentContainerClassName="gap-6 p-6">
+        <View className="flex-row items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel={t("settings.back")}
+            onPress={() => {
+              tap();
+              router.back();
+            }}
+          >
+            <Icon as={ArrowLeft} />
+          </Button>
+          <Text variant="h1" accessibilityRole="header">
+            {t("settings.title")}
+          </Text>
+        </View>
 
         <View className="gap-2">
-          <Text variant="small">{t("settings.theme.label")}</Text>
+          <Text variant="small" accessibilityRole="header">
+            {t("settings.theme.label")}
+          </Text>
           <View
             accessibilityRole="radiogroup"
             accessibilityLabel={t("settings.theme.label")}
@@ -123,7 +144,9 @@ export function DevSettings() {
         </View>
 
         <View className="gap-2">
-          <Text variant="small">{t("settings.language.label")}</Text>
+          <Text variant="small" accessibilityRole="header">
+            {t("settings.language.label")}
+          </Text>
           <View
             accessibilityRole="radiogroup"
             accessibilityLabel={t("settings.language.label")}
@@ -145,7 +168,9 @@ export function DevSettings() {
             the recovery for a lost phone. Errors are swallowed: the local
             session is cleared either way, and the row expires on its own. */}
         <View className="gap-2">
-          <Text variant="small">{t("settings.session.label")}</Text>
+          <Text variant="small" accessibilityRole="header">
+            {t("settings.session.label")}
+          </Text>
           {session.status === "signed-in" ? (
             <View className="flex-row flex-wrap gap-2">
               <Button
@@ -170,21 +195,20 @@ export function DevSettings() {
           )}
         </View>
 
-        {/* Proves error reporting end to end (#11): a real JS error with a stack
-            for Sentry to symbolicate. A no-op in a build without a DSN. */}
+        {/* Export, the research opt-in and deletion (#51): nothing when signed out. */}
+        <AccountActions />
+
         <View className="gap-2">
-          <Button
-            variant="outline"
-            onPress={() => {
-              Sentry.captureException(new Error("Sentry test from the settings sheet"));
-              setErrorSent(true);
-            }}
-          >
-            {t("settings.errorTest.send")}
-          </Button>
-          {errorSent && <Text variant="muted">{t("settings.errorTest.sent")}</Text>}
+          <Text variant="small" accessibilityRole="header">
+            {t("settings.about.title")}
+          </Text>
+          {source ? (
+            <SourceOffer source={source} />
+          ) : (
+            <Text variant="muted">{t("about.source.body")}</Text>
+          )}
         </View>
-      </DialogContent>
-    </Dialog>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

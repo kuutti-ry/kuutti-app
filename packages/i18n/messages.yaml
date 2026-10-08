@@ -23,112 +23,7 @@
 # database). legal.* keys take a consent_version and never a machine flag.
 # After editing: `pnpm i18n:build`, and commit src/generated with it.
 
-smoke.title:
-  en: Kuutti
-  description: App name as the heading of the smoke screen. Never translated.
-  fi: Kuutti
-  sv: Kuutti
-  machine: { fi: true, sv: true }
 
-smoke.loading:
-  en: Reaching the API…
-  description: Smoke screen, shown while the first request to the API is in flight.
-  fi: Yhdistetään rajapintaan…
-  sv: Ansluter till API:et…
-  machine: { fi: true, sv: true }
-
-smoke.status.label:
-  en: API status
-  description: Smoke screen, screen-reader label of the card that shows the API's version.
-  fi: Rajapinnan tila
-  sv: API-status
-  machine: { fi: true, sv: true }
-
-smoke.api.title:
-  en: API
-  description: Smoke screen, title of the card about the API the app talks to. Never translated.
-  fi: API
-  sv: API
-  machine: { fi: true, sv: true }
-
-smoke.status.commit:
-  en: git commit {commit}
-  description: Smoke screen, in both cards. {commit} is a short git hash (a code, not translated); the card title says whose it is, the API's or the app's.
-  fi: git-commit {commit}
-  sv: git-commit {commit}
-  machine: { fi: true, sv: true }
-
-smoke.app.title:
-  en: App
-  description: Smoke screen, title of the card about the JavaScript this phone is running, as opposed to the API.
-  fi: Sovellus
-  sv: Appen
-  machine: { fi: true, sv: true }
-
-smoke.app.label:
-  en: App version
-  description: Smoke screen, screen-reader label of the card that shows the app's own commit and update.
-  fi: Sovelluksen versio
-  sv: Appens version
-  machine: { fi: true, sv: true }
-
-smoke.app.runtime:
-  en: "native build {runtime}"
-  description: "App card: the first seven characters of the native build's runtime version (the fingerprint, ADR-004). An over-the-air update reaches only a build with the same runtime, so this is what to compare with the EAS build list when the commit stops moving."
-  fi: "natiiviversio {runtime}"
-  sv: "nativ version {runtime}"
-  machine: { fi: true, sv: true }
-
-smoke.app.noRuntime:
-  en: "native build not recorded"
-  description: "App card when expo-updates reports no runtime version (the web preview, a dev client on Metro)."
-  fi: "natiiviversiota ei kirjattu"
-  sv: "nativ version inte registrerad"
-  machine: { fi: true, sv: true }
-
-smoke.app.embedded:
-  en: "running the build's own bundle, no update applied yet"
-  description: "App card when the app runs the JavaScript embedded in the native build rather than an over-the-air update."
-  fi: "käytössä version oma paketti, päivitystä ei vielä asennettu"
-  sv: "kör versionens eget paket, ingen uppdatering ännu"
-  machine: { fi: true, sv: true }
-
-smoke.app.updated:
-  en: "update published {date}"
-  description: "App card: when the running over-the-air update was published (expo-updates createdAt; the module does not record when this phone applied it); {date} is already formatted."
-  fi: "päivitys julkaistu {date}"
-  sv: "uppdatering publicerad {date}"
-  machine: { fi: true, sv: true }
-
-smoke.app.noCommit:
-  en: git commit not recorded in this build
-  description: Smoke screen, App card, when the running code was built before the commit was stamped into it.
-  fi: git-committia ei ole tallennettu tähän rakennukseen
-  sv: git-commit inte registrerad i det här bygget
-  machine: { fi: true, sv: true }
-
-
-smoke.status.database:
-  en: database {db} · migrations {migrations}
-  description: Smoke screen. {db} and {migrations} are raw state words from the API (ok, current), not translated.
-  fi: tietokanta {db} · migraatiot {migrations}
-  sv: databas {db} · migreringar {migrations}
-  machine: { fi: true, sv: true }
-
-
-smoke.unreachable.title:
-  en: API unreachable
-  description: Smoke screen, title of the error state when the request to the API failed. The technical reason follows untranslated.
-  fi: Rajapintaan ei saada yhteyttä
-  sv: API:et kan inte nås
-  machine: { fi: true, sv: true }
-
-smoke.retry:
-  en: Retry
-  description: Smoke screen, button that repeats the request to the API.
-  fi: Yritä uudelleen
-  sv: Försök igen
-  machine: { fi: true, sv: true }
 
 # --- Profile (#47) ---
 
@@ -984,13 +879,6 @@ settings.title:
   sv: Inställningar
   machine: { fi: true, sv: true }
 
-settings.devOnly:
-  en: Shown in development builds only.
-  description: Note under the title of the settings sheet.
-  fi: Näkyy vain kehitysversioissa.
-  sv: Visas bara i utvecklingsversioner.
-  machine: { fi: true, sv: true }
-
 settings.close:
   en: Close settings
   description: Screen-reader label of the close button of the settings sheet.
@@ -1073,20 +961,6 @@ about.source.open:
   description: Screen-reader label of the link that opens the source repository in the system browser.
   fi: Avaa lähdekoodi selaimessa
   sv: Öppna källkoden i webbläsaren
-  machine: { fi: true, sv: true }
-
-settings.errorTest.send:
-  en: Send a test error
-  description: Settings sheet of non-production builds. Button that reports one marked error to the error tracker, to check that reporting works. Short, on a button.
-  fi: Lähetä testivirhe
-  sv: Skicka ett testfel
-  machine: { fi: true, sv: true }
-
-settings.errorTest.sent:
-  en: Test error sent. It shows up in the error tracker within a minute if reporting is on in this build.
-  description: Settings sheet, shown under the button after it was pressed.
-  fi: Testivirhe lähetetty. Se näkyy virheseurannassa minuutin kuluessa, jos raportointi on päällä tässä versiossa.
-  sv: Testfelet har skickats. Det syns i felspårningen inom en minut om rapportering är på i den här versionen.
   machine: { fi: true, sv: true }
 
 errors.validation_failed:
@@ -1451,41 +1325,6 @@ signIn.tryAgain:
   description: Sign-in screen, the button in the error state; returns to the start.
   fi: Yritä uudelleen
   sv: Försök igen
-  machine: { fi: true, sv: true }
-
-smoke.session.title:
-  en: Session
-  description: Smoke screen, title of the card that shows whether this device is signed in.
-  fi: Istunto
-  sv: Session
-  machine: { fi: true, sv: true }
-
-smoke.session.label:
-  en: Session status
-  description: Screen-reader label of the smoke screen's session card.
-  fi: Istunnon tila
-  sv: Sessionens status
-  machine: { fi: true, sv: true }
-
-smoke.session.signedIn:
-  en: Signed in · session {session}
-  description: Smoke screen, the device holds a session; {session} is the first characters of its id (a device id, never the person).
-  fi: Kirjautunut · istunto {session}
-  sv: Inloggad · session {session}
-  machine: { fi: true, sv: true }
-
-smoke.session.signedOut:
-  en: Not signed in
-  description: Smoke screen, the device holds no session.
-  fi: Ei kirjautunut
-  sv: Inte inloggad
-  machine: { fi: true, sv: true }
-
-smoke.session.signIn:
-  en: Sign in
-  description: Smoke screen, the button that opens the sign-in screen.
-  fi: Kirjaudu sisään
-  sv: Logga in
   machine: { fi: true, sv: true }
 
 settings.session.label:
@@ -2045,13 +1884,6 @@ photos.imageLabel:
   sv: "Foto {position, number} / {total, number}"
   machine: { fi: true, sv: true }
 
-smoke.photos.open:
-  en: Your photos
-  description: Home (smoke) screen, the button that opens the photos screen when the device is signed in.
-  fi: Kuvasi
-  sv: Dina foton
-  machine: { fi: true, sv: true }
-
 photos.rejected.nudity:
   en: Not accepted. Photos with nudity cannot be used on Kuutti.
   description: Photos screen, under the badge of a rejected photo; the moderator chose the reason nudity.
@@ -2374,27 +2206,6 @@ account.research.failed:
   sv: "Forskningsvalet kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
-smoke.gate.checking:
-  en: "Checking your account setup…"
-  description: "Home screen while GET /onboarding is in flight (#46): nothing that needs a finished account shows until it says complete."
-  fi: "Tarkistetaan tilisi asetuksia…"
-  sv: "Kontrollerar din kontoinställning…"
-  machine: { fi: true, sv: true }
-
-smoke.gate.failed:
-  en: "Your account setup could not be checked."
-  description: "Home screen when GET /onboarding failed: the gate stays closed and offers a retry."
-  fi: "Tilisi asetuksia ei voitu tarkistaa."
-  sv: "Din kontoinställning kunde inte kontrolleras."
-  machine: { fi: true, sv: true }
-
-smoke.gate.retry:
-  en: "Check again"
-  description: "Retry button of the home screen's onboarding gate."
-  fi: "Tarkista uudelleen"
-  sv: "Kontrollera igen"
-  machine: { fi: true, sv: true }
-
 pond.waitlist.label:
   en: "People in your area"
   description: "Home screen, accessible name of the card with the waitlist counter of the person's own pond (#54, ADR-013)."
@@ -2555,4 +2366,250 @@ pond.gate.retry:
   description: "Gate card, the button that fetches the person's gate again."
   fi: "Yritä uudelleen"
   sv: "Försök igen"
+  machine: { fi: true, sv: true }
+
+# --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---
+home.title:
+  en: "Kuutti"
+  description: "Home screen heading: the name of the app, as the placeholder page and the sign-in screen say it."
+  fi: "Kuutti"
+  sv: "Kuutti"
+  machine: { fi: true, sv: true }
+
+home.loading:
+  en: "Loading…"
+  description: "The first screen while the stored session is being read, before the sign-in or the home screen shows."
+  fi: "Ladataan…"
+  sv: "Laddar…"
+  machine: { fi: true, sv: true }
+
+home.settings.open:
+  en: "Settings"
+  description: "Accessible name of the gear button on the home screen that opens the settings screen."
+  fi: "Asetukset"
+  sv: "Inställningar"
+  machine: { fi: true, sv: true }
+
+home.tech.open:
+  en: "Tech config"
+  description: "Accessible name of the wrench button on the home screen that opens the technical view (commits, API, test error); not in production builds."
+  fi: "Tekniset tiedot"
+  sv: "Teknisk vy"
+  machine: { fi: true, sv: true }
+
+home.gate.checking:
+  en: "Checking your account setup…"
+  description: "Home screen while GET /onboarding is in flight (#46): nothing that needs a finished account shows until it says complete."
+  fi: "Tarkistetaan tilisi asetuksia…"
+  sv: "Kontrollerar din kontoinställning…"
+  machine: { fi: true, sv: true }
+
+home.gate.failed:
+  en: "Your account setup could not be checked."
+  description: "Home screen when GET /onboarding failed: the gate stays closed and a retry is offered."
+  fi: "Tilisi asetuksia ei voitu tarkistaa."
+  sv: "Din kontoinställning kunde inte kontrolleras."
+  machine: { fi: true, sv: true }
+
+home.gate.retry:
+  en: "Check again"
+  description: "Button under home.gate.failed: reads GET /onboarding again."
+  fi: "Tarkista uudelleen"
+  sv: "Kontrollera igen"
+  machine: { fi: true, sv: true }
+
+home.photos.open:
+  en: "Your photos"
+  description: "Home screen button to the photos screen (#48)."
+  fi: "Kuvasi"
+  sv: "Dina bilder"
+  machine: { fi: true, sv: true }
+
+settings.back:
+  en: "Back"
+  description: "Accessible name of the arrow button at the top of the settings screen that returns to the home screen."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+settings.about.title:
+  en: "About Kuutti"
+  description: "Settings screen, heading of the section with the source-code offer (AGPL-3.0 section 13)."
+  fi: "Tietoja Kuutista"
+  sv: "Om Kuutti"
+  machine: { fi: true, sv: true }
+
+tech.title:
+  en: "Tech config"
+  description: "Heading of the technical view: environment, API, commits, test error, licences. Not in production builds."
+  fi: "Tekniset tiedot"
+  sv: "Teknisk vy"
+  machine: { fi: true, sv: true }
+
+tech.back:
+  en: "Back"
+  description: "Accessible name of the arrow button at the top of the tech config screen that returns to the home screen."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+tech.unavailable:
+  en: "Not in this build."
+  description: "The tech config route in a production build, where the technical view does not exist."
+  fi: "Ei tässä versiossa."
+  sv: "Inte i den här versionen."
+  machine: { fi: true, sv: true }
+
+tech.environment:
+  en: "Environment: {environment}"
+  description: "Tech config: which environment the JavaScript runs in. {environment} is one of development, preview, staging, production, as the code names them; not translated."
+  fi: "Ympäristö: {environment}"
+  sv: "Miljö: {environment}"
+  machine: { fi: true, sv: true }
+
+tech.api.title:
+  en: "API"
+  description: "Tech config card: the API this build talks to; its address is under the title."
+  fi: "API"
+  sv: "API"
+  machine: { fi: true, sv: true }
+
+tech.api.loading:
+  en: "Reaching the API…"
+  description: "Tech config, API card while GET /health is in flight."
+  fi: "Yhdistetään API:in…"
+  sv: "Kontaktar API:et…"
+  machine: { fi: true, sv: true }
+
+tech.api.commit:
+  en: "git commit {commit}"
+  description: "Tech config, API card: the API's git commit from GET /health. {commit} is a short hash."
+  fi: "git-commit {commit}"
+  sv: "git-commit {commit}"
+  machine: { fi: true, sv: true }
+
+tech.api.database:
+  en: "database {db} · migrations {migrations}"
+  description: "Tech config, API card: the database state and the migration state from GET /health, as the API names them; not translated."
+  fi: "tietokanta {db} · migraatiot {migrations}"
+  sv: "databas {db} · migreringar {migrations}"
+  machine: { fi: true, sv: true }
+
+tech.api.unreachable:
+  en: "API unreachable"
+  description: "Tech config, API card when GET /health failed; the error's message follows."
+  fi: "API ei vastaa"
+  sv: "API:et svarar inte"
+  machine: { fi: true, sv: true }
+
+tech.api.check:
+  en: "Check again"
+  description: "Tech config, API card button: reads GET /health again."
+  fi: "Tarkista uudelleen"
+  sv: "Kontrollera igen"
+  machine: { fi: true, sv: true }
+
+tech.app.title:
+  en: "App"
+  description: "Tech config card: this app's own commit, native build, update, channel and version."
+  fi: "Sovellus"
+  sv: "Appen"
+  machine: { fi: true, sv: true }
+
+tech.app.commit:
+  en: "git commit {commit}"
+  description: "Tech config, App card: the git commit app.config.ts stamped into this JavaScript. {commit} is a short hash."
+  fi: "git-commit {commit}"
+  sv: "git-commit {commit}"
+  machine: { fi: true, sv: true }
+
+tech.app.noCommit:
+  en: "git commit not recorded in this build"
+  description: "Tech config, App card when no commit was stamped (a local export without git)."
+  fi: "git-commitia ei ole tallennettu tähän versioon"
+  sv: "git-commit saknas i den här versionen"
+  machine: { fi: true, sv: true }
+
+tech.app.runtime:
+  en: "native build {runtime}"
+  description: "Tech config, App card: the native build's runtime version, the first seven characters of the fingerprint (ADR-004)."
+  fi: "natiiviversio {runtime}"
+  sv: "nativ version {runtime}"
+  machine: { fi: true, sv: true }
+
+tech.app.noRuntime:
+  en: "native build not recorded"
+  description: "Tech config, App card when expo-updates reports no runtime version (a dev client on Metro)."
+  fi: "natiiviversiota ei ole tallennettu"
+  sv: "nativ version saknas"
+  machine: { fi: true, sv: true }
+
+tech.app.embedded:
+  en: "running the build's own bundle, no update applied yet"
+  description: "Tech config, App card when the app runs the JavaScript the native build shipped with, not an over-the-air update."
+  fi: "käytössä version oma paketti, päivitystä ei ole vielä asennettu"
+  sv: "kör versionens egna paket, ingen uppdatering är installerad ännu"
+  machine: { fi: true, sv: true }
+
+tech.app.updated:
+  en: "update published {date}"
+  description: "Tech config, App card: when the over-the-air update the app runs was published. {date} is a formatted date and time."
+  fi: "päivitys julkaistu {date}"
+  sv: "uppdatering publicerad {date}"
+  machine: { fi: true, sv: true }
+
+tech.app.channel:
+  en: "channel {channel}"
+  description: "Tech config, App card: the EAS Update channel (staging, production, pr-<n>); empty for a dev client. Not translated."
+  fi: "kanava {channel}"
+  sv: "kanal {channel}"
+  machine: { fi: true, sv: true }
+
+tech.app.version:
+  en: "version {version}"
+  description: "Tech config, App card: the app's version from app.json. {version} is a version string."
+  fi: "versio {version}"
+  sv: "version {version}"
+  machine: { fi: true, sv: true }
+
+tech.app.releases:
+  en: "Releases on GitHub"
+  description: "Tech config, App card link to the repository's releases page, where a version is explained."
+  fi: "Julkaisut GitHubissa"
+  sv: "Utgåvor på GitHub"
+  machine: { fi: true, sv: true }
+
+tech.errorTest.send:
+  en: "Send a test error"
+  description: "Tech config button that reports one marked test error to the error tracker (#11); nothing happens in a build without reporting."
+  fi: "Lähetä testivirhe"
+  sv: "Skicka ett testfel"
+  machine: { fi: true, sv: true }
+
+tech.errorTest.sent:
+  en: "Test error sent. It shows up in the error tracker within a minute if reporting is on in this build."
+  description: "Tech config, under the test error button after it was pressed."
+  fi: "Testivirhe lähetetty. Se näkyy virheseurannassa minuutin sisällä, jos raportointi on päällä tässä versiossa."
+  sv: "Testfelet skickades. Det syns i felspårningen inom en minut om rapportering är på i den här versionen."
+  machine: { fi: true, sv: true }
+
+tech.licenses.title:
+  en: "Licences of the packages"
+  description: "Tech config, heading of the list of the packages this build is made of, each with its licence."
+  fi: "Pakettien lisenssit"
+  sv: "Paketens licenser"
+  machine: { fi: true, sv: true }
+
+tech.licenses.show:
+  en: "{packages, plural, one {Show # package} other {Show # packages}}"
+  description: "Tech config button that opens the licence list. {packages} is the number of packages."
+  fi: "{packages, plural, one {Näytä # paketti} other {Näytä # pakettia}}"
+  sv: "{packages, plural, one {Visa # paket} other {Visa # paket}}"
+  machine: { fi: true, sv: true }
+
+tech.licenses.hide:
+  en: "Hide the list"
+  description: "Tech config button that closes the licence list."
+  fi: "Piilota luettelo"
+  sv: "Dölj listan"
   machine: { fi: true, sv: true }
