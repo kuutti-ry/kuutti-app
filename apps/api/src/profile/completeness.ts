@@ -8,8 +8,9 @@ import {
 
 /**
  * What a profile needs before the round builder may show it (#47): a name, at
- * least three approved photos (an automatic approval requires a face,
- * ADR-006), a bio of fifty characters or two answered prompts, and the two
+ * least two approved photos (an automatic approval requires a face, ADR-006;
+ * two since #56, where a third became a tip), a bio of fifty characters or
+ * two answered prompts, and the two
  * things onboarding sets (#46), seeks and the age window. Pure: the callers
  * gather the snapshot; the tips of #56 and the round builder of M4 read the
  * same answer.

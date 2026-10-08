@@ -19,7 +19,10 @@ export const BIO_MIN_FOR_COMPLETENESS = 50;
 export const PROMPT_ANSWER_MAX = 160;
 export const PROMPTS_MAX = 3;
 export const PROMPTS_FOR_COMPLETENESS = 2;
-export const PHOTOS_FOR_COMPLETENESS = 3;
+/** Approved photos a profile needs before it is complete (#47; two since #56). */
+export const PHOTOS_FOR_COMPLETENESS = 2;
+/** A profile with enough photos to be complete, but fewer than this, gets the tip to add one (#56). */
+export const PHOTOS_SUGGESTED = 3;
 
 /** The prompts a person may answer; texts are i18n keys profile.prompt.<key>. */
 export const PROMPT_KEYS = [
@@ -96,6 +99,14 @@ export const Completeness = z
   .meta({ id: "Completeness" });
 export type Completeness = z.infer<typeof Completeness>;
 
+/**
+ * Advisory profile tips for the owner (#56). One tip at a time; never gates
+ * completeness, moderation, or matching. Kinds grow as label rules land.
+ * A kind names what was noticed; the words for it are the client's.
+ */
+export const TipKind = z.enum(["few_photos"]).meta({ id: "TipKind" });
+export type TipKind = z.infer<typeof TipKind>;
+
 /** The stored profile, as the owner reads it back. */
 export const ProfileDocument = z
   .object({
@@ -117,6 +128,8 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
+    /** The highest-priority tip, or null when none applies. */
+    tip: TipKind.nullable(),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;
@@ -161,6 +174,8 @@ export const CardPreviewResponse = z
   .object({
     card: ProfileCard.nullable(),
     completeness: Completeness,
+    /** The highest-priority tip, or null when none applies. */
+    tip: TipKind.nullable(),
   })
   .meta({ id: "CardPreviewResponse" });
 export type CardPreviewResponse = z.infer<typeof CardPreviewResponse>;

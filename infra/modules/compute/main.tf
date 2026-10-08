@@ -101,13 +101,18 @@ data "aws_iam_policy_document" "api" {
     }
   }
 
-  # Photo moderation (#49, ADR-006): the two detect calls and nothing else of
-  # Rekognition. Detect actions take no resource, hence "*"; the images are
-  # bytes in the request and nothing is stored on the Rekognition side.
+  # Photo moderation (#49, ADR-006) and tip signals (#56): the three detect
+  # calls and nothing else of Rekognition. Detect actions take no resource,
+  # hence "*"; the images are bytes in the request and nothing is stored on
+  # the Rekognition side.
   statement {
-    sid       = "RekognitionDetect"
-    effect    = "Allow"
-    actions   = ["rekognition:DetectModerationLabels", "rekognition:DetectFaces"]
+    sid    = "RekognitionDetect"
+    effect = "Allow"
+    actions = [
+      "rekognition:DetectModerationLabels",
+      "rekognition:DetectFaces",
+      "rekognition:DetectLabels",
+    ]
     resources = ["*"]
   }
 

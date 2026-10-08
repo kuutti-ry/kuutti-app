@@ -101,7 +101,7 @@ resource "aws_ssm_parameter" "config" {
     # Pull-request previews connect as this role (#9); its password is
     # db-preview-password from infra/scripts/db-app-role.sh.
     "db-preview-user" = "kuutti_preview"
-    # Photo moderation through Rekognition (#49, ADR-006); the instance role allows the two calls.
+    # Photo moderation through Rekognition (#49, ADR-006); the instance role allows the three calls.
     "moderation" = "rekognition"
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.

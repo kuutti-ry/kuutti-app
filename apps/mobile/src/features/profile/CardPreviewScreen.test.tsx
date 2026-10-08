@@ -54,7 +54,11 @@ describe("CardPreviewScreen", () => {
       const path = new URL(request.url).pathname;
       calls.push(path);
       if (path === "/profile/card") {
-        return json({ card, completeness: { complete: false, missing: ["seeks", "age_window"] } });
+        return json({
+          card,
+          completeness: { complete: false, missing: ["seeks", "age_window"] },
+          tip: null,
+        });
       }
       if (path.startsWith("/photos/")) {
         const variant = path.split("/").pop();
@@ -94,7 +98,11 @@ describe("CardPreviewScreen", () => {
 
   it("asks for the profile first when there is no card yet", async () => {
     globalThis.fetch = jest.fn(async () =>
-      json({ card: null, completeness: { complete: false, missing: ["display_name"] } }),
+      json({
+        card: null,
+        completeness: { complete: false, missing: ["display_name"] },
+        tip: null,
+      }),
     ) as unknown as typeof fetch;
     await act(async () => {
       renderWithTheme(<CardPreviewScreen />);

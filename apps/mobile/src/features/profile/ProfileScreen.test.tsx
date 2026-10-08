@@ -35,7 +35,11 @@ function fakeApi(options: { saveStatus?: number; saveCode?: string } = {}) {
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/profile" && request.method === "GET") {
-      return json({ profile: null, completeness: { complete: false, missing } });
+      return json({
+        profile: null,
+        completeness: { complete: false, missing },
+        tip: null,
+      });
     }
     if (path === "/profile" && request.method === "PUT") {
       const body = await request.json();
@@ -55,6 +59,7 @@ function fakeApi(options: { saveStatus?: number; saveCode?: string } = {}) {
           updatedAt: "2026-09-26T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos", "seeks", "age_window"] },
+        tip: null,
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
@@ -80,7 +85,7 @@ describe("ProfileScreen", () => {
     expect(screen.getByText("Something long-term")).toBeTruthy();
     expect(screen.getByText("My ideal Sunday")).toBeTruthy();
     expect(screen.getByText(/too lazy to write/)).toBeTruthy();
-    expect(screen.getByText("At least 3 approved photos")).toBeTruthy();
+    expect(screen.getByText("At least 2 approved photos")).toBeTruthy();
     // A text that is still its key means the catalogue and the registry disagree.
     expect(screen.queryAllByText(/^profile\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);

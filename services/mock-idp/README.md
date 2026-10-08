@@ -16,7 +16,7 @@ One tap logs a persona in. Nothing in the API or the app knows about them: the b
 | Mikael Lindqvist | 02/08/1992 | a second newcomer, for the walkthrough in Swedish |
 | Sanna Korhonen | 23/11/1989 | onboarded, with a profile that lacks only its photos until the photo loader has run |
 | Onni Mäkelä | 30/05/1995 | registered and never onboarded |
-| Noa Salmi | 09/01/1999 | onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing |
+| Noa Salmi | 09/01/1999 | onboarded, with a profile; one photo only once the photo loader has run, so the profile says what is missing |
 | Kerttu Åkerlund | 17/06/1985 | accepted an older wording of the terms: the app asks again |
 | Tapio Heikkinen | 05/02/1978 | a banned identity: the login is refused |
 | Ilona Öhman | 27/09/1993 | deleted her account: refused until the waiting time is over |

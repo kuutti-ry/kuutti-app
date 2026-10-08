@@ -85,6 +85,8 @@ describe("profile routes", () => {
       complete: false,
       missing: ["display_name", "photos", "bio_or_prompts", "seeks", "age_window"],
     });
+    // Photos are missing; a tip would say it twice.
+    expect(body.tip).toBeNull();
   });
 
   test("PUT /profile saves the whole document and answers it back with its completeness", async ({
@@ -105,6 +107,7 @@ describe("profile routes", () => {
     });
     // Two prompts stand in for the bio; photos and onboarding are still missing.
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
+    expect(body.tip).toBeNull();
     const again = await put(app, a.headers, { ...update, displayName: "Aino V.", prompts: [] });
     expect(ProfileResponse.parse(await again.json()).profile?.displayName).toBe("Aino V.");
     const { rows } = await ctx.client.query<{ n: string }>(
@@ -218,6 +221,25 @@ describe("profile routes", () => {
     expect(body.card?.photos.map((p) => p.id)).toEqual([approved]);
     expect(body.card?.pond).toBeNull();
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
+    expect(body.tip).toBeNull();
+    // The pending upload becomes the second approved photo: enough to be
+    // complete, and the tip asks for one more.
+    await ctx.client.query("UPDATE photo SET state = 'approved' WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    const preview = async () =>
+      CardPreviewResponse.parse(
+        await (await app.request("/profile/card", { headers: a.headers })).json(),
+      );
+    const two = await preview();
+    expect(two.card?.photos).toHaveLength(2);
+    expect(two.completeness.missing).toEqual(["seeks", "age_window"]);
+    expect(two.tip).toBe("few_photos");
+    // A third clears it.
+    await approvedPhotos(ctx, app, a.headers, 1);
+    const three = await preview();
+    expect(three.card?.photos).toHaveLength(3);
+    expect(three.tip).toBeNull();
     // A preview records nothing.
     const { rows } = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = $1", [
       a.accountId,

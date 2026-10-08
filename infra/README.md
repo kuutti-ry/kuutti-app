@@ -293,7 +293,7 @@ After the cutover the box still admits 443 from anywhere, because Dokploy's cont
 
 ### Photo moderation (#49, ADR-006)
 
-The instance role may call `rekognition:DetectModerationLabels` and `rekognition:DetectFaces` (`modules/compute`, statement `RekognitionDetect`), the parameter `moderation=rekognition` under `/kuutti/<env>/` switches the API's automatic check on, and the observability module counts the calls from the `photo moderated` log lines (`RekognitionCalls` in the `Kuutti/<env>` namespace). Without the parameter every photo goes to the human queue.
+The instance role may call `rekognition:DetectModerationLabels`, `rekognition:DetectFaces` and `rekognition:DetectLabels` (`modules/compute`, statement `RekognitionDetect`), the parameter `moderation=rekognition` under `/kuutti/<env>/` switches the API's automatic check on, and the observability module counts the calls from the `photo moderated` log lines (`RekognitionCalls` in the `Kuutti/<env>` namespace). Without the parameter every photo goes to the human queue (and tip signals stay empty).
 
 Staff are identities with a role (rules/admin.md): the person signs in once through the bank (the app is enough), then the maintainer grants the role to the identity that just appeared, from a machine that reaches the database (the Session Manager tunnel of `db-app-role.sh`). The API never logs a `hetu_hmac`; `recent` lists the last five logins by it:
 
