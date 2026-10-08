@@ -3,7 +3,7 @@ import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
  * What the six personas "with a history" have done before the demo begins
- * (#73, ADR-014 §12). Data only: `pnpm demo:reset` gives a persona its history
+ * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons (#140). Data only: `pnpm demo:reset` gives a persona its history
  * by logging it in at the mock bank and sending these answers through the
  * API's own routes, as the app would, so every rule that holds for a person
  * holds for a persona. What no route can do (an older wording of the terms, a
