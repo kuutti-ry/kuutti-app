@@ -196,6 +196,12 @@ describe("bank login", () => {
     expect(JSON.stringify(logs())).not.toContain(ADULT_HETU.slice(0, 6));
     expect(JSON.stringify(logs())).not.toContain(body.accessToken);
     expect(JSON.stringify(logs())).not.toContain(body.refreshToken);
+    // The one line a login leaves (#33): the level, the method and the decision.
+    expect(logs().find((line) => line.msg === "bank login")).toMatchObject({
+      acr: "http://ftn.ficora.fi/2017/loatest2",
+      amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1"],
+      outcome: "created",
+    });
   });
 
   test("A second login of the same person resumes the live account", async ({ ctx }) => {

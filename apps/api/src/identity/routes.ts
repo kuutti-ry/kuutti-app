@@ -212,16 +212,23 @@ export function authRoutes(
   const sessionDeps: SessionDeps = { db: deps.db, now };
   const adminAppUrl = deps.config.ADMIN_APP_URL;
 
-  const loginDeps = (): LoginDeps => {
+  const loginDeps = (requestId: string): LoginDeps => {
     if (!deps.broker || !hmacKey) {
       throw new AppError(503, "auth_provider_error", "Bank identification is not configured here");
     }
-    return { db: deps.db, broker: deps.broker, hmacKey, now, adminAppUrl };
+    return {
+      db: deps.db,
+      broker: deps.broker,
+      hmacKey,
+      now,
+      adminAppUrl,
+      logger: deps.logger.child({ requestId }),
+    };
   };
 
   app.openapi(startRoute, async (c) => {
     const query = c.req.valid("query");
-    const url = await startLogin(loginDeps(), {
+    const url = await startLogin(loginDeps(c.get("requestId")), {
       platform: query.platform,
       locale: query.locale ?? c.get("locale"),
     });
@@ -231,7 +238,7 @@ export function authRoutes(
   app.openapi(callbackRoute, async (c) => {
     const query = c.req.valid("query");
     try {
-      const target = await completeLogin(loginDeps(), {
+      const target = await completeLogin(loginDeps(c.get("requestId")), {
         callbackUrl: new URL(c.req.url),
         query,
       });
@@ -293,7 +300,9 @@ export function authRoutes(
   // rest sits behind the admin guard, registered on the path before the handler.
   app.openapi(adminStartRoute, async (c) => {
     const query = c.req.valid("query");
-    const url = await startAdminLogin(loginDeps(), { locale: query.locale ?? c.get("locale") });
+    const url = await startAdminLogin(loginDeps(c.get("requestId")), {
+      locale: query.locale ?? c.get("locale"),
+    });
     return c.redirect(url.toString(), 302);
   });
 
