@@ -328,6 +328,111 @@ profile.number.hint:
   sv: "Ett heltal från {min, number} till {max, number}."
   machine: { fi: true, sv: true }
 
+profile.number.unset:
+  en: "No answer yet"
+  description: "Shown in a number stepper while the field has no value (#148)."
+  fi: "Ei vielä vastausta"
+  sv: "Inget svar ännu"
+  machine: { fi: true, sv: true }
+
+profile.number.down:
+  en: "One less"
+  description: "Screen-reader label of the minus button of a number field (#148)."
+  fi: "Yksi vähemmän"
+  sv: "En mindre"
+  machine: { fi: true, sv: true }
+
+profile.number.up:
+  en: "One more"
+  description: "Screen-reader label of the plus button of a number field (#148)."
+  fi: "Yksi enemmän"
+  sv: "En mer"
+  machine: { fi: true, sv: true }
+
+profile.clear:
+  en: "Clear the answer"
+  description: "Button that removes a number field's value (#148)."
+  fi: "Tyhjennä vastaus"
+  sv: "Rensa svaret"
+  machine: { fi: true, sv: true }
+
+profile.later.title:
+  en: "While you wait"
+  description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
+  fi: "Odotellessasi"
+  sv: "Medan du väntar"
+  machine: { fi: true, sv: true }
+
+profile.later.progress:
+  en: "{answered, number} of {total, number} answered"
+  description: "Progress line of the later screens (#148)."
+  fi: "{answered, number} / {total, number} vastattu"
+  sv: "{answered, number} av {total, number} besvarade"
+  machine: { fi: true, sv: true }
+
+profile.later.explain:
+  en: "One question at a time, each optional. Skip what you like; every answer is on your card only when you give it."
+  description: "Explanation on the first later screen (#148)."
+  fi: "Yksi kysymys kerrallaan, jokainen vapaaehtoinen. Ohita mitä haluat; vastaus näkyy kortillasi vain, jos annat sen."
+  sv: "En fråga i taget, var och en frivillig. Hoppa över vad du vill; ett svar syns på ditt kort bara om du ger det."
+  machine: { fi: true, sv: true }
+
+profile.later.skip:
+  en: "Ask me later"
+  description: "Button that moves to the next later screen without saving (#148)."
+  fi: "Kysy myöhemmin"
+  sv: "Fråga mig senare"
+  machine: { fi: true, sv: true }
+
+profile.later.next:
+  en: "Save and continue"
+  description: "Button that saves the answer and moves to the next later screen (#148)."
+  fi: "Tallenna ja jatka"
+  sv: "Spara och fortsätt"
+  machine: { fi: true, sv: true }
+
+profile.later.done:
+  en: "That is everything. Thank you."
+  description: "Said after the last later screen (#148)."
+  fi: "Siinä kaikki. Kiitos."
+  sv: "Det var allt. Tack."
+  machine: { fi: true, sv: true }
+
+profile.later.open:
+  en: "Fill in the rest while you wait"
+  description: "Button on the home screen and the profile that opens the later screens (#148)."
+  fi: "Täydennä loput odotellessasi"
+  sv: "Fyll i resten medan du väntar"
+  machine: { fi: true, sv: true }
+
+profile.later.search:
+  en: "Search"
+  description: "Label and placeholder of the search box over a long list of options (#148)."
+  fi: "Hae"
+  sv: "Sök"
+  machine: { fi: true, sv: true }
+
+profile.optionWithKids.wantsKids.want:
+  en: "Want more"
+  description: "The wants-kids answer 'want' when the person has kids (#148, the sheet's adaptive labels)."
+  fi: "Haluan lisää"
+  sv: "Vill ha fler"
+  machine: { fi: true, sv: true }
+
+profile.optionWithKids.wantsKids.dont_want:
+  en: "No more"
+  description: "The wants-kids answer 'don't want' when the person has kids (#148)."
+  fi: "Ei enää"
+  sv: "Inga fler"
+  machine: { fi: true, sv: true }
+
+profile.optionWithKids.wantsKids.not_sure:
+  en: "Not sure anymore"
+  description: "The wants-kids answer 'not sure' when the person has kids (#148)."
+  fi: "En ole enää varma"
+  sv: "Inte säker längre"
+  machine: { fi: true, sv: true }
+
 profile.option.intent.long_term:
   en: "Something long-term"
   description: "Option long_term of the intent field (#47 registry)."
@@ -3630,6 +3735,76 @@ account.specialCategory.explain:
   description: "Explanation under the special-category switch of the account card (#146)."
   fi: "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset, ja sinulta kysytään uudelleen, kenen seuraa etsit."
   sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort, och du får frågan om vem du söker igen."
+  machine: { fi: true, sv: true }
+
+account.email.title:
+  en: "A way back in"
+  description: "Heading of the optional e-mail card (#148, TD-18)."
+  fi: "Tie takaisin sisään"
+  sv: "En väg tillbaka in"
+  machine: { fi: true, sv: true }
+
+account.email.explain:
+  en: "Optional. If a phone is lost, we can reach you here. Never shown to anyone, never a login, and nothing is sent to it yet."
+  description: "Explanation of the optional e-mail (#148): the honest reason, as the sheet asks."
+  fi: "Vapaaehtoinen. Jos puhelin katoaa, tavoitamme sinut täältä. Ei näytetä kenellekään, ei koskaan kirjautumista varten, eikä tänne vielä lähetetä mitään."
+  sv: "Frivilligt. Om en telefon tappas bort når vi dig här. Visas aldrig för någon, aldrig en inloggning, och inget skickas hit ännu."
+  machine: { fi: true, sv: true }
+
+account.email.label:
+  en: "E-mail address"
+  description: "Label of the e-mail input (#148)."
+  fi: "Sähköpostiosoite"
+  sv: "E-postadress"
+  machine: { fi: true, sv: true }
+
+account.email.save:
+  en: "Save the address"
+  description: "Button that saves the e-mail (#148)."
+  fi: "Tallenna osoite"
+  sv: "Spara adressen"
+  machine: { fi: true, sv: true }
+
+account.email.clear:
+  en: "Remove the address"
+  description: "Button that clears the e-mail (#148)."
+  fi: "Poista osoite"
+  sv: "Ta bort adressen"
+  machine: { fi: true, sv: true }
+
+account.email.saved:
+  en: "Saved."
+  description: "Said after the e-mail is saved or removed (#148)."
+  fi: "Tallennettu."
+  sv: "Sparad."
+  machine: { fi: true, sv: true }
+
+account.email.invalid:
+  en: "That does not look like an e-mail address."
+  description: "Said when the API refuses the e-mail as malformed (#148)."
+  fi: "Tuo ei näytä sähköpostiosoitteelta."
+  sv: "Det ser inte ut som en e-postadress."
+  machine: { fi: true, sv: true }
+
+account.email.failed:
+  en: "The address could not be saved. Try again."
+  description: "Said when saving or removing the e-mail failed for another reason (#148)."
+  fi: "Osoitetta ei voitu tallentaa. Yritä uudelleen."
+  sv: "Adressen kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
+account.email.set:
+  en: "An address is set."
+  description: "Said on the card while an e-mail is set; the address itself is in the input (#148)."
+  fi: "Osoite on tallennettu."
+  sv: "En adress är sparad."
+  machine: { fi: true, sv: true }
+
+account.email.done:
+  en: "Done"
+  description: "Button of the e-mail screen that returns to the home screen (#148)."
+  fi: "Valmis"
+  sv: "Klart"
   machine: { fi: true, sv: true }
 
 pond.waitlist.label:

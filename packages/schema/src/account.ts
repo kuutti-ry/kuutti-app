@@ -14,6 +14,23 @@ import { ResearchExport } from "./research.ts";
  */
 
 /** A body, so a stray call cannot erase an account; the app shows its own confirmation first. */
+/**
+ * The optional e-mail (#148, TD-18): a way back in if a phone is lost, never
+ * a login, never shown to anybody. Validated as an address and nothing else;
+ * no mail is sent until SES exists (M5).
+ */
+export const EMAIL_MAX = 254;
+export const AccountEmail = z
+  .object({ email: z.email().max(EMAIL_MAX) })
+  .strict()
+  .meta({ id: "AccountEmail" });
+export type AccountEmail = z.infer<typeof AccountEmail>;
+
+export const AccountEmailResponse = z
+  .object({ email: z.string().max(EMAIL_MAX).nullable() })
+  .meta({ id: "AccountEmailResponse" });
+export type AccountEmailResponse = z.infer<typeof AccountEmailResponse>;
+
 export const AccountDeletionRequest = z
   .object({
     confirm: z
@@ -70,6 +87,8 @@ export const AccountExport = z
       /** When the gender, or whom one seeks, last changed from an earlier answer (#147); null until then and after erasure. */
       genderChangedAt: z.iso.datetime().nullable(),
       seeksChangedAt: z.iso.datetime().nullable(),
+      /** The optional e-mail (#148): the person's own, in their own download; null when none is set. */
+      email: z.string().max(EMAIL_MAX).nullable(),
     }),
     /** The two hard rows onboarding writes (#46): whom the person seeks and the age window. */
     preferences: PreferencesResponse,

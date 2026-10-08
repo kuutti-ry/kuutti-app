@@ -40,6 +40,7 @@ function accountRow(identityId: string): Account {
     pondId: null,
     genderChangedAt: null,
     seeksChangedAt: null,
+    email: null,
     deletedAt: null,
   };
 }

@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { AccountActions, useSession } from "@/features/identity";
+import { AccountActions, EmailCard, useSession } from "@/features/identity";
 import { fetchHealth } from "@/lib/api";
 import {
   LOCALE_FLAGS,
@@ -197,6 +197,8 @@ export function SettingsScreen() {
 
         {/* Export, the research opt-in and deletion (#51): nothing when signed out. */}
         <AccountActions />
+        {/* The optional e-mail (#148): a way back in, never shown, never a login. */}
+        <EmailCard />
 
         <View className="gap-2">
           <Text variant="small" accessibilityRole="header">

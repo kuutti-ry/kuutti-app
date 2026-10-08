@@ -427,6 +427,35 @@ export const CARD_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => {
   return role === "info" || role === "hard";
 });
 
+/**
+ * The optional fields as the screens after the gate ask them, one per
+ * screen with "Ask me later", in the field sheet's order (#148, TD-16).
+ * Intent and the identity label are onboarding's; a companion field shares
+ * its screen with the one it belongs to.
+ */
+export const LATER_FIELD_ORDER: readonly ProfileFieldKey[] = [
+  "hasKids",
+  "wantsKids",
+  "smoking",
+  "languages",
+  "education",
+  "drinking",
+  "drugsAttitude",
+  "hobbies",
+  "height",
+  "exercise",
+  "pets",
+  "field",
+  "occupation",
+  "politics",
+  "religion",
+  "zodiac",
+];
+export const LATER_COMPANIONS: Readonly<Partial<Record<ProfileFieldKey, ProfileFieldKey>>> = {
+  field: "hideFromField",
+  occupation: "occupationTitle",
+};
+
 /** The fields a deal-breaker may be set on (#149), always one the person answered themselves. */
 export const DEAL_BREAKER_FIELDS = PROFILE_FIELD_KEYS.filter(
   (key) => PROFILE_FIELDS[key].preferenceAbout === "deal_breaker",

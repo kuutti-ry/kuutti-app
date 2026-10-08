@@ -66,7 +66,8 @@ export function useProfile() {
     setDraft((previous) => ({ ...previous, ...patch }));
   }, []);
 
-  const save = useCallback(async () => {
+  /** Saves the draft; true when the API took it, false when it refused or failed (the notice says why). */
+  const save = useCallback(async (): Promise<boolean> => {
     setSaving(true);
     setNotice(null);
     const submitted = draft;
@@ -79,17 +80,19 @@ export function useProfile() {
           .filter((p) => p.answer.trim().length > 0)
           .map((p) => ({ key: p.key, answer: p.answer.trim() })),
       });
-      if (!mounted.current) return;
+      if (!mounted.current) return true;
       // The stored document replaces the draft only if nothing was typed while
       // the save was in flight; otherwise those keystrokes would vanish.
       const stored = response.profile;
       if (stored) setDraft((current) => (current === submitted ? toUpdate(stored) : current));
       setCompleteness(response.completeness);
       setNotice({ kind: "saved" });
+      return true;
     } catch (error) {
       if (mounted.current) {
         setNotice({ kind: "error", code: error instanceof ApiError ? error.code : undefined });
       }
+      return false;
     } finally {
       if (mounted.current) setSaving(false);
     }

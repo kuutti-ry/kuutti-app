@@ -146,6 +146,7 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
       pond,
       genderChangedAt: account.genderChangedAt?.toISOString() ?? null,
       seeksChangedAt: account.seeksChangedAt?.toISOString() ?? null,
+      email: account.email,
     },
     preferences,
     consents,
