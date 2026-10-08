@@ -24,6 +24,7 @@
       button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
       .name { display: block; font-weight: 600; }
       .note { display: block; color: var(--soft); font-size: 0.9375rem; }
+      .bank { display: block; color: var(--soft); font-size: 0.875rem; }
       label { display: block; font-weight: 600; margin: 12px 0 4px; }
       input, textarea { font: inherit; color: inherit; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
       textarea { font-family: ui-monospace, monospace; font-size: 0.875rem; min-height: 14rem; }
@@ -45,54 +46,62 @@
           <button type="button" data-persona="aino">
             <span class="name">Aino Virtanen</span>
             <span class="note">The walkthrough: registers, onboards, fills in a profile, uploads photos.</span>
+            <span class="bank">On staging: Nordea, DEMOUSER2</span>
           </button>
         </li>
         <li>
           <button type="button" data-persona="mikael">
             <span class="name">Mikael Lindqvist</span>
             <span class="note">A second newcomer, for the walkthrough in Swedish.</span>
+            <span class="bank">On staging: Ålandsbanken, 12345678 (password 123456, code card 1234; S-Pankki returns the same person)</span>
           </button>
         </li>
       </ul>
     </section>
     <section aria-labelledby="group-history">
       <h2 id="group-history">People with a history</h2>
-      <p class="lead">The same identity on every day. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.</p>
+      <p class="lead">The same identity on every day, and the same person as a test user of Telia&#39;s bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.</p>
       <ul>
         <li>
           <button type="button" data-persona="sanna">
             <span class="name">Sanna Korhonen</span>
             <span class="note">Onboarded, with a profile that lacks only its photos until the photo loader has run.</span>
+            <span class="bank">On staging: Nordea, DEMOUSER4</span>
           </button>
         </li>
         <li>
           <button type="button" data-persona="onni">
-            <span class="name">Onni Mäkelä</span>
+            <span class="name">Onni Korhonen</span>
             <span class="note">Registered and never onboarded: the app starts at the first step.</span>
+            <span class="bank">On staging: Nordea, DEMOUSER1</span>
           </button>
         </li>
         <li>
           <button type="button" data-persona="noa">
             <span class="name">Noa Salmi</span>
             <span class="note">Onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing.</span>
+            <span class="bank">On staging: Nordea, DEMOUSER3</span>
           </button>
         </li>
         <li>
           <button type="button" data-persona="kerttu">
             <span class="name">Kerttu Åkerlund</span>
             <span class="note">Accepted an older wording of the terms: the app asks again.</span>
+            <span class="bank">On staging: Säästöpankki, 22222222 (password 123456; POP, OmaSP and Handelsbanken return the same person)</span>
           </button>
         </li>
         <li>
           <button type="button" data-persona="tapio">
             <span class="name">Tapio Heikkinen</span>
             <span class="note">A banned identity: the login is refused.</span>
+            <span class="bank">On staging: OP, prefilled</span>
           </button>
         </li>
         <li>
           <button type="button" data-persona="ilona">
             <span class="name">Ilona Öhman</span>
             <span class="note">Deleted her account: refused until the waiting time is over.</span>
+            <span class="bank">On staging: Aktia, prefilled (or 12345678, password 123456, code 1234)</span>
           </button>
         </li>
       </ul>
@@ -120,8 +129,8 @@
           </button>
         </li>
         <li>
-          <button type="button" data-persona="helmi">
-            <span class="name">Helmi Koskinen</span>
+          <button type="button" data-persona="siiri">
+            <span class="name">Siiri Koskinen</span>
             <span class="note">99: the upper end of the age window.</span>
           </button>
         </li>
@@ -152,7 +161,7 @@
       </section>
     </main>
     <script>
-      const PERSONAS = [{"key":"aino","given":"Aino","family":"Virtanen","born":{"year":1997,"month":3,"day":14},"individual":901},{"key":"mikael","given":"Mikael","family":"Lindqvist","born":{"year":1992,"month":8,"day":2},"individual":902},{"key":"sanna","given":"Sanna","family":"Korhonen","born":{"year":1989,"month":11,"day":23},"individual":903},{"key":"onni","given":"Onni","family":"Mäkelä","born":{"year":1995,"month":5,"day":30},"individual":904},{"key":"noa","given":"Noa","family":"Salmi","born":{"year":1999,"month":1,"day":9},"individual":905},{"key":"kerttu","given":"Kerttu","family":"Åkerlund","born":{"year":1985,"month":6,"day":17},"individual":906},{"key":"tapio","given":"Tapio","family":"Heikkinen","born":{"year":1978,"month":2,"day":5},"individual":907},{"key":"ilona","given":"Ilona","family":"Öhman","born":{"year":1993,"month":9,"day":27},"individual":908},{"key":"eetu","given":"Eetu","family":"Laine","born":{"yearsAgo":18,"monthsAgo":1},"individual":909},{"key":"venla","given":"Venla","family":"Nieminen","born":{"yearsAgo":18,"monthsAgo":0},"individual":910},{"key":"lauri","given":"Lauri","family":"Hämäläinen","born":{"yearsAgo":17,"monthsAgo":1},"individual":911},{"key":"helmi","given":"Helmi","family":"Koskinen","born":{"yearsAgo":99,"monthsAgo":1},"individual":912}];
+      const PERSONAS = [{"key":"aino","given":"Aino","family":"Virtanen","born":{"year":1992,"month":12,"day":29},"individual":918},{"key":"mikael","given":"Mikael","family":"Lindqvist","born":{"year":1970,"month":1,"day":1},"individual":960},{"key":"sanna","given":"Sanna","family":"Korhonen","born":{"year":1977,"month":6,"day":17},"individual":924},{"key":"onni","given":"Onni","family":"Korhonen","born":{"year":2000,"month":2,"day":1},"individual":961},{"key":"noa","given":"Noa","family":"Salmi","born":{"year":1983,"month":8,"day":3},"individual":925},{"key":"kerttu","given":"Kerttu","family":"Åkerlund","born":{"year":1980,"month":2,"day":1},"individual":952},{"key":"tapio","given":"Tapio","family":"Heikkinen","born":{"year":1970,"month":7,"day":7},"individual":905},{"key":"ilona","given":"Ilona","family":"Öhman","born":{"year":1970,"month":1,"day":1},"individual":999},{"key":"eetu","given":"Eetu","family":"Laine","born":{"yearsAgo":18,"monthsAgo":1},"individual":909},{"key":"venla","given":"Venla","family":"Nieminen","born":{"yearsAgo":18,"monthsAgo":0},"individual":910},{"key":"lauri","given":"Lauri","family":"Hämäläinen","born":{"yearsAgo":17,"monthsAgo":1},"individual":911},{"key":"siiri","given":"Siiri","family":"Koskinen","born":{"yearsAgo":99,"monthsAgo":1},"individual":912}];
       const ACR = "http://ftn.ficora.fi/2017/loatest2";
       const AMR = "https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.mock.1";
       const CHECK = "0123456789ABCDEFHJKLMNPRSTUVWXY";

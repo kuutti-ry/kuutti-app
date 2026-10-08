@@ -3,7 +3,7 @@ import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
  * What the six personas "with a history" have done before the demo begins
- * (#73, ADR-014 §12). Data only: `pnpm demo:reset` gives a persona its history
+ * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons (#140). Data only: `pnpm demo:reset` gives a persona its history
  * by logging it in at the mock bank and sending these answers through the
  * API's own routes, as the app would, so every rule that holds for a person
  * holds for a persona. What no route can do (an older wording of the terms, a
@@ -39,7 +39,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 32, max: 44 },
+      ageWindow: { min: 42, max: 56 },
       pond: "espoo",
     },
     profile: {
@@ -77,7 +77,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "non_binary",
       seeks: ["woman", "man", "non_binary"],
-      ageWindow: { min: 24, max: 34 },
+      ageWindow: { min: 36, max: 48 },
       pond: "otaniemi",
     },
     profile: {
@@ -107,7 +107,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["woman", "man"],
-      ageWindow: { min: 35, max: 50 },
+      ageWindow: { min: 40, max: 55 },
       pond: "espoo",
     },
     profile: {
@@ -136,7 +136,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "man",
       seeks: ["woman"],
-      ageWindow: { min: 38, max: 55 },
+      ageWindow: { min: 46, max: 62 },
       pond: "espoo",
     },
     profile: null,
@@ -149,7 +149,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 28, max: 40 },
+      ageWindow: { min: 48, max: 62 },
       pond: "otaniemi",
     },
     profile: {

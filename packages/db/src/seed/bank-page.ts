@@ -26,7 +26,7 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
   {
     group: "history",
     title: "People with a history",
-    lead: "The same identity on every day. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
+    lead: "The same identity on every day, and the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
   },
   {
     group: "ages",
@@ -52,6 +52,12 @@ const SOMEBODY = {
   amr: [MOCK_BANK_AMR],
 };
 
+/** Where the same person is on Telia's bed, under the note; nothing for a persona of the mock bank only. */
+const bankLine = (p: DemoPersona): string =>
+  p.bank
+    ? `\n            <span class="bank">${escapeHtml(`On staging: ${p.bank.name}, ${p.bank.user}${p.bank.note ? ` (${p.bank.note})` : ""}`)}</span>`
+    : "";
+
 export function renderBankPage(personas: readonly DemoPersona[]): string {
   // The page computes the codes itself, so the range is held here, before anything is written.
   for (const persona of personas) assertArtificial(persona);
@@ -62,7 +68,7 @@ export function renderBankPage(personas: readonly DemoPersona[]): string {
         (p) => `        <li>
           <button type="button" data-persona="${escapeHtml(p.key)}">
             <span class="name">${escapeHtml(`${p.given} ${p.family}`)}</span>
-            <span class="note">${escapeHtml(p.note)}</span>
+            <span class="note">${escapeHtml(p.note)}</span>${bankLine(p)}
           </button>
         </li>`,
       )
@@ -110,6 +116,7 @@ ${buttons}
       button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
       .name { display: block; font-weight: 600; }
       .note { display: block; color: var(--soft); font-size: 0.9375rem; }
+      .bank { display: block; color: var(--soft); font-size: 0.875rem; }
       label { display: block; font-weight: 600; margin: 12px 0 4px; }
       input, textarea { font: inherit; color: inherit; width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
       textarea { font-family: ui-monospace, monospace; font-size: 0.875rem; min-height: 14rem; }
