@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Withdraws the preview runs that wait for a click nobody owes any more
 # (#9, ADR-012 §8). A run of preview.yml waits for the reviewer of the
-# "preview" environment; its pull request merges or closes; the run goes on
-# waiting, for the thirty days GitHub gives it, and asks the maintainer to
-# review a deployment of work that is on main already. The sweep that removes
+# "preview" environment (when it has one, ADR-004 §3); its pull request
+# merges or closes; the run goes on waiting, for the thirty days GitHub gives
+# it, and asks the maintainer to review a deployment of work that is on main
+# already. The sweep that removes
 # what was deployed never saw these: a run that was not approved deployed
 # nothing, so there is nothing of it on the box to find it by.
 #

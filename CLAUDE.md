@@ -40,7 +40,7 @@ Before pushing: typecheck, lint, and tests pass locally. Do not push red.
 
 ## Git
 
-- `main` only, and only through a pull request (TD-2, switched on 2026-09-25 when the `contributors` team got write): squash merge, the fourteen checks that run on every pull request green, one approving review for anyone who is not a repository admin (admins bypass), one more for changes attributed to no person. A contributor's preview deploys only after the maintainer has approved the run (ADR-004).
+- `main` only, and only through a pull request (TD-2, switched on 2026-09-25 when the `contributors` team got write): squash merge, the fourteen checks that run on every pull request green, one approving review for anyone who is not a repository admin (admins bypass), one more for changes attributed to no person. A pull request's previews deploy on every push without approval; write access is that trust (ADR-004 §3, from 2026-10-08).
 - Every commit is signed off (`git commit -s`). Enable the hooks once per clone: `git config core.hooksPath .githooks` (the sign-off check, and Biome on the staged files before a commit). The DCO workflow fails on unsigned commits.
 - Linear history: no merge commits, no force-push, never touch the branch ruleset or repository settings.
 - Subject line imperative and under 72 characters; the body says what and why. Cite the TD or ADR when a change follows one.
