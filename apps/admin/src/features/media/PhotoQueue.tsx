@@ -1,4 +1,4 @@
-import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
+import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import {
   type PhotoRejectionReason,
@@ -129,10 +129,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   };
 
   const notChecked = item.flagged.includes("not_checked");
-  const uploaded = formatDate(locale, new Date(item.uploadedAt), {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const uploaded = formatDateTime(locale, new Date(item.uploadedAt));
 
   if (state.kind === "decided") {
     return (

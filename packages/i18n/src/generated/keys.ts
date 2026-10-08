@@ -263,6 +263,7 @@ export type MessageParams = {
   "profile.card.loading": Record<never, never>;
   "profile.card.open": Record<never, never>;
   "profile.card.photoLabel": { "position": number; "total": number };
+  "profile.card.sharedOption": { "option": string };
   "profile.card.title": Record<never, never>;
   "profile.card.verifiedAge": { "years": number };
   "profile.clear": Record<never, never>;
@@ -300,7 +301,6 @@ export type MessageParams = {
   "profile.field.field": Record<never, never>;
   "profile.field.hasKids": Record<never, never>;
   "profile.field.height": Record<never, never>;
-  "profile.field.height.value": { "cm": number };
   "profile.field.hideFromField": Record<never, never>;
   "profile.field.hobbies": Record<never, never>;
   "profile.field.identityLabel": Record<never, never>;

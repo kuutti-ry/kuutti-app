@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PhotoId } from "./media.ts";
-import { PondSummary } from "./onboarding.ts";
-import { ProfileFields } from "./profile-fields.ts";
+import { Gender, PondSummary } from "./onboarding.ts";
+import { HOBBIES_MAX, LANGUAGES_MAX, ProfileFields } from "./profile-fields.ts";
 
 /**
  * The profile as the person writes it and the card as others see it (#47,
@@ -145,13 +145,21 @@ export const ProfileCard = z
       years: z.int().min(18).max(130),
       verifiedByBank: z.literal(true),
     }),
+    /** Self-declared (#146), display only (ADR-019 §1); null before the gender step. The identity label, if any, is in `fields`. */
+    gender: Gender.nullable(),
     /** Where the person matches (#46); null until onboarding set it. */
     pond: PondSummary.nullable(),
     photos: z.array(CardPhoto).max(50),
+    /** The info and hard fields of the registry (ADR-019 §2), less a field the person hides (#150). */
     fields: ProfileFields,
     bio: z.string().max(BIO_MAX).nullable(),
     bioPreset: BioPreset.nullable(),
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
+    /** What both the viewer and the subject answered (#150): marked in words on the card, never a count. Empty on the owner's preview. */
+    shared: z.object({
+      hobbies: z.array(z.string().max(40)).max(HOBBIES_MAX),
+      languages: z.array(z.string().max(40)).max(LANGUAGES_MAX),
+    }),
   })
   .meta({ id: "ProfileCard" });
 export type ProfileCard = z.infer<typeof ProfileCard>;

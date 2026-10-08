@@ -1,4 +1,4 @@
-import { formatDate } from "@kuutti/i18n";
+import { formatTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
@@ -21,7 +21,7 @@ export function App() {
           <p className="session">
             {t("admin.session.role", { role: session.session.role })} ·{" "}
             {t("admin.session.expires", {
-              time: formatDate(locale, new Date(session.session.expiresAt), { timeStyle: "short" }),
+              time: formatTime(locale, new Date(session.session.expiresAt)),
             })}{" "}
             <button type="button" onClick={() => void session.signOut()}>
               {t("admin.signOut")}

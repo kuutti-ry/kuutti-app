@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   createI18n,
   formatDate,
+  formatDateTime,
+  formatHeight,
   formatNumber,
   formatPond,
+  formatTime,
   parseAcceptLanguage,
   RELEASED_LOCALES,
   resolveLocale,
@@ -98,21 +101,29 @@ describe("locale resolution", () => {
 });
 
 describe("formatting", () => {
-  it("goes through Intl for dates and numbers", () => {
+  it("writes every date d.M.yyyy in every language, never ISO or month first (#150)", () => {
     const day = Date.UTC(2026, 8, 19, 12);
-    expect(formatDate("fi", day, { dateStyle: "medium", timeZone: "UTC" })).toBe("19.9.2026");
-    expect(formatDate("en-XA", day, { dateStyle: "medium", timeZone: "UTC" })).toBe("19 Sept 2026");
+    for (const locale of ["fi", "sv", "en", "en-XA"] as const) {
+      expect(formatDate(locale, day, { timeZone: "UTC" })).toBe("19.9.2026");
+    }
+    // The eleventh of September: the day cannot be read as the month.
+    expect(formatDate("en", Date.UTC(2026, 8, 11, 12), { timeZone: "UTC" })).toBe("11.9.2026");
+    expect(formatDate("en", Date.UTC(2026, 10, 9, 12), { timeZone: "UTC" })).toBe("9.11.2026");
     expect(formatNumber("fi", 1234.5)).toBe("1\u00a0234,5");
   });
 
-  it("formats in Finland's locale in every language: day first, 24-hour time, decimal comma", () => {
+  it("formats time in 24 hours with the language's separator, and a height in centimetres", () => {
     const at = Date.UTC(2026, 8, 19, 14, 14);
-    const short = { dateStyle: "short", timeStyle: "short", timeZone: "UTC" } as const;
-    expect(formatDate("en", at, short)).toBe("19/09/2026, 14.14");
-    expect(formatDate("sv", at, short)).toBe("19.9.2026 14.14");
-    expect(formatDate("fi", at, short)).toBe("19.9.2026 klo 14.14");
+    const utc = { timeZone: "UTC" };
+    expect(formatTime("en", at, utc)).toBe("14.14");
+    expect(formatTime("sv", at, utc)).toBe("14.14");
+    expect(formatTime("fi", at, utc)).toBe("14.14");
+    expect(formatDateTime("en", at, utc)).toBe("19.9.2026 14.14");
+    expect(formatDateTime("fi", at, utc)).toBe("19.9.2026 14.14");
     expect(formatNumber("en", 1234.5)).toBe("1\u00a0234,5");
     expect(formatNumber("sv", 1234.5)).toBe("1\u00a0234,5");
+    expect(formatHeight("fi", 171)).toBe("171\u00a0cm");
+    expect(formatHeight("en", 171.4)).toBe("171\u00a0cm");
   });
 
   it("formats ICU date arguments the same way, through i18next-icu", () => {

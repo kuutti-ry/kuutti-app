@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, type PlainMessageKey } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, formatHeight, type PlainMessageKey } from "@kuutti/i18n";
 import {
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
@@ -123,7 +123,7 @@ export function FieldEditor({
   draft: Draft;
   update: Update;
 }) {
-  const { t } = useT();
+  const { t, locale } = useT();
   const tap = useHapticTap();
   const [search, setSearch] = useState("");
   const spec = PROFILE_FIELDS[field];
@@ -205,9 +205,7 @@ export function FieldEditor({
             label={label}
             value={typeof value === "number" ? value : Math.round((spec.min + spec.max) / 2)}
             shown={
-              typeof value === "number"
-                ? t("profile.field.height.value", { cm: value })
-                : t("profile.number.unset")
+              typeof value === "number" ? formatHeight(locale, value) : t("profile.number.unset")
             }
             downLabel={t("profile.number.down")}
             upLabel={t("profile.number.up")}

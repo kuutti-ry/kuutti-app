@@ -138,7 +138,7 @@ describe("SignInScreen", () => {
 
   it("shows the cooldown with its date in the app's locale", async () => {
     await renderWithTheme(<SignInScreen error="auth_cooldown" until="2026-10-22T10:00:00.000Z" />);
-    expect(await screen.findByText(/The earliest day for a new one: 22 October 2026/)).toBeTruthy();
+    expect(await screen.findByText(/The earliest day for a new one: 22.10.2026/)).toBeTruthy();
   });
 
   it("shows the generic text for a code it has no words for", async () => {

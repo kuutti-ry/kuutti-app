@@ -2865,12 +2865,17 @@ export interface components {
                 /** @enum {boolean} */
                 verifiedByBank: true;
             };
+            gender: components["schemas"]["Gender"];
             pond: components["schemas"]["PondSummary"];
             photos: components["schemas"]["CardPhoto"][];
             fields: components["schemas"]["ProfileFields"];
             bio: string | null;
             bioPreset: components["schemas"]["BioPreset"];
             prompts: components["schemas"]["PromptAnswer"][];
+            shared: {
+                hobbies: string[];
+                languages: string[];
+            };
         } | null;
         CardPhoto: {
             id: components["schemas"]["PhotoId"];

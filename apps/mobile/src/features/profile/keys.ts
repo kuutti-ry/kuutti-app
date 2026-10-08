@@ -3,6 +3,7 @@ import {
   BIO_MIN_FOR_COMPLETENESS,
   type BioPreset,
   type CompletenessItem,
+  type Gender,
   PHOTOS_FOR_COMPLETENESS,
   type ProfileFieldKey,
   type PromptKey,
@@ -13,6 +14,10 @@ import type { useT } from "@/lib/locale";
 // placeholder bios by key; their texts are messages.yaml entries with the
 // same key. ProfileScreen.test.tsx renders every one of them and fails on a
 // text that is still a key, which keeps the catalogue and the registry equal.
+
+/** The gender word of the card (#150): the same word onboarding asks with. */
+export const genderKey = (gender: Gender): PlainMessageKey =>
+  `onboarding.gender.${gender}` as PlainMessageKey;
 
 export const fieldLabelKey = (field: ProfileFieldKey): PlainMessageKey =>
   `profile.field.${field}` as PlainMessageKey;

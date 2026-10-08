@@ -2207,6 +2207,9 @@
               "verifiedByBank"
             ]
           },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
           "pond": {
             "$ref": "#/components/schemas/PondSummary"
           },
@@ -2234,18 +2237,45 @@
               "$ref": "#/components/schemas/PromptAnswer"
             },
             "maxItems": 3
+          },
+          "shared": {
+            "type": "object",
+            "properties": {
+              "hobbies": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "maxItems": 5
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "maxItems": 5
+              }
+            },
+            "required": [
+              "hobbies",
+              "languages"
+            ]
           }
         },
         "required": [
           "accountId",
           "displayName",
           "age",
+          "gender",
           "pond",
           "photos",
           "fields",
           "bio",
           "bioPreset",
-          "prompts"
+          "prompts",
+          "shared"
         ]
       },
       "CardPhoto": {

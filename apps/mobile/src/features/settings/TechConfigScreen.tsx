@@ -1,4 +1,4 @@
-import { formatDate } from "@kuutti/i18n";
+import { formatDateTime } from "@kuutti/i18n";
 import type { HealthResponse } from "@kuutti/schema";
 import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
@@ -79,7 +79,7 @@ export function TechConfigScreen() {
       ? t("tech.app.embedded")
       : updatedAt instanceof Date && !Number.isNaN(updatedAt.getTime())
         ? t("tech.app.updated", {
-            date: formatDate(locale, updatedAt, { dateStyle: "medium", timeStyle: "short" }),
+            date: formatDateTime(locale, updatedAt),
           })
         : null;
   const version: unknown = Constants.expoConfig?.version;
