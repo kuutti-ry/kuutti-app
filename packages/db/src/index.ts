@@ -3,6 +3,8 @@ export {
   ageFromYearMonth,
   CENTURY_SIGNS,
   generateHetu,
+  type HetuProblem,
+  hetuProblem,
   isAdult,
   type ParsedHetu,
   parseHetu,

@@ -1,5 +1,5 @@
 import { createHmac } from "node:crypto";
-import { isAdult, parseHetu } from "@kuutti/db";
+import { type HetuProblem, hetuProblem, isAdult, parseHetu } from "@kuutti/db";
 
 /**
  * What the callback keeps of a personal identity code (rules 1–3, TD-1): its
@@ -15,16 +15,17 @@ export type DerivedIdentity = {
   adult: boolean;
 };
 
+/** Names the check the code failed and nothing of the code: the message is what the callback logs. */
 export class InvalidHetuError extends Error {
-  constructor() {
-    super("the identification service returned an invalid personal identity code");
+  constructor(readonly problem: HetuProblem) {
+    super(`the identification service returned an invalid personal identity code (${problem})`);
     this.name = "InvalidHetuError";
   }
 }
 
 export function deriveIdentity(hetu: string, key: Buffer, at: Date): DerivedIdentity {
   const parsed = parseHetu(hetu);
-  if (parsed === null) throw new InvalidHetuError();
+  if (parsed === null) throw new InvalidHetuError(hetuProblem(hetu) ?? "format");
   return {
     hetuHmac: createHmac("sha256", key).update(hetu.toUpperCase()).digest("hex"),
     birthYear: parsed.birthYear,
