@@ -11,7 +11,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
-    "check:contrast": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-contrast.ts"
+    "check:contrast": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-contrast.ts",
+    "licenses": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/licenses.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.16",

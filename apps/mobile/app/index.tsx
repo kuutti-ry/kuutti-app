@@ -1,5 +1,5 @@
-import { SmokeScreen } from "@/features/smoke";
+import { HomeRoute } from "@/features/home";
 
 export default function IndexRoute() {
-  return <SmokeScreen />;
+  return <HomeRoute />;
 }

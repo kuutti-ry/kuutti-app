@@ -17,7 +17,7 @@ export type PlainMessageKey = {
   [K in MessageKey]: keyof MessageParams[K] extends never ? K : never;
 }[MessageKey];
 
-/** `t("smoke.retry")`, `t("errors.rate_limited", { seconds: 3 })`; an unknown key is a type error. */
+/** `t("onboarding.retry")`, `t("errors.rate_limited", { seconds: 3 })`; an unknown key is a type error. */
 export type TFunction = <K extends MessageKey>(key: K, ...params: ParamsOf<K>) => string;
 
 export type CreateI18nOptions = {
@@ -33,7 +33,7 @@ export type CreateI18nOptions = {
 
 /**
  * An i18next instance over the compiled catalogues with ICU MessageFormat.
- * Keys are flat ("smoke.title"), fi and sv fall back to en, and init is
+ * Keys are flat ("home.title"), fi and sv fall back to en, and init is
  * synchronous because every catalogue is already in the bundle.
  */
 export function createI18n(options: CreateI18nOptions): i18n {

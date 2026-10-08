@@ -27,7 +27,7 @@ Builds are listed on the project's builds page, https://expo.dev/accounts/kuutti
 - **Android.** Open the build's page on the phone and install the APK. Allow installs from the browser when Android asks.
 - **iOS.** Ad hoc distribution installs only on registered devices. Ask the maintainer for the registration link (`eas device:create` prints a URL and a QR code), open it on the phone, install the profile; the next `development` build includes the device (Apple allows 100 per year). Then open the build page on the phone and install.
 
-In the dev client, connect to Metro on your machine for local work (the API URL is derived from the Metro host); `pnpm env:up` and `pnpm dev:mobile` start it. A dev client built while updates were still signed (fingerprint `d9ecc75a` or earlier) refuses Metro's unsigned manifest: install the current Android build from the builds page, or rebuild locally (`expo run:ios`, `expo run:android`). Or open a published update: the launcher's *Extensions* tab lists EAS Update branches (`staging`, `pr-<n>`), and a pull-request comment's QR code opens that branch directly. The smoke screen shows which API the JavaScript was built for.
+In the dev client, connect to Metro on your machine for local work (the API URL is derived from the Metro host); `pnpm env:up` and `pnpm dev:mobile` start it. A dev client built while updates were still signed (fingerprint `d9ecc75a` or earlier) refuses Metro's unsigned manifest: install the current Android build from the builds page, or rebuild locally (`expo run:ios`, `expo run:android`). Or open a published update: the launcher's *Extensions* tab lists EAS Update branches (`staging`, `pr-<n>`), and a pull-request comment's QR code opens that branch directly. The tech config screen (the wrench on the home screen, outside production) shows which API the JavaScript was built for.
 
 ### Apple account
 
@@ -45,7 +45,7 @@ Checks: an Android team member installs the dev client from the link and sees th
 
 ## Signing in and recovering an account
 
-Bank ID is the account: there is no password and no e-mail to recover through. The app opens the API's `/auth/start` in the system browser, the bank identifies the person, and the app receives a one-time code by deep link, which it exchanges for this device's session (an access token that renews itself, and a refresh token good for ninety days, both in the secure store). A lost or stolen phone is handled by signing in on a new phone and choosing "log out everywhere" in the settings sheet: every device's session ends on its next request, and the old phone is back at the sign-in screen. Nothing is stored that could sign someone in without their bank.
+Bank ID is the account: there is no password and no e-mail to recover through. The app opens the API's `/auth/start` in the system browser, the bank identifies the person, and the app receives a one-time code by deep link, which it exchanges for this device's session (an access token that renews itself, and a refresh token good for ninety days, both in the secure store). A lost or stolen phone is handled by signing in on a new phone and choosing "log out everywhere" on the settings screen: every device's session ends on its next request, and the old phone is back at the sign-in screen. Nothing is stored that could sign someone in without their bank.
 
 ## Error reporting (Sentry, #11)
 
@@ -53,4 +53,4 @@ Errors only, no analytics (rules/mobile.md): `src/lib/sentry.ts` builds the opti
 
 Source maps: the `@sentry/react-native/expo` plugin in `app.json` names the EU server, organisation `kuutti-fi` and project `mobile`, and uploads maps during EAS Build when `SENTRY_AUTH_TOKEN` is an EAS secret; for updates, `deploy.yml` runs `sentry-expo-upload-sourcemaps dist` with the token from the GitHub environment and names the organisation in `SENTRY_ORG` (the uploader reads the environment before `app.json`). The token is never in the repository or at repository level.
 
-Which JavaScript a phone runs: `app.config.ts` stamps the git commit into `extra.commit` at export and build time (`GITHUB_SHA` in CI, `EAS_BUILD_GIT_COMMIT_HASH` on EAS, git locally), and the smoke screen shows it in its App card next to the update id, apart from the API's commit. `fingerprint.config.js` skips the `extra` section, so a new commit is never a new runtime version.
+Which JavaScript a phone runs: `app.config.ts` stamps the git commit into `extra.commit` at export and build time (`GITHUB_SHA` in CI, `EAS_BUILD_GIT_COMMIT_HASH` on EAS, git locally), and the tech config screen shows it in its App card next to the update id, apart from the API's commit. `fingerprint.config.js` skips the `extra` section, so a new commit is never a new runtime version.
