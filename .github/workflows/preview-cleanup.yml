@@ -15,9 +15,10 @@ name: Preview cleanup
 # and in this repository that has meant once in two to six hours, whatever the
 # cron line says (ADR-012 §6). A push to main runs main's copy of this file. It
 # does NOT run on the pull request's close event: that event runs the pull
-# request's own copy of this file, which would put the tokens in a
-# contributor's hands without a reviewer, and the reviewer is exactly what
-# left three previews of merged pull requests on the box until it ran out of
+# request's own copy of this file, and the removal must run main's copy (its
+# actions: write job, ADR-012 §8, and the plan role that trusts main alone);
+# a close event that waited for the reviewer of "preview" is also what left
+# three previews of merged pull requests on the box until it ran out of
 # memory (2026-09-27, ADR-012). pull_request_target is banned in this
 # repository for the same class of reason (check-workflow-permissions.py).
 # The GitHub environment "preview-cleanup" holds the same Dokploy and EAS
@@ -28,9 +29,10 @@ name: Preview cleanup
 # EAS removal does not, it fails the run by name.
 #
 # Beside that, and needing none of it: the runs of preview.yml that still
-# wait for the reviewer of "preview" while their pull request has merged or
-# closed are cancelled (ADR-012 §8). They deployed nothing, so the sweep
-# above never finds them, and they would wait for thirty days.
+# wait for a reviewer of "preview" while their pull request has merged or
+# closed are cancelled (ADR-012 §8; idle while the environment has no
+# reviewer, ADR-004 §3). They deployed nothing, so the sweep above never
+# finds them, and they would wait for thirty days.
 
 on:
   push:

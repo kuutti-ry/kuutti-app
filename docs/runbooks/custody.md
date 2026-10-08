@@ -25,7 +25,7 @@ Fill the *holder*, *MFA*, *backup factor* and *second custodian* columns from th
 - Every row has a password-manager entry under the project, never under a personal vault, so the association inherits it (TD-4). Recovery codes and backup keys go in the same entry or in the sealed envelope, never on the laptop alone.
 - No identity may be recoverable through exactly one device. The mailbox is the root of every recovery chain above, so it gets the strongest protection and the first second custodian.
 - Second custodian: another organisation owner receives, in person, either a registered backup security key or the sealed recovery codes for the mailbox and AWS root. Until that happens the project has a bus factor of one, and this file says so.
-- Write access to the repository is staging-level trust, and with unsigned updates the trust of a push to `main` (ADR-004). Today only the three organisation owners have it. Before granting it to anyone else, switch on the required reviewer of the `preview` environment (`infra/README.md`, Previews, Trust): it was removed on 2026-09-19 because it stopped nobody.
+- Write access to the repository is staging-level trust, and with unsigned updates the trust of a push to `main` (ADR-004): a pull request's preview runs its code on the staging box and holds the Expo token, and from 2026-10-08 nobody approves it first (the `preview` environment had the maintainer as required reviewer from 2026-09-25 to that day; ADR-004 §3). The organisation's owners and the `contributors` team have write. Grant it by name, to a person the maintainer knows, never to a team of unknowns or to an app; their GitHub login is a lock on the update path. Before the first production build reaches anyone outside the team, put the reviewer back on (`infra/README.md`, Previews, Trust, has the command) or ship signed updates (ADR-004 §3 and §4).
 - Handover to the association (TD-4): re-point the root email and registrant contact to the association's alias, move the Identity Center instance (ADR-001, step 7 of `infra/README.md`), transfer the Expo owner login and the password-manager vault. Nothing under `infra/` changes.
 
 ## Checklist
@@ -33,6 +33,7 @@ Fill the *holder*, *MFA*, *backup factor* and *second custodian* columns from th
 - [ ] Mailbox: second factor registered, backup codes in the entry, recovery phone/email noted
 - [ ] AWS root: two MFA devices, no virtual device, zero access keys (`aws iam get-account-summary`: MFA 1, keys 0)
 - [ ] Expo owner and the maintainer's Admin login: 2FA on, recovery codes in the entry (they guard the unsigned update path, ADR-004)
+- [ ] Before the first production build outside the team: the `preview` reviewer back on, or signed updates (ADR-004 §3 and §4)
 - [ ] GitHub org billing email moved to the project mailbox
 - [ ] Second custodian named above and holding a backup factor
 - [ ] Reminder set for 2027-08: domain renewal, card validity, this review
