@@ -289,6 +289,11 @@ export type MessageParams = {
   "profile.dealBreakers.saved": Record<never, never>;
   "profile.dealBreakers.switch": { "field": string };
   "profile.dealBreakers.title": Record<never, never>;
+  "profile.discard.body": Record<never, never>;
+  "profile.discard.close": Record<never, never>;
+  "profile.discard.keep": Record<never, never>;
+  "profile.discard.leave": Record<never, never>;
+  "profile.discard.title": Record<never, never>;
   "profile.displayName.hint": { "max": number };
   "profile.displayName.label": Record<never, never>;
   "profile.error.generic": Record<never, never>;

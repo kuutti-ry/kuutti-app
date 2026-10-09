@@ -90,6 +90,41 @@ profile.saved:
   sv: "Sparat."
   machine: { fi: true, sv: true }
 
+profile.discard.title:
+  en: Leave without saving?
+  description: Title of the dialog shown when a person leaves the profile screen with edits that are not saved (the profile saves whole, on Save).
+  fi: Poistutaanko tallentamatta?
+  sv: Lämna utan att spara?
+  machine: { fi: true, sv: true }
+
+profile.discard.body:
+  en: What you changed here is not saved yet. Save first, or leave and lose it.
+  description: Body of the leave-without-saving dialog of the profile screen.
+  fi: Tekemiäsi muutoksia ei ole vielä tallennettu. Tallenna ensin, tai poistu ja menetä ne.
+  sv: Det du ändrade här är inte sparat ännu. Spara först, eller lämna och förlora det.
+  machine: { fi: true, sv: true }
+
+profile.discard.keep:
+  en: Keep editing
+  description: Button of the leave-without-saving dialog that stays on the profile screen.
+  fi: Jatka muokkaamista
+  sv: Fortsätt redigera
+  machine: { fi: true, sv: true }
+
+profile.discard.leave:
+  en: Leave without saving
+  description: Button of the leave-without-saving dialog that leaves the profile screen and loses the edits.
+  fi: Poistu tallentamatta
+  sv: Lämna utan att spara
+  machine: { fi: true, sv: true }
+
+profile.discard.close:
+  en: Close
+  description: Screen-reader label of the close control of the leave-without-saving dialog; closing it stays on the screen.
+  fi: Sulje
+  sv: Stäng
+  machine: { fi: true, sv: true }
+
 profile.error.generic:
   en: "Saving did not work. Check the fields and try again."
   description: "Notice after a refused save without a more specific text (validation_failed and the rest)."

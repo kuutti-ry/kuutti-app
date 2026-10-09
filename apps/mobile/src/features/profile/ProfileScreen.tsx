@@ -7,12 +7,20 @@ import {
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
 } from "@kuutti/schema";
-import { useRouter } from "expo-router";
-import { Fragment } from "react";
+import { useNavigation, useRouter } from "expo-router";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -76,6 +84,20 @@ export function ProfileScreen() {
   const tap = useHapticTap();
   const profile = useProfile();
   const { draft, update } = profile;
+  const navigation = useNavigation();
+  // The document saves whole, on Save, and the screen has no header: the back
+  // gesture was the only way out and lost unsaved edits without a word
+  // (09/10/2026, Kerttu's smoking answer). Leaving with edits asks first.
+  const [leaving, setLeaving] = useState<Parameters<typeof navigation.dispatch>[0] | null>(null);
+  const leaveConfirmed = useRef(false);
+  useEffect(() => {
+    if (!profile.dirty) return;
+    return navigation.addListener("beforeRemove", (event) => {
+      if (leaveConfirmed.current) return;
+      event.preventDefault();
+      setLeaving(event.data.action);
+    });
+  }, [navigation, profile.dirty]);
 
   const consented = isConsented(draft);
   const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
@@ -114,10 +136,11 @@ export function ProfileScreen() {
         {profile.completeness && (
           <Card>
             <CardHeader>
-              <CardTitle>{t("profile.completeness.title")}</CardTitle>
-              {profile.completeness.complete && (
-                <CardDescription>{t("profile.completeness.complete")}</CardDescription>
-              )}
+              <CardTitle>
+                {profile.completeness.complete
+                  ? t("profile.completeness.complete")
+                  : t("profile.completeness.title")}
+              </CardTitle>
             </CardHeader>
             {!profile.completeness.complete && (
               <CardContent className="gap-1">
@@ -181,6 +204,10 @@ export function ProfileScreen() {
           const spec = PROFILE_FIELDS[key];
           // An article 9 field is offered only behind its consent (ADR-019 §4).
           if (spec.specialCategory && !SPECIAL_CATEGORY_VERSION) return null;
+          // The identity label is offered after a non-binary gender only, in
+          // onboarding (the registry's rule, #146); here it shows when it was
+          // given, to change or clear it, and is not offered to everyone.
+          if (key === "identityLabel" && draft.fields.identityLabel === undefined) return null;
           const offered = !spec.specialCategory || consented;
           return (
             <Fragment key={key}>
@@ -233,6 +260,32 @@ export function ProfileScreen() {
           {t("profile.dealBreakers.open")}
         </Button>
       </ScrollView>
+
+      <Dialog open={leaving !== null} onOpenChange={(open) => !open && setLeaving(null)}>
+        <DialogContent closeLabel={t("profile.discard.close")}>
+          <DialogHeader>
+            <DialogTitle>{t("profile.discard.title")}</DialogTitle>
+            <DialogDescription>{t("profile.discard.body")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onPress={() => setLeaving(null)}>
+              {t("profile.discard.keep")}
+            </Button>
+            <Button
+              variant="destructive"
+              onPress={() => {
+                const action = leaving;
+                setLeaving(null);
+                if (!action) return;
+                leaveConfirmed.current = true;
+                navigation.dispatch(action);
+              }}
+            >
+              {t("profile.discard.leave")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SafeAreaView>
   );
 }

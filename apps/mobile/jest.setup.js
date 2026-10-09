@@ -35,8 +35,21 @@ jest.mock("expo-router", () => {
   const { useEffect } = require("react");
   const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), setParams: jest.fn() };
   const focused = new Set();
+  // The navigation object a screen listens on (beforeRemove, the unsaved-changes
+  // guard of the profile screen); `__navigation.emit(name, event)` is a test leaving the screen.
+  const listeners = new Map();
+  const navigation = {
+    addListener: jest.fn((name, listener) => {
+      listeners.set(name, listener);
+      return () => listeners.delete(name);
+    }),
+    dispatch: jest.fn(),
+    emit: (name, event) => listeners.get(name)?.(event),
+  };
   return {
     __router: router,
+    __navigation: navigation,
+    useNavigation: () => navigation,
     __focus: () => {
       for (const effect of focused) effect();
     },
