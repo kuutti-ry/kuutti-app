@@ -297,14 +297,14 @@ Staging holds no real person: its identities are Telia's test persons (#140) and
 
 ```sh
 aws ssm start-session --target "$(tofu output -raw instance_id)"
-sudo docker ps --format '{{.Names}}' | grep '^api'
-sudo docker exec -it <container> node dist/demo-assets.js   # the photos release, public, over HTTPS
+sudo docker ps --format '{{.Names}}' | grep staging-api   # the task of the api service, staging-api-<id>.1.<task>
+sudo docker exec -it <container> node dist/demo-assets.js   # the photos release, public, over HTTPS; again after every deploy
 sudo docker exec -it <container> node dist/demo-stories.js
 sudo docker exec -it <container> node dist/demo-population.js --env staging
 sudo docker exec -it <container> node dist/demo-reset.js --env staging
 ```
 
-The stories register the eight fixed personas as a registration would and give the six histories through the API's own service functions; a persona's first login at its test bank (`docs/vendors/telia.md` 1.4) then resumes the account. Run again, the stories change nothing. The population writes the one-pond population and counts the counter and the gates anew; `--remove` takes it away. The reset returns the personas to never-registered through the erasure path and gives the stories again (`--bare` for none). None of the three takes a database address or a key: they read staging's parameters as the API does, and a value given by hand is refused.
+The picture cache is the container's own (`/home/node/.cache`), so a deploy empties it: `demo-assets.js` runs again on every new container before the first stories, population or reset, which otherwise refuse and say so. The stories register the eight fixed personas as a registration would and give the six histories through the API's own service functions; a persona's first login at its test bank (`docs/vendors/telia.md` 1.4) then resumes the account. Run again, the stories change nothing. The population writes the one-pond population and counts the counter and the gates anew; `--remove` takes it away. The reset returns the personas to never-registered through the erasure path and gives the stories again (`--bare` for none). None of the three takes a database address or a key: they read staging's parameters as the API does, and a value given by hand is refused.
 
 ### Photo moderation (#49, ADR-006)
 
