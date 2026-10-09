@@ -115,13 +115,18 @@ describe("the synthetic population", () => {
     const ponds = summarise(people);
     const { gate_k: gate, majority_share_max: majority, waitlist_k: counterK } = MATCHING_CONFIG_V1;
     // The one pond (#146): over the gate, men over the majority share, every cell at ten or more.
-    expect(ponds.suomi).toMatchObject({ people: 276, woman: 88, man: 171, non_binary: 17 });
-    expect(ponds.suomi?.people).toBeGreaterThanOrEqual(gate);
-    expect(ponds.suomi?.largestShare).toBeGreaterThan(majority);
+    expect(ponds.paakaupunkiseutu).toMatchObject({
+      people: 276,
+      woman: 88,
+      man: 171,
+      non_binary: 17,
+    });
+    expect(ponds.paakaupunkiseutu?.people).toBeGreaterThanOrEqual(gate);
+    expect(ponds.paakaupunkiseutu?.largestShare).toBeGreaterThan(majority);
     for (const gender of Gender.options) {
-      expect(ponds.suomi?.[gender]).toBeGreaterThanOrEqual(counterK);
+      expect(ponds.paakaupunkiseutu?.[gender]).toBeGreaterThanOrEqual(counterK);
     }
-    expect(Object.keys(ponds)).toEqual(["suomi"]);
+    expect(Object.keys(ponds)).toEqual(["paakaupunkiseutu"]);
     expect(people.filter((p) => p.pond === null)).toHaveLength(24);
     expect(uncrossed(ponds, THRESHOLDS)).toEqual([]);
   });
@@ -264,7 +269,7 @@ describe("writing the population", () => {
           removed: 0,
           spared: 0,
           written: 300,
-          ponds: { suomi: 276 },
+          ponds: { paakaupunkiseutu: 276 },
         });
         expect(await marked()).toBe(300);
         expect(await count("SELECT count(*) AS n FROM account WHERE state = 'active'")).toBe(
@@ -290,11 +295,15 @@ describe("writing the population", () => {
             [`${DEMO_SUBJECT_PREFIX}%`],
           ),
         ).toBe(0);
-        const suomi = await pool.query<{ gender: string; n: string }>(
-          `SELECT a.gender, count(*) AS n FROM account a JOIN ponds p ON p.id = a.pond_id
-           WHERE p.slug = 'suomi' GROUP BY a.gender ORDER BY a.gender`,
+        // The population's own people in the pond; the seed's account lives there too (ADR-010 §11) and is nobody else's to count.
+        const capital = await pool.query<{ gender: string; n: string }>(
+          `SELECT a.gender, count(*) AS n FROM account a
+           JOIN ponds p ON p.id = a.pond_id JOIN identity i ON i.id = a.identity_id
+           WHERE p.slug = 'paakaupunkiseutu' AND i.broker_subject LIKE $1
+           GROUP BY a.gender ORDER BY a.gender`,
+          [`${DEMO_SUBJECT_PREFIX}%`],
         );
-        expect(suomi.rows).toEqual([
+        expect(capital.rows).toEqual([
           { gender: "woman", n: "88" },
           { gender: "man", n: "171" },
           { gender: "non_binary", n: "17" },

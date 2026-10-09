@@ -34,14 +34,14 @@ Three hundred accounts that look bank-verified, among real people, would enter t
 
 ## Who lives where, and why
 
-One country-wide pond for now (#146, ADR-010 §10): everybody who onboarded is in Suomi, and the pond has to show everything at once.
+One pond for now, the capital region (#146, ADR-010 §11): everybody who onboarded is in Pääkaupunkiseutu, and the pond has to show everything at once.
 
 | pond | people | women | men | non-binary | why |
 |---|---|---|---|---|---|
-| Suomi | 276 | 88 | 171 | 17 | over `gate_k` (30); men are 62 %, over `majority_share_max` (0.6), so the admission rule holds them back; every cell at ten or more, so the counter shows the split |
+| Pääkaupunkiseutu | 276 | 88 | 171 | 17 | over `gate_k` (30); men are 62 %, over `majority_share_max` (0.6), so the admission rule holds them back; every cell at ten or more, so the counter shows the split |
 | none | 24 | | | | registered at the bank and gone before the first onboarding step: no gender, no pond, no consent |
 
-These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k, and under 33 people the pond is under the gate). At another size 8 % never onboarded and the rest is in Suomi with the same gender shares.
+These are exact counts, apportioned from shares by largest remainder, not draws: the thresholds are crossed by construction, from a population of 174 up (a test goes through every size; below that the non-binary cell is under the counter's k, and under 33 people the pond is under the gate). At another size 8 % never onboarded and the rest is in Pääkaupunkiseutu with the same gender shares.
 
 Everybody with a pond has a gender, because the app asks for the gender before the pond is assigned.
 

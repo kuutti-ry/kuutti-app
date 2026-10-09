@@ -5,13 +5,18 @@ import type { Pool } from "./pool.ts";
 import { account, identity, matchingConfig, ponds, preferences, profile } from "./schema/index.ts";
 
 /**
- * One country-wide pond for now (#146, ADR-010 §10): everybody is in Suomi,
- * assigned by the API from matching_config.default_pond, and the pond step
- * does not exist. The postal-code ponds of the field sheet come later; the
- * tree (parent_id) is ready for them.
+ * One pond for now, the capital region (#146, ADR-010 §10 and §11): everybody
+ * is in Pääkaupunkiseutu, assigned by the API from matching_config.default_pond,
+ * and the pond step does not exist. The postal-code ponds of the field sheet
+ * come later; the tree (parent_id) is ready for them.
  */
 export const SEED_PONDS = [
-  { slug: "suomi", nameNominative: "Suomi", nameInessive: "Suomessa", parent: null },
+  {
+    slug: "paakaupunkiseutu",
+    nameNominative: "Pääkaupunkiseutu",
+    nameInessive: "Pääkaupunkiseudulla",
+    parent: null,
+  },
 ] as const;
 
 /**
@@ -47,7 +52,8 @@ export const MATCHING_CONFIG_V1 = {
   // only where at least this many people stand behind it.
   waitlist_k: 10,
   // #146 (ADR-010 §10): the pond every account is put in when it has none;
-  // the slug of a row in ponds. Null once people choose among several.
+  // the slug of a row in ponds. Version 2 names another (below); null once
+  // people choose among several.
   default_pond: "suomi",
   // #147 (the field sheet, ADR-015 §9): a change of gender or of whom one
   // seeks is possible once in this many days, effective from the next count.
@@ -55,6 +61,15 @@ export const MATCHING_CONFIG_V1 = {
   // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
   // may set; two at launch, so a small pond is not cut to nothing.
   deal_breakers_max: 2,
+} as const;
+
+/**
+ * matching_config version 2 (ADR-010 §11, migration 0025): the one pond is the
+ * capital region. Version 1 keeps its row as migration 0020 wrote it; the
+ * latest version of a key wins (apps/api/src/lib/matching-config.ts).
+ */
+export const MATCHING_CONFIG_V2 = {
+  default_pond: "paakaupunkiseutu",
 } as const;
 
 /**
@@ -114,14 +129,19 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
       });
   }
 
-  for (const [key, value] of Object.entries(MATCHING_CONFIG_V1)) {
-    await db
-      .insert(matchingConfig)
-      .values({ version: 1, key, value, createdBy })
-      .onConflictDoUpdate({
-        target: [matchingConfig.key, matchingConfig.version],
-        set: { value },
-      });
+  for (const [version, rows] of [
+    [1, MATCHING_CONFIG_V1],
+    [2, MATCHING_CONFIG_V2],
+  ] as const) {
+    for (const [key, value] of Object.entries(rows)) {
+      await db
+        .insert(matchingConfig)
+        .values({ version, key, value, createdBy })
+        .onConflictDoUpdate({
+          target: [matchingConfig.key, matchingConfig.version],
+          set: { value },
+        });
+    }
   }
 
   const now = Date.now();
@@ -159,13 +179,13 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
       if (current) {
         // Onboarding (#46): gender, pond and the two hard rows; the consents
         // are left for the flow to ask, so the screens can be tried locally.
-        const [otaniemi] = await db
+        const [pond] = await db
           .select({ id: ponds.id })
           .from(ponds)
-          .where(eq(ponds.slug, "otaniemi"));
+          .where(eq(ponds.slug, MATCHING_CONFIG_V2.default_pond));
         await db
           .update(account)
-          .set({ gender: "woman", pondId: otaniemi?.id ?? null })
+          .set({ gender: "woman", pondId: pond?.id ?? null })
           .where(eq(account.id, current.id));
         for (const [field, value] of [
           ["seeks", ["man", "non_binary"]],
@@ -203,7 +223,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
 
   return {
     ponds: SEED_PONDS.length,
-    matchingConfig: Object.keys(MATCHING_CONFIG_V1).length,
+    matchingConfig: Object.keys(MATCHING_CONFIG_V1).length + Object.keys(MATCHING_CONFIG_V2).length,
     identities: SEED_IDENTITIES.length,
   };
 }

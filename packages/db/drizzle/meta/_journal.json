@@ -176,6 +176,13 @@
       "when": 1791483892079,
       "tag": "0024_deal_breakers_max",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791558545561,
+      "tag": "0025_default_pond_paakaupunkiseutu",
+      "breakpoints": true
     }
   ]
 }

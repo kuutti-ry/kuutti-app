@@ -31,7 +31,7 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 |---|---|---|
 | the API answers | `curl -s localhost:3000/health` | `curl -s https://api.staging.kuutti.app/health`: the commit is `main`'s |
 | the build | the dev client opens Metro | the tech config screen: channel `staging`, the API above, the runtime's fingerprint matches the installed build |
-| the counter | `curl -s localhost:3000/waitlist`: Suomi with a total and a split | the same against staging |
+| the counter | `curl -s localhost:3000/waitlist`: Pääkaupunkiseutu with a total and a split | the same against staging |
 | the gate | sign in as Sanna: "Matching is open for you." | the same, through Nordea `DEMOUSER4` |
 | the queue | the panel lists Noa's three negatives | the same |
 | the refusals | Tapio refused as banned, Ilona with the date | the same, through OP and Aktia |

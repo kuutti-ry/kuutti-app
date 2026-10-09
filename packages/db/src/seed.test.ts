@@ -3,13 +3,13 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { migrate } from "./migrate.ts";
 import { createPool } from "./pool.ts";
-import { MATCHING_CONFIG_V1, SEED_PONDS, seed } from "./seed.ts";
+import { MATCHING_CONFIG_V1, MATCHING_CONFIG_V2, SEED_PONDS, seed } from "./seed.ts";
 import { withTemporaryDatabase } from "./test/temporary-database.ts";
 
 const MIGRATIONS = resolve(import.meta.dirname, "..", "drizzle");
 
 describe("seed", () => {
-  it("is idempotent and writes the pond tree and matching_config version 1", async () => {
+  it("is idempotent and writes the pond tree and matching_config versions 1 and 2", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
@@ -25,14 +25,17 @@ describe("seed", () => {
           `SELECT c.slug, p.slug AS parent, c.name_inessive AS inessive
            FROM ponds c LEFT JOIN ponds p ON p.id = c.parent_id ORDER BY c.slug`,
         );
-        // One country-wide pond for now (#146); the tree is ready for the postal-code ponds later.
-        expect(tree.rows).toEqual([{ slug: "suomi", parent: null, inessive: "Suomessa" }]);
+        // One pond for now, the capital region (#146, ADR-010 §11); the tree is ready for the postal-code ponds later.
+        expect(tree.rows).toEqual([
+          { slug: "paakaupunkiseutu", parent: null, inessive: "Pääkaupunkiseudulla" },
+        ]);
 
         const config = await pool.query<{ key: string; value: number; version: number }>(
-          "SELECT key, value, version FROM matching_config ORDER BY key",
+          "SELECT key, value, version FROM matching_config ORDER BY key, version",
         );
-        expect(config.rows.every((r) => r.version === 1)).toBe(true);
-        const byKey = Object.fromEntries(config.rows.map((r) => [r.key, r.value]));
+        const byKey = Object.fromEntries(
+          config.rows.filter((r) => r.version === 1).map((r) => [r.key, r.value]),
+        );
         // The decisions log numbers, read back from the database.
         expect(byKey).toEqual({
           gate_k: 30,
@@ -58,6 +61,12 @@ describe("seed", () => {
           deal_breakers_max: 2,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
+        // Version 2 (ADR-010 §11): the one pond is the capital region, and it wins over version 1.
+        const later = Object.fromEntries(
+          config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
+        );
+        expect(later).toEqual({ default_pond: "paakaupunkiseutu" });
+        expect(later).toEqual(MATCHING_CONFIG_V2);
       } finally {
         await pool.end();
       }
