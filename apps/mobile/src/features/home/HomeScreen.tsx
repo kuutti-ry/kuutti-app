@@ -10,7 +10,7 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useOnboardingGate } from "@/features/identity";
 import { GateCard, WaitlistCard } from "@/features/pond";
-import { FIRST_LATER_FIELD, laterPath } from "@/features/profile";
+import { DEAL_BREAKERS_PATH, FIRST_LATER_FIELD, laterPath } from "@/features/profile";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
@@ -129,6 +129,16 @@ export function HomeScreen() {
               }}
             >
               <Text>{t("profile.later.open")}</Text>
+            </Button>
+            <Button
+              variant="outline"
+              accessibilityLabel={t("profile.dealBreakers.open")}
+              onPress={() => {
+                tap();
+                router.push(DEAL_BREAKERS_PATH);
+              }}
+            >
+              <Text>{t("profile.dealBreakers.open")}</Text>
             </Button>
           </View>
         )}

@@ -45,7 +45,7 @@ export function optionTextKey(
 }
 
 /** One choice: a button that says whether it is chosen, never a colour alone. */
-function Chip({
+export function Chip({
   label,
   selected,
   onPress,

@@ -33,7 +33,7 @@ import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { pondRoutes } from "./pond/index.ts";
-import { profileRoutes } from "./profile/index.ts";
+import { exportProfile, profileRoutes } from "./profile/index.ts";
 
 export type { AppEnv };
 
@@ -140,7 +140,15 @@ export function createApp(deps: Deps) {
       gateOf({ db: deps.db, logger: deps.logger, now: () => new Date() }, accountId),
     ),
   );
-  app.route("/", preferencesRoutes(deps, guard));
+  // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
+  app.route(
+    "/",
+    preferencesRoutes(
+      deps,
+      guard,
+      async (accountId) => (await exportProfile(deps.db, accountId))?.fields ?? {},
+    ),
+  );
 
   // The bearer scheme the session routes declare (#35); the tokens themselves
   // are opaque, so the scheme is all the contract says about them.

@@ -88,6 +88,7 @@ export type MessageParams = {
   "errors.auth_under_18": Record<never, never>;
   "errors.card_budget_exceeded": Record<never, never>;
   "errors.change_too_soon": Record<never, never>;
+  "errors.filter_unanswered": Record<never, never>;
   "errors.http_error": Record<never, never>;
   "errors.internal_error": Record<never, never>;
   "errors.media_busy": Record<never, never>;
@@ -272,6 +273,20 @@ export type MessageParams = {
   "profile.completeness.photos": { "min": number };
   "profile.completeness.seeks": Record<never, never>;
   "profile.completeness.title": Record<never, never>;
+  "profile.dealBreakers.accept": Record<never, never>;
+  "profile.dealBreakers.answer": Record<never, never>;
+  "profile.dealBreakers.explain": { "max": number };
+  "profile.dealBreakers.failed": Record<never, never>;
+  "profile.dealBreakers.gated": Record<never, never>;
+  "profile.dealBreakers.includeUnknown": Record<never, never>;
+  "profile.dealBreakers.limit": { "max": number };
+  "profile.dealBreakers.open": Record<never, never>;
+  "profile.dealBreakers.paused": Record<never, never>;
+  "profile.dealBreakers.pickOne": Record<never, never>;
+  "profile.dealBreakers.save": Record<never, never>;
+  "profile.dealBreakers.saved": Record<never, never>;
+  "profile.dealBreakers.switch": { "field": string };
+  "profile.dealBreakers.title": Record<never, never>;
   "profile.displayName.hint": { "max": number };
   "profile.displayName.label": Record<never, never>;
   "profile.error.generic": Record<never, never>;
