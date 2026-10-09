@@ -1,5 +1,7 @@
 # The synthetic population
 
+One of the demo's four documents: `storyboard.md` (what is shown), `runbook.md` (how a demo day is prepared), `photo-prompts.md` (the pictures), and this one (the people).
+
 Data dictionary of `pnpm demo:population` (#73, ADR-014 §8 to §10). The population is never stored: `generatePopulation` in `packages/db/src/seed/population.ts` makes it from a seed, a size and an epoch, and the numbers below are what it makes at the defaults (size 300, seed 73, epoch 01/09/2026, which is in the past so that nobody registered in the future). Change a number there and here in the same change; the tests hold the thresholds.
 
 ## Commands
