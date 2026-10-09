@@ -34,6 +34,7 @@ export const sv: Readonly<Record<string, string>> = {
   "errors.auth_suspended": "Det här kontot är tills vidare avstängt.",
   "errors.auth_under_18": "Kuutti är bara för vuxna.",
   "errors.card_budget_exceeded": "Du har sett många profiler i dag. Nya kommer efter midnatt.",
+  "errors.change_too_soon": "Du ändrade det här nyligen. En ändring är möjlig när väntetiden gått; startsidan säger från när.",
   "errors.http_error": "Begäran misslyckades.",
   "errors.internal_error": "Något gick fel hos oss.",
   "errors.media_busy": "Många foton bearbetas just nu. Försök igen om en stund.",

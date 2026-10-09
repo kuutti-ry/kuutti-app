@@ -97,6 +97,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
         research: current,
         special_category: SPECIAL,
       },
+      nextChange: { gender: null, seeks: null },
       missing,
       complete: missing.length === 0,
     };

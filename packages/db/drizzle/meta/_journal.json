@@ -148,6 +148,20 @@
       "when": 1791471352548,
       "tag": "0020_default_pond",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791473721676,
+      "tag": "0021_change_cadence",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791473722169,
+      "tag": "0022_change_cadence_days",
+      "breakpoints": true
     }
   ]
 }

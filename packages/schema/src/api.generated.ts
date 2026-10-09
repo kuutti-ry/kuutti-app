@@ -2245,6 +2245,10 @@ export interface components {
                 birthMonth: number | null;
                 gender: components["schemas"]["Gender"];
                 pond: components["schemas"]["PondSummary"];
+                /** Format: date-time */
+                genderChangedAt: string | null;
+                /** Format: date-time */
+                seeksChangedAt: string | null;
             };
             preferences: components["schemas"]["PreferencesResponse"];
             consents: components["schemas"]["ConsentRecord"][];
@@ -2628,6 +2632,12 @@ export interface components {
                 } | null;
             };
             currentVersions: components["schemas"]["ConsentVersions"];
+            nextChange: {
+                /** Format: date-time */
+                gender: string | null;
+                /** Format: date-time */
+                seeks: string | null;
+            };
             missing: components["schemas"]["OnboardingStep"][];
             complete: boolean;
         };

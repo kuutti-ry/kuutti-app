@@ -100,13 +100,14 @@ const SEEKS: Readonly<Record<Gender, Readonly<Record<string, number>>>> = {
 };
 
 /**
- * Terms and privacy only. No research consent: the product writes that
- * consent and its research_id mapping together, synthetic people emit no
- * events, and events of people who never were would muddy the first real
- * numbers (#73, out of scope).
+ * Terms, privacy and the special-category consent that the seek answer
+ * needs. No research consent: the product writes that consent and its
+ * research_id mapping together, synthetic people emit no events, and events
+ * of people who never were would muddy the first real numbers (#73, out of scope).
  */
 export type SyntheticConsent = {
-  kind: "terms" | "privacy";
+  /** The two of the welcome screen and the special-category consent of the seek screen (#146, ADR-019 §4). */
+  kind: "terms" | "privacy" | "special_category";
   localeShown: Language;
   givenAt: Date;
 };
@@ -300,6 +301,7 @@ function onboarded(
   const consents: SyntheticConsent[] = [
     { kind: "terms", localeShown: language, givenAt: agreedAt },
     { kind: "privacy", localeShown: language, givenAt: agreedAt },
+    { kind: "special_category", localeShown: language, givenAt: agreedAt },
   ];
   return {
     label,

@@ -27,3 +27,13 @@ Feature: The hard preferences of onboarding
     Given two accounts, one with preferences set
     When the other reads its preferences
     Then it sees nothing set
+
+  Scenario: A change of whom one seeks is possible once in the cadence
+    Given a signed-in account that set seeks and an age window
+    When it changes whom it seeks, and again within the cadence
+    Then the first change is stored, the second is refused as change_too_soon, the same answer again and another window of ages pass, and the onboarding status says from when
+
+  Scenario: A change of gender is possible once in the cadence
+    Given a signed-in account that declared a gender
+    When it declares another, and another again within the cadence
+    Then the first change is stored, the second is refused as change_too_soon, the same gender again passes, and the onboarding status says from when

@@ -161,7 +161,7 @@ describe("the synthetic population", () => {
       expect(Gender.safeParse(person.gender).success, person.label).toBe(true);
       expect(PreferencesUpdate.safeParse(person.preferences).success, person.label).toBe(true);
       // No research consent: the product writes it with its mapping row, and nobody here takes part.
-      expect(person.consents.map((c) => c.kind)).toEqual(["terms", "privacy"]);
+      expect(person.consents.map((c) => c.kind)).toEqual(["terms", "privacy", "special_category"]);
       if (person.profile) {
         const { specialCategoryConsentedAt, ...document } = person.profile;
         const specialCategoryConsent = specialCategoryConsentedAt
@@ -277,6 +277,9 @@ describe("writing the population", () => {
           await count("SELECT count(*) AS n FROM consent WHERE version = 'test-terms-1'"),
         ).toBe(276);
         expect(await count("SELECT count(*) AS n FROM consent WHERE kind = 'research'")).toBe(0);
+        expect(
+          await count("SELECT count(*) AS n FROM consent WHERE version = 'test-special-1'"),
+        ).toBe(276);
         expect(await count("SELECT count(*) AS n FROM research_subject")).toBe(0);
         // Nothing of a bank login is on a synthetic identity.
         expect(

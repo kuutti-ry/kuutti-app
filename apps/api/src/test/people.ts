@@ -15,9 +15,11 @@ export type PeopleOptions = {
   /** With `complete`: whom they seek (default: men) and the ages (default: 25 to 40). */
   seeks?: ("woman" | "man" | "non_binary")[];
   ageWindow?: { min: number; max: number };
+  /** With `complete`: what they are here for (default: open to either, which fits everybody; #147). */
+  intent?: "long_term" | "casual" | "open_to_either";
   /** Born in June of this year (default: 1990). */
   birthYear?: number;
-  /** Terms and privacy accepted in their current wording, as onboarding leaves them (#46): what the pond gate asks for (#94). */
+  /** Terms, privacy and the special-category consent in their current wording, as onboarding leaves them (#46, #146): what the pond gate asks for (#94). */
   consented?: boolean;
   /** When they registered; people of one call are a second apart, in the order of the ids returned. */
   registeredAt?: Date;
@@ -79,15 +81,19 @@ export async function people(
       `INSERT INTO consent (account_id, kind, version, locale_shown)
        SELECT id, k.kind::consent_kind, k.version, 'fi'
        FROM unnest($1::uuid[]) AS id,
-            (VALUES ('terms', $2), ('privacy', $3)) AS k(kind, version)`,
-      [ids, CONSENT_VERSIONS.terms, CONSENT_VERSIONS.privacy],
+            (VALUES ('terms', $2), ('privacy', $3), ('special_category', $4)) AS k(kind, version)`,
+      [ids, CONSENT_VERSIONS.terms, CONSENT_VERSIONS.privacy, CONSENT_VERSIONS.special_category],
     );
   }
   if (options.complete) {
     await db.query(
       `INSERT INTO profile (account_id, display_name, bio, fields, prompts)
-       SELECT id, 'Aino', $2, '{}'::jsonb, '[]'::jsonb FROM unnest($1::uuid[]) AS id`,
-      [ids, "A bio that is long enough to count as one, by the rule of the profile."],
+       SELECT id, 'Aino', $2, $3::jsonb, '[]'::jsonb FROM unnest($1::uuid[]) AS id`,
+      [
+        ids,
+        "A bio that is long enough to count as one, by the rule of the profile.",
+        JSON.stringify({ intent: options.intent ?? "open_to_either" }),
+      ],
     );
     await db.query(
       `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)

@@ -54,6 +54,7 @@ describe("seed", () => {
           photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
           waitlist_k: 10,
           default_pond: "suomi",
+          change_cadence_days: 30,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
       } finally {

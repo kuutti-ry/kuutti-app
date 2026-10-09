@@ -208,7 +208,7 @@ export function OnboardingScreen() {
   const { t, locale } = useT();
   const router = useRouter();
   const tap = useHapticTap();
-  const { state, busy, failed, reload, step } = useOnboarding();
+  const { state, busy, failed, failedCode, reload, step } = useOnboarding();
   const profile = useProfile();
   const [researchOffered, setResearchOffered] = useState(false);
   const [seeks, setSeeks] = useState<Gender[]>([]);
@@ -293,7 +293,12 @@ export function OnboardingScreen() {
           </Text>
         )}
         {(failed || profileFailed) && (
-          <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>
+          <Text accessibilityLiveRegion="assertive">
+            {/* A change refused for its cadence is said as that (#147), the rest as a step that did not go through. */}
+            {failedCode === "change_too_soon"
+              ? t("errors.change_too_soon")
+              : t("onboarding.failed")}
+          </Text>
         )}
 
         {current === "welcome" && (

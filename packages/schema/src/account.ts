@@ -67,6 +67,9 @@ export const AccountExport = z
       /** Self-declared (#46); null before onboarding and after erasure. */
       gender: Gender.nullable(),
       pond: PondSummary.nullable(),
+      /** When the gender, or whom one seeks, last changed from an earlier answer (#147); null until then and after erasure. */
+      genderChangedAt: z.iso.datetime().nullable(),
+      seeksChangedAt: z.iso.datetime().nullable(),
     }),
     /** The two hard rows onboarding writes (#46): whom the person seeks and the age window. */
     preferences: PreferencesResponse,

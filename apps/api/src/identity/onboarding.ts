@@ -19,8 +19,13 @@ import {
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { readMatchingConfig } from "../lib/matching-config.ts";
-import { deleteSeeksOfAccount, readPreferences } from "../matching/index.ts";
+import { matchingConfigNumber, readMatchingConfig } from "../lib/matching-config.ts";
+import {
+  CHANGE_CADENCE_KEY,
+  deleteSeeksOfAccount,
+  nextChangeFrom,
+  readPreferences,
+} from "../matching/index.ts";
 import { listPhotos } from "../media/index.ts";
 import {
   admissionAnew,
@@ -144,13 +149,15 @@ export async function onboardingStatus(
   ) {
     throw new AppError(404, "not_found", "No live account");
   }
-  const [preferences, consents, profile, photos] = await Promise.all([
+  const [preferences, consents, profile, photos, cadence] = await Promise.all([
     readPreferences(deps.db, accountId),
     // The newest active row per kind, however long the history (#65 review).
     repo.activeConsents(deps.db, accountId),
     readProfile({ ...deps, readPreferences }, accountId),
     listPhotos(deps.db, accountId),
+    matchingConfigNumber(deps.db, CHANGE_CADENCE_KEY),
   ]);
+  const now = deps.now();
   const pond =
     (await findPondOfAccount(deps.db, accountId)) ?? (await assignDefaultPond(deps, accountId));
   const terms = acceptedCurrent(consents, "terms")?.version ?? null;
@@ -185,7 +192,7 @@ export async function onboardingStatus(
   }
   return {
     state,
-    age: ageInYears(account.birthYear, account.birthMonth, deps.now()),
+    age: ageInYears(account.birthYear, account.birthMonth, now),
     gender: account.gender,
     pond,
     preferences,
@@ -198,6 +205,10 @@ export async function onboardingStatus(
         : null,
     },
     currentVersions: CURRENT_CONSENT_VERSIONS,
+    nextChange: {
+      gender: nextChangeFrom(account.genderChangedAt, cadence, now)?.toISOString() ?? null,
+      seeks: nextChangeFrom(account.seeksChangedAt, cadence, now)?.toISOString() ?? null,
+    },
     missing,
     complete: missing.length === 0,
   };
@@ -294,7 +305,9 @@ export async function withdrawConsentOf(
     if (kind === "research") {
       // The mapping row goes with the consent; the events stay, unlinkable (ADR-011).
       await removeResearchSubject(tx, accountId);
-    } else {
+    } else if (withdrawn.withdrawn > 0) {
+      // Only a consent that was there takes the answers with it: a request
+      // without one changes nothing, and is no way round the cadence (#147).
       await deleteSeeksOfAccount(tx, accountId);
       await withdrawSpecialCategoryAnswers(
         { db: tx, logger: deps.logger, now: deps.now },
@@ -313,14 +326,27 @@ export async function declareGender(
   accountId: string,
   gender: Gender,
 ): Promise<void> {
+  const at = deps.now();
   const declared = await transaction(deps.db, async (tx) => {
     const before = await repo.lockGender(tx, accountId);
     if (before === undefined) return false;
-    if (!(await repo.setGender(tx, accountId, gender))) return false;
-    // The gender decides with whom one waits at the pond gate (#94, ADR-015
-    // §9): joining a group that waits is decided anew by the next count.
+    // A change from an earlier answer is possible once in the cadence (#147,
+    // ADR-015 §9), said without a wall: the date, never a reason.
+    const change = before.gender !== null && before.gender !== gender;
+    if (change) {
+      const cadence = await matchingConfigNumber(tx, CHANGE_CADENCE_KEY);
+      const from = nextChangeFrom(before.changedAt, cadence, at);
+      if (from) {
+        throw new AppError(429, "change_too_soon", "The gender was changed recently", {
+          from: from.toISOString(),
+        });
+      }
+    }
+    if (!(await repo.setGender(tx, accountId, gender, change ? at : null))) return false;
+    // The gender decides for whom one competes at the pond gate (#94, ADR-015
+    // §9): joining a contest is decided anew by the next count.
     const { seeks } = await readPreferences(tx, accountId);
-    await admissionAnew(tx, accountId, { gender: before, seeks }, { gender, seeks });
+    await admissionAnew(tx, accountId, { gender: before.gender, seeks }, { gender, seeks });
     return true;
   });
   if (!declared) throw new AppError(404, "not_found", "No live account");

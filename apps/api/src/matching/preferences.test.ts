@@ -1,6 +1,7 @@
-import { PreferencesResponse } from "@kuutti/schema";
+import { OnboardingStatus, PreferencesResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
 import { signedInAccount } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 
@@ -81,5 +82,62 @@ describe("preferences", () => {
       ageWindow: null,
     });
     expect((await app.request("/preferences")).status).toBe(401);
+  });
+});
+
+describe("the cadence of a change (#147, ADR-015 §9)", () => {
+  test("A change of whom one seeks is possible once in the cadence", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const window = { min: 25, max: 35 };
+    const status = async () =>
+      OnboardingStatus.parse(
+        await (await app.request("/onboarding", { headers: a.headers })).json(),
+      );
+    // The first answer is no change, and the first change is free.
+    expect((await put(app, a.headers, { seeks: ["woman"], ageWindow: window })).status).toBe(200);
+    expect((await status()).nextChange.seeks).toBeNull();
+    expect((await put(app, a.headers, { seeks: ["man"], ageWindow: window })).status).toBe(200);
+    const from = (await status()).nextChange.seeks;
+    expect(from).not.toBeNull();
+    expect(Date.parse(from as string)).toBeGreaterThan(Date.now() + 29 * 86_400_000);
+    // The second change within the cadence is refused, said without a reason.
+    const refused = await put(app, a.headers, { seeks: ["non_binary"], ageWindow: window });
+    expect(refused.status).toBe(429);
+    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
+      "change_too_soon",
+    );
+    expect(
+      PreferencesResponse.parse(
+        await (await app.request("/preferences", { headers: a.headers })).json(),
+      ).seeks,
+    ).toEqual(["man"]);
+    // The same answer again, and another window of ages, are no change.
+    expect(
+      (await put(app, a.headers, { seeks: ["man"], ageWindow: { min: 30, max: 40 } })).status,
+    ).toBe(200);
+    expect((await status()).nextChange.seeks).toBe(from);
+    // Withdrawing the special-category consent takes the seek row with it, and the
+    // answer after it counts as a change while one is on record: no way round.
+    const consent = await app.request("/consents", {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "special_category",
+        version: SPECIAL_CATEGORY_CONSENT_VERSION,
+        locale: "fi",
+      }),
+    });
+    expect(consent.status).toBe(200);
+    expect(
+      (await app.request("/consents/special_category", { method: "DELETE", headers: a.headers }))
+        .status,
+    ).toBe(200);
+    expect((await status()).preferences.seeks).toBeNull();
+    const again = await put(app, a.headers, { seeks: ["non_binary"], ageWindow: window });
+    expect(again.status).toBe(429);
+    expect((await status()).preferences.seeks).toBeNull();
+    // Nothing of what is sought reaches a log line (rule 5), the refusals included.
+    expect(JSON.stringify(logs())).not.toContain("non_binary");
   });
 });

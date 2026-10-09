@@ -77,6 +77,7 @@ export type MessageParams = {
   "errors.auth_suspended": Record<never, never>;
   "errors.auth_under_18": Record<never, never>;
   "errors.card_budget_exceeded": Record<never, never>;
+  "errors.change_too_soon": Record<never, never>;
   "errors.http_error": Record<never, never>;
   "errors.internal_error": Record<never, never>;
   "errors.media_busy": Record<never, never>;

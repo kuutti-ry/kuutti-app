@@ -4,8 +4,9 @@ import {
   type Applicant,
   admit,
   admitsAlone,
-  contestedGroup,
-  joinsAGroupThatWaits,
+  competeAlike,
+  contestsOf,
+  joinsAContest,
   neededFrom,
   placeAlone,
   saidInStep,
@@ -13,8 +14,8 @@ import {
   sayPool,
 } from "./gate.ts";
 
-// features/pond/gate.feature (#94, ADR-015): admission and what is said, as
-// the pure rules they are. The count over a database is jobs/pond-gate.test.ts.
+// features/pond/gate.feature (#94, #147, ADR-015): admission and what is said,
+// as the pure rules they are. The count over a database is jobs/pond-gate.test.ts.
 
 const T0 = Date.parse("2026-10-01T09:00:00Z");
 let serial = 0;
@@ -38,12 +39,16 @@ function group(
   });
 }
 
-/** Any pond: people of the three genders, some let in already, registered at any time. */
+const genderArb = fc.constantFrom("woman", "man", "non_binary") as fc.Arbitrary<
+  Applicant["gender"]
+>;
+
+/** Any pond: people of the three genders seeking any of them, some let in already, registered at any time. */
 const applicantsArb = fc
   .array(
     fc.record({
-      gender: fc.constantFrom("woman", "man", "non_binary"),
-      seeksOwn: fc.boolean(),
+      gender: genderArb,
+      seeks: fc.uniqueArray(genderArb, { minLength: 1, maxLength: 3 }),
       admitted: fc.boolean(),
       minute: fc.integer({ min: 0, max: 10_000 }),
     }),
@@ -53,18 +58,16 @@ const applicantsArb = fc
     drawn.map(
       (d, i): Applicant => ({
         id: `p-${String(i).padStart(3, "0")}`,
-        gender: d.gender as Applicant["gender"],
-        seeks:
-          d.gender === "non_binary"
-            ? ["woman", "man"]
-            : d.seeksOwn
-              ? [d.gender as "woman" | "man"]
-              : [d.gender === "woman" ? "man" : "woman"],
+        gender: d.gender,
+        seeks: d.seeks,
         admitted: d.admitted,
         registeredAt: new Date(T0 + d.minute * 60_000),
       }),
     ),
   );
+
+const sameContests = (a: Applicant, b: Applicant) =>
+  contestsOf(a).join(",") === contestsOf(b).join(",");
 
 describe("admission", () => {
   it("The smaller group is always let in, the larger while it is at most its share", () => {
@@ -98,21 +101,46 @@ describe("admission", () => {
     expect([...waiting]).toEqual([[waited[1]?.id, 1]]);
   });
 
-  it("People who seek their own gender, and non-binary people, never wait", () => {
+  it("People who compete for nobody never wait, and seeking one's own gender too opens no door", () => {
     const inside = [
       ...group(9, "man", ["woman"], { admitted: true }),
       ...group(1, "woman", ["man"], { admitted: true }),
     ];
-    const both = group(1, "man", ["woman", "man"], { from: 100 });
-    const own = group(1, "man", ["man"], { from: 101 });
-    const nonBinary = group(1, "non_binary", ["woman"], { from: 102 });
-    const waits = group(1, "man", ["woman"], { from: 103 });
-    const { admitted, waiting } = admit([...inside, ...both, ...own, ...nonBinary, ...waits], 0.6);
-    expect(admitted).toEqual([both[0]?.id, own[0]?.id, nonBinary[0]?.id]);
-    expect([...waiting.keys()]).toEqual([waits[0]?.id]);
-    expect(contestedGroup(both[0] as Applicant)).toBeNull();
-    expect(contestedGroup(nonBinary[0] as Applicant)).toBeNull();
-    expect(contestedGroup(waits[0] as Applicant)).toBe("man");
+    const own = group(1, "man", ["man"], { from: 100 });
+    const both = group(1, "man", ["woman", "man"], { from: 101 });
+    const waits = group(1, "man", ["woman"], { from: 102 });
+    const { admitted, waiting } = admit([...inside, ...own, ...both, ...waits], 0.6);
+    expect(admitted).toEqual([own[0]?.id]);
+    expect([...waiting]).toEqual([
+      [both[0]?.id, 1],
+      [waits[0]?.id, 2],
+    ]);
+    expect(contestsOf(own[0] as Applicant)).toEqual([]);
+    expect(contestsOf(both[0] as Applicant)).toEqual(["woman"]);
+    expect(contestsOf(waits[0] as Applicant)).toEqual(["woman"]);
+  });
+
+  it("A person competes for whom they seek, whatever label they chose for themselves", () => {
+    // Six men and four women seeking each other: the contest for women is at its ratio (three to two).
+    const inside = [
+      ...group(6, "man", ["woman"], { admitted: true }),
+      ...group(4, "woman", ["man"], { admitted: true }),
+    ];
+    const they = group(1, "non_binary", ["woman"], { from: 100 });
+    const he = group(1, "man", ["woman"], { from: 101 });
+    const { admitted, waiting } = admit([...inside, ...they, ...he], 0.6);
+    expect(admitted).toEqual([]);
+    expect([...waiting]).toEqual([
+      [they[0]?.id, 1],
+      [he[0]?.id, 2],
+    ]);
+    expect(competeAlike(they[0] as Applicant, he[0] as Applicant)).toBe(true);
+    // One more woman makes room for one: the one who registered first, whoever they are.
+    const her = group(1, "woman", ["man"], { from: 102 });
+    expect(admit([...inside, ...they, ...he, ...her], 0.6).admitted).toEqual([
+      they[0]?.id,
+      her[0]?.id,
+    ]);
   });
 
   it("Nobody is let out again when the pond drifts", () => {
@@ -173,7 +201,7 @@ describe("admission", () => {
     );
   });
 
-  it("for any pond: within a group nobody is let in before somebody who registered earlier", () => {
+  it("for any pond: among people of the same contests nobody is let in before somebody who registered earlier", () => {
     fc.assert(
       fc.property(applicantsArb, (people) => {
         const { admitted, waiting } = admit(people, 0.6);
@@ -182,7 +210,7 @@ describe("admission", () => {
           const w = byId.get(waits) as Applicant;
           for (const id of admitted) {
             const a = byId.get(id) as Applicant;
-            if (contestedGroup(a) !== contestedGroup(w)) continue;
+            if (!sameContests(a, w)) continue;
             expect(a.registeredAt.getTime()).toBeLessThanOrEqual(w.registeredAt.getTime());
           }
         }
@@ -205,23 +233,29 @@ describe("admission", () => {
     );
   });
 
-  it("for any pond: whoever waits would put their group over its share", () => {
+  it("for any pond: whoever waits would put a contest of theirs over its ratio", () => {
     fc.assert(
       fc.property(applicantsArb, (people) => {
         const { admitted, waiting } = admit(people, 0.6);
         const inside = new Set([...people.filter((p) => p.admitted).map((p) => p.id), ...admitted]);
-        const count = { woman: 0, man: 0 };
+        const competitors = { woman: 0, man: 0, non_binary: 0 };
+        const supply = { woman: 0, man: 0, non_binary: 0 };
         for (const p of people) {
-          const g = contestedGroup(p);
-          if (g && inside.has(p.id)) count[g] += 1;
+          if (!inside.has(p.id)) continue;
+          const contests = contestsOf(p);
+          for (const gender of contests) competitors[gender] += 1;
+          if (contests.length > 0) supply[p.gender] += 1;
         }
         const byId = new Map(people.map((p) => [p.id, p]));
         for (const id of waiting.keys()) {
-          const g = contestedGroup(byId.get(id) as Applicant);
-          if (!g) throw new Error("somebody waits who waits with nobody");
-          const other = g === "woman" ? "man" : "woman";
-          expect(count[g]).toBeGreaterThan(count[other]);
-          expect((count[g] + 1) / (count.woman + count.man + 1)).toBeGreaterThan(0.6);
+          const contests = contestsOf(byId.get(id) as Applicant);
+          if (contests.length === 0) throw new Error("somebody waits who competes for nobody");
+          const full = contests.some(
+            (gender) =>
+              competitors[gender] > supply[gender] &&
+              competitors[gender] + 1 > 1.5 * supply[gender],
+          );
+          expect(full).toBe(true);
         }
       }),
     );
@@ -234,13 +268,17 @@ describe("a first ask", () => {
     ...group(3, "woman", ["man"], { admitted: true }),
   ];
 
-  it("lets in who waits with nobody, whoever else is there", () => {
+  it("lets in who competes for nobody, whoever else is there, and whom a contest has room for", () => {
     const crowd = group(9, "man", ["woman"], { from: 100 });
-    const both = group(1, "man", ["woman", "man"], { from: 200 });
+    const own = group(1, "man", ["man"], { from: 200 });
+    // Competes for men, with the three women inside: three for three, room.
     const nonBinary = group(1, "non_binary", ["man"], { from: 201 });
-    const people = [...inside, ...crowd, ...both, ...nonBinary];
-    expect(admitsAlone(people, both[0]?.id as string, 0.6)).toBe(true);
+    // Competes for women, behind the nine men of the crowd: no.
+    const both = group(1, "man", ["woman", "man"], { from: 202 });
+    const people = [...inside, ...crowd, ...own, ...nonBinary, ...both];
+    expect(admitsAlone(people, own[0]?.id as string, 0.6)).toBe(true);
     expect(admitsAlone(people, nonBinary[0]?.id as string, 0.6)).toBe(true);
+    expect(admitsAlone(people, both[0]?.id as string, 0.6)).toBe(false);
   });
 
   it("lets in the first of a group when the group may enter as the admissions stand", () => {
@@ -286,9 +324,9 @@ describe("a first ask", () => {
     expect(placeAlone(people, last)).toBe(12);
     expect(sayPlace(placeAlone(people, last) as number, 10)).toBe(20);
     expect(placeAlone(people, men[0]?.id as string)).toBe(1);
-    // Somebody who waits with nobody has no place in any line.
-    const both = group(1, "man", ["woman", "man"], { from: 300 });
-    expect(placeAlone([...people, ...both], both[0]?.id as string)).toBeNull();
+    // Somebody who competes for nobody has no place in any line.
+    const own = group(1, "man", ["man"], { from: 300 });
+    expect(placeAlone([...people, ...own], own[0]?.id as string)).toBeNull();
   });
 
   it("for any pond: a place on a first ask is never better than the place of the count", () => {
@@ -308,10 +346,9 @@ describe("a first ask", () => {
         for (const person of people) {
           if (person.admitted || !admitsAlone(people, person.id, 0.6)) continue;
           expect(together.has(person.id)).toBe(true);
-          const g = contestedGroup(person);
-          if (!g) continue;
+          if (contestsOf(person).length === 0) continue;
           for (const other of people) {
-            if (other.admitted || other.id === person.id || contestedGroup(other) !== g) continue;
+            if (other.admitted || other.id === person.id || !competeAlike(other, person)) continue;
             const before =
               other.registeredAt.getTime() < person.registeredAt.getTime() ||
               (other.registeredAt.getTime() === person.registeredAt.getTime() &&
@@ -459,32 +496,29 @@ describe("what is said", () => {
 describe("a change of what a person declares", () => {
   const man = (seeks: string[]) => ({ gender: "man", seeks });
 
-  it("joining a group that waits is a reason to decide anew, leaving one is not", () => {
-    // Seeks their own gender too, then not any more: into the group.
-    expect(joinsAGroupThatWaits(man(["woman", "man"]), man(["woman"]))).toBe(true);
-    // From non-binary, who wait with nobody.
-    expect(joinsAGroupThatWaits({ gender: "non_binary", seeks: ["woman"] }, man(["woman"]))).toBe(
-      true,
-    );
-    // From one group to the other.
-    expect(joinsAGroupThatWaits({ gender: "woman", seeks: ["man"] }, man(["woman"]))).toBe(true);
-    // Out of the group, to where nobody waits.
-    expect(joinsAGroupThatWaits(man(["woman"]), man(["woman", "man"]))).toBe(false);
-    expect(joinsAGroupThatWaits(man(["woman"]), { gender: "non_binary", seeks: ["woman"] })).toBe(
-      false,
-    );
+  it("joining a contest is a reason to decide anew, leaving one is not", () => {
+    // From one contest to another.
+    expect(joinsAContest({ gender: "woman", seeks: ["man"] }, man(["woman"]))).toBe(true);
+    // One contest more.
+    expect(joinsAContest(man(["woman"]), man(["woman", "non_binary"]))).toBe(true);
+    expect(joinsAContest(man(["man"]), man(["man", "woman"]))).toBe(true);
+    // Out of a contest, to where nobody waits.
+    expect(joinsAContest(man(["woman", "non_binary"]), man(["woman"]))).toBe(false);
+    expect(joinsAContest(man(["woman"]), man(["man"]))).toBe(false);
   });
 
-  it("a change within the same group takes nothing back", () => {
-    expect(joinsAGroupThatWaits(man(["woman"]), man(["woman", "non_binary"]))).toBe(false);
-    expect(joinsAGroupThatWaits(man(["woman"]), man(["woman"]))).toBe(false);
-    expect(joinsAGroupThatWaits(man(["man"]), man(["man", "woman"]))).toBe(false);
+  it("one's own gender is no contest, and a label that keeps the contests changes nothing", () => {
+    expect(joinsAContest(man(["woman"]), man(["woman", "man"]))).toBe(false);
+    expect(joinsAContest(man(["woman", "man"]), man(["woman"]))).toBe(false);
+    expect(joinsAContest({ gender: "non_binary", seeks: ["woman"] }, man(["woman"]))).toBe(false);
+    expect(joinsAContest(man(["woman"]), { gender: "non_binary", seeks: ["woman"] })).toBe(false);
+    expect(joinsAContest(man(["woman"]), man(["woman"]))).toBe(false);
   });
 
   it("a first declaration is a joining, and an unfinished one is none", () => {
-    expect(joinsAGroupThatWaits({ gender: null, seeks: null }, man(["woman"]))).toBe(true);
-    expect(joinsAGroupThatWaits({ gender: "man", seeks: null }, man(["woman"]))).toBe(true);
-    expect(joinsAGroupThatWaits(man(["woman"]), { gender: "man", seeks: null })).toBe(false);
-    expect(joinsAGroupThatWaits(man(["woman"]), { gender: null, seeks: ["woman"] })).toBe(false);
+    expect(joinsAContest({ gender: null, seeks: null }, man(["woman"]))).toBe(true);
+    expect(joinsAContest({ gender: "man", seeks: null }, man(["woman"]))).toBe(true);
+    expect(joinsAContest(man(["woman"]), { gender: "man", seeks: null })).toBe(false);
+    expect(joinsAContest(man(["woman"]), { gender: null, seeks: ["woman"] })).toBe(false);
   });
 });
