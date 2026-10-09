@@ -1,6 +1,6 @@
 import {
   DetectFacesCommand,
-  DetectModerationLabelsCommand,
+  type DetectModerationLabelsCommand,
   type RekognitionClient,
 } from "@aws-sdk/client-rekognition";
 import sharp from "sharp";
