@@ -25,8 +25,10 @@ export type PersonaHistory = {
     pond: string;
   } | null;
   profile: ProfileUpdate | null;
-  /** How many photos the persona has once the photo loader has run; none before. */
+  /** How many of the persona's own pictures the loader uploads and approves (#142): the release has that many of them. */
   photos: number;
+  /** Pictures the check is meant to refuse, uploaded for this persona and left to the queue (#142). */
+  negatives?: readonly string[];
   afterwards: "nothing" | "older_terms" | "banned" | "deleted";
 };
 
@@ -100,6 +102,8 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       specialCategoryConsent: null,
     },
     photos: 2,
+    // The queue's four: no face, several people, text, and a location in the EXIF the pipeline strips.
+    negatives: ["no-face", "several-people", "text", "exif-location"],
     afterwards: "nothing",
   },
   {

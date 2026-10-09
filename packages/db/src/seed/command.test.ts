@@ -20,6 +20,7 @@ describe("the command's arguments", () => {
       size: 300,
       seed: 73,
       action: "write",
+      photos: false,
     });
     // pnpm hands the separator through.
     expect(parseDemoCommand(["--", "--dry-run"], "development").action).toBe("dry-run");
@@ -31,10 +32,12 @@ describe("the command's arguments", () => {
       size: 5000,
       seed: 7,
       action: "write",
+      photos: false,
     });
     expect(parseDemoCommand(["--env=preview", "--remove"], "preview")).toMatchObject({
       env: "preview",
       action: "remove",
+      photos: false,
     });
   });
 

@@ -20,7 +20,9 @@
  * server is asked that it is a managed one; every persona's code is
  * artificial. Its lines carry keys and counts, never a code, a name or whom
  * one seeks. `pnpm demo:stories` runs the same file on a laptop, where it
- * refuses. The photos of the stories come with #142.
+ * refuses. The pictures of the stories (#142) go through the upload pipeline
+ * from the release in the container's cache, where there is one; the
+ * container's own check decides on them.
  */
 import { createPool } from "@kuutti/db";
 import {
@@ -38,6 +40,7 @@ import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError } from "./demo/bank.ts";
+import { loadAssets } from "./demo/photos.ts";
 import { giveStories, viaServices } from "./demo/services.ts";
 
 function fail(message: string, code = 2): never {
@@ -81,7 +84,18 @@ try {
   assertDemoTarget(target, "staging");
 
   const now = () => new Date();
-  const writer = viaServices({ db: pool, logger, now, hmacKey, media: media.deps });
+  const assets = loadAssets();
+  console.log(
+    JSON.stringify({ msg: "demo stories: pictures", pictures: assets?.manifest.length ?? 0 }),
+  );
+  const writer = viaServices({
+    db: pool,
+    logger,
+    now,
+    hmacKey,
+    media: media.deps,
+    ...(assets ? { assets } : {}),
+  });
   for (const given of await giveStories(writer)) {
     console.log(JSON.stringify({ msg: "demo stories: history", ...given }));
   }

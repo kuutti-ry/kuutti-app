@@ -17,11 +17,12 @@ import {
 } from "../../src/identity/index.ts";
 import type { Logger } from "../../src/lib/logger.ts";
 import { readPreferences, savePreferences } from "../../src/matching/index.ts";
-import type { MediaDeps } from "../../src/media/index.ts";
+import { type MediaDeps, uploadPhoto } from "../../src/media/index.ts";
 import { findPondBySlug, setPondOfAccount } from "../../src/pond/index.ts";
 import { saveProfile } from "../../src/profile/index.ts";
 import { DemoError } from "./bank.ts";
 import { giveHistory, type HistoryResult, type HistoryWriter } from "./histories.ts";
+import type { PhotoAssets } from "./photos.ts";
 
 /**
  * The hands of the staging job (#141, ADR-018): inside the API's container,
@@ -40,6 +41,8 @@ export type ServicesContext = {
   now: () => Date;
   hmacKey: Buffer;
   media?: MediaDeps;
+  /** The release's pictures, verified (photos.ts); absent, nobody gets a photo. */
+  assets?: PhotoAssets;
 };
 
 export function viaServices(context: ServicesContext): HistoryWriter {
@@ -50,6 +53,7 @@ export function viaServices(context: ServicesContext): HistoryWriter {
   return {
     db,
     now,
+    ...(context.assets ? { assets: context.assets } : {}),
     async login(persona) {
       assertArtificial(persona);
       const at = now();
@@ -88,6 +92,19 @@ export function viaServices(context: ServicesContext): HistoryWriter {
     },
     async profile(accountId, update) {
       await saveProfile({ db, logger, now, readPreferences }, accountId, update);
+    },
+    async photos(accountId, pictures) {
+      if (!context.media) {
+        throw new DemoError("no object store is configured, and the stories have pictures");
+      }
+      const deps = { ...context.media, db, logger, now };
+      const ids: string[] = [];
+      for (const bytes of pictures) ids.push((await uploadPhoto(deps, { accountId, bytes })).id);
+      return ids;
+    },
+    async approve() {
+      // The check the container is configured with decides (Rekognition on
+      // staging, ADR-018 §8); nothing is approved by hand here.
     },
     async status(accountId) {
       return onboardingStatus(onboarding, accountId);

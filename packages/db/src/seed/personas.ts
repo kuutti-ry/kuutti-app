@@ -94,7 +94,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1977, month: 6, day: 17 },
     individual: 924,
     group: "history",
-    note: "Onboarded, with a profile that lacks only its photos until the photo loader has run.",
+    note: "Onboarded, with a complete profile: three photos once the release of pictures is loaded.",
     bank: { name: "Nordea", user: "DEMOUSER4" },
   },
   {
@@ -114,7 +114,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1983, month: 8, day: 3 },
     individual: 925,
     group: "history",
-    note: "Onboarded, with a profile; two photos only once the photo loader has run, so the profile says what is missing.",
+    note: "Onboarded, with a profile; two photos and the four pictures the check refuses, so the profile says what is missing and the queue has work.",
     bank: { name: "Nordea", user: "DEMOUSER3" },
   },
   {

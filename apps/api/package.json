@@ -12,6 +12,7 @@
     "demo:population": "node --env-file-if-exists=../../.env --import tsx scripts/demo-population.ts",
     "demo:reset": "node --env-file-if-exists=../../.env --import tsx scripts/demo-reset.ts",
     "demo:stories": "node --import tsx scripts/demo-stories.ts",
+    "demo:assets": "node --import tsx scripts/demo-assets.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
