@@ -94,7 +94,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1977, month: 6, day: 17 },
     individual: 924,
     group: "history",
-    note: "Onboarded, with a complete profile: three photos once the release of pictures is loaded.",
+    note: "Onboarded, with a complete profile: five photos once the release of pictures is loaded.",
     bank: { name: "Nordea", user: "DEMOUSER4" },
   },
   {

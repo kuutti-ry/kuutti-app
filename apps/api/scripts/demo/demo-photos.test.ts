@@ -91,8 +91,8 @@ describe("the release in the cache", () => {
     const sanna = picturesOf({ dir, manifest }, { key: "sanna", photos: 3 });
     expect(sanna.faces).toHaveLength(3);
     expect(sanna.negatives).toHaveLength(0);
-    expect(() => picturesOf({ dir, manifest }, { key: "sanna", photos: 4 })).toThrow(
-      /has 3 pictures of sanna, and the story needs 4/,
+    expect(() => picturesOf({ dir, manifest }, { key: "sanna", photos: 6 })).toThrow(
+      /has 5 pictures of sanna, and the story needs 6/,
     );
     expect(() =>
       picturesOf({ dir, manifest }, { key: "noa", photos: 0, negatives: ["cartoon"] }),
@@ -108,15 +108,15 @@ describe("the stories with their pictures", () => {
     const { writer, store } = await world(ctx, assets);
     const results = await giveStories(writer);
     expect(Object.fromEntries(results.map((r) => [r.key, r.photos]))).toEqual({
-      sanna: 3,
+      sanna: 5,
       onni: 0,
       noa: 6,
-      kerttu: 3,
+      kerttu: 4,
       tapio: 0,
       ilona: 0,
     });
     const sanna = await photosOf(ctx, "sanna");
-    expect(sanna).toHaveLength(3);
+    expect(sanna).toHaveLength(5);
     // No check is configured in this world: the pictures wait for one, and
     // the services writer approves nothing by hand (the container's check decides).
     expect(sanna.every((p) => p.state === "pending" && p.blurhash.length > 0)).toBe(true);

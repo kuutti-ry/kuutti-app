@@ -14,7 +14,7 @@ One tap logs a persona in. Nothing in the API or the app knows about them: the b
 |---|---|---|---|
 | Aino Virtanen | 29/12/1992 | Nordea, DEMOUSER2 | the walkthrough: registers, onboards, fills in a profile, uploads photos |
 | Mikael Lindqvist | 01/01/1970 | Ålandsbanken, 12345678 (password 123456, code card 1234; S-Pankki returns the same person) | a second newcomer, for the walkthrough in Swedish |
-| Sanna Korhonen | 17/06/1977 | Nordea, DEMOUSER4 | onboarded, with a complete profile: three photos once the release of pictures is loaded |
+| Sanna Korhonen | 17/06/1977 | Nordea, DEMOUSER4 | onboarded, with a complete profile: five photos once the release of pictures is loaded |
 | Onni Korhonen | 01/02/2000 | Nordea, DEMOUSER1 | registered and never onboarded |
 | Noa Salmi | 03/08/1983 | Nordea, DEMOUSER3 | onboarded, with a profile; two photos and the four pictures the check refuses, so the profile says what is missing and the queue has work |
 | Kerttu Åkerlund | 01/02/1980 | Säästöpankki, 22222222 (password 123456; POP, OmaSP and Handelsbanken return the same person) | accepted an older wording of the terms: the app asks again |
