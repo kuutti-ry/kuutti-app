@@ -13,10 +13,13 @@
  * day and moves in steps, which is right among people and would leave a demo
  * showing yesterday's ponds. What may be said of a pond is decided as ever.
  *
- * It goes ahead only in development, test and preview, understands every
- * argument or refuses, and asks the server it is connected to what it is
- * before it writes or removes anything: staging and production are refused
- * whatever the environment is called (packages/db/src/seed/command.ts).
+ * It goes ahead only in development, test and preview, and on staging from
+ * inside the API's container (`node dist/demo-population.js --env staging`,
+ * ADR-018: the database is read from the environment's own parameter store,
+ * never given); it understands every argument or refuses, and asks the
+ * server it is connected to what it is before it writes or removes anything:
+ * production is refused whatever the environment is called
+ * (packages/db/src/seed/command.ts).
  * The ponds come from the seed (`pnpm --filter @kuutti/db seed`), which runs
  * first. It lives with the API because the consents name the version of the
  * wording in force, which the API knows from the message catalogue.
@@ -24,7 +27,9 @@
 import { createPool, MATCHING_CONFIG_V1 } from "@kuutti/db";
 import {
   assertDemoTarget,
+  assertStagingProcess,
   DemoCommandError,
+  type DemoEnvironment,
   describeTarget,
   generatePopulation,
   parseDemoCommand,
@@ -36,6 +41,7 @@ import {
 import { CURRENT_CONSENT_VERSIONS } from "../src/identity/index.ts";
 import { countGates } from "../src/jobs/pond-gate.ts";
 import { takeSnapshot } from "../src/jobs/waitlist-snapshot.ts";
+import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { SPECIAL_CATEGORY_CONSENT_VERSION } from "../src/profile/index.ts";
 
@@ -70,7 +76,17 @@ if (action === "dry-run") {
   process.exit(0);
 }
 
-const url = process.env.DATABASE_URL ?? fail("DATABASE_URL is not set");
+/** Where the rows go: given locally; on staging the container's own, read as the API reads it (ADR-018). */
+async function databaseOf(target: DemoEnvironment): Promise<string> {
+  if (target !== "staging") return process.env.DATABASE_URL ?? fail("DATABASE_URL is not set");
+  assertStagingProcess(process.env);
+  return (await loadConfig()).databaseUrl;
+}
+
+const url = await databaseOf(env).catch((error: unknown) => {
+  if (error instanceof DemoCommandError) return fail(error.message, 2);
+  throw error;
+});
 const pool = createPool({ connectionString: url, max: 1, applicationName: "kuutti-demo" });
 try {
   const target = await describeTarget(pool);

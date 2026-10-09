@@ -19,7 +19,7 @@ import { DEMO_SEED, DEMO_SIZE, DEMO_SIZE_MAX } from "./population.ts";
  *   unless it is a pull request's own preview database.
  */
 
-export const DEMO_ENVIRONMENTS = ["development", "test", "preview"] as const;
+export const DEMO_ENVIRONMENTS = ["development", "test", "preview", "staging"] as const;
 export type DemoEnvironment = (typeof DEMO_ENVIRONMENTS)[number];
 
 export class DemoCommandError extends Error {
@@ -147,12 +147,56 @@ const PREVIEW_DATABASE = /^kuutti_pr_\d+$/;
 
 /**
  * Refuses a managed server unless it is a pull request's own database, asked
- * for as a preview. Staging and production are managed and called `kuutti`.
+ * for as a preview, or staging's, asked for as staging. Staging and
+ * production are both managed and both called `kuutti`, and no question to
+ * the server tells them apart: what does is where the command runs
+ * (`assertStagingProcess`, ADR-018), inside staging's own container with
+ * staging's own parameters.
  */
 export function assertDemoTarget(target: DemoTarget, env: DemoEnvironment): void {
+  if (env === "staging") {
+    if (target.managed) return;
+    throw new DemoCommandError(
+      `refusing: --env staging names a managed server (RDS), and "${target.database}" is not on one`,
+    );
+  }
   if (!target.managed) return;
   if (env === "preview" && PREVIEW_DATABASE.test(target.database)) return;
   throw new DemoCommandError(
-    `refusing: database "${target.database}" is on a managed server (RDS). Synthetic people go into a local database or a pull request's own (kuutti_pr_<n>, with --env preview), never into staging or production`,
+    `refusing: database "${target.database}" is on a managed server (RDS). Synthetic people go into a local database, a pull request's own (kuutti_pr_<n>, with --env preview) or staging from inside its container (--env staging, ADR-018), never into production`,
   );
+}
+
+/**
+ * What a demo command on staging may not be given (ADR-018): the database
+ * and the key come from staging's own parameter store, read as the API reads
+ * them, through the instance role, inside the container. A value given to
+ * the process would be a tunnel to somewhere, or a key from somewhere, and
+ * is refused before anything is read. The guard is against accidents (a
+ * tunnel, a pasted key, the wrong window), not against a holder of the
+ * maintainer's own cloud session, who can read the parameters anyway.
+ */
+export const NEVER_GIVEN_ON_STAGING = [
+  "DATABASE_URL",
+  "DB_HOST",
+  "DB_NAME",
+  "DB_USER",
+  "DB_APP_PASSWORD",
+  "HETU_HMAC_KEY",
+  "SSM_PARAMETER_PREFIX",
+] as const;
+
+/** The process is staging's container and nothing else: the name says so, and nothing was given by hand. */
+export function assertStagingProcess(env: Readonly<Record<string, string | undefined>>): void {
+  if (env.APP_ENV !== "staging") {
+    throw new DemoCommandError(
+      `refusing: APP_ENV is "${env.APP_ENV ?? "unset"}", and the demo runs on staging only, from inside its container (ADR-018)`,
+    );
+  }
+  const given = NEVER_GIVEN_ON_STAGING.filter((key) => env[key] !== undefined);
+  if (given.length > 0) {
+    throw new DemoCommandError(
+      `refusing: ${given.join(", ")} given to the process. On staging the database and the key come from the environment's own parameter store, which the container reads through its role; nothing of them is given by hand (ADR-018)`,
+    );
+  }
 }

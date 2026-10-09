@@ -6,12 +6,14 @@
 export { renderBankPage } from "./bank-page.ts";
 export {
   assertDemoTarget,
+  assertStagingProcess,
   DEMO_ENVIRONMENTS,
   type DemoCommand,
   DemoCommandError,
   type DemoEnvironment,
   type DemoTarget,
   describeTarget,
+  NEVER_GIVEN_ON_STAGING,
   parseDemoCommand,
 } from "./command.ts";
 export {

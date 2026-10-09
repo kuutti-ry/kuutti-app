@@ -58,6 +58,11 @@ import { DemoError } from "./bank.ts";
  * - after each erasure the objects it deleted are counted. The erasure path
  *   forgives a store that fails, as it must for a person who leaves; a
  *   reset does not.
+ *
+ * On staging (#141, ADR-018) the personas are the test persons of Telia's
+ * bed and are known by the hash the container derived from their artificial
+ * codes, the same hash the bed's login finds them by; the mock bank's marks
+ * mean nothing there. The caller hands the hashes in, by persona.
  */
 export type ResetDeps = {
   db: Queryable;
@@ -66,6 +71,8 @@ export type ResetDeps = {
   media?: MediaDeps;
   /** Go ahead although the store does not hold the photos' objects: they are lost. */
   objectsLost?: boolean;
+  /** On staging: the personas by their hash (`personaHashes`); locally, left out, by what the mock bank called them. */
+  personas?: ReadonlyMap<string, string>;
 };
 
 export type ResetResult = {
@@ -80,36 +87,57 @@ export async function resetPersonas(deps: ResetDeps): Promise<ResetResult> {
   // One instant for the question and for the deletion: a session is ended
   // for both or for neither, whatever the clock does in between.
   const at = deps.now();
-  const personas = [DEMO_PERSONAS.map((p) => p.key), MOCK_BANK_AMR];
+  const who = deps.personas
+    ? { clause: "i.hetu_hmac = ANY($1)", params: [[...deps.personas.keys()]] }
+    : {
+        clause: "i.broker_subject = ANY($1) AND $2 = ANY(i.amr)",
+        params: [DEMO_PERSONAS.map((p) => p.key), MOCK_BANK_AMR],
+      };
+  const keyOf = (row: { subject: string; hash: string }): string =>
+    deps.personas?.get(row.hash) ?? row.subject;
   return transaction(deps.db, async (tx) => {
     // FOR UPDATE, not less: it is the lock a foreign key's check waits for.
     await tx.query(
-      `SELECT id FROM identity WHERE broker_subject = ANY($1) AND $2 = ANY(amr)
-       ORDER BY id FOR UPDATE`,
-      personas,
+      `SELECT i.id FROM identity i WHERE ${who.clause} ORDER BY i.id FOR UPDATE`,
+      who.params,
     );
     // A statement of its own, after the lock: it sees what was committed
     // while the lock was waited for.
-    const { rows: identities } = await tx.query<{ id: string; key: string; staff: boolean }>(
-      `SELECT i.id, i.broker_subject AS key,
+    const { rows: identities } = await tx.query<{
+      id: string;
+      subject: string;
+      hash: string;
+      staff: boolean;
+    }>(
+      `SELECT i.id, i.broker_subject AS subject, i.hetu_hmac AS hash,
               (EXISTS (SELECT 1 FROM moderator_roles m WHERE m.identity_id = i.id)
                OR EXISTS (SELECT 1 FROM admin_session s WHERE s.identity_id = i.id
-                          AND s.revoked_at IS NULL AND s.expires_at >= $3)
+                          AND s.revoked_at IS NULL AND s.expires_at >= $${who.params.length + 1})
                OR EXISTS (SELECT 1 FROM audit_log a WHERE a.actor_identity_id = i.id)
                OR EXISTS (SELECT 1 FROM photo_review r WHERE r.decided_by = i.id)) AS staff
-       FROM identity i WHERE i.broker_subject = ANY($1) AND $2 = ANY(i.amr)`,
-      [...personas, at],
+       FROM identity i WHERE ${who.clause}`,
+      [...who.params, at],
     );
-    const spared = [...new Set(identities.filter((r) => r.staff).map((r) => r.key))].sort();
+    const spared = [...new Set(identities.filter((r) => r.staff).map(keyOf))].sort();
     const ids = identities.filter((r) => !r.staff).map((r) => r.id);
     if (ids.length === 0) return { identities: 0, erased: 0, objects: 0, spared };
 
-    const { rows: photos } = await tx.query<{ key: string; account: string; content: string }>(
-      `SELECT DISTINCT i.broker_subject AS key, a.id AS account, p.key AS content FROM photo p
-         JOIN account a ON a.id = p.account_id JOIN identity i ON i.id = a.identity_id
-       WHERE i.id = ANY($1) ORDER BY 1, 3`,
+    const { rows: photoRows } = await tx.query<{
+      subject: string;
+      hash: string;
+      account: string;
+      content: string;
+    }>(
+      `SELECT DISTINCT i.broker_subject AS subject, i.hetu_hmac AS hash, a.id AS account, p.key AS content
+       FROM photo p JOIN account a ON a.id = p.account_id JOIN identity i ON i.id = a.identity_id
+       WHERE i.id = ANY($1) ORDER BY 1, 4`,
       [ids],
     );
+    const photos = photoRows.map((r) => ({
+      key: keyOf(r),
+      account: r.account,
+      content: r.content,
+    }));
     const named = (rows: readonly { key: string }[]) =>
       [...new Set(rows.map((r) => r.key))].join(", ");
     if (!deps.media && photos.length > 0) {

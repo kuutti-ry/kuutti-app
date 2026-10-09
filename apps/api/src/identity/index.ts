@@ -8,16 +8,27 @@ export {
   adminSessionStore,
   sweepAdminSessions,
 } from "./admin-session.ts";
+// hetu.ts stays inside the slice: nothing outside it may hold a hetu (rules/api.md).
+// The one registration without a bank is the demo job's (ADR-018 §2), from an
+// artificial code only: the derivation refuses a code a person could have.
+export {
+  type ArtificialRegistration,
+  deriveArtificialIdentity,
+  NotArtificialError,
+  registerArtificial,
+} from "./artificial.ts";
 export { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 export { type ErasureSummary, eraseAccount, exportAccount } from "./erasure.ts";
+export { hmacKeyFromHex } from "./hetu.ts";
 export { wellKnownRoutes } from "./links.ts";
-// hetu.ts stays inside the slice: nothing outside it may hold a hetu (rules/api.md).
 export { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.ts";
 export {
   activationWaitsFor,
   CURRENT_CONSENT_VERSIONS,
   DEFAULT_POND_KEY,
+  declareGender,
   exportConsents,
+  giveConsent,
   missingSteps,
   onboardingStatus,
   shownLocale,
@@ -29,6 +40,8 @@ export {
   type RegistrationDecision,
   recordDeletion,
 } from "./registration.ts";
+// Read-only: what the callback would find for a hash (the demo's tests ask so).
+export { findIdentityByHmac, findLiveAccount } from "./repo.ts";
 export { authRoutes } from "./routes.ts";
 export { sessionStore } from "./session-store.ts";
 export { sweepSessions } from "./sessions.ts";

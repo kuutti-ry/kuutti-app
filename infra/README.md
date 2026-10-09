@@ -291,6 +291,20 @@ After the cutover the box still admits 443 from anywhere, because Dokploy's cont
 
 **Anti-scraping and the order of the switches (#52, ADR-008 §5).** Three switches belong together, and the order matters. The origin request policy forwards the CloudFront headers, so the API sees `CloudFront-Viewer-Address`; the rate limiter reads it only when `trusted-proxy` says `cloudfront` (`trusted_proxy` in `envs/<env>/main.tf`), and that flips in the same apply as `cloudfront_only_ingress`, never before: until the box admits CloudFront alone, anyone reaching the origin could send the header. And `media_enabled` does not go first: between the cutover and the ingress switch every request would reach Traefik from a CloudFront edge, the limiter (still in `traefik` mode, keyed on the last `X-Forwarded-For` hop) would count per edge address, and people behind one edge would share a bucket. So the follow-up above (Dokploy and the previews behind the distribution) precedes the cutover, and the cutover commit sets all three. The observability module's `PhotoBudgetRefusals` metric and its alarm (`budget_refusals_per_day`, 100) count the API's `photo refused` lines; to see the alarm trip on staging, sign in on a phone, set a small `photo_fetches_per_day` in `matching_config` and reload the grid a hundred times, then restore the row as a new version.
 
+### The demo on staging (#141, ADR-018)
+
+Staging holds no real person: its identities are Telia's test persons (#140) and the synthetic population. The personas' stories, the population and the reset are written from inside the API's container and nowhere else; each command refuses outside it (ADR-018 §3). Reach the container through a Session Manager session on the box (the API runs as Dokploy's `api` application; its container name starts with the application's), or through Dokploy's terminal for that application:
+
+```sh
+aws ssm start-session --target "$(tofu output -raw instance_id)"
+sudo docker ps --format '{{.Names}}' | grep '^api'
+sudo docker exec -it <container> node dist/demo-stories.js
+sudo docker exec -it <container> node dist/demo-population.js --env staging
+sudo docker exec -it <container> node dist/demo-reset.js --env staging
+```
+
+The stories register the eight fixed personas as a registration would and give the six histories through the API's own service functions; a persona's first login at its test bank (`docs/vendors/telia.md` 1.4) then resumes the account. Run again, the stories change nothing. The population writes the one-pond population and counts the counter and the gates anew; `--remove` takes it away. The reset returns the personas to never-registered through the erasure path and gives the stories again (`--bare` for none). None of the three takes a database address or a key: they read staging's parameters as the API does, and a value given by hand is refused.
+
 ### Photo moderation (#49, ADR-006)
 
 The instance role may call `rekognition:DetectModerationLabels` and `rekognition:DetectFaces` (`modules/compute`, statement `RekognitionDetect`), the parameter `moderation=rekognition` under `/kuutti/<env>/` switches the API's automatic check on, and the observability module counts the calls from the `photo moderated` log lines (`RekognitionCalls` in the `Kuutti/<env>` namespace). Without the parameter every photo goes to the human queue.
