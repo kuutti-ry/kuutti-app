@@ -18,7 +18,7 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 
 Staging holds no real person (ADR-018). The three commands run inside the API's container and nowhere else; `infra/README.md`, "The demo on staging", says how to reach it. In order:
 
-1. `pnpm demo:assets` once in the container's cache (`gh` with read access to the private repository), or copy the verified cache in; the job refuses a cache that is not the release's.
+1. `node dist/demo-assets.js` once in the container: the release's tarball from the public repository over HTTPS into the cache, checked against the manifest; the job refuses a cache that is not the release's. While staging's media is off, the jobs skip the pictures and say so.
 2. `node dist/demo-reset.js --env staging`: the personas forgotten by their hash, the stories told anew through the service functions, the pictures through the pipeline with Rekognition deciding (faces approved, the negatives queued).
 3. `node dist/demo-population.js --env staging --photos`.
 4. The phone: the `preview` build on channel `staging` (`apps/mobile/README.md`); the tech config screen shows `api.staging.kuutti.app` and the commit. A JS-only merge to `main` reaches it on the next launch; a native change needs the build reinstalled.

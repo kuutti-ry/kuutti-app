@@ -8,7 +8,7 @@ import { createRandom } from "./rng.ts";
 /**
  * The demo's pictures (#142, ADR-014 §7): generated faces for the personas
  * and a pool for the population, and the negatives the moderation queue is
- * meant to refuse, in a private repository of their own, released by tag.
+ * meant to refuse, in a public repository of their own, released by tag.
  * This repository holds the manifest (path, SHA-256, purpose) and nothing
  * binary; `pnpm demo:assets` fetches a release into the cache and refuses a
  * file whose checksum differs, and the loaders push every picture through

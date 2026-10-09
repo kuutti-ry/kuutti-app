@@ -84,9 +84,15 @@ try {
   assertDemoTarget(target, "staging");
 
   const now = () => new Date();
-  const assets = loadAssets();
+  // Without an object store (staging until its media is on, ADR-005 §7) the
+  // stories go without pictures, and the line says why.
+  const assets = media.deps ? loadAssets() : null;
   console.log(
-    JSON.stringify({ msg: "demo stories: pictures", pictures: assets?.manifest.length ?? 0 }),
+    JSON.stringify({
+      msg: "demo stories: pictures",
+      pictures: assets?.manifest.length ?? 0,
+      ...(media.setup.mode === "off" ? { off: media.setup.reason } : {}),
+    }),
   );
   const writer = viaServices({
     db: pool,

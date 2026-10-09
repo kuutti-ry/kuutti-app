@@ -10,6 +10,7 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    "demo-assets": "scripts/demo-assets.ts",
     "demo-stories": "scripts/demo-stories.ts",
     "demo-population": "scripts/demo-population.ts",
     "demo-reset": "scripts/demo-reset.ts",

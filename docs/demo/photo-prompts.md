@@ -302,7 +302,7 @@ AI Studio downloads PNG. Keep the downloads in a working folder outside the rele
 
 - A `PROVENANCE.md` row: `faces/sanna/1.jpg`, what it is, `Nano Banana Pro (gemini-3-pro-image), Google AI Studio, prompt p-sanna-1`, the terms by name and date (the Gemini API Additional Terms of Service of that day), the date dd/mm/yyyy.
 - A `manifest.json` entry: `{ "path": "faces/sanna/1.jpg", "sha256": "<hex>", "purpose": "persona:sanna" }`; purposes are `persona:<key>`, `pool`, `negative:<name>`.
-- `LICENSE`: the terms the pictures are held under, and that they are for the demo of this project only, never published, never in a store listing or a screenshot that leaves the team.
+- `LICENSE`: CC0 1.0. The README says the pictures are AI-generated test data, asks that they never be used as anybody's profile or in marketing, and takes removal requests at privacy@kuutti.app.
 
 ## Before the release
 
