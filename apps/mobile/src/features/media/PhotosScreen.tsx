@@ -247,6 +247,16 @@ export function PhotosScreen() {
         >
           <Text>{t("photos.add")}</Text>
         </Button>
+        {/* Headers are hidden app-wide; from onboarding this is the way on to the next step. */}
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            router.back();
+          }}
+        >
+          <Text>{t("photos.done")}</Text>
+        </Button>
       </ScrollView>
 
       <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>

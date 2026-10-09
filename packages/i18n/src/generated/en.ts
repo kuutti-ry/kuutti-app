@@ -184,6 +184,7 @@ export const en: Readonly<Record<string, string>> = {
   "photos.add": "Add a photo",
   "photos.count": "{photos, plural, one {# photo} other {# photos}}, at most {max, number}",
   "photos.dialog.close": "Close",
+  "photos.done": "Done",
   "photos.empty": "No photos yet.",
   "photos.error.generic": "The photo could not be uploaded. Try again.",
   "photos.error.media_busy": "Many photos are being processed right now. Try again in a moment.",

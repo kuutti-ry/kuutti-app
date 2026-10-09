@@ -3275,6 +3275,13 @@ photos.add:
   sv: Lägg till ett foto
   machine: { fi: true, sv: true }
 
+photos.done:
+  en: Done
+  description: Photos screen, the button at the end that returns to where the person came from (onboarding, which then moves to its next step, or the home screen). Headers are hidden, so without it the only way back on iOS is the edge swipe.
+  fi: Valmis
+  sv: Klar
+  machine: { fi: true, sv: true }
+
 photos.picking:
   en: Choosing a photo…
   description: Photos screen, while the phone's picker is open.

@@ -142,6 +142,7 @@ export const fi: Readonly<Record<string, string>> = {
   "photos.add": "Lisää kuva",
   "photos.count": "{photos, plural, one {# kuva} other {# kuvaa}}, enintään {max, number}",
   "photos.dialog.close": "Sulje",
+  "photos.done": "Valmis",
   "photos.empty": "Ei vielä kuvia.",
   "photos.error.generic": "Kuvan lähetys ei onnistunut. Yritä uudelleen.",
   "photos.error.media_busy": "Kuvia käsitellään juuri nyt paljon. Yritä hetken kuluttua uudelleen.",

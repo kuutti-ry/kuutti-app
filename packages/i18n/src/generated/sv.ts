@@ -134,6 +134,7 @@ export const sv: Readonly<Record<string, string>> = {
   "photos.add": "Lägg till ett foto",
   "photos.count": "{photos, plural, one {# foto} other {# foton}}, högst {max, number}",
   "photos.dialog.close": "Stäng",
+  "photos.done": "Klar",
   "photos.empty": "Inga foton ännu.",
   "photos.error.generic": "Fotot kunde inte laddas upp. Försök igen.",
   "photos.error.media_busy": "Många foton bearbetas just nu. Försök igen om en stund.",

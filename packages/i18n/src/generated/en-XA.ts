@@ -184,6 +184,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "photos.add": "［ÁÁdd áá phóótóó］",
   "photos.count": "［{photos,plural,one{# phóótóó} other{# phóótóóš}}, áát móóšt {max, number}］",
   "photos.dialog.close": "［Çlóóšéé］",
+  "photos.done": "［Dóóñéé］",
   "photos.empty": "［Ñóó phóótóóš ýýéét.］",
   "photos.error.generic": "［Théé phóótóó çóóúúld ñóót béé úúplóóáádééd. Trýý áágááííñ.］",
   "photos.error.media_busy": "［Mááñýý phóótóóš ááréé bééííñg próóçééššééd rííght ñóów. Trýý áágááííñ ííñ áá móómééñt.］",

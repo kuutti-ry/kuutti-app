@@ -185,6 +185,7 @@ export type MessageParams = {
   "photos.add": Record<never, never>;
   "photos.count": { "photos": number; "max": number };
   "photos.dialog.close": Record<never, never>;
+  "photos.done": Record<never, never>;
   "photos.empty": Record<never, never>;
   "photos.error.generic": Record<never, never>;
   "photos.error.media_busy": Record<never, never>;
