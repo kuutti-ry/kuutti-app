@@ -8,8 +8,11 @@
  *   pnpm demo:assets -- --check <dir>      verify a directory against the manifest; nothing is fetched
  *   pnpm demo:assets -- --manifest <dir>   write packages/db/src/seed/photos-manifest.ts from a directory of pictures
  *
- * The fetch is `gh release download`: the repository is private, so a
- * contributor needs read access and a signed-in gh. A file whose checksum
+ * A release is a tag (the photos repository's README), fetched as the tag's
+ * tarball through `gh api`: the tree keeps `faces/<set>/` and `negatives/`,
+ * which release assets cannot, since their names carry no slash. The
+ * repository is private, so a contributor needs read access and a signed-in
+ * gh. A file whose checksum
  * differs from the manifest's, a listed file that is missing and a picture
  * that is not listed are each named, and the command fails; the loaders
  * refuse the same cache (`loadAssets`). `--manifest` is the maintainer's
@@ -17,8 +20,9 @@
  * file goes into the release as manifest.json.
  */
 import { execFile } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   demoAssetsDir,
@@ -93,10 +97,19 @@ const dir = check ? resolve(check) : demoAssetsDir(tag);
 if (!check) {
   mkdirSync(dir, { recursive: true });
   try {
-    await run("gh", ["release", "download", tag, "--repo", PHOTOS_REPO, "--dir", dir, "--clobber"]);
+    const { stdout } = await run("gh", ["api", `repos/${PHOTOS_REPO}/tarball/${tag}`], {
+      encoding: "buffer",
+      maxBuffer: 512 * 1024 * 1024,
+    });
+    const tarball = join(tmpdir(), `kuutti-demo-photos-${process.pid}.tar.gz`);
+    writeFileSync(tarball, stdout);
+    // The tarball's one top directory is named after the commit; its contents are the release.
+    await run("tar", ["-xzf", tarball, "--strip-components=1", "-C", dir]).finally(() =>
+      rmSync(tarball, { force: true }),
+    );
   } catch (error) {
     fail(
-      `gh release download ${tag} from ${PHOTOS_REPO} failed: ${error instanceof Error ? error.message.split("\n")[0] : "unknown"}. Is gh signed in with read access to the private repository?`,
+      `fetching ${tag} of ${PHOTOS_REPO} failed: ${error instanceof Error ? error.message.split("\n")[0] : "unknown"}. Is gh signed in with read access to the private repository?`,
     );
   }
 }

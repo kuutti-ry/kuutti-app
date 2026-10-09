@@ -19,7 +19,7 @@ Chosen 09/10/2026.
 | `faces/aino/1.jpg` … `5.jpg` | Aino's camera roll: the live upload of scene 2 of the storyboard, where she picks three or more | 5 | a woman of 33 |
 | `faces/mikael/1.jpg` … `4.jpg` | Mikael's camera roll: the walkthrough in Swedish | 4 | a man of 56, Swedish-speaking |
 | `faces/sanna/1.jpg` … `5.jpg` | Sanna's profile (complete) | 5 | a woman of 49, an architect who birdwatches |
-| `faces/onni/1.jpg` … `4.jpg` | Onni's camera roll, for a demo that onboards him | 4 | a man of 26 |
+| `faces/onni/1.jpg` … `8.jpg` | Onni's camera roll, for a demo that onboards him | 8 | a man of 26 |
 | `faces/noa/1.jpg` … `2.jpg` | Noa's profile (incomplete: two of three) | 2 | a non-binary person of 43, a doctoral researcher who climbs |
 | `faces/kerttu/1.jpg` … `4.jpg` | Kerttu's profile | 4 | a woman of 46, Swedish-speaking, by the sea with a book and coffee |
 | `faces/tapio/1.jpg` … `3.jpg` | nothing today: Tapio is banned and refused at login, and his story uploads nothing; the set lets a later story give him a profile without a new release | 3 | a man of 56 |
@@ -152,6 +152,30 @@ Another photo of the same man as in the first picture: keep his face, hair, age 
 Exactly one person, face visible, no text or logos. An imperfect phone photo, not a professional one, photorealistic, vertical 3:4.
 ```
 
+```
+p-onni-5
+Another photo of the same man as in the first picture: keep his face, his hazel-brown eyes, hair, age and build exactly the same. A selfie at arm's length in a snowy pine forest on a freezing winter day, a plain knitted beanie with some of his wavy hair showing under it, a thick scarf, his breath visible, the low sun behind the trees making the sky overexposed; the phone held a little low.
+Exactly one person, face visible, no text or logos. An unposed phone selfie, not a professional photo, photorealistic, vertical 3:4.
+```
+
+```
+p-onni-6
+Another photo of the same man as in the first picture: keep his face, hair, age and build exactly the same. In the evening he sits on a sofa with a grey cat on his lap, the cat looking at the camera, he laughing at it; warm lamp light, a little soft, taken by a friend. Nobody else in the picture.
+Exactly one person, face visible, no text or logos. An imperfect phone photo, not a professional one, photorealistic, vertical 3:4.
+```
+
+```
+p-onni-7
+Another photo of the same man as in the first picture: keep his face, hair, age and build exactly the same. He sits in the back of a canoe on a calm lake at golden hour, the paddle across his knees, smiling at the camera from the other end of the canoe; forest shore behind him, no text on the canoe.
+Exactly one person, face visible, no text or logos. An imperfect phone photo, not a professional one, photorealistic, vertical 3:4.
+```
+
+```
+p-onni-8
+Another photo of the same man as in the first picture: keep his face, hair, age and build exactly the same. This picture is the selfie itself, taken with the phone in his raised hand, so no phone and no hand holding one appear in it: a close-up from above of him lying on his back in the grass on a summer day, squinting into the sun, half his face in the shade of a tree, the frame tilted at an odd angle, slightly soft focus.
+Exactly one person, face visible, no text or logos. An unposed phone selfie, not a professional photo, photorealistic, vertical 3:4.
+```
+
 ### Noa, 43
 
 ```
@@ -230,7 +254,7 @@ Candid smartphone photo taken by a friend: natural available light, true colours
 
 ```
 p-ilona-2
-Another photo of the same woman as in the first picture: keep her face, hair, glasses, age and build exactly the same. She cycles slowly along a seaside promenade on a summer day in a striped shirt, one hand on the handlebar, smiling at the camera; sea and sky behind her, nobody else on the path.
+Another photo of the same woman as in the first picture: keep her face, hair, glasses, age and build exactly the same. Only her appearance carries over; the place is entirely new, with nothing of the first picture's balcony. She cycles slowly along a seaside path on the Finnish coast on a summer day, in a striped shirt, one hand on the handlebar, smiling at the camera; smooth granite rocks, a few pines and the grey-blue Baltic behind her, nobody else on the path.
 Exactly one person, face clearly visible, no text or logos. Candid phone photo, natural light, no retouching, photorealistic, vertical 3:4.
 ```
 
