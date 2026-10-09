@@ -45,6 +45,7 @@ import { createLogger, type Logger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError, lookAtApi, onThisComputer, whyNotTheLocalStore } from "./demo/bank.ts";
 import { giveHistory, viaRoutes } from "./demo/histories.ts";
+import { loadAssets } from "./demo/photos.ts";
 import { type ResetResult, resetPersonas } from "./demo/reset.ts";
 import { giveStories, personaHashes, viaServices } from "./demo/services.ts";
 
@@ -202,7 +203,18 @@ async function localReset(): Promise<void> {
     console.log(JSON.stringify({ msg: "demo reset: personas forgotten", ...reset }));
 
     if (!bare) {
-      const writer = viaRoutes({ api: apiUrl.origin, fetch, now, db: pool });
+      // The release's pictures, where the cache holds them (#142): the faces of the stories and the queue's negatives.
+      const assets = loadAssets();
+      console.log(
+        JSON.stringify({ msg: "demo reset: pictures", pictures: assets?.manifest.length ?? 0 }),
+      );
+      const writer = viaRoutes({
+        api: apiUrl.origin,
+        fetch,
+        now,
+        db: pool,
+        ...(assets ? { assets } : {}),
+      });
       for (const history of PERSONA_HISTORIES) {
         if (reset.spared.includes(history.key)) continue;
         const given = await giveHistory(history, writer);
@@ -252,7 +264,18 @@ async function stagingReset(): Promise<void> {
     });
     console.log(JSON.stringify({ msg: "demo reset: personas forgotten", ...reset }));
     if (!bare) {
-      const writer = viaServices({ db: pool, logger, now, hmacKey, media: media.deps });
+      const assets = loadAssets();
+      console.log(
+        JSON.stringify({ msg: "demo reset: pictures", pictures: assets?.manifest.length ?? 0 }),
+      );
+      const writer = viaServices({
+        db: pool,
+        logger,
+        now,
+        hmacKey,
+        media: media.deps,
+        ...(assets ? { assets } : {}),
+      });
       for (const given of await giveStories(writer, reset.spared)) {
         console.log(JSON.stringify({ msg: "demo reset: history", ...given }));
       }

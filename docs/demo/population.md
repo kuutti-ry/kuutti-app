@@ -8,7 +8,7 @@ Data dictionary of `pnpm demo:population` (#73, ADR-014 §8 to §10). The popula
 pnpm demo:population
 ```
 
-Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond comes from the seed, which `pnpm env:up` has run.
+Writes three hundred people into the database of the local environment, replacing the synthetic population that was there. The pond comes from the seed, which `pnpm env:up` has run. The pictures are a release of the private photos repository (`docs/demo/photo-prompts.md`), fetched and verified by `pnpm demo:assets` into `~/.cache/kuutti-demo-photos/v1`; this repository holds the manifest (`packages/db/src/seed/photos-manifest.ts`) and never a picture.
 
 After a write or a removal the public counter (#54) is counted anew over what is in the database now, so `GET /waitlist` and the card in the app show the ponds of the population at once. Left to itself the counter would not move: it counts once a day and moves in steps of ten people, which is right among people and would leave a demo showing yesterday's ponds. What may be said of a pond is decided as ever; the app keeps an answer for up to an hour.
 
@@ -16,6 +16,7 @@ After a write or a removal the public counter (#54) is counted anew over what is
 |---|---|
 | `-- --size 5000` | as many people as asked, 1 to 5,000. From 235 people up the population shows everything it is there for; a smaller one is written too, and the command says what it does not show (`notShown`) |
 | `-- --seed 7` | other people in the same ponds |
+| `-- --photos` | faces of the release for the people, drawn by seed (none, a few or the whole grid), through the upload pipeline like anybody's; `pnpm demo:assets` fetches the release first. Locally the faces are approved as a moderator would (the local check queues everything); on staging Rekognition decides |
 | `-- --dry-run` | prints the counts per pond and writes nothing; it does not connect |
 | `-- --remove` | removes the synthetic population and writes nobody |
 | `-- --env preview` | for a pull request's own database, `kuutti_pr_<n>` |
@@ -58,7 +59,7 @@ Everybody with a pond has a gender, because the app asks for the gender before t
 | prompts | none 25 %, one 20 %, two 35 %, three 20 % |
 | fields | the registry of `packages/schema` (ADR-019), options straight from it. Everybody with a profile has an intent (an onboarding step, #146): long-term 55 %, casual 20 %, open to either 25 %. Then, of those with a profile: monogamy 50 % (monogamous 85 %), kids 60 % (none 70 %, living with me 18 %, not with me 12 %), kids in the future 55 %, smoking 65 % (never 60 %, sometimes 20 %, regularly 12 %, quitting 8 %), languages 85 % (the person's own and up to two more), education 65 %, drinking 65 % (never 15 %, rarely 30 %, socially 45 %, often 10 %), attitude to drugs 40 %, one to five hobbies 70 %, a height of 152 to 198 cm 55 %, exercise 55 %, pets 50 % (none 35 %, a dog 25 %, a cat 25 %, both 8 %, other 4 %, allergic 3 %), a field of study or work 45 % (and 15 % of those hide themselves from their field), a line of work 50 %, a job title 30 % (titles only: no employer is named), a star sign 45 %. Politics (one to three parties, 70 %) and religion (60 %) only among the 35 % who gave the special-category consent, as the API would have it |
 
-Nobody has a photo until the photo loader of #73's later part, so nobody in the population has a complete profile yet.
+With `--photos` (#142) the people get faces of the release's pool, drawn from the population's own seed so that two machines give the same people the same pictures: none, a few or the whole grid of six, by weight, and only for somebody with a profile. The pictures go through `uploadPhoto` (sharp, EXIF stripped, three WebP variants, a blurhash, the check), so a person with three approved faces has a complete profile and counts at the gate. A write replaces the population that was there and a removal takes it away; either leaves the pictures' objects without a row, so both delete the orphans through the media slice afterwards, and both refuse while there are pictures and no store to delete from. Without the flag, or while the release does not exist (the manifest is empty), nobody has a photo and nobody is complete.
 
 ## What makes a synthetic person unmistakable
 

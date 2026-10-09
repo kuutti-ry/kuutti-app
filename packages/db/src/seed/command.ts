@@ -34,6 +34,8 @@ export type DemoCommand = {
   size: number;
   seed: number;
   action: "write" | "remove" | "dry-run";
+  /** Faces of the release for the people written (#142). */
+  photos: boolean;
 };
 
 const allowed = (env: string): env is DemoEnvironment =>
@@ -53,6 +55,7 @@ export function parseDemoCommand(argv: readonly string[], appEnv: string | undef
   let env: string | undefined;
   let size = DEMO_SIZE;
   let seed = DEMO_SEED;
+  let photos = false;
   const actions = new Set<"remove" | "dry-run">();
 
   const seen = new Set<string>();
@@ -84,9 +87,13 @@ export function parseDemoCommand(argv: readonly string[], appEnv: string | undef
         if (equals > 0) throw new DemoCommandError(`${flag} takes no value`);
         actions.add(flag === "--remove" ? "remove" : "dry-run");
         break;
+      case "--photos":
+        if (equals > 0) throw new DemoCommandError(`${flag} takes no value`);
+        photos = true;
+        break;
       default:
         throw new DemoCommandError(
-          `unknown argument ${arg}: --env, --size, --seed, --dry-run and --remove are all there is`,
+          `unknown argument ${arg}: --env, --size, --seed, --photos, --dry-run and --remove are all there is`,
         );
     }
   }
@@ -106,12 +113,18 @@ export function parseDemoCommand(argv: readonly string[], appEnv: string | undef
     throw new DemoCommandError(`a population is 1 to ${DEMO_SIZE_MAX} people, not ${size}`);
   }
   if (actions.size > 1) throw new DemoCommandError("--remove and --dry-run exclude each other");
+  if (photos && actions.has("remove")) {
+    throw new DemoCommandError(
+      "--photos is for writing; a removal takes the pictures with the people",
+    );
+  }
 
   return {
     env: (env ?? appEnv ?? "development") as DemoEnvironment,
     size,
     seed,
     action: actions.has("remove") ? "remove" : actions.has("dry-run") ? "dry-run" : "write",
+    photos,
   };
 }
 

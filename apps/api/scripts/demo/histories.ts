@@ -15,7 +15,8 @@ import {
   type ProfileUpdate,
   SessionResponse,
 } from "@kuutti/schema";
-import { type BankContext, call, DemoError, loginAs } from "./bank.ts";
+import { type BankContext, call, DemoError, loginAs, upload } from "./bank.ts";
+import { approveLocally, type PhotoAssets, picturesOf } from "./photos.ts";
 
 /**
  * Gives a persona its history (#73, ADR-014 §12; on staging #141, ADR-018):
@@ -27,7 +28,7 @@ import { type BankContext, call, DemoError, loginAs } from "./bank.ts";
  * registers the persona as the callback would and calls the service
  * functions the routes call (`viaServices`, services.ts).
  */
-export type HistoryContext = BankContext & { db: Queryable };
+export type HistoryContext = BankContext & { db: Queryable; assets?: PhotoAssets };
 
 export type Locale = PersonaHistory["locale"];
 export type HistoryConsentKind = "terms" | "privacy" | "special_category";
@@ -38,6 +39,8 @@ export type HistoryLogin =
 export type HistoryWriter = {
   db: Queryable;
   now: () => Date;
+  /** The release's pictures, verified; absent while there is none, and nobody gets a photo. */
+  assets?: PhotoAssets;
   /** The persona's way in: a bank login, or the registration the job does in its stead. */
   login(persona: DemoPersona, locale: Locale): Promise<HistoryLogin>;
   currentVersions(accountId: string): Promise<Record<HistoryConsentKind, string>>;
@@ -51,6 +54,10 @@ export type HistoryWriter = {
   preferences(accountId: string, update: PreferencesUpdate): Promise<void>;
   pond(accountId: string, slug: string): Promise<void>;
   profile(accountId: string, update: ProfileUpdate): Promise<void>;
+  /** The pictures through the upload pipeline (rule 4), as anybody's; the ids, in order. */
+  photos(accountId: string, pictures: readonly Uint8Array[]): Promise<string[]>;
+  /** The look a moderator gives the faces of a story where no check decides; nothing where one does. */
+  approve(accountId: string, photoIds: readonly string[]): Promise<void>;
   status(accountId: string): Promise<OnboardingStatus>;
   deleteAccount(accountId: string): Promise<void>;
   logout(accountId: string): Promise<void>;
@@ -65,6 +72,8 @@ export type HistoryWriter = {
 
 export type HistoryResult = {
   key: string;
+  /** Pictures uploaded for the persona this time: faces and negatives. */
+  photos: number;
   /** `already`: the story's own ending (a ban, a deletion) refused the login, so it was told before. */
   login: "created" | "resumed" | "already";
   onboarded: boolean;
@@ -88,6 +97,7 @@ export function viaRoutes(context: HistoryContext): HistoryWriter {
   return {
     db: context.db,
     now: context.now,
+    ...(context.assets ? { assets: context.assets } : {}),
     async login(persona, locale) {
       const login = await loginAs(persona, context, locale);
       if (login.kind === "refused") return { refused: login.error };
@@ -117,6 +127,17 @@ export function viaRoutes(context: HistoryContext): HistoryWriter {
     },
     async profile(accountId, update) {
       await as(accountId, "PUT", "/profile", update);
+    },
+    async photos(accountId, pictures) {
+      const token = tokens.get(accountId);
+      if (!token) throw new DemoError(`no session for ${accountId}: the login comes first`);
+      const ids: string[] = [];
+      for (const bytes of pictures) ids.push((await upload(context, token, bytes)).id);
+      return ids;
+    },
+    async approve(accountId, photoIds) {
+      // Locally the check queues everything (ADR-006): the look a moderator gives, by a named statement.
+      await approveLocally(context.db, accountId, photoIds);
     },
     async status(accountId) {
       return OnboardingStatus.parse(await as(accountId, "GET", "/onboarding"));
@@ -150,6 +171,7 @@ export async function giveHistory(
     if (asTold) {
       return {
         key: history.key,
+        photos: 0,
         onboarded: history.onboarding !== null,
         profile: history.profile !== null,
         afterwards: history.afterwards,
@@ -163,6 +185,7 @@ export async function giveHistory(
   const { accountId } = login;
   const told = {
     key: history.key,
+    photos: 0,
     onboarded: history.onboarding !== null,
     profile: history.profile !== null,
     afterwards: history.afterwards,
@@ -187,6 +210,17 @@ export async function giveHistory(
     await writer.pond(accountId, history.onboarding.pond);
   }
   if (history.profile) await writer.profile(accountId, history.profile);
+  // The pictures (#142), through the pipeline like anybody's: the faces of the
+  // story approved where no check decides, the negatives left to the queue.
+  // Without the release nobody gets a photo, and the profile says so.
+  let photos = 0;
+  if (writer.assets && (history.photos > 0 || (history.negatives?.length ?? 0) > 0)) {
+    const pictures = picturesOf(writer.assets, history);
+    const faces = await writer.photos(accountId, pictures.faces);
+    await writer.approve(accountId, faces);
+    const negatives = await writer.photos(accountId, pictures.negatives);
+    photos = faces.length + negatives.length;
+  }
   if (history.onboarding) {
     // The app reads its onboarding after the last answer, and that reading is
     // what makes the account active (ADR-010): the persona's app has done it.
@@ -253,5 +287,5 @@ export async function giveHistory(
   if (history.afterwards === "nothing" || history.afterwards === "older_terms") {
     await writer.logout(accountId);
   }
-  return { ...told, login: login.outcome };
+  return { ...told, photos, login: login.outcome };
 }

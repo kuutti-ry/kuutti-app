@@ -25,5 +25,5 @@ Locally the personas get their stories by logging in at the mock bank and sendin
 - The identity slice exports a derivation for the first time. It takes only an artificial code, and `hetu.ts` says so; the callback's derivation stays inside.
 - `pnpm demo:stories` exists on a laptop so that the file is typechecked and tested like the others; it refuses there, by §3.
 - A persona's first login on the bed overwrites the job's mark with Telia's transient `sub` and the bank's method (ADR-016: every login refreshes the reference). That is right: the row is then a login's, as everybody's is.
-- For #142: the photos of the stories go through `uploadPhoto` in the job, as the issue says; the writer gets a `photos` step then.
+- #142 gave the writer its `photos` step: the job uploads a persona's pictures through `uploadPhoto` from the release in the container's cache (`pnpm demo:assets` there too), and the container's check decides on them; locally the reset approves the faces of a story by a named statement.
 - For the maintainer: `infra/README.md` says how to reach the container (an SSM session and `docker exec`, or Dokploy's terminal for the `api` application) and the three commands; nothing of this needs a parameter written by hand.

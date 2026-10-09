@@ -34,6 +34,22 @@ export {
   personaHetu,
 } from "./personas.ts";
 export {
+  type AssetProblem,
+  assetsFor,
+  demoAssetsDir,
+  facesForPopulation,
+  manifestOf,
+  negativesOf,
+  PHOTOS_RELEASE,
+  PHOTOS_REPO,
+  type PhotoAsset,
+  type PhotoPurpose,
+  purposeOf,
+  renderManifest,
+  verifyAssets,
+} from "./photos.ts";
+export { PHOTOS_MANIFEST } from "./photos-manifest.ts";
+export {
   apportion,
   DEMO_EPOCH,
   DEMO_LABEL_PREFIX,
