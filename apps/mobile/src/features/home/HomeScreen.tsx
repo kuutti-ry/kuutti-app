@@ -10,6 +10,7 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useOnboardingGate } from "@/features/identity";
 import { GateCard, WaitlistCard } from "@/features/pond";
+import { FIRST_LATER_FIELD, laterPath } from "@/features/profile";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
@@ -117,6 +118,17 @@ export function HomeScreen() {
               }}
             >
               <Text>{t("home.photos.open")}</Text>
+            </Button>
+            {/* The optional fields, one at a time, while the person waits at the gate (#148, TD-16). */}
+            <Button
+              variant="outline"
+              accessibilityLabel={t("profile.later.open")}
+              onPress={() => {
+                tap();
+                router.push(laterPath(FIRST_LATER_FIELD));
+              }}
+            >
+              <Text>{t("profile.later.open")}</Text>
             </Button>
           </View>
         )}

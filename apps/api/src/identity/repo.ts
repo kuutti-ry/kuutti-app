@@ -45,6 +45,7 @@ const accountFrom = (r: Row): Account => ({
   pondId: (r.pond_id as string | null) ?? null,
   genderChangedAt: (r.gender_changed_at as Date | null) ?? null,
   seeksChangedAt: (r.seeks_changed_at as Date | null) ?? null,
+  email: (r.email as string | null) ?? null,
   registeredAt: r.registered_at as Date,
   deletedAt: (r.deleted_at as Date | null) ?? null,
 });
@@ -605,7 +606,7 @@ export async function tombstoneAccount(
   const result = await db.query(
     `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
        birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL,
-       gender_changed_at = NULL, seeks_changed_at = NULL
+       gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL
      WHERE id = $1 AND state <> 'deleted'`,
     [accountId, at],
   );
@@ -672,6 +673,23 @@ export async function lockGender(
   );
   const row = rows[0];
   return row ? { gender: row.gender, changedAt: row.gender_changed_at ?? null } : undefined;
+}
+
+/**
+ * The optional e-mail (#148, TD-18), set or cleared; a tombstone takes none.
+ * The value is in the statement and nowhere else: not in the log line the
+ * caller writes, not in an event (rules/api.md).
+ */
+export async function setEmail(
+  db: Queryable,
+  accountId: string,
+  email: string | null,
+): Promise<boolean> {
+  const result = await db.query(
+    "UPDATE account SET email = $2 WHERE id = $1 AND state <> 'deleted'",
+    [accountId, email],
+  );
+  return result.rowCount === 1;
 }
 
 /** registered becomes active once (the onboarding rule decides when); nothing else changes here. */

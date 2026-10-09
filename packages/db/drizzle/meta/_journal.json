@@ -162,6 +162,13 @@
       "when": 1791473722169,
       "tag": "0022_change_cadence_days",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791483182561,
+      "tag": "0023_account_email",
+      "breakpoints": true
     }
   ]
 }

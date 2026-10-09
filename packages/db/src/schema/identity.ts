@@ -90,6 +90,10 @@ export const account = pgTable(
     // deletes (ADR-019 §4).
     genderChangedAt: timestamp("gender_changed_at", { withTimezone: true }),
     seeksChangedAt: timestamp("seeks_changed_at", { withTimezone: true }),
+    // The optional e-mail (#148, TD-18): a way back in if a phone is lost,
+    // never a login, never shown to anybody, never in a log line or an event
+    // (rules/db.md). Nulled at erasure with the rest of what is personal.
+    email: text("email"),
     registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },

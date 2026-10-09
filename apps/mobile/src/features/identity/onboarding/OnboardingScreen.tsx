@@ -13,15 +13,13 @@ import {
   type ProfileFields,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
-import Minus from "lucide-react-native/icons/minus";
-import Plus from "lucide-react-native/icons/plus";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { optionKey, PromptsEditor, useProfile } from "@/features/profile";
@@ -136,62 +134,6 @@ function Chip({
     >
       {label}
     </Button>
-  );
-}
-
-/** One end of the age window: a number between a minus and a plus, every answer a button (ADR-010 §9). */
-function Stepper({
-  label,
-  value,
-  downLabel,
-  upLabel,
-  canDown,
-  canUp,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  downLabel: string;
-  upLabel: string;
-  canDown: boolean;
-  canUp: boolean;
-  onChange: (next: number) => void;
-}) {
-  const { t } = useT();
-  const tap = useHapticTap();
-  return (
-    <View className="flex-1 items-center gap-1">
-      <Text variant="small">{label}</Text>
-      <View className="flex-row items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          accessibilityLabel={downLabel}
-          disabled={!canDown}
-          onPress={() => {
-            tap();
-            onChange(value - 1);
-          }}
-        >
-          <Icon as={Minus} />
-        </Button>
-        <Text variant="h2" accessibilityLiveRegion="polite">
-          {t("onboarding.age.years", { years: value })}
-        </Text>
-        <Button
-          variant="outline"
-          size="icon"
-          accessibilityLabel={upLabel}
-          disabled={!canUp}
-          onPress={() => {
-            tap();
-            onChange(value + 1);
-          }}
-        >
-          <Icon as={Plus} />
-        </Button>
-      </View>
-    </View>
   );
 }
 
@@ -571,6 +513,7 @@ export function OnboardingScreen() {
               <Stepper
                 label={t("onboarding.age.youngest")}
                 value={ages.min}
+                shown={t("onboarding.age.years", { years: ages.min })}
                 downLabel={t("onboarding.age.youngestDown")}
                 upLabel={t("onboarding.age.youngestUp")}
                 canDown={ages.min > AGE_MIN}
@@ -580,6 +523,7 @@ export function OnboardingScreen() {
               <Stepper
                 label={t("onboarding.age.oldest")}
                 value={ages.max}
+                shown={t("onboarding.age.years", { years: ages.max })}
                 downLabel={t("onboarding.age.oldestDown")}
                 upLabel={t("onboarding.age.oldestUp")}
                 canDown={ages.max > ages.min}

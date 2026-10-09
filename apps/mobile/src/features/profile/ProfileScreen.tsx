@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, type PlainMessageKey } from "@kuutti/i18n";
+import type { PlainMessageKey } from "@kuutti/i18n";
 import {
   BIO_MAX,
   BIO_MIN_FOR_COMPLETENESS,
@@ -6,9 +6,6 @@ import {
   DISPLAY_NAME_MAX,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
-  type ProfileFieldKey,
-  type ProfileFields,
-  SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { Fragment } from "react";
@@ -17,11 +14,17 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { completenessText, fieldLabelKey, optionKey, presetKey } from "./keys";
+import {
+  FieldEditor,
+  isConsented,
+  SPECIAL_CATEGORY_VERSION,
+  SpecialCategoryConsent,
+} from "./FieldEditor";
+import { completenessText, presetKey } from "./keys";
+import { FIRST_LATER_FIELD, laterPath } from "./later/LaterFieldScreen";
 import { PromptsEditor } from "./PromptsEditor";
 import { type ProfileNotice, useProfile } from "./useProfile";
 
@@ -30,9 +33,6 @@ const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["text_contact_details", "profile.error.text_contact_details"],
   ["consent_required", "errors.special_category_locked"],
 ]);
-
-/** The wording of the special-category consent this build rendered (ADR-010 §4, ADR-019 §4). */
-const SPECIAL_CATEGORY_VERSION = CONSENT_VERSIONS.special_category;
 
 function noticeText(notice: NonNullable<ProfileNotice>, t: ReturnType<typeof useT>["t"]): string {
   if (notice.kind === "saved") return t("profile.saved");
@@ -76,24 +76,7 @@ export function ProfileScreen() {
   const profile = useProfile();
   const { draft, update } = profile;
 
-  const setField = (key: ProfileFieldKey, value: unknown) => {
-    const fields: Record<string, unknown> = { ...draft.fields };
-    if (value === undefined) delete fields[key];
-    else fields[key] = value;
-    update({ fields: fields as ProfileFields });
-  };
-
-  const consented = draft.specialCategoryConsent?.version === SPECIAL_CATEGORY_VERSION;
-  const setConsent = (on: boolean) => {
-    if (on && SPECIAL_CATEGORY_VERSION) {
-      update({ specialCategoryConsent: { version: SPECIAL_CATEGORY_VERSION } });
-      return;
-    }
-    // Withdrawing the consent takes the answers it covered with it: the API would refuse them anyway.
-    const fields: Record<string, unknown> = { ...draft.fields };
-    for (const key of SPECIAL_CATEGORY_FIELDS) delete fields[key];
-    update({ specialCategoryConsent: null, fields: fields as ProfileFields });
-  };
+  const consented = isConsented(draft);
   const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
 
   if (profile.status === "loading") {
@@ -195,110 +178,13 @@ export function ProfileScreen() {
 
         {PROFILE_FIELD_KEYS.map((key) => {
           const spec = PROFILE_FIELDS[key];
-          const value = (draft.fields as Record<string, unknown>)[key];
-          const label = t(fieldLabelKey(key));
           // An article 9 field is offered only behind its consent (ADR-019 §4).
           if (spec.specialCategory && !SPECIAL_CATEGORY_VERSION) return null;
           const offered = !spec.specialCategory || consented;
           return (
             <Fragment key={key}>
-              {key === firstSpecial && (
-                <View className="gap-2">
-                  <View className="flex-row items-center justify-between gap-3">
-                    <Text variant="small" className="flex-1">
-                      {t("legal.special_category.title")}
-                    </Text>
-                    <Switch
-                      accessibilityLabel={t("legal.special_category.title")}
-                      checked={consented}
-                      onCheckedChange={(on) => {
-                        tap();
-                        setConsent(on);
-                      }}
-                    />
-                  </View>
-                  <Text variant="muted">{t("legal.special_category.summary")}</Text>
-                </View>
-              )}
-              {offered && spec.kind === "flag" && (
-                <View className="flex-row items-center justify-between gap-3">
-                  <Text variant="small" className="flex-1">
-                    {label}
-                  </Text>
-                  <Switch
-                    accessibilityLabel={label}
-                    checked={value === true}
-                    onCheckedChange={(on) => {
-                      tap();
-                      setField(key, on ? true : undefined);
-                    }}
-                  />
-                </View>
-              )}
-              {offered && spec.kind !== "flag" && (
-                <View className="gap-2">
-                  <Text variant="small">{label}</Text>
-                  {spec.kind === "text" && (
-                    <>
-                      <Input
-                        accessibilityLabel={label}
-                        value={typeof value === "string" ? value : ""}
-                        maxLength={spec.maxLength}
-                        onChangeText={(text) => setField(key, text.length > 0 ? text : undefined)}
-                      />
-                      <Text variant="muted">{t("profile.text.hint", { max: spec.maxLength })}</Text>
-                    </>
-                  )}
-                  {spec.kind === "number" && (
-                    <>
-                      <Input
-                        accessibilityLabel={label}
-                        value={typeof value === "number" ? String(value) : ""}
-                        inputMode="numeric"
-                        maxLength={3}
-                        onChangeText={(text) => {
-                          const n = Number.parseInt(text, 10);
-                          setField(key, Number.isNaN(n) ? undefined : n);
-                        }}
-                      />
-                      <Text variant="muted">
-                        {t("profile.number.hint", { min: spec.min, max: spec.max })}
-                      </Text>
-                    </>
-                  )}
-                  {(spec.kind === "single" || spec.kind === "multi") && (
-                    <View className="flex-row flex-wrap gap-2">
-                      {spec.options.map((option) => {
-                        const selected =
-                          spec.kind === "multi"
-                            ? Array.isArray(value) && value.includes(option)
-                            : value === option;
-                        return (
-                          <Chip
-                            key={option}
-                            label={t(optionKey(key, option))}
-                            selected={selected}
-                            onPress={() => {
-                              tap();
-                              if (spec.kind === "multi") {
-                                const current = Array.isArray(value) ? (value as string[]) : [];
-                                const next = selected
-                                  ? current.filter((v) => v !== option)
-                                  : current.length < spec.max
-                                    ? [...current, option]
-                                    : current;
-                                setField(key, next.length > 0 ? next : undefined);
-                              } else {
-                                setField(key, selected ? undefined : option);
-                              }
-                            }}
-                          />
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-              )}
+              {key === firstSpecial && <SpecialCategoryConsent draft={draft} update={update} />}
+              {offered && <FieldEditor field={key} draft={draft} update={update} />}
             </Fragment>
           );
         })}
@@ -326,6 +212,15 @@ export function ProfileScreen() {
           }}
         >
           {t("profile.card.open")}
+        </Button>
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            router.push(laterPath(FIRST_LATER_FIELD));
+          }}
+        >
+          {t("profile.later.open")}
         </Button>
       </ScrollView>
     </SafeAreaView>

@@ -49,6 +49,12 @@ Feature: Account deletion per the erasure table
     Then the export carries the account, first-seen and last-login dates, the device, the photo with three URLs and its outcome, and the fetch log
     And nothing about anyone else
 
+  Scenario: The optional e-mail is set, cleared, exported and erased, and reaches no log line
+    Given "A" sets an optional e-mail
+    Then the export carries it, a malformed one is refused, and no log line of any of it holds the address
+    When "A" clears it, or deletes the account
+    Then the account holds none
+
   Scenario: The export works without object storage, with no URLs
     Given the API has no object storage
     When "A" exports the account
