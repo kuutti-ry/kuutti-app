@@ -45,7 +45,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["man"],
       ageWindow: { min: 42, max: 56 },
-      pond: "suomi",
+      pond: "paakaupunkiseutu",
     },
     profile: {
       displayName: "Sanna",
@@ -83,7 +83,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "non_binary",
       seeks: ["woman", "man", "non_binary"],
       ageWindow: { min: 35, max: 50 },
-      pond: "suomi",
+      pond: "paakaupunkiseutu",
     },
     profile: {
       displayName: "Noa",
@@ -115,7 +115,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["woman", "man"],
       ageWindow: { min: 40, max: 55 },
-      pond: "suomi",
+      pond: "paakaupunkiseutu",
     },
     profile: {
       displayName: "Kerttu",
@@ -144,7 +144,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "man",
       seeks: ["woman"],
       ageWindow: { min: 45, max: 60 },
-      pond: "suomi",
+      pond: "paakaupunkiseutu",
     },
     profile: null,
     photos: 0,
@@ -157,7 +157,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       gender: "woman",
       seeks: ["man"],
       ageWindow: { min: 48, max: 64 },
-      pond: "suomi",
+      pond: "paakaupunkiseutu",
     },
     profile: {
       displayName: "Ilona",

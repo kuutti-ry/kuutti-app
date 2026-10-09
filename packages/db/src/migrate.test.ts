@@ -5,7 +5,7 @@ import { readJournal } from "./journal.ts";
 import { migrate } from "./migrate.ts";
 import { migrationsStatus } from "./migrations.ts";
 import { createPool } from "./pool.ts";
-import { MATCHING_CONFIG_V1 } from "./seed.ts";
+import { MATCHING_CONFIG_V1, MATCHING_CONFIG_V2 } from "./seed.ts";
 import { withTemporaryDatabase } from "./test/temporary-database.ts";
 
 const MIGRATIONS = resolve(import.meta.dirname, "..", "drizzle");
@@ -53,15 +53,20 @@ describe("migrate", () => {
     });
   });
 
-  it("carries matching_config version 1, the same rows as the seed", async () => {
+  it("carries matching_config versions 1 and 2, the same rows as the seed", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       try {
         await migrate(pool, MIGRATIONS);
-        const { rows } = await pool.query<{ key: string; value: unknown }>(
-          "SELECT key, value FROM matching_config WHERE version = 1 ORDER BY key",
+        const { rows } = await pool.query<{ key: string; value: unknown; version: number }>(
+          "SELECT key, value, version FROM matching_config ORDER BY key, version",
         );
-        expect(Object.fromEntries(rows.map((r) => [r.key, r.value]))).toEqual(MATCHING_CONFIG_V1);
+        const at = (version: number) =>
+          Object.fromEntries(
+            rows.filter((r) => r.version === version).map((r) => [r.key, r.value]),
+          );
+        expect(at(1)).toEqual(MATCHING_CONFIG_V1);
+        expect(at(2)).toEqual(MATCHING_CONFIG_V2);
       } finally {
         await pool.end();
       }

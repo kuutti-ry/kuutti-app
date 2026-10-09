@@ -78,7 +78,7 @@ async function world(ctx: TestContext) {
   const { logger, lines } = await captureLogger();
   // The pond the histories name, and the default pond (#146): the test database has no seed.
   await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('suomi', 'Suomi', 'Suomessa')
+    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')
      ON CONFLICT (slug) DO NOTHING`,
   );
   const config = testConfig({

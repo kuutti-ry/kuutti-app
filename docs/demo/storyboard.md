@@ -24,7 +24,7 @@ The steps in the order the sheet asks them (ADR-010, #146), one screen each, "Co
 6. Age window: buttons, not a number field, around her own age.
 7. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them pending; on staging Rekognition approves a face within seconds.
 8. "A few words": two prompts of twelve, or a bio of fifty characters.
-9. Done. The pond is assigned by the API (one country-wide pond, "Suomi"); there is no pond step.
+9. Done. The pond is assigned by the API (one pond for now, "Pääkaupunkiseutu"); there is no pond step.
 
 The account is active once the four matching answers and the two consents are there (ADR-010 §6); the profile steps may be finished later.
 

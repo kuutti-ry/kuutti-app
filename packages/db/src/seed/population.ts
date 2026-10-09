@@ -57,13 +57,13 @@ export type PondPlan = {
 
 /**
  * Who lives where, and why: the data dictionary of docs/demo/population.md in
- * code. One country-wide pond for now (#146): it has to show everything at
+ * code. One pond for now, the capital region (#146, ADR-010 §11): it has to show everything at
  * once, so it is over the gate, has men over the majority share (the line the
  * admission rule draws) and, from enough people up, every counter cell at k.
  */
 export const POND_PLANS: readonly PondPlan[] = [
   {
-    slug: "suomi",
+    slug: "paakaupunkiseutu",
     people: { share: 1 },
     genders: { woman: 0.32, man: 0.62, non_binary: 0.06 },
     why: "over gate_k (30); men are 62 %, over majority_share_max (0.6), so the admission rule holds them back; from 174 people up every gender cell is at ten or more, so the counter shows the split",
@@ -386,7 +386,7 @@ export type Thresholds = { gateK: number; majorityShareMax: number; counterK: nu
  */
 export function uncrossed(ponds: Record<string, PondSummary>, t: Thresholds): string[] {
   const missing: string[] = [];
-  const pond = ponds.suomi;
+  const pond = ponds.paakaupunkiseutu;
   if (!pond || pond.people < t.gateK) missing.push("the pond is under the gate");
   if (!pond || pond.largestShare <= t.majorityShareMax) {
     missing.push("the pond is not over the majority share");

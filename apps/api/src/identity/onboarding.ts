@@ -117,7 +117,7 @@ function acceptedCurrent(rows: repo.ConsentRow[], kind: ConsentKind): repo.Conse
 }
 
 /**
- * One country-wide pond for now (#146, ADR-010 §10): an account with none is
+ * One pond for now (#146, ADR-010 §10 and §11): an account with none is
  * put in the pond matching_config names, on its first status read, so no
  * pond step exists. Where the key names no live pond (several ponds later,
  * or a test database without the seed) the step stays and PUT /account/pond

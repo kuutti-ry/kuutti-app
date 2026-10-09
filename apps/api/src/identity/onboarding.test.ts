@@ -495,13 +495,17 @@ describe("onboarding and consents", () => {
 
   test("An account gets the default pond without a pond step", async ({ ctx }) => {
     const { app, logs } = await appWith(ctx);
-    // The seed pond, which matching_config.default_pond names (migration 0020); the test database has no seed.
+    // The seed pond, which matching_config.default_pond names (migration 0025); the test database has no seed.
     const { rows } = await ctx.client.query<{ id: string }>(
-      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('suomi', 'Suomi', 'Suomessa') RETURNING id",
+      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id",
     );
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
     const first = await status(app, a.headers);
-    expect(first.pond).toMatchObject({ id: rows[0]?.id, slug: "suomi", nameInessive: "Suomessa" });
+    expect(first.pond).toMatchObject({
+      id: rows[0]?.id,
+      slug: "paakaupunkiseutu",
+      nameInessive: "Pääkaupunkiseudulla",
+    });
     expect(first.missing).not.toContain("pond");
     expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(1);
     const stored = await ctx.client.query<{ pond_id: string }>(
