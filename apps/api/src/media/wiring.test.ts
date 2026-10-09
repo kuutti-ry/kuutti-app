@@ -58,6 +58,27 @@ describe("media wiring", () => {
     ).toThrow(/half configured/);
   });
 
+  it("refuses a signing key that is not a private key, at boot and without quoting it", () => {
+    const publicHalf =
+      "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE\n-----END PUBLIC KEY-----\n";
+    let thrown: unknown;
+    try {
+      createMediaDeps(
+        testConfig({
+          APP_ENV: "staging",
+          NODE_ENV: "production",
+          ...cloudfront,
+          CLOUDFRONT_SIGNING_KEY: publicHalf,
+        }),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toMatch(/not a private key/);
+    expect((thrown as Error).message).not.toContain("PUBLIC KEY");
+  });
+
   it("a pull-request preview has no media even though it reads staging's parameters", () => {
     // What a preview sees after loadConfig merged /kuutti/staging/*: the
     // bucket, the URL base and the signing key. It must not hold or use them.

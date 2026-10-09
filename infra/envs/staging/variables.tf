@@ -63,7 +63,7 @@ variable "telia_client_id" {
 variable "media_enabled" {
   description = "Photos (#48, ADR-005): the media bucket, the CloudFront distribution in front of the API and the bucket, and the signed-URL key group. Flipped to true in the cutover commit, after the maintainer has created /kuutti/<env>/cloudfront-signing-key in SSM, committed its public half as cloudfront-signing-key.pub.pem next to this file, and given the api application the origin.api.<env> domain in Dokploy (infra/README.md, Media)."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "cloudfront_only_ingress" {
