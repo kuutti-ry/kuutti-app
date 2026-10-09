@@ -1,8 +1,11 @@
 import {
   AccountExport,
+  CARD_FIELD_KEYS,
   CardPreviewResponse,
   HOBBIES,
   Photo,
+  PROFILE_FIELD_KEYS,
+  PROFILE_FIELDS,
   ProfileResponse,
   type ProfileUpdate,
 } from "@kuutti/schema";
@@ -218,22 +221,84 @@ describe("profile routes", () => {
     expect(rows).toHaveLength(0);
   });
 
-  test("the card leaves a soft value and a setting on the profile", async ({ ctx }) => {
+  test("the card leaves a soft value and a setting on the profile, and the field of study the person hides", async ({
+    ctx,
+  }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     const saved = await put(app, a.headers, {
       ...update,
-      fields: { ...update.fields, education: "amk", drinking: "rarely", hideFromField: true },
+      fields: {
+        ...update.fields,
+        education: "amk",
+        drinking: "rarely",
+        field: "tech",
+        hideFromField: true,
+      },
     });
     expect(saved.status).toBe(200);
     expect(ProfileResponse.parse(await saved.json()).profile?.fields).toMatchObject({
       education: "amk",
       drinking: "rarely",
+      field: "tech",
       hideFromField: true,
     });
     const preview = await app.request("/profile/card", { headers: a.headers });
     const card = CardPreviewResponse.parse(await preview.json()).card;
     expect(card?.fields).toEqual(update.fields);
+    // The owner previews without what both answered: there is nobody on the other side.
+    expect(card?.shared).toEqual({ hobbies: [], languages: [] });
+  });
+
+  test("the card carries every answered info and hard field, nothing soft or hidden, and no key beyond the contract", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    // One answer on every field of the registry, whatever its kind.
+    const everything: Record<string, unknown> = {};
+    for (const key of PROFILE_FIELD_KEYS) {
+      const spec = PROFILE_FIELDS[key];
+      everything[key] =
+        spec.kind === "single"
+          ? spec.options[0]
+          : spec.kind === "multi"
+            ? [spec.options[0]]
+            : spec.kind === "number"
+              ? spec.min
+              : spec.kind === "text"
+                ? "Architect"
+                : true;
+    }
+    const saved = await put(app, a.headers, {
+      ...update,
+      fields: everything,
+      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
+    });
+    expect(saved.status).toBe(200);
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    const card = CardPreviewResponse.parse(await preview.json()).card;
+    const onCard = Object.keys(card?.fields ?? {}).sort();
+    // The info and hard fields (ADR-019 §2), less the field of study behind the hide-from-field setting.
+    expect(onCard).toEqual(CARD_FIELD_KEYS.filter((key) => key !== "field").sort());
+    for (const key of onCard) {
+      const role = PROFILE_FIELDS[key as (typeof PROFILE_FIELD_KEYS)[number]].role;
+      expect(["info", "hard"]).toContain(role);
+    }
+    // Nothing about anyone else and no count of anything (rules/schema.md).
+    expect(Object.keys(card ?? {}).sort()).toEqual([
+      "accountId",
+      "age",
+      "bio",
+      "bioPreset",
+      "displayName",
+      "fields",
+      "gender",
+      "photos",
+      "pond",
+      "prompts",
+      "shared",
+    ]);
   });
 
   it("the consent gate refuses a special-category value without the version of the current wording", () => {
@@ -309,13 +374,24 @@ describe("profile routes", () => {
   }) => {
     const { app, logger } = await appWith(ctx);
     const viewer = await signedInAccount(ctx.client);
-    const complete = async () => {
+    // The viewer's own answers: what both answered is marked on the card (#150).
+    await put(app, viewer.headers, {
+      ...update,
+      fields: { ...update.fields, hobbies: ["yoga", "hiking"] },
+    });
+    const complete = async (fields: ProfileUpdate["fields"] = {}) => {
       const who = await signedInAccount(ctx.client);
       await approvedPhotos(ctx, app, who.headers, 3);
-      await put(app, who.headers, { ...update, bio: "x".repeat(60), bioPreset: null });
+      await put(app, who.headers, {
+        ...update,
+        fields: { ...update.fields, ...fields },
+        bio: "x".repeat(60),
+        bioPreset: null,
+      });
       return who;
     };
-    const b = await complete();
+    const b = await complete({ hobbies: ["yoga", "gym"] });
+    await ctx.client.query("UPDATE account SET gender = 'woman' WHERE id = $1", [b.accountId]);
     const c = await complete();
     const d = await signedInAccount(ctx.client); // no profile
     // Onboarding (#46) is not here; a reader that says it is done stands in.
@@ -331,6 +407,9 @@ describe("profile routes", () => {
     });
     expect(first.card?.photos).toHaveLength(3);
     expect(first.card?.bio).toBe("x".repeat(60));
+    expect(first.card?.gender).toBe("woman");
+    // In the order the subject gave them; never a count.
+    expect(first.card?.shared).toEqual({ hobbies: ["yoga"], languages: ["fi", "en"] });
     const shown = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM card_shown WHERE account_id = $1",
       [viewer.accountId],

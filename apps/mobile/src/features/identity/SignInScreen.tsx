@@ -108,8 +108,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     if (failure.code === "auth_cooldown") {
       const day = failure.until ? new Date(failure.until) : null;
       return t("signIn.error.auth_cooldown", {
-        date:
-          day && !Number.isNaN(day.getTime()) ? formatDate(locale, day, { dateStyle: "long" }) : "",
+        date: day && !Number.isNaN(day.getTime()) ? formatDate(locale, day) : "",
       });
     }
     return t(REFUSALS.get(failure.code) ?? "signIn.error.generic");

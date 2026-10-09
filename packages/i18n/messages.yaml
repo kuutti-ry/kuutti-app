@@ -307,13 +307,6 @@ profile.field.zodiac:
   sv: "Stjärntecken"
   machine: { fi: true, sv: true }
 
-profile.field.height.value:
-  en: "{cm, number} cm"
-  description: "A height on the card and under the field: centimetres, display only (#145, ADR-019)."
-  fi: "{cm, number} cm"
-  sv: "{cm, number} cm"
-  machine: { fi: true, sv: true }
-
 profile.text.hint:
   en: "In your own words, up to {max, number} characters."
   description: "Hint under a free-text field of the registry (the job title)."
@@ -2272,6 +2265,13 @@ profile.card.photoLabel:
   description: "Screen-reader label of a card photo."
   fi: "Kuva {position, number} / {total, number}"
   sv: "Foto {position, number} av {total, number}"
+  machine: { fi: true, sv: true }
+
+profile.card.sharedOption:
+  en: "{option} (you too)"
+  description: "An answer on a card that the viewer gave as well (#150): a hobby or a language both answered, marked in words, never a count."
+  fi: "{option} (sinäkin)"
+  sv: "{option} (du också)"
   machine: { fi: true, sv: true }
 
 profile.card.back:

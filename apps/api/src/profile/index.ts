@@ -7,7 +7,9 @@ export {
   buildCard,
   type CardDeps,
   completenessOf,
+  fieldsOnCard,
   type PreferenceReader,
+  sharedAnswers,
 } from "./card.ts";
 export { type CompletenessSnapshot, completeness } from "./completeness.ts";
 export { answeredPromptsOf } from "./repo.ts";

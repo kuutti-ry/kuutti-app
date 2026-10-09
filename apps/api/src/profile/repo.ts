@@ -1,6 +1,7 @@
 import type { Queryable } from "@kuutti/db";
 import {
   type BioPreset,
+  type Gender,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
   type ProfileDocument,
@@ -155,6 +156,8 @@ export type CardSubject = {
   state: string;
   birthYear: number | null;
   birthMonth: number | null;
+  /** Self-declared, display only (ADR-019 §1). */
+  gender: Gender | null;
   profile: ProfileRow | null;
 };
 
@@ -169,7 +172,7 @@ export async function findCardSubject(
   subjectAccountId: string,
 ): Promise<CardSubject | null> {
   const { rows } = await db.query<Row>(
-    `SELECT a.id, a.state, a.birth_year, a.birth_month,
+    `SELECT a.id, a.state, a.birth_year, a.birth_month, a.gender,
             p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts,
             p.special_category_consent_version, p.special_category_consented_at, p.updated_at
      FROM account a LEFT JOIN profile p ON p.account_id = a.id
@@ -183,6 +186,7 @@ export async function findCardSubject(
     state: r.state as string,
     birthYear: (r.birth_year as number | null) ?? null,
     birthMonth: (r.birth_month as number | null) ?? null,
+    gender: (r.gender as Gender | null) ?? null,
     profile: r.account_id ? profileFrom(r) : null,
   };
 }
