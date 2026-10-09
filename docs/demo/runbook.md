@@ -18,7 +18,7 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 
 Staging holds no real person (ADR-018). The three commands run inside the API's container and nowhere else; `infra/README.md`, "The demo on staging", says how to reach it. In order:
 
-1. `node dist/demo-assets.js` once in the container: the release's tarball from the public repository over HTTPS into the cache, checked against the manifest; the job refuses a cache that is not the release's. While staging's media is off, the jobs skip the pictures and say so.
+1. `node dist/demo-assets.js` in the container, and again after every deploy: the cache is the container's own and a new container starts without it, so the stories, the population and the reset refuse until it is there. The release's tarball comes from the public repository over HTTPS into the cache, checked against the manifest; the job refuses a cache that is not the release's.
 2. `node dist/demo-reset.js --env staging`: the personas forgotten by their hash, the stories told anew through the service functions, the pictures through the pipeline with Rekognition deciding (faces approved, the negatives queued).
 3. `node dist/demo-population.js --env staging --photos`.
 4. The phone: the `preview` build on channel `staging` (`apps/mobile/README.md`); the tech config screen shows `api.staging.kuutti.app` and the commit. A JS-only merge to `main` reaches it on the next launch; a native change needs the build reinstalled.
@@ -38,7 +38,7 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 | the camera roll | the five pictures are there | the same |
 | the clock | the gate was counted after the population was written (the reset and the population both count); the nightly count runs at 04:00 Helsinki | the same |
 
-Anything wrong: run the reset again (locally two seconds; on staging under a minute), then the population. A second reset within a minute waits for the rate limit.
+Anything wrong: run the reset again (locally two seconds; on staging under a minute), then the population. A second reset within a minute waits for the rate limit. A reset that refused after "personas forgotten" (a missing cache, say) has erased the personas and told nobody: fix the cause and run it again, and it tells the stories from nothing.
 
 ## After the demo
 
