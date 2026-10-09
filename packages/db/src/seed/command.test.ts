@@ -39,7 +39,7 @@ describe("the command's arguments", () => {
   });
 
   it("go ahead only in an environment that is named and allowed", () => {
-    for (const env of ["production", "Production", "prod", "staging", "", " development", "demo"]) {
+    for (const env of ["production", "Production", "prod", "Staging", "", " development", "demo"]) {
       expect(() => parseDemoCommand(["--env", env], undefined), `--env ${env}`).toThrow(
         DemoCommandError,
       );
@@ -102,6 +102,15 @@ describe("the server the rows would go to", () => {
     } finally {
       await pool.end();
     }
+  });
+
+  it("allows staging by name since ADR-018, and asks where the command runs afterwards", () => {
+    expect(parseDemoCommand(["--env", "staging"], "staging").env).toBe("staging");
+    expect(() => parseDemoCommand(["--env", "staging"], "production")).toThrow(DemoCommandError);
+    // Staging names a managed server, from inside its container (assertStagingProcess); a local one is not it.
+    const tunnel: DemoTarget = { ...local, port: 15432, user: "kuutti_app", managed: true };
+    expect(() => assertDemoTarget(tunnel, "staging")).not.toThrow();
+    expect(() => assertDemoTarget(local, "staging")).toThrow(/managed server/);
   });
 
   it("is refused when it is a deployed one, whatever the environment is called", () => {

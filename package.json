@@ -32,7 +32,8 @@
     "check:licenses": "node scripts/check-licenses.ts",
     "demo:bank": "node packages/db/src/cli/demo-bank.ts",
     "demo:population": "pnpm --filter @kuutti/api run demo:population",
-    "demo:reset": "pnpm --filter @kuutti/api run demo:reset"
+    "demo:reset": "pnpm --filter @kuutti/api run demo:reset",
+    "demo:stories": "pnpm --filter @kuutti/api run demo:stories"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

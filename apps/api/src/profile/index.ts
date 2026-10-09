@@ -19,5 +19,6 @@ export {
   exportProfile,
   readProfile,
   SPECIAL_CATEGORY_CONSENT_VERSION,
+  saveProfile,
   withdrawSpecialCategoryAnswers,
 } from "./service.ts";

@@ -41,7 +41,7 @@ import {
   ofThisComputer,
   whyNotTheLocalStore,
 } from "./bank.ts";
-import { giveHistory } from "./histories.ts";
+import { giveHistory, viaRoutes } from "./histories.ts";
 import { resetPersonas } from "./reset.ts";
 
 // The personas' histories and the reset (#73, ADR-014 §12), against the real
@@ -646,7 +646,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const { bank, context, lines } = await world(ctx);
     const began = Date.now();
     for (const history of PERSONA_HISTORIES) {
-      expect(await giveHistory(history, context)).toMatchObject({ key: history.key });
+      expect(await giveHistory(history, viaRoutes(context))).toMatchObject({ key: history.key });
     }
     const ended = Date.now();
 
@@ -737,7 +737,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     // The statements go where nothing of the persona is: they meet no row.
     const elsewhere = { query: async () => ({ rows: [], rowCount: 0 }) };
     await expect(
-      giveHistory(kerttu, { ...context, db: elsewhere as unknown as typeof context.db }),
+      giveHistory(kerttu, viaRoutes({ ...context, db: elsewhere as unknown as typeof context.db })),
     ).rejects.toThrow(DemoError);
   });
 
@@ -746,7 +746,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
   }) => {
     const { bank, context, logger } = await world(ctx);
     const now = () => new Date();
-    for (const history of PERSONA_HISTORIES) await giveHistory(history, context);
+    for (const history of PERSONA_HISTORIES) await giveHistory(history, viaRoutes(context));
     await loginAs(persona("aino"), bank);
     // Somebody who is no persona, at the same bank.
     const other = await loginAs({ ...persona("mikael"), key: "somebody", individual: 950 }, bank);

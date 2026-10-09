@@ -52,7 +52,12 @@
       "linter": {
         "rules": {
           "suspicious": {
-            "noUnknownAtRules": { "level": "error", "options": { "ignore": ["tailwind"] } }
+            "noUnknownAtRules": {
+              "level": "error",
+              "options": {
+                "ignore": ["tailwind"]
+              }
+            }
           }
         }
       }
@@ -73,6 +78,71 @@
                 "paths": {
                   "@kuutti/db/demo": "The demo tools (personas, synthetic population) stay out of the apps: the API's image and the clients' bundles carry nothing of them (ADR-014). Command lines under scripts/ and tests may import them."
                 },
+                "patterns": [
+                  {
+                    "group": [
+                      "**/identity/*",
+                      "**/identity/**",
+                      "!**/identity/index",
+                      "!**/identity/index.ts",
+                      "**/profile/*",
+                      "**/profile/**",
+                      "!**/profile/index",
+                      "!**/profile/index.ts",
+                      "**/media/*",
+                      "**/media/**",
+                      "!**/media/index",
+                      "!**/media/index.ts",
+                      "**/pond/*",
+                      "**/pond/**",
+                      "!**/pond/index",
+                      "!**/pond/index.ts",
+                      "**/matching/*",
+                      "**/matching/**",
+                      "!**/matching/index",
+                      "!**/matching/index.ts",
+                      "**/chat/*",
+                      "**/chat/**",
+                      "!**/chat/index",
+                      "!**/chat/index.ts",
+                      "**/safety/*",
+                      "**/safety/**",
+                      "!**/safety/index",
+                      "!**/safety/index.ts",
+                      "**/research/*",
+                      "**/research/**",
+                      "!**/research/index",
+                      "!**/research/index.ts",
+                      "**/rewards/*",
+                      "**/rewards/**",
+                      "!**/rewards/index",
+                      "!**/rewards/index.ts",
+                      "**/notifications/*",
+                      "**/notifications/**",
+                      "!**/notifications/index",
+                      "!**/notifications/index.ts",
+                      "**/smoke/*",
+                      "**/smoke/**",
+                      "!**/smoke/index",
+                      "!**/smoke/index.ts"
+                    ],
+                    "message": "Slices import from a neighbour only through its index.ts, never its internals. Move shared code down into lib/ or export it from the neighbour's index. See .claude/rules/layout.md."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/api/scripts/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
                 "patterns": [
                   {
                     "group": [

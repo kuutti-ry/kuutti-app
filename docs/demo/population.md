@@ -19,6 +19,7 @@ After a write or a removal the public counter (#54) is counted anew over what is
 | `-- --dry-run` | prints the counts per pond and writes nothing; it does not connect |
 | `-- --remove` | removes the synthetic population and writes nobody |
 | `-- --env preview` | for a pull request's own database, `kuutti_pr_<n>` |
+| `--env staging` | on staging, from inside the API's container only (`--remove` there reports the personas' rows as `spared`: they carry the mark but not a label's hash, ADR-014 §9, and the reset is what forgets them): `node dist/demo-population.js --env staging` (ADR-018; `infra/README.md` says how to reach the container). The database is read from staging's own parameter store, never given |
 
 ## Where it refuses to write
 
@@ -26,7 +27,7 @@ Three hundred accounts that look bank-verified, among real people, would enter t
 
 - it goes ahead only when the environment is `development`, `test` or `preview`, by `--env` and by `APP_ENV`, both when both are given;
 - it refuses an argument it does not know, so a mistyped `--dryrun` is not a write, and an argument given twice, so `--env production --env development` does not talk its own first word away;
-- after connecting and before writing or removing anything it prints where it is connected (database, user, host, port; never a password) and asks the server what it is. A managed server (RDS) is refused unless the database is a pull request's own and the environment is `preview`. Staging and production are reached through a tunnel on 127.0.0.1 under the same database name as the local one, so neither the host nor the name tells them apart; the server does.
+- after connecting and before writing or removing anything it prints where it is connected (database, user, host, port; never a password) and asks the server what it is. A managed server (RDS) is refused unless the database is a pull request's own and the environment is `preview`, or the environment is `staging` and the command runs inside staging's container. Staging and production are reached through a tunnel on 127.0.0.1 under the same database name as the local one, so neither the host nor the name tells them apart, and neither does the server: what does, for staging, is that the command was given nothing by hand (`APP_ENV` is staging, and no `DATABASE_URL`, no key, no parameter prefix in its environment), so its database can only be the one staging's own parameter store names (ADR-018 §3).
 
 ## Who lives where, and why
 
