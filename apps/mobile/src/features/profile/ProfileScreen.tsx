@@ -8,7 +8,12 @@ import {
   PROFILE_FIELDS,
 } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
-import { Fragment, useEffect, useRef, useState } from "react";
+// Expo Router 57 vendors React Navigation and exposes the hook that holds a
+// native stack's swipe-back only from the vendored core: a plain beforeRemove
+// listener cannot stop a native removal (the screen leaves the stack natively
+// while JS keeps it; 09/10/2026, the simulator).
+import { usePreventRemove } from "expo-router/build/react-navigation/core";
+import { Fragment, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
@@ -36,6 +41,8 @@ import { completenessText, presetKey } from "./keys";
 import { FIRST_LATER_FIELD, laterPath } from "./later/LaterFieldScreen";
 import { PromptsEditor } from "./PromptsEditor";
 import { type ProfileNotice, useProfile } from "./useProfile";
+
+type LeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]["data"]["action"];
 
 /** The API's refusals the screen has its own words for; anything else is the generic line. */
 const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
@@ -87,17 +94,10 @@ export function ProfileScreen() {
   const navigation = useNavigation();
   // The document saves whole, on Save, and the screen has no header: the back
   // gesture was the only way out and lost unsaved edits without a word
-  // (09/10/2026, Kerttu's smoking answer). Leaving with edits asks first.
-  const [leaving, setLeaving] = useState<Parameters<typeof navigation.dispatch>[0] | null>(null);
-  const leaveConfirmed = useRef(false);
-  useEffect(() => {
-    if (!profile.dirty) return;
-    return navigation.addListener("beforeRemove", (event) => {
-      if (leaveConfirmed.current) return;
-      event.preventDefault();
-      setLeaving(event.data.action);
-    });
-  }, [navigation, profile.dirty]);
+  // (09/10/2026, Kerttu's smoking answer). Leaving with edits asks first; the
+  // action handed back remembers it was held here, so dispatching it leaves.
+  const [leaving, setLeaving] = useState<LeaveAction | null>(null);
+  usePreventRemove(profile.dirty, ({ data }) => setLeaving(data.action));
 
   const consented = isConsented(draft);
   const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
@@ -276,9 +276,7 @@ export function ProfileScreen() {
               onPress={() => {
                 const action = leaving;
                 setLeaving(null);
-                if (!action) return;
-                leaveConfirmed.current = true;
-                navigation.dispatch(action);
+                if (action) navigation.dispatch(action);
               }}
             >
               {t("profile.discard.leave")}
