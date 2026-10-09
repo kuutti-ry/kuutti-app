@@ -8,7 +8,7 @@ import { createRandom } from "./rng.ts";
 /**
  * The demo's pictures (#142, ADR-014 §7): generated faces for the personas
  * and a pool for the population, and the negatives the moderation queue is
- * meant to refuse, in a private repository of their own, released by tag.
+ * meant to refuse, in a public repository of their own, released by tag.
  * This repository holds the manifest (path, SHA-256, purpose) and nothing
  * binary; `pnpm demo:assets` fetches a release into the cache and refuses a
  * file whose checksum differs, and the loaders push every picture through
@@ -152,10 +152,11 @@ export function facesForPopulation(
 
 /** The manifest module as `pnpm demo:assets -- --manifest` writes it: data, generated, never edited by hand. */
 export function renderManifest(assets: readonly PhotoAsset[]): string {
+  // One field per line, as Biome formats an object too long for one line.
   const rows = assets
     .map(
       (a) =>
-        `  { path: ${JSON.stringify(a.path)}, sha256: ${JSON.stringify(a.sha256)}, purpose: ${JSON.stringify(a.purpose)} },`,
+        `  {\n    path: ${JSON.stringify(a.path)},\n    sha256: ${JSON.stringify(a.sha256)},\n    purpose: ${JSON.stringify(a.purpose)},\n  },`,
     )
     .join("\n");
   return `import type { PhotoAsset } from "./photos.ts";

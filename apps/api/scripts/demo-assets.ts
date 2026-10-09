@@ -1,5 +1,5 @@
 /**
- * The demo's pictures (#142, ADR-014 §7): a release of the private photos
+ * The demo's pictures (#142, ADR-014 §7): a release of the public photos
  * repository, fetched into the cache and verified against the manifest this
  * repository holds, or the manifest written from a directory of pictures.
  *
@@ -8,17 +8,21 @@
  *   pnpm demo:assets -- --check <dir>      verify a directory against the manifest; nothing is fetched
  *   pnpm demo:assets -- --manifest <dir>   write packages/db/src/seed/photos-manifest.ts from a directory of pictures
  *
- * The fetch is `gh release download`: the repository is private, so a
- * contributor needs read access and a signed-in gh. A file whose checksum
- * differs from the manifest's, a listed file that is missing and a picture
- * that is not listed are each named, and the command fails; the loaders
- * refuse the same cache (`loadAssets`). `--manifest` is the maintainer's
+ * A release is a tag (the photos repository's README), fetched as the tag's
+ * tarball over plain HTTPS: the repository is public, so a laptop, CI and the
+ * staging container need no login, and the tree keeps `faces/<set>/` and
+ * `negatives/`, which release assets cannot (their names carry no slash). The
+ * checksums of the manifest, not the transport, decide what is trusted: a
+ * file whose checksum differs from the manifest's, a listed file that is
+ * missing and a picture that is not listed are each named, and the command
+ * fails; the loaders refuse the same cache (`loadAssets`). `--manifest` is the maintainer's
  * step after generating the pictures (docs/demo/photo-prompts.md): the same
  * file goes into the release as manifest.json.
  */
 import { execFile } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   demoAssetsDir,
@@ -93,10 +97,18 @@ const dir = check ? resolve(check) : demoAssetsDir(tag);
 if (!check) {
   mkdirSync(dir, { recursive: true });
   try {
-    await run("gh", ["release", "download", tag, "--repo", PHOTOS_REPO, "--dir", dir, "--clobber"]);
+    const url = `https://github.com/${PHOTOS_REPO}/archive/refs/tags/${tag}.tar.gz`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+    const tarball = join(tmpdir(), `kuutti-demo-photos-${process.pid}.tar.gz`);
+    writeFileSync(tarball, new Uint8Array(await response.arrayBuffer()));
+    // The tarball's one top directory is named after the commit; its contents are the release.
+    await run("tar", ["-xzf", tarball, "--strip-components=1", "-C", dir]).finally(() =>
+      rmSync(tarball, { force: true }),
+    );
   } catch (error) {
     fail(
-      `gh release download ${tag} from ${PHOTOS_REPO} failed: ${error instanceof Error ? error.message.split("\n")[0] : "unknown"}. Is gh signed in with read access to the private repository?`,
+      `fetching ${tag} of ${PHOTOS_REPO} failed: ${error instanceof Error ? error.message.split("\n")[0] : "unknown"}. Is the tag pushed?`,
     );
   }
 }

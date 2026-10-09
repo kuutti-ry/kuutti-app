@@ -47,7 +47,12 @@ export type TestBank = {
 };
 
 export type DemoPersona = {
-  /** The name typed at the bank, and the `sub` of the token. */
+  /**
+   * The persona's id: the name typed at the bank, the `sub` of the token, the
+   * story's key and the folder of its pictures (`faces/<key>/`). Never renamed
+   * and never reused: tests, the stories and the photos release find a persona
+   * by it.
+   */
   key: string;
   /** What the bank says the person is called. The product never stores it (rule 3). */
   given: string;
@@ -94,7 +99,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1977, month: 6, day: 17 },
     individual: 924,
     group: "history",
-    note: "Onboarded, with a complete profile: three photos once the release of pictures is loaded.",
+    note: "Onboarded, with a complete profile: five photos once the release of pictures is loaded.",
     bank: { name: "Nordea", user: "DEMOUSER4" },
   },
   {

@@ -3,10 +3,12 @@ import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
  * What the six personas "with a history" have done before the demo begins
- * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons (#140). Data only: `pnpm demo:reset` gives a persona its history
- * by logging it in at the mock bank and sending these answers through the
- * API's own routes, as the app would, so every rule that holds for a person
- * holds for a persona. What no route can do (an older wording of the terms, a
+ * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
+ * (#140), and each age window holds its persona's own age (a test says so).
+ * Data only: `pnpm demo:reset` gives a persona its history by logging it in
+ * at the mock bank and sending these answers through the API's own routes,
+ * as the app would, so every rule that holds for a person holds for a
+ * persona. What no route can do (an older wording of the terms, a
  * ban) is named in `afterwards` and done in the database.
  *
  * The two newcomers and the four ages have no history: they begin as people
@@ -42,7 +44,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 32, max: 44 },
+      ageWindow: { min: 42, max: 56 },
       pond: "suomi",
     },
     profile: {
@@ -70,7 +72,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       ],
       specialCategoryConsent: null,
     },
-    photos: 3,
+    photos: 5,
     afterwards: "nothing",
   },
   { key: "onni", locale: "fi", onboarding: null, profile: null, photos: 0, afterwards: "nothing" },
@@ -80,7 +82,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "non_binary",
       seeks: ["woman", "man", "non_binary"],
-      ageWindow: { min: 24, max: 34 },
+      ageWindow: { min: 35, max: 50 },
       pond: "suomi",
     },
     profile: {
@@ -112,7 +114,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["woman", "man"],
-      ageWindow: { min: 35, max: 50 },
+      ageWindow: { min: 40, max: 55 },
       pond: "suomi",
     },
     profile: {
@@ -132,7 +134,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       ],
       specialCategoryConsent: null,
     },
-    photos: 3,
+    photos: 4,
     afterwards: "older_terms",
   },
   {
@@ -141,7 +143,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "man",
       seeks: ["woman"],
-      ageWindow: { min: 38, max: 55 },
+      ageWindow: { min: 45, max: 60 },
       pond: "suomi",
     },
     profile: null,
@@ -154,7 +156,7 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     onboarding: {
       gender: "woman",
       seeks: ["man"],
-      ageWindow: { min: 28, max: 40 },
+      ageWindow: { min: 48, max: 64 },
       pond: "suomi",
     },
     profile: {

@@ -99,7 +99,7 @@ describe("the release's layout", () => {
     const dir = release(PICTURES);
     const text = renderManifest(manifestOf(dir));
     expect(text).toContain("export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [");
-    expect(text).toContain('{ path: "faces/sanna/1.jpg", sha256: "');
+    expect(text).toContain('    path: "faces/sanna/1.jpg",\n    sha256: "');
     expect(text).toContain('purpose: "negative:no-face"');
     expect(text.trim().endsWith("];")).toBe(true);
   });

@@ -298,6 +298,7 @@ Staging holds no real person: its identities are Telia's test persons (#140) and
 ```sh
 aws ssm start-session --target "$(tofu output -raw instance_id)"
 sudo docker ps --format '{{.Names}}' | grep '^api'
+sudo docker exec -it <container> node dist/demo-assets.js   # the photos release, public, over HTTPS
 sudo docker exec -it <container> node dist/demo-stories.js
 sudo docker exec -it <container> node dist/demo-population.js --env staging
 sudo docker exec -it <container> node dist/demo-reset.js --env staging

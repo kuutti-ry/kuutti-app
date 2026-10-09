@@ -264,9 +264,14 @@ async function stagingReset(): Promise<void> {
     });
     console.log(JSON.stringify({ msg: "demo reset: personas forgotten", ...reset }));
     if (!bare) {
-      const assets = loadAssets();
+      // As the stories job: without an object store, no pictures, and the line says why.
+      const assets = media.deps ? loadAssets() : null;
       console.log(
-        JSON.stringify({ msg: "demo reset: pictures", pictures: assets?.manifest.length ?? 0 }),
+        JSON.stringify({
+          msg: "demo reset: pictures",
+          pictures: assets?.manifest.length ?? 0,
+          ...(media.setup.mode === "off" ? { off: media.setup.reason } : {}),
+        }),
       );
       const writer = viaServices({
         db: pool,

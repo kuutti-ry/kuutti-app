@@ -22,7 +22,7 @@ The steps in the order the sheet asks them (ADR-010, #146), one screen each, "Co
 4. Whom she seeks: one to three; under it the line "I consent to Kuutti storing whom I seek" (the article 9 consent, ADR-019 §4). Choose men.
 5. Intent: long-term, casual, or open to either.
 6. Age window: buttons, not a number field, around her own age.
-7. Photos: "Add photos", at least three. From the camera roll: her three pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them pending; on staging Rekognition approves a face within seconds.
+7. Photos: "Add photos", at least three. From the camera roll: three or more of her five pictures (the runbook put them there). Each goes through the pipeline: resized, EXIF stripped, three variants, a blurhash, the check. Locally the check queues everything, so the grid shows them pending; on staging Rekognition approves a face within seconds.
 8. "A few words": two prompts of twelve, or a bio of fifty characters.
 9. Done. The pond is assigned by the API (one country-wide pond, "Suomi"); there is no pond step.
 
@@ -33,14 +33,14 @@ The account is active once the four matching answers and the two consents are th
 The home screen: "Kuutti", two cards and the ways onward.
 
 - "People in your area": the counter of the pond, in tens, with the split by gender when every cell is at least ten, and "n people are still finishing their profile." (ADR-013). With the population written, the numbers are of a pond over the gate.
-- "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her three photos are approved: "Your profile is finished. Where you stand is counted tonight." After the count (the runbook runs it): "You are among the next 10 in line for your area." or "Matching is open for you." (ADR-015: the women of the population are the smaller group, so she is let in; a man of the larger group is told his place in line).
+- "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Your profile is finished. Where you stand is counted tonight." After the count (the runbook runs it): "You are among the next 10 in line for your area." or "Matching is open for you." (ADR-015: the women of the population are the smaller group, so she is let in; a man of the larger group is told his place in line).
 - Below: "Your profile", "Your photos", "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148), "Your deal-breakers" (up to two, only on what she answered herself, #149).
 
 Show "Fill in the rest while you wait" for one field and skip it; show "Your deal-breakers": the field she has not answered says "To filter on this, share yours first."
 
 ## Scene 4: Sanna's card (1 min)
 
-Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, three approved photos, the gate open.
+Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, the gate open.
 
 - Home: "Matching is open for you."
 - "Your profile" → "See your card": the card as others see it (#150): the first photo, "Sanna", "49, age verified by your bank", "Woman", the pond, one prompt answer, the other photos, the fields that are information (languages by their own names, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference.
