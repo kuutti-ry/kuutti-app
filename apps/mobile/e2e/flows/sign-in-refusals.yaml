@@ -1,0 +1,67 @@
+# Who the bank login lets in, and who not (TD-7, the age rule of #33; the cast
+# of personas.ts): a banned identity, an account deleted inside its waiting
+# time and those under 18 are refused at the callback, each in its own words;
+# the youngest who gets in and the oldest reach the welcome screen. Age is
+# counted from the end of the birth month, so Venla, who turns 18 this month,
+# is refused on every day but its last.
+appId: fi.kuutti.app
+name: The bank login refuses the banned, the recently deleted and those under 18, and lets in 18 and 99
+---
+- runFlow: ../common/open-app.yaml
+- runFlow: ../common/sign-out.yaml
+
+- runFlow:
+    file: ../common/bank-login.yaml
+    env:
+      PERSONA: Tapio Heikkinen
+- extendedWaitUntil:
+    visible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
+    timeout: 30000
+- assertVisible: "This person may not use Kuutti.|Tämä henkilö ei voi käyttää Kuuttia.|Den här personen får inte använda Kuutti."
+
+- runFlow:
+    file: ../common/bank-login.yaml
+    env:
+      PERSONA: Ilona Öhman
+- extendedWaitUntil:
+    visible: "You deleted your account recently.*|Poistit tilisi äskettäin.*|Du raderade ditt konto nyligen.*"
+    timeout: 30000
+
+- runFlow:
+    file: ../common/bank-login.yaml
+    env:
+      PERSONA: Lauri Hämäläinen
+- extendedWaitUntil:
+    visible: "Kuutti is for adults.*|Kuutti on aikuisille.*|Kuutti är för vuxna.*"
+    timeout: 30000
+
+- runFlow:
+    # Tomorrow is the 1st on the last day of a month, the one day Venla gets in.
+    when:
+      true: ${new Date(Date.now() + 86400000).getDate() !== 1}
+    commands:
+      # "Try again" clears the previous refusal, so the one shown after the bank is Venla's.
+      - runFlow:
+          file: ../common/bank-login.yaml
+          env:
+            PERSONA: Venla Nieminen
+      - extendedWaitUntil:
+          visible: "Kuutti is for adults.*|Kuutti on aikuisille.*|Kuutti är för vuxna.*"
+          timeout: 30000
+
+- runFlow:
+    file: ../common/bank-login.yaml
+    env:
+      PERSONA: Eetu Laine
+- extendedWaitUntil:
+    visible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    timeout: 30000
+
+- runFlow: ../common/sign-out.yaml
+- runFlow:
+    file: ../common/bank-login.yaml
+    env:
+      PERSONA: Siiri Koskinen
+- extendedWaitUntil:
+    visible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    timeout: 30000

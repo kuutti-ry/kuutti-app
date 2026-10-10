@@ -1,0 +1,80 @@
+# Withdrawing the sensitive-answers consent (#204, ADR-019 §4) removes whom one
+# seeks, the parties and the religion, and pauses matching: home sends the
+# person back to whom they seek, which waits for the consent again on the same
+# screen. The age window is no sensitive answer and stays, so the ages are not
+# asked again (ADR-010 §13, #219). Noa seeks everyone; she answers the same
+# again, which is no change (#147), and research, which she never answered, is
+# offered once. The flow ends where it began: consent given, everyone sought.
+appId: fi.kuutti.app
+name: Withdrawing the sensitive-answers consent asks whom one seeks again with the consent, and keeps the age window
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Noa Salmi
+- openLink: kuutti://settings
+- scrollUntilVisible:
+    element: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+    direction: DOWN
+    centerElement: true
+# A switch's text, to Maestro, is its value ("1" on, "0" off), right of its words.
+- assertVisible:
+    text: "1"
+    rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+- tapOn:
+    text: "1"
+    rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+- extendedWaitUntil:
+    visible:
+      text: "0"
+      rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+    timeout: 15000
+
+# Home asks whom she seeks again, nothing chosen, and waits for the consent.
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
+    timeout: 15000
+- assertVisible: "Step 4 of 10|Vaihe 4 / 10|Steg 4 av 10"
+- assertVisible:
+    text: "Anyone|Kenet tahansa|Vem som helst"
+    selected: false
+- tapOn: "Anyone|Kenet tahansa|Vem som helst"
+- assertVisible:
+    text: "Women|Naisia|Kvinnor"
+    selected: true
+- assertVisible:
+    text: "Men|Miehiä|Män"
+    selected: true
+- assertVisible:
+    text: "Non-binary people|Muunsukupuolisia|Icke-binära personer"
+    selected: true
+- scrollUntilVisible:
+    element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
+    direction: DOWN
+- assertVisible:
+    text: "Continue|Jatka|Fortsätt"
+    enabled: false
+- tapOn:
+    text: "0"
+    rightOf: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
+- extendedWaitUntil:
+    visible:
+      text: "Continue|Jatka|Fortsätt"
+      enabled: true
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Continue|Jatka|Fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Continue|Jatka|Fortsätt"
+
+# Not the ages: the window stayed. Research is offered, then home.
+- extendedWaitUntil:
+    visible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
+    timeout: 15000
+- assertNotVisible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
+- tapOn: "Not now|Ei nyt|Inte nu"
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000

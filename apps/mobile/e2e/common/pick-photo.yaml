@@ -1,0 +1,17 @@
+# On the photos screen, add a picture of the camera roll through the system
+# picker and wait until the screen counts COUNT (the photos.count text, a regex
+# in three languages). The picker is the system's: its grid has no names to tap
+# by, so CELL is the cell's position ("17%,43%" the first of the top row, then
+# "50%,43%", "83%,43%"); addMedia puts the flow's pictures first. The upload
+# runs through the API's pipeline (rule 4).
+appId: fi.kuutti.app
+---
+- tapOn: "Add a photo|Lisää kuva|Lägg till ett foto"
+- extendedWaitUntil:
+    visible: "Photos|Kuvat|Bilder"
+    timeout: 15000
+- tapOn:
+    point: "${CELL}"
+- extendedWaitUntil:
+    visible: "${COUNT}"
+    timeout: 60000
