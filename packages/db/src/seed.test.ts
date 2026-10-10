@@ -25,9 +25,10 @@ describe("seed", () => {
           `SELECT c.slug, p.slug AS parent, c.name_inessive AS inessive
            FROM ponds c LEFT JOIN ponds p ON p.id = c.parent_id ORDER BY c.slug`,
         );
-        // One pond for now, the capital region (#146, ADR-010 §11); the tree is ready for the postal-code ponds later.
+        // Two ponds side by side, the capital region and the rest of the country (#174, ADR-010 §12); the tree waits for the postal-code ponds.
         expect(tree.rows).toEqual([
           { slug: "paakaupunkiseutu", parent: null, inessive: "Pääkaupunkiseudulla" },
+          { slug: "suomi", parent: null, inessive: "Suomessa" },
         ]);
 
         const config = await pool.query<{ key: string; value: number; version: number }>(

@@ -160,6 +160,8 @@ export type MessageParams = {
   "onboarding.photos.explain": Record<never, never>;
   "onboarding.photos.open": Record<never, never>;
   "onboarding.photos.title": Record<never, never>;
+  "onboarding.pond.explain": Record<never, never>;
+  "onboarding.pond.title": Record<never, never>;
   "onboarding.progress": { "step": number; "total": number };
   "onboarding.prompts.explain": { "min": number };
   "onboarding.prompts.save": Record<never, never>;
@@ -242,6 +244,8 @@ export type MessageParams = {
   "pond.gate.title": Record<never, never>;
   "pond.gate.waiting": { "within": number };
   "pond.gate.waiting.why": Record<never, never>;
+  "pond.name.paakaupunkiseutu": Record<never, never>;
+  "pond.name.suomi": Record<never, never>;
   "pond.waitlist.failed": Record<never, never>;
   "pond.waitlist.finishing": { "people": number };
   "pond.waitlist.label": Record<never, never>;

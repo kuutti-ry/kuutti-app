@@ -683,7 +683,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(sanna.profile.profile?.displayName).toBe("Sanna");
     expect(sanna.profile.completeness.missing).toEqual(["photos"]);
 
-    // Registered and gone: nothing answered, and the first status read put the account in the one pond (#146).
+    // Registered and gone: nothing answered. With two ponds to choose from, the pond is asked too (ADR-010 §12).
     expect((await as("onni")).onboarding.missing).toEqual([
       "terms",
       "privacy",
@@ -694,6 +694,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       "age_window",
       "photos",
       "prompts_or_bio",
+      "pond",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
 

@@ -40,6 +40,13 @@ const POND = {
   nameInessive: "Suomessa",
   parentId: null,
 };
+const CAPITAL = {
+  id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
+  slug: "paakaupunkiseutu",
+  name: "Pääkaupunkiseutu",
+  nameInessive: "Pääkaupunkiseudulla",
+  parentId: null,
+};
 const ACTIVATION = ["gender", "seeks", "age_window", "pond", "terms", "privacy"];
 
 type Profile = {
@@ -62,6 +69,8 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     photos: number;
     /** From when a gender change is possible again; set, the API refuses one with 429 (#147). */
     genderFrom: string | null;
+    /** The pond; null when there is more than one and the person has not chosen (#174). */
+    pond: typeof POND | null;
   } = {
     gender: null,
     seeks: null,
@@ -70,6 +79,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     profile: null,
     photos: 0,
     genderFrom: null,
+    pond: POND,
   };
   const calls: { method: string; path: string; body: unknown }[] = [];
   const has = (kind: string, version: string) =>
@@ -85,6 +95,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       ...(server.seeks && has("special_category", SPECIAL) ? [] : ["seeks"]),
       ...(server.profile?.fields.intent ? [] : ["intent"]),
       ...(server.ageWindow ? [] : ["age_window"]),
+      ...(server.pond ? [] : ["pond"]),
       ...(server.photos >= 3 ? [] : ["photos"]),
       ...(bio.length >= 50 || prompts >= 2 ? [] : ["prompts_or_bio"]),
     ];
@@ -93,7 +104,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       state: missing.some((step) => ACTIVATION.includes(step)) ? "registered" : "active",
       age: options.age ?? 36,
       gender: server.gender,
-      pond: POND,
+      pond: server.pond,
       preferences: { seeks: server.seeks, ageWindow: server.ageWindow },
       consents: {
         terms: has("terms", VERSION) ? VERSION : null,
@@ -142,6 +153,12 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     }
     if (path === "/account/gender") {
       server.gender = (body as { gender: string }).gender;
+      return new Response(null, { status: 204 });
+    }
+    if (path === "/ponds") return json({ ponds: [CAPITAL, POND] });
+    if (path === "/account/pond") {
+      const { pondId } = body as { pondId: string };
+      server.pond = [CAPITAL, POND].find((pond) => pond.id === pondId) ?? null;
       return new Response(null, { status: 204 });
     }
     if (path === "/preferences") {
@@ -278,6 +295,34 @@ describe("OnboardingScreen", () => {
       "/preferences",
       "/profile",
     ]);
+  });
+
+  it("asks the pond with one button per area, in the person's language, when there is more than one to choose from", async () => {
+    const { server, calls } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
+    server.gender = "woman";
+    server.seeks = ["man"];
+    server.ageWindow = { min: 30, max: 40 };
+    server.profile = {
+      displayName: "Aino",
+      bio: "x".repeat(50),
+      bioPreset: null,
+      fields: { intent: "casual" },
+      prompts: [],
+    };
+    server.photos = 3;
+    server.pond = null;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
+    // The seeded slugs read in the app's language, never the Finnish name the API sends (#174).
+    await waitFor(() => expect(screen.getByRole("button", { name: "Capital Area" })).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Finland" })).toBeTruthy();
+    expect(screen.queryByText("Suomi")).toBeNull();
+    checkA11y();
+    await press(screen.getByRole("button", { name: "Finland" }));
+    expect(calls.some((c) => c.method === "PUT" && c.path === "/account/pond")).toBe(true);
+    await waitFor(() => expect(screen.queryByText("Where do you live?")).toBeNull());
+    expect(server.pond).toMatchObject({ slug: "suomi" });
   });
 
   it("offers the identity label after a non-binary gender only, and saves the one chosen", async () => {

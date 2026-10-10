@@ -3191,6 +3191,34 @@ onboarding.seeks.allow:
   sv: "Jag samtycker till att Kuutti lagrar vem jag söker"
   machine: { fi: true, sv: true }
 
+onboarding.pond.title:
+  en: "Where do you live?"
+  description: "Heading of the pond step (#174, ADR-010 §12), shown when there is more than one area to choose from."
+  fi: "Missä asut?"
+  sv: "Var bor du?"
+  machine: { fi: true, sv: true }
+
+onboarding.pond.explain:
+  en: "Kuutti matches people inside one area. Choose yours."
+  description: "Explanation under the pond step's heading (#174)."
+  fi: "Kuutti yhdistää ihmisiä yhden alueen sisällä. Valitse omasi."
+  sv: "Kuutti matchar människor inom ett område. Välj ditt."
+  machine: { fi: true, sv: true }
+
+pond.name.paakaupunkiseutu:
+  en: "Capital Area"
+  description: "The name of the pond with slug paakaupunkiseutu, by language (#174): the Helsinki capital region. Nominative only; no sentence is built around it."
+  fi: "Pääkaupunkiseutu"
+  sv: "Huvudstadsregionen"
+  machine: { fi: true, sv: true }
+
+pond.name.suomi:
+  en: "Finland"
+  description: "The name of the pond with slug suomi, by language (#174): the rest of the country, a sibling of the capital region."
+  fi: "Suomi"
+  sv: "Finland"
+  machine: { fi: true, sv: true }
+
 onboarding.intent.title:
   en: "What are you here for?"
   description: "Heading of the intent step (#146)."
