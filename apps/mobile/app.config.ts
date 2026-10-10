@@ -35,3 +35,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...(config as ExpoConfig),
   extra: { ...config.extra, commit: commit(), version: countedVersion() },
 });
+
+// Preview check for #9, lane native: this comment is the throwaway change and never merges.
