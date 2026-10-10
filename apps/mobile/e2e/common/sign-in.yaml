@@ -1,0 +1,54 @@
+# Sign in at the mock bank as a persona of the demo cast (#164, ADR-020).
+# Starts from wherever the app is: signed in, it signs out first, so a flow
+# always begins where a new person does. The persona is named as the mock
+# bank's page names them (packages/db/src/seed/personas.ts, given + family).
+appId: fi.kuutti.app
+env:
+  PERSONA: Sanna Korhonen
+---
+# The dev client opens the local bundle by its launcher link, never through the launcher screen.
+- openLink: exp+kuutti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081
+# Signed in, the app shows the home screen's area card or the onboarding's welcome;
+# signed out, the sign-in button. "Kuutti" alone would match the dev client's loading screen.
+- extendedWaitUntil:
+    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    timeout: 60000
+- runFlow:
+    when:
+      visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    commands:
+      - openLink: kuutti://settings
+      - tapOn: "Log out|Kirjaudu ulos|Logga ut"
+      - extendedWaitUntil:
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+          timeout: 15000
+- tapOn: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+# A fresh simulator's Safari greets the first page with sheets to continue past,
+# a moment after the page: wait for either, then at most three taps, so our own
+# Continue button can never trap the loop.
+- extendedWaitUntil:
+    visible: ".*${PERSONA}.*|Continue|Jatka|Fortsätt"
+    timeout: 30000
+- repeat:
+    times: 3
+    while:
+      visible: "Continue|Jatka|Fortsätt"
+    commands:
+      - tapOn: "Continue|Jatka|Fortsätt"
+# The mock bank's page opens in the system browser: one button per persona, whose
+# accessible name is the person's name followed by the note under it.
+# Safari's address bar lies over the bottom of the page: the card is scrolled to the middle first.
+- scrollUntilVisible:
+    element: ".*${PERSONA}.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: ".*${PERSONA}.*"
+# iOS asks before handing the link back to the app.
+- extendedWaitUntil:
+    visible: "Open|Avaa|Öppna"
+    timeout: 15000
+- tapOn: "Open|Avaa|Öppna"
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    timeout: 30000
