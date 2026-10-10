@@ -577,6 +577,7 @@ export type MessageParams = {
   "profile.save": Record<never, never>;
   "profile.saved": Record<never, never>;
   "profile.saving": Record<never, never>;
+  "profile.specialCategory.note": Record<never, never>;
   "profile.text.hint": { "max": number };
   "profile.title": Record<never, never>;
   "settings.about.title": Record<never, never>;

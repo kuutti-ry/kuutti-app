@@ -17,7 +17,7 @@ import {
 import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
-import { exportConsents } from "./onboarding.ts";
+import { currentConsent, exportConsents } from "./onboarding.ts";
 import { recordDeletion } from "./registration.ts";
 import * as repo from "./repo.ts";
 
@@ -130,7 +130,11 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
     ? { ...deps.media, db: deps.db, logger: deps.logger, now: deps.now }
     : { db: deps.db, logger: deps.logger, now: deps.now };
   const photos = await exportPhotos(media, accountId);
-  const profile = await exportProfile(deps.db, accountId);
+  const profile = await exportProfile(
+    deps.db,
+    accountId,
+    await currentConsent(deps.db, accountId, "special_category"),
+  );
   const [pond, preferences, consents, research, gate, dealBreakers] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),

@@ -31,11 +31,18 @@ export type PreferenceReader = (
 
 export const noPreferencesYet: PreferenceReader = async () => ({ seeks: null, ageWindow: null });
 
+/** The special-category consent as the identity slice's consent rows hold it (ADR-019 §4, #204); without a reader nothing special is stored and the document echoes none. */
+export type SpecialCategoryConsent = { version: string; givenAt: Date } | null;
+export type ConsentReader = (db: Queryable, accountId: string) => Promise<SpecialCategoryConsent>;
+
+export const noConsentYet: ConsentReader = async () => null;
+
 export type CardDeps = {
   db: Queryable;
   logger: Logger;
   now: () => Date;
   readPreferences?: PreferenceReader;
+  specialCategoryConsent?: ConsentReader;
 };
 
 /**

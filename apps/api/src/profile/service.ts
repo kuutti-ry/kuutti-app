@@ -1,4 +1,4 @@
-import type { Queryable } from "@kuutti/db";
+import { type Queryable, transaction } from "@kuutti/db";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import {
   PROFILE_FIELD_KEYS,
@@ -11,7 +11,12 @@ import {
 import { AppError } from "../lib/errors.ts";
 import { listApprovedPhotos } from "../media/index.ts";
 import { track } from "../research/index.ts";
-import { type CardDeps, completenessOf } from "./card.ts";
+import {
+  type CardDeps,
+  completenessOf,
+  noConsentYet,
+  type SpecialCategoryConsent,
+} from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
 
@@ -31,19 +36,18 @@ export const SPECIAL_CATEGORY_CONSENT_VERSION: string = specialCategoryVersion()
 
 /**
  * Which fields of the update need the explicit consent, given a registry of
- * special-category fields and the current wording's version (#47, ADR-009 §2,
- * ADR-019 §4): a value for one of them without the consent of that version is
- * refused before anything is written. Pure, so the gate is tested with any registry.
+ * special-category fields and whether the current wording's consent is on
+ * record (#47, ADR-009 §2, ADR-019 §4, #204): a value for one of them without
+ * it is refused before anything is written. Pure, so the gate is tested with
+ * any registry.
  */
 export function consentMissingFor(
-  update: Pick<ProfileUpdate, "fields" | "specialCategoryConsent">,
+  fields: ProfileUpdate["fields"],
+  consented: boolean,
   specialFields: readonly string[] = SPECIAL_CATEGORY_FIELDS,
-  currentVersion: string = SPECIAL_CATEGORY_CONSENT_VERSION,
 ): string[] {
-  if (update.specialCategoryConsent?.version === currentVersion) return [];
-  return specialFields.filter(
-    (key) => (update.fields as Record<string, unknown>)[key] !== undefined,
-  );
+  if (consented) return [];
+  return specialFields.filter((key) => (fields as Record<string, unknown>)[key] !== undefined);
 }
 
 /** The first field whose text carries a way to reach the person, or null. */
@@ -71,11 +75,19 @@ export function contactDetailsInUpdate(
   return null;
 }
 
-const toDocument = ({
-  accountId: _accountId,
-  dropped: _dropped,
-  ...document
-}: repo.ProfileRow): ProfileDocument => document;
+/** The document the owner reads back: the row, and the consent as the consent rows hold it (ADR-019 §4). */
+const toDocument = (
+  { accountId: _accountId, dropped: _dropped, ...document }: repo.ProfileRow,
+  consent: SpecialCategoryConsent,
+): ProfileDocument => ({
+  ...document,
+  specialCategoryConsent: consent
+    ? { version: consent.version, at: consent.givenAt.toISOString() }
+    : null,
+});
+
+const readConsent = (deps: CardDeps, accountId: string): Promise<SpecialCategoryConsent> =>
+  (deps.specialCategoryConsent ?? noConsentYet)(deps.db, accountId);
 
 /** A stored value the registry no longer knows: the key goes to the log (never the value) so a backfill can follow. */
 function noteDropped(deps: CardDeps, row: repo.ProfileRow | null): void {
@@ -85,13 +97,14 @@ function noteDropped(deps: CardDeps, row: repo.ProfileRow | null): void {
 }
 
 export async function readProfile(deps: CardDeps, accountId: string): Promise<ProfileResponse> {
-  const [row, photos] = await Promise.all([
+  const [row, photos, consent] = await Promise.all([
     repo.findProfile(deps.db, accountId),
     listApprovedPhotos(deps.db, accountId),
+    readConsent(deps, accountId),
   ]);
   noteDropped(deps, row);
   return {
-    profile: row ? toDocument(row) : null,
+    profile: row ? toDocument(row, consent) : null,
     completeness: await completenessOf(deps, accountId, row, photos.length),
   };
 }
@@ -110,28 +123,34 @@ export async function saveProfile(
       contact,
     );
   }
-  const missing = consentMissingFor(update);
-  if (missing.length > 0) {
-    throw new AppError(403, "consent_required", "These fields need the explicit consent first", {
-      fields: missing,
-      currentVersion: SPECIAL_CATEGORY_CONSENT_VERSION,
-    });
-  }
-  // A consent for any other wording than the current one is not stored: a row
-  // that looks like consent given for a text nobody can point at would be
-  // worse than none (ADR-009 §2). The app sends the version it rendered, and
-  // asks for an update when the two differ, as it does for the terms (ADR-010 §4).
-  if (
-    update.specialCategoryConsent &&
-    update.specialCategoryConsent.version !== SPECIAL_CATEGORY_CONSENT_VERSION
-  ) {
-    throw new AppError(409, "agreement_outdated", "The wording has a newer version", {
-      kind: "special_category",
-    });
-  }
-  const row = await repo.upsertProfile(deps.db, accountId, update, deps.now());
-  // No row, no profile: the account was erased between the guard and here (#51).
-  if (!row) throw new AppError(404, "not_found", "No live account");
+  // The consent is the identity slice's row, given at the seeks step and
+  // withdrawn in Settings (ADR-019 §4, #204): a politics or religion answer
+  // is refused without the current wording's; an older wording reads as none.
+  // The read, the gate and the write share one transaction under the account
+  // row's lock, the lock a withdrawal takes: a save either lands before the
+  // withdrawal, whose clear then removes the answer, or waits, reads the
+  // withdrawn row and is refused. Without the lock a save that read the
+  // consent a moment before the withdrawal could leave an answer behind with
+  // no consent on record (the security review of 10/10/2026).
+  const { row, consent } = await transaction(deps.db, async (tx) => {
+    const live = await tx.query(
+      "SELECT id FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE",
+      [accountId],
+    );
+    // No row, no profile: the account was erased meanwhile (#51).
+    if (live.rows.length === 0) throw new AppError(404, "not_found", "No live account");
+    const consent = await (deps.specialCategoryConsent ?? noConsentYet)(tx, accountId);
+    const missing = consentMissingFor(update.fields, consent !== null);
+    if (missing.length > 0) {
+      throw new AppError(403, "consent_required", "These fields need the explicit consent first", {
+        fields: missing,
+        currentVersion: SPECIAL_CATEGORY_CONSENT_VERSION,
+      });
+    }
+    const row = await repo.upsertProfile(tx, accountId, update, deps.now());
+    if (!row) throw new AppError(404, "not_found", "No live account");
+    return { row, consent };
+  });
   const photos = await listApprovedPhotos(deps.db, accountId);
   deps.logger.info({ accountId, prompts: update.prompts.length }, "profile saved");
   const completenessNow = await completenessOf(deps, accountId, row, photos.length);
@@ -140,7 +159,7 @@ export async function saveProfile(
     complete: completenessNow.complete,
     approvedPhotos: photos.length,
   });
-  return { profile: toDocument(row), completeness: completenessNow };
+  return { profile: toDocument(row, consent), completeness: completenessNow };
 }
 
 /** Erasure (#51): the profile row, inside the caller's transaction. */
@@ -152,9 +171,10 @@ export async function eraseProfileOfAccount(tx: Queryable, accountId: string): P
 export async function exportProfile(
   db: Queryable,
   accountId: string,
+  consent: SpecialCategoryConsent = null,
 ): Promise<ProfileDocument | null> {
   const row = await repo.findProfile(db, accountId);
-  return row ? toDocument(row) : null;
+  return row ? toDocument(row, consent) : null;
 }
 
 /** The identity slice calls this when the special-category consent is withdrawn (#146). */

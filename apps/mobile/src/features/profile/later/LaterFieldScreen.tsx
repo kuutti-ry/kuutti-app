@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { FieldEditor, isConsented, SpecialCategoryConsent } from "../FieldEditor";
+import { FieldEditor, SpecialCategoryNote } from "../FieldEditor";
 import { useProfile } from "../useProfile";
 
 /** The route of a later screen; the first one is where the home screen and the profile send a person. */
@@ -95,7 +95,6 @@ export function LaterFieldScreen({ field }: { field: string }) {
   }
   const { draft, saved, update } = profile;
   const progress = laterProgress(draft.fields);
-  const offered = !spec.specialCategory || isConsented(draft);
   // Onward to the next field without an answer; answered ones are the profile screen's to change.
   const moveOn = () => {
     const next = nextUnanswered(draft.fields, index);
@@ -121,9 +120,10 @@ export function LaterFieldScreen({ field }: { field: string }) {
           <Text>{t("profile.later.explain")}</Text>
         )}
 
-        {spec.specialCategory && <SpecialCategoryConsent draft={draft} update={update} />}
-        {offered && <FieldEditor field={key} draft={draft} update={update} />}
-        {offered && companion && <FieldEditor field={companion} draft={draft} update={update} />}
+        {/* An article 9 field stands under the note on its consent (ADR-019 §4, #204). */}
+        {spec.specialCategory && <SpecialCategoryNote />}
+        <FieldEditor field={key} draft={draft} update={update} />
+        {companion && <FieldEditor field={companion} draft={draft} update={update} />}
 
         {profile.notice?.kind === "error" && (
           <Text accessibilityLiveRegion="assertive">

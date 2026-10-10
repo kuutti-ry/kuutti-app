@@ -170,7 +170,6 @@ describe("ProfileScreen", () => {
       bioPreset: null,
       fields: { intent: "long_term", languages: ["fi", "en"] },
       prompts: [{ key: "sunday", answer: "A long breakfast." }],
-      specialCategoryConsent: null,
     });
     expect(screen.getByText("Saved.")).toBeTruthy();
     expect(screen.queryByText("A name on the card")).toBeNull();

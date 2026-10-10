@@ -31,12 +31,7 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
-import {
-  FieldEditor,
-  isConsented,
-  SPECIAL_CATEGORY_VERSION,
-  SpecialCategoryConsent,
-} from "./FieldEditor";
+import { FieldEditor, SpecialCategoryNote } from "./FieldEditor";
 import { completenessText, presetKey } from "./keys";
 import { FIRST_LATER_FIELD, laterPath } from "./later/LaterFieldScreen";
 import { PromptsEditor } from "./PromptsEditor";
@@ -99,7 +94,6 @@ export function ProfileScreen() {
   const [leaving, setLeaving] = useState<LeaveAction | null>(null);
   usePreventRemove(profile.dirty, ({ data }) => setLeaving(data.action));
 
-  const consented = isConsented(draft);
   const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
 
   if (profile.status === "loading") {
@@ -203,18 +197,16 @@ export function ProfileScreen() {
         </View>
 
         {PROFILE_FIELD_KEYS.map((key) => {
-          const spec = PROFILE_FIELDS[key];
-          // An article 9 field is offered only behind its consent (ADR-019 §4).
-          if (spec.specialCategory && !SPECIAL_CATEGORY_VERSION) return null;
           // The identity label is offered after a non-binary gender only, in
           // onboarding (the registry's rule, #146); here it shows when it was
           // given, to change or clear it, and is not offered to everyone.
           if (key === "identityLabel" && draft.fields.identityLabel === undefined) return null;
-          const offered = !spec.specialCategory || consented;
+          // The article 9 fields stand under the note on their consent (ADR-019 §4, #204):
+          // anyone active gave it at the seeks step; Settings is where it is withdrawn.
           return (
             <Fragment key={key}>
-              {key === firstSpecial && <SpecialCategoryConsent draft={draft} update={update} />}
-              {offered && <FieldEditor field={key} draft={draft} update={update} />}
+              {key === firstSpecial && <SpecialCategoryNote />}
+              <FieldEditor field={key} draft={draft} update={update} />
             </Fragment>
           );
         })}

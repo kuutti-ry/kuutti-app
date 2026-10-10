@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { CardPreviewResponse, ErrorResponse, ProfileResponse, ProfileUpdate } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
+import { currentConsent } from "../identity/index.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { readPreferences } from "../matching/index.ts";
@@ -34,7 +35,7 @@ const saveRoute = createRoute({
   path: "/profile",
   summary: "Save the caller's profile",
   description:
-    "The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts, and the special-category consent version when a field needs it. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.",
+    "The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts. A politics or religion answer needs the special-category consent on record, which is given at the seeks step and withdrawn in Settings (the consent routes), never in this body. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.",
   ...bearer,
   request: { body: { required: true, ...json(ProfileUpdate) } },
   responses: {
@@ -50,7 +51,6 @@ const saveRoute = createRoute({
       "consent_required: a politics or religion answer without the consent of the current wording (ADR-019); the detail names the fields and the current version.",
     ),
     404: errorContent("No live account (erased meanwhile)."),
-    409: errorContent("agreement_outdated: a consent version that is not the current wording's."),
   },
 });
 
@@ -75,6 +75,8 @@ export function profileRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     logger: deps.logger,
     now: () => new Date(),
     readPreferences,
+    // The special-category consent is the identity slice's row, never the document's (ADR-019 §4, #204).
+    specialCategoryConsent: (db, accountId) => currentConsent(db, accountId, "special_category"),
   };
   for (const path of new Set([readRoute, saveRoute, cardRoute].map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);

@@ -31,7 +31,6 @@ const answer = (app: App, headers: Headers, fields: ProfileUpdate["fields"]) =>
       bioPreset: null,
       fields,
       prompts: [],
-      specialCategoryConsent: null,
     } satisfies ProfileUpdate),
   });
 

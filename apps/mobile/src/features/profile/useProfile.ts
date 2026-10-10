@@ -11,7 +11,6 @@ export const EMPTY_PROFILE: ProfileUpdate = {
   bioPreset: null,
   fields: {},
   prompts: [],
-  specialCategoryConsent: null,
 };
 
 /** Key order aside: the draft is built by merging patches, the document comes from the API. */
@@ -32,9 +31,6 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
   bioPreset: profile.bioPreset,
   fields: profile.fields,
   prompts: profile.prompts,
-  specialCategoryConsent: profile.specialCategoryConsent
-    ? { version: profile.specialCategoryConsent.version }
-    : null,
 });
 
 /**
