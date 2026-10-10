@@ -13,7 +13,7 @@ import {
   type ProfileFields,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
@@ -166,6 +166,12 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (current === "done") router.replace("/");
   }, [current, router]);
+  // Each step starts at its top: the ScrollView kept the last step's offset,
+  // so a new step's title began under the status bar (10/10/2026).
+  const scroll = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (current) scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [current]);
   const age = state.status === "ready" ? state.onboarding.age : null;
   // From when a refused change is possible (#147): the gender's for the gender
   // step, whom one seeks for the steps that save it (seeks, the age window).
@@ -229,6 +235,7 @@ export function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
+        ref={scroll}
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
