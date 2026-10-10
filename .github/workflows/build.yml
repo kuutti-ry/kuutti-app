@@ -64,13 +64,15 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_FROM_THIS_REPO: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]' }}
         run: |
+          # The counted version is the root package.json's (CLAUDE.md, Git: versioning); an untagged build names it with its commit.
+          counted="$(jq -r .version package.json)"
           if [ -n "$PR_NUMBER" ]; then
             short="${PR_HEAD_SHA::7}"
-            version="0.0.0-pr$PR_NUMBER-$short"
+            version="$counted-pr$PR_NUMBER-$short"
             preview_tags="$IMAGE:pr-$PR_NUMBER-$short"$'\n'"$IMAGE:pr-$PR_NUMBER"
           else
             short="${GITHUB_SHA::7}"
-            if [ "$IS_TAG" = "true" ]; then version="${REF_NAME#v}"; else version="0.0.0-$short"; fi
+            if [ "$IS_TAG" = "true" ]; then version="${REF_NAME#v}"; else version="$counted-$short"; fi
             preview_tags=""
           fi
           {

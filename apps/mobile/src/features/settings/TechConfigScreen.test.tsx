@@ -15,7 +15,8 @@ jest.mock("expo-updates", () => ({
 }));
 jest.mock("expo-constants", () => ({
   __esModule: true,
-  default: { expoConfig: { version: "1.2.3", extra: { commit: "1a2b3c4" } } },
+  // app.json's 1.2.3 is the store's; the counted version rides in extra and is what the screen names (#172).
+  default: { expoConfig: { version: "1.2.3", extra: { commit: "1a2b3c4", version: "0.1.0" } } },
 }));
 
 const ok = {
@@ -46,23 +47,21 @@ describe("the tech config screen", () => {
     expect(screen.getByText("native build 88a4337")).toBeTruthy();
     expect(screen.getByText(/^update published /)).toBeTruthy();
     expect(screen.getByText("channel staging")).toBeTruthy();
-    expect(screen.getByText("version 1.2.3")).toBeTruthy();
+    expect(screen.getByText("version 0.1.0")).toBeTruthy();
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
     );
   });
 
-  it("links the version to the releases and offers the source of the running service", async () => {
+  it("names the version without a releases link, and offers the source of the running service", async () => {
     const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<TechConfigScreen />);
     await waitFor(() => expect(screen.getByText("git commit abc1234")).toBeTruthy());
+    expect(screen.getByText("version 0.1.0")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Releases on GitHub" })).toBeNull();
     const user = userEvent.setup();
-    await user.press(screen.getByRole("link", { name: "Releases on GitHub" }));
     await user.press(screen.getByRole("link", { name: "Open the source code in the browser" }));
-    expect(open.mock.calls.map((c) => c[0])).toEqual([
-      "https://github.com/kuutti-ry/kuutti-app/releases",
-      "https://github.com/kuutti-ry/kuutti-app",
-    ]);
+    expect(open.mock.calls.map((c) => c[0])).toEqual(["https://github.com/kuutti-ry/kuutti-app"]);
   });
 
   it("says in words when the API is unreachable, and checks again on request", async () => {

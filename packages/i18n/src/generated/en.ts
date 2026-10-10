@@ -624,7 +624,6 @@ export const en: Readonly<Record<string, string>> = {
   "tech.app.embedded": "running the build's own bundle, no update applied yet",
   "tech.app.noCommit": "git commit not recorded in this build",
   "tech.app.noRuntime": "native build not recorded",
-  "tech.app.releases": "Releases on GitHub",
   "tech.app.runtime": "native build {runtime}",
   "tech.app.title": "App",
   "tech.app.updated": "update published {date}",

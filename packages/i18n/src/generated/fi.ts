@@ -582,7 +582,6 @@ export const fi: Readonly<Record<string, string>> = {
   "tech.app.embedded": "käytössä version oma paketti, päivitystä ei ole vielä asennettu",
   "tech.app.noCommit": "git-commitia ei ole tallennettu tähän versioon",
   "tech.app.noRuntime": "natiiviversiota ei ole tallennettu",
-  "tech.app.releases": "Julkaisut GitHubissa",
   "tech.app.runtime": "natiiviversio {runtime}",
   "tech.app.title": "Sovellus",
   "tech.app.updated": "päivitys julkaistu {date}",

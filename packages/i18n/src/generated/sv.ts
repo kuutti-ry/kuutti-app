@@ -574,7 +574,6 @@ export const sv: Readonly<Record<string, string>> = {
   "tech.app.embedded": "kör versionens egna paket, ingen uppdatering är installerad ännu",
   "tech.app.noCommit": "git-commit saknas i den här versionen",
   "tech.app.noRuntime": "nativ version saknas",
-  "tech.app.releases": "Utgåvor på GitHub",
   "tech.app.runtime": "nativ version {runtime}",
   "tech.app.title": "Appen",
   "tech.app.updated": "uppdatering publicerad {date}",

@@ -4322,16 +4322,9 @@ tech.app.channel:
 
 tech.app.version:
   en: "version {version}"
-  description: "Tech config, App card: the app's version from app.json. {version} is a version string."
+  description: "Tech config, App card: the JavaScript's version, the root package.json's, stamped into extra.version by app.config.ts. {version} is a version string."
   fi: "versio {version}"
   sv: "version {version}"
-  machine: { fi: true, sv: true }
-
-tech.app.releases:
-  en: "Releases on GitHub"
-  description: "Tech config, App card link to the repository's releases page, where a version is explained."
-  fi: "Julkaisut GitHubissa"
-  sv: "Utgåvor på GitHub"
   machine: { fi: true, sv: true }
 
 tech.errorTest.send:
