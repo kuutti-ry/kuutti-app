@@ -1,0 +1,37 @@
+# The photos screen (#48, #138): the count against the limit, the first photo
+# the main one, each photo's state in words, the moves and the removal as
+# labelled buttons; a photo opens full size and back, and removing one asks
+# first. Sanna has five approved photos; the removal is declined.
+appId: fi.kuutti.app
+name: A photo opens full size and back, and removing one asks first
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://photos
+- extendedWaitUntil:
+    visible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Main photo|Pääkuva|Huvudfoto"
+- assertVisible: "Visible to others|Näkyy muille|Syns för andra"
+- assertVisible: "Make main photo|Aseta pääkuvaksi|Gör till huvudfoto"
+- assertVisible: "Move later|Siirrä myöhemmäksi|Flytta bakåt"
+
+- tapOn: "Open photo 1|Avaa kuva 1|Öppna foto 1"
+- extendedWaitUntil:
+    visible: "Back to your photos|Takaisin kuviisi|Tillbaka till dina foton"
+    timeout: 15000
+- assertVisible: "Photo 1 / 5, full size|Kuva 1 / 5, täysikokoinen|Foto 1 / 5, full storlek"
+- tapOn: "Back to your photos|Takaisin kuviisi|Tillbaka till dina foton"
+
+- extendedWaitUntil:
+    visible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
+    timeout: 15000
+- tapOn:
+    text: "Remove|Poista|Ta bort"
+    index: 0
+- extendedWaitUntil:
+    visible: "Remove this photo\\?|Poistetaanko tämä kuva\\?|Ta bort det här fotot\\?"
+    timeout: 15000
+- tapOn: "Keep it|Säilytä|Behåll"
+- assertNotVisible: "Remove this photo\\?|Poistetaanko tämä kuva\\?|Ta bort det här fotot\\?"
+- assertVisible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"

@@ -1,0 +1,54 @@
+# What a finished profile needs, and what the card leaves out (#47, #94,
+# ADR-006, ADR-019 §5). Noa has two approved photos and four the check put in
+# review, so onboarding is done (it counts photos uploaded) but the gate and
+# the profile wait for three approved ones, and the card shows the approved
+# two only. She hides herself from her field: the field leaves the card, the
+# work stays. Read only. Locally the check queues everything; on staging
+# Rekognition decides, so this flow holds locally.
+appId: fi.kuutti.app
+name: With two approved photos the gate says the profile lacks something, and a hidden field leaves the card
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Noa Salmi
+- assertVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
+
+# Six photos, the grid full: two visible to others, four in review.
+- openLink: kuutti://photos
+- extendedWaitUntil:
+    visible: "6 photos, at most 6|6 kuvaa, enintään 6|6 foton, högst 6"
+    timeout: 15000
+- assertVisible: "Visible to others|Näkyy muille|Syns för andra"
+- scrollUntilVisible:
+    element: "Being reviewed|Tarkistuksessa|Granskas|Waiting for review|Odottaa tarkistusta|Väntar på granskning"
+    direction: DOWN
+    centerElement: true
+- scrollUntilVisible:
+    element: "Add a photo|Lisää kuva|Lägg till ett foto"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    text: "Add a photo|Lisää kuva|Lägg till ett foto"
+    enabled: false
+
+# The profile says what is missing.
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "Your profile|Profiilisi|Din profil"
+    timeout: 15000
+- assertVisible: "Before your card can be shown|Ennen kuin korttisi voidaan näyttää|Innan ditt kort kan visas"
+- assertVisible: "At least 3 approved photos|Vähintään 3 hyväksyttyä kuvaa|Minst 3 godkända foton"
+
+# The card: the approved photos only; the work, not the field.
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- assertVisible: "Photo 1 of 2|Kuva 1 / 2|Foto 1 av 2"
+- scrollUntilVisible:
+    element: "Work|Työ|Arbete"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Science and research|Tiede ja tutkimus|Vetenskap och forskning"
+- assertNotVisible: "Field|Ala|Bransch"

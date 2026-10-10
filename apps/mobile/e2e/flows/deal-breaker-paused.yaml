@@ -1,0 +1,77 @@
+# A deal-breaker waits while the person's own answer on its field is missing
+# (#149, the disclose-to-filter rule, features/matching/preferences.feature):
+# taking one's smoking answer back pauses the smoking deal-breaker, said in
+# words, with nothing deleted; answering again lifts the pause. Sanna smokes
+# never and has no deal-breaker; the flow ends as it began.
+appId: fi.kuutti.app
+name: Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
+- tapOn: "Never|En koskaan|Aldrig"
+- tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+- extendedWaitUntil:
+    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    timeout: 15000
+
+# Her own answer taken back.
+- openLink: kuutti://profile/later/smoking
+- extendedWaitUntil:
+    visible:
+      text: "Never|En koskaan|Aldrig"
+      selected: true
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Never|En koskaan|Aldrig"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    notVisible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+
+# Paused, in words; nothing deleted.
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
+    timeout: 15000
+- assertVisible:
+    text: "Never|En koskaan|Aldrig"
+    selected: true
+
+# Answered again: the pause lifts.
+- tapOn: "Answer it|Vastaa|Svara"
+- extendedWaitUntil:
+    visible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Never|En koskaan|Aldrig"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    notVisible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertNotVisible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
+
+# Back as it began: no deal-breaker.
+- tapOn: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
+- tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+- extendedWaitUntil:
+    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    timeout: 15000
+- assertNotVisible: "Fine with me|Sopii minulle|Okej för mig"
