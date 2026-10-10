@@ -171,7 +171,9 @@ export function ProfileScreen() {
             value={draft.bio ?? ""}
             maxLength={BIO_MAX}
             multiline
-            numberOfLines={4}
+            // Room for four lines and more as the bio grows: a capped field scrolled
+            // its start out of sight at large text sizes (10/10/2026).
+            className="min-h-28"
             onChangeText={(text) =>
               update({
                 bio: text.length > 0 ? text : null,

@@ -47,7 +47,7 @@ describe("SignInScreen", () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-    expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios`);
+    expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios&locale=en`);
     expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
   });
 

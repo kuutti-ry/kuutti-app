@@ -580,7 +580,8 @@ export function OnboardingScreen() {
                 value={draft.bio ?? ""}
                 maxLength={BIO_MAX}
                 multiline
-                numberOfLines={4}
+                // Room for four lines and more as the bio grows (as on the profile screen).
+                className="min-h-28"
                 onChangeText={(text) =>
                   update({ bio: text.length > 0 ? text : null, bioPreset: null })
                 }
