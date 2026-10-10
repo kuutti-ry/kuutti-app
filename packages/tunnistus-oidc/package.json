@@ -30,7 +30,7 @@
     "zod": "^4.6.5"
   },
   "peerDependencies": {
-    "hono": "^4.13.12"
+    "hono": "^4.13.13"
   },
   "peerDependenciesMeta": {
     "hono": {
@@ -38,9 +38,9 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^22.20.4",
+    "@types/node": "^22.20.5",
     "fast-check": "^4.10.2",
-    "hono": "^4.13.12",
+    "hono": "^4.13.13",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }
