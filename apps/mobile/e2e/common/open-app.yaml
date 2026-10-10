@@ -7,6 +7,15 @@
 appId: fi.kuutti.app
 ---
 - openLink: exp+kuutti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081
+# The dev client's own menu, should a tap have brushed its floating Tools
+# button, lies over the app as a sheet: swiped down, it goes.
+- runFlow:
+    when:
+      visible: "Connected to:"
+    commands:
+      - swipe:
+          start: "50%, 15%"
+          end: "50%, 95%"
 - extendedWaitUntil:
     visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
     timeout: 60000

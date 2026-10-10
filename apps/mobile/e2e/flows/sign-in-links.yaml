@@ -1,0 +1,60 @@
+# The return link of the bank login (#36, #45): a link this phone did not ask
+# for is refused without touching the session (the login-CSRF guard), a link
+# to no screen goes home rather than to Expo's unmatched route, and every
+# refusal the API can send back is said in its own words, a crafted code as
+# the generic line. Most codes no persona produces (no cancel at the mock
+# bank, no suspended persona), so they are opened as links. Sanna; read only.
+appId: fi.kuutti.app
+name: A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://auth?code=forged
+- extendedWaitUntil:
+    visible: "This sign-in link was not requested from this phone\\. Start the sign-in here, with the button\\.|Tätä kirjautumislinkkiä ei pyydetty tältä puhelimelta\\. Aloita kirjautuminen tästä painikkeella\\.|Den här inloggningslänken begärdes inte från den här telefonen\\. Starta inloggningen här med knappen\\."
+    timeout: 15000
+# Still signed in.
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Log out|Kirjaudu ulos|Logga ut"
+    timeout: 15000
+# No such screen: home.
+- openLink: kuutti://auth/return
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000
+- assertNotVisible: "Unmatched Route"
+
+# Signed out, each refusal by its code.
+- runFlow: ../common/sign-out.yaml
+- openLink: kuutti://auth?error=auth_suspended
+- extendedWaitUntil:
+    visible: "This account is suspended for now\\.|Tämä tili on toistaiseksi jäädytetty\\.|Det här kontot är tills vidare avstängt\\."
+    timeout: 15000
+- assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
+- assertVisible: "Try again|Yritä uudelleen|Försök igen"
+- openLink: kuutti://auth?error=auth_cancelled
+- extendedWaitUntil:
+    visible: "You cancelled the sign-in at your bank\\. Nothing was saved\\.|Peruutit kirjautumisen pankissasi\\. Mitään ei tallennettu\\.|Du avbröt inloggningen hos din bank\\. Inget sparades\\."
+    timeout: 15000
+- openLink: kuutti://auth?error=auth_state_mismatch
+- extendedWaitUntil:
+    visible: "That sign-in attempt is unknown or has expired\\. Start again\\.|Tätä kirjautumisyritystä ei tunnisteta tai se on vanhentunut\\. Aloita alusta\\.|Det här inloggningsförsöket är okänt eller har gått ut\\. Börja om\\."
+    timeout: 15000
+- openLink: kuutti://auth?error=auth_code_used
+- extendedWaitUntil:
+    visible: "That sign-in link was already used or has expired\\. Start again\\.|Tämä kirjautumislinkki on jo käytetty tai vanhentunut\\. Aloita alusta\\.|Den här inloggningslänken har redan använts eller gått ut\\. Börja om\\."
+    timeout: 15000
+- openLink: kuutti://auth?error=auth_provider_error
+- extendedWaitUntil:
+    visible: "The identification service did not complete the sign-in\\. Try again in a moment\\.|Tunnistuspalvelu ei saanut kirjautumista valmiiksi\\. Yritä hetken kuluttua uudelleen\\.|Identifieringstjänsten slutförde inte inloggningen\\. Försök igen om en stund\\."
+    timeout: 15000
+# Midday UTC, so the same day in every zone the phone could be in.
+- openLink: kuutti://auth?error=auth_cooldown&until=2026-11-09T12:00:00.000Z
+- extendedWaitUntil:
+    visible: ".*9\\.11\\.2026.*|.*11/9/2026.*|.*2026-11-09.*"
+    timeout: 15000
+# A code the app does not know, named like a property every object has.
+- openLink: kuutti://auth?error=toString
+- extendedWaitUntil:
+    visible: "Something went wrong\\. Try again\\.|Jokin meni pieleen\\. Yritä uudelleen\\.|Något gick fel\\. Försök igen\\."
+    timeout: 15000

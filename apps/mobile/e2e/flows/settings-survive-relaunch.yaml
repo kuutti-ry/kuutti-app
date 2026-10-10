@@ -1,0 +1,31 @@
+# What the person chose in Settings stays across closing the app (#12, #55):
+# the session (no bank login again), the theme and the language. Sanna; the
+# flow ends on the system theme and the phone's language, as it began.
+appId: fi.kuutti.app
+name: The session, the theme and the language survive closing and reopening the app
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Theme|Teema|Tema"
+    timeout: 15000
+- tapOn: "Dark|Tumma|Mörkt"
+- assertVisible: "✓ Dark|✓ Tumma|✓ Mörkt"
+- tapOn: ".*Svenska.*"
+- assertVisible: "Inställningar"
+
+- stopApp
+- runFlow: ../common/open-app.yaml
+- assertVisible: "Ditt område"
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Inställningar"
+    timeout: 15000
+- assertVisible: "✓ Mörkt"
+- assertVisible: ".*✓.*Svenska.*"
+
+# Back as it began.
+- tapOn: "System"
+- tapOn: "Telefonens språk"
+- assertVisible: "✓ System|✓ Järjestelmä"
+- assertVisible: "✓ Phone's language|✓ Puhelimen kieli|✓ Telefonens språk"
