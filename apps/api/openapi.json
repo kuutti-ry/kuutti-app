@@ -1031,48 +1031,58 @@
             "maxItems": 5
           },
           "field": {
-            "type": "string",
-            "enum": [
-              "tech",
-              "engineering",
-              "business",
-              "arts",
-              "science",
-              "health",
-              "education",
-              "law",
-              "social",
-              "trades",
-              "service",
-              "other"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tech",
+                "engineering",
+                "business",
+                "arts",
+                "science",
+                "health",
+                "education",
+                "law",
+                "social",
+                "trades",
+                "service",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
           },
           "hideFromField": {
             "type": "boolean"
           },
           "occupation": {
-            "type": "string",
-            "enum": [
-              "student",
-              "tech",
-              "healthcare",
-              "education",
-              "business",
-              "arts_culture",
-              "science",
-              "trades_construction",
-              "service_hospitality",
-              "public_sector",
-              "transport",
-              "agriculture",
-              "media",
-              "law_finance",
-              "sports",
-              "entrepreneur",
-              "between_jobs",
-              "retired",
-              "other"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "student",
+                "tech",
+                "healthcare",
+                "education",
+                "business",
+                "arts_culture",
+                "science",
+                "trades_construction",
+                "service_hospitality",
+                "public_sector",
+                "transport",
+                "agriculture",
+                "media",
+                "law_finance",
+                "sports",
+                "entrepreneur",
+                "between_jobs",
+                "retired",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
           },
           "occupationTitle": {
             "type": "string",
@@ -1651,45 +1661,55 @@
             "maxItems": 5
           },
           "field": {
-            "type": "string",
-            "enum": [
-              "tech",
-              "engineering",
-              "business",
-              "arts",
-              "science",
-              "health",
-              "education",
-              "law",
-              "social",
-              "trades",
-              "service",
-              "other"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tech",
+                "engineering",
+                "business",
+                "arts",
+                "science",
+                "health",
+                "education",
+                "law",
+                "social",
+                "trades",
+                "service",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
           },
           "occupation": {
-            "type": "string",
-            "enum": [
-              "student",
-              "tech",
-              "healthcare",
-              "education",
-              "business",
-              "arts_culture",
-              "science",
-              "trades_construction",
-              "service_hospitality",
-              "public_sector",
-              "transport",
-              "agriculture",
-              "media",
-              "law_finance",
-              "sports",
-              "entrepreneur",
-              "between_jobs",
-              "retired",
-              "other"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "student",
+                "tech",
+                "healthcare",
+                "education",
+                "business",
+                "arts_culture",
+                "science",
+                "trades_construction",
+                "service_hospitality",
+                "public_sector",
+                "transport",
+                "agriculture",
+                "media",
+                "law_finance",
+                "sports",
+                "entrepreneur",
+                "between_jobs",
+                "retired",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
           },
           "zodiac": {
             "type": "string",

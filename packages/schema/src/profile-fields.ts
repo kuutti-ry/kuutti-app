@@ -317,8 +317,8 @@ export const PROFILE_FIELDS = {
     role: "info",
     preferenceAbout: "none",
   }),
-  /** Field of study or work; a list per university is a configuration of its own, later (ADR-019 §5). */
-  field: single(
+  /** Up to three fields of study or work (#178); a list per university is a configuration of its own, later (ADR-019 §5). */
+  field: multi(
     [
       "tech",
       "engineering",
@@ -333,11 +333,13 @@ export const PROFILE_FIELDS = {
       "service",
       "other",
     ],
+    3,
     { role: "info", preferenceAbout: "none" },
   ),
   /** "Hide me from my field": people of the same field never see this person; the round builder of #95 reads it. */
   hideFromField: flag({ role: "hidden", preferenceAbout: "none" }),
-  occupation: single(
+  /** Up to three lines of work (#178). */
+  occupation: multi(
     [
       "student",
       "tech",
@@ -359,6 +361,7 @@ export const PROFILE_FIELDS = {
       "retired",
       "other",
     ],
+    3,
     { role: "info", preferenceAbout: "none" },
   ),
   /** A short title in the person's words and no employer's name: under the plain-text rule like every free text. */

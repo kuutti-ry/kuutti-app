@@ -248,7 +248,7 @@ describe("profile routes", () => {
         ...update.fields,
         education: "amk",
         drinking: "rarely",
-        field: "tech",
+        field: ["tech"],
         hideFromField: true,
       },
     });
@@ -256,7 +256,7 @@ describe("profile routes", () => {
     expect(ProfileResponse.parse(await saved.json()).profile?.fields).toMatchObject({
       education: "amk",
       drinking: "rarely",
-      field: "tech",
+      field: ["tech"],
       hideFromField: true,
     });
     const preview = await app.request("/profile/card", { headers: a.headers });
