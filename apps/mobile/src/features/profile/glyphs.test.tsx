@@ -4,7 +4,7 @@ import type React from "react";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { Chip } from "./FieldEditor";
-import { GLYPH_FIELDS, OptionGlyph, optionGlyph } from "./glyphs";
+import { GLYPH_FIELDS, GLYPHLESS_PARTIES, OptionGlyph, optionGlyph } from "./glyphs";
 
 /** The nodes hidden from a screen reader: what a decorative glyph renders as. */
 const hidden = (node: HostNode | string | null | undefined): HostNode[] => {
@@ -20,8 +20,13 @@ const show = (ui: React.ReactElement) =>
   });
 
 describe("the option glyphs (#213)", () => {
-  it("exist for every party, for the religions with a symbol and for every sign, and for nothing else", () => {
-    for (const party of PARTY_OPTIONS) expect(optionGlyph("politics", party)).not.toBeNull();
+  it("exist for every party but the wordmarks, for the religions with a symbol and for every sign, and for nothing else", () => {
+    for (const party of PARTY_OPTIONS) {
+      expect([party, optionGlyph("politics", party) !== null]).toEqual([
+        party,
+        !GLYPHLESS_PARTIES.includes(party),
+      ]);
+    }
     expect(optionGlyph("politics", "none_of_them")).toBeNull();
     expect(optionGlyph("politics", "kahvipuolue")).toBeNull();
     for (const sign of PROFILE_FIELDS.zodiac.options)
