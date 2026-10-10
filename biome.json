@@ -16,7 +16,8 @@
       "!pnpm-lock.yaml",
       "!apps/api/openapi.json",
       "!packages/schema/src/api.generated.ts",
-      "!packages/i18n/src/generated"
+      "!packages/i18n/src/generated",
+      "!apps/mobile/assets/glyphs"
     ]
   },
   "formatter": {

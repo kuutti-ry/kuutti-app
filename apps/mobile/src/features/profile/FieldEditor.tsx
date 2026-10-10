@@ -8,6 +8,7 @@ import {
   type ProfileUpdate,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
+import type React from "react";
 import { useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { OptionGlyph, optionGlyph } from "./glyphs";
 import { fieldLabelKey, optionKey } from "./keys";
 
 /** Lists longer than this get a search box (#148): the languages, the hobbies, the lines of work. */
@@ -46,18 +48,33 @@ export function Chip({
   label,
   selected,
   onPress,
+  glyph,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
+  /** A decorative glyph before the label (#213); the label still names the button. */
+  glyph?: React.ReactNode;
 }) {
+  const variant = selected ? "default" : "outline";
+  if (glyph === undefined || glyph === null || glyph === false) {
+    return (
+      <Button variant={variant} accessibilityState={{ selected }} onPress={onPress}>
+        {label}
+      </Button>
+    );
+  }
   return (
     <Button
-      variant={selected ? "default" : "outline"}
+      variant={variant}
       accessibilityState={{ selected }}
       onPress={onPress}
+      accessibilityLabel={label}
     >
-      {label}
+      <View className="flex-row items-center gap-2">
+        {glyph}
+        <Text>{label}</Text>
+      </View>
     </Button>
   );
 }
@@ -144,6 +161,15 @@ export function FieldEditor({
         key={option}
         label={t(optionTextKey(field, option, draft.fields))}
         selected={selected}
+        glyph={
+          optionGlyph(field, option) && (
+            <OptionGlyph
+              field={field}
+              option={option}
+              className={selected ? "text-primary-foreground" : "text-foreground"}
+            />
+          )
+        }
         onPress={() => {
           tap();
           if (spec.kind === "multi") {

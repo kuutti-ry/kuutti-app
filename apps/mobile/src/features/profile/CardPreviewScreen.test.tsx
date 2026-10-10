@@ -40,6 +40,8 @@ const card = {
     hobbies: ["yoga", "hiking"],
     occupationTitle: "Architect",
     height: 171,
+    politics: ["kok", "vihr"],
+    zodiac: "corgi",
   },
   bio: null,
   bioPreset: "photos_speak",

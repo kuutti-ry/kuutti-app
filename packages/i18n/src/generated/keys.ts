@@ -520,6 +520,7 @@ export type MessageParams = {
   "profile.option.politics.kok": Record<never, never>;
   "profile.option.politics.liik": Record<never, never>;
   "profile.option.politics.none_of_them": Record<never, never>;
+  "profile.option.politics.pp": Record<never, never>;
   "profile.option.politics.ps": Record<never, never>;
   "profile.option.politics.rkp": Record<never, never>;
   "profile.option.politics.sdp": Record<never, never>;

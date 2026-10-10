@@ -2614,9 +2614,9 @@ export interface components {
             hideFromField?: boolean;
             occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
             occupationTitle?: string;
-            politics?: ("kok" | "ps" | "sdp" | "kesk" | "vihr" | "vas" | "rkp" | "kd" | "liik" | "none_of_them" | "kahvipuolue")[];
+            politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them" | "kahvipuolue")[];
             /** @enum {string} */
-            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "jewish" | "buddhist" | "hindu" | "spiritual" | "agnostic" | "atheist" | "other";
+            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
             /** @enum {string} */
             zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };

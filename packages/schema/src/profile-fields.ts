@@ -236,24 +236,31 @@ export const HEIGHT_MIN_CM = 140;
 export const HEIGHT_MAX_CM = 220;
 
 /**
- * The parties of the parliament by their usual abbreviation, plain names and
- * no logos (ADR-019 §4); the list is refreshed after the election of April
- * 2027. "None of them" is an answer of its own, and the coffee party is the
- * one joke the sheet asks for.
+ * The parties by their usual abbreviation: the nine of the parliament and the
+ * Pirate Party, in the order of their Finnish names, each shown with its logo
+ * before the name (#213, ADR-019 §3); the list is refreshed after the
+ * election of April 2027. "None of them" is an answer of its own, and the
+ * coffee party is the one joke the sheet asks for; both stand after the
+ * parties, and neither has a logo.
  */
 export const POLITICS_OPTIONS = [
-  "kok",
-  "ps",
-  "sdp",
   "kesk",
-  "vihr",
-  "vas",
-  "rkp",
+  "kok",
   "kd",
   "liik",
+  "ps",
+  "pp",
+  "rkp",
+  "sdp",
+  "vas",
+  "vihr",
   "none_of_them",
   "kahvipuolue",
 ] as const;
+/** The options of `politics` that are parties: the ones with a logo. */
+export const PARTY_OPTIONS = POLITICS_OPTIONS.filter(
+  (option) => option !== "none_of_them" && option !== "kahvipuolue",
+);
 
 export const PROFILE_FIELDS = {
   /** Asked in onboarding (#146); "open to either" matches both others (#147). */
@@ -373,15 +380,16 @@ export const PROFILE_FIELDS = {
     specialCategory: true,
   }),
   /** Article 9; a deal-breaker only after the Ombudsman's answer (ADR-019 §4). The list is the maintainer's. */
+  /** The religions by their share of the people of Finland (Statistics Finland, 2023; the maintainer, 10/10/2026), the stances after them. */
   religion: single(
     [
       "lutheran",
       "orthodox",
       "other_christian",
       "muslim",
-      "jewish",
       "buddhist",
       "hindu",
+      "jewish",
       "spiritual",
       "agnostic",
       "atheist",

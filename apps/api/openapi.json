@@ -1094,21 +1094,22 @@
             "items": {
               "type": "string",
               "enum": [
-                "kok",
-                "ps",
-                "sdp",
                 "kesk",
-                "vihr",
-                "vas",
-                "rkp",
+                "kok",
                 "kd",
                 "liik",
+                "ps",
+                "pp",
+                "rkp",
+                "sdp",
+                "vas",
+                "vihr",
                 "none_of_them",
                 "kahvipuolue"
               ]
             },
             "minItems": 1,
-            "maxItems": 11
+            "maxItems": 12
           },
           "religion": {
             "type": "string",
@@ -1117,9 +1118,9 @@
               "orthodox",
               "other_christian",
               "muslim",
-              "jewish",
               "buddhist",
               "hindu",
+              "jewish",
               "spiritual",
               "agnostic",
               "atheist",

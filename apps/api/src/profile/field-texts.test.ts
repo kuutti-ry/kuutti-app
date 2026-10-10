@@ -1,5 +1,10 @@
 import { CONSENT_VERSIONS, createI18n } from "@kuutti/i18n";
-import { HOBBY_GROUP_KEYS, PROFILE_FIELD_KEYS, PROFILE_FIELDS } from "@kuutti/schema";
+import {
+  HOBBY_GROUP_KEYS,
+  PARTY_OPTIONS,
+  PROFILE_FIELD_KEYS,
+  PROFILE_FIELDS,
+} from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 
 // The registry of packages/schema names fields, options and hobby groups by
@@ -34,5 +39,19 @@ describe("the texts of the profile registry", () => {
     expect(CONSENT_VERSIONS.special_category).toMatch(/^\d{4}-\d{2}-/);
     expect(has("en", "legal.special_category.summary")).toBe(true);
     expect(has("fi", "legal.special_category.summary")).toBe(true);
+  });
+
+  it("lists the parties in the order of their Finnish names, the two that are no party last", () => {
+    // People know the parties by name and logo (#213); the order is the Finnish names' (ADR-019 §3).
+    const finnish = (option: string) =>
+      String(i18n.getResource("fi", "translation", `profile.option.politics.${option}`));
+    const collator = new Intl.Collator("fi");
+    expect([...PARTY_OPTIONS]).toEqual(
+      [...PARTY_OPTIONS].sort((a, b) => collator.compare(finnish(a), finnish(b))),
+    );
+    expect(PROFILE_FIELDS.politics.options.slice(PARTY_OPTIONS.length)).toEqual([
+      "none_of_them",
+      "kahvipuolue",
+    ]);
   });
 });
