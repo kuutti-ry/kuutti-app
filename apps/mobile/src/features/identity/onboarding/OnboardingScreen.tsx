@@ -185,9 +185,15 @@ export function OnboardingScreen() {
     state.status === "ready"
       ? state.onboarding.nextChange[current === "gender" ? "gender" : "seeks"]
       : null;
+  // The stored window first: a withdrawal of the sensitive-answers consent asks
+  // whom one seeks again, and the ages with it (#204), and the person keeps
+  // the window they had. The default around their age is for the first time.
+  const stored = state.status === "ready" ? state.onboarding.preferences.ageWindow : null;
   useEffect(() => {
-    if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
-  }, [current, ages, age]);
+    if (current === "age" && ages === null && age !== null) {
+      setAges(stored ?? defaultAgeWindow(age));
+    }
+  }, [current, ages, age, stored]);
   // The ponds to choose from, read once the step is reached (#174): null while loading, [] when the read failed.
   const [ponds, setPonds] = useState<PondSummary[] | null>(null);
   useEffect(() => {
