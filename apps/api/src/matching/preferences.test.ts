@@ -71,6 +71,25 @@ describe("preferences", () => {
     expect(JSON.stringify(logs())).not.toContain("non_binary");
   });
 
+  test("Whom one seeks and the age window are saved one at a time", async ({ ctx }) => {
+    // Onboarding saves each on its own screen (ADR-010 §13): an app closed between them keeps the first.
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const read = async () =>
+      PreferencesResponse.parse(
+        await (await app.request("/preferences", { headers: a.headers })).json(),
+      );
+    const seeks = await put(app, a.headers, { seeks: ["non_binary"] });
+    expect(seeks.status).toBe(200);
+    expect(await read()).toEqual({ seeks: ["non_binary"], ageWindow: null });
+    const ages = await put(app, a.headers, { ageWindow: { min: 25, max: 35 } });
+    expect(ages.status).toBe(200);
+    expect(await read()).toEqual({ seeks: ["non_binary"], ageWindow: { min: 25, max: 35 } });
+    expect((await put(app, a.headers, {})).status).toBe(400);
+    expect(await read()).toEqual({ seeks: ["non_binary"], ageWindow: { min: 25, max: 35 } });
+    expect(JSON.stringify(logs())).not.toContain("non_binary");
+  });
+
   test("PUT /preferences writes the caller's rows and leaves another account's alone", async ({
     ctx,
   }) => {

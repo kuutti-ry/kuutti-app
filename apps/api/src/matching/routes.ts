@@ -43,9 +43,9 @@ const readRoute = createRoute({
 const saveRoute = createRoute({
   method: "put",
   path: "/preferences",
-  summary: "Set whom the caller seeks and the age window",
+  summary: "Set whom the caller seeks, the age window, or both",
   description:
-    "Both at once: a non-empty set of genders and an age window within 18 and 99 with min at most max. Hard rows: the round builder never crosses them, in either direction.",
+    "Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.",
   ...bearer,
   request: { body: { required: true, ...json(PreferencesUpdate) } },
   responses: {
