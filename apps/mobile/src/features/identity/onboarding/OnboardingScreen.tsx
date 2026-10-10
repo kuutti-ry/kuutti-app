@@ -59,11 +59,9 @@ const STEPS: Step[] = [
   "research",
 ];
 
-/** What the screen keeps between two status reads: the answers the API takes together with a later one. */
+/** What the screen keeps between two status reads: what the API's status does not say. */
 export type LocalAnswers = {
   researchOffered: boolean;
-  /** The seek screen was left with its answer, which is saved with the age window (one PUT /preferences, ADR-010 §2). */
-  seeksDone: boolean;
   /** A non-binary gender was just declared: the label is offered once, before the next step. */
   labelPending: boolean;
 };
@@ -82,9 +80,9 @@ export function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("name")) return "name";
   if (missing.has("gender")) return "gender";
   if (local.labelPending) return "identityLabel";
-  if (missing.has("seeks") && !local.seeksDone) return "seeks";
+  if (missing.has("seeks")) return "seeks";
   if (missing.has("intent")) return "intent";
-  if (missing.has("age_window") || missing.has("seeks")) return "age";
+  if (missing.has("age_window")) return "age";
   // Open only where more than one pond exists (#174, ADR-010 §12); with one, the API assigned it.
   if (missing.has("pond")) return "pond";
   if (missing.has("photos")) return "photos";
@@ -160,15 +158,12 @@ export function OnboardingScreen() {
   const profile = useProfile();
   const [researchOffered, setResearchOffered] = useState(false);
   const [seeks, setSeeks] = useState<Gender[]>([]);
-  const [seeksDone, setSeeksDone] = useState(false);
   const [labelPending, setLabelPending] = useState(false);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
 
   const current: Step | null =
-    state.status === "ready"
-      ? nextStep(state.onboarding, { researchOffered, seeksDone, labelPending })
-      : null;
+    state.status === "ready" ? nextStep(state.onboarding, { researchOffered, labelPending }) : null;
   useEffect(() => {
     if (current === "done") router.replace("/");
   }, [current, router]);
@@ -180,20 +175,17 @@ export function OnboardingScreen() {
   }, [current]);
   const age = state.status === "ready" ? state.onboarding.age : null;
   // From when a refused change is possible (#147): the gender's for the gender
-  // step, whom one seeks for the steps that save it (seeks, the age window).
+  // step, whom one seeks for the step that saves it.
   const changeFrom =
     state.status === "ready"
       ? state.onboarding.nextChange[current === "gender" ? "gender" : "seeks"]
       : null;
-  // The stored window first: a withdrawal of the sensitive-answers consent asks
-  // whom one seeks again, and the ages with it (#204), and the person keeps
-  // the window they had. The default around their age is for the first time.
-  const stored = state.status === "ready" ? state.onboarding.preferences.ageWindow : null;
+  // The age step is open only while no window is stored (ADR-010 §13): a
+  // withdrawal asks whom one seeks again and keeps the window, so the default
+  // around the person's age is all this step ever starts from.
   useEffect(() => {
-    if (current === "age" && ages === null && age !== null) {
-      setAges(stored ?? defaultAgeWindow(age));
-    }
-  }, [current, ages, age, stored]);
+    if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
+  }, [current, ages, age]);
   // The ponds to choose from, read once the step is reached (#174): null while loading, [] when the read failed.
   const [ponds, setPonds] = useState<PondSummary[] | null>(null);
   useEffect(() => {
@@ -505,12 +497,12 @@ export function OnboardingScreen() {
                 )}
               </CardContent>
             </Card>
-            {/* Seeks and the age window are one save: this button only moves on. */}
+            {/* Saved on leaving the screen (ADR-010 §13): an app closed before the ages keeps it. */}
             <Button
               disabled={busy || seeks.length === 0 || !specialConsented}
               onPress={() => {
                 tap();
-                setSeeksDone(true);
+                void step(() => savePreferences({ seeks }));
               }}
             >
               {t("onboarding.continue")}
@@ -574,10 +566,10 @@ export function OnboardingScreen() {
               />
             </View>
             <Button
-              disabled={busy || seeks.length === 0}
+              disabled={busy}
               onPress={() => {
                 tap();
-                void step(() => savePreferences({ seeks, ageWindow: ages }));
+                void step(() => savePreferences({ ageWindow: ages }));
               }}
             >
               {t("onboarding.continue")}

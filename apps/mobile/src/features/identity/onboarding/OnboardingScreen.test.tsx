@@ -162,10 +162,11 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       return new Response(null, { status: 204 });
     }
     if (path === "/preferences") {
-      const b = body as { seeks: string[]; ageWindow: { min: number; max: number } };
-      server.seeks = b.seeks;
-      server.ageWindow = b.ageWindow;
-      return json({ seeks: b.seeks, ageWindow: b.ageWindow });
+      // Either row or both, each replacing its own (ADR-010 §13).
+      const b = body as { seeks?: string[]; ageWindow?: { min: number; max: number } };
+      if (b.seeks) server.seeks = b.seeks;
+      if (b.ageWindow) server.ageWindow = b.ageWindow;
+      return json({ seeks: server.seeks, ageWindow: server.ageWindow });
     }
     if (path === "/consents") {
       server.consents.push(body as { kind: string; version: string; locale: string });
@@ -246,6 +247,9 @@ describe("OnboardingScreen", () => {
     expect(server.consents.at(-1)).toEqual(consented("special_category"));
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("What are you here for?")).toBeTruthy());
+    // Whom one seeks is saved on leaving its screen, before the ages (ADR-010 §13).
+    expect(server.seeks).toEqual(["man", "non_binary"]);
+    expect(server.ageWindow).toBeNull();
     checkA11y();
     await press(screen.getByRole("button", { name: "Something casual" }));
     await press(screen.getByRole("button", { name: "Continue" }));
@@ -291,9 +295,38 @@ describe("OnboardingScreen", () => {
       "/profile",
       "/account/gender",
       "/consents",
+      "/preferences",
       "/profile",
       "/preferences",
       "/profile",
+    ]);
+    expect(calls.filter((c) => c.path === "/preferences" && c.method === "PUT")).toEqual([
+      { method: "PUT", path: "/preferences", body: { seeks: ["man", "non_binary"] } },
+      { method: "PUT", path: "/preferences", body: { ageWindow: { min: 30, max: 42 } } },
+    ]);
+  });
+
+  it("resumes at the intent with whom one seeks kept when the app closed before the ages", async () => {
+    // What a relaunch finds after leaving the seek screen: the answer and its consent stored,
+    // the intent and the window not yet (ADR-010 §13). The screen's own memory is empty.
+    const { server, calls } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
+    server.profile = { displayName: "Onni", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    server.gender = "non_binary";
+    server.seeks = ["woman", "man", "non_binary"];
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("What are you here for?")).toBeTruthy());
+    expect(screen.queryByText("Whom are you looking for?")).toBeNull();
+    await press(screen.getByRole("button", { name: "Something long-term" }));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    expect(server.seeks).toEqual(["woman", "man", "non_binary"]);
+    expect(server.ageWindow).toEqual({ min: 31, max: 41 });
+    expect(calls.filter((c) => c.path === "/preferences" && c.method === "PUT")).toEqual([
+      { method: "PUT", path: "/preferences", body: { ageWindow: { min: 31, max: 41 } } },
     ]);
   });
 
@@ -406,10 +439,10 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["woman", "man", "non_binary"]);
   });
 
-  it("shows the stored age window again when whom one seeks is asked anew", async () => {
-    // A withdrawal of the sensitive-answers consent asks whom one seeks again, and the ages
-    // with it (#204): the window the person had, not the default around their age.
-    const { server } = fakeApi({ age: 43 });
+  it("asks only whom one seeks again after a withdrawal, and keeps the age window", async () => {
+    // A withdrawal of the sensitive-answers consent removes whom one seeks (#204); the window
+    // is no sensitive answer and stays, so the ages are not asked again (ADR-010 §13).
+    const { server, calls } = fakeApi({ age: 43 });
     server.consents.push(consented("terms"), consented("privacy"));
     server.profile = {
       displayName: "Noa",
@@ -425,12 +458,13 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Anyone" }));
     await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
     await press(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
-    expect(screen.getByText("35")).toBeTruthy();
-    expect(screen.getByText("50")).toBeTruthy();
-    await press(screen.getByRole("button", { name: "Continue" }));
-    await flush();
+    await waitFor(() => expect(screen.getByText("Three photos of you")).toBeTruthy());
+    expect(screen.queryByText("What ages?")).toBeNull();
+    expect(server.seeks).toEqual(["woman", "man", "non_binary"]);
     expect(server.ageWindow).toEqual({ min: 35, max: 50 });
+    expect(calls.filter((c) => c.path === "/preferences" && c.method === "PUT")).toEqual([
+      { method: "PUT", path: "/preferences", body: { seeks: ["woman", "man", "non_binary"] } },
+    ]);
   });
 
   it("asks for an app update instead of recording a consent for a wording it did not show", async () => {
