@@ -65,9 +65,13 @@ const byRegistration = (a: Applicant, b: Applicant) =>
 /**
  * The contest ratio behind the share (ADR-015 §4): a group kept to at most
  * `shareMax` of two groups is a ratio of at most shareMax / (1 - shareMax)
- * between the two (0.6 is three to two).
+ * between the two (0.6 is three to two). The share is held in thousandths
+ * and the ratio compared in integers: in floating point 0.6 / 0.4 is
+ * 1.4999999999999998, which refused a contest standing at exactly three to
+ * two, once in a while, in the property test (#216).
  */
-const ratioOf = (shareMax: number): number => shareMax / (1 - shareMax);
+const SHARE_SCALE = 1000;
+const sharePermille = (shareMax: number): number => Math.round(shareMax * SHARE_SCALE);
 
 /** Per gender: how many let-in people compete for it, and how many of it are there to compete for. */
 type Tally = { competitors: Record<Gender, number>; supply: Record<Gender, number> };
@@ -89,12 +93,13 @@ function count(t: Tally, person: Pick<Applicant, "gender" | "seeks">): void {
  * most those they compete for, always; beyond that, while one more keeps
  * the ratio. An empty pond has room for the first of anybody.
  */
-const hasRoom = (t: Tally, gender: Gender, ratio: number): boolean =>
+const hasRoom = (t: Tally, gender: Gender, share: number): boolean =>
   t.competitors[gender] <= t.supply[gender] ||
-  t.competitors[gender] + 1 <= ratio * t.supply[gender];
+  // competitors + 1 <= share / (1 - share) * supply, with nothing divided.
+  (t.competitors[gender] + 1) * (SHARE_SCALE - share) <= share * t.supply[gender];
 
-const mayEnter = (t: Tally, person: Applicant, ratio: number): boolean =>
-  contestsOf(person).every((gender) => hasRoom(t, gender, ratio));
+const mayEnter = (t: Tally, person: Applicant, share: number): boolean =>
+  contestsOf(person).every((gender) => hasRoom(t, gender, share));
 
 /**
  * Who of one pond is let in now. People who compete for nobody are let in at
@@ -107,7 +112,7 @@ const mayEnter = (t: Tally, person: Applicant, ratio: number): boolean =>
  * promise about the ratio, which also drifts as people leave (TD-13).
  */
 export function admit(people: readonly Applicant[], shareMax: number): Admission {
-  const ratio = ratioOf(shareMax);
+  const share = sharePermille(shareMax);
   const t = tally();
   const admitted: Applicant[] = [];
   const line: Applicant[] = [];
@@ -118,7 +123,7 @@ export function admit(people: readonly Applicant[], shareMax: number): Admission
   }
   line.sort(byRegistration);
   for (;;) {
-    const index = line.findIndex((person) => mayEnter(t, person, ratio));
+    const index = line.findIndex((person) => mayEnter(t, person, share));
     if (index < 0) break;
     const [next] = line.splice(index, 1);
     if (!next) break;

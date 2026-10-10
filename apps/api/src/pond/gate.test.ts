@@ -190,6 +190,17 @@ describe("admission", () => {
     expect([...other.waiting]).toEqual([...one.waiting].map(([id, n]) => [`swapped-${id}`, n]));
   });
 
+  it("a contest standing at exactly its ratio has room for the one more the share allows", () => {
+    // Four women competed for by five, the share three to two: the sixth competitor is the
+    // ratio exactly. In floating point 0.6 / 0.4 fell short of 1.5 and he waited (#216).
+    const women = group(4, "woman", ["non_binary"]);
+    const others = group(5, "non_binary", ["woman"]);
+    const man = group(1, "man", ["woman"]);
+    const { admitted, waiting } = admit([...women, ...others, ...man], 0.6);
+    expect(waiting.size).toBe(0);
+    expect(admitted).toHaveLength(10);
+  });
+
   it("for any pond: everybody is let in or waits, nobody twice, and nobody who was in is touched", () => {
     fc.assert(
       fc.property(applicantsArb, (people) => {
