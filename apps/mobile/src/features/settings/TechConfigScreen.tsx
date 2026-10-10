@@ -5,9 +5,8 @@ import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import * as Updates from "expo-updates";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import ExternalLink from "lucide-react-native/icons/external-link";
 import { useCallback, useEffect, useState } from "react";
-import { Linking, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,16 +25,15 @@ type State =
   | { kind: "ok"; health: HealthResponse }
   | { kind: "error"; message: string };
 
-/** Where a build's version is explained: the releases of the repository. */
-const RELEASES_URL = "https://github.com/kuutti-ry/kuutti-app/releases";
-
 /**
  * Everything technical about the running app, for the team and for anybody
  * who installs a staging build (#143; the team's notes of 08/10): the
  * environment, the API's address and health, the two commits, the native
- * build and the update it runs, the version with its releases page, a test
- * error for the error tracker, and the licences of the packages. It exists
- * outside production only; the store's build has the route and shows that.
+ * build and the update it runs, the version, a test error for the error
+ * tracker, and the licences of the packages. It exists outside production
+ * only; the store's build has the route and shows that. There is no link to
+ * releases: the repository has deployments and packages, no releases (the
+ * maintainer, 10/10/2026).
  */
 export function TechConfigScreen() {
   const { t, locale } = useT();
@@ -82,7 +80,8 @@ export function TechConfigScreen() {
             date: formatDateTime(locale, updatedAt),
           })
         : null;
-  const version: unknown = Constants.expoConfig?.version;
+  // The counted version (#172) rides in extra, which the fingerprint skips; app.json's is the store's.
+  const version: unknown = Constants.expoConfig?.extra?.version ?? Constants.expoConfig?.version;
   const versionLine = t("tech.app.version", {
     version: typeof version === "string" && version.length > 0 ? version : "?",
   });
@@ -173,17 +172,6 @@ export function TechConfigScreen() {
                   </CardDescription>
                   <CardDescription>{versionLine}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <Button
-                    variant="ghost"
-                    accessibilityRole="link"
-                    accessibilityLabel={t("tech.app.releases")}
-                    onPress={() => void Linking.openURL(RELEASES_URL)}
-                  >
-                    <Text className="text-primary underline">{t("tech.app.releases")}</Text>
-                    <Icon as={ExternalLink} className="text-primary" size={16} />
-                  </Button>
-                </CardContent>
               </View>
             </Card>
 

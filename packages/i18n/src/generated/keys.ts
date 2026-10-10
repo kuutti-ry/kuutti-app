@@ -625,7 +625,6 @@ export type MessageParams = {
   "tech.app.embedded": Record<never, never>;
   "tech.app.noCommit": Record<never, never>;
   "tech.app.noRuntime": Record<never, never>;
-  "tech.app.releases": Record<never, never>;
   "tech.app.runtime": { "runtime": string };
   "tech.app.title": Record<never, never>;
   "tech.app.updated": { "date": string };

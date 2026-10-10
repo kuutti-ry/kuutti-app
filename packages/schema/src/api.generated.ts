@@ -2629,7 +2629,7 @@ export interface components {
             /** @enum {string} */
             religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "jewish" | "buddhist" | "hindu" | "spiritual" | "agnostic" | "atheist" | "other";
             /** @enum {string} */
-            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces" | "corgi";
+            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };
         PromptAnswer: {
             key: components["schemas"]["PromptKey"];
@@ -2739,7 +2739,7 @@ export interface components {
             /** @enum {string} */
             occupation?: "student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other";
             /** @enum {string} */
-            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces" | "corgi";
+            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };
         ExportedGate: {
             /** Format: uuid */

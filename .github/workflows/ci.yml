@@ -182,6 +182,9 @@ jobs:
       - name: No forbidden identifiers in the schema
         run: pnpm check:schema-words
 
+      - name: One counted version in the root and the apps
+        run: pnpm check:version
+
   compose:
     name: compose
     # The local stack as a developer runs it: Postgres, the S3 stand-in (versitygw), the mock bank IdP.

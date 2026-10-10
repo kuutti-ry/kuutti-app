@@ -624,7 +624,6 @@ export const enXA: Readonly<Record<string, string>> = {
   "tech.app.embedded": "［rúúññííñg théé búúííld'š óówñ búúñdléé, ñóó úúpdáátéé áápplííééd ýýéét］",
   "tech.app.noCommit": "［gíít çóómmíít ñóót rééçóórdééd ííñ thííš búúííld］",
   "tech.app.noRuntime": "［ñáátíívéé búúííld ñóót rééçóórdééd］",
-  "tech.app.releases": "［Réélééáášééš óóñ GíítHúúb］",
   "tech.app.runtime": "［ñáátíívéé búúííld {runtime}］",
   "tech.app.title": "［ÁÁpp］",
   "tech.app.updated": "［úúpdáátéé púúblííšhééd {date}］",

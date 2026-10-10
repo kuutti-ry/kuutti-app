@@ -386,7 +386,7 @@ export const PROFILE_FIELDS = {
     ],
     { role: "info", preferenceAbout: "none", specialCategory: true },
   ),
-  /** Self-declared: nothing stored could derive it (no birth day, rule 3). The thirteenth sign is the attitude. */
+  /** Self-declared: nothing stored could derive it (no birth day, rule 3). The thirteenth sign is the attitude, and it sits among the twelve, not after them (the maintainer, 10/10/2026). */
   zodiac: single(
     [
       "aries",
@@ -395,13 +395,13 @@ export const PROFILE_FIELDS = {
       "cancer",
       "leo",
       "virgo",
+      "corgi",
       "libra",
       "scorpio",
       "sagittarius",
       "capricorn",
       "aquarius",
       "pisces",
-      "corgi",
     ],
     { role: "info", preferenceAbout: "none" },
   ),
