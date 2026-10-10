@@ -192,6 +192,26 @@ describe("sessions", () => {
     expect((await whoami(ctx.app, stranger.accessToken)).status).toBe(200);
   });
 
+  test("wrong user: the session route names the caller and a logout ends the caller's session only", async ({
+    ctx,
+  }) => {
+    const a = await device(ctx, await accountRow(ctx, "a"));
+    const bAccount = await accountRow(ctx, "b");
+    const b = await device(ctx, bAccount);
+    // Each token answers as its own account, never the other's (rule 6).
+    const mine = await whoami(ctx.app, b.accessToken);
+    expect(mine.status).toBe(200);
+    expect((mine.body as { accountId: string }).accountId).toBe(bAccount);
+    expect((mine.body as { accountId: string }).accountId).not.toBe(
+      ((await whoami(ctx.app, a.accessToken)).body as { accountId: string }).accountId,
+    );
+    // B's logout revokes B's device and leaves A signed in.
+    const out = await ctx.app.request("/auth/logout", { method: "post", ...bearer(b.accessToken) });
+    expect(out.status).toBe(204);
+    expect((await whoami(ctx.app, b.accessToken)).code).toBe("session_revoked");
+    expect((await whoami(ctx.app, a.accessToken)).status).toBe(200);
+  });
+
   test("A session of a sanctioned account stops answering", async ({ ctx }) => {
     // A ban is set on the identity (rules/api.md); the account may also be suspended on its own.
     const account = await accountRow(ctx, "a");

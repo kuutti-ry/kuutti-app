@@ -336,6 +336,36 @@ describe("profile routes", () => {
     expect((await app.request("/profile/card")).status).toBe(401);
   });
 
+  test("wrong user: the profile and the card are the caller's, never another account's", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    expect((await put(app, a.headers, update)).status).toBe(200);
+    // B reads nothing of A's.
+    const theirs = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: b.headers })).json(),
+    );
+    expect(theirs.profile).toBeNull();
+    expect(
+      CardPreviewResponse.parse(
+        await (await app.request("/profile/card", { headers: b.headers })).json(),
+      ).card,
+    ).toBeNull();
+    // B's save writes B's row and leaves A's as it was.
+    expect((await put(app, b.headers, { ...update, displayName: "Bea" })).status).toBe(200);
+    const hers = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: a.headers })).json(),
+    );
+    expect(hers.profile?.displayName).toBe("Aino");
+    const card = CardPreviewResponse.parse(
+      await (await app.request("/profile/card", { headers: b.headers })).json(),
+    );
+    expect(card.card?.displayName).toBe("Bea");
+    expect(card.card?.accountId).toBe(b.accountId);
+  });
+
   test("GET /profile/card previews the owner's card with the verified age and approved photos only", async ({
     ctx,
   }) => {
