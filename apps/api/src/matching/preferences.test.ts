@@ -71,6 +71,21 @@ describe("preferences", () => {
     expect(JSON.stringify(logs())).not.toContain("non_binary");
   });
 
+  test("PUT /preferences writes the caller's rows and leaves another account's alone", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const window = { min: 20, max: 30 };
+    expect((await put(app, a.headers, { seeks: ["man"], ageWindow: window })).status).toBe(200);
+    expect((await put(app, b.headers, { seeks: ["woman"], ageWindow: window })).status).toBe(200);
+    const read = async (headers: Record<string, string>) =>
+      PreferencesResponse.parse(await (await app.request("/preferences", { headers })).json());
+    expect((await read(a.headers)).seeks).toEqual(["man"]);
+    expect((await read(b.headers)).seeks).toEqual(["woman"]);
+  });
+
   test("The preferences of another account are never served", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);

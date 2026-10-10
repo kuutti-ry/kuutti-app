@@ -328,6 +328,54 @@ describe("onboarding and consents", () => {
     }
   });
 
+  test("wrong user: the onboarding, gender and consent routes act on the caller only", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    // A answers; B's status, list and rows show none of it (rule 6).
+    expect((await consent(app, a.headers, "terms", CURRENT_CONSENT_VERSIONS.terms)).ok).toBe(true);
+    expect((await consent(app, a.headers, "research", CURRENT_CONSENT_VERSIONS.research)).ok).toBe(
+      true,
+    );
+    await app.request("/account/gender", {
+      method: "PUT",
+      headers: jsonHeaders(a.headers),
+      body: JSON.stringify({ gender: "woman" }),
+    });
+    const theirs = await status(app, b.headers);
+    expect(theirs.consents.terms).toBeNull();
+    expect(theirs.consents.research).toBeNull();
+    expect(theirs.missing).toContain("gender");
+    const listed = ConsentsResponse.parse(
+      await (await app.request("/consents", { headers: b.headers })).json(),
+    );
+    expect(listed.consents).toEqual([]);
+    expect(await consentRows(ctx, b.accountId)).toBe(0);
+    // B's writes change B only: a gender, a consent and a withdrawal.
+    await app.request("/account/gender", {
+      method: "PUT",
+      headers: jsonHeaders(b.headers),
+      body: JSON.stringify({ gender: "man" }),
+    });
+    expect((await consent(app, b.headers, "research", CURRENT_CONSENT_VERSIONS.research)).ok).toBe(
+      true,
+    );
+    expect(
+      (await app.request("/consents/research", { method: "DELETE", headers: b.headers })).ok,
+    ).toBe(true);
+    const { rows } = await ctx.client.query<{ id: string; gender: string | null }>(
+      "SELECT id, gender FROM account WHERE id = ANY($1::uuid[]) ORDER BY id = $2 DESC",
+      [[a.accountId, b.accountId], a.accountId],
+    );
+    expect(rows.map((r) => r.gender)).toEqual(["woman", "man"]);
+    const hers = await status(app, a.headers);
+    expect(hers.consents.research).not.toBeNull();
+    expect(hers.consents.terms).not.toBeNull();
+    expect(await consentRows(ctx, a.accountId)).toBe(2);
+  });
+
   test("validation: a gender or a consent outside the closed lists is refused", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);

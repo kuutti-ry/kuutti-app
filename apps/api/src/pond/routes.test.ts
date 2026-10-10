@@ -79,6 +79,31 @@ describe("pond choice", () => {
     expect(after.rows[0]?.pond_id).toBe(otaniemi);
   });
 
+  test("wrong user: a pond choice moves the caller only", async ({ ctx }) => {
+    const app = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const otaniemi = await pond(ctx, "test-otaniemi");
+    const espoo = await pond(ctx, "test-espoo");
+    const choose = (headers: Record<string, string>, pondId: string) =>
+      app.request("/account/pond", {
+        method: "PUT",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({ pondId }),
+      });
+    const ponds = async () => {
+      const { rows } = await ctx.client.query<{ id: string; pond_id: string | null }>(
+        "SELECT id, pond_id FROM account WHERE id = ANY($1::uuid[])",
+        [[a.accountId, b.accountId]],
+      );
+      return Object.fromEntries(rows.map((r) => [r.id, r.pond_id]));
+    };
+    expect((await choose(a.headers, otaniemi)).status).toBe(204);
+    expect(await ponds()).toEqual({ [a.accountId]: otaniemi, [b.accountId]: null });
+    expect((await choose(b.headers, espoo)).status).toBe(204);
+    expect(await ponds()).toEqual({ [a.accountId]: otaniemi, [b.accountId]: espoo });
+  });
+
   test("unauthenticated: 401 on the pond routes", async ({ ctx }) => {
     const app = await appWith(ctx);
     expect((await app.request("/ponds")).status).toBe(401);
