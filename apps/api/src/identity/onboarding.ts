@@ -31,6 +31,7 @@ import {
   admissionAnew,
   findPondBySlug,
   findPondOfAccount,
+  listPonds,
   setPondOfAccount,
 } from "../pond/index.ts";
 import { ageInYears, readProfile, withdrawSpecialCategoryAnswers } from "../profile/index.ts";
@@ -143,6 +144,10 @@ async function assignDefaultPond(
 ): Promise<PondSummary | null> {
   const slug = await readMatchingConfig(deps.db, DEFAULT_POND_KEY);
   if (typeof slug !== "string" || slug.length === 0) return null;
+  // With more than one pond to choose from the choice is the person's (#174,
+  // ADR-010 §12): the step stays open and the app asks; a child pond is no choice yet.
+  const topLevel = (await listPonds(deps.db)).filter((pond) => pond.parentId === null);
+  if (topLevel.length > 1) return null;
   const pond = await findPondBySlug(deps.db, slug);
   if (!pond) return null;
   if ((await setPondOfAccount(deps.db, accountId, pond.id)) !== "set") return null;

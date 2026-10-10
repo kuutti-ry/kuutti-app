@@ -9,6 +9,7 @@ import {
   GENDERS,
   type Gender,
   type OnboardingStatus,
+  type PondSummary,
   PROFILE_FIELDS,
   type ProfileFields,
 } from "@kuutti/schema";
@@ -22,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
+import { choosePond, fetchPonds, pondName } from "@/features/pond";
 import { optionKey, PromptsEditor, useProfile } from "@/features/profile";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
@@ -36,13 +38,14 @@ type Step =
   | "seeks"
   | "intent"
   | "age"
+  | "pond"
   | "photos"
   | "prompts"
   | "research"
   | "stuck"
   | "done";
 
-/** The screens, for "Step x of n"; the identity label shares the gender's number. */
+/** The screens, for "Step x of n"; the identity label shares the gender's number. The pond is asked only where there is more than one (#174). */
 const STEPS: Step[] = [
   "welcome",
   "name",
@@ -50,6 +53,7 @@ const STEPS: Step[] = [
   "seeks",
   "intent",
   "age",
+  "pond",
   "photos",
   "prompts",
   "research",
@@ -81,6 +85,8 @@ export function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("seeks") && !local.seeksDone) return "seeks";
   if (missing.has("intent")) return "intent";
   if (missing.has("age_window") || missing.has("seeks")) return "age";
+  // Open only where more than one pond exists (#174, ADR-010 §12); with one, the API assigned it.
+  if (missing.has("pond")) return "pond";
   if (missing.has("photos")) return "photos";
   if (missing.has("prompts_or_bio")) return "prompts";
   if (!status.consents.research && !local.researchOffered) return "research";
@@ -182,6 +188,18 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
   }, [current, ages, age]);
+  // The ponds to choose from, read once the step is reached (#174): null while loading, [] when the read failed.
+  const [ponds, setPonds] = useState<PondSummary[] | null>(null);
+  useEffect(() => {
+    if (current !== "pond" || ponds !== null) return;
+    let live = true;
+    fetchPonds()
+      .then((list) => live && setPonds(list.ponds.filter((pond) => pond.parentId === null)))
+      .catch(() => live && setPonds([]));
+    return () => {
+      live = false;
+    };
+  }, [current, ponds]);
 
   const setField = (key: keyof ProfileFields, value: string | undefined) => {
     const fields: Record<string, unknown> = { ...profile.draft.fields };
@@ -558,6 +576,47 @@ export function OnboardingScreen() {
             >
               {t("onboarding.continue")}
             </Button>
+          </View>
+        )}
+
+        {current === "pond" && (
+          <View className="gap-4">
+            <Text variant="h2">{t("onboarding.pond.title")}</Text>
+            <Text>{t("onboarding.pond.explain")}</Text>
+            {ponds === null && (
+              <Text accessibilityLiveRegion="polite">{t("onboarding.loading")}</Text>
+            )}
+            {ponds !== null && ponds.length === 0 && (
+              <View className="gap-3">
+                <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    tap();
+                    setPonds(null);
+                  }}
+                >
+                  {t("onboarding.retry")}
+                </Button>
+              </View>
+            )}
+            {ponds !== null && ponds.length > 0 && (
+              <View className="flex-row flex-wrap gap-2">
+                {ponds.map((pond) => (
+                  <Button
+                    key={pond.id}
+                    variant="outline"
+                    disabled={busy}
+                    onPress={() => {
+                      tap();
+                      void step(() => choosePond(pond.id));
+                    }}
+                  >
+                    {pondName(t, pond)}
+                  </Button>
+                ))}
+              </View>
+            )}
           </View>
         )}
 

@@ -9,6 +9,7 @@ import { View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { type OnRefused, PhotoImage } from "@/features/media";
+import { pondName } from "@/features/pond";
 import { useT } from "@/lib/locale";
 import { fieldLabelKey, genderKey, optionKey, presetKey, promptKey } from "./keys";
 
@@ -80,7 +81,7 @@ export function ProfileCardView({
         {identityLabel && (
           <Text variant="muted">{t(optionKey("identityLabel", identityLabel))}</Text>
         )}
-        {card.pond && <Text variant="muted">{card.pond.name}</Text>}
+        {card.pond && <Text variant="muted">{pondName(t, card.pond)}</Text>}
       </CardHeader>
       <CardContent className="gap-4">
         {firstPrompt && prompt(firstPrompt)}

@@ -17,6 +17,13 @@ export const SEED_PONDS = [
     nameInessive: "Pääkaupunkiseudulla",
     parent: null,
   },
+  // The rest of the country, a sibling of the capital region (#174, ADR-010 §12); migration 0027 writes the same row.
+  {
+    slug: "suomi",
+    nameNominative: "Suomi",
+    nameInessive: "Suomessa",
+    parent: null,
+  },
 ] as const;
 
 /**

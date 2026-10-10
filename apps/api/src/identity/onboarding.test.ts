@@ -5,6 +5,7 @@ import {
   GENDERS,
   ONBOARDING_STEPS,
   OnboardingStatus,
+  PondList,
   ProfileResponse,
 } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
@@ -543,6 +544,8 @@ describe("onboarding and consents", () => {
   test("An account gets the default pond without a pond step", async ({ ctx }) => {
     const { app, logs } = await appWith(ctx);
     // The seed pond, which matching_config.default_pond names (migration 0025); the test database has no seed.
+    // Migration 0027 writes the second pond into every database: this test wants the one-pond world (ADR-010 §12).
+    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
     const { rows } = await ctx.client.query<{ id: string }>(
       "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') RETURNING id",
     );
@@ -563,6 +566,42 @@ describe("onboarding and consents", () => {
     // Assigned once: the next read finds it and says nothing.
     await status(app, a.headers);
     expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(1);
+  });
+
+  test("The default pond is assigned only while it is the only pond without a parent", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    // Two ponds side by side (#174, ADR-010 §12): the capital region, which the config names, and the rest of the country.
+    await ctx.client.query(
+      `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES
+         ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla'),
+         ('suomi', 'Suomi', 'Suomessa')
+       ON CONFLICT (slug) DO NOTHING`,
+    );
+    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    const first = await status(app, a.headers);
+    expect(first.pond).toBeNull();
+    expect(first.missing).toContain("pond");
+    expect(logs().filter((l) => l.msg === "pond assigned")).toHaveLength(0);
+    // The person chooses; the list carries both, and a child pond would be no choice.
+    const listed = PondList.parse(
+      await (await app.request("/ponds", { headers: a.headers })).json(),
+    );
+    expect(listed.ponds.map((p) => p.slug).sort()).toEqual(["paakaupunkiseutu", "suomi"]);
+    const suomi = listed.ponds.find((p) => p.slug === "suomi");
+    expect(
+      (
+        await app.request("/account/pond", {
+          method: "PUT",
+          headers: jsonHeaders(a.headers),
+          body: JSON.stringify({ pondId: suomi?.id }),
+        })
+      ).status,
+    ).toBe(204);
+    const chosen = await status(app, a.headers);
+    expect(chosen.pond?.slug).toBe("suomi");
+    expect(chosen.missing).not.toContain("pond");
   });
 
   test("The seek consent is recorded with the answer and withdrawing it blanks the seek rows", async ({

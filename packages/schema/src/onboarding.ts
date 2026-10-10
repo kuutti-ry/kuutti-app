@@ -137,8 +137,9 @@ export type ConsentsResponse = z.infer<typeof ConsentsResponse>;
  * The steps of onboarding in the order the app asks them (#146, the field
  * sheet): the two consents on the welcome screen, the name, the gender, whom
  * one seeks (with the special-category consent), the intent, the age window,
- * three photos, two prompts or a bio. The pond is assigned by the API from
- * `matching_config.default_pond` and is a step only where no default exists.
+ * three photos, two prompts or a bio. The pond is a step only while there is
+ * a choice: more than one pond without a parent, or no default (ADR-010 §12);
+ * with one, the API assigns it from `matching_config.default_pond`.
  * Research is never one of them.
  */
 export const ONBOARDING_STEPS = [
