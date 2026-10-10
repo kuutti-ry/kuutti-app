@@ -1,0 +1,4 @@
+# The workspace is this folder, so the flows' common steps and the pictures
+# their addMedia reads lie inside it; what runs is flows/ (ADR-020).
+flows:
+  - "flows/*"

@@ -40,6 +40,15 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     text: "Anyone|Kenet tahansa|Vem som helst"
     selected: false
 - tapOn: "Anyone|Kenet tahansa|Vem som helst"
+# Anyone is all three; one dropped, it is not anyone any more, and back again.
+- tapOn: "Men|Miehiä|Män"
+- assertVisible:
+    text: "Anyone|Kenet tahansa|Vem som helst"
+    selected: false
+- tapOn: "Men|Miehiä|Män"
+- assertVisible:
+    text: "Anyone|Kenet tahansa|Vem som helst"
+    selected: true
 - assertVisible:
     text: "Women|Naisia|Kvinnor"
     selected: true

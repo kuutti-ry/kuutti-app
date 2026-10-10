@@ -1,0 +1,28 @@
+# Download my data (#52, ADR-007): a file with everything Kuutti holds about
+# the person is handed to the phone's share sheet, and nothing goes wrong on
+# the way. The sheet is the system's, in the phone's language, so the flow
+# asserts only that the app's own failure line never shows, and closes the
+# sheet by dragging it down. The file's contents are held by erasure.test.ts.
+# Sanna; read only.
+appId: fi.kuutti.app
+name: Download my data hands the person's file to the share sheet
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- scrollUntilVisible:
+    element: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
+- tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+# The sheet covers the app; its file is named after the export's title.
+- extendedWaitUntil:
+    notVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    timeout: 20000
+- swipe:
+    start: "50%, 45%"
+    end: "50%, 98%"
+- extendedWaitUntil:
+    visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    timeout: 15000
+- assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."

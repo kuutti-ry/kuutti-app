@@ -76,5 +76,5 @@ expo-env.d.ts
 # Where a withdrawn update signing key (ADR-004) may still sit on a developer's machine.
 apps/mobile/keys/
 
-# --- End-to-end flows: the link scripts/e2e.ts makes to the cached pictures ---
+# --- End-to-end flows: the copy of the cached pictures scripts/e2e.ts makes ---
 apps/mobile/e2e/media

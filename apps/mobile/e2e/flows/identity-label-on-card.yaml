@@ -1,0 +1,51 @@
+# The identity label (#146, ADR-019): offered after non-binary, chosen with a
+# button, and shown on the card in its header after the gender; it is never
+# used for matching. Eetu, who turned 18 last month, is a newcomer; the flow
+# stops at whom he seeks, so one run per `pnpm demo:reset`, and the refusal
+# flow's welcome check still holds for him.
+appId: fi.kuutti.app
+name: A label chosen after non-binary shows on the card after the gender
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Eetu Laine
+- scrollUntilVisible:
+    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+    direction: DOWN
+    centerElement: true
+- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+- extendedWaitUntil:
+    visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
+    timeout: 15000
+- tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
+- inputText: "Eetu"
+- hideKeyboard
+- tapOn: "Continue|Jatka|Fortsätt"
+- extendedWaitUntil:
+    visible: "How do you describe yourself\\?|Miten kuvailet itseäsi\\?|Hur beskriver du dig själv\\?"
+    timeout: 15000
+- tapOn: "Non-binary|Muunsukupuolinen|Icke-binär"
+- tapOn: "Continue|Jatka|Fortsätt"
+- extendedWaitUntil:
+    visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
+    timeout: 15000
+- assertVisible:
+    text: "Continue|Jatka|Fortsätt"
+    enabled: false
+- tapOn: "Genderqueer"
+- assertVisible:
+    text: "Genderqueer"
+    selected: true
+- tapOn: "Continue|Jatka|Fortsätt"
+- extendedWaitUntil:
+    visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
+    timeout: 15000
+
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- assertVisible: "Eetu"
+- assertVisible: "Non-binary|Muunsukupuolinen|Icke-binär"
+- assertVisible: "Genderqueer"
