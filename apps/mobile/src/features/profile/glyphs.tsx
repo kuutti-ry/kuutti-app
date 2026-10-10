@@ -16,19 +16,18 @@ import { DECORATIVE } from "@/theme/a11y";
  */
 const ink = (source: number): number => source;
 
-/** The parties whose logo is a wordmark, which no glyph can carry: they stand without one until a mark exists. */
-export const GLYPHLESS_PARTIES: readonly string[] = ["liik", "vihr"];
-
 const OPTION_GLYPHS = {
   politics: {
     kesk: ink(require("../../../assets/glyphs/politics/kesk.svg")),
     kok: ink(require("../../../assets/glyphs/politics/kok.svg")),
     kd: ink(require("../../../assets/glyphs/politics/kd.svg")),
+    liik: ink(require("../../../assets/glyphs/politics/liik.png")),
     ps: ink(require("../../../assets/glyphs/politics/ps.png")),
     pp: ink(require("../../../assets/glyphs/politics/pp.svg")),
     rkp: ink(require("../../../assets/glyphs/politics/rkp.svg")),
     sdp: ink(require("../../../assets/glyphs/politics/sdp.svg")),
     vas: ink(require("../../../assets/glyphs/politics/vas.svg")),
+    vihr: ink(require("../../../assets/glyphs/politics/vihr.png")),
   },
   religion: {
     lutheran: ink(require("../../../assets/glyphs/religion/lutheran.svg")),
