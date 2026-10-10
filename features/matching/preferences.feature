@@ -28,6 +28,11 @@ Feature: The hard preferences of onboarding
     When it sets seeks and an age window
     Then two rows of mode hard exist and the read answers the same values
 
+  Scenario: Whom one seeks and the age window are saved one at a time
+    Given a signed-in account
+    When it sets whom it seeks alone, then the age window alone
+    Then each is stored when it is sent and the other stays as it was, and an update naming neither is refused
+
   Scenario: The preferences of another account are never served
     Given two accounts, one with preferences set
     When the other reads its preferences

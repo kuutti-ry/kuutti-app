@@ -2282,8 +2282,8 @@ export interface paths {
             };
         };
         /**
-         * Set whom the caller seeks and the age window
-         * @description Both at once: a non-empty set of genders and an age window within 18 and 99 with min at most max. Hard rows: the round builder never crosses them, in either direction.
+         * Set whom the caller seeks, the age window, or both
+         * @description Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.
          */
         put: {
             parameters: {
@@ -2963,8 +2963,8 @@ export interface components {
             includeUnknown: boolean;
         };
         PreferencesUpdate: {
-            seeks: components["schemas"]["Gender"][];
-            ageWindow: components["schemas"]["AgeWindow"];
+            seeks?: components["schemas"]["Gender"][];
+            ageWindow?: components["schemas"]["AgeWindow"];
         };
     };
     responses: never;

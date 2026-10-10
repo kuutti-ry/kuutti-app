@@ -66,7 +66,10 @@ export async function readPreferences(
   return preferencesFrom({ seeks: byField.get(SEEKS), ageWindow: byField.get(AGE_WINDOW) });
 }
 
-/** Both rows, written or replaced together; a tombstone takes none (#51). */
+/**
+ * The rows the update names, each written or replaced; the other stays as it
+ * was (ADR-010 §13). A tombstone takes none (#51).
+ */
 export async function savePreferences(
   db: Queryable,
   accountId: string,
@@ -83,6 +86,7 @@ export async function savePreferences(
     const account = live.rows[0];
     if (!account) return false;
     const before = await readPreferences(tx, accountId);
+    const { seeks, ageWindow } = update;
     // A change of whom one seeks, once in the cadence (#147, ADR-015 §10): a
     // lever on the figures otherwise. The first answer and the same answer
     // again are no change; the window of ages is free. The time lives on the
@@ -90,9 +94,8 @@ export async function savePreferences(
     // a withdrawal counts as a change while a change is on record: the
     // withdrawal is no way round.
     const change =
-      before.seeks === null
-        ? account.seeks_changed_at !== null
-        : !sameSet(before.seeks, update.seeks);
+      seeks !== undefined &&
+      (before.seeks === null ? account.seeks_changed_at !== null : !sameSet(before.seeks, seeks));
     if (change) {
       const cadence = await matchingConfigNumber(tx, CHANGE_CADENCE_KEY);
       const from = nextChangeFrom(account.seeks_changed_at, cadence, at);
@@ -103,11 +106,12 @@ export async function savePreferences(
       }
       await tx.query("UPDATE account SET seeks_changed_at = $2 WHERE id = $1", [accountId, at]);
     }
+    const rows = [
+      ...(seeks === undefined ? [] : [[SEEKS, seeks] as const]),
+      ...(ageWindow === undefined ? [] : [[AGE_WINDOW, ageWindow] as const]),
+    ];
     let written = 0;
-    for (const [field, value] of [
-      [SEEKS, update.seeks],
-      [AGE_WINDOW, update.ageWindow],
-    ] as const) {
+    for (const [field, value] of rows) {
       const result = await tx.query(
         `INSERT INTO preferences (account_id, field, value, mode, include_unknown, created_at, updated_at)
          SELECT $1, $2, $3::jsonb, 'hard', false, $4, $4
@@ -120,13 +124,15 @@ export async function savePreferences(
     }
     // Whom one seeks decides with whom one waits at the pond gate (#94,
     // ADR-015 §9): joining a group that waits is decided anew by the next count.
-    await admissionAnew(
-      tx,
-      accountId,
-      { gender: account.gender, seeks: before.seeks },
-      { gender: account.gender, seeks: update.seeks },
-    );
-    return written === 2;
+    if (seeks !== undefined) {
+      await admissionAnew(
+        tx,
+        accountId,
+        { gender: account.gender, seeks: before.seeks },
+        { gender: account.gender, seeks },
+      );
+    }
+    return written === rows.length;
   });
 }
 

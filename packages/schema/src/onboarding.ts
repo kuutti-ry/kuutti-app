@@ -27,16 +27,24 @@ export type AgeWindow = z.infer<typeof AgeWindow>;
 
 const distinct = (values: readonly string[]) => new Set(values).size === values.length;
 
+/**
+ * Whom one seeks, the age window, or both (ADR-010 §13): onboarding saves each
+ * on leaving its own screen, so an app closed between the two loses neither.
+ */
 export const PreferencesUpdate = z
   .object({
     seeks: z
       .array(Gender)
       .min(1)
       .max(GENDERS.length)
-      .refine(distinct, { message: "each gender at most once" }),
-    ageWindow: AgeWindow,
+      .refine(distinct, { message: "each gender at most once" })
+      .optional(),
+    ageWindow: AgeWindow.optional(),
   })
   .strict()
+  .refine((update) => update.seeks !== undefined || update.ageWindow !== undefined, {
+    message: "whom one seeks, the age window or both",
+  })
   .meta({ id: "PreferencesUpdate" });
 export type PreferencesUpdate = z.infer<typeof PreferencesUpdate>;
 
