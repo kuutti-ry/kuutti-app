@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readJournal } from "./journal.ts";
@@ -67,6 +68,56 @@ describe("migrate", () => {
           );
         expect(at(1)).toEqual(MATCHING_CONFIG_V1);
         expect(at(2)).toEqual(MATCHING_CONFIG_V2);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
+  it("migration 0026 turns a stored single field or line of work into an array and leaves arrays alone (#178)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        // A profile written before the registry made the two fields multi-choice (ADR-019 §1, amended).
+        const identity = await pool.query<{ id: string }>(
+          "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+          ["f".repeat(64)],
+        );
+        const account = await pool.query<{ id: string }>(
+          "INSERT INTO account (identity_id) VALUES ($1) RETURNING id",
+          [identity.rows[0]?.id],
+        );
+        const accountId = account.rows[0]?.id;
+        await pool.query(
+          `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
+           VALUES ($1, 'A', NULL, NULL, $2::jsonb, '[]'::jsonb, now(), now())`,
+          [accountId, JSON.stringify({ field: "arts", occupation: ["science"], smoking: "never" })],
+        );
+        const sql = readFileSync(
+          resolve(MIGRATIONS, "0026_profile_fields_multi_occupation_field.sql"),
+          "utf8",
+        );
+        const fields = async () =>
+          (
+            await pool.query<{ fields: Record<string, unknown> }>(
+              "SELECT fields FROM profile WHERE account_id = $1",
+              [accountId],
+            )
+          ).rows[0]?.fields;
+        await pool.query(sql);
+        expect(await fields()).toEqual({
+          field: ["arts"],
+          occupation: ["science"],
+          smoking: "never",
+        });
+        // Idempotent: a second run changes nothing.
+        await pool.query(sql);
+        expect(await fields()).toEqual({
+          field: ["arts"],
+          occupation: ["science"],
+          smoking: "never",
+        });
       } finally {
         await pool.end();
       }

@@ -2610,11 +2610,9 @@ export interface components {
             /** @enum {string} */
             exercise?: "never" | "sometimes" | "weekly" | "daily";
             pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
-            /** @enum {string} */
-            field?: "tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other";
+            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
             hideFromField?: boolean;
-            /** @enum {string} */
-            occupation?: "student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other";
+            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
             occupationTitle?: string;
             politics?: ("kok" | "ps" | "sdp" | "kesk" | "vihr" | "vas" | "rkp" | "kd" | "liik" | "none_of_them" | "kahvipuolue")[];
             /** @enum {string} */
@@ -2725,10 +2723,8 @@ export interface components {
             /** @enum {string} */
             exercise?: "never" | "sometimes" | "weekly" | "daily";
             pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
-            /** @enum {string} */
-            field?: "tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other";
-            /** @enum {string} */
-            occupation?: "student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other";
+            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
+            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
             /** @enum {string} */
             zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };

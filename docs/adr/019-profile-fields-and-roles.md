@@ -28,9 +28,9 @@ Between 1 and 7 October 2026 the team went through what Kuutti asks a person and
    | height | 140 to 220 cm | info | none | display only, never filterable |
    | exercise | never / sometimes / weekly / daily | info | none | |
    | pets | dog / cat / other / none / allergic | info | none | |
-   | field | field of study or work, closed list | info | none | §5 |
+   | field | up to three fields of study or work, closed list (#178) | info | none | §5 |
    | hideFromField | on or off | hidden | none | "hide me from people in my field", §5 |
-   | occupation | a category list | info | none | §5 |
+   | occupation | up to three of a category list (#178) | info | none | §5 |
    | occupationTitle | up to 40 characters | info | none | under the plain-text rule; no employer's name |
    | politics | the parliament's parties, none of them, one joke; several | info, shown only when filled | none | article 9, §4 |
    | religion | a closed list | info | none; a deal-breaker only after the Ombudsman's answer | article 9, §4 |
@@ -68,3 +68,4 @@ Between 1 and 7 October 2026 the team went through what Kuutti asks a person and
 ## History
 
 - 2026-10-10: §4 amended (#204). The special-category consent was held twice, as the consent row of the seeks step and as a copy on the profile row that only `PUT /profile` wrote, and the two disagreed on staging. The consent row is the one record: the profile's gate reads it, the document echoes it, the profile and later screens lose their switch, and Settings stays the one place to withdraw it, with the consequence said (matching pauses, the profile stays). The 409 `agreement_outdated` answer of `PUT /profile` is gone with the field that carried a version.
+- 2026-10-10: §1 amended (#178). `field` and `occupation` are multi-choice, up to three each: a person can have several jobs and several fields (the maintainer, 10/10/2026). Migration 0026 turns a stored single answer into a one-element array so nothing is read as unanswered; the card joins the options as it does for languages; `hideFromField` keeps its one meaning over every field the person named.

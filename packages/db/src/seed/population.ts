@@ -237,11 +237,20 @@ function drawFields(random: Random, language: Language, consented: boolean): Pro
       .weighted({ none: 35, dog: 25, cat: 25, "dog,cat": 8, other: 4, allergic: 3 })
       .split(",") as ProfileFields["pets"];
   }
+  // Several fields and lines of work are the rule for many (#178): one for most, two or three for some.
   if (random.chance(0.45)) {
-    fields.field = random.pick(PROFILE_FIELDS.field.options);
+    fields.field = random.sample(
+      PROFILE_FIELDS.field.options,
+      random.weighted({ "1": 70, "2": 22, "3": 8 }) === "1" ? 1 : random.int(2, 3),
+    );
     if (random.chance(0.15)) fields.hideFromField = true;
   }
-  if (random.chance(0.5)) fields.occupation = random.pick(PROFILE_FIELDS.occupation.options);
+  if (random.chance(0.5)) {
+    fields.occupation = random.sample(
+      PROFILE_FIELDS.occupation.options,
+      random.weighted({ "1": 70, "2": 22, "3": 8 }) === "1" ? 1 : random.int(2, 3),
+    );
+  }
   if (random.chance(0.3)) fields.occupationTitle = random.pick(OCCUPATION_TITLES[language]);
   // Article 9 answers only behind the consent (ADR-019 §4), as the API would have it.
   if (consented) {
