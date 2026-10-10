@@ -1,0 +1,58 @@
+# The later fields (#148, ADR-019): "Fill in the rest" on the home screen
+# opens the first field not yet answered and walks the unanswered ones in the
+# sheet's order, one question per screen, each optional; "Ask me later" moves
+# on and writes nothing, so the count of answered fields stays. After the
+# last field comes the way back in (the e-mail) and the deal-breakers. Sanna
+# has answered ten of sixteen; read only.
+appId: fi.kuutti.app
+name: Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
+---
+- runFlow: ../common/sign-in.yaml
+- scrollUntilVisible:
+    element: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+- extendedWaitUntil:
+    visible: "While you wait|Odotellessasi|Medan du väntar"
+    timeout: 15000
+- assertVisible: "10 of 16 answered|10 / 16 vastattu|10 av 16 besvarade"
+- assertVisible: "One question at a time, each optional\\..*|Yksi kysymys kerrallaan, jokainen vapaaehtoinen\\..*|En fråga i taget, var och en frivillig\\..*"
+- assertVisible: "Drugs, your attitude|Suhtautuminen huumeisiin|Inställning till droger"
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- extendedWaitUntil:
+    visible: "Exercise|Liikunta|Motion"
+    timeout: 15000
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- extendedWaitUntil:
+    visible: "Pets|Lemmikit|Husdjur"
+    timeout: 15000
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- extendedWaitUntil:
+    visible: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- extendedWaitUntil:
+    visible: "Religion|Uskonto"
+    timeout: 15000
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- extendedWaitUntil:
+    visible: "Star sign|Horoskooppimerkki|Stjärntecken"
+    timeout: 15000
+- assertVisible: "Corgi"
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+
+# After the last: the way back in, then home. Nothing was written.
+- extendedWaitUntil:
+    visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
+    timeout: 15000
+- assertVisible: "A way back in|Tie takaisin sisään|En väg tillbaka in"
+- assertVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
+- openLink: kuutti://profile/later/drugsAttitude
+- extendedWaitUntil:
+    visible: "10 of 16 answered|10 / 16 vastattu|10 av 16 besvarade"
+    timeout: 15000

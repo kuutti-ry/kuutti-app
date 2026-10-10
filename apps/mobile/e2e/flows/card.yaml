@@ -1,0 +1,57 @@
+# The card is what others see (#47, ADR-019 §2): it leads with the main photo,
+# the name and the age the bank verified, then the gender and the area, the
+# prompts and the bio, and the information fields with their labels, several
+# answers joined by commas; soft fields (education, drinking) never show, and
+# a finished profile has no list of what is missing. Sanna's history after
+# `pnpm demo:reset` (packages/db/src/seed/histories.ts); read only.
+appId: fi.kuutti.app
+name: The card leads with the photo, the name and the verified age, and shows the information fields but nothing soft
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- assertVisible: "This is what others see\\.|Tämän muut näkevät\\.|Det här ser andra\\."
+- assertVisible: "Photo 1 of 5|Kuva 1 / 5|Foto 1 av 5"
+- scrollUntilVisible:
+    element: ".*, age verified by your bank|.*, ikä varmistettu pankistasi|.*, ålder verifierad av din bank"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Sanna"
+- assertVisible: "Woman|Nainen|Kvinna"
+- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- scrollUntilVisible:
+    element: "Arkkitehti, joka piirtää.*"
+    direction: DOWN
+    centerElement: true
+- scrollUntilVisible:
+    element: "Looking for|Etsin|Söker"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
+- scrollUntilVisible:
+    element: "Languages|Kielet|Språk"
+    direction: DOWN
+    centerElement: true
+# Several answers on one line, in the order given.
+- assertVisible: "suomi, English, svenska"
+- scrollUntilVisible:
+    element: "Height|Pituus|Längd"
+    direction: DOWN
+    centerElement: true
+# The unit is joined by a no-break space.
+- assertVisible: "171.cm"
+- scrollUntilVisible:
+    element: "Job title, without the employer's name|Tehtävänimike ilman työnantajan nimeä|Yrkestitel utan arbetsgivarens namn"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Arkkitehti"
+- scrollUntilVisible:
+    element: "Teach me|Opeta minulle|Lär mig"
+    direction: DOWN
+    centerElement: true
+# Nothing soft, and nothing missing.
+- assertNotVisible: "Education|Koulutus|Utbildning"
+- assertNotVisible: "Drinking|Alkoholi|Alkohol"
+- assertNotVisible: "Before your card can be shown|Ennen kuin korttisi voidaan näyttää|Innan ditt kort kan visas"

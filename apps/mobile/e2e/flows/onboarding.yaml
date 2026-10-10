@@ -26,6 +26,7 @@ name: A registered person is taken through onboarding one question per screen, a
 - scrollUntilVisible:
     element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
     direction: DOWN
+    centerElement: true
 - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 
 # 2: the name, typed, never the bank's.
@@ -60,6 +61,7 @@ name: A registered person is taken through onboarding one question per screen, a
 - scrollUntilVisible:
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
     direction: DOWN
+    centerElement: true
 - assertVisible:
     text: "Continue|Jatka|Fortsätt"
     enabled: false
@@ -143,6 +145,7 @@ name: A registered person is taken through onboarding one question per screen, a
 - scrollUntilVisible:
     element: "Done|Valmis|Klar"
     direction: DOWN
+    centerElement: true
 - tapOn: "Done|Valmis|Klar"
 
 # 9: a bio of at least 50 characters instead of two prompts.
@@ -158,6 +161,7 @@ name: A registered person is taken through onboarding one question per screen, a
 - scrollUntilVisible:
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
+    centerElement: true
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 
 # 10: research, optional, on its own screen.

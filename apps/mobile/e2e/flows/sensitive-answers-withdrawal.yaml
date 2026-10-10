@@ -52,6 +52,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
 - scrollUntilVisible:
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
     direction: DOWN
+    centerElement: true
 - assertVisible:
     text: "Continue|Jatka|Fortsätt"
     enabled: false

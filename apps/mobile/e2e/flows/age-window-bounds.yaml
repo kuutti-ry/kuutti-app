@@ -13,6 +13,7 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - scrollUntilVisible:
     element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
     direction: DOWN
+    centerElement: true
 - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 - extendedWaitUntil:
     visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
@@ -36,6 +37,7 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - scrollUntilVisible:
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
     direction: DOWN
+    centerElement: true
 - tapOn:
     text: "0"
     rightOf: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
