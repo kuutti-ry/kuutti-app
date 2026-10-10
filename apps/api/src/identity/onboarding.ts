@@ -117,6 +117,20 @@ function acceptedCurrent(rows: repo.ConsentRow[], kind: ConsentKind): repo.Conse
 }
 
 /**
+ * The active consent of a kind for the current wording, as the consent rows
+ * hold it, or null (ADR-019 §4, #204): what the profile slice asks before it
+ * stores a politics or religion answer, and what the profile document echoes.
+ */
+export async function currentConsent(
+  db: Queryable,
+  accountId: string,
+  kind: ConsentKind,
+): Promise<{ version: string; givenAt: Date } | null> {
+  const row = acceptedCurrent(await repo.listConsents(db, accountId), kind);
+  return row ? { version: row.version, givenAt: row.givenAt } : null;
+}
+
+/**
  * One pond for now (#146, ADR-010 §10 and §11): an account with none is
  * put in the pond matching_config names, on its first status read, so no
  * pond step exists. Where the key names no live pond (several ponds later,

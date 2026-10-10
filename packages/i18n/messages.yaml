@@ -3885,10 +3885,17 @@ account.specialCategory.label:
   machine: { fi: true, sv: true }
 
 account.specialCategory.explain:
-  en: "Whom you seek, the parties you could vote for and your religion. Switching this off removes those answers, and you will be asked whom you seek again."
-  description: "Explanation under the special-category switch of the account card (#146)."
-  fi: "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset, ja sinulta kysytään uudelleen, kenen seuraa etsit."
-  sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort, och du får frågan om vem du söker igen."
+  en: "Whom you seek, the parties you could vote for and your religion. Switching this off removes those answers and pauses matching; your profile stays, and you are asked whom you seek again before matching resumes."
+  description: "Explanation under the special-category switch of the account card (#146, #204): the one place the consent is withdrawn, with its consequence."
+  fi: "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset ja keskeyttää yhdistämisen; profiilisi säilyy, ja sinulta kysytään uudelleen, kenen seuraa etsit, ennen kuin yhdistäminen jatkuu."
+  sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort och matchningen pausas; din profil finns kvar, och du får frågan om vem du söker igen innan matchningen fortsätter."
+  machine: { fi: true, sv: true }
+
+profile.specialCategory.note:
+  en: "Stored under the sensitive-answers consent you gave when you signed up. You can withdraw it in Settings; that removes these answers and pauses matching until you say yes again."
+  description: "The line above the politics and religion fields on the profile and later screens (#204, ADR-019 §4): names the consent given at the seeks step and where it is withdrawn. A Settings button follows it."
+  fi: "Tallennetaan arkaluonteisten vastausten suostumuksella, jonka annoit rekisteröityessäsi. Voit perua sen asetuksissa; se poistaa nämä vastaukset ja keskeyttää yhdistämisen, kunnes sanot uudelleen kyllä."
+  sv: "Lagras under det samtycke till känsliga svar du gav när du registrerade dig. Du kan ta tillbaka det i inställningarna; då tas de här svaren bort och matchningen pausas tills du säger ja igen."
   machine: { fi: true, sv: true }
 
 account.email.title:

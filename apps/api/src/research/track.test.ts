@@ -212,7 +212,6 @@ describe("track", () => {
           bioPreset: null,
           fields: { intent: "casual" },
           prompts: [],
-          specialCategoryConsent: null,
         }),
       });
       expect(response.status).toBe(200);

@@ -25,6 +25,7 @@ export { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.
 export {
   activationWaitsFor,
   CURRENT_CONSENT_VERSIONS,
+  currentConsent,
   DEFAULT_POND_KEY,
   declareGender,
   exportConsents,

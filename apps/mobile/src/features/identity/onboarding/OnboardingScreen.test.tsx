@@ -126,7 +126,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     if (path === "/onboarding") return json(status());
     if (path === "/profile" && request.method === "GET") return json(profileResponse());
     if (path === "/profile") {
-      const b = body as Profile & { specialCategoryConsent: unknown };
+      const b = body as Profile;
       server.profile = {
         displayName: b.displayName,
         bio: b.bio,

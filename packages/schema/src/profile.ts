@@ -64,11 +64,9 @@ export const ProfileUpdate = z
     bioPreset: BioPreset.nullable(),
     fields: ProfileFields,
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
-    /** The version of the special-category consent text the person accepted; null withdraws it (ADR-009). */
-    specialCategoryConsent: z
-      .object({ version: z.string().min(1).max(40) })
-      .strict()
-      .nullable(),
+    // The special-category consent is not part of the document: it is given
+    // once at the seeks step and withdrawn in Settings (the consent routes),
+    // and the API reads it from the consent rows (ADR-019 §4, #204).
   })
   .strict()
   .refine((p) => !(p.bio !== null && p.bioPreset !== null), {
@@ -104,6 +102,7 @@ export const ProfileDocument = z
     bioPreset: BioPreset.nullable(),
     fields: ProfileFields,
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
+    /** The special-category consent as the consent rows hold it: the current wording's version and when it was given, or null (ADR-019 §4). Read-only here. */
     specialCategoryConsent: z
       .object({ version: z.string().max(40), at: z.iso.datetime() })
       .nullable(),

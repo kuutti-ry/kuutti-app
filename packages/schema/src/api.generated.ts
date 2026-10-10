@@ -1512,7 +1512,7 @@ export interface paths {
         };
         /**
          * Save the caller's profile
-         * @description The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts, and the special-category consent version when a field needs it. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.
+         * @description The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts. A politics or religion answer needs the special-category consent on record, which is given at the seeks step and withdrawn in Settings (the consent routes), never in this body. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.
          */
         put: {
             parameters: {
@@ -1565,15 +1565,6 @@ export interface paths {
                 };
                 /** @description No live account (erased meanwhile). */
                 404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ErrorResponse"];
-                    };
-                };
-                /** @description agreement_outdated: a consent version that is not the current wording's. */
-                409: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2848,9 +2839,6 @@ export interface components {
             bioPreset: components["schemas"]["BioPreset"];
             fields: components["schemas"]["ProfileFields"];
             prompts: components["schemas"]["PromptAnswer"][];
-            specialCategoryConsent: {
-                version: string;
-            } | null;
         };
         CardPreviewResponse: {
             card: components["schemas"]["ProfileCard"];

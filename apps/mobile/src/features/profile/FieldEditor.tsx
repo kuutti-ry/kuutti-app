@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, formatHeight, type PlainMessageKey } from "@kuutti/i18n";
+import { formatHeight, type PlainMessageKey } from "@kuutti/i18n";
 import {
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
@@ -6,8 +6,8 @@ import {
   type ProfileFieldKey,
   type ProfileFields,
   type ProfileUpdate,
-  SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
@@ -22,10 +22,7 @@ import { fieldLabelKey, optionKey } from "./keys";
 /** Lists longer than this get a search box (#148): the languages, the hobbies, the lines of work. */
 export const SEARCHABLE_FROM = 12;
 
-/** The wording of the special-category consent this build rendered (ADR-010 §4, ADR-019 §4). */
-export const SPECIAL_CATEGORY_VERSION = CONSENT_VERSIONS.special_category;
-
-type Draft = Pick<ProfileUpdate, "fields" | "specialCategoryConsent">;
+type Draft = Pick<ProfileUpdate, "fields">;
 type Update = (patch: Partial<Draft>) => void;
 
 /**
@@ -66,45 +63,30 @@ export function Chip({
 }
 
 /**
- * The article 9 consent as a switch over the fields it covers (ADR-019 §4):
- * on, the document carries the wording's version; off takes the answers it
- * covered with it, since the API would refuse them anyway.
+ * The line above the article 9 fields (ADR-019 §4, #204): the consent was
+ * given once, at the seeks step, and anyone active has it; here it is named,
+ * with the one place it is withdrawn. No second switch.
  */
-export function SpecialCategoryConsent({ draft, update }: { draft: Draft; update: Update }) {
+export function SpecialCategoryNote() {
   const { t } = useT();
+  const router = useRouter();
   const tap = useHapticTap();
-  const consented = draft.specialCategoryConsent?.version === SPECIAL_CATEGORY_VERSION;
-  const setConsent = (on: boolean) => {
-    if (on && SPECIAL_CATEGORY_VERSION) {
-      update({ specialCategoryConsent: { version: SPECIAL_CATEGORY_VERSION } });
-      return;
-    }
-    const fields: Record<string, unknown> = { ...draft.fields };
-    for (const key of SPECIAL_CATEGORY_FIELDS) delete fields[key];
-    update({ specialCategoryConsent: null, fields: fields as ProfileFields });
-  };
   return (
     <View className="gap-2">
-      <View className="flex-row items-center justify-between gap-3">
-        <Text variant="small" className="flex-1">
-          {t("legal.special_category.title")}
-        </Text>
-        <Switch
-          accessibilityLabel={t("legal.special_category.title")}
-          checked={consented}
-          onCheckedChange={(on) => {
-            tap();
-            setConsent(on);
-          }}
-        />
-      </View>
-      <Text variant="muted">{t("legal.special_category.summary")}</Text>
+      <Text variant="muted">{t("profile.specialCategory.note")}</Text>
+      <Button
+        variant="outline"
+        accessibilityLabel={t("home.settings.open")}
+        onPress={() => {
+          tap();
+          router.push("/settings");
+        }}
+      >
+        {t("home.settings.open")}
+      </Button>
     </View>
   );
 }
-
-export const isConsented = (draft: Draft): boolean =>
-  draft.specialCategoryConsent?.version === SPECIAL_CATEGORY_VERSION;
 
 /**
  * One field of the registry as the person answers it (#47, #148, ADR-019):

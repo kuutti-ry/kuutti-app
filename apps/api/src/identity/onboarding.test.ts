@@ -9,7 +9,7 @@ import {
 } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
-import { ageInYears, SPECIAL_CATEGORY_CONSENT_VERSION } from "../profile/index.ts";
+import { ageInYears } from "../profile/index.ts";
 import { signedInAccount } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
@@ -95,7 +95,6 @@ const PROFILE = {
   bioPreset: null,
   fields: { intent: "casual" },
   prompts: [],
-  specialCategoryConsent: null,
 };
 const putProfile = (app: App, headers: Headers, body: unknown) =>
   app.request("/profile", {
@@ -575,7 +574,6 @@ describe("onboarding and consents", () => {
     const saved = await putProfile(app, a.headers, {
       ...PROFILE,
       fields: { ...PROFILE.fields, politics: ["vihr"] },
-      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
     });
     expect(saved.status).toBe(200);
     const withdrawn = await app.request("/consents/special_category", {

@@ -44,7 +44,6 @@ const update: ProfileUpdate = {
     { key: "sunday", answer: "A long breakfast and a longer walk." },
     { key: "hidden_talent", answer: "I can whistle with my mouth full." },
   ],
-  specialCategoryConsent: null,
 };
 
 const put = (app: App, headers: Record<string, string>, body: unknown) =>
@@ -174,20 +173,37 @@ describe("profile routes", () => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     const answered = { ...update, fields: { ...update.fields, politics: ["vihr", "vas"] } };
-    for (const consent of [null, { version: "2026-01-older" }]) {
-      const response = await put(app, a.headers, { ...answered, specialCategoryConsent: consent });
-      expect(response.status).toBe(403);
-      // The detail (the fields, the current version) goes to the log, never the body (lib/errors.ts).
-      expect(await errorCode(response)).toBe("consent_required");
-    }
-    const { rows: none } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
-      a.accountId,
-    ]);
-    expect(none).toHaveLength(0);
+    // No consent row, then a row for an older wording: both read as none (ADR-019 §4, #204).
+    const none = await put(app, a.headers, answered);
+    expect(none.status).toBe(403);
+    // The detail (the fields, the current version) goes to the log, never the body (lib/errors.ts).
+    expect(await errorCode(none)).toBe("consent_required");
+    await ctx.client.query(
+      "INSERT INTO consent (account_id, kind, version, locale_shown, given_at) VALUES ($1, 'special_category', '2026-01-older', 'fi', now())",
+      [a.accountId],
+    );
+    const stale = await put(app, a.headers, answered);
+    expect(stale.status).toBe(403);
+    expect(await errorCode(stale)).toBe("consent_required");
+    const { rows: nothing } = await ctx.client.query(
+      "SELECT 1 FROM profile WHERE account_id = $1",
+      [a.accountId],
+    );
+    expect(nothing).toHaveLength(0);
+    // The consent is given where it is given: the seeks step's route, never the document.
+    const given = await app.request("/consents", {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "special_category",
+        version: SPECIAL_CATEGORY_CONSENT_VERSION,
+        locale: "fi",
+      }),
+    });
+    expect(given.ok).toBe(true);
     const saved = await put(app, a.headers, {
       ...answered,
       fields: { ...answered.fields, religion: "agnostic" },
-      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
     });
     expect(saved.status).toBe(200);
     const stored = ProfileResponse.parse(await saved.json());
@@ -195,6 +211,7 @@ describe("profile routes", () => {
       politics: ["vihr", "vas"],
       religion: "agnostic",
     });
+    // The document echoes the consent row, never a copy of its own.
     expect(stored.profile?.specialCategoryConsent?.version).toBe(SPECIAL_CATEGORY_CONSENT_VERSION);
     // Shown on the card, as an answered info field is (ADR-019 §2).
     const preview = await app.request("/profile/card", { headers: a.headers });
@@ -204,17 +221,16 @@ describe("profile routes", () => {
     });
   });
 
-  test("PUT /profile refuses a consent version that is not the current wording's", async ({
+  test("PUT /profile refuses a consent in the body: the consent is the consent routes' (ADR-019 §4)", async ({
     ctx,
   }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     const response = await put(app, a.headers, {
       ...update,
-      specialCategoryConsent: { version: "2026-01-older" },
+      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
     });
-    expect(response.status).toBe(409);
-    expect(await errorCode(response)).toBe("agreement_outdated");
+    expect(response.status).toBe(400);
     const { rows } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
       a.accountId,
     ]);
@@ -270,11 +286,16 @@ describe("profile routes", () => {
                 ? "Architect"
                 : true;
     }
-    const saved = await put(app, a.headers, {
-      ...update,
-      fields: everything,
-      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
+    await app.request("/consents", {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "special_category",
+        version: SPECIAL_CATEGORY_CONSENT_VERSION,
+        locale: "fi",
+      }),
     });
+    const saved = await put(app, a.headers, { ...update, fields: everything });
     expect(saved.status).toBe(200);
     const preview = await app.request("/profile/card", { headers: a.headers });
     const card = CardPreviewResponse.parse(await preview.json()).card;
@@ -301,32 +322,17 @@ describe("profile routes", () => {
     ]);
   });
 
-  it("the consent gate refuses a special-category value without the version of the current wording", () => {
+  it("the consent gate refuses a special-category value unless the current wording's consent is on record", () => {
     const fields = { ...update.fields, religion: "agnostic" } as ProfileUpdate["fields"];
-    expect(consentMissingFor({ fields, specialCategoryConsent: null }, ["religion"], "v2")).toEqual(
-      ["religion"],
-    );
-    expect(
-      consentMissingFor({ fields, specialCategoryConsent: { version: "v1" } }, ["religion"], "v2"),
-    ).toEqual(["religion"]);
-    expect(
-      consentMissingFor({ fields, specialCategoryConsent: { version: "v2" } }, ["religion"], "v2"),
-    ).toEqual([]);
-    expect(
-      consentMissingFor(
-        { fields: update.fields, specialCategoryConsent: null },
-        ["religion"],
-        "v2",
-      ),
-    ).toEqual([]);
-    // The real registry flags politics and religion (ADR-019 §4).
-    expect(
-      consentMissingFor({
-        fields: { ...fields, politics: ["none_of_them"] },
-        specialCategoryConsent: null,
-      }),
-    ).toEqual(["politics", "religion"]);
-    expect(consentMissingFor({ fields: update.fields, specialCategoryConsent: null })).toEqual([]);
+    expect(consentMissingFor(fields, false, ["religion"])).toEqual(["religion"]);
+    expect(consentMissingFor(fields, true, ["religion"])).toEqual([]);
+    expect(consentMissingFor(update.fields, false, ["religion"])).toEqual([]);
+    // The registry's own special fields by default, in its order.
+    expect(consentMissingFor({ ...fields, politics: ["none_of_them"] }, false)).toEqual([
+      "politics",
+      "religion",
+    ]);
+    expect(consentMissingFor(update.fields, false)).toEqual([]);
   });
 
   test("unauthenticated: 401 on every profile route", async ({ ctx }) => {

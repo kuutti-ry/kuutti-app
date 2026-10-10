@@ -21,7 +21,7 @@ import {
 
 type Row = Record<string, unknown>;
 
-export type ProfileRow = ProfileDocument & {
+export type ProfileRow = Omit<ProfileDocument, "specialCategoryConsent"> & {
   accountId: string;
   /** Stored values the registry no longer knows (an option removed): read as unanswered; the caller logs the keys. */
   dropped: string[];
@@ -75,20 +75,13 @@ const profileFrom = (r: Row): ProfileRow => {
     fields: fields.fields,
     prompts: prompts.prompts,
     dropped: [...fields.dropped, ...prompts.dropped],
-    specialCategoryConsent:
-      typeof r.special_category_consent_version === "string" &&
-      r.special_category_consented_at instanceof Date
-        ? {
-            version: r.special_category_consent_version,
-            at: r.special_category_consented_at.toISOString(),
-          }
-        : null,
     updatedAt: (r.updated_at as Date).toISOString(),
   };
 };
 
-const COLUMNS =
-  "account_id, display_name, bio, bio_preset, fields, prompts, special_category_consent_version, special_category_consented_at, updated_at";
+// The two special_category_consent_* columns stay unused since #204 (the
+// consent rows are the source); the next migration of this table drops them.
+const COLUMNS = "account_id, display_name, bio, bio_preset, fields, prompts, updated_at";
 
 export async function findProfile(db: Queryable, accountId: string): Promise<ProfileRow | null> {
   const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM profile WHERE account_id = $1`, [
@@ -101,8 +94,8 @@ export async function findProfile(db: Queryable, accountId: string): Promise<Pro
  * The whole document, inserted or replaced; a tombstone writes nothing (#51).
  * The account row is taken under lock first, the same lock erasure takes, so
  * a save racing an erasure either lands before the deletes or sees the
- * tombstone and writes nothing. The consent's time is kept when the version
- * is unchanged and set anew when it changes; null withdraws it.
+ * tombstone and writes nothing. The special-category consent is not written
+ * here: it is a consent row (ADR-019 §4, #204).
  */
 export async function upsertProfile(
   db: Queryable,
@@ -112,10 +105,8 @@ export async function upsertProfile(
 ): Promise<ProfileRow | null> {
   const { rows } = await db.query<Row>(
     `WITH live AS (SELECT id FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE)
-     INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts,
-                          special_category_consent_version, special_category_consented_at,
-                          created_at, updated_at)
-     SELECT $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, CASE WHEN $7::text IS NULL THEN NULL ELSE $8::timestamptz END, $8, $8
+     INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
+     SELECT $1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $7
      FROM live
      ON CONFLICT (account_id) DO UPDATE SET
        display_name = EXCLUDED.display_name,
@@ -123,12 +114,6 @@ export async function upsertProfile(
        bio_preset = EXCLUDED.bio_preset,
        fields = EXCLUDED.fields,
        prompts = EXCLUDED.prompts,
-       special_category_consent_version = EXCLUDED.special_category_consent_version,
-       special_category_consented_at = CASE
-         WHEN EXCLUDED.special_category_consent_version IS NULL THEN NULL
-         WHEN profile.special_category_consent_version = EXCLUDED.special_category_consent_version
-           THEN profile.special_category_consented_at
-         ELSE EXCLUDED.special_category_consented_at END,
        updated_at = EXCLUDED.updated_at
      RETURNING ${COLUMNS}`,
     [
@@ -138,7 +123,6 @@ export async function upsertProfile(
       update.bioPreset,
       JSON.stringify(update.fields),
       JSON.stringify(update.prompts),
-      update.specialCategoryConsent?.version ?? null,
       at,
     ],
   );
@@ -173,8 +157,7 @@ export async function findCardSubject(
 ): Promise<CardSubject | null> {
   const { rows } = await db.query<Row>(
     `SELECT a.id, a.state, a.birth_year, a.birth_month, a.gender,
-            p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts,
-            p.special_category_consent_version, p.special_category_consented_at, p.updated_at
+            p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts, p.updated_at
      FROM account a LEFT JOIN profile p ON p.account_id = a.id
      WHERE a.id = $1`,
     [subjectAccountId],
@@ -193,8 +176,8 @@ export async function findCardSubject(
 
 /**
  * Withdrawing the special-category consent takes the article 9 answers with
- * it (ADR-019 §4, #146): politics and religion leave the document and the
- * consent columns are cleared; everything else stays. Under the account row's
+ * it (ADR-019 §4, #146): politics and religion leave the document;
+ * everything else stays. The consent itself is the withdrawn consent row. Under the account row's
  * lock like every writer; a tombstone changes nothing.
  */
 export async function clearSpecialCategoryAnswers(
@@ -205,8 +188,6 @@ export async function clearSpecialCategoryAnswers(
   const result = await db.query(
     `WITH live AS (SELECT id FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE)
      UPDATE profile SET fields = fields - $2::text[],
-                        special_category_consent_version = NULL,
-                        special_category_consented_at = NULL,
                         updated_at = $3
      WHERE account_id IN (SELECT id FROM live)`,
     [accountId, SPECIAL_CATEGORY_FIELDS, at],

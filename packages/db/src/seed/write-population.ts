@@ -175,12 +175,12 @@ export async function writePopulation(
         }
       }
       if (person.profile) {
-        const consentedAt = person.profile.specialCategoryConsentedAt;
+        // The special-category consent is a consent row (written above with
+        // the others), not a profile column (ADR-019 §4, #204).
         await tx.query(
           `INSERT INTO profile
-             (account_id, display_name, bio, bio_preset, fields, prompts,
-              special_category_consent_version, special_category_consented_at, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $9, $9)`,
+             (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $7)`,
           [
             accountId,
             person.profile.displayName,
@@ -188,8 +188,6 @@ export async function writePopulation(
             person.profile.bioPreset,
             JSON.stringify(person.profile.fields),
             JSON.stringify(person.profile.prompts),
-            consentedAt ? consentVersions.special_category : null,
-            consentedAt,
             person.registeredAt,
           ],
         );

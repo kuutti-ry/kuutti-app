@@ -169,15 +169,12 @@ describe("the synthetic population", () => {
       expect(person.consents.map((c) => c.kind)).toEqual(["terms", "privacy", "special_category"]);
       if (person.profile) {
         const { specialCategoryConsentedAt, ...document } = person.profile;
-        const specialCategoryConsent = specialCategoryConsentedAt
-          ? { version: VERSIONS.special_category }
-          : null;
-        const parsed = ProfileUpdate.safeParse({ ...document, specialCategoryConsent });
+        const parsed = ProfileUpdate.safeParse(document);
         expect(parsed.success, `${person.label}: ${JSON.stringify(parsed.error?.issues)}`).toBe(
           true,
         );
         // Stored as it would be after the API's own trim: nothing to trim.
-        expect(parsed.data).toEqual({ ...document, specialCategoryConsent });
+        expect(parsed.data).toEqual(document);
         // An article 9 answer only behind the consent, given with the others (ADR-019 §4).
         if (document.fields.politics !== undefined || document.fields.religion !== undefined) {
           expect(specialCategoryConsentedAt, person.label).not.toBeNull();
@@ -308,16 +305,17 @@ describe("writing the population", () => {
           { gender: "man", n: "171" },
           { gender: "non_binary", n: "17" },
         ]);
-        // The special-category consent is stored with the article 9 answers (ADR-019 §4).
+        // An article 9 answer only behind the consent row of its account (ADR-019 §4, #204): the row, never a profile column.
         expect(
           await count(
-            "SELECT count(*) AS n FROM profile WHERE fields ? 'politics' AND special_category_consent_version IS NULL",
+            `SELECT count(*) AS n FROM profile p
+             WHERE p.fields ? 'politics'
+               AND NOT EXISTS (SELECT 1 FROM consent c WHERE c.account_id = p.account_id
+                               AND c.kind = 'special_category' AND c.withdrawn_at IS NULL)`,
           ),
         ).toBe(0);
         expect(
-          await count(
-            "SELECT count(*) AS n FROM profile WHERE special_category_consent_version = 'test-special-1'",
-          ),
+          await count("SELECT count(*) AS n FROM profile WHERE fields ? 'politics'"),
         ).toBeGreaterThan(0);
         // No code was hashed: the hash is of the label.
         const first = await pool.query<{ hetu_hmac: string }>(

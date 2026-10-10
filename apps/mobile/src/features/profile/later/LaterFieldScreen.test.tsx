@@ -35,7 +35,6 @@ type Profile = {
   bioPreset: string | null;
   fields: Record<string, unknown>;
   prompts: { key: string; answer: string }[];
-  specialCategoryConsent: { version: string } | null;
 };
 
 /** A tiny server for the profile: the later screens read it, "Save and continue" writes it whole. */
@@ -46,9 +45,8 @@ function fakeApi(profile: Profile | null = null) {
     profile: server.profile
       ? {
           ...server.profile,
-          specialCategoryConsent: server.profile.specialCategoryConsent
-            ? { ...server.profile.specialCategoryConsent, at: "2026-10-08T10:00:00.000Z" }
-            : null,
+          // The document echoes the consent row; the seeks step gave it, so anyone here has it.
+          specialCategoryConsent: { version: SPECIAL, at: "2026-10-08T10:00:00.000Z" },
           updatedAt: "2026-10-08T10:00:00.000Z",
         }
       : null,
@@ -69,13 +67,12 @@ function fakeApi(profile: Profile | null = null) {
   return { server, puts };
 }
 
-const named = (fields: Record<string, unknown>, consent: string | null = null): Profile => ({
+const named = (fields: Record<string, unknown>): Profile => ({
   displayName: "Aino",
   bio: null,
   bioPreset: null,
   fields,
   prompts: [],
-  specialCategoryConsent: consent ? { version: consent } : null,
 });
 
 const checkA11y = () => {
@@ -148,21 +145,21 @@ describe("LaterFieldScreen", () => {
     expect(laterProgress({ hasKids: "yes_with_me" })).toEqual({ answered: 1, total: 16 });
   });
 
-  it("offers an article 9 field behind its consent and saves the wording's version with the answer", async () => {
+  it("shows an article 9 field under the note on its consent, and saves the answer without a consent of its own", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="politics" />);
-    await waitFor(() => expect(screen.getByText("Sensitive answers")).toBeTruthy());
-    expect(screen.queryByText("Greens")).toBeNull();
-    await press(screen.getByLabelText("Sensitive answers"));
     await waitFor(() => expect(screen.getByText("Greens")).toBeTruthy());
+    // No second switch (#204): the consent was given at the seeks step; Settings is where it is withdrawn.
+    expect(screen.queryByLabelText("Sensitive answers")).toBeNull();
+    expect(screen.getByText(/withdraw it in Settings/)).toBeTruthy();
     checkA11y();
+    await press(screen.getByRole("button", { name: "Settings" }));
+    expect(router.push).toHaveBeenCalledWith("/settings");
     await press(screen.getByRole("button", { name: "Greens" }));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0]).toMatchObject({
-      fields: { politics: ["vihr"] },
-      specialCategoryConsent: { version: SPECIAL },
-    });
+    expect(puts[0]).toMatchObject({ fields: { politics: ["vihr"] } });
+    expect(puts[0]).not.toHaveProperty("specialCategoryConsent");
     expect(router.push).toHaveBeenCalledWith("/profile/later/religion");
   });
 
