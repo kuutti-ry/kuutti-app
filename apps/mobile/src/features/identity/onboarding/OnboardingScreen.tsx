@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, type PlainMessageKey } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, formatDate, type PlainMessageKey } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
@@ -167,6 +167,12 @@ export function OnboardingScreen() {
     if (current === "done") router.replace("/");
   }, [current, router]);
   const age = state.status === "ready" ? state.onboarding.age : null;
+  // From when a refused change is possible (#147): the gender's for the gender
+  // step, whom one seeks for the steps that save it (seeks, the age window).
+  const changeFrom =
+    state.status === "ready"
+      ? state.onboarding.nextChange[current === "gender" ? "gender" : "seeks"]
+      : null;
   useEffect(() => {
     if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
   }, [current, ages, age]);
@@ -240,6 +246,11 @@ export function OnboardingScreen() {
             {failedCode === "change_too_soon"
               ? t("errors.change_too_soon")
               : t("onboarding.failed")}
+          </Text>
+        )}
+        {failed && failedCode === "change_too_soon" && changeFrom && (
+          <Text>
+            {t("onboarding.changeFrom", { date: formatDate(locale, new Date(changeFrom)) })}
           </Text>
         )}
 

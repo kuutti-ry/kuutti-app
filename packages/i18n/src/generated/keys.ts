@@ -136,6 +136,7 @@ export type MessageParams = {
   "onboarding.age.youngest": Record<never, never>;
   "onboarding.age.youngestDown": Record<never, never>;
   "onboarding.age.youngestUp": Record<never, never>;
+  "onboarding.changeFrom": { "date": string };
   "onboarding.consents.binding": Record<never, never>;
   "onboarding.consents.explain": Record<never, never>;
   "onboarding.consents.outdatedApp": Record<never, never>;

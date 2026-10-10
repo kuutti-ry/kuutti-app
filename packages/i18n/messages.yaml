@@ -2677,10 +2677,10 @@ errors.too_many_changes:
   machine: { fi: true, sv: true }
 
 errors.change_too_soon:
-  en: "You changed this recently. A change is possible once the waiting time has passed; the home screen says from when."
-  description: "PUT /account/gender or PUT /preferences (429): the gender or whom one seeks was changed less than change_cadence_days ago (#147, ADR-015 §9). No hostile wording: somebody transitioning must not hit a wall."
-  fi: "Muutit tätä äskettäin. Muutos on mahdollinen, kun odotusaika on kulunut; etusivu kertoo, mistä alkaen."
-  sv: "Du ändrade det här nyligen. En ändring är möjlig när väntetiden gått; startsidan säger från när."
+  en: "You changed this recently. A change is possible again once the waiting time has passed."
+  description: "PUT /account/gender or PUT /preferences (429): the gender or whom one seeks was changed less than change_cadence_days ago (#147, ADR-015 §9). No hostile wording: somebody transitioning must not hit a wall. The app adds the date (onboarding.changeFrom)."
+  fi: "Muutit tätä äskettäin. Muutos on taas mahdollinen, kun odotusaika on kulunut."
+  sv: "Du ändrade det här nyligen. En ändring är möjlig igen när väntetiden har gått."
   machine: { fi: true, sv: true }
 
 errors.filter_unanswered:
@@ -2909,6 +2909,13 @@ onboarding.loading:
   description: "Shown while the onboarding status loads."
   fi: "Hetki…"
   sv: "Ett ögonblick…"
+  machine: { fi: true, sv: true }
+
+onboarding.changeFrom:
+  en: "Next change possible: {date}."
+  description: "Under errors.change_too_soon in onboarding: the day from which the gender, or whom one seeks, may be changed again, from the status's nextChange (#147, ADR-015 §9). {date} is d.M.yyyy (formatDate)."
+  fi: "Seuraava muutos mahdollinen: {date}."
+  sv: "Nästa ändring möjlig: {date}."
   machine: { fi: true, sv: true }
 
 onboarding.failed:

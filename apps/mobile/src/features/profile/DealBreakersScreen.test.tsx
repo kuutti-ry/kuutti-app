@@ -104,6 +104,14 @@ describe("DealBreakersScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/profile/later/hasKids");
   });
 
+  it("leads a field without a later screen to the profile screen", async () => {
+    fakeApi({ ...answeredAll, monogamy: undefined });
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Answer it" }));
+    expect(router.push).toHaveBeenCalledWith("/profile");
+  });
+
   it("switches deal-breakers on, takes what is fine, holds the limit, and saves the set", async () => {
     const { puts } = fakeApi(answeredAll);
     await show(<DealBreakersScreen />);

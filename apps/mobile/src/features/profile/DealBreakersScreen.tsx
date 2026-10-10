@@ -2,6 +2,7 @@ import {
   DEAL_BREAKER_FIELDS,
   type DealBreakerField,
   type DealBreakersUpdate,
+  LATER_FIELD_ORDER,
   PROFILE_FIELDS,
   type StoredDealBreaker,
 } from "@kuutti/schema";
@@ -144,7 +145,13 @@ export function DealBreakersScreen() {
       variant="outline"
       onPress={() => {
         tap();
-        router.push(laterPath(field));
+        // A field of the later screens opens its own; the rest (monogamy) is
+        // answered on the profile screen, which has every field (10/10/2026:
+        // "Answer it" on relationship structure opened the first unanswered
+        // later field instead).
+        router.push(
+          (LATER_FIELD_ORDER as readonly string[]).includes(field) ? laterPath(field) : "/profile",
+        );
       }}
     >
       {t("profile.dealBreakers.answer")}

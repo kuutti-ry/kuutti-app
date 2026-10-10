@@ -126,6 +126,7 @@ export function useProfile() {
   return {
     status,
     draft,
+    saved,
     completeness,
     saving,
     notice,

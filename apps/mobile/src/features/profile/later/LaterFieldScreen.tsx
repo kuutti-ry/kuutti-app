@@ -93,7 +93,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
       </SafeAreaView>
     );
   }
-  const { draft, update } = profile;
+  const { draft, saved, update } = profile;
   const progress = laterProgress(draft.fields);
   const offered = !spec.specialCategory || isConsented(draft);
   // Onward to the next field without an answer; answered ones are the profile screen's to change.
@@ -115,7 +115,9 @@ export function LaterFieldScreen({ field }: { field: string }) {
         <Text variant="muted" accessibilityLiveRegion="polite">
           {t("profile.later.progress", progress)}
         </Text>
-        {(index === 0 || key === nextUnanswered(draft.fields, -1)) && (
+        {/* Decided from the stored document, not the draft: from the draft the
+            line left on the first choice and the buttons jumped (10/10/2026). */}
+        {(index === 0 || key === nextUnanswered(saved.fields, -1)) && (
           <Text>{t("profile.later.explain")}</Text>
         )}
 

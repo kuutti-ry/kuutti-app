@@ -130,6 +130,14 @@ describe("LaterFieldScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
   });
 
+  it("keeps the intro line on the first unanswered field while it is being answered", async () => {
+    fakeApi(named({ hasKids: "no" }));
+    await show(<LaterFieldScreen field="wantsKids" />);
+    await waitFor(() => expect(screen.getByText(/One question at a time/)).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Want kids" }));
+    expect(screen.getByText(/One question at a time/)).toBeTruthy();
+  });
+
   it("adapts the wants-kids texts to the kids answer", async () => {
     fakeApi(named({ hasKids: "yes_with_me" }));
     await show(<LaterFieldScreen field="wantsKids" />);
