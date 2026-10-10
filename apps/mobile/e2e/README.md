@@ -4,7 +4,7 @@ Flows that drive the app on a simulator against the local environment: the real 
 
 ## Run
 
-1. Once: `brew trust mobile-dev-inc/tap && brew install maestro` (the tap is Maestro's own; it brings OpenJDK).
+1. Once: `brew trust mobile-dev-inc/tap && brew install --formula mobile-dev-inc/tap/maestro` (the tap is Maestro's own; `--formula`, since the cask is the desktop app). It brings OpenJDK keg-only, which `pnpm e2e` puts on the PATH; to call `maestro` yourself, `export PATH="$(brew --prefix openjdk)/bin:$PATH"` first.
 2. `pnpm env:up` in one terminal: the database, the API on 3000, Metro on 8081.
 3. A booted simulator with the dev client installed (`pnpm dev:mobile` has built it before). With two booted, name one: `maestro --device <udid> test apps/mobile/e2e/flows`.
 4. `pnpm e2e` runs every flow under `flows/`; `maestro test apps/mobile/e2e/flows/language.yaml` runs one. `maestro studio` inspects what a screen shows to Maestro, the way to find a text that does not match.
