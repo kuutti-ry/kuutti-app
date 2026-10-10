@@ -6,6 +6,7 @@ import {
   clearSession,
   currentSession,
   loadSession,
+  markLoginStarted,
   onSessionChange,
   refreshSession,
   saveSession,
@@ -41,12 +42,25 @@ describe("session storage", () => {
     const seen: (SessionTokens | null)[] = [];
     const stop = onSessionChange((s) => seen.push(s));
     await saveSession(tokens(1));
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith("kuutti.session", expect.any(String));
+    // The item stays on this device: never in a backup or a transfer (#35, the review of 10/10/2026).
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith("kuutti.session", expect.any(String), {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
+    // Deleted before written, so an item from before this rule does not keep its old accessibility.
+    const order = (fn: unknown) => (fn as jest.Mock).mock.invocationCallOrder.at(-1) ?? 0;
+    expect(order(SecureStore.deleteItemAsync)).toBeLessThan(order(SecureStore.setItemAsync));
     expect(await loadSession()).toEqual(tokens(1));
     await clearSession();
     expect(currentSession()).toBeNull();
     expect(seen.map((s) => s?.accessToken ?? null)).toEqual([token("access1"), null]);
     stop();
+  });
+
+  it("keeps the pending login mark on this device too", async () => {
+    await markLoginStarted(BASE);
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith("kuutti.session.pending", String(BASE), {
+      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+    });
   });
 
   it("treats a value that does not parse as no session", async () => {
