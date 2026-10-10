@@ -477,6 +477,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.option.politics.kok": "Kokoomus",
   "profile.option.politics.liik": "Liike Nyt",
   "profile.option.politics.none_of_them": "Ei mikään näistä",
+  "profile.option.politics.pp": "Piraattipuolue",
   "profile.option.politics.ps": "Perussuomalaiset",
   "profile.option.politics.rkp": "RKP",
   "profile.option.politics.sdp": "SDP",

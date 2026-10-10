@@ -1574,6 +1574,13 @@ profile.option.politics.kahvipuolue:
   sv: "Kaffepartiet"
   machine: { fi: true, sv: true }
 
+profile.option.politics.pp:
+  en: "Pirate Party"
+  description: "Option pp of the politics field, Piraattipuolue (#213)."
+  fi: "Piraattipuolue"
+  sv: "Piratpartiet"
+  machine: { fi: true, sv: true }
+
 profile.option.religion.lutheran:
   en: "Lutheran"
   description: "Option lutheran of the religion field (#145 registry, ADR-019)."

@@ -519,6 +519,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.option.politics.kok": "National Coalition Party",
   "profile.option.politics.liik": "Movement Now",
   "profile.option.politics.none_of_them": "None of them",
+  "profile.option.politics.pp": "Pirate Party",
   "profile.option.politics.ps": "Finns Party",
   "profile.option.politics.rkp": "Swedish People's Party",
   "profile.option.politics.sdp": "Social Democrats",

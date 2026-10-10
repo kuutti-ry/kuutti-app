@@ -519,6 +519,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.option.politics.kok": "［Ñáátííóóñáál Çóóáálíítííóóñ Páártýý］",
   "profile.option.politics.liik": "［Móóvéémééñt Ñóów］",
   "profile.option.politics.none_of_them": "［Ñóóñéé óóf théém］",
+  "profile.option.politics.pp": "［Pííráátéé Páártýý］",
   "profile.option.politics.ps": "［Fííññš Páártýý］",
   "profile.option.politics.rkp": "［Šwéédííšh Pééóópléé'š Páártýý］",
   "profile.option.politics.sdp": "［Šóóçííáál Déémóóçráátš］",

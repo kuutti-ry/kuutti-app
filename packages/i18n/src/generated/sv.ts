@@ -469,6 +469,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.option.politics.kok": "Samlingspartiet",
   "profile.option.politics.liik": "Rörelse Nu",
   "profile.option.politics.none_of_them": "Inget av dem",
+  "profile.option.politics.pp": "Piratpartiet",
   "profile.option.politics.ps": "Sannfinländarna",
   "profile.option.politics.rkp": "SFP",
   "profile.option.politics.sdp": "Socialdemokraterna",

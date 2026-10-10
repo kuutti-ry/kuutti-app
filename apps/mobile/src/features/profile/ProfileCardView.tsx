@@ -11,6 +11,7 @@ import { Text } from "@/components/ui/text";
 import { type OnRefused, PhotoImage } from "@/features/media";
 import { pondName } from "@/features/pond";
 import { useT } from "@/lib/locale";
+import { hasGlyphs, OptionGlyph } from "./glyphs";
 import { fieldLabelKey, genderKey, optionKey, presetKey, promptKey } from "./keys";
 
 /**
@@ -106,6 +107,23 @@ export function ProfileCardView({
           const value = fields[key];
           // The identity label stands in the header, after the gender.
           if (value === undefined || key === "identityLabel") return null;
+          if (hasGlyphs(key)) {
+            // A party, a religion, a star sign: the glyph before each name (#213).
+            const options = (Array.isArray(value) ? value : [value]).map(String);
+            return (
+              <View key={key} className="gap-0.5">
+                <Text variant="small">{t(fieldLabelKey(key))}</Text>
+                <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+                  {options.map((option) => (
+                    <View key={option} className="flex-row items-center gap-1">
+                      <OptionGlyph field={key} option={option} />
+                      <Text>{t(optionKey(key, option))}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          }
           const shown = shownOf(key, value);
           if (shown === null) return null;
           return (
