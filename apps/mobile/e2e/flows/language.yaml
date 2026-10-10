@@ -1,0 +1,23 @@
+# The language choice in Settings changes the app's language at once, and
+# the phone's language takes it back (#164, the first feature flow; the
+# texts are those of packages/i18n/messages.yaml in all three languages).
+appId: fi.kuutti.app
+name: The language choice in Settings changes the app's language at once
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+- tapOn: ".*Suomi.*"
+- assertVisible: "Asetukset"
+- assertVisible: "Kieli"
+- tapOn: ".*Svenska.*"
+- assertVisible: "Inställningar"
+- assertVisible: "Språk"
+- tapOn: ".*English.*"
+- assertVisible: "Settings"
+- assertVisible: "Language"
+# Back to the phone's language, so the next flow finds the app as a person would.
+- tapOn: "Phone's language"
+- assertVisible: "Settings|Asetukset|Inställningar"
