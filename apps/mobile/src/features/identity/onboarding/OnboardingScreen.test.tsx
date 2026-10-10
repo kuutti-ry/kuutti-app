@@ -406,6 +406,33 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["woman", "man", "non_binary"]);
   });
 
+  it("shows the stored age window again when whom one seeks is asked anew", async () => {
+    // A withdrawal of the sensitive-answers consent asks whom one seeks again, and the ages
+    // with it (#204): the window the person had, not the default around their age.
+    const { server } = fakeApi({ age: 43 });
+    server.consents.push(consented("terms"), consented("privacy"));
+    server.profile = {
+      displayName: "Noa",
+      bio: null,
+      bioPreset: null,
+      fields: { intent: "open_to_either" },
+      prompts: [],
+    };
+    server.gender = "woman";
+    server.ageWindow = { min: 35, max: 50 };
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Anyone" }));
+    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
+    expect(screen.getByText("35")).toBeTruthy();
+    expect(screen.getByText("50")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    expect(server.ageWindow).toEqual({ min: 35, max: 50 });
+  });
+
   it("asks for an app update instead of recording a consent for a wording it did not show", async () => {
     const { server, calls } = fakeApi({ version: "2026-11-final-1" });
     await show(<OnboardingScreen />);
