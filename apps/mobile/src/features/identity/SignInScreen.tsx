@@ -98,7 +98,12 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     router.setParams({ code: undefined, error: undefined, until: undefined });
     try {
       await markLoginStarted();
-      await Linking.openURL(`${apiBaseUrl()}/auth/start?platform=${Platform.OS}`);
+      // The bank's chooser in the app's language, which can differ from the
+      // phone's and so from the browser's (#55); en-XA asks for English.
+      const bankLocale = locale === "fi" || locale === "sv" ? locale : "en";
+      await Linking.openURL(
+        `${apiBaseUrl()}/auth/start?platform=${Platform.OS}&locale=${bankLocale}`,
+      );
     } catch {
       setPhase({ kind: "error", code: "generic" });
     }

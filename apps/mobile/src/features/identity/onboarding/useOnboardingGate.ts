@@ -1,6 +1,6 @@
 import type { PondSummary } from "@kuutti/schema";
-import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import { useSession } from "../session";
 import { fetchOnboarding } from "./client";
 
@@ -18,7 +18,11 @@ export type OnboardingGate =
  * The home screen's gate (#46): a signed-in account that has not finished
  * onboarding is sent to it, and until the status has been read and says
  * complete, the screen shows none of what needs a finished account. A
- * status that cannot be read keeps the gate closed rather than open.
+ * status that cannot be read keeps the gate closed rather than open. The
+ * status is read again whenever the screen regains the focus: a consent
+ * withdrawn in Settings reopens a step, and the way back to home is the
+ * moment to ask it (09/10/2026, found on the simulator). What was known
+ * stays on screen while the re-read is in flight.
  */
 export function useOnboardingGate(): OnboardingGate & { retry: () => void } {
   const session = useSession();
@@ -26,13 +30,13 @@ export function useOnboardingGate(): OnboardingGate & { retry: () => void } {
   const signedIn = session.status === "signed-in";
   const [gate, setGate] = useState<OnboardingGate>({ status: "signed-out" });
   const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
+  const read = useCallback(() => {
     if (!signedIn) {
       setGate({ status: "signed-out" });
       return;
     }
     let live = true;
-    setGate({ status: "checking" });
+    setGate((previous) => (previous.status === "complete" ? previous : { status: "checking" }));
     fetchOnboarding()
       .then((status) => {
         if (!live) return;
@@ -50,6 +54,7 @@ export function useOnboardingGate(): OnboardingGate & { retry: () => void } {
       live = false;
     };
   }, [signedIn, router, attempt]);
+  useFocusEffect(read);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
   return { ...gate, retry };
 }

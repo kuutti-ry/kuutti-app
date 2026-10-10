@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, type PlainMessageKey } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, formatDate, type PlainMessageKey } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
@@ -13,7 +13,7 @@ import {
   type ProfileFields,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
@@ -166,7 +166,19 @@ export function OnboardingScreen() {
   useEffect(() => {
     if (current === "done") router.replace("/");
   }, [current, router]);
+  // Each step starts at its top: the ScrollView kept the last step's offset,
+  // so a new step's title began under the status bar (10/10/2026).
+  const scroll = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (current) scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [current]);
   const age = state.status === "ready" ? state.onboarding.age : null;
+  // From when a refused change is possible (#147): the gender's for the gender
+  // step, whom one seeks for the steps that save it (seeks, the age window).
+  const changeFrom =
+    state.status === "ready"
+      ? state.onboarding.nextChange[current === "gender" ? "gender" : "seeks"]
+      : null;
   useEffect(() => {
     if (current === "age" && ages === null && age !== null) setAges(defaultAgeWindow(age));
   }, [current, ages, age]);
@@ -223,6 +235,7 @@ export function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView
+        ref={scroll}
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
@@ -240,6 +253,11 @@ export function OnboardingScreen() {
             {failedCode === "change_too_soon"
               ? t("errors.change_too_soon")
               : t("onboarding.failed")}
+          </Text>
+        )}
+        {failed && failedCode === "change_too_soon" && changeFrom && (
+          <Text>
+            {t("onboarding.changeFrom", { date: formatDate(locale, new Date(changeFrom)) })}
           </Text>
         )}
 
@@ -569,7 +587,8 @@ export function OnboardingScreen() {
                 value={draft.bio ?? ""}
                 maxLength={BIO_MAX}
                 multiline
-                numberOfLines={4}
+                // Room for four lines and more as the bio grows (as on the profile screen).
+                className="min-h-28"
                 onChangeText={(text) =>
                   update({ bio: text.length > 0 ? text : null, bioPreset: null })
                 }

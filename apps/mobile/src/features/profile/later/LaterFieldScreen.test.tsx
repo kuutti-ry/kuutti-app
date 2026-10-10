@@ -115,6 +115,29 @@ describe("LaterFieldScreen", () => {
     expect(screen.getByText("1 of 16 answered")).toBeTruthy();
   });
 
+  it("lands on the first unanswered field when the first one is answered already", async () => {
+    fakeApi(named({ hasKids: "no" }));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/profile/later/wantsKids"));
+  });
+
+  it("moves on past answered fields, to the next one without an answer", async () => {
+    fakeApi(named({ wantsKids: "want", smoking: "never" }));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("2 of 16 answered")).toBeTruthy());
+    expect(router.replace).not.toHaveBeenCalled();
+    await press(screen.getByRole("button", { name: "Ask me later" }));
+    expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
+  });
+
+  it("keeps the intro line on the first unanswered field while it is being answered", async () => {
+    fakeApi(named({ hasKids: "no" }));
+    await show(<LaterFieldScreen field="wantsKids" />);
+    await waitFor(() => expect(screen.getByText(/One question at a time/)).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Want kids" }));
+    expect(screen.getByText(/One question at a time/)).toBeTruthy();
+  });
+
   it("adapts the wants-kids texts to the kids answer", async () => {
     fakeApi(named({ hasKids: "yes_with_me" }));
     await show(<LaterFieldScreen field="wantsKids" />);

@@ -86,6 +86,24 @@ What the guide requires, where the API does it, and which test proves it. Levels
 
 Per bank: Nordea `DEMOUSER1`–`DEMOUSER4`; Danske `88888888` / `4545`; Aktia and OP prefilled; Ålandsbanken and S-Pankki `12345678` / `123456` / `1234` (code card); Säästöpankki and OmaSP `11111111` / `123456`; POP `12345678` / `0000`; Mobiilivarmenne emulator prefilled (`acr` `mpki.telia.emulator.1`). The hetu they return is a test code (for example `220750-999Y`, `141002A909X`). The published codes of the test persons (integrator documentation, 2024; verified on the bed by #139) are the identities of the demo personas of the mock bank (#140, `services/mock-idp/README.md`); of them Danske's `280453-111A` and Samlink's first person `010100A001N` fail the check character and are refused by `deriveIdentity`.
 
+What the bed returned when each test user logged in to staging (#139, the simulator against `api.staging.kuutti.app` at `c63001f`, 08/10–10/10/2026; staging's log carries every completed login as one line with `acr` loatest2, the bank as `amr` and the outcome):
+
+| bank, user | code returned | birth | Kuutti's answer |
+|---|---|---|---|
+| Nordea `DEMOUSER1` | Onni's | 1.2.2000 | completed (onboarding from the first step) |
+| Nordea `DEMOUSER2` | Aino's | 29.12.1992 | completed |
+| Nordea `DEMOUSER3` | Noa's | 3.8.1983 | completed (resumed) |
+| Nordea `DEMOUSER4` | Sanna's | 17.6.1977 | completed (resumed) |
+| Säästöpankki `22222222` / `123456` | `010280-952L` (Kerttu's) | 1.2.1980 | completed (asked to accept the terms again) |
+| OP, prefilled, key code 1234 | Tapio's | 7.7.1970 | refused: banned, by design |
+| Aktia, prefilled | `010170-999R` (Ilona's) | 1.1.1970 | refused: deleted, with the earliest day, by design |
+| Ålandsbanken `12345678` / `123456` / `1234` | `410165-012D` | 1.2.1980 | refused: not a valid code (day 41) |
+| S-Pankki `12345678` / `123456` / `1234` | `750240-1228` | 1.2.1980 | refused: not a valid code (day 75) |
+| Danske `88888888` / `4545` | `010108-000Z` | 1.1.1908 | refused: not a valid code (individual number 000) |
+| Mobiilivarmenne emulator, `0401234567` | `010132-998W` | 1.1.1932 | completed (a new account, 94 years old) |
+
+Two things changed on the bed since the published list: Danske now returns `010108-000Z` (not `280453-111A`), and Ålandsbanken and S-Pankki return codes with impossible days, so neither is Mikael (`010170-960x`) any more; the mock bank's Mikael has no working test user on staging. Every refusal of an invalid code reaches the person as "the identification service did not complete the login; try again in a while", which promises a retry that cannot help.
+
 ## The four confirmations we need in writing
 
 Asked of Telia at onboarding; the answers decide #34 and the privacy notice. The maintainer put the first four to the commercial contact on 2026-10-07; that side answered the retention question and sent the rest to id-maintenance, so they go into the test-bed request above. Fill in the date and the answer.

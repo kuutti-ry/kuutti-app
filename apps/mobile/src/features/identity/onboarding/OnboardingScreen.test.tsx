@@ -60,7 +60,17 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     consents: { kind: string; version: string; locale: string }[];
     profile: Profile | null;
     photos: number;
-  } = { gender: null, seeks: null, ageWindow: null, consents: [], profile: null, photos: 0 };
+    /** From when a gender change is possible again; set, the API refuses one with 429 (#147). */
+    genderFrom: string | null;
+  } = {
+    gender: null,
+    seeks: null,
+    ageWindow: null,
+    consents: [],
+    profile: null,
+    photos: 0,
+    genderFrom: null,
+  };
   const calls: { method: string; path: string; body: unknown }[] = [];
   const has = (kind: string, version: string) =>
     server.consents.some((c) => c.kind === kind && c.version === version);
@@ -97,7 +107,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
         research: current,
         special_category: SPECIAL,
       },
-      nextChange: { gender: null, seeks: null },
+      nextChange: { gender: server.genderFrom, seeks: null },
       missing,
       complete: missing.length === 0,
     };
@@ -125,6 +135,10 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
         prompts: b.prompts,
       };
       return json(profileResponse());
+    }
+    if (path === "/account/gender" && server.genderFrom) {
+      const error = { code: "change_too_soon", message: "Changed recently", requestId: "r" };
+      return json({ error }, 429);
     }
     if (path === "/account/gender") {
       server.gender = (body as { gender: string }).gender;
@@ -282,6 +296,20 @@ describe("OnboardingScreen", () => {
     await flush();
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
     expect(server.profile?.fields).toEqual({ identityLabel: "genderfluid" });
+  });
+
+  it("says from when a gender change is possible when one is refused for its cadence", async () => {
+    const { server } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"));
+    server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    server.genderFrom = "2026-11-08T10:00:00.000Z";
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Woman" }));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText(/You changed this recently/)).toBeTruthy());
+    expect(screen.getByText("Next change possible: 8.11.2026.")).toBeTruthy();
   });
 
   it("skips the identity label on request and never offers it after another gender", async () => {

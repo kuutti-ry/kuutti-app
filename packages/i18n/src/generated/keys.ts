@@ -136,6 +136,7 @@ export type MessageParams = {
   "onboarding.age.youngest": Record<never, never>;
   "onboarding.age.youngestDown": Record<never, never>;
   "onboarding.age.youngestUp": Record<never, never>;
+  "onboarding.changeFrom": { "date": string };
   "onboarding.consents.binding": Record<never, never>;
   "onboarding.consents.explain": Record<never, never>;
   "onboarding.consents.outdatedApp": Record<never, never>;
@@ -185,6 +186,7 @@ export type MessageParams = {
   "photos.add": Record<never, never>;
   "photos.count": { "photos": number; "max": number };
   "photos.dialog.close": Record<never, never>;
+  "photos.done": Record<never, never>;
   "photos.empty": Record<never, never>;
   "photos.error.generic": Record<never, never>;
   "photos.error.media_busy": Record<never, never>;
@@ -288,6 +290,11 @@ export type MessageParams = {
   "profile.dealBreakers.saved": Record<never, never>;
   "profile.dealBreakers.switch": { "field": string };
   "profile.dealBreakers.title": Record<never, never>;
+  "profile.discard.body": Record<never, never>;
+  "profile.discard.close": Record<never, never>;
+  "profile.discard.keep": Record<never, never>;
+  "profile.discard.leave": Record<never, never>;
+  "profile.discard.title": Record<never, never>;
   "profile.displayName.hint": { "max": number };
   "profile.displayName.label": Record<never, never>;
   "profile.error.generic": Record<never, never>;

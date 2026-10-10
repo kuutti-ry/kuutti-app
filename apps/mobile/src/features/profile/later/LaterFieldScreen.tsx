@@ -5,7 +5,7 @@ import {
   type ProfileFieldKey,
 } from "@kuutti/schema";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,14 @@ import { useProfile } from "../useProfile";
 /** The route of a later screen; the first one is where the home screen and the profile send a person. */
 export const laterPath = (field: ProfileFieldKey) => `/profile/later/${field}` as const;
 export const FIRST_LATER_FIELD = LATER_FIELD_ORDER[0] as ProfileFieldKey;
+
+/** The first later field after the index that the draft does not answer; none when every one is. */
+export function nextUnanswered(
+  fields: Record<string, unknown>,
+  afterIndex: number,
+): ProfileFieldKey | undefined {
+  return LATER_FIELD_ORDER.find((key, i) => i > afterIndex && fields[key] === undefined);
+}
 
 /** How many of the later fields the draft answers, of how many there are. */
 export function laterProgress(fields: Record<string, unknown>): {
@@ -48,15 +56,23 @@ export function LaterFieldScreen({ field }: { field: string }) {
   useEffect(() => {
     if (index < 0) router.replace(laterPath(FIRST_LATER_FIELD));
   }, [index, router]);
-  if (index < 0) return null;
-  const key = LATER_FIELD_ORDER[index] as ProfileFieldKey;
+  // "The rest" means what is unanswered (#148): a person sent to the first
+  // field who answered it already lands on the first unanswered one instead
+  // (09/10/2026: Sanna opened on Kids, answered twice over). Once, on entry;
+  // answering the first field here must not bounce the screen.
+  const entered = useRef(false);
+  const loadedFields = profile.status === "ready" ? profile.draft.fields : null;
+  const key = index < 0 ? null : (LATER_FIELD_ORDER[index] as ProfileFieldKey);
+  useEffect(() => {
+    if (index !== 0 || !key || !loadedFields || entered.current) return;
+    entered.current = true;
+    if (loadedFields[key] === undefined) return;
+    const next = nextUnanswered(loadedFields, 0);
+    if (next) router.replace(laterPath(next));
+  }, [index, key, loadedFields, router]);
+  if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
   const spec = PROFILE_FIELDS[key];
-  const following = LATER_FIELD_ORDER[index + 1];
-  const moveOn = () => {
-    if (following) router.push(laterPath(following));
-    else router.push("/account/email");
-  };
 
   if (profile.status === "loading") {
     return (
@@ -77,9 +93,15 @@ export function LaterFieldScreen({ field }: { field: string }) {
       </SafeAreaView>
     );
   }
-  const { draft, update } = profile;
+  const { draft, saved, update } = profile;
   const progress = laterProgress(draft.fields);
   const offered = !spec.specialCategory || isConsented(draft);
+  // Onward to the next field without an answer; answered ones are the profile screen's to change.
+  const moveOn = () => {
+    const next = nextUnanswered(draft.fields, index);
+    if (next) router.push(laterPath(next));
+    else router.push("/account/email");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -93,7 +115,11 @@ export function LaterFieldScreen({ field }: { field: string }) {
         <Text variant="muted" accessibilityLiveRegion="polite">
           {t("profile.later.progress", progress)}
         </Text>
-        {index === 0 && <Text>{t("profile.later.explain")}</Text>}
+        {/* Decided from the stored document, not the draft: from the draft the
+            line left on the first choice and the buttons jumped (10/10/2026). */}
+        {(index === 0 || key === nextUnanswered(saved.fields, -1)) && (
+          <Text>{t("profile.later.explain")}</Text>
+        )}
 
         {spec.specialCategory && <SpecialCategoryConsent draft={draft} update={update} />}
         {offered && <FieldEditor field={key} draft={draft} update={update} />}

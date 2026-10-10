@@ -91,7 +91,8 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView contentContainerClassName="gap-6 p-6">
+      {/* The e-mail card's Save must take the first tap while the keyboard is up. */}
+      <ScrollView contentContainerClassName="gap-6 p-6" keyboardShouldPersistTaps="handled">
         <View className="flex-row items-center gap-2">
           <Button
             variant="ghost"

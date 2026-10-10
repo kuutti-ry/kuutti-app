@@ -169,61 +169,68 @@ export function PhotosScreen() {
                 {index === 0 && <Text variant="small">{t("photos.main")}</Text>}
                 <Text variant="muted">{stateText(photo, t)}</Text>
               </View>
-              <View className="flex-row flex-wrap gap-1">
-                {index !== 0 && (
+              {/* Two rows on purpose: four 44-point targets never fit one row of a half-width tile, and a wrap that depends on the font size put the remove button on a row of its own. */}
+              <View className="gap-1">
+                <View className="flex-row gap-1">
+                  {index !== 0 && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      accessibilityLabel={t("photos.makeMain")}
+                      disabled={busy}
+                      onPress={() => {
+                        tap();
+                        void photos.makeMain(photo.id);
+                      }}
+                    >
+                      <Icon as={Star} />
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="icon"
-                    accessibilityLabel={t("photos.makeMain")}
+                    accessibilityLabel={t("photos.remove")}
                     disabled={busy}
                     onPress={() => {
                       tap();
-                      void photos.makeMain(photo.id);
+                      setRemoving(photo);
                     }}
                   >
-                    <Icon as={Star} />
+                    <Icon as={Trash} />
                   </Button>
+                </View>
+                {total > 1 && (
+                  <View className="flex-row gap-1">
+                    {index !== 0 && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        accessibilityLabel={t("photos.moveEarlier")}
+                        disabled={busy}
+                        onPress={() => {
+                          tap();
+                          void photos.move(photo.id, -1);
+                        }}
+                      >
+                        <Icon as={ArrowLeft} />
+                      </Button>
+                    )}
+                    {index !== total - 1 && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        accessibilityLabel={t("photos.moveLater")}
+                        disabled={busy}
+                        onPress={() => {
+                          tap();
+                          void photos.move(photo.id, 1);
+                        }}
+                      >
+                        <Icon as={ArrowRight} />
+                      </Button>
+                    )}
+                  </View>
                 )}
-                {index !== 0 && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    accessibilityLabel={t("photos.moveEarlier")}
-                    disabled={busy}
-                    onPress={() => {
-                      tap();
-                      void photos.move(photo.id, -1);
-                    }}
-                  >
-                    <Icon as={ArrowLeft} />
-                  </Button>
-                )}
-                {index !== total - 1 && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    accessibilityLabel={t("photos.moveLater")}
-                    disabled={busy}
-                    onPress={() => {
-                      tap();
-                      void photos.move(photo.id, 1);
-                    }}
-                  >
-                    <Icon as={ArrowRight} />
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="icon"
-                  accessibilityLabel={t("photos.remove")}
-                  disabled={busy}
-                  onPress={() => {
-                    tap();
-                    setRemoving(photo);
-                  }}
-                >
-                  <Icon as={Trash} />
-                </Button>
               </View>
             </View>
           ))}
@@ -246,6 +253,16 @@ export function PhotosScreen() {
           }}
         >
           <Text>{t("photos.add")}</Text>
+        </Button>
+        {/* Headers are hidden app-wide; from onboarding this is the way on to the next step. */}
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            router.back();
+          }}
+        >
+          {t("photos.done")}
         </Button>
       </ScrollView>
 
