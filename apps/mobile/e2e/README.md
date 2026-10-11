@@ -9,9 +9,9 @@ Flows that drive the app on a simulator against the local environment: the real 
 3. `pnpm env:up` in one terminal: the database, the API on 3000, Metro on 8081.
 4. A booted simulator with the dev client installed (`pnpm dev:mobile` has built it before).
 5. `pnpm demo:reset`: the flows start from the cast's stories (below), and some can run once per reset.
-6. `pnpm e2e` runs every flow under `flows/`; `pnpm e2e -- --device <udid>` picks one simulator of two booted; `pnpm e2e -- apps/mobile/e2e/flows/language.yaml` runs one flow. `maestro studio`, or `maestro hierarchy` on the screen as a flow left it, shows what Maestro sees, the way to find a text that does not match.
+6. `pnpm e2e` runs every flow under `flows/`; `pnpm e2e -- --device <udid>` picks one simulator of several; `pnpm e2e -- apps/mobile/e2e/flows/language.yaml` runs one flow. `maestro studio`, or `maestro hierarchy` on the screen as a flow left it, shows what Maestro sees, the way to find a text that does not match.
 
-`pnpm e2e` (`scripts/e2e.ts`) copies the cached release to `apps/mobile/e2e/media`, since `addMedia` reads files inside the flows' workspace and follows no link out of it; git ignores the copy.
+`pnpm e2e` (`scripts/e2e.ts`) copies the cached release to `apps/mobile/e2e/media`, since `addMedia` reads files inside the flows' workspace and follows no link out of it; git ignores the copy. A simulator named with `--device` is booted if it is not, and shut down when the run ends, passed or failed: left booted between runs, one gathered 127 web content processes, some 6 GB, in an hour (11/10/2026). An Android emulator stays up, since its serial cannot start it again.
 
 ## The flows and their cast
 
