@@ -174,7 +174,10 @@ describe("CardPreviewScreen", () => {
 
   it("asks for the profile first when there is no card yet", async () => {
     globalThis.fetch = jest.fn(async () =>
-      json({ card: null, completeness: { complete: false, missing: ["display_name"] } }),
+      json({
+        card: null,
+        completeness: { complete: false, missing: ["display_name"] },
+      }),
     ) as unknown as typeof fetch;
     await show();
     await waitFor(() => expect(screen.getByText(/Save your profile first/)).toBeTruthy());

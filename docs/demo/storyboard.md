@@ -51,7 +51,7 @@ Noa Salmi's story uploaded two faces and four pictures the check is meant to ref
 
 1. The admin panel (the runbook says where): sign in as the moderator through the bank.
 2. The queue lists the three: what the check saw (labels, faces), the picture, "Approve" and "Reject" with a reason from the list (no person, several people, text with contact details, and so on). Reject the one without a face as "no person".
-3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your photos" shows the rejection with its reason in her language; her card shows the two approved faces; the gate says her profile still lacks something (two of three).
+3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your photos" shows the rejection with its reason in her language; her card shows the approved face while the second waits in the queue; the gate says her profile still lacks something (one of two).
 
 ## Scene 6: Refusals (1 min)
 

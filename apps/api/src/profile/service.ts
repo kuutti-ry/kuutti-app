@@ -9,7 +9,8 @@ import {
   SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
-import { listApprovedPhotos } from "../media/index.ts";
+import { matchingConfigNumbers } from "../lib/matching-config.ts";
+import { listPhotoTipInputs } from "../media/index.ts";
 import { track } from "../research/index.ts";
 import {
   type CardDeps,
@@ -19,6 +20,7 @@ import {
 } from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
+import { TIP_THRESHOLD_KEYS, type TipSnapshot, type TipThresholds, tips } from "./tips.ts";
 
 /**
  * The consent_version of the special-category wording as built
@@ -96,16 +98,39 @@ function noteDropped(deps: CardDeps, row: repo.ProfileRow | null): void {
   }
 }
 
+/** The tip thresholds from matching_config, in one statement; missing keys fail closed. */
+async function readTipThresholds(db: Queryable): Promise<TipThresholds> {
+  const fields = Object.keys(TIP_THRESHOLD_KEYS) as (keyof typeof TIP_THRESHOLD_KEYS)[];
+  const values = await matchingConfigNumbers(
+    db,
+    fields.map((field) => TIP_THRESHOLD_KEYS[field]),
+  );
+  return Object.fromEntries(
+    fields.map((field) => [field, values[TIP_THRESHOLD_KEYS[field]]]),
+  ) as TipThresholds;
+}
+
+/** The approved photos carry the signals; the ones in review only count. */
+async function tipSnapshotOf(deps: CardDeps, accountId: string): Promise<TipSnapshot> {
+  const [uploaded, thresholds] = await Promise.all([
+    listPhotoTipInputs(deps.db, accountId),
+    readTipThresholds(deps.db),
+  ]);
+  const photos = uploaded.filter((photo) => photo.state === "approved");
+  return { photos, inReview: uploaded.length - photos.length, thresholds };
+}
+
 export async function readProfile(deps: CardDeps, accountId: string): Promise<ProfileResponse> {
-  const [row, photos, consent] = await Promise.all([
+  const [row, consent, tipSnapshot] = await Promise.all([
     repo.findProfile(deps.db, accountId),
-    listApprovedPhotos(deps.db, accountId),
     readConsent(deps, accountId),
+    tipSnapshotOf(deps, accountId),
   ]);
   noteDropped(deps, row);
   return {
     profile: row ? toDocument(row, consent) : null,
-    completeness: await completenessOf(deps, accountId, row, photos.length),
+    completeness: await completenessOf(deps, accountId, row, tipSnapshot.photos.length),
+    tips: tips(tipSnapshot),
   };
 }
 
@@ -151,15 +176,19 @@ export async function saveProfile(
     if (!row) throw new AppError(404, "not_found", "No live account");
     return { row, consent };
   });
-  const photos = await listApprovedPhotos(deps.db, accountId);
+  const tipSnapshot = await tipSnapshotOf(deps, accountId);
   deps.logger.info({ accountId, prompts: update.prompts.length }, "profile saved");
-  const completenessNow = await completenessOf(deps, accountId, row, photos.length);
+  const completenessNow = await completenessOf(deps, accountId, row, tipSnapshot.photos.length);
   // Research (#50): whether profiles get finished; nothing of the text, and nothing without the consent.
   await track(deps, accountId, "profile_saved", {
     complete: completenessNow.complete,
-    approvedPhotos: photos.length,
+    approvedPhotos: tipSnapshot.photos.length,
   });
-  return { profile: toDocument(row, consent), completeness: completenessNow };
+  return {
+    profile: toDocument(row, consent),
+    completeness: completenessNow,
+    tips: tips(tipSnapshot),
+  };
 }
 
 /** Erasure (#51): the profile row, inside the caller's transaction. */

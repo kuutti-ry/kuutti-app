@@ -124,7 +124,7 @@ name: A registered person is taken through onboarding one question per screen, a
 
 # 8: three photos, the reason first, through the system picker one at a time.
 - extendedWaitUntil:
-    visible: "Three photos of you|Kolme kuvaa sinusta|Tre bilder på dig"
+    visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
     timeout: 15000
 - assertVisible: "Step 8 of 10|Vaihe 8 / 10|Steg 8 av 10"
 - tapOn: "Add photos|Lisää kuvia|Lägg till bilder"

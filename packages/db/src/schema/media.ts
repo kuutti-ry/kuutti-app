@@ -138,7 +138,8 @@ export const photoReview = pgTable(
     photoId: uuid("photo_id")
       .primaryKey()
       .references(() => photo.id, { onDelete: "cascade" }),
-    // [{ name, parentName, confidence }], at most 50, from DetectModerationLabels.
+    // [{ name, parentName, confidence }], at most 50: moderation labels first,
+    // then tip signals from DetectLabels / DetectFaces (#56).
     labels: jsonb("labels").notNull(),
     // Faces DetectFaces found above the configured confidence.
     faces: integer("faces").notNull(),

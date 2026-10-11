@@ -91,6 +91,6 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
 - tapOn: "Finland|Suomi"
 - extendedWaitUntil:
-    visible: "Three photos of you|Kolme kuvaa sinusta|Tre bilder på dig"
+    visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
     timeout: 15000
 - assertVisible: "Step 8 of 10|Vaihe 8 / 10|Steg 8 av 10"

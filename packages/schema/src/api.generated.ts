@@ -1479,7 +1479,7 @@ export interface paths {
         };
         /**
          * The caller's profile and what it still needs
-         * @description The profile as saved (null before the first save) and the completeness rule's verdict: what is missing before the profile can enter a round.
+         * @description The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the advisory tips for the owner that apply, highest priority first.
          */
         get: {
             parameters: {
@@ -1527,7 +1527,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Saved; the profile as stored, with its completeness. */
+                /** @description Saved; the profile as stored, with its completeness and its advisory tips. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2822,6 +2822,7 @@ export interface components {
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
+            tips: components["schemas"]["TipKind"][];
         };
         Completeness: {
             complete: boolean;
@@ -2829,6 +2830,8 @@ export interface components {
         };
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
+        /** @enum {string} */
+        TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos";
         ProfileUpdate: {
             displayName: string;
             bio: string | null;
