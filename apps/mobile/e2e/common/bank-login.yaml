@@ -26,12 +26,28 @@ appId: fi.kuutti.app
 # Safari's sheets (Continue), Chrome's welcome (without an account) and its
 # questions (notifications, sync); and a busy emulator's "not responding",
 # waited for (never closed: it may be ours). A bounded loop, so our own Continue button can never trap it.
-- repeat:
-    times: 6
-    while:
-      visible: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
+# They come on a browser's first page only, and asking `visible` of what is not
+# there costs 7 s (README). Chrome's welcome comes before the page and its
+# questions after a tap in the loop, so on Android their absence is asked as
+# `notVisible`, in half a second; Safari's sheets come a moment after the page,
+# which only the loop's own 7 s catches, so on iOS the loop always runs.
+- evalScript: ${output.browserFirstUse = true}
+- runFlow:
+    when:
+      platform: Android
+      notVisible: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
     commands:
-      - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
+      - evalScript: ${output.browserFirstUse = false}
+- runFlow:
+    when:
+      true: ${output.browserFirstUse}
+    commands:
+      - repeat:
+          times: 6
+          while:
+            visible: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
+          commands:
+            - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
 # One button per persona, whose accessible name is the person's name followed by
 # the note under it, and above the cards a short one with the name alone, all of
 # them in view without scrolling: a selector by the name finds that one first,
@@ -52,8 +68,10 @@ appId: fi.kuutti.app
       - extendedWaitUntil:
           visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
           timeout: 20000
+# Only iOS asks: on Android the question would cost its 7 s on every sign-in.
 - runFlow:
     when:
+      platform: iOS
       visible: "Open|Avaa|Öppna"
     commands:
       - tapOn: "Open|Avaa|Öppna"
