@@ -132,14 +132,11 @@ export async function readProfile(deps: CardDeps, accountId: string): Promise<Pr
 }
 
 export async function previewCard(deps: CardDeps, accountId: string): Promise<CardPreviewResponse> {
-  const [{ card, completeness }, tipSnapshot] = await Promise.all([
-    buildCard(deps, {
-      viewerAccountId: accountId,
-      subjectAccountId: accountId,
-    }),
-    tipSnapshotOf(deps, accountId),
-  ]);
-  return { card, completeness, tip: tipFor(tipSnapshot) };
+  const { card, completeness } = await buildCard(deps, {
+    viewerAccountId: accountId,
+    subjectAccountId: accountId,
+  });
+  return { card, completeness };
 }
 
 export async function saveProfile(

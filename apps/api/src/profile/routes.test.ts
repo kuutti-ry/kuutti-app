@@ -401,9 +401,8 @@ describe("profile routes", () => {
     expect(body.card?.photos.map((p) => p.id)).toEqual([approved]);
     expect(body.card?.pond).toBeNull();
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
-    expect(body.tip).toBeNull();
-    // The pending upload becomes the second approved photo: enough to be
-    // complete, and the tip asks for one more.
+    // The pending upload becomes the second approved photo: enough for
+    // completeness on photos; the tip for one more is on GET /profile.
     await ctx.client.query("UPDATE photo SET state = 'approved' WHERE account_id = $1", [
       a.accountId,
     ]);
@@ -411,15 +410,17 @@ describe("profile routes", () => {
       CardPreviewResponse.parse(
         await (await app.request("/profile/card", { headers: a.headers })).json(),
       );
+    const profile = async () =>
+      ProfileResponse.parse(await (await app.request("/profile", { headers: a.headers })).json());
     const two = await preview();
     expect(two.card?.photos).toHaveLength(2);
     expect(two.completeness.missing).toEqual(["seeks", "age_window"]);
-    expect(two.tip).toBe("few_photos");
+    expect((await profile()).tip).toBe("few_photos");
     // A third clears it.
     await approvedPhotos(ctx, app, a.headers, 1);
     const three = await preview();
     expect(three.card?.photos).toHaveLength(3);
-    expect(three.tip).toBeNull();
+    expect((await profile()).tip).toBeNull();
     // A preview records nothing.
     const { rows } = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = $1", [
       a.accountId,

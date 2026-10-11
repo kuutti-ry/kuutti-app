@@ -2842,7 +2842,6 @@ export interface components {
         CardPreviewResponse: {
             card: components["schemas"]["ProfileCard"];
             completeness: components["schemas"]["Completeness"];
-            tip: components["schemas"]["TipKind"];
         };
         ProfileCard: {
             /** Format: uuid */

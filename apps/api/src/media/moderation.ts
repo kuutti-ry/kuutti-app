@@ -56,13 +56,6 @@ export const MAX_LABELS = 50;
 const REKOGNITION_MIN_CONFIDENCE = 30;
 /** Scene labels tips care about; DetectLabels is filtered to these. */
 const SCENE_TIP_LABELS = ["Mirror", "Bathroom", "Sunglasses"] as const;
-/**
- * Face fills this much of the frame → TightCrop tip signal is stored.
- * Keep equal to matching_config photo_tip_tight_crop_face_area_min: the tips
- * rule can only fire on rows that were stored, so a lower config later would
- * miss the gap.
- */
-const TIGHT_CROP_AREA = 0.4;
 export const NOT_CHECKED = "not_checked";
 export const NO_FACE = "no_face";
 
@@ -103,9 +96,8 @@ export function tipLabelsFrom(
     if (largest.Sunglasses?.Value) {
       out.push(asLabel("Sunglasses", "Face", largest.Sunglasses.Confidence ?? 0));
     }
-    if (largestArea >= TIGHT_CROP_AREA) {
-      out.push(asLabel("TightCrop", "Face", largestArea * 100));
-    }
+    // Face area as a fraction × 100 when known; matching_config is the tip threshold (#56).
+    if (largestArea > 0) out.push(asLabel("TightCrop", "Face", largestArea * 100));
     if (largest.Quality?.Brightness != null) {
       out.push(asLabel("Brightness", "Face", largest.Quality.Brightness));
     }
@@ -113,7 +105,6 @@ export function tipLabelsFrom(
       out.push(asLabel("Sharpness", "Face", largest.Quality.Sharpness));
     }
   }
-  if (faces.length > 1) out.push(asLabel("Group", "Face", 100));
   return out.slice(0, MAX_LABELS);
 }
 

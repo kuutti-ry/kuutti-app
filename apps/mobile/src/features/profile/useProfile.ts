@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
 
-export type ProfileNotice = { kind: "saved" } | { kind: "error"; code: string | undefined } | null;
+export type ProfileNotice = { kind: "error"; code: string | undefined } | null;
 
 export const EMPTY_PROFILE: ProfileUpdate = {
   displayName: "",
@@ -109,7 +109,6 @@ export function useProfile() {
       }
       setCompleteness(response.completeness);
       setTip(response.tip);
-      setNotice({ kind: "saved" });
       return true;
     } catch (error) {
       if (mounted.current) {
@@ -120,8 +119,6 @@ export function useProfile() {
       if (mounted.current) setSaving(false);
     }
   }, [draft]);
-
-  const dismissNotice = useCallback(() => setNotice(null), []);
 
   /** Whether the draft differs from what is saved: what leaving the screen would lose. */
   const dirty = canonical(draft) !== canonical(saved);
@@ -138,6 +135,5 @@ export function useProfile() {
     update,
     save,
     reload: load,
-    dismissNotice,
   };
 }

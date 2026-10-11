@@ -68,7 +68,7 @@ function serveCard(completeness = { complete: false, missing: ["seeks", "age_win
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
     calls.push(path);
-    if (path === "/profile/card") return json({ card, completeness, tip: null });
+    if (path === "/profile/card") return json({ card, completeness });
     if (path.startsWith("/photos/")) {
       const variant = path.split("/").pop();
       return json({
@@ -177,7 +177,6 @@ describe("CardPreviewScreen", () => {
       json({
         card: null,
         completeness: { complete: false, missing: ["display_name"] },
-        tip: null,
       }),
     ) as unknown as typeof fetch;
     await show();

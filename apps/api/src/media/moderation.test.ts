@@ -85,7 +85,6 @@ describe("Automatic moderation decision", () => {
       inspection("none", "99", [
         { name: "Mirror", parentName: "", confidence: 99 },
         { name: "TightCrop", parentName: "Face", confidence: 80 },
-        { name: "Group", parentName: "Face", confidence: 100 },
       ]),
       { labelThreshold: 60, faceThreshold: 90 },
     );
@@ -114,7 +113,6 @@ describe("tip signals for photo_review", () => {
       { name: "TightCrop", parentName: "Face", confidence: 49 },
       { name: "Brightness", parentName: "Face", confidence: 40.2 },
       { name: "Sharpness", parentName: "Face", confidence: 12.5 },
-      { name: "Group", parentName: "Face", confidence: 100 },
     ]);
   });
 
@@ -127,7 +125,7 @@ describe("tip signals for photo_review", () => {
     const tipLabels = [
       { name: "Mirror", parentName: "", confidence: 90 },
       { name: "Bathroom", parentName: "", confidence: 80 },
-      { name: "Group", parentName: "Face", confidence: 100 },
+      { name: "TightCrop", parentName: "Face", confidence: 40 },
     ];
     expect(storedLabels({ ...inspection("none", "99", tipLabels), labels })).toHaveLength(50);
     expect(storedLabels({ ...inspection("none", "99", tipLabels), labels }).at(-1)?.name).toBe(

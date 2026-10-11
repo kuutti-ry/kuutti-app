@@ -49,7 +49,11 @@ function fakeApi(
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/profile" && request.method === "GET") {
-      return json({ profile: options.profile ?? null, completeness: { complete: false, missing } });
+      return json({
+        profile: options.profile ?? null,
+        completeness: { complete: false, missing },
+        tip: null,
+      });
     }
     if (path === "/profile" && request.method === "PUT") {
       const body = await request.json();
@@ -69,6 +73,7 @@ function fakeApi(
           updatedAt: "2026-09-26T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos", "seeks", "age_window"] },
+        tip: null,
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);

@@ -58,7 +58,7 @@ Between 1 and 7 October 2026 the team went through what Kuutti asks a person and
 - `apps/api/src/profile`: the consent gate compares the version (`SPECIAL_CATEGORY_CONSENT_VERSION`, built from the catalogue), the card builder strips soft values and settings, the route documents 409, a test holds every text; `PUT /profile` answers 403 for politics or religion without the current consent and 409 for a stale version.
 - `packages/i18n`: 222 keys for the fields, the options and the groups; the special-category wording with its version and a golden row in the consent test.
 - `packages/db`: the seed profile, the persona histories and the population generator draw from the new registry (`docs/demo/population.md` lists the shares); synthetic people carry the special-category consent when they have an article 9 answer, and the writer stores its version.
-- The app's profile screen renders every kind (chips, a number, a text, a switch); the article 9 fields stand under a line that names the consent and the Settings where it is withdrawn, with no switch of their own (#204); the screens of #148 take the optional fields one at a time with "Ask me later", the adaptive texts and the pickers.
+- The app's profile section screens render every kind (chips, a number, a text, a switch); the article 9 fields stand under a line that names the consent and the Settings where it is withdrawn, with no switch of their own (#204); the screens of #148 take the optional fields one at a time with "Ask me later", the adaptive texts and the pickers.
 - `pnpm openapi` regenerated the document and the typed client.
 
 ## Not decided here

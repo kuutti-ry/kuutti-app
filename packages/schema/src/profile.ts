@@ -192,8 +192,6 @@ export const CardPreviewResponse = z
   .object({
     card: ProfileCard.nullable(),
     completeness: Completeness,
-    /** The highest-priority tip, or null when none applies. */
-    tip: TipKind.nullable(),
   })
   .meta({ id: "CardPreviewResponse" });
 export type CardPreviewResponse = z.infer<typeof CardPreviewResponse>;
