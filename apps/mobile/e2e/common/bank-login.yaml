@@ -34,20 +34,34 @@ appId: fi.kuutti.app
     commands:
       - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
 # One button per persona, whose accessible name is the person's name followed by
-# the note under it. The browser's bar lies over the bottom of the page: the
-# card is scrolled to the middle first. Chrome's toolbar moves the page as it
-# hides, so a scroll can pass the card: down, and if it went past, back up.
-- scrollUntilVisible:
-    element: ".*${PERSONA}.*"
-    direction: DOWN
-    centerElement: true
-    timeout: 40000
-    optional: true
-- scrollUntilVisible:
-    element: ".*${PERSONA}.*"
-    direction: UP
-    centerElement: true
-    timeout: 40000
+# the note under it. On iOS Safari's bar lies over the bottom of the page and a
+# card under it counts as visible: the card is scrolled to the middle, down and,
+# should a scroll have passed it, back up. On Android Chrome's bar is at the top
+# and covers nothing, while its toolbar moves the page as it hides, so a swipe
+# can jump over the middle both ways: a card in full view is enough there.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: DOWN
+          centerElement: true
+          timeout: 40000
+          optional: true
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: UP
+          centerElement: true
+          timeout: 40000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: DOWN
+          timeout: 60000
 # iOS asks before handing the link back to the app; Chrome hands it on. A tap
 # on a page that still moves is lost: tapped again while the card is there.
 - waitForAnimationToEnd

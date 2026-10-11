@@ -133,17 +133,17 @@ name: A registered person is taken through onboarding one question per screen, a
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
-      CELL: "17%,43%"
+      INDEX: 0
       COUNT: "1 photo, at most 6|1 kuva, enintään 6|1 foto, högst 6"
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
-      CELL: "50%,43%"
+      INDEX: 1
       COUNT: "2 photos, at most 6|2 kuvaa, enintään 6|2 foton, högst 6"
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
-      CELL: "83%,43%"
+      INDEX: 2
       COUNT: "3 photos, at most 6|3 kuvaa, enintään 6|3 foton, högst 6"
 - scrollUntilVisible:
     element: "Done|Valmis|Klar"
