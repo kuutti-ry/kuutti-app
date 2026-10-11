@@ -26,13 +26,13 @@ appId: fi.kuutti.app
 # Past the browser's first-use screens, the most private answer each time:
 # Safari's sheets (Continue), Chrome's welcome (without an account) and its
 # questions (notifications, sync); and a busy emulator's "not responding",
-# closed. A bounded loop, so our own Continue button can never trap it.
+# waited for (never closed: it may be ours). A bounded loop, so our own Continue button can never trap it.
 - repeat:
     times: 6
     while:
-      visible: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Close app"
+      visible: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
     commands:
-      - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Close app"
+      - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
 # One button per persona, whose accessible name is the person's name followed by
 # the note under it. The browser's bar lies over the bottom of the page: the
 # card is scrolled to the middle first. Chrome's toolbar moves the page as it

@@ -12,12 +12,13 @@ appId: fi.kuutti.app
 - extendedWaitUntil:
     visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|This is the developer menu.*|Connected to:|.* isn't responding"
     timeout: 120000
-# A busy Android emulator says a system app of its own is not responding; closed, it goes.
+# A busy Android emulator says an app is not responding, a system app of its
+# own or ours while its bundle loads: waited for, never closed, so ours lives.
 - runFlow:
     when:
       visible: ".* isn't responding"
     commands:
-      - tapOn: "Close app"
+      - tapOn: "Wait"
 # A fresh install (every CI run) greets the first load with the dev client's
 # own sheet about its menu, over the app.
 - runFlow:
