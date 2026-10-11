@@ -61,6 +61,16 @@ const bankLine = (p: DemoPersona): string =>
 export function renderBankPage(personas: readonly DemoPersona[]): string {
   // The page computes the codes itself, so the range is held here, before anything is written.
   for (const persona of personas) assertArtificial(persona);
+  // A short button per persona, the name alone, above the cards: all of them in view on a phone
+  // without scrolling, so an end-to-end flow taps one where it is (#226). Scrolled to a card, a
+  // flow could stop with the card's edge at the screen's edge, a sliver Maestro counts as wholly
+  // visible, and its tap there missed.
+  const names = personas
+    .map(
+      (p) =>
+        `        <li><button type="button" data-persona="${escapeHtml(p.key)}">${escapeHtml(`${p.given} ${p.family}`)}</button></li>`,
+    )
+    .join("\n");
   const sections = GROUPS.map(({ group, title, lead }) => {
     const buttons = personas
       .filter((p) => p.group === group)
@@ -113,6 +123,8 @@ ${buttons}
       ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
       button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
       button[data-persona] { display: block; width: 100%; min-height: 56px; padding: 10px 14px; text-align: left; }
+      .names { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+      .names button[data-persona] { min-height: 44px; padding: 8px 12px; font-weight: 600; }
       button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
       .name { display: block; font-weight: 600; }
       .note { display: block; color: var(--soft); font-size: 0.9375rem; }
@@ -130,6 +142,12 @@ ${buttons}
         This stands in for bank identification on a developer's machine. Nobody here is a person:
         every code on this page is artificial.
       </p>
+      <section aria-labelledby="group-names">
+        <h2 id="group-names">Sign in as</h2>
+        <ul class="names">
+${names}
+        </ul>
+      </section>
 ${sections}
       <section aria-labelledby="group-somebody">
         <h2 id="group-somebody">Somebody else</h2>

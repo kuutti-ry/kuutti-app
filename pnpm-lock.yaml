@@ -209,6 +209,9 @@ importers:
       eas-cli:
         specifier: 24.11.0
         version: 24.11.0(@types/node@22.20.5)(supports-color@10.2.2)(typescript@6.0.3)
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
 
   apps/admin:
     dependencies:

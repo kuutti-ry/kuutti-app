@@ -5,13 +5,16 @@ name: E2E
 # Postgres, the S3 stand-in and the mock bank from docker compose, the API from
 # source, the dev client built here (or restored by its fingerprint), Metro
 # serving the bundle. The emulator reaches them on its own 127.0.0.1 through
-# adb reverse, so nothing in the flows or the app names another host. The
-# flows' order does not matter (the README's table).
+# adb reverse, so nothing in the flows or the app names another host.
 #
-# When (ADR-020 §6): a run costs close to an hour, about 13 minutes for the dev
-# client and 1.4 a flow (11/10/2026), so every push to main, a pull request that
-# carries the label e2e (each push while it stays) and changes what the flows
-# exercise, and by hand. Faster flows are #226.
+# In four jobs (ADR-020 §7, #226): each runs a stretch of config.yaml's order on
+# its own emulator and stack, so no flow shares a persona or a database with
+# another job, after one job that restores the dev client or builds it. Setting
+# up costs a job about three minutes, the flows close to forty in one job.
+#
+# When (ADR-020 §6): every push to main, a pull request that carries the label
+# e2e (each push while it stays) and changes what the flows exercise, and by
+# hand.
 
 on:
   push:
@@ -38,10 +41,17 @@ permissions:
   contents: read
 
 jobs:
-  e2e-android:
-    name: e2e-android
+  # The dev client holds only the native side, which its fingerprint names (the
+  # one preview.yml and eas-build.yml compare; the commit in `extra` is left
+  # out, and Metro serves the config anyway). A pull request that leaves the
+  # native side alone finds main's; one that changes it builds once, and its
+  # later pushes find that. The key's tail names how it is built, so a change of
+  # the build changes the key. Built here once, not in each of the four jobs.
+  dev-client:
+    name: e2e-dev-client
     # A pull request only with the label: put on now, or there already when a
-    # push comes. Another label put on is no reason to run.
+    # push comes. Another label put on is no reason to run. The four jobs need
+    # this one, so they are skipped with it.
     if: >-
       github.event_name != 'pull_request'
       || (contains(github.event.pull_request.labels.*.name, 'e2e')
@@ -49,14 +59,77 @@ jobs:
     # On the job, not the workflow: a run whose job is skipped must not cancel
     # the one in progress.
     concurrency:
-      group: e2e-android-${{ github.ref }}
+      group: e2e-dev-client-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    # About 13 minutes when it builds.
+    timeout-minutes: 30
+    outputs:
+      key: ${{ steps.dev-client.outputs.cache-primary-key }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm
+
+      - name: Fingerprint of the dev client
+        id: fingerprint
+        working-directory: apps/mobile
+        run: |
+          hash=$(node ../../node_modules/@expo/fingerprint/bin/cli.js fingerprint:generate --platform android | jq -r .hash)
+          echo "android fingerprint $hash"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
+      # Only whether it is there: the four jobs restore it themselves.
+      - name: Look for the dev client
+        id: dev-client
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dev-client/app-debug.apk
+          key: e2e-dev-client-${{ steps.fingerprint.outputs.hash }}-debug-x86_64
+          lookup-only: true
+
+      # No Gradle cache: the dev client is cached whole, and a Gradle cache
+      # would be restored on every run for the few that build.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        if: steps.dev-client.outputs.cache-hit != 'true'
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Build the dev client
+        if: steps.dev-client.outputs.cache-hit != 'true'
+        working-directory: apps/mobile
+        run: |
+          CI=1 npx expo prebuild --platform android --no-install
+          (cd android && ./gradlew assembleDebug --console=plain -PreactNativeArchitectures=x86_64)
+          mkdir -p ../../dev-client
+          cp android/app/build/outputs/apk/debug/app-debug.apk ../../dev-client/
+
+      - name: Save the dev client
+        if: steps.dev-client.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dev-client/app-debug.apk
+          key: ${{ steps.dev-client.outputs.cache-primary-key }}
+
+  e2e-android:
+    name: e2e-android (${{ matrix.shard }}/4)
+    needs: dev-client
+    strategy:
+      # Every stretch reports, whichever fails.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    concurrency:
+      group: e2e-android-${{ github.ref }}-${{ matrix.shard }}
       cancel-in-progress: true
     # x86_64: hardware acceleration of the emulator is proven on the standard
     # Linux runners (free for a public repository), and docker compose runs as
     # on a laptop. The rest of CI is arm64.
     runs-on: ubuntu-latest
-    # About 55 minutes when it passes; a hung emulator or flow ends here.
-    timeout-minutes: 75
+    # About 15 minutes when it passes; a hung emulator or flow ends here.
+    timeout-minutes: 40
     env:
       MAESTRO_VERSION: 2.11.0
       MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
@@ -66,9 +139,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/pnpm
 
-      # Java for Maestro, and for Gradle when the dev client is built. No Gradle
-      # cache: the dev client is cached whole below, and a Gradle cache would be
-      # restored on every run for the few that build.
+      # Java for Maestro.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
@@ -84,7 +155,8 @@ jobs:
       # GitHub's own actions and those of verified creators, and the emulator
       # actions are neither. Started here, so it boots while the rest is built;
       # the image is the local emulator's, Chrome included, on a phone of the
-      # same screen (the runner's tools know no Pixel 8).
+      # same screen (the runner's tools know no Pixel 8). No metrics, and no
+      # prompt about them, which the emulator says a later release will ask.
       # `yes` ends on a broken pipe once the licences are taken, hence `|| true`.
       - name: Start the emulator
         run: |
@@ -100,7 +172,7 @@ jobs:
           echo no | "$tools/avdmanager" create avd --name e2e --package "$image" --device pixel_7 \
             || { "$tools/avdmanager" list device --compact; exit 1; }
           nohup "$ANDROID_HOME/emulator/emulator" -avd e2e -no-window -no-audio -no-boot-anim \
-            -no-snapshot -gpu swiftshader_indirect -camera-back none -camera-front none \
+            -no-snapshot -no-metrics -gpu swiftshader_indirect -camera-back none -camera-front none \
             > emulator.log 2>&1 &
 
       - name: Start the stack
@@ -136,50 +208,24 @@ jobs:
       - name: The synthetic population
         run: pnpm demo:population
 
-      # The dev client holds only the native side, which its fingerprint names
-      # (the one preview.yml and eas-build.yml compare; the commit in `extra`
-      # is left out, and Metro serves the config anyway). A pull request that
-      # leaves the native side alone restores main's in seconds; one that
-      # changes it builds once, and its later pushes restore that. The key's
-      # tail names how it is built, so a change of the build changes the key.
-      # Saved as soon as it is built, so a red run still leaves it.
-      - name: Fingerprint of the dev client
-        id: fingerprint
-        working-directory: apps/mobile
-        run: |
-          hash=$(node ../../node_modules/@expo/fingerprint/bin/cli.js fingerprint:generate --platform android | jq -r .hash)
-          echo "android fingerprint $hash"
-          echo "hash=$hash" >> "$GITHUB_OUTPUT"
-
       - name: Restore the dev client
-        id: dev-client
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: dev-client/app-debug.apk
-          key: e2e-dev-client-${{ steps.fingerprint.outputs.hash }}-debug-x86_64
+          key: ${{ needs.dev-client.outputs.key }}
+          fail-on-cache-miss: true
 
-      - name: Build the dev client
-        if: steps.dev-client.outputs.cache-hit != 'true'
-        working-directory: apps/mobile
-        run: |
-          CI=1 npx expo prebuild --platform android --no-install
-          (cd android && ./gradlew assembleDebug --console=plain -PreactNativeArchitectures=x86_64)
-          mkdir -p ../../dev-client
-          cp android/app/build/outputs/apk/debug/app-debug.apk ../../dev-client/
-
-      - name: Save the dev client
-        if: steps.dev-client.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: dev-client/app-debug.apk
-          key: ${{ steps.dev-client.outputs.cache-primary-key }}
-
+      # The first bundle takes Metro about 35 s: asked for here, the one the
+      # dev client will ask for (the manifest names it), it is built while the
+      # emulator boots rather than in the first flow.
       - name: Start Metro
         run: |
           CI=1 nohup pnpm dev:mobile > metro.log 2>&1 &
-          for _ in $(seq 1 90); do curl -fsS http://127.0.0.1:8081/status && exit 0; sleep 2; done
-          cat metro.log
-          exit 1
+          for _ in $(seq 1 90); do curl -fsS http://127.0.0.1:8081/status && break; sleep 2; done
+          curl -fsS -o /dev/null http://127.0.0.1:8081/status || { cat metro.log; exit 1; }
+          bundle=$(curl -fsS -H "expo-platform: android" -H "accept: application/expo+json,application/json" \
+            http://127.0.0.1:8081/ | jq -r .launchAsset.url)
+          nohup curl -fsS -o /dev/null "$bundle" > /dev/null 2>&1 &
 
       - name: Install Maestro
         run: |
@@ -208,13 +254,15 @@ jobs:
           adb install -r dev-client/app-debug.apk
 
       - name: The flows on the emulator
-        run: node scripts/e2e.ts --format junit --output e2e-report.xml
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
 
       - name: Keep what the run saw
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e2e-android
+          name: e2e-android-${{ matrix.shard }}
           path: |
             e2e-report.xml
             api.log
