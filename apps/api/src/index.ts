@@ -1,13 +1,11 @@
 import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { createPool, migrate, seed } from "@kuutti/db";
+import { DiscoveryError, discoverProvider, isTeliaIssuer } from "@kuutti/tunnistus-oidc";
 import { createApp } from "./app.ts";
 import {
   brokerOptionsFromConfig,
-  DiscoveryError,
-  discoverProvider,
   type IdentityBroker,
-  isTeliaIssuer,
   OidcBroker,
   sweepAdminSessions,
   sweepSessions,

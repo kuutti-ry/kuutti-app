@@ -19,7 +19,7 @@ Each build counts against Expo's free tier (30 a month, at most 15 iOS). Until S
 
 1. On the phone, open the build page from #17 in the browser and download the APK.
 2. Android asks whether the browser may install apps: allow it for this once. On Xiaomi (MIUI or HyperOS) the install dialog has a ten-second countdown and may ask to scan the app; both are normal.
-3. Open Kuutti. A `preview` build shows the smoke screen with the staging API's version and commit; pull down nothing, tap nothing: that is the check of #10's first box and #5's last.
+3. Open Kuutti. A `preview` build shows the sign-in screen; the wrench on the home screen after sign-in, or the tech config screen, shows the staging API's version and commit: that is the check of #10's first box and #5's last.
 
 With a cable instead (useful for logs): Settings, About phone, tap the MIUI or OS version seven times; Additional settings, Developer options, turn on **USB debugging** and, on Xiaomi, **Install via USB** (it wants a SIM card and a Mi account on some versions; if it refuses, use the browser route above). Then `adb devices` must list the phone as `device`, and `adb install <file>.apk` installs, `adb logcat '*:S' ReactNativeJS:V` shows the app's log.
 
@@ -49,7 +49,7 @@ Push notification credentials (`eas credentials`: FCM service account, APNs key)
 
 ## The dev client against your Mac
 
-Phone and Mac on the same network. `pnpm env:up` on the Mac; open the `development` build; it lists the Metro server on the Mac, or scan the QR code Metro prints. The smoke screen then shows the API on the Mac (`http://<mac>:3000`), and edits appear on save. With a cable, `adb reverse tcp:8081 tcp:8081 && adb reverse tcp:3000 tcp:3000` makes `localhost` work on Android without any network.
+Phone and Mac on the same network. `pnpm env:up` on the Mac; open the `development` build; it lists the Metro server on the Mac, or scan the QR code Metro prints. The tech config screen then shows the API on the Mac (`http://<mac>:3000`), and edits appear on save. With a cable, `adb reverse tcp:8081 tcp:8081 && adb reverse tcp:3000 tcp:3000` makes `localhost` work on Android without any network.
 
 ## Simulators and emulators
 

@@ -11,8 +11,19 @@ export const EMPTY_PROFILE: ProfileUpdate = {
   bioPreset: null,
   fields: {},
   prompts: [],
-  specialCategoryConsent: null,
 };
+
+/** Key order aside: the draft is built by merging patches, the document comes from the API. */
+const canonical = (value: unknown): string =>
+  JSON.stringify(value, (_, v) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.keys(v as Record<string, unknown>)
+            .sort()
+            .map((k) => [k, (v as Record<string, unknown>)[k]]),
+        )
+      : v,
+  );
 
 const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
   displayName: profile.displayName,
@@ -20,9 +31,6 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
   bioPreset: profile.bioPreset,
   fields: profile.fields,
   prompts: profile.prompts,
-  specialCategoryConsent: profile.specialCategoryConsent
-    ? { version: profile.specialCategoryConsent.version }
-    : null,
 });
 
 /**
@@ -34,6 +42,8 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
 export function useProfile() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [draft, setDraft] = useState<ProfileUpdate>(EMPTY_PROFILE);
+  /** The document as the API last gave it, in the draft's shape. */
+  const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
   const [completeness, setCompleteness] = useState<Completeness | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
@@ -50,7 +60,9 @@ export function useProfile() {
     try {
       const response = await fetchProfile();
       if (!mounted.current) return;
-      setDraft(response.profile ? toUpdate(response.profile) : EMPTY_PROFILE);
+      const document = response.profile ? toUpdate(response.profile) : EMPTY_PROFILE;
+      setDraft(document);
+      setSaved(document);
       setCompleteness(response.completeness);
       setStatus("ready");
     } catch {
@@ -66,7 +78,8 @@ export function useProfile() {
     setDraft((previous) => ({ ...previous, ...patch }));
   }, []);
 
-  const save = useCallback(async () => {
+  /** Saves the draft; true when the API took it, false when it refused or failed (the notice says why). */
+  const save = useCallback(async (): Promise<boolean> => {
     setSaving(true);
     setNotice(null);
     const submitted = draft;
@@ -79,17 +92,23 @@ export function useProfile() {
           .filter((p) => p.answer.trim().length > 0)
           .map((p) => ({ key: p.key, answer: p.answer.trim() })),
       });
-      if (!mounted.current) return;
+      if (!mounted.current) return true;
       // The stored document replaces the draft only if nothing was typed while
       // the save was in flight; otherwise those keystrokes would vanish.
       const stored = response.profile;
-      if (stored) setDraft((current) => (current === submitted ? toUpdate(stored) : current));
+      if (stored) {
+        const document = toUpdate(stored);
+        setSaved(document);
+        setDraft((current) => (current === submitted ? document : current));
+      }
       setCompleteness(response.completeness);
       setNotice({ kind: "saved" });
+      return true;
     } catch (error) {
       if (mounted.current) {
         setNotice({ kind: "error", code: error instanceof ApiError ? error.code : undefined });
       }
+      return false;
     } finally {
       if (mounted.current) setSaving(false);
     }
@@ -97,5 +116,20 @@ export function useProfile() {
 
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  return { status, draft, completeness, saving, notice, update, save, reload: load, dismissNotice };
+  /** Whether the draft differs from what is saved: what leaving the screen would lose. */
+  const dirty = canonical(draft) !== canonical(saved);
+
+  return {
+    status,
+    draft,
+    saved,
+    completeness,
+    saving,
+    notice,
+    dirty,
+    update,
+    save,
+    reload: load,
+    dismissNotice,
+  };
 }

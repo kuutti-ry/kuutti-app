@@ -35,3 +35,7 @@ A dating app without pre-publication photo moderation ships pornography and othe
 **Rekognition on the `full` variant.** Rejected: more bytes for no better answer; the card is what people see.
 
 **Waiting for M4's admin work before any queue.** Rejected: photos would stay `pending` for everyone until then, so nobody could test the pipeline on a phone with a real approval; the minimal session is small and M4 builds on it.
+
+## History
+
+- 2026-10-09: the first uploads on staging came back from Rekognition as `InvalidImageFormatException` and stayed pending: the check sent the stored card variant, which is WebP (ADR-005 §2), and Rekognition reads JPEG and PNG only. The adapter now re-encodes the card variant to JPEG in memory for its two calls; what is stored, what the queue shows and what the sweep re-checks from stay the WebP card. Nothing of §2 changes.

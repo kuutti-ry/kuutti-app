@@ -1,5 +1,5 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { type GateResponse, waitlistK } from "@kuutti/schema";
+import { type GateResponse, PROFILE_FIELDS, waitlistK } from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
@@ -56,11 +56,13 @@ type FactsRow = {
   display_name: string | null;
   bio: string | null;
   prompts: unknown;
+  intent: string | null;
   approved_photos: string;
   seeks: unknown;
   age_window: unknown;
   terms: boolean;
   privacy: boolean;
+  special_category: boolean;
   gate_pond: string | null;
   admitted_at: Date | null;
   pool_said: number | null;
@@ -81,7 +83,7 @@ type Subject = Applicant & {
 // consents yet), paused, suspended and banned accounts are hidden or gone.
 const FACTS = `
   SELECT a.id, a.gender, a.state, a.birth_year, a.birth_month, a.registered_at,
-         p.display_name, p.bio, p.prompts,
+         p.display_name, p.bio, p.prompts, p.fields->>'intent' AS intent,
          (SELECT count(*) FROM photo ph
            WHERE ph.account_id = a.id AND ph.state = 'approved') AS approved_photos,
          (SELECT r.value FROM preferences r
@@ -92,6 +94,8 @@ const FACTS = `
                   AND c.withdrawn_at IS NULL AND c.version = $2) AS terms,
          EXISTS (SELECT 1 FROM consent c WHERE c.account_id = a.id AND c.kind = 'privacy'
                   AND c.withdrawn_at IS NULL AND c.version = $3) AS privacy,
+         EXISTS (SELECT 1 FROM consent c WHERE c.account_id = a.id AND c.kind = 'special_category'
+                  AND c.withdrawn_at IS NULL AND c.version = $5) AS special_category,
          g.pond_id AS gate_pond, g.admitted_at, g.pool_said, g.opened_at
   FROM account a
   JOIN identity i ON i.id = a.identity_id
@@ -112,7 +116,11 @@ function subjectFrom(row: FactsRow, pondId: string, at: Date): Subject | null {
   const gender = row.gender as Subject["gender"] | null;
   if (!gender || !preferences.seeks || !preferences.ageWindow) return null;
   if (row.birth_year === null || row.birth_month === null) return null;
-  if (!row.terms || !row.privacy) return null;
+  // Intent is a hard filter both ways (#147): an onboarding step, so a person without one is not done.
+  const intent = PROFILE_FIELDS.intent.schema.safeParse(row.intent).data;
+  if (!intent) return null;
+  // The seek answer counts only with the special-category consent (ADR-019 §4), as the status reads it.
+  if (!row.terms || !row.privacy || !row.special_category) return null;
   const complete = completeness({
     displayName: row.display_name,
     bio: row.bio,
@@ -135,6 +143,7 @@ function subjectFrom(row: FactsRow, pondId: string, at: Date): Subject | null {
       seeks: preferences.seeks,
       ageWindow: preferences.ageWindow,
       age: ageInYears(row.birth_year, row.birth_month, at),
+      intent,
     },
     visible: row.state === "active",
     admittedAt: here ? row.admitted_at : null,
@@ -198,6 +207,7 @@ async function countPond(
       CURRENT_CONSENT_VERSIONS.terms,
       CURRENT_CONSENT_VERSIONS.privacy,
       "asker" in counted ? counted.asker : counted.locked,
+      CURRENT_CONSENT_VERSIONS.special_category,
     ],
   );
   const subjects = rows.flatMap((row) => subjectFrom(row, pondId, at) ?? []);
@@ -444,6 +454,7 @@ export async function gateOf(deps: GateDeps, accountId: string): Promise<GateRes
     CURRENT_CONSENT_VERSIONS.terms,
     CURRENT_CONSENT_VERSIONS.privacy,
     [accountId],
+    CURRENT_CONSENT_VERSIONS.special_category,
   ]);
   const row = rows[0];
   if (!row || !subjectFrom(row, pondId, deps.now())) {

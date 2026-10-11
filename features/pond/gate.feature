@@ -1,31 +1,52 @@
 # features/pond/gate.feature
 Feature: The pond gate
   Between a finished profile and the first round stand two things (TD-10,
-  TD-13, TD-14; #94, ADR-015). Admission: most people are let into their pond
-  at once; where one group is the larger among those who seek another gender
-  than their own, its newcomers wait in the order they registered. And the
-  gate: matching opens for a person when enough people are there who match
-  what they seek and whose wishes they match. The rules name no gender, no
-  hard filter is ever crossed (rule 7), and nobody is let out again when the
-  pond drifts. What a person is told of it is said in tens, never exactly,
+  TD-13, TD-14; #94, #147, ADR-015). Admission: most people are let into
+  their pond at once; a person competes for every gender they seek but their
+  own, and where the people competing for a gender are more than that gender
+  can bear, its newcomers wait in the order they registered, whatever label
+  they chose for themselves. And the gate: matching opens for a person when
+  enough people are there who match what they seek, whose wishes they match,
+  and who want the same thing or are open to either. The rules name no
+  gender, no hard filter is ever crossed (rule 7), and nobody is let out
+  again when the pond drifts. What a person is told of it is said in tens, never exactly,
   and only the night moves it: a figure that answered every question put to
   it would say what one other person seeks (TD-14).
 
   Scenario Outline: Two people are in each other's pool only when each passes what the other asked for
-    Given a <a_gender> of <a_age> who seeks <a_seeks> between <a_min> and <a_max>
-    And a <b_gender> of <b_age> who seeks <b_seeks> between <b_min> and <b_max>
+    Given a <a_gender> of <a_age> who seeks <a_seeks> between <a_min> and <a_max>, here for <a_intent>
+    And a <b_gender> of <b_age> who seeks <b_seeks> between <b_min> and <b_max>, here for <b_intent>
     Then they are <in> each other's pool, asked from either side
 
     Examples:
-      | a_gender   | a_age | a_seeks          | a_min | a_max | b_gender   | b_age | b_seeks    | b_min | b_max | in     |
-      | woman      | 30    | man              | 25    | 40    | man        | 35    | woman      | 25    | 40    | in     |
-      | woman      | 30    | man              | 25    | 40    | man        | 35    | man        | 25    | 40    | not in |
-      | woman      | 30    | man              | 25    | 34    | man        | 35    | woman      | 25    | 40    | not in |
-      | woman      | 41    | man              | 25    | 45    | man        | 35    | woman      | 25    | 40    | not in |
-      | woman      | 30    | woman            | 25    | 40    | woman      | 28    | woman      | 25    | 40    | in     |
-      | non_binary | 30    | man,non_binary   | 25    | 40    | man        | 35    | non_binary | 25    | 40    | in     |
-      | non_binary | 30    | man              | 25    | 40    | man        | 35    | woman      | 25    | 40    | not in |
-      | woman      | 25    | man              | 25    | 40    | man        | 40    | woman      | 25    | 40    | in     |
+      | a_gender   | a_age | a_seeks          | a_min | a_max | a_intent       | b_gender   | b_age | b_seeks    | b_min | b_max | b_intent       | in     |
+      | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | in     |
+      | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | man        | 25    | 40    | open_to_either | not in |
+      | woman      | 30    | man              | 25    | 34    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+      | woman      | 41    | man              | 25    | 45    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+      | woman      | 30    | woman            | 25    | 40    | open_to_either | woman      | 28    | woman      | 25    | 40    | open_to_either | in     |
+      | non_binary | 30    | man,non_binary   | 25    | 40    | open_to_either | man        | 35    | non_binary | 25    | 40    | open_to_either | in     |
+      | non_binary | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
+      | woman      | 25    | man              | 25    | 40    | open_to_either | man        | 40    | woman      | 25    | 40    | open_to_either | in     |
+      | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | long_term      | in     |
+      | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | casual         | not in |
+      | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | open_to_either | in     |
+      | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | casual         | in     |
+      | woman      | 30    | man              | 25    | 40    | casual         | man        | 35    | woman      | 25    | 40    | casual         | in     |
+
+  Scenario Outline: The sheet's examples of who is shown to whom, by gender and seek
+    Given a <a_gender> seeking <a_seeks> and a <b_gender> seeking <b_seeks>, both of thirty, open to either and to any age
+    Then they are shown to each other: <shown>
+
+    Examples:
+      | a_gender   | a_seeks              | b_gender   | b_seeks              | shown |
+      | man        | man                  | man        | man                  | yes   |
+      | woman      | woman,man            | man        | woman                | yes   |
+      | woman      | non_binary           | non_binary | woman                | yes   |
+      | woman      | non_binary           | non_binary | man                  | no    |
+      | non_binary | woman                | woman      | man                  | no    |
+      | man        | woman                | woman      | woman,man,non_binary | yes   |
+      | non_binary | woman,man,non_binary | man        | woman                | no    |
 
   Scenario: The smaller group is always let in, the larger while it is at most its share
     Given a pond where six of one group and four of the other are let in, all seeking the other
@@ -35,16 +56,21 @@ Feature: The pond gate
     Then that one is let in, and the first in line with them
     And the one who is left is first in line
 
+  Scenario: A person competes for whom they seek, whatever label they chose for themselves
+    Given a pond where the people competing for one gender are at their ratio
+    When a non-binary person who seeks that gender finishes their profile, and a person of the other gender who seeks it
+    Then both wait in the same line, in the order they registered, and neither is let in before the other
+
   Scenario: A newcomer of the smaller group opens the way for those who waited
     Given a pond where three of one group are let in and two more of it wait
     When three of the other group finish their profile and the gates are counted
     Then the three are let in, and so is the one who waited longest
     And the other one is first in the waitlist
 
-  Scenario: People who seek their own gender, and non-binary people, never wait
+  Scenario: People who compete for nobody never wait, and seeking one's own gender too opens no door
     Given a pond where one group is far over its share
-    When a person of that group who seeks their own gender too, and a non-binary person, finish their profile
-    Then both are let in at once
+    When a person who seeks only their own gender finishes their profile, and a person of the larger group who seeks their own gender too
+    Then the first is let in at once and the second waits in the line, as anybody of the larger group does
 
   Scenario: Nobody is let out again when the pond drifts
     Given a pond where the larger group is at its share and everybody is let in
@@ -113,13 +139,13 @@ Feature: The pond gate
     When the gates are counted
     Then they are told where they stand in the pond they went to
 
-  Scenario: Admission is decided anew for a person who joins a group that waits
-    Given two people of the larger group who wait, and one of them declares that they seek their own gender too
-    When the gates are counted
-    Then that one is let in
-    When they take the declaration back
+  Scenario: Admission is decided anew for a person who joins a contest that waits
+    Given a person let in who competes for nobody, in a pond where the people competing for one gender are over their ratio
+    When they declare that they seek that gender too
     Then they are neither let in nor in the line until the gates are counted
-    And the next place that opens goes to the one who registered first
+    When the gates are counted
+    Then they wait behind everybody who competes for that gender and registered before them
+    And a change of gender that keeps the same contests, or a narrower window of ages, takes nothing back
 
   Scenario: Erasure removes the place at the gate
     Given a person with a place at the gate

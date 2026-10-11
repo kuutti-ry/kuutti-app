@@ -90,7 +90,7 @@ The tag retags the image `main` already built for that commit, so production run
 
 - `main` is the only long-lived branch. It cannot be deleted or force-pushed, and nothing reaches it except a squash-merged pull request whose checks are green.
 - Work on a branch of this repository (members of the `contributors` team have write) or on a fork; open the pull request against `main` with `Refs #<issue>` in the body (the `issue-link` check refuses a missing reference and a closing keyword: an issue closes when the maintainer has tested it, not when a merge happens).
-- A pull request from a contributor needs one approving review, and one more when its changes are attributed to no person (a coding agent's pull request); the preview lanes (API, web, native) run only after the maintainer has approved the run, because they hold the staging and Expo tokens (ADR-004). Their removal needs nobody: a sweep from `main`, started by every merge, retires the previews of closed and merged pull requests (ADR-012).
+- A pull request from a contributor needs one approving review, and one more when its changes are attributed to no person (a coding agent's pull request); the preview lanes (API, web, native) run on every push without approval, holding the staging and Expo tokens: write access to this repository is that trust (ADR-004 §3). Their removal needs nobody: a sweep from `main`, started by every merge, retires the previews of closed and merged pull requests (ADR-012).
 - History is linear: no merge commits. Pull requests are squash-merged, nothing else (the ruleset allows only squash).
 - Dependency updates arrive as Dependabot pull requests.
 

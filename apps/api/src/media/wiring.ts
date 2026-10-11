@@ -1,3 +1,4 @@
+import { createPrivateKey } from "node:crypto";
 import { availableParallelism } from "node:os";
 import { RekognitionClient } from "@aws-sdk/client-rekognition";
 import pLimit from "p-limit";
@@ -67,6 +68,14 @@ export function createMediaDeps(config: Config): { deps?: MediaDeps; setup: Medi
     );
   }
   if (config.MEDIA_URL_BASE && config.CLOUDFRONT_KEY_PAIR_ID && config.CLOUDFRONT_SIGNING_KEY) {
+    // ADR-005 §5: a value that is not a private key (the public half by
+    // mistake, a truncated PEM) fails the boot here, not the first photo.
+    // The error names nothing of the value.
+    try {
+      createPrivateKey(config.CLOUDFRONT_SIGNING_KEY);
+    } catch {
+      throw new Error("CLOUDFRONT_SIGNING_KEY is not a private key in PEM");
+    }
     const client = createS3Client(config);
     const moderator = moderatorFor(config);
     return {

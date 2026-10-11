@@ -1,8 +1,8 @@
 # ADR-012: Preview cleanup runs unattended from main
 
-- Status: accepted
+- Status: accepted, amended 2026-10-08 (the reviewer on `preview` that §1, §2, §7 and §9 name is off from that day, ADR-004 §3; the points stand on the sweep running `main`'s copy, on its `actions: write` job and the plan role trusting `main` alone, and on the environment's branch policy, not on the reviewer)
 - Date: 2026-09-27
-- Follows: TD-2 (free tiers, three previews), TD-19 (one staging box, previews on it), ADR-004 §3 (the reviewer on the `preview` environment follows who can push), `.github/scripts/check-workflow-permissions.py` (no `pull_request_target`), CLAUDE.md "Do not add infrastructure for scale that is not coming"; issue #9, the staging outage of 2026-09-27
+- Follows: TD-2 (free tiers, three previews), TD-19 (one staging box, previews on it), ADR-004 §3 (the trust of the `preview` environment: a reviewer from 2026-09-25 to 2026-10-08, write access from then), `.github/scripts/check-workflow-permissions.py` (no `pull_request_target`), CLAUDE.md "Do not add infrastructure for scale that is not coming"; issue #9, the staging outage of 2026-09-27
 
 ## Context
 

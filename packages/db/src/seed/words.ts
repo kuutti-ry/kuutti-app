@@ -81,24 +81,46 @@ export const NAMES = {
 } as const;
 
 /**
- * Campus or field, in the person's words. Places and fields of study only: no
- * guild, club or company is named, so no organisation that exists is given
- * members who do not.
+ * Job titles in the person's words and language: short, and never an
+ * employer's name, so no organisation that exists is given members who do
+ * not (ADR-019 §5).
  */
-export const CAMPUSES = [
-  "Otaniemi",
-  "Kumpula",
-  "Viikki",
-  "Meilahti",
-  "Keskusta",
-  "Arabia",
-  "Leppävaara",
-  "Myllypuro",
-  "Tietotekniikka",
-  "Teknillinen fysiikka",
-  "Konetekniikka",
-  "Arkkitehtuuri",
-] as const;
+export const OCCUPATION_TITLES: Readonly<Record<Language, readonly string[]>> = {
+  fi: [
+    "arkkitehti",
+    "sairaanhoitaja",
+    "luokanopettaja",
+    "ohjelmistokehittäjä",
+    "kirvesmies",
+    "tutkija",
+    "kokki",
+    "bussinkuljettaja",
+    "graafikko",
+    "fysioterapeutti",
+  ],
+  sv: [
+    "sjukskötare",
+    "klasslärare",
+    "snickare",
+    "forskare",
+    "kock",
+    "bibliotekarie",
+    "ingenjör",
+    "trädgårdsmästare",
+  ],
+  en: [
+    "data analyst",
+    "nurse",
+    "software developer",
+    "barista",
+    "doctoral researcher",
+    "project manager",
+    "electrician",
+    "translator",
+    "UX designer",
+    "chef",
+  ],
+};
 
 /** Bios. The first of each language are long enough to count for completeness, the last ones are not. */
 export const BIOS: Readonly<Record<Language, readonly string[]>> = {
@@ -206,7 +228,7 @@ export const PROMPT_ANSWERS: Readonly<
 export function everyText(): string[] {
   return [
     ...Object.values(NAMES).flat(),
-    ...CAMPUSES,
+    ...Object.values(OCCUPATION_TITLES).flat(),
     ...Object.values(BIOS).flat(),
     ...Object.values(PROMPT_ANSWERS).flatMap((byLanguage) => Object.values(byLanguage).flat()),
   ];

@@ -17,6 +17,13 @@ For everyone who writes or reviews `packages/i18n/messages.yaml`, and sent with 
 - Gender-neutral throughout. Finnish is by nature; in Swedish avoid constructions that force *han/hon*.
 - Finnish runs about a third longer than English. Buttons and labels stay as short as the language allows; a description in `messages.yaml` says when space is tight.
 
+## Formats (the field sheet's Formats line, #150)
+
+- Dates are d.M.yyyy in every language: 19.9.2026. Never ISO (2026-09-19), never month first (9/19/2026), never a month name on a screen. `formatDate` in `packages/i18n`.
+- Times are 24-hour with the language's own separator (14.14); a date with its time is `formatDateTime`, a time alone `formatTime`.
+- A height is centimetres with the unit, `formatHeight` (171 cm); an age is a number, said with "verified by your bank"; distances will be bands, never metres, when there is a second pond.
+- A date or a number is never built from strings in a client; `pnpm lint` refuses `toLocaleDateString` and `Intl.DateTimeFormat` outside `packages/i18n`.
+
 ## Hard rules (checked by `pnpm i18n:check`)
 
 - A dynamic value (`{pond}`, `{name}`) stands only where it needs no inflection: after a colon, as a subject, in a list. Never "in {pond}", never `{pond}ssa`. If the sentence needs a case form, the form comes from the database (`formatPond`), not from the message.

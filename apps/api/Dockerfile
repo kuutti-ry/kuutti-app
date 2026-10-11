@@ -10,11 +10,13 @@ COPY apps/api/package.json apps/api/
 COPY packages/schema/package.json packages/schema/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
+COPY packages/tunnistus-oidc/package.json packages/tunnistus-oidc/
 RUN pnpm install --frozen-lockfile --filter @kuutti/api...
 COPY tsconfig.base.json ./
 COPY packages/schema packages/schema
 COPY packages/db packages/db
 COPY packages/i18n packages/i18n
+COPY packages/tunnistus-oidc packages/tunnistus-oidc
 COPY apps/api apps/api
 RUN pnpm --filter @kuutti/api build
 

@@ -32,7 +32,8 @@ export const DEMO_SUBJECT_PREFIX = "kuutti-demo:";
 export const demoHetuHmac = (label: string): string =>
   createHash("sha256").update(`kuutti demo identity: ${label}`).digest("hex");
 
-export type ConsentVersions = Readonly<Record<"terms" | "privacy", string>>;
+/** The versions the rows name: the two consents of onboarding and the special-category wording of the profile (ADR-019 §4). */
+export type ConsentVersions = Readonly<Record<"terms" | "privacy" | "special_category", string>>;
 
 /** `spared`: identities that carry the mark and are not synthetic; never touched. */
 export type RemoveResult = { removed: number; spared: number };
@@ -174,6 +175,8 @@ export async function writePopulation(
         }
       }
       if (person.profile) {
+        // The special-category consent is a consent row (written above with
+        // the others), not a profile column (ADR-019 §4, #204).
         await tx.query(
           `INSERT INTO profile
              (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)

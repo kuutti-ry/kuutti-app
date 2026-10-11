@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -309,6 +309,33 @@
           "expiresAt"
         ]
       },
+      "AccountEmailResponse": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AccountEmail": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
       "AccountDeletionRequest": {
         "type": "object",
         "properties": {
@@ -368,6 +395,21 @@
               },
               "pond": {
                 "$ref": "#/components/schemas/PondSummary"
+              },
+              "genderChangedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "seeksChangedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "email": {
+                "type": "string",
+                "nullable": true,
+                "maxLength": 254
               }
             },
             "required": [
@@ -377,11 +419,21 @@
               "birthYear",
               "birthMonth",
               "gender",
-              "pond"
+              "pond",
+              "genderChangedAt",
+              "seeksChangedAt",
+              "email"
             ]
           },
           "preferences": {
             "$ref": "#/components/schemas/PreferencesResponse"
+          },
+          "dealBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoredDealBreaker"
+            },
+            "maxItems": 5
           },
           "consents": {
             "type": "array",
@@ -498,6 +550,7 @@
           "exportedAt",
           "account",
           "preferences",
+          "dealBreakers",
           "consents",
           "identity",
           "sessions",
@@ -596,6 +649,47 @@
         ],
         "additionalProperties": false
       },
+      "StoredDealBreaker": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "accept": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "minItems": 1,
+            "maxItems": 60
+          },
+          "includeUnknown": {
+            "type": "boolean"
+          },
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field",
+          "accept",
+          "includeUnknown",
+          "paused"
+        ],
+        "additionalProperties": false
+      },
+      "DealBreakerField": {
+        "type": "string",
+        "enum": [
+          "monogamy",
+          "hasKids",
+          "wantsKids",
+          "smoking",
+          "languages"
+        ]
+      },
       "ConsentRecord": {
         "type": "object",
         "properties": {
@@ -637,7 +731,8 @@
         "enum": [
           "terms",
           "privacy",
-          "research"
+          "research",
+          "special_category"
         ]
       },
       "ProfileDocument": {
@@ -712,6 +807,58 @@
       "ProfileFields": {
         "type": "object",
         "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "long_term",
+              "casual",
+              "open_to_either"
+            ]
+          },
+          "identityLabel": {
+            "type": "string",
+            "enum": [
+              "agender",
+              "genderfluid",
+              "genderqueer",
+              "bigender",
+              "two_spirit",
+              "questioning",
+              "non_binary"
+            ]
+          },
+          "monogamy": {
+            "type": "string",
+            "enum": [
+              "monogamous",
+              "non_monogamous"
+            ]
+          },
+          "hasKids": {
+            "type": "string",
+            "enum": [
+              "no",
+              "yes_with_me",
+              "yes_not_with_me"
+            ]
+          },
+          "wantsKids": {
+            "type": "string",
+            "enum": [
+              "want",
+              "dont_want",
+              "not_sure"
+            ]
+          },
+          "smoking": {
+            "type": "string",
+            "enum": [
+              "never",
+              "sometimes",
+              "regularly",
+              "quitting"
+            ]
+          },
           "languages": {
             "type": "array",
             "items": {
@@ -720,98 +867,283 @@
                 "fi",
                 "sv",
                 "en",
-                "ru",
+                "se",
                 "et",
+                "ru",
                 "uk",
                 "ar",
                 "so",
+                "fa",
+                "ku",
+                "zh",
+                "sq",
+                "vi",
+                "th",
+                "tr",
+                "es",
                 "de",
                 "fr",
-                "es",
+                "tl",
+                "pl",
+                "it",
+                "pt",
+                "hi",
+                "ne",
+                "bn",
+                "ur",
+                "ro",
+                "hu",
+                "ja",
+                "lt",
+                "lv",
+                "nl",
+                "ko",
                 "other"
               ]
             },
             "minItems": 1,
             "maxItems": 5
           },
-          "intent": {
+          "education": {
             "type": "string",
             "enum": [
-              "long_term",
-              "short_term",
-              "figuring_out",
-              "friends"
+              "peruskoulu",
+              "toinen_aste",
+              "amk",
+              "kandi",
+              "maisteri",
+              "tohtori"
             ]
           },
-          "relationship": {
+          "drinking": {
             "type": "string",
             "enum": [
-              "monogamous",
-              "open",
-              "polyamorous",
-              "lat",
-              "undecided"
+              "never",
+              "rarely",
+              "socially",
+              "often"
             ]
           },
-          "kids": {
+          "drugsAttitude": {
             "type": "string",
             "enum": [
-              "have_want_more",
-              "have_done",
-              "want_someday",
-              "dont_want",
-              "not_sure"
+              "not_my_thing",
+              "dont_mind",
+              "fine_with_it"
             ]
           },
-          "smoking": {
-            "type": "string",
-            "enum": [
-              "no",
-              "sometimes",
-              "yes",
-              "snus"
-            ]
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hiking",
+                "cycling",
+                "running",
+                "skiing",
+                "swimming",
+                "sailing",
+                "foraging",
+                "fishing",
+                "climbing",
+                "gym",
+                "football",
+                "floorball",
+                "ice_hockey",
+                "yoga",
+                "dance",
+                "martial_arts",
+                "padel",
+                "photography",
+                "drawing",
+                "making_music",
+                "writing",
+                "crafts",
+                "theatre",
+                "cooking",
+                "baking",
+                "coffee",
+                "wine_and_beer",
+                "reading",
+                "cinema",
+                "museums",
+                "concerts",
+                "podcasts",
+                "board_games",
+                "video_games",
+                "chess",
+                "puzzles",
+                "gardening",
+                "sauna",
+                "cottage",
+                "diy",
+                "travelling",
+                "road_trips",
+                "learning_languages",
+                "dogs",
+                "cats",
+                "horses",
+                "birdwatching",
+                "programming",
+                "electronics",
+                "astronomy",
+                "volunteering",
+                "karaoke",
+                "pub_quiz",
+                "dinner_parties",
+                "meditation",
+                "winter_swimming",
+                "forest_walks",
+                "slow_mornings",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
-          "alcohol": {
+          "height": {
+            "type": "integer",
+            "minimum": 140,
+            "maximum": 220
+          },
+          "exercise": {
             "type": "string",
             "enum": [
               "never",
               "sometimes",
-              "often"
+              "weekly",
+              "daily"
             ]
           },
-          "education": {
-            "type": "string",
-            "enum": [
-              "secondary",
-              "vocational",
-              "bachelor",
-              "master",
-              "doctorate",
-              "other"
-            ]
+          "pets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dog",
+                "cat",
+                "other",
+                "none",
+                "allergic"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
           "field": {
-            "type": "string",
-            "enum": [
-              "tech",
-              "engineering",
-              "business",
-              "arts",
-              "science",
-              "health",
-              "education",
-              "law",
-              "social",
-              "trades",
-              "service",
-              "other"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tech",
+                "engineering",
+                "business",
+                "arts",
+                "science",
+                "health",
+                "education",
+                "law",
+                "social",
+                "trades",
+                "service",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
           },
-          "campus": {
+          "hideFromField": {
+            "type": "boolean"
+          },
+          "occupation": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "student",
+                "tech",
+                "healthcare",
+                "education",
+                "business",
+                "arts_culture",
+                "science",
+                "trades_construction",
+                "service_hospitality",
+                "public_sector",
+                "transport",
+                "agriculture",
+                "media",
+                "law_finance",
+                "sports",
+                "entrepreneur",
+                "between_jobs",
+                "retired",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "occupationTitle": {
             "type": "string",
             "minLength": 1,
             "maxLength": 40
+          },
+          "politics": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "kesk",
+                "kok",
+                "kd",
+                "liik",
+                "ps",
+                "pp",
+                "rkp",
+                "sdp",
+                "vas",
+                "vihr",
+                "none_of_them",
+                "kahvipuolue"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 12
+          },
+          "religion": {
+            "type": "string",
+            "enum": [
+              "lutheran",
+              "orthodox",
+              "other_christian",
+              "muslim",
+              "buddhist",
+              "hindu",
+              "jewish",
+              "spiritual",
+              "agnostic",
+              "atheist",
+              "other"
+            ]
+          },
+          "zodiac": {
+            "type": "string",
+            "enum": [
+              "aries",
+              "taurus",
+              "gemini",
+              "cancer",
+              "leo",
+              "virgo",
+              "corgi",
+              "libra",
+              "scorpio",
+              "sagittarius",
+              "capricorn",
+              "aquarius",
+              "pisces"
+            ]
           }
         },
         "additionalProperties": false
@@ -1111,6 +1443,58 @@
       "ResearchFields": {
         "type": "object",
         "properties": {
+          "intent": {
+            "type": "string",
+            "enum": [
+              "long_term",
+              "casual",
+              "open_to_either"
+            ]
+          },
+          "identityLabel": {
+            "type": "string",
+            "enum": [
+              "agender",
+              "genderfluid",
+              "genderqueer",
+              "bigender",
+              "two_spirit",
+              "questioning",
+              "non_binary"
+            ]
+          },
+          "monogamy": {
+            "type": "string",
+            "enum": [
+              "monogamous",
+              "non_monogamous"
+            ]
+          },
+          "hasKids": {
+            "type": "string",
+            "enum": [
+              "no",
+              "yes_with_me",
+              "yes_not_with_me"
+            ]
+          },
+          "wantsKids": {
+            "type": "string",
+            "enum": [
+              "want",
+              "dont_want",
+              "not_sure"
+            ]
+          },
+          "smoking": {
+            "type": "string",
+            "enum": [
+              "never",
+              "sometimes",
+              "regularly",
+              "quitting"
+            ]
+          },
           "languages": {
             "type": "array",
             "items": {
@@ -1119,92 +1503,231 @@
                 "fi",
                 "sv",
                 "en",
-                "ru",
+                "se",
                 "et",
+                "ru",
                 "uk",
                 "ar",
                 "so",
+                "fa",
+                "ku",
+                "zh",
+                "sq",
+                "vi",
+                "th",
+                "tr",
+                "es",
                 "de",
                 "fr",
-                "es",
+                "tl",
+                "pl",
+                "it",
+                "pt",
+                "hi",
+                "ne",
+                "bn",
+                "ur",
+                "ro",
+                "hu",
+                "ja",
+                "lt",
+                "lv",
+                "nl",
+                "ko",
                 "other"
               ]
             },
             "minItems": 1,
             "maxItems": 5
           },
-          "intent": {
+          "education": {
             "type": "string",
             "enum": [
-              "long_term",
-              "short_term",
-              "figuring_out",
-              "friends"
+              "peruskoulu",
+              "toinen_aste",
+              "amk",
+              "kandi",
+              "maisteri",
+              "tohtori"
             ]
           },
-          "relationship": {
+          "drinking": {
             "type": "string",
             "enum": [
-              "monogamous",
-              "open",
-              "polyamorous",
-              "lat",
-              "undecided"
+              "never",
+              "rarely",
+              "socially",
+              "often"
             ]
           },
-          "kids": {
+          "drugsAttitude": {
             "type": "string",
             "enum": [
-              "have_want_more",
-              "have_done",
-              "want_someday",
-              "dont_want",
-              "not_sure"
+              "not_my_thing",
+              "dont_mind",
+              "fine_with_it"
             ]
           },
-          "smoking": {
-            "type": "string",
-            "enum": [
-              "no",
-              "sometimes",
-              "yes",
-              "snus"
-            ]
+          "hobbies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hiking",
+                "cycling",
+                "running",
+                "skiing",
+                "swimming",
+                "sailing",
+                "foraging",
+                "fishing",
+                "climbing",
+                "gym",
+                "football",
+                "floorball",
+                "ice_hockey",
+                "yoga",
+                "dance",
+                "martial_arts",
+                "padel",
+                "photography",
+                "drawing",
+                "making_music",
+                "writing",
+                "crafts",
+                "theatre",
+                "cooking",
+                "baking",
+                "coffee",
+                "wine_and_beer",
+                "reading",
+                "cinema",
+                "museums",
+                "concerts",
+                "podcasts",
+                "board_games",
+                "video_games",
+                "chess",
+                "puzzles",
+                "gardening",
+                "sauna",
+                "cottage",
+                "diy",
+                "travelling",
+                "road_trips",
+                "learning_languages",
+                "dogs",
+                "cats",
+                "horses",
+                "birdwatching",
+                "programming",
+                "electronics",
+                "astronomy",
+                "volunteering",
+                "karaoke",
+                "pub_quiz",
+                "dinner_parties",
+                "meditation",
+                "winter_swimming",
+                "forest_walks",
+                "slow_mornings",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
-          "alcohol": {
+          "exercise": {
             "type": "string",
             "enum": [
               "never",
               "sometimes",
-              "often"
+              "weekly",
+              "daily"
             ]
           },
-          "education": {
-            "type": "string",
-            "enum": [
-              "secondary",
-              "vocational",
-              "bachelor",
-              "master",
-              "doctorate",
-              "other"
-            ]
+          "pets": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "dog",
+                "cat",
+                "other",
+                "none",
+                "allergic"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 5
           },
           "field": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "tech",
+                "engineering",
+                "business",
+                "arts",
+                "science",
+                "health",
+                "education",
+                "law",
+                "social",
+                "trades",
+                "service",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "occupation": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "student",
+                "tech",
+                "healthcare",
+                "education",
+                "business",
+                "arts_culture",
+                "science",
+                "trades_construction",
+                "service_hospitality",
+                "public_sector",
+                "transport",
+                "agriculture",
+                "media",
+                "law_finance",
+                "sports",
+                "entrepreneur",
+                "between_jobs",
+                "retired",
+                "other"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3
+          },
+          "zodiac": {
             "type": "string",
             "enum": [
-              "tech",
-              "engineering",
-              "business",
-              "arts",
-              "science",
-              "health",
-              "education",
-              "law",
-              "social",
-              "trades",
-              "service",
-              "other"
+              "aries",
+              "taurus",
+              "gemini",
+              "cancer",
+              "leo",
+              "virgo",
+              "corgi",
+              "libra",
+              "scorpio",
+              "sagittarius",
+              "capricorn",
+              "aquarius",
+              "pisces"
             ]
           }
         },
@@ -1643,21 +2166,6 @@
               "$ref": "#/components/schemas/PromptAnswer"
             },
             "maxItems": 3
-          },
-          "specialCategoryConsent": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "version": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 40
-              }
-            },
-            "required": [
-              "version"
-            ],
-            "additionalProperties": false
           }
         },
         "required": [
@@ -1665,8 +2173,7 @@
           "bio",
           "bioPreset",
           "fields",
-          "prompts",
-          "specialCategoryConsent"
+          "prompts"
         ],
         "additionalProperties": false
       },
@@ -1721,6 +2228,9 @@
               "verifiedByBank"
             ]
           },
+          "gender": {
+            "$ref": "#/components/schemas/Gender"
+          },
           "pond": {
             "$ref": "#/components/schemas/PondSummary"
           },
@@ -1748,18 +2258,45 @@
               "$ref": "#/components/schemas/PromptAnswer"
             },
             "maxItems": 3
+          },
+          "shared": {
+            "type": "object",
+            "properties": {
+              "hobbies": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "maxItems": 5
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 40
+                },
+                "maxItems": 5
+              }
+            },
+            "required": [
+              "hobbies",
+              "languages"
+            ]
           }
         },
         "required": [
           "accountId",
           "displayName",
           "age",
+          "gender",
           "pond",
           "photos",
           "fields",
           "bio",
           "bioPreset",
-          "prompts"
+          "prompts",
+          "shared"
         ]
       },
       "CardPhoto": {
@@ -1806,6 +2343,11 @@
               "deleted"
             ]
           },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 130
+          },
           "gender": {
             "$ref": "#/components/schemas/Gender"
           },
@@ -1824,6 +2366,11 @@
                 "maxLength": 40
               },
               "privacy": {
+                "type": "string",
+                "nullable": true,
+                "maxLength": 40
+              },
+              "specialCategory": {
                 "type": "string",
                 "nullable": true,
                 "maxLength": 40
@@ -1850,18 +2397,38 @@
             "required": [
               "terms",
               "privacy",
+              "specialCategory",
               "research"
             ]
           },
           "currentVersions": {
             "$ref": "#/components/schemas/ConsentVersions"
           },
+          "nextChange": {
+            "type": "object",
+            "properties": {
+              "gender": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
+              "seeks": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "gender",
+              "seeks"
+            ]
+          },
           "missing": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OnboardingStep"
             },
-            "maxItems": 6
+            "maxItems": 10
           },
           "complete": {
             "type": "boolean"
@@ -1869,11 +2436,13 @@
         },
         "required": [
           "state",
+          "age",
           "gender",
           "pond",
           "preferences",
           "consents",
           "currentVersions",
+          "nextChange",
           "missing",
           "complete"
         ]
@@ -1892,24 +2461,33 @@
           "research": {
             "type": "string",
             "maxLength": 40
+          },
+          "special_category": {
+            "type": "string",
+            "maxLength": 40
           }
         },
         "required": [
           "terms",
           "privacy",
-          "research"
+          "research",
+          "special_category"
         ],
         "description": "The consent_version of the current wording per kind."
       },
       "OnboardingStep": {
         "type": "string",
         "enum": [
+          "terms",
+          "privacy",
+          "name",
           "gender",
           "seeks",
+          "intent",
           "age_window",
-          "pond",
-          "terms",
-          "privacy"
+          "photos",
+          "prompts_or_bio",
+          "pond"
         ]
       },
       "GenderUpdate": {
@@ -1969,6 +2547,13 @@
           "locale"
         ],
         "additionalProperties": false
+      },
+      "WithdrawableConsentKind": {
+        "type": "string",
+        "enum": [
+          "research",
+          "special_category"
+        ]
       },
       "GateResponse": {
         "type": "object",
@@ -2121,6 +2706,70 @@
         ],
         "additionalProperties": false
       },
+      "DealBreakersResponse": {
+        "type": "object",
+        "properties": {
+          "dealBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoredDealBreaker"
+            },
+            "maxItems": 5
+          },
+          "max": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5
+          }
+        },
+        "required": [
+          "dealBreakers",
+          "max"
+        ]
+      },
+      "DealBreakersUpdate": {
+        "type": "object",
+        "properties": {
+          "dealBreakers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealBreaker"
+            },
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "dealBreakers"
+        ],
+        "additionalProperties": false
+      },
+      "DealBreaker": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "accept": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "minItems": 1,
+            "maxItems": 60
+          },
+          "includeUnknown": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "field",
+          "accept",
+          "includeUnknown"
+        ],
+        "additionalProperties": false
+      },
       "PreferencesUpdate": {
         "type": "object",
         "properties": {
@@ -2136,10 +2785,6 @@
             "$ref": "#/components/schemas/AgeWindow"
           }
         },
-        "required": [
-          "seeks",
-          "ageWindow"
-        ],
         "additionalProperties": false
       }
     },
@@ -2613,6 +3258,126 @@
           },
           "401": {
             "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/email": {
+      "get": {
+        "summary": "The caller's optional e-mail",
+        "description": "The optional e-mail of #148 (TD-18): a way back in if a phone is lost, never a login, never shown to anybody. Null when none is set.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The e-mail, or null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountEmailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Set the caller's optional e-mail",
+        "description": "Validated as an address and nothing else; no mail is sent until SES exists (M5). The value reaches no log line and no event.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Set."
+          },
+          "400": {
+            "description": "Validation failed: not an address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Clear the caller's optional e-mail",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Cleared."
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3323,7 +4088,7 @@
       },
       "put": {
         "summary": "Save the caller's profile",
-        "description": "The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts, and the special-category consent version when a field needs it. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.",
+        "description": "The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts. A politics or religion answer needs the special-category consent on record, which is given at the seeks step and withdrawn in Settings (the consent routes), never in this body. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.",
         "security": [
           {
             "session": []
@@ -3371,7 +4136,7 @@
             }
           },
           "403": {
-            "description": "consent_required: a special-category field without the consent version.",
+            "description": "consent_required: a politics or religion answer without the consent of the current wording (ADR-019); the detail names the fields and the current version.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3428,8 +4193,8 @@
     },
     "/onboarding": {
       "get": {
-        "summary": "What the caller has answered and what activation still waits for",
-        "description": "Gender, pond, the two hard preferences, the consents given for the current wordings and the current versions. When nothing required is missing and the account is still registered, it becomes active here.",
+        "summary": "What the caller has answered and which steps of onboarding are still open",
+        "description": "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
         "security": [
           {
             "session": []
@@ -3548,7 +4313,7 @@
       },
       "post": {
         "summary": "Record a consent for the current wording",
-        "description": "The kind, the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.",
+        "description": "The kind (terms, privacy, research, or special_category for whom one seeks, politics and religion), the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.",
         "security": [
           {
             "session": []
@@ -3628,13 +4393,23 @@
         }
       }
     },
-    "/consents/research": {
+    "/consents/{kind}": {
       "delete": {
-        "summary": "Withdraw the research opt-in",
-        "description": "The one consent a person withdraws; terms and privacy end with the account. The rows stay as the record of what was agreed and when.",
+        "summary": "Withdraw the research opt-in or the special-category consent",
+        "description": "The two consents a person withdraws; terms and privacy end with the account. Withdrawing special_category takes whom the person seeks and the politics and religion of the profile with it, and onboarding asks the seek question again. The rows stay as the record of what was agreed and when.",
         "security": [
           {
             "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/WithdrawableConsentKind"
+            },
+            "required": true,
+            "name": "kind",
+            "in": "path"
           }
         ],
         "responses": {
@@ -3644,6 +4419,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ConsentsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: not a kind a person withdraws.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3810,6 +4595,110 @@
         }
       }
     },
+    "/preferences/deal-breakers": {
+      "get": {
+        "summary": "The caller's deal-breakers",
+        "description": "Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The deal-breakers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealBreakersResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Set the caller's deal-breakers",
+        "description": "The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealBreakersUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved; the deal-breakers as stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealBreakersResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: more than allowed, a field twice, or an answer the field has not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "filter_unanswered: a deal-breaker on a field the person has not answered themselves (the log names the field, the screen knows it).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/preferences": {
       "get": {
         "summary": "Whom the caller seeks and the age window",
@@ -3843,8 +4732,8 @@
         }
       },
       "put": {
-        "summary": "Set whom the caller seeks and the age window",
-        "description": "Both at once: a non-empty set of genders and an age window within 18 and 99 with min at most max. Hard rows: the round builder never crosses them, in either direction.",
+        "summary": "Set whom the caller seeks, the age window, or both",
+        "description": "Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.",
         "security": [
           {
             "session": []

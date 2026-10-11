@@ -108,10 +108,21 @@ function parseFeature(file: string): Scenario[] {
 
 const STRING_LITERAL = /(["'`])((?:\\.|(?!\1)[^\\])*)\1/gs;
 
+/**
+ * Comments go before the literals are read: an apostrophe in a prose comment
+ * ("onboarding's") would otherwise open a string that swallows every test
+ * name up to the next quote. Whole-line comments and block comments only; a
+ * comment after code on the same line stays, since "//" also lives inside a
+ * URL in a string.
+ */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
 function collectTestNames(files: string[]): Map<string, string[]> {
   const names = new Map<string, string[]>();
   for (const file of files) {
-    const source = readFileSync(file, "utf8");
+    const source = withoutComments(readFileSync(file, "utf8"));
     for (const match of source.matchAll(STRING_LITERAL)) {
       const literal = match[2] ?? "";
       if (literal === "") continue;

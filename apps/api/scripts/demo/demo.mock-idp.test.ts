@@ -6,6 +6,7 @@ import {
   MOCK_BANK_AMR,
   OLDER_TERMS_VERSION,
   PERSONA_HISTORIES,
+  personaBirth,
   personaHetu,
 } from "@kuutti/db/demo";
 import {
@@ -40,7 +41,7 @@ import {
   ofThisComputer,
   whyNotTheLocalStore,
 } from "./bank.ts";
-import { giveHistory } from "./histories.ts";
+import { giveHistory, viaRoutes } from "./histories.ts";
 import { resetPersonas } from "./reset.ts";
 
 // The personas' histories and the reset (#73, ADR-014 §12), against the real
@@ -75,10 +76,9 @@ const lastDayOfMonth = (at: Date) =>
 
 async function world(ctx: TestContext) {
   const { logger, lines } = await captureLogger();
-  // The ponds the histories name: the test database has no seed.
+  // The pond the histories name, and the default pond (#146): the test database has no seed.
   await ctx.client.query(
-    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES
-       ('espoo', 'Espoo', 'Espoossa'), ('otaniemi', 'Otaniemi', 'Otaniemessä')
+    `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla')
      ON CONFLICT (slug) DO NOTHING`,
   );
   const config = testConfig({
@@ -614,7 +614,8 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       `SELECT a.birth_year, a.birth_month FROM account a JOIN identity i ON i.id = a.identity_id
        WHERE i.broker_subject = 'aino'`,
     );
-    expect(rows).toEqual([{ birth_year: 1997, birth_month: 3 }]);
+    const born = personaBirth(persona("aino"), new Date());
+    expect(rows).toEqual([{ birth_year: born.year, birth_month: born.month }]);
   });
 
   test("the ages are let in and refused by the product's own rule, on whatever day this runs", async ({
@@ -622,7 +623,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
   }) => {
     const { bank } = await world(ctx);
     expect(await loginAs(persona("eetu"), bank)).toMatchObject({ kind: "session" });
-    expect(await loginAs(persona("helmi"), bank)).toMatchObject({ kind: "session" });
+    expect(await loginAs(persona("siiri"), bank)).toMatchObject({ kind: "session" });
     expect(await loginAs(persona("lauri"), bank)).toEqual({
       kind: "refused",
       error: "auth_under_18",
@@ -645,7 +646,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const { bank, context, lines } = await world(ctx);
     const began = Date.now();
     for (const history of PERSONA_HISTORIES) {
-      expect(await giveHistory(history, context)).toMatchObject({ key: history.key });
+      expect(await giveHistory(history, viaRoutes(context))).toMatchObject({ key: history.key });
     }
     const ended = Date.now();
 
@@ -677,24 +678,29 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
 
     const sanna = await as("sanna");
     expect(sanna.login.outcome).toBe("resumed");
-    expect(sanna.onboarding.missing).toEqual([]);
-    expect(sanna.profile.profile?.displayName).toBe("Sanna");
     // Everything but the photos, which the photo loader brings.
+    expect(sanna.onboarding.missing).toEqual(["photos"]);
+    expect(sanna.profile.profile?.displayName).toBe("Sanna");
     expect(sanna.profile.completeness.missing).toEqual(["photos"]);
 
+    // Registered and gone: nothing answered. With two ponds to choose from, the pond is asked too (ADR-010 §12).
     expect((await as("onni")).onboarding.missing).toEqual([
-      "gender",
-      "seeks",
-      "age_window",
-      "pond",
       "terms",
       "privacy",
+      "name",
+      "gender",
+      "seeks",
+      "intent",
+      "age_window",
+      "photos",
+      "prompts_or_bio",
+      "pond",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
 
     // The wording moved on: an active account that is asked for the terms again, and only for them.
     const kerttu = await as("kerttu");
-    expect(kerttu.onboarding).toMatchObject({ state: "active", missing: ["terms"] });
+    expect(kerttu.onboarding).toMatchObject({ state: "active", missing: ["terms", "photos"] });
     const { rows: older } = await ctx.client.query<{ version: string }>(
       `SELECT c.version FROM consent c JOIN account a ON a.id = c.account_id
        JOIN identity i ON i.id = a.identity_id WHERE i.broker_subject = 'kerttu' AND c.kind = 'terms'`,
@@ -732,7 +738,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     // The statements go where nothing of the persona is: they meet no row.
     const elsewhere = { query: async () => ({ rows: [], rowCount: 0 }) };
     await expect(
-      giveHistory(kerttu, { ...context, db: elsewhere as unknown as typeof context.db }),
+      giveHistory(kerttu, viaRoutes({ ...context, db: elsewhere as unknown as typeof context.db })),
     ).rejects.toThrow(DemoError);
   });
 
@@ -741,7 +747,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
   }) => {
     const { bank, context, logger } = await world(ctx);
     const now = () => new Date();
-    for (const history of PERSONA_HISTORIES) await giveHistory(history, context);
+    for (const history of PERSONA_HISTORIES) await giveHistory(history, viaRoutes(context));
     await loginAs(persona("aino"), bank);
     // Somebody who is no persona, at the same bank.
     const other = await loginAs({ ...persona("mikael"), key: "somebody", individual: 950 }, bank);

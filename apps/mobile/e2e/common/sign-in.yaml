@@ -1,0 +1,17 @@
+# Sign in at the mock bank as a persona of the demo cast (#164, ADR-020).
+# Starts from wherever the app is: signed in, it signs out first, so a flow
+# always begins where a new person does. The persona is named as the mock
+# bank's page names them (packages/db/src/seed/personas.ts, given + family),
+# Sanna Korhonen unless the caller passes PERSONA. The default is written as a
+# fallback, not an env header: a header would override what the caller passes.
+appId: fi.kuutti.app
+---
+- runFlow: open-app.yaml
+- runFlow: sign-out.yaml
+- runFlow:
+    file: bank-login.yaml
+    env:
+      PERSONA: ${PERSONA || "Sanna Korhonen"}
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    timeout: 30000

@@ -1,7 +1,7 @@
 {
   "name": "kuutti",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "description": "Kuutti monorepo root. Workspace members arrive with the M1 scaffold (#2).",
   "license": "SEE LICENSE IN LICENSE-EXCEPTION",
@@ -23,20 +23,24 @@
     "format": "biome format --write .",
     "test": "pnpm -r run test",
     "check:scenarios": "node scripts/check-scenarios.ts",
+    "e2e": "node scripts/e2e.ts",
     "i18n:build": "pnpm --filter @kuutti/i18n run build",
     "i18n:check": "pnpm --filter @kuutti/i18n run check",
     "i18n:translate": "pnpm --filter @kuutti/i18n translate",
     "i18n:review": "pnpm --filter @kuutti/i18n run review",
     "openapi": "pnpm --filter @kuutti/api openapi",
     "check:schema-words": "node scripts/check-schema-words.ts",
+    "check:version": "node scripts/check-version.ts",
     "check:licenses": "node scripts/check-licenses.ts",
     "demo:bank": "node packages/db/src/cli/demo-bank.ts",
     "demo:population": "pnpm --filter @kuutti/api run demo:population",
-    "demo:reset": "pnpm --filter @kuutti/api run demo:reset"
+    "demo:reset": "pnpm --filter @kuutti/api run demo:reset",
+    "demo:stories": "pnpm --filter @kuutti/api run demo:stories",
+    "demo:assets": "pnpm --filter @kuutti/api run demo:assets"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
-    "eas-cli": "24.8.0"
+    "eas-cli": "24.11.0"
   },
   "dependencies": {
     "zod": "^4.6.5"

@@ -1,79 +1,77 @@
-import { describe, expect, it } from "vitest";
-import { BrokerError, HETU_CLAIM } from "./broker.ts";
-import { identityFromClaims, registeredCallbackUrl } from "./oidc-broker.ts";
+import { randomBytes } from "node:crypto";
+import { ACR_LOATEST2 } from "@kuutti/tunnistus-oidc";
+import { type FakeTelia, fakeTelia, TELIA_ISSUER } from "@kuutti/tunnistus-oidc/testing";
+import { beforeEach, describe, expect, it } from "vitest";
+import { BrokerError } from "./broker.ts";
+import { OidcBroker } from "./oidc-broker.ts";
 
-// The two decisions of the adapter that do not need a provider: which URL the
-// token request names as redirect_uri, and which ID tokens count as a login.
+// What the adapter adds to the kit (ADR-017): the dialect itself is proven in
+// packages/tunnistus-oidc; here only Kuutti's part of a login is checked.
 
-const LOA = "http://ftn.ficora.fi/2017/loatest2";
-const claims = (overrides: Record<string, unknown> = {}) => ({
-  iss: "https://tunnistus-pp.telia.fi/uas",
-  sub: "2BY5CDNFBEOSUFSKNGFSY4Y3DZISGL4I",
-  aud: "kuutti",
-  exp: 1_800_000_000,
-  iat: 1_799_999_000,
-  [HETU_CLAIM]: "290793V6787",
-  acr: LOA,
-  amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1", 7],
-  ...overrides,
-});
+const random = () => randomBytes(24).toString("base64url");
 
-/** The reason a BrokerError carries; the message itself is the generic one. */
-function detailOf(fn: () => unknown): unknown {
-  try {
-    fn();
-  } catch (error) {
-    if (error instanceof BrokerError) return (error.detail as { detail: string }).detail;
-    throw error;
-  }
-  throw new Error("did not throw");
+async function brokerFor(telia: FakeTelia) {
+  return OidcBroker.create({
+    issuer: TELIA_ISSUER,
+    clientId: telia.clientId,
+    redirectUri: telia.redirectUri,
+    acrValues: ACR_LOATEST2,
+    signingKeyPem: telia.signingKeyPem,
+    encryptionKeyPem: telia.encryptionKeyPem,
+    fetch: telia.fetch,
+  });
 }
 
-describe("registeredCallbackUrl", () => {
-  it("names the registered redirect_uri, whatever Host and scheme the proxy passed on", () => {
-    const seen = new URL("http://api.staging.kuutti.app/auth/callback?code=abc&state=xyz");
-    const url = registeredCallbackUrl("https://api.staging.kuutti.app/auth/callback", seen);
-    expect(url.origin + url.pathname).toBe("https://api.staging.kuutti.app/auth/callback");
-    expect(url.searchParams.get("code")).toBe("abc");
-    expect(url.searchParams.get("state")).toBe("xyz");
-    const forged = new URL("http://evil.example/other/path?code=abc&state=xyz");
-    expect(registeredCallbackUrl("https://api.kuutti.app/auth/callback", forged).host).toBe(
-      "api.kuutti.app",
-    );
-  });
-});
+async function login(broker: OidcBroker, telia: FakeTelia) {
+  const state = random();
+  const nonce = random();
+  const back = await telia.authorize(await broker.startLogin({ state, nonce, locale: "fi" }));
+  return broker.completeLogin({ callbackUrl: back, state, nonce });
+}
 
-describe("identityFromClaims", () => {
-  it("keeps the hetu, subject, level and methods; auth_time falls back to iat", () => {
-    const identity = identityFromClaims(claims({ session_index: "_cb08", jti: "72b1" }), null);
-    expect(identity).toEqual({
-      hetu: "290793V6787",
+describe("OidcBroker, the adapter over @kuutti/tunnistus-oidc", () => {
+  let telia: FakeTelia;
+  beforeEach(async () => {
+    telia = await fakeTelia();
+  });
+
+  it("asks the bank every time (ADR-016) and keeps of the answer what the callback may hold, no name or date of birth", async () => {
+    const broker = await brokerFor(telia);
+    const answer = await login(broker, telia);
+    expect(telia.seen.requestObject).toMatchObject({ prompt: "login", ui_locales: "fi" });
+    expect(answer).toMatchObject({
+      hetu: "010170-999R",
       subject: "2BY5CDNFBEOSUFSKNGFSY4Y3DZISGL4I",
-      sessionIndex: "_cb08",
-      tokenId: "72b1",
-      authenticatedAt: new Date(1_799_999_000 * 1000),
-      acr: LOA,
-      amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1"],
+      acr: ACR_LOATEST2,
     });
-    expect(identityFromClaims(claims({ auth_time: 1_799_999_500 }), null).authenticatedAt).toEqual(
-      new Date(1_799_999_500 * 1000),
+    expect(Object.keys(answer).sort()).toEqual(
+      ["acr", "amr", "authenticatedAt", "hetu", "sessionIndex", "subject", "tokenId"].sort(),
     );
+    expect(JSON.stringify(answer)).not.toContain("Äyrämö");
+    expect(JSON.stringify(answer)).not.toContain("1970-01-01");
   });
 
-  it("accepts only the level that was asked for", () => {
-    const expected = new Set([LOA, "http://ftn.ficora.fi/2017/loa2"]);
-    expect(identityFromClaims(claims(), expected).acr).toBe(LOA);
-    expect(() => identityFromClaims(claims({ acr: "mpki.telia.emulator.1" }), expected)).toThrow(
-      BrokerError,
-    );
-    expect(detailOf(() => identityFromClaims(claims({ acr: undefined }), expected))).toBe("no acr");
-    expect(() => identityFromClaims(claims({ acr: "anything" }), null)).not.toThrow();
+  it("turns the kit's refusal into the API's error with the reason as its detail", async () => {
+    const broker = await brokerFor(telia);
+    telia.misbehave = { omitHetu: true };
+    await expect(login(broker, telia)).rejects.toBeInstanceOf(BrokerError);
+    telia.misbehave = { omitHetu: true };
+    await expect(login(broker, telia)).rejects.toMatchObject({
+      detail: { detail: "no identity code" },
+    });
   });
 
-  it("refuses a token without an identity code", () => {
-    expect(() => identityFromClaims(claims({ [HETU_CLAIM]: "" }), null)).toThrow(BrokerError);
-    expect(detailOf(() => identityFromClaims(claims({ [HETU_CLAIM]: undefined }), null))).toBe(
-      "no identity code",
-    );
+  it("does not boot against a Telia issuer without both keys, naming the parameters", async () => {
+    await expect(
+      OidcBroker.create({
+        issuer: TELIA_ISSUER,
+        clientId: telia.clientId,
+        redirectUri: telia.redirectUri,
+        acrValues: ACR_LOATEST2,
+        signingKeyPem: telia.signingKeyPem,
+        encryptionKeyPem: null,
+        fetch: telia.fetch,
+      }),
+    ).rejects.toThrow(/TELIA_SIGNING_KEY and TELIA_ENCRYPTION_KEY/);
   });
 });

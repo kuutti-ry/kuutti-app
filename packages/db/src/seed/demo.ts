@@ -6,12 +6,14 @@
 export { renderBankPage } from "./bank-page.ts";
 export {
   assertDemoTarget,
+  assertStagingProcess,
   DEMO_ENVIRONMENTS,
   type DemoCommand,
   DemoCommandError,
   type DemoEnvironment,
   type DemoTarget,
   describeTarget,
+  NEVER_GIVEN_ON_STAGING,
   parseDemoCommand,
 } from "./command.ts";
 export {
@@ -31,6 +33,22 @@ export {
   personaClaims,
   personaHetu,
 } from "./personas.ts";
+export {
+  type AssetProblem,
+  assetsFor,
+  demoAssetsDir,
+  facesForPopulation,
+  manifestOf,
+  negativesOf,
+  PHOTOS_RELEASE,
+  PHOTOS_REPO,
+  type PhotoAsset,
+  type PhotoPurpose,
+  purposeOf,
+  renderManifest,
+  verifyAssets,
+} from "./photos.ts";
+export { PHOTOS_MANIFEST } from "./photos-manifest.ts";
 export {
   apportion,
   DEMO_EPOCH,

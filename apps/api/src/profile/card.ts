@@ -1,5 +1,12 @@
 import type { Queryable } from "@kuutti/db";
-import type { CardPhoto, Completeness, ProfileCard, ProfileUpdate } from "@kuutti/schema";
+import {
+  type CardPhoto,
+  type Completeness,
+  cardFields,
+  type ProfileCard,
+  type ProfileFields,
+  type ProfileUpdate,
+} from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
@@ -24,12 +31,45 @@ export type PreferenceReader = (
 
 export const noPreferencesYet: PreferenceReader = async () => ({ seeks: null, ageWindow: null });
 
+/** The special-category consent as the identity slice's consent rows hold it (ADR-019 §4, #204); without a reader nothing special is stored and the document echoes none. */
+export type SpecialCategoryConsent = { version: string; givenAt: Date } | null;
+export type ConsentReader = (db: Queryable, accountId: string) => Promise<SpecialCategoryConsent>;
+
+export const noConsentYet: ConsentReader = async () => null;
+
 export type CardDeps = {
   db: Queryable;
   logger: Logger;
   now: () => Date;
   readPreferences?: PreferenceReader;
+  specialCategoryConsent?: ConsentReader;
 };
+
+/**
+ * What both the viewer and the subject answered (#150): the hobbies and
+ * languages the card marks "you too". Computed at build time from the two
+ * documents, never stored, never a count or a score (the matching
+ * document's invariant 6); nothing for the owner's own preview.
+ */
+export function sharedAnswers(
+  viewer: ProfileFields | null,
+  subject: ProfileFields,
+): ProfileCard["shared"] {
+  const both = (key: "hobbies" | "languages"): string[] => {
+    const mine: readonly string[] = viewer?.[key] ?? [];
+    const theirs: readonly string[] = subject[key] ?? [];
+    return theirs.filter((option) => mine.includes(option));
+  };
+  if (!viewer) return { hobbies: [], languages: [] };
+  return { hobbies: both("hobbies"), languages: both("languages") };
+}
+
+/** The card's fields: the info and hard ones (ADR-019 §2), less the field of study when the person hides it (#150). */
+export function fieldsOnCard(fields: ProfileFields): ProfileFields {
+  const out: Record<string, unknown> = { ...cardFields(fields) };
+  if (fields.hideFromField === true) delete out.field;
+  return out as ProfileFields;
+}
 
 /** Whole years from the bank-verified year and month, by the Finnish calendar (rule 3: never a day). */
 export function ageInYears(birthYear: number, birthMonth: number, at: Date): number {
@@ -82,9 +122,11 @@ export async function buildCard(
   if (!own && subject.state !== "active") {
     throw new AppError(404, "not_found", "No such card");
   }
-  const [photos, pond] = await Promise.all([
+  const [photos, pond, viewer] = await Promise.all([
     listApprovedPhotos(deps.db, subject.accountId),
     findPondOfAccount(deps.db, subject.accountId),
+    // The viewer's own answers, for what both answered; the owner previews without.
+    own ? null : repo.findProfile(deps.db, input.viewerAccountId),
   ]);
   const done = await completenessOf(deps, subject.accountId, subject.profile, photos.length);
   const at = deps.now();
@@ -140,12 +182,15 @@ export async function buildCard(
       accountId: subject.accountId,
       displayName: subject.profile.displayName,
       age: { years: ageInYears(subject.birthYear, subject.birthMonth, at), verifiedByBank: true },
+      gender: subject.gender,
       pond,
       photos: cardPhotos,
-      fields: subject.profile.fields,
+      // What is there to be seen and what both sides matched on; a soft value or a setting stays on the profile (ADR-019 §2).
+      fields: fieldsOnCard(subject.profile.fields),
       bio: subject.profile.bio,
       bioPreset: subject.profile.bioPreset,
       prompts: subject.profile.prompts,
+      shared: sharedAnswers(viewer?.fields ?? null, subject.profile.fields),
     },
     completeness: done,
   };

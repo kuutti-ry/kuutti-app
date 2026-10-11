@@ -18,11 +18,27 @@ const KEY = "kuutti.session";
 
 let memory: StoredSession | null = null;
 
+/**
+ * A session belongs to the device that signed in through the bank (#35, TD-1):
+ * an iOS keychain item with the default accessibility is restored onto a new
+ * iPhone from an encrypted backup or a device transfer, and the new phone would
+ * resume the ninety-day session without the bank. THIS_DEVICE_ONLY keeps the
+ * item out of backups and transfers; Android's Keystore never backs its keys
+ * up, so this changes nothing there. The security review of 10/10/2026.
+ *
+ * The item is deleted before every write: the keychain keeps an existing
+ * item's accessibility on an update (SecItemUpdate rewrites the value only),
+ * so a pair stored before this rule would stay migratable for its ninety
+ * days. A delete on a missing item is not an error; a crash between the two
+ * calls costs the local pair, which a bank login replaces.
+ */
+const THIS_DEVICE = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
+
 async function persist(session: StoredSession | null): Promise<void> {
   memory = session;
   if (Platform.OS === "web") return;
-  if (session === null) await SecureStore.deleteItemAsync(KEY);
-  else await SecureStore.setItemAsync(KEY, JSON.stringify(session));
+  await SecureStore.deleteItemAsync(KEY);
+  if (session !== null) await SecureStore.setItemAsync(KEY, JSON.stringify(session), THIS_DEVICE);
 }
 
 /** Loaded once at start; a value that does not parse is treated as no session. */
@@ -115,7 +131,10 @@ let pendingInMemory: string | null = null;
 export async function markLoginStarted(now = Date.now()): Promise<void> {
   const value = String(now);
   pendingInMemory = value;
-  if (Platform.OS !== "web") await SecureStore.setItemAsync(PENDING_KEY, value);
+  if (Platform.OS !== "web") {
+    await SecureStore.deleteItemAsync(PENDING_KEY);
+    await SecureStore.setItemAsync(PENDING_KEY, value, THIS_DEVICE);
+  }
 }
 
 /** True once per started login: reading it clears it. */

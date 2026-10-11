@@ -1,5 +1,5 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import type { AccountExport, ConsentsResponse } from "@kuutti/schema";
+import type { AccountExport, ConsentsResponse, WithdrawableConsentKind } from "@kuutti/schema";
 import { useCallback, useEffect, useState } from "react";
 import { Platform, Share, View } from "react-native";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { consentLocale, fetchConsents, giveConsent, withdrawResearch } from "./onboarding/client";
+import { consentLocale, fetchConsents, giveConsent, withdrawConsent } from "./onboarding/client";
 import { useSession } from "./session";
 
 /** Days before the same person may register again (TD-7); the API's constant, repeated for the text. */
@@ -51,33 +51,37 @@ export async function shareExport(
   await share({ title, message: json });
 }
 
-type ResearchState = "loading" | "unavailable" | "on" | "off" | "outdated";
+type ConsentState = "loading" | "unavailable" | "on" | "off" | "outdated";
 
-const bundledResearchVersion = (): string => CONSENT_VERSIONS.research ?? "";
+const bundledVersion = (kind: WithdrawableConsentKind): string => CONSENT_VERSIONS[kind] ?? "";
 
 /**
- * The research opt-in as a switch on the account card (#46, ADR-010 §4): on
- * when an active research consent names the current wording, off otherwise;
- * a change is a POST or a DELETE, both answered with the consents as stored.
- * When the wording built into this app is older than the API's, the switch
- * is locked with the "update the app" line: no consent for a text this app
- * never showed.
+ * A withdrawable consent as a switch on the account card (#46, #146, ADR-010
+ * §4): on when an active consent of the kind names the current wording, off
+ * otherwise; a change is a POST or a DELETE, both answered with the consents
+ * as stored. When the wording built into this app is older than the API's,
+ * the switch is locked with the "update the app" line: no consent for a text
+ * this app never showed. Withdrawing the special-category consent takes the
+ * seek answer with it, and onboarding asks it again (ADR-019 §4).
  */
-function useResearchOptIn(signedIn: boolean, locale: string) {
-  const [state, setState] = useState<ResearchState>("loading");
+function useConsentSwitch(kind: WithdrawableConsentKind, signedIn: boolean, locale: string) {
+  const [state, setState] = useState<ConsentState>("loading");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const apply = useCallback((consents: ConsentsResponse) => {
-    const current = consents.currentVersions.research;
-    if (bundledResearchVersion() !== current) {
-      setState("outdated");
-      return;
-    }
-    const active = consents.consents.some(
-      (c) => c.kind === "research" && c.withdrawnAt === null && c.version === current,
-    );
-    setState(active ? "on" : "off");
-  }, []);
+  const apply = useCallback(
+    (consents: ConsentsResponse) => {
+      const current = consents.currentVersions[kind];
+      if (bundledVersion(kind) !== current) {
+        setState("outdated");
+        return;
+      }
+      const active = consents.consents.some(
+        (c) => c.kind === kind && c.withdrawnAt === null && c.version === current,
+      );
+      setState(active ? "on" : "off");
+    },
+    [kind],
+  );
   useEffect(() => {
     if (!signedIn) return;
     let live = true;
@@ -95,8 +99,8 @@ function useResearchOptIn(signedIn: boolean, locale: string) {
       try {
         apply(
           on
-            ? await giveConsent("research", bundledResearchVersion(), consentLocale(locale))
-            : await withdrawResearch(),
+            ? await giveConsent(kind, bundledVersion(kind), consentLocale(locale))
+            : await withdrawConsent(kind),
         );
       } catch {
         setFailed(true);
@@ -104,9 +108,47 @@ function useResearchOptIn(signedIn: boolean, locale: string) {
         setBusy(false);
       }
     },
-    [apply, locale],
+    [apply, kind, locale],
   );
   return { state, busy, failed, set };
+}
+
+function ConsentSwitch({
+  consent,
+  label,
+  explain,
+}: {
+  consent: ReturnType<typeof useConsentSwitch>;
+  label: string;
+  explain: string;
+}) {
+  const { t } = useT();
+  const tap = useHapticTap();
+  if (consent.state !== "on" && consent.state !== "off" && consent.state !== "outdated") {
+    return null;
+  }
+  return (
+    <View className="gap-2">
+      <View className="flex-row items-center justify-between gap-3">
+        <Text className="flex-1">{label}</Text>
+        <Switch
+          accessibilityLabel={label}
+          checked={consent.state === "on"}
+          disabled={consent.busy || consent.state === "outdated"}
+          onCheckedChange={(on) => {
+            tap();
+            void consent.set(on);
+          }}
+        />
+      </View>
+      <Text variant="muted">
+        {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : explain}
+      </Text>
+      {consent.failed && (
+        <Text accessibilityLiveRegion="assertive">{t("account.research.failed")}</Text>
+      )}
+    </View>
+  );
 }
 
 /**
@@ -122,7 +164,8 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
   const [busy, setBusy] = useState<Busy>({ kind: "idle" });
   const [notice, setNotice] = useState<Notice>(null);
   const [confirming, setConfirming] = useState(false);
-  const research = useResearchOptIn(session.status === "signed-in", locale);
+  const research = useConsentSwitch("research", session.status === "signed-in", locale);
+  const special = useConsentSwitch("special_category", session.status === "signed-in", locale);
 
   if (session.status !== "signed-in") return null;
 
@@ -175,32 +218,16 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
                 : t("account.delete.working")}
             </Text>
           )}
-          {(research.state === "on" ||
-            research.state === "off" ||
-            research.state === "outdated") && (
-            <View className="gap-2">
-              <View className="flex-row items-center justify-between gap-3">
-                <Text className="flex-1">{t("account.research.label")}</Text>
-                <Switch
-                  accessibilityLabel={t("account.research.label")}
-                  checked={research.state === "on"}
-                  disabled={research.busy || research.state === "outdated"}
-                  onCheckedChange={(on) => {
-                    tap();
-                    void research.set(on);
-                  }}
-                />
-              </View>
-              <Text variant="muted">
-                {research.state === "outdated"
-                  ? t("onboarding.consents.outdatedApp")
-                  : t("account.research.explain")}
-              </Text>
-              {research.failed && (
-                <Text accessibilityLiveRegion="assertive">{t("account.research.failed")}</Text>
-              )}
-            </View>
-          )}
+          <ConsentSwitch
+            consent={research}
+            label={t("account.research.label")}
+            explain={t("account.research.explain")}
+          />
+          <ConsentSwitch
+            consent={special}
+            label={t("account.specialCategory.label")}
+            explain={t("account.specialCategory.explain")}
+          />
           <Button
             variant="outline"
             accessibilityLabel={t("account.export.button")}

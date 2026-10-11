@@ -20,7 +20,12 @@ describe("the words of the synthetic population", () => {
     for (const person of generatePopulation()) {
       if (!person.profile) continue;
       const { displayName, bio, fields, prompts } = person.profile;
-      for (const text of [displayName, bio, fields.campus, ...prompts.map((p) => p.answer)]) {
+      for (const text of [
+        displayName,
+        bio,
+        fields.occupationTitle,
+        ...prompts.map((p) => p.answer),
+      ]) {
         if (text != null) expect(contactDetailsIn(text), `${person.label}: ${text}`).toBeNull();
       }
     }

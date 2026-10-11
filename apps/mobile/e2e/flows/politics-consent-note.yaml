@@ -1,0 +1,42 @@
+# The parties screen (#204, #213): it names the sensitive-answers consent the
+# person gave with whom they seek and where to withdraw it, with no second
+# switch, and lists the ten parties with the Pirate Party, "none of them" and
+# the coffee party, with a search box. The note's button opens Settings at
+# the switch. Sanna consented at the seek step; nothing is saved.
+appId: fi.kuutti.app
+name: The parties screen names the consent and where to withdraw it, with no switch of its own
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/later/politics
+- extendedWaitUntil:
+    visible: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Stored under the sensitive-answers consent you gave when you signed up\\..*|Tallennetaan arkaluonteisten vastausten suostumuksella, jonka annoit rekisteröityessäsi\\..*|Lagras under det samtycke till känsliga svar du gav när du registrerade dig\\..*"
+- assertNotVisible: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
+- assertVisible: "Search|Hae|Sök"
+- assertVisible: "Centre Party|Keskusta|Centern"
+- assertVisible: "National Coalition Party|Kokoomus|Samlingspartiet"
+- assertVisible: "Christian Democrats|Kristillisdemokraatit|Kristdemokraterna"
+- assertVisible: "Movement Now|Liike Nyt|Rörelse Nu"
+- assertVisible: "Finns Party|Perussuomalaiset|Sannfinländarna"
+- assertVisible: "Pirate Party|Piraattipuolue|Piratpartiet"
+- assertVisible: "Swedish People's Party|RKP|SFP"
+- assertVisible: "Social Democrats|SDP|Socialdemokraterna"
+- assertVisible: "Left Alliance|Vasemmistoliitto|Vänsterförbundet"
+- assertVisible: "Greens|Vihreät|De Gröna"
+- scrollUntilVisible:
+    element: "The Coffee Party|Kahvipuolue|Kaffepartiet"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "None of them|Ei mikään näistä|Inget av dem"
+# The note's button: Settings, at the one switch.
+- scrollUntilVisible:
+    element: "Settings|Asetukset|Inställningar"
+    direction: UP
+    centerElement: true
+- tapOn: "Settings|Asetukset|Inställningar"
+- scrollUntilVisible:
+    element: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+    direction: DOWN
+    centerElement: true

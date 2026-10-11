@@ -1,0 +1,46 @@
+# The text rule (#47, TD-6): contact details come after a match, so a bio with
+# a phone number is refused with the reason, and nothing is stored. Leaving
+# with the unsaved edit asks first. Sanna's bio is untouched afterwards.
+appId: fi.kuutti.app
+name: A phone number in the bio is refused with the reason, and the stored bio stays
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "Your profile|Profiilisi|Din profil"
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Arkkitehti, joka piirtää.*"
+    direction: DOWN
+    centerElement: true
+# Typed into the bio where the tap puts the cursor: a number anywhere in it is refused.
+- tapOn: "Arkkitehti, joka piirtää.*"
+- inputText: " Soita minulle 040 123 4567, niin sovitaan retki Nuuksioon. "
+# The profile is ten screens long; Save is at its end.
+- scrollUntilVisible:
+    element: "Save|Tallenna|Spara"
+    direction: DOWN
+    centerElement: true
+    speed: 80
+    timeout: 60000
+- tapOn: "Save|Tallenna|Spara"
+- extendedWaitUntil:
+    visible: "Your text has an e-mail address, a link, a phone number or a social media handle\\. Those come after a match\\.|Tekstissäsi on sähköpostiosoite, linkki, puhelinnumero tai somekäyttäjänimi\\. Ne tulevat mätsin jälkeen\\.|Din text har en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier\\. De kommer efter en match\\."
+    timeout: 15000
+
+# Away with the edit unsaved: asked first, then left.
+- openLink: kuutti://profile/card
+- runFlow:
+    when:
+      visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
+    commands:
+      - tapOn: "Leave without saving|Poistu tallentamatta|Lämna utan att spara"
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Arkkitehti, joka piirtää.*"
+    direction: DOWN
+    centerElement: true
+- assertNotVisible: ".*040 123 4567.*"

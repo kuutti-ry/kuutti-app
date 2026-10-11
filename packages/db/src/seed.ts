@@ -4,7 +4,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "./pool.ts";
 import { account, identity, matchingConfig, ponds, preferences, profile } from "./schema/index.ts";
 
-/** Otaniemi first, then the city, then the region (project context §1). */
+/**
+ * One pond for now, the capital region (#146, ADR-010 §10 and §11): everybody
+ * is in Pääkaupunkiseutu, assigned by the API from matching_config.default_pond,
+ * and the pond step does not exist. The postal-code ponds of the field sheet
+ * come later; the tree (parent_id) is ready for them.
+ */
 export const SEED_PONDS = [
   {
     slug: "paakaupunkiseutu",
@@ -12,8 +17,13 @@ export const SEED_PONDS = [
     nameInessive: "Pääkaupunkiseudulla",
     parent: null,
   },
-  { slug: "espoo", nameNominative: "Espoo", nameInessive: "Espoossa", parent: "paakaupunkiseutu" },
-  { slug: "otaniemi", nameNominative: "Otaniemi", nameInessive: "Otaniemessä", parent: "espoo" },
+  // The rest of the country, a sibling of the capital region (#174, ADR-010 §12); migration 0027 writes the same row.
+  {
+    slug: "suomi",
+    nameNominative: "Suomi",
+    nameInessive: "Suomessa",
+    parent: null,
+  },
 ] as const;
 
 /**
@@ -56,6 +66,25 @@ export const MATCHING_CONFIG_V1 = {
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,
+  // #146 (ADR-010 §10): the pond every account is put in when it has none;
+  // the slug of a row in ponds. Version 2 names another (below); null once
+  // people choose among several.
+  default_pond: "suomi",
+  // #147 (the field sheet, ADR-015 §9): a change of gender or of whom one
+  // seeks is possible once in this many days, effective from the next count.
+  change_cadence_days: 30,
+  // #149 (TD-16, the disclose-to-filter rule): how many deal-breakers a person
+  // may set; two at launch, so a small pond is not cut to nothing.
+  deal_breakers_max: 2,
+} as const;
+
+/**
+ * matching_config version 2 (ADR-010 §11, migration 0025): the one pond is the
+ * capital region. Version 1 keeps its row as migration 0020 wrote it; the
+ * latest version of a key wins (apps/api/src/lib/matching-config.ts).
+ */
+export const MATCHING_CONFIG_V2 = {
+  default_pond: "paakaupunkiseutu",
 } as const;
 
 /**
@@ -79,7 +108,7 @@ export const SEED_IDENTITIES = [
 export const SEED_PROFILE = {
   displayName: "Seed",
   bio: "A seeded profile for local development: long enough to count as a bio, short enough to read.",
-  fields: { languages: ["fi", "en"], intent: "long_term", campus: "Otaniemi" },
+  fields: { languages: ["fi", "en"], intent: "long_term", occupationTitle: "Seed gardener" },
   prompts: [{ key: "sunday", answer: "Sauna, then a long breakfast." }],
 } as const;
 
@@ -115,14 +144,19 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
       });
   }
 
-  for (const [key, value] of Object.entries(MATCHING_CONFIG_V1)) {
-    await db
-      .insert(matchingConfig)
-      .values({ version: 1, key, value, createdBy })
-      .onConflictDoUpdate({
-        target: [matchingConfig.key, matchingConfig.version],
-        set: { value },
-      });
+  for (const [version, rows] of [
+    [1, MATCHING_CONFIG_V1],
+    [2, MATCHING_CONFIG_V2],
+  ] as const) {
+    for (const [key, value] of Object.entries(rows)) {
+      await db
+        .insert(matchingConfig)
+        .values({ version, key, value, createdBy })
+        .onConflictDoUpdate({
+          target: [matchingConfig.key, matchingConfig.version],
+          set: { value },
+        });
+    }
   }
 
   const now = Date.now();
@@ -160,13 +194,13 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
       if (current) {
         // Onboarding (#46): gender, pond and the two hard rows; the consents
         // are left for the flow to ask, so the screens can be tried locally.
-        const [otaniemi] = await db
+        const [pond] = await db
           .select({ id: ponds.id })
           .from(ponds)
-          .where(eq(ponds.slug, "otaniemi"));
+          .where(eq(ponds.slug, MATCHING_CONFIG_V2.default_pond));
         await db
           .update(account)
-          .set({ gender: "woman", pondId: otaniemi?.id ?? null })
+          .set({ gender: "woman", pondId: pond?.id ?? null })
           .where(eq(account.id, current.id));
         for (const [field, value] of [
           ["seeks", ["man", "non_binary"]],
@@ -204,7 +238,7 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
 
   return {
     ponds: SEED_PONDS.length,
-    matchingConfig: Object.keys(MATCHING_CONFIG_V1).length,
+    matchingConfig: Object.keys(MATCHING_CONFIG_V1).length + Object.keys(MATCHING_CONFIG_V2).length,
     identities: SEED_IDENTITIES.length,
   };
 }

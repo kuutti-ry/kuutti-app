@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { pondName } from "./names";
 import { useWaitlist } from "./useWaitlist";
 
 /**
@@ -12,7 +13,8 @@ import { useWaitlist } from "./useWaitlist";
  * public counter, in words. Below the threshold no number is said, here as
  * everywhere, and the card says why the numbers stand still for a while: they
  * move in steps of at least k people. The pond's name stands on a line of its
- * own, in the nominative: no sentence is built around it (TD-17).
+ * own, in the nominative and in the person's language (#174): no sentence is
+ * built around it (TD-17).
  */
 export function WaitlistCard({ pond }: { pond: PondSummary }) {
   const { t } = useT();
@@ -25,7 +27,7 @@ export function WaitlistCard({ pond }: { pond: PondSummary }) {
       <View accessibilityLabel={t("pond.waitlist.label")} className="gap-6">
         <CardHeader>
           <CardDescription>{t("pond.waitlist.title")}</CardDescription>
-          <CardTitle>{pond.name}</CardTitle>
+          <CardTitle>{pondName(t, pond)}</CardTitle>
         </CardHeader>
         <CardContent className="gap-2">
           {waitlist.status === "loading" && (

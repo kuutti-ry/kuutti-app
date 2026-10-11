@@ -6,13 +6,14 @@ export {
   admissionAnew,
   admit,
   admitsAlone,
-  contestedGroup,
+  competeAlike,
+  contestsOf,
   type Declared,
   deleteGateOfAccount,
   exportGate,
   GATE_EMPTIED,
   type GateRow,
-  joinsAGroupThatWaits,
+  joinsAContest,
   neededFrom,
   placeAlone,
   readGateRow,
@@ -20,7 +21,7 @@ export {
   sayPlace,
   sayPool,
 } from "./gate.ts";
-export { findPondOfAccount, listPonds } from "./repo.ts";
+export { findPondBySlug, findPondOfAccount, listPonds, setPondOfAccount } from "./repo.ts";
 export { type GateReader, pondRoutes } from "./routes.ts";
 export {
   readStandingFigures,

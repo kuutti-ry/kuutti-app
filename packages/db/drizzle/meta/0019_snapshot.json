@@ -1,5 +1,5 @@
 {
-  "id": "a7ce51d1-c97d-4439-9825-5154a5a04999",
+  "id": "781a3941-b9ad-46d3-bde5-a71999896fc7",
   "prevId": "a93ecc96-9f3c-4e2f-9fcd-121e5bb36725",
   "version": "7",
   "dialect": "postgresql",
@@ -86,10 +86,10 @@
             }
           ],
           "isUnique": true,
-          "with": {},
-          "method": "btree",
           "where": "\"account\".\"state\" <> 'deleted'",
-          "concurrently": false
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "account_state_idx": {
           "name": "account_state_idx",
@@ -102,37 +102,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "account_identity_id_identity_id_fk": {
           "name": "account_identity_id_identity_id_fk",
           "tableFrom": "account",
+          "tableTo": "identity",
           "columnsFrom": [
             "identity_id"
           ],
-          "tableTo": "identity",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "account_pond_id_ponds_id_fk": {
           "name": "account_pond_id_ponds_id_fk",
           "tableFrom": "account",
+          "tableTo": "ponds",
           "columnsFrom": [
             "pond_id"
           ],
-          "tableTo": "ponds",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -210,34 +210,34 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "admin_session_identity_id_identity_id_fk": {
           "name": "admin_session_identity_id_identity_id_fk",
           "tableFrom": "admin_session",
+          "tableTo": "identity",
           "columnsFrom": [
             "identity_id"
           ],
-          "tableTo": "identity",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "admin_session_access_hash_unique": {
           "name": "admin_session_access_hash_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "access_hash"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -311,9 +311,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "audit_log_actor_at_idx": {
           "name": "audit_log_actor_at_idx",
@@ -332,24 +332,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "audit_log_actor_identity_id_identity_id_fk": {
           "name": "audit_log_actor_identity_id_identity_id_fk",
           "tableFrom": "audit_log",
+          "tableTo": "identity",
           "columnsFrom": [
             "actor_identity_id"
           ],
-          "tableTo": "identity",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -455,54 +455,54 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "auth_request_account_id_account_id_fk": {
           "name": "auth_request_account_id_account_id_fk",
           "tableFrom": "auth_request",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "auth_request_identity_id_identity_id_fk": {
           "name": "auth_request_identity_id_identity_id_fk",
           "tableFrom": "auth_request",
+          "tableTo": "identity",
           "columnsFrom": [
             "identity_id"
           ],
-          "tableTo": "identity",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "auth_request_state_unique": {
           "name": "auth_request_state_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "state"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "auth_request_code_hash_unique": {
           "name": "auth_request_code_hash_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "code_hash"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -558,9 +558,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "card_shown_photo_idx": {
           "name": "card_shown_photo_idx",
@@ -573,37 +573,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "card_shown_account_id_account_id_fk": {
           "name": "card_shown_account_id_account_id_fk",
           "tableFrom": "card_shown",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "card_shown_photo_id_photo_id_fk": {
           "name": "card_shown_photo_id_photo_id_fk",
           "tableFrom": "card_shown",
+          "tableTo": "photo",
           "columnsFrom": [
             "photo_id"
           ],
-          "tableTo": "photo",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -680,24 +680,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "consent_account_id_account_id_fk": {
           "name": "consent_account_id_account_id_fk",
           "tableFrom": "consent",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -759,28 +759,28 @@
         "gate_account_id_account_id_fk": {
           "name": "gate_account_id_account_id_fk",
           "tableFrom": "gate",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
         "gate_pond_id_ponds_id_fk": {
           "name": "gate_pond_id_ponds_id_fk",
           "tableFrom": "gate",
+          "tableTo": "ponds",
           "columnsFrom": [
             "pond_id"
           ],
-          "tableTo": "ponds",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -913,9 +913,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -923,10 +923,10 @@
       "uniqueConstraints": {
         "identity_hetu_hmac_unique": {
           "name": "identity_hetu_hmac_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "hetu_hmac"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -994,9 +994,9 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -1042,15 +1042,15 @@
         "moderator_roles_identity_id_identity_id_fk": {
           "name": "moderator_roles_identity_id_identity_id_fk",
           "tableFrom": "moderator_roles",
+          "tableTo": "identity",
           "columnsFrom": [
             "identity_id"
           ],
-          "tableTo": "identity",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1147,9 +1147,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "photo_key_idx": {
           "name": "photo_key_idx",
@@ -1162,24 +1162,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "photo_account_id_account_id_fk": {
           "name": "photo_account_id_account_id_fk",
           "tableFrom": "photo",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1244,24 +1244,24 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "photo_access_account_id_account_id_fk": {
           "name": "photo_access_account_id_account_id_fk",
           "tableFrom": "photo_access",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1355,37 +1355,37 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "photo_review_photo_id_photo_id_fk": {
           "name": "photo_review_photo_id_photo_id_fk",
           "tableFrom": "photo_review",
+          "tableTo": "photo",
           "columnsFrom": [
             "photo_id"
           ],
-          "tableTo": "photo",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "photo_review_decided_by_identity_id_fk": {
           "name": "photo_review_decided_by_identity_id_fk",
           "tableFrom": "photo_review",
+          "tableTo": "identity",
           "columnsFrom": [
             "decided_by"
           ],
-          "tableTo": "identity",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1442,25 +1442,25 @@
         "ponds_parent_id_ponds_id_fk": {
           "name": "ponds_parent_id_ponds_id_fk",
           "tableFrom": "ponds",
+          "tableTo": "ponds",
           "columnsFrom": [
             "parent_id"
           ],
-          "tableTo": "ponds",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "ponds_slug_unique": {
           "name": "ponds_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "slug"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1543,24 +1543,24 @@
             }
           ],
           "isUnique": true,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "preferences_account_id_account_id_fk": {
           "name": "preferences_account_id_account_id_fk",
           "tableFrom": "preferences",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1643,15 +1643,15 @@
         "profile_account_id_account_id_fk": {
           "name": "profile_account_id_account_id_fk",
           "tableFrom": "profile",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1696,25 +1696,25 @@
         "research_subject_account_id_account_id_fk": {
           "name": "research_subject_account_id_account_id_fk",
           "tableFrom": "research_subject",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "research_subject_research_id_unique": {
           "name": "research_subject_research_id_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "research_id"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1819,9 +1819,9 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         },
         "session_retired_refresh_hash_idx": {
           "name": "session_retired_refresh_hash_idx",
@@ -1834,41 +1834,41 @@
             }
           ],
           "isUnique": false,
-          "with": {},
+          "concurrently": false,
           "method": "btree",
-          "concurrently": false
+          "with": {}
         }
       },
       "foreignKeys": {
         "session_account_id_account_id_fk": {
           "name": "session_account_id_account_id_fk",
           "tableFrom": "session",
+          "tableTo": "account",
           "columnsFrom": [
             "account_id"
           ],
-          "tableTo": "account",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "session_access_hash_unique": {
           "name": "session_access_hash_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "access_hash"
-          ],
-          "nullsNotDistinct": false
+          ]
         },
         "session_refresh_hash_unique": {
           "name": "session_refresh_hash_unique",
+          "nullsNotDistinct": false,
           "columns": [
             "refresh_hash"
-          ],
-          "nullsNotDistinct": false
+          ]
         }
       },
       "policies": {},
@@ -1934,15 +1934,15 @@
         "waitlist_snapshot_pond_id_ponds_id_fk": {
           "name": "waitlist_snapshot_pond_id_ponds_id_fk",
           "tableFrom": "waitlist_snapshot",
+          "tableTo": "ponds",
           "columnsFrom": [
             "pond_id"
           ],
-          "tableTo": "ponds",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1972,7 +1972,8 @@
       "values": [
         "terms",
         "privacy",
-        "research"
+        "research",
+        "special_category"
       ]
     },
     "public.gender": {
@@ -2053,10 +2054,10 @@
     }
   },
   "schemas": {},
-  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

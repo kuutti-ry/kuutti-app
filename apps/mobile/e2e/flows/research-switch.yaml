@@ -1,0 +1,42 @@
+# The research opt-in stays reachable after onboarding as a switch on the
+# account card (ADR-010 §9, TD-5): on, it records the consent and stays on
+# when Settings is opened again; off, it withdraws it. Sanna never took part;
+# the flow ends with the switch off.
+appId: fi.kuutti.app
+name: The research switch in Settings records the opt-in and withdraws it again
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- scrollUntilVisible:
+    element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
+# A switch's text, to Maestro, is its value ("0" off, "1" on), right of its words.
+- tapOn:
+    text: "0"
+    rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+- extendedWaitUntil:
+    visible:
+      text: "1"
+      rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    timeout: 15000
+
+- openLink: kuutti://
+- openLink: kuutti://settings
+- scrollUntilVisible:
+    element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    text: "1"
+    rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+- tapOn:
+    text: "1"
+    rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+- extendedWaitUntil:
+    visible:
+      text: "0"
+      rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    timeout: 15000
+- assertNotVisible: "The research choice could not be saved\\. Try again\\.|Tutkimusvalintaa ei voitu tallentaa\\. Yritä uudelleen\\.|Forskningsvalet kunde inte sparas\\. Försök igen\\."

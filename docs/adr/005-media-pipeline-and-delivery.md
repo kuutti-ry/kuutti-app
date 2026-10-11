@@ -35,3 +35,7 @@ A photo is the most identifying thing in the product and the easiest to scrape. 
 **A separate `media.<env>` host.** Rejected as above: nothing gained for a second certificate and alias, and the anti-scraping work wants one ingress.
 
 **Keeping the original for re-processing.** Rejected by rule 4 and TD-8: nothing needs it, and a breach of originals is the worst case.
+
+## History
+
+- 2026-10-09: staging cut over with `media_enabled` alone (`infra/envs/staging`): the key pair of §3 created, its public half committed, the `origin.api.staging` domain given to the `api` application. The ingress switch of §7 stays off, so until Dokploy and the previews are behind the distribution the rate limiter keys on the CloudFront edge that forwarded the request (ADR-008 §5 and History, `infra/README.md` Media): one sender near an edge can exhaust the anonymous buckets for every phone behind it for the window. The maintainer accepts that for staging, where those phones are the team's; production keeps the order of §7.

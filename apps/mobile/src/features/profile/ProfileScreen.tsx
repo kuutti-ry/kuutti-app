@@ -6,23 +6,38 @@ import {
   DISPLAY_NAME_MAX,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
-  PROMPT_ANSWER_MAX,
-  PROMPT_KEYS,
-  PROMPTS_MAX,
-  type ProfileFieldKey,
-  type ProfileFields,
 } from "@kuutti/schema";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
+// Expo Router 57 vendors React Navigation and exposes the hook that holds a
+// native stack's swipe-back only from the vendored core: a plain beforeRemove
+// listener cannot stop a native removal (the screen leaves the stack natively
+// while JS keeps it; 09/10/2026, the simulator).
+import { usePreventRemove } from "expo-router/build/react-navigation/core";
+import { Fragment, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { completenessText, fieldLabelKey, optionKey, presetKey, promptKey } from "./keys";
+import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
+import { FieldEditor, SpecialCategoryNote } from "./FieldEditor";
+import { completenessText, presetKey } from "./keys";
+import { FIRST_LATER_FIELD, laterPath } from "./later/LaterFieldScreen";
+import { PromptsEditor } from "./PromptsEditor";
 import { type ProfileNotice, useProfile } from "./useProfile";
+
+type LeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]["data"]["action"];
 
 /** The API's refusals the screen has its own words for; anything else is the generic line. */
 const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
@@ -57,11 +72,13 @@ function Chip({
 }
 
 /**
- * The profile as the person writes it (#47, ADR-009): a name, a bio or a
- * placeholder line, the fields of the registry as choices, up to three
- * prompts with short answers, and the checklist of what the card still
- * needs. Every decision is a button; every control carries its label
- * (CLAUDE.md Accessibility).
+ * The profile as the person writes it (#47, ADR-009, ADR-019): a name, a bio
+ * or a placeholder line, the fields of the registry (choices as chips, a
+ * number, a text, a setting as a switch), the article 9 fields behind their
+ * consent, up to three prompts with short answers, and the checklist of what
+ * the card still needs. Every decision is a button; every control carries its
+ * label (CLAUDE.md Accessibility). The screens of #148 take the optional
+ * fields one at a time; this is the whole document on one page.
  */
 export function ProfileScreen() {
   const { t } = useT();
@@ -69,14 +86,15 @@ export function ProfileScreen() {
   const tap = useHapticTap();
   const profile = useProfile();
   const { draft, update } = profile;
+  const navigation = useNavigation();
+  // The document saves whole, on Save, and the screen has no header: the back
+  // gesture was the only way out and lost unsaved edits without a word
+  // (09/10/2026, Kerttu's smoking answer). Leaving with edits asks first; the
+  // action handed back remembers it was held here, so dispatching it leaves.
+  const [leaving, setLeaving] = useState<LeaveAction | null>(null);
+  usePreventRemove(profile.dirty, ({ data }) => setLeaving(data.action));
 
-  const setField = (key: ProfileFieldKey, value: unknown) => {
-    const fields: Record<string, unknown> = { ...draft.fields };
-    if (value === undefined) delete fields[key];
-    else fields[key] = value;
-    update({ fields: fields as ProfileFields });
-  };
-  const chosenPrompts = new Set(draft.prompts.map((p) => p.key));
+  const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
 
   if (profile.status === "loading") {
     return (
@@ -112,10 +130,11 @@ export function ProfileScreen() {
         {profile.completeness && (
           <Card>
             <CardHeader>
-              <CardTitle>{t("profile.completeness.title")}</CardTitle>
-              {profile.completeness.complete && (
-                <CardDescription>{t("profile.completeness.complete")}</CardDescription>
-              )}
+              <CardTitle>
+                {profile.completeness.complete
+                  ? t("profile.completeness.complete")
+                  : t("profile.completeness.title")}
+              </CardTitle>
             </CardHeader>
             {!profile.completeness.complete && (
               <CardContent className="gap-1">
@@ -146,7 +165,9 @@ export function ProfileScreen() {
             value={draft.bio ?? ""}
             maxLength={BIO_MAX}
             multiline
-            numberOfLines={4}
+            // Room for four lines and more as the bio grows: a capped field scrolled
+            // its start out of sight at large text sizes (10/10/2026).
+            className="min-h-28"
             onChangeText={(text) =>
               update({
                 bio: text.length > 0 ? text : null,
@@ -176,110 +197,21 @@ export function ProfileScreen() {
         </View>
 
         {PROFILE_FIELD_KEYS.map((key) => {
-          const spec = PROFILE_FIELDS[key];
-          const value = (draft.fields as Record<string, unknown>)[key];
+          // The identity label is offered after a non-binary gender only, in
+          // onboarding (the registry's rule, #146); here it shows when it was
+          // given, to change or clear it, and is not offered to everyone.
+          if (key === "identityLabel" && draft.fields.identityLabel === undefined) return null;
+          // The article 9 fields stand under the note on their consent (ADR-019 §4, #204):
+          // anyone active gave it at the seeks step; Settings is where it is withdrawn.
           return (
-            <View key={key} className="gap-2">
-              <Text variant="small">{t(fieldLabelKey(key))}</Text>
-              {spec.kind === "text" && (
-                <>
-                  <Input
-                    accessibilityLabel={t(fieldLabelKey(key))}
-                    value={typeof value === "string" ? value : ""}
-                    maxLength={spec.maxLength}
-                    onChangeText={(text) => setField(key, text.length > 0 ? text : undefined)}
-                  />
-                  <Text variant="muted">{t("profile.campus.hint", { max: spec.maxLength })}</Text>
-                </>
-              )}
-              {spec.kind !== "text" && (
-                <View className="flex-row flex-wrap gap-2">
-                  {spec.options.map((option) => {
-                    const selected =
-                      spec.kind === "multi"
-                        ? Array.isArray(value) && value.includes(option)
-                        : value === option;
-                    return (
-                      <Chip
-                        key={option}
-                        label={t(optionKey(key, option))}
-                        selected={selected}
-                        onPress={() => {
-                          tap();
-                          if (spec.kind === "multi") {
-                            const current = Array.isArray(value) ? (value as string[]) : [];
-                            const next = selected
-                              ? current.filter((v) => v !== option)
-                              : current.length < spec.max
-                                ? [...current, option]
-                                : current;
-                            setField(key, next.length > 0 ? next : undefined);
-                          } else {
-                            setField(key, selected ? undefined : option);
-                          }
-                        }}
-                      />
-                    );
-                  })}
-                </View>
-              )}
-            </View>
+            <Fragment key={key}>
+              {key === firstSpecial && <SpecialCategoryNote />}
+              <FieldEditor field={key} draft={draft} update={update} />
+            </Fragment>
           );
         })}
 
-        <View className="gap-3">
-          <Text variant="small">{t("profile.prompts.label")}</Text>
-          <Text variant="muted">{t("profile.prompts.hint", { max: PROMPTS_MAX })}</Text>
-          {draft.prompts.map((prompt) => {
-            const question = t(promptKey(prompt.key));
-            return (
-              <View key={prompt.key} className="gap-2">
-                <Text>{question}</Text>
-                <Input
-                  accessibilityLabel={t("profile.prompts.answer", { prompt: question })}
-                  value={prompt.answer}
-                  maxLength={PROMPT_ANSWER_MAX}
-                  multiline
-                  onChangeText={(answer) =>
-                    update({
-                      prompts: draft.prompts.map((p) =>
-                        p.key === prompt.key ? { ...p, answer } : p,
-                      ),
-                    })
-                  }
-                />
-                <Button
-                  variant="ghost"
-                  accessibilityLabel={t("profile.prompts.remove", { prompt: question })}
-                  onPress={() => {
-                    tap();
-                    update({ prompts: draft.prompts.filter((p) => p.key !== prompt.key) });
-                  }}
-                >
-                  <Text>{t("profile.prompts.removeButton")}</Text>
-                </Button>
-              </View>
-            );
-          })}
-          {draft.prompts.length < PROMPTS_MAX && (
-            <View className="gap-2">
-              <Text variant="small">{t("profile.prompts.pick")}</Text>
-              <View className="flex-row flex-wrap gap-2">
-                {PROMPT_KEYS.filter((key) => !chosenPrompts.has(key)).map((key) => (
-                  <Chip
-                    key={key}
-                    label={t(promptKey(key))}
-                    selected={false}
-                    onPress={() => {
-                      tap();
-                      update({ prompts: [...draft.prompts, { key, answer: "" }] });
-                    }}
-                  />
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
+        <PromptsEditor draft={draft} update={update} />
 
         {profile.notice && (
           <Text accessibilityLiveRegion="assertive">{noticeText(profile.notice, t)}</Text>
@@ -303,7 +235,49 @@ export function ProfileScreen() {
         >
           {t("profile.card.open")}
         </Button>
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            router.push(laterPath(FIRST_LATER_FIELD));
+          }}
+        >
+          {t("profile.later.open")}
+        </Button>
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            router.push(DEAL_BREAKERS_PATH);
+          }}
+        >
+          {t("profile.dealBreakers.open")}
+        </Button>
       </ScrollView>
+
+      <Dialog open={leaving !== null} onOpenChange={(open) => !open && setLeaving(null)}>
+        <DialogContent closeLabel={t("profile.discard.close")}>
+          <DialogHeader>
+            <DialogTitle>{t("profile.discard.title")}</DialogTitle>
+            <DialogDescription>{t("profile.discard.body")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onPress={() => setLeaving(null)}>
+              {t("profile.discard.keep")}
+            </Button>
+            <Button
+              variant="destructive"
+              onPress={() => {
+                const action = leaving;
+                setLeaving(null);
+                if (action) navigation.dispatch(action);
+              }}
+            >
+              {t("profile.discard.leave")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SafeAreaView>
   );
 }

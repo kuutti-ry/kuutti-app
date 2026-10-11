@@ -1,6 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import { type DemoPersona, personaClaims } from "@kuutti/db/demo";
-import { AuthExchangeResponse, ErrorResponse, HealthResponse } from "@kuutti/schema";
+import { AuthExchangeResponse, ErrorResponse, HealthResponse, Photo } from "@kuutti/schema";
 
 /**
  * A persona's way through the bank and back, as a browser and the app walk it
@@ -244,4 +244,26 @@ export async function call(
     throw new DemoError(`${method} ${path}: ${response.status} ${code}`);
   }
   return answer;
+}
+
+/** One upload as the persona, as the app sends it (#142): multipart, the field the route reads. */
+export async function upload(
+  context: BankContext,
+  accessToken: string,
+  bytes: Uint8Array,
+): Promise<Photo> {
+  const form = new FormData();
+  form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }), "photo.jpg");
+  const response = await patient(context, new URL("/photos", context.api), {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}` },
+    body: form,
+  });
+  const answer: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const envelope = ErrorResponse.safeParse(answer);
+    const code = envelope.success ? envelope.data.error.code : "unreadable";
+    throw new DemoError(`POST /photos: ${response.status} ${code}`);
+  }
+  return Photo.parse(answer);
 }

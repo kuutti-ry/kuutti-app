@@ -23,112 +23,7 @@
 # database). legal.* keys take a consent_version and never a machine flag.
 # After editing: `pnpm i18n:build`, and commit src/generated with it.
 
-smoke.title:
-  en: Kuutti
-  description: App name as the heading of the smoke screen. Never translated.
-  fi: Kuutti
-  sv: Kuutti
-  machine: { fi: true, sv: true }
 
-smoke.loading:
-  en: Reaching the API…
-  description: Smoke screen, shown while the first request to the API is in flight.
-  fi: Yhdistetään rajapintaan…
-  sv: Ansluter till API:et…
-  machine: { fi: true, sv: true }
-
-smoke.status.label:
-  en: API status
-  description: Smoke screen, screen-reader label of the card that shows the API's version.
-  fi: Rajapinnan tila
-  sv: API-status
-  machine: { fi: true, sv: true }
-
-smoke.api.title:
-  en: API
-  description: Smoke screen, title of the card about the API the app talks to. Never translated.
-  fi: API
-  sv: API
-  machine: { fi: true, sv: true }
-
-smoke.status.commit:
-  en: git commit {commit}
-  description: Smoke screen, in both cards. {commit} is a short git hash (a code, not translated); the card title says whose it is, the API's or the app's.
-  fi: git-commit {commit}
-  sv: git-commit {commit}
-  machine: { fi: true, sv: true }
-
-smoke.app.title:
-  en: App
-  description: Smoke screen, title of the card about the JavaScript this phone is running, as opposed to the API.
-  fi: Sovellus
-  sv: Appen
-  machine: { fi: true, sv: true }
-
-smoke.app.label:
-  en: App version
-  description: Smoke screen, screen-reader label of the card that shows the app's own commit and update.
-  fi: Sovelluksen versio
-  sv: Appens version
-  machine: { fi: true, sv: true }
-
-smoke.app.runtime:
-  en: "native build {runtime}"
-  description: "App card: the first seven characters of the native build's runtime version (the fingerprint, ADR-004). An over-the-air update reaches only a build with the same runtime, so this is what to compare with the EAS build list when the commit stops moving."
-  fi: "natiiviversio {runtime}"
-  sv: "nativ version {runtime}"
-  machine: { fi: true, sv: true }
-
-smoke.app.noRuntime:
-  en: "native build not recorded"
-  description: "App card when expo-updates reports no runtime version (the web preview, a dev client on Metro)."
-  fi: "natiiviversiota ei kirjattu"
-  sv: "nativ version inte registrerad"
-  machine: { fi: true, sv: true }
-
-smoke.app.embedded:
-  en: "running the build's own bundle, no update applied yet"
-  description: "App card when the app runs the JavaScript embedded in the native build rather than an over-the-air update."
-  fi: "käytössä version oma paketti, päivitystä ei vielä asennettu"
-  sv: "kör versionens eget paket, ingen uppdatering ännu"
-  machine: { fi: true, sv: true }
-
-smoke.app.updated:
-  en: "update published {date}"
-  description: "App card: when the running over-the-air update was published (expo-updates createdAt; the module does not record when this phone applied it); {date} is already formatted."
-  fi: "päivitys julkaistu {date}"
-  sv: "uppdatering publicerad {date}"
-  machine: { fi: true, sv: true }
-
-smoke.app.noCommit:
-  en: git commit not recorded in this build
-  description: Smoke screen, App card, when the running code was built before the commit was stamped into it.
-  fi: git-committia ei ole tallennettu tähän rakennukseen
-  sv: git-commit inte registrerad i det här bygget
-  machine: { fi: true, sv: true }
-
-
-smoke.status.database:
-  en: database {db} · migrations {migrations}
-  description: Smoke screen. {db} and {migrations} are raw state words from the API (ok, current), not translated.
-  fi: tietokanta {db} · migraatiot {migrations}
-  sv: databas {db} · migreringar {migrations}
-  machine: { fi: true, sv: true }
-
-
-smoke.unreachable.title:
-  en: API unreachable
-  description: Smoke screen, title of the error state when the request to the API failed. The technical reason follows untranslated.
-  fi: Rajapintaan ei saada yhteyttä
-  sv: API:et kan inte nås
-  machine: { fi: true, sv: true }
-
-smoke.retry:
-  en: Retry
-  description: Smoke screen, button that repeats the request to the API.
-  fi: Yritä uudelleen
-  sv: Försök igen
-  machine: { fi: true, sv: true }
 
 # --- Profile (#47) ---
 
@@ -193,6 +88,41 @@ profile.saved:
   description: "Notice after a successful save."
   fi: "Tallennettu."
   sv: "Sparat."
+  machine: { fi: true, sv: true }
+
+profile.discard.title:
+  en: Leave without saving?
+  description: Title of the dialog shown when a person leaves the profile screen with edits that are not saved (the profile saves whole, on Save).
+  fi: Poistutaanko tallentamatta?
+  sv: Lämna utan att spara?
+  machine: { fi: true, sv: true }
+
+profile.discard.body:
+  en: What you changed here is not saved yet. Save first, or leave and lose it.
+  description: Body of the leave-without-saving dialog of the profile screen.
+  fi: Tekemiäsi muutoksia ei ole vielä tallennettu. Tallenna ensin, tai poistu ja menetä ne.
+  sv: Det du ändrade här är inte sparat ännu. Spara först, eller lämna och förlora det.
+  machine: { fi: true, sv: true }
+
+profile.discard.keep:
+  en: Keep editing
+  description: Button of the leave-without-saving dialog that stays on the profile screen.
+  fi: Jatka muokkaamista
+  sv: Fortsätt redigera
+  machine: { fi: true, sv: true }
+
+profile.discard.leave:
+  en: Leave without saving
+  description: Button of the leave-without-saving dialog that leaves the profile screen and loses the edits.
+  fi: Poistu tallentamatta
+  sv: Lämna utan att spara
+  machine: { fi: true, sv: true }
+
+profile.discard.close:
+  en: Close
+  description: Screen-reader label of the close control of the leave-without-saving dialog; closing it stays on the screen.
+  fi: Sulje
+  sv: Stäng
   machine: { fi: true, sv: true }
 
 profile.error.generic:
@@ -279,32 +209,11 @@ profile.field.intent:
   sv: "Söker"
   machine: { fi: true, sv: true }
 
-profile.field.relationship:
-  en: "Relationship type"
-  description: "Label of the relationship field of the profile registry (#47)."
-  fi: "Suhteen tyyppi"
-  sv: "Typ av relation"
-  machine: { fi: true, sv: true }
-
-profile.field.kids:
-  en: "Kids"
-  description: "Label of the kids field of the profile registry (#47)."
-  fi: "Lapset"
-  sv: "Barn"
-  machine: { fi: true, sv: true }
-
 profile.field.smoking:
   en: "Smoking"
   description: "Label of the smoking field of the profile registry (#47)."
   fi: "Tupakointi"
   sv: "Rökning"
-  machine: { fi: true, sv: true }
-
-profile.field.alcohol:
-  en: "Alcohol"
-  description: "Label of the alcohol field of the profile registry (#47)."
-  fi: "Alkoholi"
-  sv: "Alkohol"
   machine: { fi: true, sv: true }
 
 profile.field.education:
@@ -321,102 +230,333 @@ profile.field.field:
   sv: "Bransch"
   machine: { fi: true, sv: true }
 
-profile.field.campus:
-  en: "Campus or guild"
-  description: "Label of the campus field of the profile registry (#47)."
-  fi: "Kampus tai kilta"
-  sv: "Campus eller gille"
+profile.field.identityLabel:
+  en: "Identity"
+  description: "Label of the identityLabel field of the profile registry (#145, ADR-019)."
+  fi: "Identiteetti"
+  sv: "Identitet"
   machine: { fi: true, sv: true }
 
-profile.campus.hint:
+profile.field.monogamy:
+  en: "Relationship structure"
+  description: "Label of the monogamy field of the profile registry (#145, ADR-019)."
+  fi: "Suhteen muoto"
+  sv: "Relationsform"
+  machine: { fi: true, sv: true }
+
+profile.field.hasKids:
+  en: "Kids"
+  description: "Label of the hasKids field of the profile registry (#145, ADR-019)."
+  fi: "Lapset"
+  sv: "Barn"
+  machine: { fi: true, sv: true }
+
+profile.field.wantsKids:
+  en: "Kids in the future"
+  description: "Label of the wantsKids field of the profile registry (#145, ADR-019)."
+  fi: "Lapset tulevaisuudessa"
+  sv: "Barn i framtiden"
+  machine: { fi: true, sv: true }
+
+profile.field.drinking:
+  en: "Drinking"
+  description: "Label of the drinking field of the profile registry (#145, ADR-019)."
+  fi: "Alkoholi"
+  sv: "Alkohol"
+  machine: { fi: true, sv: true }
+
+profile.field.drugsAttitude:
+  en: "Drugs, your attitude"
+  description: "Label of the drugsAttitude field of the profile registry (#145, ADR-019)."
+  fi: "Suhtautuminen huumeisiin"
+  sv: "Inställning till droger"
+  machine: { fi: true, sv: true }
+
+profile.field.hobbies:
+  en: "Hobbies"
+  description: "Label of the hobbies field of the profile registry (#145, ADR-019)."
+  fi: "Harrastukset"
+  sv: "Hobbyer"
+  machine: { fi: true, sv: true }
+
+profile.field.height:
+  en: "Height"
+  description: "Label of the height field of the profile registry (#145, ADR-019)."
+  fi: "Pituus"
+  sv: "Längd"
+  machine: { fi: true, sv: true }
+
+profile.field.exercise:
+  en: "Exercise"
+  description: "Label of the exercise field of the profile registry (#145, ADR-019)."
+  fi: "Liikunta"
+  sv: "Motion"
+  machine: { fi: true, sv: true }
+
+profile.field.pets:
+  en: "Pets"
+  description: "Label of the pets field of the profile registry (#145, ADR-019)."
+  fi: "Lemmikit"
+  sv: "Husdjur"
+  machine: { fi: true, sv: true }
+
+profile.field.hideFromField:
+  en: "Hide me from people in my field"
+  description: "Label of the hideFromField field of the profile registry (#145, ADR-019)."
+  fi: "Piilota minut oman alani ihmisiltä"
+  sv: "Dölj mig för folk inom mitt område"
+  machine: { fi: true, sv: true }
+
+profile.field.occupation:
+  en: "Work"
+  description: "Label of the occupation field of the profile registry (#145, ADR-019)."
+  fi: "Työ"
+  sv: "Arbete"
+  machine: { fi: true, sv: true }
+
+profile.field.occupationTitle:
+  en: "Job title, without the employer's name"
+  description: "Label of the occupationTitle field of the profile registry (#145, ADR-019)."
+  fi: "Tehtävänimike ilman työnantajan nimeä"
+  sv: "Yrkestitel utan arbetsgivarens namn"
+  machine: { fi: true, sv: true }
+
+profile.field.politics:
+  en: "Parties you could vote for"
+  description: "Label of the politics field of the profile registry (#145, ADR-019)."
+  fi: "Puolueet, joita voisit äänestää"
+  sv: "Partier du kunde rösta på"
+  machine: { fi: true, sv: true }
+
+profile.field.religion:
+  en: "Religion"
+  description: "Label of the religion field of the profile registry (#145, ADR-019)."
+  fi: "Uskonto"
+  sv: "Religion"
+  machine: { fi: true, sv: true }
+
+profile.field.zodiac:
+  en: "Star sign"
+  description: "Label of the zodiac field of the profile registry (#145, ADR-019)."
+  fi: "Horoskooppimerkki"
+  sv: "Stjärntecken"
+  machine: { fi: true, sv: true }
+
+profile.text.hint:
   en: "In your own words, up to {max, number} characters."
-  description: "Hint under the campus or guild field."
+  description: "Hint under a free-text field of the registry (the job title)."
   fi: "Omin sanoin, enintään {max, number} merkkiä."
   sv: "Med egna ord, högst {max, number} tecken."
   machine: { fi: true, sv: true }
 
-profile.option.languages.fi:
-  en: "Finnish"
-  description: "Option fi of the languages field (#47 registry)."
-  fi: "suomi"
-  sv: "finska"
+profile.number.hint:
+  en: "A whole number from {min, number} to {max, number}."
+  description: "Hint under a number field of the registry (the height, in centimetres)."
+  fi: "Kokonaisluku väliltä {min, number}–{max, number}."
+  sv: "Ett heltal från {min, number} till {max, number}."
   machine: { fi: true, sv: true }
 
-profile.option.languages.sv:
-  en: "Swedish"
-  description: "Option sv of the languages field (#47 registry)."
-  fi: "ruotsi"
-  sv: "svenska"
+profile.number.unset:
+  en: "No answer yet"
+  description: "Shown in a number stepper while the field has no value (#148)."
+  fi: "Ei vielä vastausta"
+  sv: "Inget svar ännu"
   machine: { fi: true, sv: true }
 
-profile.option.languages.en:
-  en: "English"
-  description: "Option en of the languages field (#47 registry)."
-  fi: "englanti"
-  sv: "engelska"
+profile.number.down:
+  en: "One less"
+  description: "Screen-reader label of the minus button of a number field (#148)."
+  fi: "Yksi vähemmän"
+  sv: "En mindre"
   machine: { fi: true, sv: true }
 
-profile.option.languages.ru:
-  en: "Russian"
-  description: "Option ru of the languages field (#47 registry)."
-  fi: "venäjä"
-  sv: "ryska"
+profile.number.up:
+  en: "One more"
+  description: "Screen-reader label of the plus button of a number field (#148)."
+  fi: "Yksi enemmän"
+  sv: "En mer"
   machine: { fi: true, sv: true }
 
-profile.option.languages.et:
-  en: "Estonian"
-  description: "Option et of the languages field (#47 registry)."
-  fi: "viro"
-  sv: "estniska"
+profile.clear:
+  en: "Clear the answer"
+  description: "Button that removes a number field's value (#148)."
+  fi: "Tyhjennä vastaus"
+  sv: "Rensa svaret"
   machine: { fi: true, sv: true }
 
-profile.option.languages.uk:
-  en: "Ukrainian"
-  description: "Option uk of the languages field (#47 registry)."
-  fi: "ukraina"
-  sv: "ukrainska"
+profile.dealBreakers.title:
+  en: "Deal-breakers"
+  description: "Heading of the deal-breakers screen (#149)."
+  fi: "Ehdottomat rajat"
+  sv: "Absoluta gränser"
   machine: { fi: true, sv: true }
 
-profile.option.languages.ar:
-  en: "Arabic"
-  description: "Option ar of the languages field (#47 registry)."
-  fi: "arabia"
-  sv: "arabiska"
+profile.dealBreakers.explain:
+  en: "Up to {max, number}. Only on what you answered yourself, and both ways: yours apply to others, theirs to you."
+  description: "Explanation of the deal-breakers (#149, the disclose-to-filter rule)."
+  fi: "Enintään {max, number}. Vain siitä, mihin vastasit itse, ja molempiin suuntiin: sinun rajasi koskevat muita, heidän rajansa sinua."
+  sv: "Högst {max, number}. Bara om det du själv svarat på, och åt båda hållen: dina gäller andra, deras gäller dig."
   machine: { fi: true, sv: true }
 
-profile.option.languages.so:
-  en: "Somali"
-  description: "Option so of the languages field (#47 registry)."
-  fi: "somali"
-  sv: "somaliska"
+profile.dealBreakers.gated:
+  en: "To filter on this, share yours first."
+  description: "Shown under a field the person has not answered: a deal-breaker needs the own answer (#149)."
+  fi: "Suodattaaksesi tällä kerro ensin omasi."
+  sv: "För att filtrera på det här, dela ditt eget först."
   machine: { fi: true, sv: true }
 
-profile.option.languages.de:
-  en: "German"
-  description: "Option de of the languages field (#47 registry)."
-  fi: "saksa"
-  sv: "tyska"
+profile.dealBreakers.answer:
+  en: "Answer it"
+  description: "Button under a gated field that opens its screen (#149)."
+  fi: "Vastaa"
+  sv: "Svara"
   machine: { fi: true, sv: true }
 
-profile.option.languages.fr:
-  en: "French"
-  description: "Option fr of the languages field (#47 registry)."
-  fi: "ranska"
-  sv: "franska"
+profile.dealBreakers.switch:
+  en: "Deal-breaker: {field}"
+  description: "Label of the switch that makes a field a deal-breaker (#149); {field} is the field's label, after a colon so nothing is inflected."
+  fi: "Ehdoton raja: {field}"
+  sv: "Absolut gräns: {field}"
   machine: { fi: true, sv: true }
 
-profile.option.languages.es:
-  en: "Spanish"
-  description: "Option es of the languages field (#47 registry)."
-  fi: "espanja"
-  sv: "spanska"
+profile.dealBreakers.pickOne:
+  en: "Pick at least one answer that is fine with you."
+  description: "Shown while a deal-breaker is switched on with nothing accepted; saving waits (#149)."
+  fi: "Valitse ainakin yksi vastaus, joka sopii sinulle."
+  sv: "Välj minst ett svar som är okej för dig."
   machine: { fi: true, sv: true }
 
-profile.option.languages.other:
-  en: "Another language"
-  description: "Option other of the languages field (#47 registry)."
-  fi: "Muu kieli"
-  sv: "Ett annat språk"
+profile.dealBreakers.accept:
+  en: "Fine with me"
+  description: "Heading over the answers of others the person accepts (#149)."
+  fi: "Sopii minulle"
+  sv: "Okej för mig"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.includeUnknown:
+  en: "Also people who did not answer"
+  description: "Label of the switch that lets an unanswered field pass (#149)."
+  fi: "Myös ne, jotka eivät vastanneet"
+  sv: "Även de som inte svarade"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.paused:
+  en: "Paused until you answer it yourself."
+  description: "Said under a deal-breaker whose own answer was taken back (#149)."
+  fi: "Tauolla, kunnes vastaat siihen itse."
+  sv: "Pausad tills du själv svarar på det."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.limit:
+  en: "That is {max, number} already."
+  description: "Said when the person tries to switch on one more deal-breaker than allowed (#149)."
+  fi: "Niitä on jo {max, number}."
+  sv: "Det är redan {max, number}."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.save:
+  en: "Save the deal-breakers"
+  description: "Button that saves the deal-breakers (#149)."
+  fi: "Tallenna rajat"
+  sv: "Spara gränserna"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.saved:
+  en: "Saved."
+  description: "Said after the deal-breakers were saved (#149)."
+  fi: "Tallennettu."
+  sv: "Sparat."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.failed:
+  en: "They could not be saved. Try again."
+  description: "Said when saving the deal-breakers failed (#149)."
+  fi: "Rajoja ei voitu tallentaa. Yritä uudelleen."
+  sv: "Gränserna kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.open:
+  en: "Your deal-breakers"
+  description: "Button on the home screen, the profile and the e-mail screen that opens the deal-breakers (#149)."
+  fi: "Ehdottomat rajasi"
+  sv: "Dina absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.later.title:
+  en: "While you wait"
+  description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
+  fi: "Odotellessasi"
+  sv: "Medan du väntar"
+  machine: { fi: true, sv: true }
+
+profile.later.progress:
+  en: "{answered, number} of {total, number} answered"
+  description: "Progress line of the later screens (#148)."
+  fi: "{answered, number} / {total, number} vastattu"
+  sv: "{answered, number} av {total, number} besvarade"
+  machine: { fi: true, sv: true }
+
+profile.later.explain:
+  en: "One question at a time, each optional. Skip what you like; every answer is on your card only when you give it."
+  description: "Explanation on the first later screen (#148)."
+  fi: "Yksi kysymys kerrallaan, jokainen vapaaehtoinen. Ohita mitä haluat; vastaus näkyy kortillasi vain, jos annat sen."
+  sv: "En fråga i taget, var och en frivillig. Hoppa över vad du vill; ett svar syns på ditt kort bara om du ger det."
+  machine: { fi: true, sv: true }
+
+profile.later.skip:
+  en: "Ask me later"
+  description: "Button that moves to the next later screen without saving (#148)."
+  fi: "Kysy myöhemmin"
+  sv: "Fråga mig senare"
+  machine: { fi: true, sv: true }
+
+profile.later.next:
+  en: "Save and continue"
+  description: "Button that saves the answer and moves to the next later screen (#148)."
+  fi: "Tallenna ja jatka"
+  sv: "Spara och fortsätt"
+  machine: { fi: true, sv: true }
+
+profile.later.done:
+  en: "That is everything. Thank you."
+  description: "Said after the last later screen (#148)."
+  fi: "Siinä kaikki. Kiitos."
+  sv: "Det var allt. Tack."
+  machine: { fi: true, sv: true }
+
+profile.later.open:
+  en: "Fill in the rest while you wait"
+  description: "Button on the home screen and the profile that opens the later screens (#148)."
+  fi: "Täydennä loput odotellessasi"
+  sv: "Fyll i resten medan du väntar"
+  machine: { fi: true, sv: true }
+
+profile.later.search:
+  en: "Search"
+  description: "Label and placeholder of the search box over a long list of options (#148)."
+  fi: "Hae"
+  sv: "Sök"
+  machine: { fi: true, sv: true }
+
+profile.optionWithKids.wantsKids.want:
+  en: "Want more"
+  description: "The wants-kids answer 'want' when the person has kids (#148, the sheet's adaptive labels)."
+  fi: "Haluan lisää"
+  sv: "Vill ha fler"
+  machine: { fi: true, sv: true }
+
+profile.optionWithKids.wantsKids.dont_want:
+  en: "No more"
+  description: "The wants-kids answer 'don't want' when the person has kids (#148)."
+  fi: "Ei enää"
+  sv: "Inga fler"
+  machine: { fi: true, sv: true }
+
+profile.optionWithKids.wantsKids.not_sure:
+  en: "Not sure anymore"
+  description: "The wants-kids answer 'not sure' when the person has kids (#148)."
+  fi: "En ole enää varma"
+  sv: "Inte säker längre"
   machine: { fi: true, sv: true }
 
 profile.option.intent.long_term:
@@ -426,186 +566,11 @@ profile.option.intent.long_term:
   sv: "Något långvarigt"
   machine: { fi: true, sv: true }
 
-profile.option.intent.short_term:
-  en: "Something short-term"
-  description: "Option short_term of the intent field (#47 registry)."
-  fi: "Jotain lyhytaikaista"
-  sv: "Något kortvarigt"
-  machine: { fi: true, sv: true }
-
-profile.option.intent.figuring_out:
-  en: "Still figuring it out"
-  description: "Option figuring_out of the intent field (#47 registry)."
-  fi: "Selvittelen vielä"
-  sv: "Håller på att lista ut det"
-  machine: { fi: true, sv: true }
-
-profile.option.intent.friends:
-  en: "Friends"
-  description: "Option friends of the intent field (#47 registry)."
-  fi: "Ystäviä"
-  sv: "Vänner"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.monogamous:
-  en: "Monogamous"
-  description: "Option monogamous of the relationship field (#47 registry)."
-  fi: "Monogaminen"
-  sv: "Monogam"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.open:
-  en: "Open relationship"
-  description: "Option open of the relationship field (#47 registry)."
-  fi: "Avoin suhde"
-  sv: "Öppen relation"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.polyamorous:
-  en: "Polyamorous"
-  description: "Option polyamorous of the relationship field (#47 registry)."
-  fi: "Polyamorinen"
-  sv: "Polyamorös"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.lat:
-  en: "Living apart together"
-  description: "Option lat of the relationship field (#47 registry)."
-  fi: "Erillissuhde"
-  sv: "Särbo"
-  machine: { fi: true, sv: true }
-
-profile.option.relationship.undecided:
-  en: "Undecided"
-  description: "Option undecided of the relationship field (#47 registry)."
-  fi: "En ole päättänyt"
-  sv: "Obestämd"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.have_want_more:
-  en: "Have kids, want more"
-  description: "Option have_want_more of the kids field (#47 registry)."
-  fi: "On lapsia, haluan lisää"
-  sv: "Har barn, vill ha fler"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.have_done:
-  en: "Have kids, that is enough"
-  description: "Option have_done of the kids field (#47 registry)."
-  fi: "On lapsia, se riittää"
-  sv: "Har barn, det räcker"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.want_someday:
-  en: "Want kids someday"
-  description: "Option want_someday of the kids field (#47 registry)."
-  fi: "Haluan lapsia joskus"
-  sv: "Vill ha barn någon gång"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.dont_want:
-  en: "Do not want kids"
-  description: "Option dont_want of the kids field (#47 registry)."
-  fi: "En halua lapsia"
-  sv: "Vill inte ha barn"
-  machine: { fi: true, sv: true }
-
-profile.option.kids.not_sure:
-  en: "Not sure"
-  description: "Option not_sure of the kids field (#47 registry)."
-  fi: "En ole varma"
-  sv: "Inte säker"
-  machine: { fi: true, sv: true }
-
-profile.option.smoking.no:
-  en: "No"
-  description: "Option no of the smoking field (#47 registry)."
-  fi: "En"
-  sv: "Nej"
-  machine: { fi: true, sv: true }
-
 profile.option.smoking.sometimes:
   en: "Sometimes"
   description: "Option sometimes of the smoking field (#47 registry)."
   fi: "Joskus"
   sv: "Ibland"
-  machine: { fi: true, sv: true }
-
-profile.option.smoking.yes:
-  en: "Yes"
-  description: "Option yes of the smoking field (#47 registry)."
-  fi: "Kyllä"
-  sv: "Ja"
-  machine: { fi: true, sv: true }
-
-profile.option.smoking.snus:
-  en: "Snus"
-  description: "Option snus of the smoking field (#47 registry)."
-  fi: "Nuuskaa"
-  sv: "Snus"
-  machine: { fi: true, sv: true }
-
-profile.option.alcohol.never:
-  en: "Never"
-  description: "Option never of the alcohol field (#47 registry)."
-  fi: "En koskaan"
-  sv: "Aldrig"
-  machine: { fi: true, sv: true }
-
-profile.option.alcohol.sometimes:
-  en: "Sometimes"
-  description: "Option sometimes of the alcohol field (#47 registry)."
-  fi: "Joskus"
-  sv: "Ibland"
-  machine: { fi: true, sv: true }
-
-profile.option.alcohol.often:
-  en: "Often"
-  description: "Option often of the alcohol field (#47 registry)."
-  fi: "Usein"
-  sv: "Ofta"
-  machine: { fi: true, sv: true }
-
-profile.option.education.secondary:
-  en: "Upper secondary"
-  description: "Option secondary of the education field (#47 registry)."
-  fi: "Toinen aste"
-  sv: "Gymnasium"
-  machine: { fi: true, sv: true }
-
-profile.option.education.vocational:
-  en: "Vocational"
-  description: "Option vocational of the education field (#47 registry)."
-  fi: "Ammatillinen"
-  sv: "Yrkesutbildning"
-  machine: { fi: true, sv: true }
-
-profile.option.education.bachelor:
-  en: "Bachelor's degree"
-  description: "Option bachelor of the education field (#47 registry)."
-  fi: "Kandidaatti"
-  sv: "Kandidat"
-  machine: { fi: true, sv: true }
-
-profile.option.education.master:
-  en: "Master's degree"
-  description: "Option master of the education field (#47 registry)."
-  fi: "Maisteri"
-  sv: "Magister"
-  machine: { fi: true, sv: true }
-
-profile.option.education.doctorate:
-  en: "Doctorate"
-  description: "Option doctorate of the education field (#47 registry)."
-  fi: "Tohtori"
-  sv: "Doktor"
-  machine: { fi: true, sv: true }
-
-profile.option.education.other:
-  en: "Other"
-  description: "Option other of the education field (#47 registry)."
-  fi: "Muu"
-  sv: "Annat"
   machine: { fi: true, sv: true }
 
 profile.option.field.tech:
@@ -690,6 +655,1427 @@ profile.option.field.other:
   description: "Option other of the field field (#47 registry)."
   fi: "Muu"
   sv: "Annat"
+  machine: { fi: true, sv: true }
+
+profile.option.intent.casual:
+  en: "Something casual"
+  description: "Option casual of the intent field (#145 registry, ADR-019)."
+  fi: "Jotain rentoa"
+  sv: "Något avslappnat"
+  machine: { fi: true, sv: true }
+
+profile.option.intent.open_to_either:
+  en: "Open to either"
+  description: "Option open_to_either of the intent field (#145 registry, ADR-019)."
+  fi: "Avoin kummallekin"
+  sv: "Öppen för båda"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.agender:
+  en: "Agender"
+  description: "Option agender of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Agender"
+  sv: "Agender"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.genderfluid:
+  en: "Genderfluid"
+  description: "Option genderfluid of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Genderfluid"
+  sv: "Genderfluid"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.genderqueer:
+  en: "Genderqueer"
+  description: "Option genderqueer of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Genderqueer"
+  sv: "Genderqueer"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.bigender:
+  en: "Bigender"
+  description: "Option bigender of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Bigender"
+  sv: "Bigender"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.two_spirit:
+  en: "Two-spirit"
+  description: "Option two_spirit of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Two-spirit"
+  sv: "Two-spirit"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.questioning:
+  en: "Questioning"
+  description: "Option questioning of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Pohdin vielä"
+  sv: "Funderar ännu"
+  machine: { fi: true, sv: true }
+
+profile.option.identityLabel.non_binary:
+  en: "Just non-binary"
+  description: "Option non_binary of the identityLabel field (#145 registry, ADR-019)."
+  fi: "Ihan vain muunsukupuolinen"
+  sv: "Helt enkelt ickebinär"
+  machine: { fi: true, sv: true }
+
+profile.option.monogamy.monogamous:
+  en: "Monogamous"
+  description: "Option monogamous of the monogamy field (#145 registry, ADR-019)."
+  fi: "Monogaminen"
+  sv: "Monogam"
+  machine: { fi: true, sv: true }
+
+profile.option.monogamy.non_monogamous:
+  en: "Non-monogamous"
+  description: "Option non_monogamous of the monogamy field (#145 registry, ADR-019)."
+  fi: "Ei-monogaminen"
+  sv: "Icke-monogam"
+  machine: { fi: true, sv: true }
+
+profile.option.hasKids.no:
+  en: "No kids"
+  description: "Option no of the hasKids field (#145 registry, ADR-019)."
+  fi: "Ei lapsia"
+  sv: "Inga barn"
+  machine: { fi: true, sv: true }
+
+profile.option.hasKids.yes_with_me:
+  en: "Yes, living with me"
+  description: "Option yes_with_me of the hasKids field (#145 registry, ADR-019)."
+  fi: "Kyllä, asuvat kanssani"
+  sv: "Ja, bor hos mig"
+  machine: { fi: true, sv: true }
+
+profile.option.hasKids.yes_not_with_me:
+  en: "Yes, not living with me"
+  description: "Option yes_not_with_me of the hasKids field (#145 registry, ADR-019)."
+  fi: "Kyllä, eivät asu kanssani"
+  sv: "Ja, bor inte hos mig"
+  machine: { fi: true, sv: true }
+
+profile.option.wantsKids.want:
+  en: "Want kids"
+  description: "Option want of the wantsKids field (#145 registry, ADR-019)."
+  fi: "Haluan lapsia"
+  sv: "Vill ha barn"
+  machine: { fi: true, sv: true }
+
+profile.option.wantsKids.dont_want:
+  en: "Don't want kids"
+  description: "Option dont_want of the wantsKids field (#145 registry, ADR-019)."
+  fi: "En halua lapsia"
+  sv: "Vill inte ha barn"
+  machine: { fi: true, sv: true }
+
+profile.option.wantsKids.not_sure:
+  en: "Not sure"
+  description: "Option not_sure of the wantsKids field (#145 registry, ADR-019)."
+  fi: "En ole varma"
+  sv: "Inte säker"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.never:
+  en: "Never"
+  description: "Option never of the smoking field (#145 registry, ADR-019)."
+  fi: "En koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.regularly:
+  en: "Regularly"
+  description: "Option regularly of the smoking field (#145 registry, ADR-019)."
+  fi: "Säännöllisesti"
+  sv: "Regelbundet"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.quitting:
+  en: "Quitting"
+  description: "Option quitting of the smoking field (#145 registry, ADR-019)."
+  fi: "Lopettamassa"
+  sv: "Håller på att sluta"
+  machine: { fi: true, sv: true }
+
+profile.option.education.peruskoulu:
+  en: "Comprehensive school"
+  description: "Option peruskoulu of the education field (#145 registry, ADR-019)."
+  fi: "Peruskoulu"
+  sv: "Grundskola"
+  machine: { fi: true, sv: true }
+
+profile.option.education.toinen_aste:
+  en: "Upper secondary or vocational"
+  description: "Option toinen_aste of the education field (#145 registry, ADR-019)."
+  fi: "Toinen aste"
+  sv: "Andra stadiet"
+  machine: { fi: true, sv: true }
+
+profile.option.education.amk:
+  en: "University of applied sciences"
+  description: "Option amk of the education field (#145 registry, ADR-019)."
+  fi: "AMK"
+  sv: "Yrkeshögskola"
+  machine: { fi: true, sv: true }
+
+profile.option.education.kandi:
+  en: "Bachelor's"
+  description: "Option kandi of the education field (#145 registry, ADR-019)."
+  fi: "Kandi"
+  sv: "Kandidat"
+  machine: { fi: true, sv: true }
+
+profile.option.education.maisteri:
+  en: "Master's or YAMK"
+  description: "Option maisteri of the education field (#145 registry, ADR-019)."
+  fi: "Maisteri tai YAMK"
+  sv: "Magister eller högre YH"
+  machine: { fi: true, sv: true }
+
+profile.option.education.tohtori:
+  en: "Doctorate"
+  description: "Option tohtori of the education field (#145 registry, ADR-019)."
+  fi: "Tohtori"
+  sv: "Doktor"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.never:
+  en: "Never"
+  description: "Option never of the drinking field (#145 registry, ADR-019)."
+  fi: "En koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.rarely:
+  en: "Rarely"
+  description: "Option rarely of the drinking field (#145 registry, ADR-019)."
+  fi: "Harvoin"
+  sv: "Sällan"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.socially:
+  en: "Socially"
+  description: "Option socially of the drinking field (#145 registry, ADR-019)."
+  fi: "Seurassa"
+  sv: "I sällskap"
+  machine: { fi: true, sv: true }
+
+profile.option.drinking.often:
+  en: "Often"
+  description: "Option often of the drinking field (#145 registry, ADR-019)."
+  fi: "Usein"
+  sv: "Ofta"
+  machine: { fi: true, sv: true }
+
+profile.option.drugsAttitude.not_my_thing:
+  en: "Not my thing"
+  description: "Option not_my_thing of the drugsAttitude field (#145 registry, ADR-019)."
+  fi: "Ei minun juttuni"
+  sv: "Inte min grej"
+  machine: { fi: true, sv: true }
+
+profile.option.drugsAttitude.dont_mind:
+  en: "Don't mind"
+  description: "Option dont_mind of the drugsAttitude field (#145 registry, ADR-019)."
+  fi: "Ei haittaa"
+  sv: "Stör mig inte"
+  machine: { fi: true, sv: true }
+
+profile.option.drugsAttitude.fine_with_it:
+  en: "Fine with it"
+  description: "Option fine_with_it of the drugsAttitude field (#145 registry, ADR-019)."
+  fi: "Ihan ok"
+  sv: "Helt okej"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.hiking:
+  en: "Hiking"
+  description: "Option hiking of the hobbies field (#145 registry, ADR-019)."
+  fi: "Vaellus"
+  sv: "Vandring"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cycling:
+  en: "Cycling"
+  description: "Option cycling of the hobbies field (#145 registry, ADR-019)."
+  fi: "Pyöräily"
+  sv: "Cykling"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.running:
+  en: "Running"
+  description: "Option running of the hobbies field (#145 registry, ADR-019)."
+  fi: "Juoksu"
+  sv: "Löpning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.skiing:
+  en: "Skiing"
+  description: "Option skiing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Hiihto"
+  sv: "Skidåkning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.swimming:
+  en: "Swimming"
+  description: "Option swimming of the hobbies field (#145 registry, ADR-019)."
+  fi: "Uinti"
+  sv: "Simning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.sailing:
+  en: "Sailing"
+  description: "Option sailing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Purjehdus"
+  sv: "Segling"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.foraging:
+  en: "Mushrooms and berries"
+  description: "Option foraging of the hobbies field (#145 registry, ADR-019)."
+  fi: "Sienet ja marjat"
+  sv: "Svamp och bär"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.fishing:
+  en: "Fishing"
+  description: "Option fishing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kalastus"
+  sv: "Fiske"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.climbing:
+  en: "Climbing"
+  description: "Option climbing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kiipeily"
+  sv: "Klättring"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.gym:
+  en: "Gym"
+  description: "Option gym of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kuntosali"
+  sv: "Gym"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.football:
+  en: "Football"
+  description: "Option football of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jalkapallo"
+  sv: "Fotboll"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.floorball:
+  en: "Floorball"
+  description: "Option floorball of the hobbies field (#145 registry, ADR-019)."
+  fi: "Salibandy"
+  sv: "Innebandy"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.ice_hockey:
+  en: "Ice hockey"
+  description: "Option ice_hockey of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jääkiekko"
+  sv: "Ishockey"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.yoga:
+  en: "Yoga"
+  description: "Option yoga of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jooga"
+  sv: "Yoga"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.dance:
+  en: "Dance"
+  description: "Option dance of the hobbies field (#145 registry, ADR-019)."
+  fi: "Tanssi"
+  sv: "Dans"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.martial_arts:
+  en: "Martial arts"
+  description: "Option martial_arts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kamppailulajit"
+  sv: "Kampsport"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.padel:
+  en: "Padel"
+  description: "Option padel of the hobbies field (#145 registry, ADR-019)."
+  fi: "Padel"
+  sv: "Padel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.photography:
+  en: "Photography"
+  description: "Option photography of the hobbies field (#145 registry, ADR-019)."
+  fi: "Valokuvaus"
+  sv: "Fotografering"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.drawing:
+  en: "Drawing"
+  description: "Option drawing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Piirtäminen"
+  sv: "Teckning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.making_music:
+  en: "Making music"
+  description: "Option making_music of the hobbies field (#145 registry, ADR-019)."
+  fi: "Musiikin tekeminen"
+  sv: "Att göra musik"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.writing:
+  en: "Writing"
+  description: "Option writing of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kirjoittaminen"
+  sv: "Skrivande"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.crafts:
+  en: "Crafts"
+  description: "Option crafts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Käsityöt"
+  sv: "Handarbete"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.theatre:
+  en: "Theatre"
+  description: "Option theatre of the hobbies field (#145 registry, ADR-019)."
+  fi: "Teatteri"
+  sv: "Teater"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cooking:
+  en: "Cooking"
+  description: "Option cooking of the hobbies field (#145 registry, ADR-019)."
+  fi: "Ruoanlaitto"
+  sv: "Matlagning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.baking:
+  en: "Baking"
+  description: "Option baking of the hobbies field (#145 registry, ADR-019)."
+  fi: "Leipominen"
+  sv: "Bakning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.coffee:
+  en: "Coffee"
+  description: "Option coffee of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kahvi"
+  sv: "Kaffe"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.wine_and_beer:
+  en: "Wine and beer"
+  description: "Option wine_and_beer of the hobbies field (#145 registry, ADR-019)."
+  fi: "Viini ja olut"
+  sv: "Vin och öl"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.reading:
+  en: "Reading"
+  description: "Option reading of the hobbies field (#145 registry, ADR-019)."
+  fi: "Lukeminen"
+  sv: "Läsning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cinema:
+  en: "Cinema"
+  description: "Option cinema of the hobbies field (#145 registry, ADR-019)."
+  fi: "Elokuvat"
+  sv: "Film"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.museums:
+  en: "Museums"
+  description: "Option museums of the hobbies field (#145 registry, ADR-019)."
+  fi: "Museot"
+  sv: "Museer"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.concerts:
+  en: "Concerts"
+  description: "Option concerts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Konsertit"
+  sv: "Konserter"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.podcasts:
+  en: "Podcasts"
+  description: "Option podcasts of the hobbies field (#145 registry, ADR-019)."
+  fi: "Podcastit"
+  sv: "Poddar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.board_games:
+  en: "Board games"
+  description: "Option board_games of the hobbies field (#145 registry, ADR-019)."
+  fi: "Lautapelit"
+  sv: "Brädspel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.video_games:
+  en: "Video games"
+  description: "Option video_games of the hobbies field (#145 registry, ADR-019)."
+  fi: "Videopelit"
+  sv: "Tv-spel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.chess:
+  en: "Chess"
+  description: "Option chess of the hobbies field (#145 registry, ADR-019)."
+  fi: "Shakki"
+  sv: "Schack"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.puzzles:
+  en: "Puzzles"
+  description: "Option puzzles of the hobbies field (#145 registry, ADR-019)."
+  fi: "Pulmat"
+  sv: "Pussel"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.gardening:
+  en: "Gardening"
+  description: "Option gardening of the hobbies field (#145 registry, ADR-019)."
+  fi: "Puutarhanhoito"
+  sv: "Trädgård"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.sauna:
+  en: "Sauna"
+  description: "Option sauna of the hobbies field (#145 registry, ADR-019)."
+  fi: "Sauna"
+  sv: "Bastu"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cottage:
+  en: "The cottage"
+  description: "Option cottage of the hobbies field (#145 registry, ADR-019)."
+  fi: "Mökkeily"
+  sv: "Stugliv"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.diy:
+  en: "DIY"
+  description: "Option diy of the hobbies field (#145 registry, ADR-019)."
+  fi: "Nikkarointi"
+  sv: "Gör det själv"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.travelling:
+  en: "Travelling"
+  description: "Option travelling of the hobbies field (#145 registry, ADR-019)."
+  fi: "Matkustelu"
+  sv: "Resor"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.road_trips:
+  en: "Road trips"
+  description: "Option road_trips of the hobbies field (#145 registry, ADR-019)."
+  fi: "Automatkat"
+  sv: "Bilsemester"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.learning_languages:
+  en: "Learning languages"
+  description: "Option learning_languages of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kielten opiskelu"
+  sv: "Språkinlärning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.dogs:
+  en: "Dogs"
+  description: "Option dogs of the hobbies field (#145 registry, ADR-019)."
+  fi: "Koirat"
+  sv: "Hundar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.cats:
+  en: "Cats"
+  description: "Option cats of the hobbies field (#145 registry, ADR-019)."
+  fi: "Kissat"
+  sv: "Katter"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.horses:
+  en: "Horses"
+  description: "Option horses of the hobbies field (#145 registry, ADR-019)."
+  fi: "Hevoset"
+  sv: "Hästar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.birdwatching:
+  en: "Birdwatching"
+  description: "Option birdwatching of the hobbies field (#145 registry, ADR-019)."
+  fi: "Lintujen tarkkailu"
+  sv: "Fågelskådning"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.programming:
+  en: "Programming"
+  description: "Option programming of the hobbies field (#145 registry, ADR-019)."
+  fi: "Ohjelmointi"
+  sv: "Programmering"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.electronics:
+  en: "Electronics"
+  description: "Option electronics of the hobbies field (#145 registry, ADR-019)."
+  fi: "Elektroniikka"
+  sv: "Elektronik"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.astronomy:
+  en: "Astronomy"
+  description: "Option astronomy of the hobbies field (#145 registry, ADR-019)."
+  fi: "Tähtitiede"
+  sv: "Astronomi"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.volunteering:
+  en: "Volunteering"
+  description: "Option volunteering of the hobbies field (#145 registry, ADR-019)."
+  fi: "Vapaaehtoistyö"
+  sv: "Frivilligarbete"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.karaoke:
+  en: "Karaoke"
+  description: "Option karaoke of the hobbies field (#145 registry, ADR-019)."
+  fi: "Karaoke"
+  sv: "Karaoke"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.pub_quiz:
+  en: "Pub quiz"
+  description: "Option pub_quiz of the hobbies field (#145 registry, ADR-019)."
+  fi: "Pubivisa"
+  sv: "Pubquiz"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.dinner_parties:
+  en: "Dinner parties"
+  description: "Option dinner_parties of the hobbies field (#145 registry, ADR-019)."
+  fi: "Illalliskutsut"
+  sv: "Middagsbjudningar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.meditation:
+  en: "Meditation"
+  description: "Option meditation of the hobbies field (#145 registry, ADR-019)."
+  fi: "Meditaatio"
+  sv: "Meditation"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.winter_swimming:
+  en: "Winter swimming"
+  description: "Option winter_swimming of the hobbies field (#145 registry, ADR-019)."
+  fi: "Avantouinti"
+  sv: "Vinterbad"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.forest_walks:
+  en: "Forest walks"
+  description: "Option forest_walks of the hobbies field (#145 registry, ADR-019)."
+  fi: "Metsäkävelyt"
+  sv: "Skogspromenader"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.slow_mornings:
+  en: "Slow mornings"
+  description: "Option slow_mornings of the hobbies field (#145 registry, ADR-019)."
+  fi: "Hitaat aamut"
+  sv: "Långsamma morgnar"
+  machine: { fi: true, sv: true }
+
+profile.option.hobbies.other:
+  en: "Something else"
+  description: "Option other of the hobbies field (#145 registry, ADR-019)."
+  fi: "Jotain muuta"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.never:
+  en: "Never"
+  description: "Option never of the exercise field (#145 registry, ADR-019)."
+  fi: "En koskaan"
+  sv: "Aldrig"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.sometimes:
+  en: "Sometimes"
+  description: "Option sometimes of the exercise field (#145 registry, ADR-019)."
+  fi: "Joskus"
+  sv: "Ibland"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.weekly:
+  en: "Weekly"
+  description: "Option weekly of the exercise field (#145 registry, ADR-019)."
+  fi: "Viikoittain"
+  sv: "Varje vecka"
+  machine: { fi: true, sv: true }
+
+profile.option.exercise.daily:
+  en: "Daily"
+  description: "Option daily of the exercise field (#145 registry, ADR-019)."
+  fi: "Päivittäin"
+  sv: "Dagligen"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.dog:
+  en: "Dog"
+  description: "Option dog of the pets field (#145 registry, ADR-019)."
+  fi: "Koira"
+  sv: "Hund"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.cat:
+  en: "Cat"
+  description: "Option cat of the pets field (#145 registry, ADR-019)."
+  fi: "Kissa"
+  sv: "Katt"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.other:
+  en: "Other pet"
+  description: "Option other of the pets field (#145 registry, ADR-019)."
+  fi: "Muu lemmikki"
+  sv: "Annat husdjur"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.none:
+  en: "No pets"
+  description: "Option none of the pets field (#145 registry, ADR-019)."
+  fi: "Ei lemmikkejä"
+  sv: "Inga husdjur"
+  machine: { fi: true, sv: true }
+
+profile.option.pets.allergic:
+  en: "Allergic"
+  description: "Option allergic of the pets field (#145 registry, ADR-019)."
+  fi: "Allerginen"
+  sv: "Allergisk"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.student:
+  en: "Student"
+  description: "Option student of the occupation field (#145 registry, ADR-019)."
+  fi: "Opiskelija"
+  sv: "Studerande"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.tech:
+  en: "Tech"
+  description: "Option tech of the occupation field (#145 registry, ADR-019)."
+  fi: "Teknologia"
+  sv: "Teknik"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.healthcare:
+  en: "Health care"
+  description: "Option healthcare of the occupation field (#145 registry, ADR-019)."
+  fi: "Terveydenhuolto"
+  sv: "Hälsovård"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.education:
+  en: "Education"
+  description: "Option education of the occupation field (#145 registry, ADR-019)."
+  fi: "Opetus"
+  sv: "Utbildning"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.business:
+  en: "Business"
+  description: "Option business of the occupation field (#145 registry, ADR-019)."
+  fi: "Liike-elämä"
+  sv: "Affärsliv"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.arts_culture:
+  en: "Arts and culture"
+  description: "Option arts_culture of the occupation field (#145 registry, ADR-019)."
+  fi: "Taide ja kulttuuri"
+  sv: "Konst och kultur"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.science:
+  en: "Science and research"
+  description: "Option science of the occupation field (#145 registry, ADR-019)."
+  fi: "Tiede ja tutkimus"
+  sv: "Vetenskap och forskning"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.trades_construction:
+  en: "Trades and construction"
+  description: "Option trades_construction of the occupation field (#145 registry, ADR-019)."
+  fi: "Rakentaminen ja asennus"
+  sv: "Hantverk och bygg"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.service_hospitality:
+  en: "Service and hospitality"
+  description: "Option service_hospitality of the occupation field (#145 registry, ADR-019)."
+  fi: "Palvelut ja ravintolat"
+  sv: "Service och restaurang"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.public_sector:
+  en: "Public sector"
+  description: "Option public_sector of the occupation field (#145 registry, ADR-019)."
+  fi: "Julkinen sektori"
+  sv: "Offentlig sektor"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.transport:
+  en: "Transport and logistics"
+  description: "Option transport of the occupation field (#145 registry, ADR-019)."
+  fi: "Kuljetus ja logistiikka"
+  sv: "Transport och logistik"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.agriculture:
+  en: "Agriculture and nature"
+  description: "Option agriculture of the occupation field (#145 registry, ADR-019)."
+  fi: "Maatalous ja luonto"
+  sv: "Jordbruk och natur"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.media:
+  en: "Media and communication"
+  description: "Option media of the occupation field (#145 registry, ADR-019)."
+  fi: "Media ja viestintä"
+  sv: "Media och kommunikation"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.law_finance:
+  en: "Law and finance"
+  description: "Option law_finance of the occupation field (#145 registry, ADR-019)."
+  fi: "Laki ja rahoitus"
+  sv: "Juridik och finans"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.sports:
+  en: "Sports and wellbeing"
+  description: "Option sports of the occupation field (#145 registry, ADR-019)."
+  fi: "Liikunta ja hyvinvointi"
+  sv: "Idrott och välmående"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.entrepreneur:
+  en: "Entrepreneur"
+  description: "Option entrepreneur of the occupation field (#145 registry, ADR-019)."
+  fi: "Yrittäjä"
+  sv: "Företagare"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.between_jobs:
+  en: "Between jobs"
+  description: "Option between_jobs of the occupation field (#145 registry, ADR-019)."
+  fi: "Työnhaussa"
+  sv: "Mellan jobb"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.retired:
+  en: "Retired"
+  description: "Option retired of the occupation field (#145 registry, ADR-019)."
+  fi: "Eläkkeellä"
+  sv: "Pensionerad"
+  machine: { fi: true, sv: true }
+
+profile.option.occupation.other:
+  en: "Something else"
+  description: "Option other of the occupation field (#145 registry, ADR-019)."
+  fi: "Jotain muuta"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kok:
+  en: "National Coalition Party"
+  description: "Option kok of the politics field (#145 registry, ADR-019)."
+  fi: "Kokoomus"
+  sv: "Samlingspartiet"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.ps:
+  en: "Finns Party"
+  description: "Option ps of the politics field (#145 registry, ADR-019)."
+  fi: "Perussuomalaiset"
+  sv: "Sannfinländarna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.sdp:
+  en: "Social Democrats"
+  description: "Option sdp of the politics field (#145 registry, ADR-019)."
+  fi: "SDP"
+  sv: "Socialdemokraterna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kesk:
+  en: "Centre Party"
+  description: "Option kesk of the politics field (#145 registry, ADR-019)."
+  fi: "Keskusta"
+  sv: "Centern"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.vihr:
+  en: "Greens"
+  description: "Option vihr of the politics field (#145 registry, ADR-019)."
+  fi: "Vihreät"
+  sv: "De Gröna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.vas:
+  en: "Left Alliance"
+  description: "Option vas of the politics field (#145 registry, ADR-019)."
+  fi: "Vasemmistoliitto"
+  sv: "Vänsterförbundet"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.rkp:
+  en: "Swedish People's Party"
+  description: "Option rkp of the politics field (#145 registry, ADR-019)."
+  fi: "RKP"
+  sv: "SFP"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kd:
+  en: "Christian Democrats"
+  description: "Option kd of the politics field (#145 registry, ADR-019)."
+  fi: "Kristillisdemokraatit"
+  sv: "Kristdemokraterna"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.liik:
+  en: "Movement Now"
+  description: "Option liik of the politics field (#145 registry, ADR-019)."
+  fi: "Liike Nyt"
+  sv: "Rörelse Nu"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.none_of_them:
+  en: "None of them"
+  description: "Option none_of_them of the politics field (#145 registry, ADR-019)."
+  fi: "Ei mikään näistä"
+  sv: "Inget av dem"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.kahvipuolue:
+  en: "The Coffee Party"
+  description: "Option kahvipuolue of the politics field (#145 registry, ADR-019)."
+  fi: "Kahvipuolue"
+  sv: "Kaffepartiet"
+  machine: { fi: true, sv: true }
+
+profile.option.politics.pp:
+  en: "Pirate Party"
+  description: "Option pp of the politics field, Piraattipuolue (#213)."
+  fi: "Piraattipuolue"
+  sv: "Piratpartiet"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.lutheran:
+  en: "Lutheran"
+  description: "Option lutheran of the religion field (#145 registry, ADR-019)."
+  fi: "Luterilainen"
+  sv: "Lutheran"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.orthodox:
+  en: "Orthodox"
+  description: "Option orthodox of the religion field (#145 registry, ADR-019)."
+  fi: "Ortodoksi"
+  sv: "Ortodox"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.other_christian:
+  en: "Other Christian"
+  description: "Option other_christian of the religion field (#145 registry, ADR-019)."
+  fi: "Muu kristitty"
+  sv: "Annan kristen"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.muslim:
+  en: "Muslim"
+  description: "Option muslim of the religion field (#145 registry, ADR-019)."
+  fi: "Muslimi"
+  sv: "Muslim"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.jewish:
+  en: "Jewish"
+  description: "Option jewish of the religion field (#145 registry, ADR-019)."
+  fi: "Juutalainen"
+  sv: "Judisk"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.buddhist:
+  en: "Buddhist"
+  description: "Option buddhist of the religion field (#145 registry, ADR-019)."
+  fi: "Buddhalainen"
+  sv: "Buddhist"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.hindu:
+  en: "Hindu"
+  description: "Option hindu of the religion field (#145 registry, ADR-019)."
+  fi: "Hindu"
+  sv: "Hindu"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.spiritual:
+  en: "Spiritual"
+  description: "Option spiritual of the religion field (#145 registry, ADR-019)."
+  fi: "Henkinen"
+  sv: "Andlig"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.agnostic:
+  en: "Agnostic"
+  description: "Option agnostic of the religion field (#145 registry, ADR-019)."
+  fi: "Agnostikko"
+  sv: "Agnostiker"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.atheist:
+  en: "Atheist"
+  description: "Option atheist of the religion field (#145 registry, ADR-019)."
+  fi: "Ateisti"
+  sv: "Ateist"
+  machine: { fi: true, sv: true }
+
+profile.option.religion.other:
+  en: "Something else"
+  description: "Option other of the religion field (#145 registry, ADR-019)."
+  fi: "Jokin muu"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.aries:
+  en: "Aries"
+  description: "Option aries of the zodiac field (#145 registry, ADR-019)."
+  fi: "Oinas"
+  sv: "Väduren"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.taurus:
+  en: "Taurus"
+  description: "Option taurus of the zodiac field (#145 registry, ADR-019)."
+  fi: "Härkä"
+  sv: "Oxen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.gemini:
+  en: "Gemini"
+  description: "Option gemini of the zodiac field (#145 registry, ADR-019)."
+  fi: "Kaksoset"
+  sv: "Tvillingarna"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.cancer:
+  en: "Cancer"
+  description: "Option cancer of the zodiac field (#145 registry, ADR-019)."
+  fi: "Rapu"
+  sv: "Kräftan"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.leo:
+  en: "Leo"
+  description: "Option leo of the zodiac field (#145 registry, ADR-019)."
+  fi: "Leijona"
+  sv: "Lejonet"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.virgo:
+  en: "Virgo"
+  description: "Option virgo of the zodiac field (#145 registry, ADR-019)."
+  fi: "Neitsyt"
+  sv: "Jungfrun"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.libra:
+  en: "Libra"
+  description: "Option libra of the zodiac field (#145 registry, ADR-019)."
+  fi: "Vaaka"
+  sv: "Vågen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.scorpio:
+  en: "Scorpio"
+  description: "Option scorpio of the zodiac field (#145 registry, ADR-019)."
+  fi: "Skorpioni"
+  sv: "Skorpionen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.sagittarius:
+  en: "Sagittarius"
+  description: "Option sagittarius of the zodiac field (#145 registry, ADR-019)."
+  fi: "Jousimies"
+  sv: "Skytten"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.capricorn:
+  en: "Capricorn"
+  description: "Option capricorn of the zodiac field (#145 registry, ADR-019)."
+  fi: "Kauris"
+  sv: "Stenbocken"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.aquarius:
+  en: "Aquarius"
+  description: "Option aquarius of the zodiac field (#145 registry, ADR-019)."
+  fi: "Vesimies"
+  sv: "Vattumannen"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.pisces:
+  en: "Pisces"
+  description: "Option pisces of the zodiac field (#145 registry, ADR-019)."
+  fi: "Kalat"
+  sv: "Fiskarna"
+  machine: { fi: true, sv: true }
+
+profile.option.zodiac.corgi:
+  en: "Corgi"
+  description: "Option corgi of the zodiac field (#145 registry, ADR-019)."
+  fi: "Corgi"
+  sv: "Corgi"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fi:
+  en: "suomi"
+  description: "Option fi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "suomi"
+  sv: "suomi"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.sv:
+  en: "svenska"
+  description: "Option sv of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "svenska"
+  sv: "svenska"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.en:
+  en: "English"
+  description: "Option en of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "English"
+  sv: "English"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.se:
+  en: "davvisámegiella"
+  description: "Option se of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "davvisámegiella"
+  sv: "davvisámegiella"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.et:
+  en: "eesti"
+  description: "Option et of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "eesti"
+  sv: "eesti"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ru:
+  en: "русский"
+  description: "Option ru of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "русский"
+  sv: "русский"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.uk:
+  en: "українська"
+  description: "Option uk of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "українська"
+  sv: "українська"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ar:
+  en: "العربية"
+  description: "Option ar of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "العربية"
+  sv: "العربية"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.so:
+  en: "Soomaali"
+  description: "Option so of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Soomaali"
+  sv: "Soomaali"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fa:
+  en: "فارسی"
+  description: "Option fa of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "فارسی"
+  sv: "فارسی"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ku:
+  en: "Kurdî"
+  description: "Option ku of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Kurdî"
+  sv: "Kurdî"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.zh:
+  en: "中文"
+  description: "Option zh of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "中文"
+  sv: "中文"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.sq:
+  en: "shqip"
+  description: "Option sq of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "shqip"
+  sv: "shqip"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.vi:
+  en: "Tiếng Việt"
+  description: "Option vi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Tiếng Việt"
+  sv: "Tiếng Việt"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.th:
+  en: "ไทย"
+  description: "Option th of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "ไทย"
+  sv: "ไทย"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.tr:
+  en: "Türkçe"
+  description: "Option tr of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Türkçe"
+  sv: "Türkçe"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.es:
+  en: "español"
+  description: "Option es of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "español"
+  sv: "español"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.de:
+  en: "Deutsch"
+  description: "Option de of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Deutsch"
+  sv: "Deutsch"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.fr:
+  en: "français"
+  description: "Option fr of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "français"
+  sv: "français"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.tl:
+  en: "Tagalog"
+  description: "Option tl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Tagalog"
+  sv: "Tagalog"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.pl:
+  en: "polski"
+  description: "Option pl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "polski"
+  sv: "polski"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.it:
+  en: "italiano"
+  description: "Option it of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "italiano"
+  sv: "italiano"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.pt:
+  en: "português"
+  description: "Option pt of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "português"
+  sv: "português"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.hi:
+  en: "हिन्दी"
+  description: "Option hi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "हिन्दी"
+  sv: "हिन्दी"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ne:
+  en: "नेपाली"
+  description: "Option ne of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "नेपाली"
+  sv: "नेपाली"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.bn:
+  en: "বাংলা"
+  description: "Option bn of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "বাংলা"
+  sv: "বাংলা"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ur:
+  en: "اردو"
+  description: "Option ur of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "اردو"
+  sv: "اردو"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ro:
+  en: "română"
+  description: "Option ro of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "română"
+  sv: "română"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.hu:
+  en: "magyar"
+  description: "Option hu of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "magyar"
+  sv: "magyar"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ja:
+  en: "日本語"
+  description: "Option ja of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "日本語"
+  sv: "日本語"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.lt:
+  en: "lietuvių"
+  description: "Option lt of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "lietuvių"
+  sv: "lietuvių"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.lv:
+  en: "latviešu"
+  description: "Option lv of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "latviešu"
+  sv: "latviešu"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.nl:
+  en: "Nederlands"
+  description: "Option nl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "Nederlands"
+  sv: "Nederlands"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.ko:
+  en: "한국어"
+  description: "Option ko of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  fi: "한국어"
+  sv: "한국어"
+  machine: { fi: true, sv: true }
+
+profile.option.languages.other:
+  en: "Another language"
+  description: "Option other of the languages field (#145 registry)."
+  fi: "Muu kieli"
+  sv: "Ett annat språk"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.outdoors:
+  en: "Outdoors"
+  description: "Heading of the outdoors group of the hobby chip grid (#145, #148)."
+  fi: "Ulkoilu"
+  sv: "Friluftsliv"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.sports:
+  en: "Sports"
+  description: "Heading of the sports group of the hobby chip grid (#145, #148)."
+  fi: "Urheilu"
+  sv: "Sport"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.creative:
+  en: "Creative"
+  description: "Heading of the creative group of the hobby chip grid (#145, #148)."
+  fi: "Luovaa"
+  sv: "Kreativt"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.food:
+  en: "Food and drink"
+  description: "Heading of the food group of the hobby chip grid (#145, #148)."
+  fi: "Ruoka ja juoma"
+  sv: "Mat och dryck"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.culture:
+  en: "Culture"
+  description: "Heading of the culture group of the hobby chip grid (#145, #148)."
+  fi: "Kulttuuri"
+  sv: "Kultur"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.games:
+  en: "Games"
+  description: "Heading of the games group of the hobby chip grid (#145, #148)."
+  fi: "Pelit"
+  sv: "Spel"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.home:
+  en: "Home"
+  description: "Heading of the home group of the hobby chip grid (#145, #148)."
+  fi: "Koti"
+  sv: "Hemma"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.travel:
+  en: "Travel"
+  description: "Heading of the travel group of the hobby chip grid (#145, #148)."
+  fi: "Matkailu"
+  sv: "Resor"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.animals:
+  en: "Animals"
+  description: "Heading of the animals group of the hobby chip grid (#145, #148)."
+  fi: "Eläimet"
+  sv: "Djur"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.tech:
+  en: "Tech and science"
+  description: "Heading of the tech group of the hobby chip grid (#145, #148)."
+  fi: "Tekniikka ja tiede"
+  sv: "Teknik och vetenskap"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.social:
+  en: "Social"
+  description: "Heading of the social group of the hobby chip grid (#145, #148)."
+  fi: "Seuraelämä"
+  sv: "Socialt"
+  machine: { fi: true, sv: true }
+
+profile.hobbyGroup.wellbeing:
+  en: "Wellbeing"
+  description: "Heading of the wellbeing group of the hobby chip grid (#145, #148)."
+  fi: "Hyvinvointi"
+  sv: "Välmående"
   machine: { fi: true, sv: true }
 
 profile.prompt.sunday:
@@ -923,6 +2309,13 @@ profile.card.photoLabel:
   sv: "Foto {position, number} av {total, number}"
   machine: { fi: true, sv: true }
 
+profile.card.sharedOption:
+  en: "{option} (you too)"
+  description: "An answer on a card that the viewer gave as well (#150): a hobby or a language both answered, marked in words, never a count."
+  fi: "{option} (sinäkin)"
+  sv: "{option} (du också)"
+  machine: { fi: true, sv: true }
+
 profile.card.back:
   en: "Back to your profile"
   description: "Back button of the card preview."
@@ -970,6 +2363,18 @@ legal.research.summary:
   fi: "LUONNOS: Jos sanot kyllä, anonymisoituja tapahtumia Kuutin käytöstäsi (esimerkiksi että kierros näytettiin tai tykkäys lähetettiin; ei koskaan viestien tekstiä eikä sitä, kuka olet) säilytetään erillisellä tutkimustunnisteella enintään 90 päivää, ja yhdistyksen tutkimuskumppani käyttää niitä yhdistämisen toiminnan tutkimiseen. Voit perua milloin tahansa; peruminen poistaa yhteyden sinun ja tapahtumien välillä."
   consent_version: "2026-09-draft-1"
 
+legal.special_category.title:
+  en: "Sensitive answers"
+  description: "Heading of the special-category consent (#145, ADR-019 §4): whom you seek, the parties you could vote for, your religion. Binding legal text; the Finnish is the wording that counts."
+  fi: "Arkaluonteiset tiedot"
+  consent_version: "2026-10-draft-2"
+
+legal.special_category.summary:
+  en: "DRAFT: Whom you seek, the parties you could vote for and your religion are special categories of personal data. If you say yes, Kuutti stores the answers you give to these questions: whom you seek only to match you, never shown to anyone; the parties and the religion on your card, when you choose to fill them in. None of them ever goes into a log or a research event, and you can withdraw this consent at any time, which removes the answers. Without your yes these questions stay unanswered."
+  description: "The special-category consent the person accepts by version (#145, ADR-019 §4; GDPR art. 9(2)(a)). DRAFT wording for the association's counsel."
+  fi: "LUONNOS: Se, kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi ovat erityisiä henkilötietoryhmiä. Jos sanot kyllä, Kuutti tallentaa näihin kysymyksiin antamasi vastaukset: kenen seuraa etsit vain yhdistämistä varten, eikä sitä näytetä kenellekään; puolueet ja uskonnon kortillasi, jos päätät täyttää ne. Mikään niistä ei koskaan päädy lokiin eikä tutkimustapahtumaan, ja voit perua tämän suostumuksen milloin tahansa, jolloin vastaukset poistetaan. Ilman kyllä-vastaustasi nämä kysymykset jäävät vastaamatta."
+  consent_version: "2026-10-draft-2"
+
 settings.open:
   en: Settings
   description: Screen-reader label of the icon button that opens the settings sheet (non-production builds).
@@ -982,13 +2387,6 @@ settings.title:
   description: Title of the settings sheet.
   fi: Asetukset
   sv: Inställningar
-  machine: { fi: true, sv: true }
-
-settings.devOnly:
-  en: Shown in development builds only.
-  description: Note under the title of the settings sheet.
-  fi: Näkyy vain kehitysversioissa.
-  sv: Visas bara i utvecklingsversioner.
   machine: { fi: true, sv: true }
 
 settings.close:
@@ -1073,20 +2471,6 @@ about.source.open:
   description: Screen-reader label of the link that opens the source repository in the system browser.
   fi: Avaa lähdekoodi selaimessa
   sv: Öppna källkoden i webbläsaren
-  machine: { fi: true, sv: true }
-
-settings.errorTest.send:
-  en: Send a test error
-  description: Settings sheet of non-production builds. Button that reports one marked error to the error tracker, to check that reporting works. Short, on a button.
-  fi: Lähetä testivirhe
-  sv: Skicka ett testfel
-  machine: { fi: true, sv: true }
-
-settings.errorTest.sent:
-  en: Test error sent. It shows up in the error tracker within a minute if reporting is on in this build.
-  description: Settings sheet, shown under the button after it was pressed.
-  fi: Testivirhe lähetetty. Se näkyy virheseurannassa minuutin kuluessa, jos raportointi on päällä tässä versiossa.
-  sv: Testfelet har skickats. Det syns i felspårningen inom en minut om rapportering är på i den här versionen.
   machine: { fi: true, sv: true }
 
 errors.validation_failed:
@@ -1299,6 +2683,20 @@ errors.too_many_changes:
   sv: "Du har ändrat det här många gånger i dag. Försök igen i morgon."
   machine: { fi: true, sv: true }
 
+errors.change_too_soon:
+  en: "You changed this recently. A change is possible again once the waiting time has passed."
+  description: "PUT /account/gender or PUT /preferences (429): the gender or whom one seeks was changed less than change_cadence_days ago (#147, ADR-015 §9). No hostile wording: somebody transitioning must not hit a wall. The app adds the date (onboarding.changeFrom)."
+  fi: "Muutit tätä äskettäin. Muutos on taas mahdollinen, kun odotusaika on kulunut."
+  sv: "Du ändrade det här nyligen. En ändring är möjlig igen när väntetiden har gått."
+  machine: { fi: true, sv: true }
+
+errors.filter_unanswered:
+  en: "To filter on this, share your own answer first."
+  description: "PUT /preferences/deal-breakers (409): a deal-breaker on a field the person has not answered themselves (#149, the disclose-to-filter rule)."
+  fi: "Suodattaaksesi tällä kerro ensin oma vastauksesi."
+  sv: "För att filtrera på det här, dela ditt eget svar först."
+  machine: { fi: true, sv: true }
+
 errors.pond_unknown:
   en: "That area is not on the list."
   description: "Pond choice (400), the pond id names no pond (#46)."
@@ -1453,41 +2851,6 @@ signIn.tryAgain:
   sv: Försök igen
   machine: { fi: true, sv: true }
 
-smoke.session.title:
-  en: Session
-  description: Smoke screen, title of the card that shows whether this device is signed in.
-  fi: Istunto
-  sv: Session
-  machine: { fi: true, sv: true }
-
-smoke.session.label:
-  en: Session status
-  description: Screen-reader label of the smoke screen's session card.
-  fi: Istunnon tila
-  sv: Sessionens status
-  machine: { fi: true, sv: true }
-
-smoke.session.signedIn:
-  en: Signed in · session {session}
-  description: Smoke screen, the device holds a session; {session} is the first characters of its id (a device id, never the person).
-  fi: Kirjautunut · istunto {session}
-  sv: Inloggad · session {session}
-  machine: { fi: true, sv: true }
-
-smoke.session.signedOut:
-  en: Not signed in
-  description: Smoke screen, the device holds no session.
-  fi: Ei kirjautunut
-  sv: Inte inloggad
-  machine: { fi: true, sv: true }
-
-smoke.session.signIn:
-  en: Sign in
-  description: Smoke screen, the button that opens the sign-in screen.
-  fi: Kirjaudu sisään
-  sv: Logga in
-  machine: { fi: true, sv: true }
-
 settings.session.label:
   en: This device
   description: Settings sheet, heading of the sign-out controls.
@@ -1553,6 +2916,13 @@ onboarding.loading:
   description: "Shown while the onboarding status loads."
   fi: "Hetki…"
   sv: "Ett ögonblick…"
+  machine: { fi: true, sv: true }
+
+onboarding.changeFrom:
+  en: "Next change possible: {date}."
+  description: "Under errors.change_too_soon in onboarding: the day from which the gender, or whom one seeks, may be changed again, from the status's nextChange (#147, ADR-015 §9). {date} is d.M.yyyy (formatDate)."
+  fi: "Seuraava muutos mahdollinen: {date}."
+  sv: "Nästa ändring möjlig: {date}."
   machine: { fi: true, sv: true }
 
 onboarding.failed:
@@ -1661,10 +3031,10 @@ onboarding.age.title:
   machine: { fi: true, sv: true }
 
 onboarding.age.explain:
-  en: "The youngest and the oldest you want to see, between {min, number} and {max, number}."
+  en: "Between {min, number} and {max, number}. We start around your own age; move the ends as you like."
   description: "Age window lead text; {min} and {max} are the bounds."
-  fi: "Nuorin ja vanhin, jotka haluat nähdä, välillä {min, number} ja {max, number}."
-  sv: "Den yngsta och den äldsta du vill se, mellan {min, number} och {max, number}."
+  fi: "Väliltä {min, number}–{max, number}. Aloitamme oman ikäsi ympäriltä; siirrä päitä kuten haluat."
+  sv: "Mellan {min, number} och {max, number}. Vi börjar kring din egen ålder; flytta ändarna som du vill."
   machine: { fi: true, sv: true }
 
 onboarding.age.youngest:
@@ -1681,39 +3051,11 @@ onboarding.age.oldest:
   sv: "Äldsta"
   machine: { fi: true, sv: true }
 
-onboarding.age.invalid:
-  en: "Both between {min, number} and {max, number}, the youngest at most the oldest."
-  description: "Shown when the age window does not validate."
-  fi: "Molemmat välillä {min, number} ja {max, number}, nuorin enintään vanhin."
-  sv: "Båda mellan {min, number} och {max, number}, den yngsta högst den äldsta."
-  machine: { fi: true, sv: true }
-
-onboarding.pond.title:
-  en: "Where do you want to meet people?"
-  description: "Pond step heading."
-  fi: "Missä haluat tavata ihmisiä?"
-  sv: "Var vill du träffa människor?"
-  machine: { fi: true, sv: true }
-
-onboarding.pond.explain:
-  en: "Matching happens inside the area you choose."
-  description: "Pond step lead text (TD-10)."
-  fi: "Yhdistäminen tapahtuu valitsemasi alueen sisällä."
-  sv: "Matchningen sker inom det område du väljer."
-  machine: { fi: true, sv: true }
-
-onboarding.consents.title:
-  en: "Two things to agree to"
-  description: "Consents step heading."
-  fi: "Kaksi asiaa hyväksyttäväksi"
-  sv: "Två saker att godkänna"
-  machine: { fi: true, sv: true }
-
 onboarding.consents.explain:
-  en: "Read both. You accept exactly this version of the text; if it changes, we ask you again."
+  en: "Read both. You accept exactly this version of each text; if one changes, we ask you again."
   description: "Consents step lead text (versioned consent)."
-  fi: "Lue molemmat. Hyväksyt juuri tämän tekstiversion; jos se muuttuu, kysymme uudelleen."
-  sv: "Läs båda. Du godkänner exakt den här versionen av texten; om den ändras frågar vi igen."
+  fi: "Lue molemmat. Hyväksyt juuri tämän version kummastakin tekstistä; jos jompikumpi muuttuu, kysymme uudelleen."
+  sv: "Läs båda. Du godkänner exakt den här versionen av varje text; om en ändras frågar vi igen."
   machine: { fi: true, sv: true }
 
 onboarding.consents.binding:
@@ -1728,13 +3070,6 @@ onboarding.consents.version:
   description: "The consent version under each legal text; {version} is the consent_version string."
   fi: "Versio {version}"
   sv: "Version {version}"
-  machine: { fi: true, sv: true }
-
-onboarding.consents.accept:
-  en: "I accept the terms and the privacy notice"
-  description: "The one button that gives both required consents."
-  fi: "Hyväksyn käyttöehdot ja tietosuojaselosteen"
-  sv: "Jag godkänner villkoren och integritetsmeddelandet"
   machine: { fi: true, sv: true }
 
 onboarding.consents.outdatedApp:
@@ -1773,10 +3108,213 @@ onboarding.research.later:
   machine: { fi: true, sv: true }
 
 onboarding.done:
-  en: "All set. Add a few photos and fill in your profile next."
+  en: "All set. Your place in line is on the home screen."
   description: "Last line before the flow closes."
-  fi: "Valmista. Lisää seuraavaksi muutama kuva ja täytä profiilisi."
-  sv: "Klart. Lägg till några foton och fyll i din profil härnäst."
+  fi: "Valmista. Paikkasi jonossa näkyy etusivulla."
+  sv: "Klart. Din plats i kön finns på startsidan."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.title:
+  en: "How we do things here"
+  description: "Heading of the welcome screen, the first after the bank login (#146): the norms and the two consents on one screen."
+  fi: "Näin täällä toimitaan"
+  sv: "Så här gör vi här"
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm1:
+  en: "Everybody here has shown a bank ID. Be the person you are."
+  description: "First norm of the welcome screen (#146)."
+  fi: "Jokainen täällä on tunnistautunut pankkitunnuksilla. Ole se, joka olet."
+  sv: "Alla här har visat bank-ID. Var den du är."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm2:
+  en: "You decide with buttons, one person at a time. Nobody here is swiped through."
+  description: "Second norm of the welcome screen (#146)."
+  fi: "Päätät painikkeilla, yksi ihminen kerrallaan. Ketään ei pyyhkäistä ohi."
+  sv: "Du bestämmer med knappar, en person i taget. Ingen här sveps förbi."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm3:
+  en: "No contact details before a match. Your photos stay inside Kuutti."
+  description: "Third norm of the welcome screen (#146)."
+  fi: "Ei yhteystietoja ennen matchia. Kuvasi pysyvät Kuutin sisällä."
+  sv: "Inga kontaktuppgifter före en match. Dina bilder stannar inne i Kuutti."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.norm4:
+  en: "One round a day. Nothing here is for sale."
+  description: "Fourth norm of the welcome screen (#146)."
+  fi: "Yksi kierros päivässä. Täällä ei myydä mitään."
+  sv: "En omgång om dagen. Ingenting här är till salu."
+  machine: { fi: true, sv: true }
+
+onboarding.welcome.accept:
+  en: "I'm in, and I accept both"
+  description: "The one button of the welcome screen: it records the terms and the privacy consent (#146, ADR-010 §9)."
+  fi: "Olen mukana ja hyväksyn molemmat"
+  sv: "Jag är med och godkänner båda"
+  machine: { fi: true, sv: true }
+
+onboarding.name.title:
+  en: "What should we call you?"
+  description: "Heading of the name step (#146)."
+  fi: "Miksi sinua kutsutaan?"
+  sv: "Vad ska vi kalla dig?"
+  machine: { fi: true, sv: true }
+
+onboarding.name.explain:
+  en: "The name on your card. Yours to choose, not the bank's."
+  description: "Explanation under the name step's heading (#146): typed, never prefilled from the bank."
+  fi: "Nimi kortillasi. Sinun valintasi, ei pankin."
+  sv: "Namnet på ditt kort. Ditt val, inte bankens."
+  machine: { fi: true, sv: true }
+
+onboarding.identityLabel.title:
+  en: "A word for it, if you like"
+  description: "Heading of the identity label step, shown after a non-binary gender only (#146)."
+  fi: "Sana sille, jos haluat"
+  sv: "Ett ord för det, om du vill"
+  machine: { fi: true, sv: true }
+
+onboarding.identityLabel.explain:
+  en: "Shown on your card, never used for matching. Skip it if non-binary says it."
+  description: "Explanation under the identity label step's heading (#146, ADR-019)."
+  fi: "Näytetään kortillasi, ei koskaan käytetä yhdistämiseen. Ohita, jos muunsukupuolinen riittää."
+  sv: "Visas på ditt kort, används aldrig för matchning. Hoppa över om ickebinär säger det."
+  machine: { fi: true, sv: true }
+
+onboarding.identityLabel.skip:
+  en: "Skip"
+  description: "Button of the identity label step that moves on without a label (#146)."
+  fi: "Ohita"
+  sv: "Hoppa över"
+  machine: { fi: true, sv: true }
+
+onboarding.seeks.allow:
+  en: "I consent to Kuutti storing whom I seek"
+  description: "Label of the switch on the seek step that gives the special-category consent (#146, ADR-019 §4); the text above it is the legal wording."
+  fi: "Annan Kuutille luvan tallentaa, kenen seuraa etsin"
+  sv: "Jag samtycker till att Kuutti lagrar vem jag söker"
+  machine: { fi: true, sv: true }
+
+onboarding.pond.title:
+  en: "Where do you live?"
+  description: "Heading of the pond step (#174, ADR-010 §12), shown when there is more than one area to choose from."
+  fi: "Missä asut?"
+  sv: "Var bor du?"
+  machine: { fi: true, sv: true }
+
+onboarding.pond.explain:
+  en: "Kuutti matches people inside one area. Choose yours."
+  description: "Explanation under the pond step's heading (#174)."
+  fi: "Kuutti yhdistää ihmisiä yhden alueen sisällä. Valitse omasi."
+  sv: "Kuutti matchar människor inom ett område. Välj ditt."
+  machine: { fi: true, sv: true }
+
+pond.name.paakaupunkiseutu:
+  en: "Capital Area"
+  description: "The name of the pond with slug paakaupunkiseutu, by language (#174): the Helsinki capital region. Nominative only; no sentence is built around it."
+  fi: "Pääkaupunkiseutu"
+  sv: "Huvudstadsregionen"
+  machine: { fi: true, sv: true }
+
+pond.name.suomi:
+  en: "Finland"
+  description: "The name of the pond with slug suomi, by language (#174): the rest of the country, a sibling of the capital region."
+  fi: "Suomi"
+  sv: "Finland"
+  machine: { fi: true, sv: true }
+
+onboarding.intent.title:
+  en: "What are you here for?"
+  description: "Heading of the intent step (#146)."
+  fi: "Mitä etsit täältä?"
+  sv: "Vad är du här för?"
+  machine: { fi: true, sv: true }
+
+onboarding.intent.explain:
+  en: "You both have to want the same thing, or be open to either. You can change this later."
+  description: "Explanation under the intent step's heading (#146, #147): intent is a hard filter both ways."
+  fi: "Teidän molempien on haluttava samaa tai oltava avoimia kummallekin. Voit muuttaa tätä myöhemmin."
+  sv: "Ni måste båda vilja samma sak, eller vara öppna för båda. Du kan ändra det här senare."
+  machine: { fi: true, sv: true }
+
+onboarding.age.youngestDown:
+  en: "Youngest, one year younger"
+  description: "Screen-reader label of the minus button of the age window's lower end (#146)."
+  fi: "Nuorin, vuotta nuorempi"
+  sv: "Yngsta, ett år yngre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.youngestUp:
+  en: "Youngest, one year older"
+  description: "Screen-reader label of the plus button of the age window's lower end (#146)."
+  fi: "Nuorin, vuotta vanhempi"
+  sv: "Yngsta, ett år äldre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.oldestDown:
+  en: "Oldest, one year younger"
+  description: "Screen-reader label of the minus button of the age window's upper end (#146)."
+  fi: "Vanhin, vuotta nuorempi"
+  sv: "Äldsta, ett år yngre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.oldestUp:
+  en: "Oldest, one year older"
+  description: "Screen-reader label of the plus button of the age window's upper end (#146)."
+  fi: "Vanhin, vuotta vanhempi"
+  sv: "Äldsta, ett år äldre"
+  machine: { fi: true, sv: true }
+
+onboarding.age.years:
+  en: "{years, number}"
+  description: "The number shown between the stepper buttons of the age window (#146)."
+  fi: "{years, number}"
+  sv: "{years, number}"
+  machine: { fi: true, sv: true }
+
+onboarding.photos.title:
+  en: "Three photos of you"
+  description: "Heading of the photos step (#146)."
+  fi: "Kolme kuvaa sinusta"
+  sv: "Tre bilder på dig"
+  machine: { fi: true, sv: true }
+
+onboarding.photos.explain:
+  en: "Profiles with a face photo get seen; that is the honest reason. At least three, your face in each. They stay inside Kuutti."
+  description: "Explanation under the photos step's heading (#146): the honest reason first, as the sheet asks."
+  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kolme, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
+  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst tre, ditt ansikte i var och en. De stannar inne i Kuutti."
+  machine: { fi: true, sv: true }
+
+onboarding.photos.open:
+  en: "Add photos"
+  description: "Button of the photos step that opens the photos screen (#146)."
+  fi: "Lisää kuvia"
+  sv: "Lägg till bilder"
+  machine: { fi: true, sv: true }
+
+onboarding.prompts.title:
+  en: "A few words"
+  description: "Heading of the prompts step (#146)."
+  fi: "Muutama sana"
+  sv: "Några ord"
+  machine: { fi: true, sv: true }
+
+onboarding.prompts.explain:
+  en: "Answer two prompts, or write a bio of at least {min, number} characters. Your card leads with a photo and one answer."
+  description: "Explanation under the prompts step's heading (#146, ADR-009 §4)."
+  fi: "Vastaa kahteen kysymykseen tai kirjoita vähintään {min, number} merkin esittely. Korttisi alkaa kuvalla ja yhdellä vastauksella."
+  sv: "Svara på två frågor, eller skriv en presentation på minst {min, number} tecken. Ditt kort inleds med en bild och ett svar."
+  machine: { fi: true, sv: true }
+
+onboarding.prompts.save:
+  en: "Save and continue"
+  description: "Button of the prompts step: saves the profile and moves on (#146)."
+  fi: "Tallenna ja jatka"
+  sv: "Spara och fortsätt"
   machine: { fi: true, sv: true }
 
 photos.title:
@@ -1812,6 +3350,13 @@ photos.add:
   description: Photos screen, the button that opens the phone's photo picker.
   fi: Lisää kuva
   sv: Lägg till ett foto
+  machine: { fi: true, sv: true }
+
+photos.done:
+  en: Done
+  description: Photos screen, the button at the end that returns to where the person came from (onboarding, which then moves to its next step, or the home screen). Headers are hidden, so without it the only way back on iOS is the edge swipe.
+  fi: Valmis
+  sv: Klar
   machine: { fi: true, sv: true }
 
 photos.picking:
@@ -2043,13 +3588,6 @@ photos.imageLabel:
   description: Screen-reader label of one photo in the grid. {position} counts from 1; {total} is how many photos there are.
   fi: "Kuva {position, number} / {total, number}"
   sv: "Foto {position, number} / {total, number}"
-  machine: { fi: true, sv: true }
-
-smoke.photos.open:
-  en: Your photos
-  description: Home (smoke) screen, the button that opens the photos screen when the device is signed in.
-  fi: Kuvasi
-  sv: Dina foton
   machine: { fi: true, sv: true }
 
 photos.rejected.nudity:
@@ -2374,25 +3912,95 @@ account.research.failed:
   sv: "Forskningsvalet kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
-smoke.gate.checking:
-  en: "Checking your account setup…"
-  description: "Home screen while GET /onboarding is in flight (#46): nothing that needs a finished account shows until it says complete."
-  fi: "Tarkistetaan tilisi asetuksia…"
-  sv: "Kontrollerar din kontoinställning…"
+account.specialCategory.label:
+  en: "Store my sensitive answers"
+  description: "Label of the switch on the account card for the special-category consent (#146, ADR-019 §4)."
+  fi: "Tallenna arkaluonteiset vastaukseni"
+  sv: "Spara mina känsliga svar"
   machine: { fi: true, sv: true }
 
-smoke.gate.failed:
-  en: "Your account setup could not be checked."
-  description: "Home screen when GET /onboarding failed: the gate stays closed and offers a retry."
-  fi: "Tilisi asetuksia ei voitu tarkistaa."
-  sv: "Din kontoinställning kunde inte kontrolleras."
+account.specialCategory.explain:
+  en: "Whom you seek, the parties you could vote for and your religion. Switching this off removes those answers and pauses matching; your profile stays, and you are asked whom you seek again before matching resumes."
+  description: "Explanation under the special-category switch of the account card (#146, #204): the one place the consent is withdrawn, with its consequence."
+  fi: "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset ja keskeyttää yhdistämisen; profiilisi säilyy, ja sinulta kysytään uudelleen, kenen seuraa etsit, ennen kuin yhdistäminen jatkuu."
+  sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort och matchningen pausas; din profil finns kvar, och du får frågan om vem du söker igen innan matchningen fortsätter."
   machine: { fi: true, sv: true }
 
-smoke.gate.retry:
-  en: "Check again"
-  description: "Retry button of the home screen's onboarding gate."
-  fi: "Tarkista uudelleen"
-  sv: "Kontrollera igen"
+profile.specialCategory.note:
+  en: "Stored under the sensitive-answers consent you gave when you signed up. You can withdraw it in Settings; that removes these answers and pauses matching until you say yes again."
+  description: "The line above the politics and religion fields on the profile and later screens (#204, ADR-019 §4): names the consent given at the seeks step and where it is withdrawn. A Settings button follows it."
+  fi: "Tallennetaan arkaluonteisten vastausten suostumuksella, jonka annoit rekisteröityessäsi. Voit perua sen asetuksissa; se poistaa nämä vastaukset ja keskeyttää yhdistämisen, kunnes sanot uudelleen kyllä."
+  sv: "Lagras under det samtycke till känsliga svar du gav när du registrerade dig. Du kan ta tillbaka det i inställningarna; då tas de här svaren bort och matchningen pausas tills du säger ja igen."
+  machine: { fi: true, sv: true }
+
+account.email.title:
+  en: "A way back in"
+  description: "Heading of the optional e-mail card (#148, TD-18)."
+  fi: "Tie takaisin sisään"
+  sv: "En väg tillbaka in"
+  machine: { fi: true, sv: true }
+
+account.email.explain:
+  en: "Optional. If a phone is lost, we can reach you here. Never shown to anyone, never a login, and nothing is sent to it yet."
+  description: "Explanation of the optional e-mail (#148): the honest reason, as the sheet asks."
+  fi: "Vapaaehtoinen. Jos puhelin katoaa, tavoitamme sinut täältä. Ei näytetä kenellekään, ei koskaan kirjautumista varten, eikä tänne vielä lähetetä mitään."
+  sv: "Frivilligt. Om en telefon tappas bort når vi dig här. Visas aldrig för någon, aldrig en inloggning, och inget skickas hit ännu."
+  machine: { fi: true, sv: true }
+
+account.email.label:
+  en: "E-mail address"
+  description: "Label of the e-mail input (#148)."
+  fi: "Sähköpostiosoite"
+  sv: "E-postadress"
+  machine: { fi: true, sv: true }
+
+account.email.save:
+  en: "Save the address"
+  description: "Button that saves the e-mail (#148)."
+  fi: "Tallenna osoite"
+  sv: "Spara adressen"
+  machine: { fi: true, sv: true }
+
+account.email.clear:
+  en: "Remove the address"
+  description: "Button that clears the e-mail (#148)."
+  fi: "Poista osoite"
+  sv: "Ta bort adressen"
+  machine: { fi: true, sv: true }
+
+account.email.saved:
+  en: "Saved."
+  description: "Said after the e-mail is saved or removed (#148)."
+  fi: "Tallennettu."
+  sv: "Sparad."
+  machine: { fi: true, sv: true }
+
+account.email.invalid:
+  en: "That does not look like an e-mail address."
+  description: "Said when the API refuses the e-mail as malformed (#148)."
+  fi: "Tuo ei näytä sähköpostiosoitteelta."
+  sv: "Det ser inte ut som en e-postadress."
+  machine: { fi: true, sv: true }
+
+account.email.failed:
+  en: "The address could not be saved. Try again."
+  description: "Said when saving or removing the e-mail failed for another reason (#148)."
+  fi: "Osoitetta ei voitu tallentaa. Yritä uudelleen."
+  sv: "Adressen kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
+account.email.set:
+  en: "An address is set."
+  description: "Said on the card while an e-mail is set; the address itself is in the input (#148)."
+  fi: "Osoite on tallennettu."
+  sv: "En adress är sparad."
+  machine: { fi: true, sv: true }
+
+account.email.done:
+  en: "Done"
+  description: "Button of the e-mail screen that returns to the home screen (#148)."
+  fi: "Valmis"
+  sv: "Klart"
   machine: { fi: true, sv: true }
 
 pond.waitlist.label:
@@ -2555,4 +4163,243 @@ pond.gate.retry:
   description: "Gate card, the button that fetches the person's gate again."
   fi: "Yritä uudelleen"
   sv: "Försök igen"
+  machine: { fi: true, sv: true }
+
+# --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---
+home.title:
+  en: "Kuutti"
+  description: "Home screen heading: the name of the app, as the placeholder page and the sign-in screen say it."
+  fi: "Kuutti"
+  sv: "Kuutti"
+  machine: { fi: true, sv: true }
+
+home.loading:
+  en: "Loading…"
+  description: "The first screen while the stored session is being read, before the sign-in or the home screen shows."
+  fi: "Ladataan…"
+  sv: "Laddar…"
+  machine: { fi: true, sv: true }
+
+home.settings.open:
+  en: "Settings"
+  description: "Accessible name of the gear button on the home screen that opens the settings screen."
+  fi: "Asetukset"
+  sv: "Inställningar"
+  machine: { fi: true, sv: true }
+
+home.tech.open:
+  en: "Tech config"
+  description: "Accessible name of the wrench button on the home screen that opens the technical view (commits, API, test error); not in production builds."
+  fi: "Tekniset tiedot"
+  sv: "Teknisk vy"
+  machine: { fi: true, sv: true }
+
+home.gate.checking:
+  en: "Checking your account setup…"
+  description: "Home screen while GET /onboarding is in flight (#46): nothing that needs a finished account shows until it says complete."
+  fi: "Tarkistetaan tilisi asetuksia…"
+  sv: "Kontrollerar din kontoinställning…"
+  machine: { fi: true, sv: true }
+
+home.gate.failed:
+  en: "Your account setup could not be checked."
+  description: "Home screen when GET /onboarding failed: the gate stays closed and a retry is offered."
+  fi: "Tilisi asetuksia ei voitu tarkistaa."
+  sv: "Din kontoinställning kunde inte kontrolleras."
+  machine: { fi: true, sv: true }
+
+home.gate.retry:
+  en: "Check again"
+  description: "Button under home.gate.failed: reads GET /onboarding again."
+  fi: "Tarkista uudelleen"
+  sv: "Kontrollera igen"
+  machine: { fi: true, sv: true }
+
+home.photos.open:
+  en: "Your photos"
+  description: "Home screen button to the photos screen (#48)."
+  fi: "Kuvasi"
+  sv: "Dina bilder"
+  machine: { fi: true, sv: true }
+
+settings.back:
+  en: "Back"
+  description: "Accessible name of the arrow button at the top of the settings screen that returns to the home screen."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+settings.about.title:
+  en: "About Kuutti"
+  description: "Settings screen, heading of the section with the source-code offer (AGPL-3.0 section 13)."
+  fi: "Tietoja Kuutista"
+  sv: "Om Kuutti"
+  machine: { fi: true, sv: true }
+
+tech.title:
+  en: "Tech config"
+  description: "Heading of the technical view: environment, API, commits, test error, licences. Not in production builds."
+  fi: "Tekniset tiedot"
+  sv: "Teknisk vy"
+  machine: { fi: true, sv: true }
+
+tech.back:
+  en: "Back"
+  description: "Accessible name of the arrow button at the top of the tech config screen that returns to the home screen."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+tech.unavailable:
+  en: "Not in this build."
+  description: "The tech config route in a production build, where the technical view does not exist."
+  fi: "Ei tässä versiossa."
+  sv: "Inte i den här versionen."
+  machine: { fi: true, sv: true }
+
+tech.environment:
+  en: "Environment: {environment}"
+  description: "Tech config: which environment the JavaScript runs in. {environment} is one of development, preview, staging, production, as the code names them; not translated."
+  fi: "Ympäristö: {environment}"
+  sv: "Miljö: {environment}"
+  machine: { fi: true, sv: true }
+
+tech.api.title:
+  en: "API"
+  description: "Tech config card: the API this build talks to; its address is under the title."
+  fi: "API"
+  sv: "API"
+  machine: { fi: true, sv: true }
+
+tech.api.loading:
+  en: "Reaching the API…"
+  description: "Tech config, API card while GET /health is in flight."
+  fi: "Yhdistetään API:in…"
+  sv: "Kontaktar API:et…"
+  machine: { fi: true, sv: true }
+
+tech.api.commit:
+  en: "git commit {commit}"
+  description: "Tech config, API card: the API's git commit from GET /health. {commit} is a short hash."
+  fi: "git-commit {commit}"
+  sv: "git-commit {commit}"
+  machine: { fi: true, sv: true }
+
+tech.api.database:
+  en: "database {db} · migrations {migrations}"
+  description: "Tech config, API card: the database state and the migration state from GET /health, as the API names them; not translated."
+  fi: "tietokanta {db} · migraatiot {migrations}"
+  sv: "databas {db} · migreringar {migrations}"
+  machine: { fi: true, sv: true }
+
+tech.api.unreachable:
+  en: "API unreachable"
+  description: "Tech config, API card when GET /health failed; the error's message follows."
+  fi: "API ei vastaa"
+  sv: "API:et svarar inte"
+  machine: { fi: true, sv: true }
+
+tech.api.check:
+  en: "Check again"
+  description: "Tech config, API card button: reads GET /health again."
+  fi: "Tarkista uudelleen"
+  sv: "Kontrollera igen"
+  machine: { fi: true, sv: true }
+
+tech.app.title:
+  en: "App"
+  description: "Tech config card: this app's own commit, native build, update, channel and version."
+  fi: "Sovellus"
+  sv: "Appen"
+  machine: { fi: true, sv: true }
+
+tech.app.commit:
+  en: "git commit {commit}"
+  description: "Tech config, App card: the git commit app.config.ts stamped into this JavaScript. {commit} is a short hash."
+  fi: "git-commit {commit}"
+  sv: "git-commit {commit}"
+  machine: { fi: true, sv: true }
+
+tech.app.noCommit:
+  en: "git commit not recorded in this build"
+  description: "Tech config, App card when no commit was stamped (a local export without git)."
+  fi: "git-commitia ei ole tallennettu tähän versioon"
+  sv: "git-commit saknas i den här versionen"
+  machine: { fi: true, sv: true }
+
+tech.app.runtime:
+  en: "native build {runtime}"
+  description: "Tech config, App card: the native build's runtime version, the first seven characters of the fingerprint (ADR-004)."
+  fi: "natiiviversio {runtime}"
+  sv: "nativ version {runtime}"
+  machine: { fi: true, sv: true }
+
+tech.app.noRuntime:
+  en: "native build not recorded"
+  description: "Tech config, App card when expo-updates reports no runtime version (a dev client on Metro)."
+  fi: "natiiviversiota ei ole tallennettu"
+  sv: "nativ version saknas"
+  machine: { fi: true, sv: true }
+
+tech.app.embedded:
+  en: "running the build's own bundle, no update applied yet"
+  description: "Tech config, App card when the app runs the JavaScript the native build shipped with, not an over-the-air update."
+  fi: "käytössä version oma paketti, päivitystä ei ole vielä asennettu"
+  sv: "kör versionens egna paket, ingen uppdatering är installerad ännu"
+  machine: { fi: true, sv: true }
+
+tech.app.updated:
+  en: "update published {date}"
+  description: "Tech config, App card: when the over-the-air update the app runs was published. {date} is a formatted date and time."
+  fi: "päivitys julkaistu {date}"
+  sv: "uppdatering publicerad {date}"
+  machine: { fi: true, sv: true }
+
+tech.app.channel:
+  en: "channel {channel}"
+  description: "Tech config, App card: the EAS Update channel (staging, production, pr-<n>); empty for a dev client. Not translated."
+  fi: "kanava {channel}"
+  sv: "kanal {channel}"
+  machine: { fi: true, sv: true }
+
+tech.app.version:
+  en: "version {version}"
+  description: "Tech config, App card: the JavaScript's version, the root package.json's, stamped into extra.version by app.config.ts. {version} is a version string."
+  fi: "versio {version}"
+  sv: "version {version}"
+  machine: { fi: true, sv: true }
+
+tech.errorTest.send:
+  en: "Send a test error"
+  description: "Tech config button that reports one marked test error to the error tracker (#11); nothing happens in a build without reporting."
+  fi: "Lähetä testivirhe"
+  sv: "Skicka ett testfel"
+  machine: { fi: true, sv: true }
+
+tech.errorTest.sent:
+  en: "Test error sent. It shows up in the error tracker within a minute if reporting is on in this build."
+  description: "Tech config, under the test error button after it was pressed."
+  fi: "Testivirhe lähetetty. Se näkyy virheseurannassa minuutin sisällä, jos raportointi on päällä tässä versiossa."
+  sv: "Testfelet skickades. Det syns i felspårningen inom en minut om rapportering är på i den här versionen."
+  machine: { fi: true, sv: true }
+
+tech.licenses.title:
+  en: "Licences of the packages"
+  description: "Tech config, heading of the list of the packages this build is made of, each with its licence."
+  fi: "Pakettien lisenssit"
+  sv: "Paketens licenser"
+  machine: { fi: true, sv: true }
+
+tech.licenses.show:
+  en: "{packages, plural, one {Show # package} other {Show # packages}}"
+  description: "Tech config button that opens the licence list. {packages} is the number of packages."
+  fi: "{packages, plural, one {Näytä # paketti} other {Näytä # pakettia}}"
+  sv: "{packages, plural, one {Visa # paket} other {Visa # paket}}"
+  machine: { fi: true, sv: true }
+
+tech.licenses.hide:
+  en: "Hide the list"
+  description: "Tech config button that closes the licence list."
+  fi: "Piilota luettelo"
+  sv: "Dölj listan"
   machine: { fi: true, sv: true }

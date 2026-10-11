@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import type { AuthCallbackQuery, AuthExchangeResponse, AuthPlatform } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
+import type { Logger } from "../lib/logger.ts";
 import { ADMIN_PLATFORM, completeAdminLogin } from "./admin-session.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 import {
@@ -15,11 +16,21 @@ import { deriveIdentity, InvalidHetuError } from "./hetu.ts";
 import { decideRegistration } from "./registration.ts";
 import * as repo from "./repo.ts";
 
+/**
+ * How much earlier than the attempt's own start an `auth_time` may read and
+ * still be this login (ADR-016). The broker's clock and the database's are
+ * both disciplined by NTP and differ by seconds; a reused web session is
+ * minutes or hours old.
+ */
+export const AUTH_TIME_TOLERANCE_MS = 2 * 60_000;
+
 export type LoginDeps = {
   db: Queryable;
   broker: IdentityBroker;
   hmacKey: Buffer;
   now: () => Date;
+  /** Bound to the request (its id is in it): a login leaves one line, method and decision, nothing of the person. */
+  logger: Logger;
   /** Where an admin login's browser is sent back to (#49). */
   adminAppUrl: string;
 };
@@ -93,6 +104,16 @@ async function finishLogin(
   }
 
   const derived = await deriveFromBroker(deps, input.callbackUrl, request, now);
+  // ADR-016: the request object asks for the bank every time (prompt=login),
+  // so the authentication the broker reports happened after this attempt
+  // began. One that predates it is a web session reused for somebody else, or
+  // a broker that ignored the ask; either way it is no login of this person.
+  if (
+    derived.reference.authenticatedAt.getTime() <
+    request.createdAt.getTime() - AUTH_TIME_TOLERANCE_MS
+  ) {
+    throw new BrokerError("authentication predates this login attempt");
+  }
   if (!derived.adult) {
     throw new AppError(403, "auth_under_18", "Kuutti is for adults only");
   }
@@ -120,7 +141,15 @@ async function finishLogin(
       accountId,
       outcome,
     });
-    if (attached) return new URL(appReturnUrl(code));
+    if (attached) {
+      // The one line a login leaves (#33): the level, the method as the broker
+      // names it, and what was decided. No claim, no code, no token.
+      deps.logger.info(
+        { acr: derived.reference.acr, amr: derived.reference.amr, outcome },
+        "bank login",
+      );
+      return new URL(appReturnUrl(code));
+    }
   }
   throw new Error("account erased twice during one login");
 }

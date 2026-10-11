@@ -3,7 +3,7 @@ import * as Sentry from "@sentry/react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
-import { SessionProvider } from "@/features/identity";
+import { SessionProvider, SignedOutToStart } from "@/features/identity";
 import { LocaleProvider } from "@/lib/locale";
 import { sentryOptions } from "@/lib/sentry";
 import { ThemeProvider } from "@/theme/ThemeProvider";
@@ -22,6 +22,7 @@ function RootLayout() {
             screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "transparent" } }}
           />
           <StatusBar style="auto" />
+          <SignedOutToStart />
         </SessionProvider>
       </ThemeProvider>
     </LocaleProvider>

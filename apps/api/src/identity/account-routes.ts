@@ -1,10 +1,18 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { AccountDeletionRequest, AccountExport, ErrorResponse } from "@kuutti/schema";
+import {
+  AccountDeletionRequest,
+  AccountEmail,
+  AccountEmailResponse,
+  AccountExport,
+  ErrorResponse,
+} from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { AppError } from "../lib/errors.ts";
 import { type ErasureDeps, eraseAccount, exportAccount } from "./erasure.ts";
+import * as repo from "./repo.ts";
 
 const errorContent = (description: string) => ({
   description,
@@ -44,6 +52,49 @@ const exportRoute = createRoute({
   },
 });
 
+const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
+
+const emailRoute = createRoute({
+  method: "get",
+  path: "/account/email",
+  summary: "The caller's optional e-mail",
+  description:
+    "The optional e-mail of #148 (TD-18): a way back in if a phone is lost, never a login, never shown to anybody. Null when none is set.",
+  ...bearer,
+  responses: {
+    200: { description: "The e-mail, or null.", ...json(AccountEmailResponse) },
+    401: unauthenticated,
+  },
+});
+
+const setEmailRoute = createRoute({
+  method: "put",
+  path: "/account/email",
+  summary: "Set the caller's optional e-mail",
+  description:
+    "Validated as an address and nothing else; no mail is sent until SES exists (M5). The value reaches no log line and no event.",
+  ...bearer,
+  request: { body: { required: true, ...json(AccountEmail) } },
+  responses: {
+    204: { description: "Set." },
+    400: errorContent("Validation failed: not an address."),
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+  },
+});
+
+const clearEmailRoute = createRoute({
+  method: "delete",
+  path: "/account/email",
+  summary: "Clear the caller's optional e-mail",
+  ...bearer,
+  responses: {
+    204: { description: "Cleared." },
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+  },
+});
+
 export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const erasureDeps: ErasureDeps = {
@@ -52,9 +103,37 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     now: () => new Date(),
     ...(deps.media ? { media: deps.media } : {}),
   };
-  for (const path of new Set([deleteRoute, exportRoute].map((r) => r.getRoutingPath()))) {
+  const routes = [deleteRoute, exportRoute, emailRoute, setEmailRoute, clearEmailRoute];
+  for (const path of new Set(routes.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
+
+  app.openapi(emailRoute, async (c) => {
+    const account = await repo.findAccountById(deps.db, callerOf(c).accountId);
+    if (!account || account.state === "deleted") {
+      throw new AppError(404, "not_found", "No live account");
+    }
+    return c.json({ email: account.email }, 200);
+  });
+
+  app.openapi(setEmailRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    if (!(await repo.setEmail(deps.db, accountId, c.req.valid("json").email))) {
+      throw new AppError(404, "not_found", "No live account");
+    }
+    // The address stays out of the log (rules/api.md): this line says only that one was set.
+    deps.logger.info({ accountId }, "email set");
+    return c.body(null, 204);
+  });
+
+  app.openapi(clearEmailRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    if (!(await repo.setEmail(deps.db, accountId, null))) {
+      throw new AppError(404, "not_found", "No live account");
+    }
+    deps.logger.info({ accountId }, "email cleared");
+    return c.body(null, 204);
+  });
 
   app.openapi(deleteRoute, async (c) => {
     c.req.valid("json"); // confirm: true, or the validator has answered 400

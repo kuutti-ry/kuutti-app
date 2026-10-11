@@ -116,8 +116,9 @@ jobs:
           SHORT_SHA: ${{ steps.names.outputs.short_sha }}
         run: |
           # The pull request may have merged or closed while this run waited
-          # for the image or for its reviewer; the sweep has been there by
-          # then and nothing would remove what this step put back. Assigned
+          # for the image (or for a reviewer, when the environment has one);
+          # the sweep has been there by then and nothing would remove what
+          # this step put back. Assigned
           # first, tested after: inside the test a failure of the question
           # would read as "not open" and leave the lane green.
           open=$(.github/scripts/pr-open.sh)
@@ -210,9 +211,10 @@ jobs:
           EXPO_PUBLIC_API_URL: ${{ needs.api.outputs.api_url }}
         run: pnpm exec expo export --platform web
 
-      # This lane waits for the api lane and for its own reviewer, so it asks
-      # again: an alias made after the merge is one no sweep would find, the
-      # Dokploy application being the sweep's work list.
+      # This lane runs after the api lane (and after a reviewer, when the
+      # environment has one), so it asks again: an alias made after the merge
+      # is one no sweep would find, the Dokploy application being the sweep's
+      # work list.
       - name: Is the pull request still open?
         id: open
         env:
@@ -297,9 +299,10 @@ jobs:
       # The lane publishes only once #10 has configured expo-updates (an EAS
       # project id and updates.url). Updates are not code-signed (ADR-004), so
       # the preview environment's EXPO_TOKEN is all it takes: a preview run is
-      # as trusted as a push to main, and the environment gets a required
-      # reviewer before anyone but the owners can push (infra/README.md,
-      # Previews, Trust).
+      # as trusted as a push to main, write access to this repository is
+      # granted as that trust, and the environment's reviewer goes back on, or
+      # signing replaces it, before the first production build outside the
+      # team (ADR-004 §3 and §4, infra/README.md, Previews, Trust).
       - name: Is EAS Update configured?
         id: configured
         run: |

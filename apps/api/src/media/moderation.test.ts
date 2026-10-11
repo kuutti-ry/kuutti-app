@@ -1,8 +1,15 @@
+import {
+  DetectFacesCommand,
+  DetectLabelsCommand,
+  DetectModerationLabelsCommand,
+  type RekognitionClient,
+} from "@aws-sdk/client-rekognition";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
-import { fixtureJpeg, testMediaDeps } from "../test/media.ts";
+import { fixtureJpeg, fixtureWebp, testMediaDeps } from "../test/media.ts";
 import {
   decideModeration,
   type Inspection,
@@ -11,6 +18,7 @@ import {
   NO_FACE,
   NOT_CHECKED,
   RECHECK_AFTER_MS,
+  rekognitionModerator,
   storedLabels,
   sweepPendingPhotos,
   tipLabelsFrom,
@@ -125,6 +133,56 @@ describe("tip signals for photo_review", () => {
     expect(storedLabels({ ...inspection("none", "99", tipLabels), labels }).at(-1)?.name).toBe(
       "Bathroom",
     );
+  });
+});
+
+describe("The Rekognition adapter", () => {
+  it("sends the card variant as JPEG, since Rekognition reads JPEG and PNG only", async () => {
+    // The stored card is WebP (ADR-005 §2); on staging Rekognition answered
+    // InvalidImageFormatException to it (09/10/2026, ADR-006 History).
+    const sent: { command: string; bytes: Uint8Array }[] = [];
+    const client = {
+      async send(
+        command: DetectModerationLabelsCommand | DetectFacesCommand | DetectLabelsCommand,
+      ) {
+        sent.push({
+          command: command.constructor.name,
+          bytes: command.input.Image?.Bytes ?? new Uint8Array(),
+        });
+        if (command instanceof DetectFacesCommand) {
+          return { FaceDetails: [{ Confidence: 99.5 }] };
+        }
+        if (command instanceof DetectLabelsCommand) {
+          return { Labels: [] };
+        }
+        return { ModerationLabels: [], ModerationModelVersion: "7.0" };
+      },
+    };
+    const inspection = await rekognitionModerator(client as unknown as RekognitionClient).inspect(
+      await fixtureWebp(800, 1067),
+    );
+    expect(sent.map((s) => s.command).sort()).toEqual([
+      "DetectFacesCommand",
+      "DetectLabelsCommand",
+      "DetectModerationLabelsCommand",
+    ]);
+    for (const { bytes } of sent) {
+      // JPEG starts with the SOI marker and the first segment marker, and
+      // carries no metadata: Rekognition receives pixels only (rule 4).
+      expect(Array.from(bytes.subarray(0, 3))).toEqual([0xff, 0xd8, 0xff]);
+      const metadata = await sharp(bytes).metadata();
+      expect(metadata.exif).toBeUndefined();
+      expect(metadata.icc).toBeUndefined();
+      expect(metadata.xmp).toBeUndefined();
+      expect([metadata.width, metadata.height]).toEqual([800, 1067]);
+    }
+    expect(inspection).toMatchObject({
+      checked: true,
+      labels: [],
+      tipLabels: [],
+      faceConfidences: [99.5],
+      calls: 3,
+    });
   });
 });
 

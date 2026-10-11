@@ -111,6 +111,15 @@ resource "aws_ssm_parameter" "config" {
     "s3-bucket"              = module.media[0].bucket
     "media-url-base"         = module.media[0].media_url_base
     "cloudfront-key-pair-id" = module.media[0].key_pair_id
+    } : {}, var.telia_client_id != null ? {
+    # Bank identification (#25, docs/vendors/telia.md): Telia's production
+    # issuer, the client it assigned us, the one redirect URI registered there
+    # and the level Traficom 213/2023 S has us ask for. The API reads its
+    # endpoints and keys from the issuer's discovery document at boot.
+    "oidc-issuer"       = "https://tunnistus.telia.fi/uas"
+    "oidc-client-id"    = var.telia_client_id
+    "oidc-redirect-uri" = "https://api.${var.domain}/auth/callback"
+    "oidc-acr-values"   = "http://ftn.ficora.fi/2017/loa2"
   } : {})
 
   name  = "${module.compute.ssm_prefix}${each.key}"

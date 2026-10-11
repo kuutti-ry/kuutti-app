@@ -6,15 +6,16 @@ import {
   type RekognitionClient,
 } from "@aws-sdk/client-rekognition";
 import { type Queryable, transaction } from "@kuutti/db";
-import type { ModerationLabel } from "@kuutti/schema";
+import { type ModerationLabel, PHOTO_VARIANT_SIZES } from "@kuutti/schema";
+import sharp from "sharp";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import * as repo from "./repo.ts";
 import { type MediaStore, objectKey } from "./store.ts";
 
 // Moderation of every uploaded photo before anyone else sees it (#49, TD-8,
-// ADR-006). Rekognition sees the card variant only, from the API, through the
-// instance role; what comes back is a bounded list of labels with confidences
+// ADR-006). Rekognition sees the card variant only, re-encoded as JPEG for
+// the call, from the API, through the instance role; what comes back is a bounded list of labels with confidences
 // and a face count, never the image. Three outcomes: approved (nothing
 // flagged, a face present), queued (anything flagged, or no face: a person
 // decides), rejected (only ever by a person). Thresholds are matching_config
@@ -136,12 +137,22 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
   return { decision: flagged.length > 0 ? "queued" : "approved", flagged, faces };
 }
 
-/** Rekognition through the instance role: three calls per photo, the card variant's bytes, nothing stored there. */
+/** Rekognition through the instance role: three calls per photo, the card variant as JPEG, nothing stored there. */
 export function rekognitionModerator(client: RekognitionClient): Moderator {
   return {
     kind: "rekognition",
     async inspect(card) {
-      const image = { Bytes: card };
+      // The stored variants are WebP (ADR-005 §2) and Rekognition reads JPEG
+      // and PNG only: the first upload on staging (09/10/2026) came back as
+      // InvalidImageFormatException and stayed pending. One re-encode per
+      // check, in memory; what is stored and what the queue sees stays WebP.
+      const bytes = await sharp(card, {
+        // The card is the API's own, PHOTO_VARIANT_SIZES.card at most (pipeline.ts).
+        limitInputPixels: PHOTO_VARIANT_SIZES.card.width * PHOTO_VARIANT_SIZES.card.height,
+      })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      const image = { Bytes: bytes };
       const [moderation, faces, scene] = await Promise.all([
         client.send(
           new DetectModerationLabelsCommand({

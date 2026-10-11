@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { Gender, PreferencesUpdate, ProfileUpdate } from "@kuutti/schema";
+import { ageFromYearMonth } from "@kuutti/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
-import { ageFromYearMonth } from "../lib/hetu-format.ts";
 import { migrate } from "../migrate.ts";
 import { createPool } from "../pool.ts";
 import { MATCHING_CONFIG_V1, SEED_IDENTITIES, seed } from "../seed.ts";
@@ -28,14 +28,18 @@ import {
 // valid against the contracts, and across the thresholds on purpose.
 
 const MIGRATIONS = resolve(import.meta.dirname, "../..", "drizzle");
-const VERSIONS = { terms: "test-terms-1", privacy: "test-privacy-1" };
+const VERSIONS = {
+  terms: "test-terms-1",
+  privacy: "test-privacy-1",
+  special_category: "test-special-1",
+};
 const THRESHOLDS = {
   gateK: MATCHING_CONFIG_V1.gate_k,
   majorityShareMax: MATCHING_CONFIG_V1.majority_share_max,
   counterK: MATCHING_CONFIG_V1.waitlist_k,
 };
 /** From this many people up, the population shows everything it is there for. */
-const SHOWS_EVERYTHING_FROM = 235;
+const SHOWS_EVERYTHING_FROM = 174;
 
 describe("the random number generator", () => {
   it("gives the same numbers for the same seed, and others for another", () => {
@@ -110,24 +114,24 @@ describe("the synthetic population", () => {
   it("crosses the thresholds it is there to cross", () => {
     const ponds = summarise(people);
     const { gate_k: gate, majority_share_max: majority, waitlist_k: counterK } = MATCHING_CONFIG_V1;
-    // Under the gate, and nine women: the counter says a total and no split.
-    expect(ponds.paakaupunkiseutu).toMatchObject({ people: 24, woman: 9, man: 13, non_binary: 2 });
-    expect(ponds.paakaupunkiseutu?.people).toBeLessThan(gate);
-    // Over the majority share.
-    expect(ponds.espoo?.people).toBeGreaterThanOrEqual(gate);
-    expect(ponds.espoo?.largestShare).toBeGreaterThan(majority);
-    expect(ponds.espoo?.non_binary).toBeLessThan(counterK);
-    // The launch pond: over the gate, under the share, every cell at ten or more.
-    expect(ponds.otaniemi?.people).toBeGreaterThanOrEqual(gate);
-    expect(ponds.otaniemi?.largestShare).toBeLessThanOrEqual(majority);
+    // The one pond (#146): over the gate, men over the majority share, every cell at ten or more.
+    expect(ponds.paakaupunkiseutu).toMatchObject({
+      people: 276,
+      woman: 88,
+      man: 171,
+      non_binary: 17,
+    });
+    expect(ponds.paakaupunkiseutu?.people).toBeGreaterThanOrEqual(gate);
+    expect(ponds.paakaupunkiseutu?.largestShare).toBeGreaterThan(majority);
     for (const gender of Gender.options) {
-      expect(ponds.otaniemi?.[gender]).toBeGreaterThanOrEqual(counterK);
+      expect(ponds.paakaupunkiseutu?.[gender]).toBeGreaterThanOrEqual(counterK);
     }
+    expect(Object.keys(ponds)).toEqual(["paakaupunkiseutu"]);
     expect(people.filter((p) => p.pond === null)).toHaveLength(24);
     expect(uncrossed(ponds, THRESHOLDS)).toEqual([]);
   });
 
-  it("shows everything from 235 people up, and says what a smaller one does not", () => {
+  it("shows everything from 174 people up, and says what a smaller one does not", () => {
     for (const size of [1, 26, 100, 300, 1234]) {
       expect(summarise(generatePopulation({ size })), String(size)).toEqual(plannedPonds(size));
     }
@@ -137,13 +141,13 @@ describe("the synthetic population", () => {
       if (uncrossed(plannedPonds(size), THRESHOLDS).length > 0) tooSmall.push(size);
     }
     expect(Math.max(...tooSmall)).toBe(SHOWS_EVERYTHING_FROM - 1);
-    expect(tooSmall).toHaveLength(SHOWS_EVERYTHING_FROM - 1);
-    expect(uncrossed(plannedPonds(100), THRESHOLDS)).toContain(
-      "the launch pond has a cell under the counter's k, so no pond shows a split",
-    );
-    // The small pond is 24 people from a population of 26.
-    expect(plannedPonds(26).paakaupunkiseutu?.people).toBe(24);
-    expect(plannedPonds(25).paakaupunkiseutu?.people).toBe(23);
+    // Every size from there up shows everything; below it one size happens to round the smallest cell up to k.
+    expect(tooSmall.every((size) => size < SHOWS_EVERYTHING_FROM)).toBe(true);
+    expect(tooSmall.length).toBeGreaterThanOrEqual(SHOWS_EVERYTHING_FROM - 2);
+    expect(uncrossed(plannedPonds(100), THRESHOLDS)).toEqual([
+      "the pond has a cell under the counter's k, so it shows no split",
+    ]);
+    expect(uncrossed(plannedPonds(20), THRESHOLDS)).toContain("the pond is under the gate");
   });
 
   it("passes the contracts a person's own answers pass", () => {
@@ -162,14 +166,25 @@ describe("the synthetic population", () => {
       expect(Gender.safeParse(person.gender).success, person.label).toBe(true);
       expect(PreferencesUpdate.safeParse(person.preferences).success, person.label).toBe(true);
       // No research consent: the product writes it with its mapping row, and nobody here takes part.
-      expect(person.consents.map((c) => c.kind)).toEqual(["terms", "privacy"]);
+      expect(person.consents.map((c) => c.kind)).toEqual(["terms", "privacy", "special_category"]);
       if (person.profile) {
-        const parsed = ProfileUpdate.safeParse({ ...person.profile, specialCategoryConsent: null });
+        const { specialCategoryConsentedAt, ...document } = person.profile;
+        const parsed = ProfileUpdate.safeParse(document);
         expect(parsed.success, `${person.label}: ${JSON.stringify(parsed.error?.issues)}`).toBe(
           true,
         );
         // Stored as it would be after the API's own trim: nothing to trim.
-        expect(parsed.data).toEqual({ ...person.profile, specialCategoryConsent: null });
+        expect(parsed.data).toEqual(document);
+        // An article 9 answer only behind the consent, given with the others (ADR-019 §4).
+        if (document.fields.politics !== undefined || document.fields.religion !== undefined) {
+          expect(specialCategoryConsentedAt, person.label).not.toBeNull();
+        }
+        if (specialCategoryConsentedAt) {
+          expect(specialCategoryConsentedAt.getTime()).toBeGreaterThan(
+            person.registeredAt.getTime(),
+          );
+          expect(specialCategoryConsentedAt.getTime()).toBeLessThanOrEqual(DEMO_EPOCH.getTime());
+        }
       }
     }
   });
@@ -218,6 +233,15 @@ describe("the synthetic population", () => {
     expect(profiles.some((p) => p.prompts.length === 3)).toBe(true);
     expect(people.some((p) => p.pond !== null && p.profile === null)).toBe(true);
     expect(profiles.some((p) => /[åäöÅÄÖ]/.test(p.displayName))).toBe(true);
+    // The fields of ADR-019, each answered by some and left by others.
+    expect(profiles.every((p) => p.fields.intent !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.politics !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.religion !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.specialCategoryConsentedAt === null)).toBe(true);
+    expect(profiles.some((p) => p.fields.hideFromField === true)).toBe(true);
+    expect(profiles.some((p) => p.fields.height !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.occupationTitle !== undefined)).toBe(true);
+    expect(profiles.some((p) => p.fields.hobbies === undefined)).toBe(true);
   });
 });
 
@@ -242,7 +266,7 @@ describe("writing the population", () => {
           removed: 0,
           spared: 0,
           written: 300,
-          ponds: { paakaupunkiseutu: 24, otaniemi: 156, espoo: 96 },
+          ponds: { paakaupunkiseutu: 276 },
         });
         expect(await marked()).toBe(300);
         expect(await count("SELECT count(*) AS n FROM account WHERE state = 'active'")).toBe(
@@ -255,6 +279,9 @@ describe("writing the population", () => {
           await count("SELECT count(*) AS n FROM consent WHERE version = 'test-terms-1'"),
         ).toBe(276);
         expect(await count("SELECT count(*) AS n FROM consent WHERE kind = 'research'")).toBe(0);
+        expect(
+          await count("SELECT count(*) AS n FROM consent WHERE version = 'test-special-1'"),
+        ).toBe(276);
         expect(await count("SELECT count(*) AS n FROM research_subject")).toBe(0);
         // Nothing of a bank login is on a synthetic identity.
         expect(
@@ -265,15 +292,31 @@ describe("writing the population", () => {
             [`${DEMO_SUBJECT_PREFIX}%`],
           ),
         ).toBe(0);
-        const espoo = await pool.query<{ gender: string; n: string }>(
-          `SELECT a.gender, count(*) AS n FROM account a JOIN ponds p ON p.id = a.pond_id
-           WHERE p.slug = 'espoo' GROUP BY a.gender ORDER BY a.gender`,
+        // The population's own people in the pond; the seed's account lives there too (ADR-010 §11) and is nobody else's to count.
+        const capital = await pool.query<{ gender: string; n: string }>(
+          `SELECT a.gender, count(*) AS n FROM account a
+           JOIN ponds p ON p.id = a.pond_id JOIN identity i ON i.id = a.identity_id
+           WHERE p.slug = 'paakaupunkiseutu' AND i.broker_subject LIKE $1
+           GROUP BY a.gender ORDER BY a.gender`,
+          [`${DEMO_SUBJECT_PREFIX}%`],
         );
-        expect(espoo.rows).toEqual([
-          { gender: "woman", n: "29" },
-          { gender: "man", n: "61" },
-          { gender: "non_binary", n: "6" },
+        expect(capital.rows).toEqual([
+          { gender: "woman", n: "88" },
+          { gender: "man", n: "171" },
+          { gender: "non_binary", n: "17" },
         ]);
+        // An article 9 answer only behind the consent row of its account (ADR-019 §4, #204): the row, never a profile column.
+        expect(
+          await count(
+            `SELECT count(*) AS n FROM profile p
+             WHERE p.fields ? 'politics'
+               AND NOT EXISTS (SELECT 1 FROM consent c WHERE c.account_id = p.account_id
+                               AND c.kind = 'special_category' AND c.withdrawn_at IS NULL)`,
+          ),
+        ).toBe(0);
+        expect(
+          await count("SELECT count(*) AS n FROM profile WHERE fields ? 'politics'"),
+        ).toBeGreaterThan(0);
         // No code was hashed: the hash is of the label.
         const first = await pool.query<{ hetu_hmac: string }>(
           "SELECT hetu_hmac FROM identity WHERE broker_subject = $1",

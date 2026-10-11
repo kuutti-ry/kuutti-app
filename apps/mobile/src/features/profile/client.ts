@@ -1,6 +1,8 @@
 import {
   type ApiComponents,
   CardPreviewResponse,
+  DealBreakersResponse,
+  type DealBreakersUpdate,
   ErrorResponse,
   ProfileResponse,
   type ProfileUpdate,
@@ -39,4 +41,20 @@ export async function fetchCardPreview(): Promise<CardPreviewResponse> {
   const { data, error, response } = await api.GET("/profile/card");
   if (!data) throw failed(response, error, "card preview");
   return CardPreviewResponse.parse(data);
+}
+
+// The deal-breakers (#149) live with the preferences on the API and with the
+// profile here: the screen is profile completion as much as a filter.
+export async function fetchDealBreakers(): Promise<DealBreakersResponse> {
+  const { data, error, response } = await api.GET("/preferences/deal-breakers");
+  if (!data) throw failed(response, error, "deal-breakers");
+  return DealBreakersResponse.parse(data);
+}
+
+export async function saveDealBreakers(update: DealBreakersUpdate): Promise<DealBreakersResponse> {
+  const { data, error, response } = await api.PUT("/preferences/deal-breakers", {
+    body: update as unknown as ApiComponents["schemas"]["DealBreakersUpdate"],
+  });
+  if (!data) throw failed(response, error, "deal-breakers save");
+  return DealBreakersResponse.parse(data);
 }

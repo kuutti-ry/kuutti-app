@@ -1,4 +1,14 @@
-export { formatDate, formatNumber, formatPond, type PondCase, type PondName } from "./format.ts";
+export {
+  type FormatOptions,
+  formatDate,
+  formatDateTime,
+  formatHeight,
+  formatNumber,
+  formatPond,
+  formatTime,
+  type PondCase,
+  type PondName,
+} from "./format.ts";
 export {
   CONSENT_TEXT_HASHES,
   CONSENT_TEXT_LOCALES,

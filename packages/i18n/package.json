@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.131.0",
-    "@types/node": "^22.20.4",
+    "@types/node": "^22.20.5",
     "@types/react": "catalog:",
     "react": "catalog:",
     "typescript": "catalog:",
@@ -31,11 +31,11 @@
     "zod": "^4.6.5"
   },
   "dependencies": {
-    "@formatjs/icu-messageformat-parser": "3.5.20",
+    "@formatjs/icu-messageformat-parser": "3.5.21",
     "i18next": "26.4.2",
-    "i18next-icu": "2.4.4",
+    "i18next-icu": "2.5.0",
     "intl-messageformat": "11.2.15",
-    "react-i18next": "17.0.15"
+    "react-i18next": "17.0.16"
   },
   "peerDependencies": {
     "react": ">=19"

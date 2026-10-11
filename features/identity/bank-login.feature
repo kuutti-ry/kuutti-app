@@ -16,6 +16,7 @@ Feature: Bank login through the identification broker
     Then an identity with the HMAC of their code and an account with year and month of birth exist
     And the same code exchanged again is refused
     And no fragment of the personal identity code or of a token is in the log
+    And the log names the level, the method and the decision of the login
 
   Scenario: A second login of the same person resumes the live account
     Given a person with a live account
@@ -30,6 +31,11 @@ Feature: Bank login through the identification broker
     Given the broker answers access_denied and no code
     Then the browser is sent to the app with auth_cancelled
     And the attempt cannot be completed later
+
+  Scenario: An authentication that predates the login attempt is refused
+    Given the broker reports an authentication from before the app asked for this login
+    Then the browser is sent to the app with auth_provider_error
+    And no identity is created
 
   Scenario: A minor is refused and nothing is stored
     Given the bank identifies a person under 18

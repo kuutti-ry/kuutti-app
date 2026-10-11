@@ -81,15 +81,22 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
 }
 
 describe("the coarse snapshot", () => {
-  it("takes the closed-list fields only: never a text field, never a special-category field", () => {
+  it("takes the closed-list fields only: never a text, a number, a setting or a special-category field", () => {
     for (const key of RESEARCH_FIELD_KEYS) {
-      expect(PROFILE_FIELDS[key].kind).not.toBe("text");
+      expect(["single", "multi"]).toContain(PROFILE_FIELDS[key].kind);
+      expect(PROFILE_FIELDS[key].role).not.toBe("hidden");
       expect(SPECIAL_CATEGORY_FIELDS).not.toContain(key);
     }
     for (const key of PROFILE_FIELD_KEYS) {
-      if (PROFILE_FIELDS[key].kind === "text") expect(RESEARCH_FIELD_KEYS).not.toContain(key);
+      const spec = PROFILE_FIELDS[key];
+      if (spec.kind === "text" || spec.kind === "number" || spec.kind === "flag") {
+        expect(RESEARCH_FIELD_KEYS).not.toContain(key);
+      }
     }
-    expect(RESEARCH_FIELD_KEYS).not.toContain("campus");
+    for (const key of ["occupationTitle", "height", "hideFromField", "politics", "religion"]) {
+      expect(RESEARCH_FIELD_KEYS).not.toContain(key);
+    }
+    expect(RESEARCH_FIELD_KEYS).toContain("hobbies");
   });
 
   it("keeps a stored value only while the registry still knows it, and drops the rest", () => {
@@ -97,7 +104,9 @@ describe("the coarse snapshot", () => {
       intent: "long_term",
       languages: ["fi", "en"],
       smoking: "retired option",
-      campus: "Guild of something",
+      occupationTitle: "Guild of something",
+      height: 180,
+      politics: ["vihr"],
       displayName: "Not a field",
       seeks: ["woman"],
     });
@@ -105,9 +114,12 @@ describe("the coarse snapshot", () => {
     expect(researchFieldsOf(null)).toEqual({});
     expect(researchFieldsOf("text")).toEqual({});
     expect(ResearchSnapshot.safeParse({ gender: null, fields }).success).toBe(true);
-    expect(ResearchSnapshot.safeParse({ gender: null, fields: { campus: "x" } }).success).toBe(
-      false,
-    );
+    expect(
+      ResearchSnapshot.safeParse({ gender: null, fields: { occupationTitle: "x" } }).success,
+    ).toBe(false);
+    expect(
+      ResearchSnapshot.safeParse({ gender: null, fields: { politics: ["vihr"] } }).success,
+    ).toBe(false);
   });
 
   it("bands the age at the documented edges", () => {

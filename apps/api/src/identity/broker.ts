@@ -42,6 +42,3 @@ export class BrokerError extends AppError {
     this.name = "BrokerError";
   }
 }
-
-/** The one claim we must have, under the name Telia uses (guide 2.6.4); the mock uses it too. */
-export const HETU_CLAIM = "urn:oid:1.2.246.21";

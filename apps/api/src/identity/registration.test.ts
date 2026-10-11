@@ -38,6 +38,9 @@ function accountRow(identityId: string): Account {
     registeredAt: new Date("2026-09-01T00:00:00Z"),
     gender: null,
     pondId: null,
+    genderChangedAt: null,
+    seeksChangedAt: null,
+    email: null,
     deletedAt: null,
   };
 }

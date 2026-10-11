@@ -12,3 +12,8 @@ Feature: The pond choice
     Given a signed-in account
     When it chooses a pond from the list, then one that does not exist
     Then the first choice is stored and the second is refused as pond_unknown
+
+  Scenario: The default pond is assigned only while it is the only pond without a parent
+    Given two ponds without a parent, one of them named by matching_config.default_pond
+    When a registered account reads its onboarding status
+    Then no pond is assigned, the pond step is open, and the account chooses one from the list

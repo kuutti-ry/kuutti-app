@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AccountState } from "./account-state.ts";
+import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedGate } from "./gate.ts";
 import { AuthPlatform } from "./identity.ts";
 import { Photo, PhotoRejectionReason, PhotoVariant } from "./media.ts";
@@ -14,6 +15,23 @@ import { ResearchExport } from "./research.ts";
  */
 
 /** A body, so a stray call cannot erase an account; the app shows its own confirmation first. */
+/**
+ * The optional e-mail (#148, TD-18): a way back in if a phone is lost, never
+ * a login, never shown to anybody. Validated as an address and nothing else;
+ * no mail is sent until SES exists (M5).
+ */
+export const EMAIL_MAX = 254;
+export const AccountEmail = z
+  .object({ email: z.email().max(EMAIL_MAX) })
+  .strict()
+  .meta({ id: "AccountEmail" });
+export type AccountEmail = z.infer<typeof AccountEmail>;
+
+export const AccountEmailResponse = z
+  .object({ email: z.string().max(EMAIL_MAX).nullable() })
+  .meta({ id: "AccountEmailResponse" });
+export type AccountEmailResponse = z.infer<typeof AccountEmailResponse>;
+
 export const AccountDeletionRequest = z
   .object({
     confirm: z
@@ -67,9 +85,16 @@ export const AccountExport = z
       /** Self-declared (#46); null before onboarding and after erasure. */
       gender: Gender.nullable(),
       pond: PondSummary.nullable(),
+      /** When the gender, or whom one seeks, last changed from an earlier answer (#147); null until then and after erasure. */
+      genderChangedAt: z.iso.datetime().nullable(),
+      seeksChangedAt: z.iso.datetime().nullable(),
+      /** The optional e-mail (#148): the person's own, in their own download; null when none is set. */
+      email: z.string().max(EMAIL_MAX).nullable(),
     }),
     /** The two hard rows onboarding writes (#46): whom the person seeks and the age window. */
     preferences: PreferencesResponse,
+    /** The person's deal-breakers (#149), each with its pause. */
+    dealBreakers: z.array(StoredDealBreaker).max(DEAL_BREAKERS_CAP),
     /** Every consent ever given, withdrawn ones included: the proof of consent (#46, ADR-010). Bounded by the churn cap, not by a page. */
     consents: z.array(ConsentRecord).max(10_000),
     identity: z.object({

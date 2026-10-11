@@ -1,5 +1,5 @@
-import { generateHetu } from "@kuutti/db";
 import { AdminSession, ErrorResponse } from "@kuutti/schema";
+import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { staffSession } from "../test/account.ts";
@@ -39,7 +39,7 @@ function fakeBroker(hetu: string): IdentityBroker {
         subject: "STAFFSUBJECT",
         sessionIndex: null,
         tokenId: null,
-        authenticatedAt: NOW,
+        authenticatedAt: new Date(),
         acr: "http://ftn.ficora.fi/2017/loatest2",
         amr: [],
       };

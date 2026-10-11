@@ -1,0 +1,33 @@
+# An option's text follows another answer where the sheet says so (#148):
+# once there are kids, wanting them reads "want more", "no more", "not sure
+# anymore"; the value stored is the same. Kerttu has kids, not living with
+# her, and wants no more; Sanna has none and wants kids. Read only.
+appId: fi.kuutti.app
+name: Once there are kids, the future-kids answers read want more, no more, not sure anymore
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Kerttu Åkerlund
+- openLink: kuutti://profile/later/wantsKids
+- extendedWaitUntil:
+    visible: "Kids in the future|Lapset tulevaisuudessa|Barn i framtiden"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Want more|Haluan lisää|Vill ha fler"
+- assertVisible:
+    text: "No more|Ei enää|Inga fler"
+    selected: true
+- assertVisible: "Not sure anymore|En ole enää varma|Inte säker längre"
+- assertNotVisible: "Want kids|Haluan lapsia|Vill ha barn"
+
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/later/wantsKids
+- extendedWaitUntil:
+    visible: "Kids in the future|Lapset tulevaisuudessa|Barn i framtiden"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Want kids|Haluan lapsia|Vill ha barn"
+    selected: true
+- assertNotVisible: "Want more|Haluan lisää|Vill ha fler"

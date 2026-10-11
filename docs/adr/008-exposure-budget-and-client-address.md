@@ -25,3 +25,7 @@ With #48 every signed photo URL is a `photo_access` row. #52 turns that log into
 - The route-table test now also asks every route as a crawler would: without a session (401 outside the public list), with an unknown browser origin (no CORS answer), and checks that the public list carries no id, every response says noindex, and the contract is off in production.
 - The card route (#47) has two duties from here: write `card_shown` for the viewer, and count the card against `exposure_cards_per_day`.
 - Open, and the maintainer's: the velocity rules on rounds and device attestation (M4), the WAF (#41), and the day the ingress switch flips.
+
+## History
+
+- 2026-10-09: staging's media cutover (ADR-005 History) set `media_enabled` before the ingress switch, against the sequencing of §5. Until `cloudfront_only_ingress` and `trusted_proxy = cloudfront` flip together, the limiter in `traefik` mode keys on the CloudFront edge that forwarded the request, so one sender near an edge can exhaust the anonymous buckets (the waitlist, the auth routes) for every phone behind it for the window; the per-account exposure budget is untouched. Accepted for staging, where those phones are the team's. Production follows §5 as written.

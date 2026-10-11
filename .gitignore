@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 *.pem
+# The public half of a CloudFront signing key is declared in code (ADR-005 §3): committed, never private.
+!infra/envs/*/cloudfront-signing-key.pub.pem
+!infra/envs/*/cloudfront-signing-key.*.pub.pem
 *.key
 *.p12
 *.pfx
@@ -72,3 +75,6 @@ expo-env.d.ts
 !apps/api/certs/rds-eu-central-1-bundle.pem
 # Where a withdrawn update signing key (ADR-004) may still sit on a developer's machine.
 apps/mobile/keys/
+
+# --- End-to-end flows: the copy of the cached pictures scripts/e2e.ts makes ---
+apps/mobile/e2e/media

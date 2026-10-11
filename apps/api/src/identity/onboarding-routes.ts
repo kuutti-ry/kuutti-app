@@ -5,8 +5,10 @@ import {
   ErrorResponse,
   GenderUpdate,
   OnboardingStatus,
+  WithdrawableConsentKind,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
+import { z } from "zod";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
@@ -16,7 +18,7 @@ import {
   giveConsent,
   type OnboardingDeps,
   onboardingStatus,
-  withdrawResearchConsent,
+  withdrawConsentOf,
 } from "./onboarding.ts";
 
 const errorContent = (description: string) => ({
@@ -30,9 +32,9 @@ const unauthenticated = errorContent("unauthenticated, session_expired or sessio
 const statusRoute = createRoute({
   method: "get",
   path: "/onboarding",
-  summary: "What the caller has answered and what activation still waits for",
+  summary: "What the caller has answered and which steps of onboarding are still open",
   description:
-    "Gender, pond, the two hard preferences, the consents given for the current wordings and the current versions. When nothing required is missing and the account is still registered, it becomes active here.",
+    "The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.",
   ...bearer,
   responses: {
     200: { description: "The status.", ...json(OnboardingStatus) },
@@ -71,7 +73,7 @@ const consentRoute = createRoute({
   path: "/consents",
   summary: "Record a consent for the current wording",
   description:
-    "The kind, the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.",
+    "The kind (terms, privacy, research, or special_category for whom one seeks, politics and religion), the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.",
   ...bearer,
   request: { body: { required: true, ...json(ConsentRequest) } },
   responses: {
@@ -88,13 +90,15 @@ const consentRoute = createRoute({
 
 const withdrawRoute = createRoute({
   method: "delete",
-  path: "/consents/research",
-  summary: "Withdraw the research opt-in",
+  path: "/consents/{kind}",
+  summary: "Withdraw the research opt-in or the special-category consent",
   description:
-    "The one consent a person withdraws; terms and privacy end with the account. The rows stay as the record of what was agreed and when.",
+    "The two consents a person withdraws; terms and privacy end with the account. Withdrawing special_category takes whom the person seeks and the politics and religion of the profile with it, and onboarding asks the seek question again. The rows stay as the record of what was agreed and when.",
   ...bearer,
+  request: { params: z.object({ kind: WithdrawableConsentKind }).strict() },
   responses: {
     200: { description: "Withdrawn; the consents as stored.", ...json(ConsentsResponse) },
+    400: errorContent("Validation failed: not a kind a person withdraws."),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),
   },
@@ -133,7 +137,8 @@ export function onboardingRoutes(deps: Deps, requireSession: MiddlewareHandler<A
   });
 
   app.openapi(withdrawRoute, async (c) => {
-    return c.json(await withdrawResearchConsent(onboardingDeps, callerOf(c).accountId), 200);
+    const { kind } = c.req.valid("param");
+    return c.json(await withdrawConsentOf(onboardingDeps, callerOf(c).accountId, kind), 200);
   });
 
   return app;

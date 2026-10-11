@@ -47,7 +47,7 @@ describe("SignInScreen", () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-    expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios`);
+    expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios&locale=en`);
     expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
   });
 
@@ -138,7 +138,7 @@ describe("SignInScreen", () => {
 
   it("shows the cooldown with its date in the app's locale", async () => {
     await renderWithTheme(<SignInScreen error="auth_cooldown" until="2026-10-22T10:00:00.000Z" />);
-    expect(await screen.findByText(/The earliest day for a new one: 22 October 2026/)).toBeTruthy();
+    expect(await screen.findByText(/The earliest day for a new one: 22.10.2026/)).toBeTruthy();
   });
 
   it("shows the generic text for a code it has no words for", async () => {

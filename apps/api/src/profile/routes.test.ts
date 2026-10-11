@@ -1,7 +1,11 @@
 import {
   AccountExport,
+  CARD_FIELD_KEYS,
   CardPreviewResponse,
+  HOBBIES,
   Photo,
+  PROFILE_FIELD_KEYS,
+  PROFILE_FIELDS,
   ProfileResponse,
   type ProfileUpdate,
 } from "@kuutti/schema";
@@ -11,7 +15,7 @@ import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import { ageInYears, buildCard } from "./card.ts";
-import { consentMissingFor } from "./service.ts";
+import { consentMissingFor, SPECIAL_CATEGORY_CONSENT_VERSION } from "./service.ts";
 
 // The profile routes end to end (#47, ADR-009): real Postgres in a rolled-back
 // transaction, photos through the API with a memory store. Happy path,
@@ -30,12 +34,16 @@ const update: ProfileUpdate = {
   displayName: "Aino",
   bio: null,
   bioPreset: "lazy_nice_fellow",
-  fields: { languages: ["fi", "en"], intent: "long_term", smoking: "no", campus: "Otaniemi" },
+  fields: {
+    languages: ["fi", "en"],
+    intent: "long_term",
+    smoking: "never",
+    occupationTitle: "Architect",
+  },
   prompts: [
     { key: "sunday", answer: "A long breakfast and a longer walk." },
     { key: "hidden_talent", answer: "I can whistle with my mouth full." },
   ],
-  specialCategoryConsent: null,
 };
 
 const put = (app: App, headers: Record<string, string>, body: unknown) =>
@@ -125,6 +133,9 @@ describe("profile routes", () => {
       { ...update, fields: { ...update.fields, smoking: "cigars" } },
       { ...update, fields: { ...update.fields, religion: "x" } },
       { ...update, fields: { ...update.fields, languages: ["fi", "sv", "en", "ru", "et", "uk"] } },
+      { ...update, fields: { ...update.fields, height: 139 } },
+      { ...update, fields: { ...update.fields, hobbies: HOBBIES.slice(0, 6) } },
+      { ...update, fields: { ...update.fields, campus: "Otaniemi" } },
       { ...update, prompts: [update.prompts[0], update.prompts[0]] },
       { ...update, bio: "Hello there", bioPreset: "photos_speak" },
       { ...update, displayName: "" },
@@ -143,7 +154,7 @@ describe("profile routes", () => {
     for (const body of [
       { ...update, displayName: "@aino" },
       { ...update, bio: "Write to aino@example.com please", bioPreset: null },
-      { ...update, fields: { ...update.fields, campus: "Otaniemi, 040 1234567" } },
+      { ...update, fields: { ...update.fields, occupationTitle: "Nokia, 040 1234567" } },
       { ...update, prompts: [{ key: "ask_me", answer: "Ask me on instagram" }] },
     ]) {
       const response = await put(app, a.headers, body);
@@ -159,12 +170,68 @@ describe("profile routes", () => {
     expect(JSON.stringify(logs())).not.toContain("040 1234567");
   });
 
-  test("PUT /profile refuses a consent version while no field takes one", async ({ ctx }) => {
+  test("PUT /profile refuses a politics or religion answer without the consent of the current wording, and stores both with it", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const answered = { ...update, fields: { ...update.fields, politics: ["vihr", "vas"] } };
+    // No consent row, then a row for an older wording: both read as none (ADR-019 §4, #204).
+    const none = await put(app, a.headers, answered);
+    expect(none.status).toBe(403);
+    // The detail (the fields, the current version) goes to the log, never the body (lib/errors.ts).
+    expect(await errorCode(none)).toBe("consent_required");
+    await ctx.client.query(
+      "INSERT INTO consent (account_id, kind, version, locale_shown, given_at) VALUES ($1, 'special_category', '2026-01-older', 'fi', now())",
+      [a.accountId],
+    );
+    const stale = await put(app, a.headers, answered);
+    expect(stale.status).toBe(403);
+    expect(await errorCode(stale)).toBe("consent_required");
+    const { rows: nothing } = await ctx.client.query(
+      "SELECT 1 FROM profile WHERE account_id = $1",
+      [a.accountId],
+    );
+    expect(nothing).toHaveLength(0);
+    // The consent is given where it is given: the seeks step's route, never the document.
+    const given = await app.request("/consents", {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "special_category",
+        version: SPECIAL_CATEGORY_CONSENT_VERSION,
+        locale: "fi",
+      }),
+    });
+    expect(given.ok).toBe(true);
+    const saved = await put(app, a.headers, {
+      ...answered,
+      fields: { ...answered.fields, religion: "agnostic" },
+    });
+    expect(saved.status).toBe(200);
+    const stored = ProfileResponse.parse(await saved.json());
+    expect(stored.profile?.fields).toMatchObject({
+      politics: ["vihr", "vas"],
+      religion: "agnostic",
+    });
+    // The document echoes the consent row, never a copy of its own.
+    expect(stored.profile?.specialCategoryConsent?.version).toBe(SPECIAL_CATEGORY_CONSENT_VERSION);
+    // Shown on the card, as an answered info field is (ADR-019 §2).
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    expect(CardPreviewResponse.parse(await preview.json()).card?.fields).toMatchObject({
+      politics: ["vihr", "vas"],
+      religion: "agnostic",
+    });
+  });
+
+  test("PUT /profile refuses a consent in the body: the consent is the consent routes' (ADR-019 §4)", async ({
+    ctx,
+  }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     const response = await put(app, a.headers, {
       ...update,
-      specialCategoryConsent: { version: "x" },
+      specialCategoryConsent: { version: SPECIAL_CATEGORY_CONSENT_VERSION },
     });
     expect(response.status).toBe(400);
     const { rows } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
@@ -173,19 +240,102 @@ describe("profile routes", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("the consent gate refuses a special-category value without the version", () => {
-    const fields = { ...update.fields, religion: "x" } as ProfileUpdate["fields"];
-    expect(consentMissingFor({ fields, specialCategoryConsent: null }, ["religion"])).toEqual([
+  test("the card leaves a soft value and a setting on the profile, and the field of study the person hides", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const saved = await put(app, a.headers, {
+      ...update,
+      fields: {
+        ...update.fields,
+        education: "amk",
+        drinking: "rarely",
+        field: ["tech"],
+        hideFromField: true,
+      },
+    });
+    expect(saved.status).toBe(200);
+    expect(ProfileResponse.parse(await saved.json()).profile?.fields).toMatchObject({
+      education: "amk",
+      drinking: "rarely",
+      field: ["tech"],
+      hideFromField: true,
+    });
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    const card = CardPreviewResponse.parse(await preview.json()).card;
+    expect(card?.fields).toEqual(update.fields);
+    // The owner previews without what both answered: there is nobody on the other side.
+    expect(card?.shared).toEqual({ hobbies: [], languages: [] });
+  });
+
+  test("the card carries every answered info and hard field, nothing soft or hidden, and no key beyond the contract", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    // One answer on every field of the registry, whatever its kind.
+    const everything: Record<string, unknown> = {};
+    for (const key of PROFILE_FIELD_KEYS) {
+      const spec = PROFILE_FIELDS[key];
+      everything[key] =
+        spec.kind === "single"
+          ? spec.options[0]
+          : spec.kind === "multi"
+            ? [spec.options[0]]
+            : spec.kind === "number"
+              ? spec.min
+              : spec.kind === "text"
+                ? "Architect"
+                : true;
+    }
+    await app.request("/consents", {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "special_category",
+        version: SPECIAL_CATEGORY_CONSENT_VERSION,
+        locale: "fi",
+      }),
+    });
+    const saved = await put(app, a.headers, { ...update, fields: everything });
+    expect(saved.status).toBe(200);
+    const preview = await app.request("/profile/card", { headers: a.headers });
+    const card = CardPreviewResponse.parse(await preview.json()).card;
+    const onCard = Object.keys(card?.fields ?? {}).sort();
+    // The info and hard fields (ADR-019 §2), less the field of study behind the hide-from-field setting.
+    expect(onCard).toEqual(CARD_FIELD_KEYS.filter((key) => key !== "field").sort());
+    for (const key of onCard) {
+      const role = PROFILE_FIELDS[key as (typeof PROFILE_FIELD_KEYS)[number]].role;
+      expect(["info", "hard"]).toContain(role);
+    }
+    // Nothing about anyone else and no count of anything (rules/schema.md).
+    expect(Object.keys(card ?? {}).sort()).toEqual([
+      "accountId",
+      "age",
+      "bio",
+      "bioPreset",
+      "displayName",
+      "fields",
+      "gender",
+      "photos",
+      "pond",
+      "prompts",
+      "shared",
+    ]);
+  });
+
+  it("the consent gate refuses a special-category value unless the current wording's consent is on record", () => {
+    const fields = { ...update.fields, religion: "agnostic" } as ProfileUpdate["fields"];
+    expect(consentMissingFor(fields, false, ["religion"])).toEqual(["religion"]);
+    expect(consentMissingFor(fields, true, ["religion"])).toEqual([]);
+    expect(consentMissingFor(update.fields, false, ["religion"])).toEqual([]);
+    // The registry's own special fields by default, in its order.
+    expect(consentMissingFor({ ...fields, politics: ["none_of_them"] }, false)).toEqual([
+      "politics",
       "religion",
     ]);
-    expect(
-      consentMissingFor({ fields, specialCategoryConsent: { version: "2026-09" } }, ["religion"]),
-    ).toEqual([]);
-    expect(
-      consentMissingFor({ fields: update.fields, specialCategoryConsent: null }, ["religion"]),
-    ).toEqual([]);
-    // The real registry has no such field today (ADR-009).
-    expect(consentMissingFor({ fields, specialCategoryConsent: null })).toEqual([]);
+    expect(consentMissingFor(update.fields, false)).toEqual([]);
   });
 
   test("unauthenticated: 401 on every profile route", async ({ ctx }) => {
@@ -193,6 +343,36 @@ describe("profile routes", () => {
     expect((await app.request("/profile")).status).toBe(401);
     expect((await app.request("/profile", { method: "PUT" })).status).toBe(401);
     expect((await app.request("/profile/card")).status).toBe(401);
+  });
+
+  test("wrong user: the profile and the card are the caller's, never another account's", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    expect((await put(app, a.headers, update)).status).toBe(200);
+    // B reads nothing of A's.
+    const theirs = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: b.headers })).json(),
+    );
+    expect(theirs.profile).toBeNull();
+    expect(
+      CardPreviewResponse.parse(
+        await (await app.request("/profile/card", { headers: b.headers })).json(),
+      ).card,
+    ).toBeNull();
+    // B's save writes B's row and leaves A's as it was.
+    expect((await put(app, b.headers, { ...update, displayName: "Bea" })).status).toBe(200);
+    const hers = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: a.headers })).json(),
+    );
+    expect(hers.profile?.displayName).toBe("Aino");
+    const card = CardPreviewResponse.parse(
+      await (await app.request("/profile/card", { headers: b.headers })).json(),
+    );
+    expect(card.card?.displayName).toBe("Bea");
+    expect(card.card?.accountId).toBe(b.accountId);
   });
 
   test("GET /profile/card previews the owner's card with the verified age and approved photos only", async ({
@@ -252,13 +432,24 @@ describe("profile routes", () => {
   }) => {
     const { app, logger } = await appWith(ctx);
     const viewer = await signedInAccount(ctx.client);
-    const complete = async () => {
+    // The viewer's own answers: what both answered is marked on the card (#150).
+    await put(app, viewer.headers, {
+      ...update,
+      fields: { ...update.fields, hobbies: ["yoga", "hiking"] },
+    });
+    const complete = async (fields: ProfileUpdate["fields"] = {}) => {
       const who = await signedInAccount(ctx.client);
       await approvedPhotos(ctx, app, who.headers, 3);
-      await put(app, who.headers, { ...update, bio: "x".repeat(60), bioPreset: null });
+      await put(app, who.headers, {
+        ...update,
+        fields: { ...update.fields, ...fields },
+        bio: "x".repeat(60),
+        bioPreset: null,
+      });
       return who;
     };
-    const b = await complete();
+    const b = await complete({ hobbies: ["yoga", "gym"] });
+    await ctx.client.query("UPDATE account SET gender = 'woman' WHERE id = $1", [b.accountId]);
     const c = await complete();
     const d = await signedInAccount(ctx.client); // no profile
     // Onboarding (#46) is not here; a reader that says it is done stands in.
@@ -274,6 +465,9 @@ describe("profile routes", () => {
     });
     expect(first.card?.photos).toHaveLength(3);
     expect(first.card?.bio).toBe("x".repeat(60));
+    expect(first.card?.gender).toBe("woman");
+    // In the order the subject gave them; never a count.
+    expect(first.card?.shared).toEqual({ hobbies: ["yoga"], languages: ["fi", "en"] });
     const shown = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM card_shown WHERE account_id = $1",
       [viewer.accountId],

@@ -624,6 +624,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's optional e-mail
+         * @description The optional e-mail of #148 (TD-18): a way back in if a phone is lost, never a login, never shown to anybody. Null when none is set.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The e-mail, or null. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccountEmailResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Set the caller's optional e-mail
+         * @description Validated as an address and nothing else; no mail is sent until SES exists (M5). The value reaches no log line and no event.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AccountEmail"];
+                };
+            };
+            responses: {
+                /** @description Set. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed: not an address. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /** Clear the caller's optional e-mail */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Cleared. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account/delete": {
         parameters: {
             query?: never;
@@ -1376,7 +1512,7 @@ export interface paths {
         };
         /**
          * Save the caller's profile
-         * @description The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts, and the special-category consent version when a field needs it. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.
+         * @description The whole document every time: display name, a bio or a placeholder, the fields from the registry, up to three prompts. A politics or religion answer needs the special-category consent on record, which is given at the seeks step and withdrawn in Settings (the consent routes), never in this body. Free text passes the plain-text rule: no e-mail, URL, phone number or social handle.
          */
         put: {
             parameters: {
@@ -1418,7 +1554,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description consent_required: a special-category field without the consent version. */
+                /** @description consent_required: a politics or religion answer without the consent of the current wording (ADR-019); the detail names the fields and the current version. */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1501,8 +1637,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * What the caller has answered and what activation still waits for
-         * @description Gender, pond, the two hard preferences, the consents given for the current wordings and the current versions. When nothing required is missing and the account is still registered, it becomes active here.
+         * What the caller has answered and which steps of onboarding are still open
+         * @description The steps of the field sheet in the order the app asks them, the answers so far, the consents given for the current wordings and the current versions. An account without a pond is put in the default pond here. When the four answers matching needs and the two consents are there and the account is still registered, it becomes active here; the profile steps keep `complete` false until they are done.
          */
         get: {
             parameters: {
@@ -1649,7 +1785,7 @@ export interface paths {
         put?: never;
         /**
          * Record a consent for the current wording
-         * @description The kind, the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.
+         * @description The kind (terms, privacy, research, or special_category for whom one seeks, politics and religion), the consent_version the person read and the language it was shown in. An old version is refused with agreement_outdated; the same consent twice is recorded once.
          */
         post: {
             parameters: {
@@ -1726,7 +1862,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/consents/research": {
+    "/consents/{kind}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1737,14 +1873,16 @@ export interface paths {
         put?: never;
         post?: never;
         /**
-         * Withdraw the research opt-in
-         * @description The one consent a person withdraws; terms and privacy end with the account. The rows stay as the record of what was agreed and when.
+         * Withdraw the research opt-in or the special-category consent
+         * @description The two consents a person withdraws; terms and privacy end with the account. Withdrawing special_category takes whom the person seeks and the politics and religion of the profile with it, and onboarding asks the seek question again. The rows stay as the record of what was agreed and when.
          */
         delete: {
             parameters: {
                 query?: never;
                 header?: never;
-                path?: never;
+                path: {
+                    kind: components["schemas"]["WithdrawableConsentKind"];
+                };
                 cookie?: never;
             };
             requestBody?: never;
@@ -1756,6 +1894,15 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["ConsentsResponse"];
+                    };
+                };
+                /** @description Validation failed: not a kind a person withdraws. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description unauthenticated, session_expired or session_revoked. */
@@ -1983,6 +2130,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/preferences/deal-breakers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's deal-breakers
+         * @description Each with whether it is paused: a deal-breaker waits while the person's own answer on its field is missing (#149, the disclose-to-filter rule). `max` is how many a person may have.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The deal-breakers. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DealBreakersResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Set the caller's deal-breakers
+         * @description The whole set, at most `max`, each on a distinct whitelisted field the person has answered themselves, accepting options the field has. Hard rows: #87 applies them in the pool, both ways.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["DealBreakersUpdate"];
+                };
+            };
+            responses: {
+                /** @description Saved; the deal-breakers as stored. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["DealBreakersResponse"];
+                    };
+                };
+                /** @description Validation failed: more than allowed, a field twice, or an answer the field has not. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description filter_unanswered: a deal-breaker on a field the person has not answered themselves (the log names the field, the screen knows it). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences": {
         parameters: {
             query?: never;
@@ -2024,8 +2282,8 @@ export interface paths {
             };
         };
         /**
-         * Set whom the caller seeks and the age window
-         * @description Both at once: a non-empty set of genders and an age window within 18 and 99 with min at most max. Hard rows: the round builder never crosses them, in either direction.
+         * Set whom the caller seeks, the age window, or both
+         * @description Either or both, each replacing its row: a non-empty set of genders, an age window within 18 and 99 with min at most max. Onboarding saves each on its own screen (ADR-010 §13). Hard rows: the round builder never crosses them, in either direction.
          */
         put: {
             parameters: {
@@ -2204,6 +2462,13 @@ export interface components {
             /** Format: date-time */
             expiresAt: string;
         };
+        AccountEmailResponse: {
+            email: string | null;
+        };
+        AccountEmail: {
+            /** Format: email */
+            email: string;
+        };
         AccountDeletionRequest: {
             /**
              * @description Must be true: the person confirmed in the app.
@@ -2225,8 +2490,14 @@ export interface components {
                 birthMonth: number | null;
                 gender: components["schemas"]["Gender"];
                 pond: components["schemas"]["PondSummary"];
+                /** Format: date-time */
+                genderChangedAt: string | null;
+                /** Format: date-time */
+                seeksChangedAt: string | null;
+                email: string | null;
             };
             preferences: components["schemas"]["PreferencesResponse"];
+            dealBreakers: components["schemas"]["StoredDealBreaker"][];
             consents: components["schemas"]["ConsentRecord"][];
             identity: {
                 /** Format: date-time */
@@ -2278,6 +2549,14 @@ export interface components {
             min: number;
             max: number;
         } | null;
+        StoredDealBreaker: {
+            field: components["schemas"]["DealBreakerField"];
+            accept: string[];
+            includeUnknown: boolean;
+            paused: boolean;
+        };
+        /** @enum {string} */
+        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages";
         ConsentRecord: {
             kind: components["schemas"]["ConsentKind"];
             version: string;
@@ -2289,7 +2568,7 @@ export interface components {
             withdrawnAt: string | null;
         };
         /** @enum {string} */
-        ConsentKind: "terms" | "privacy" | "research";
+        ConsentKind: "terms" | "privacy" | "research" | "special_category";
         ProfileDocument: {
             displayName: string;
             bio: string | null;
@@ -2307,22 +2586,39 @@ export interface components {
         /** @enum {string|null} */
         BioPreset: "lazy_nice_fellow" | "ask_me_instead" | "photos_speak" | null;
         ProfileFields: {
-            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "so" | "de" | "fr" | "es" | "other")[];
             /** @enum {string} */
-            intent?: "long_term" | "short_term" | "figuring_out" | "friends";
+            intent?: "long_term" | "casual" | "open_to_either";
             /** @enum {string} */
-            relationship?: "monogamous" | "open" | "polyamorous" | "lat" | "undecided";
+            identityLabel?: "agender" | "genderfluid" | "genderqueer" | "bigender" | "two_spirit" | "questioning" | "non_binary";
             /** @enum {string} */
-            kids?: "have_want_more" | "have_done" | "want_someday" | "dont_want" | "not_sure";
+            monogamy?: "monogamous" | "non_monogamous";
             /** @enum {string} */
-            smoking?: "no" | "sometimes" | "yes" | "snus";
+            hasKids?: "no" | "yes_with_me" | "yes_not_with_me";
             /** @enum {string} */
-            alcohol?: "never" | "sometimes" | "often";
+            wantsKids?: "want" | "dont_want" | "not_sure";
             /** @enum {string} */
-            education?: "secondary" | "vocational" | "bachelor" | "master" | "doctorate" | "other";
+            smoking?: "never" | "sometimes" | "regularly" | "quitting";
+            languages?: ("fi" | "sv" | "en" | "se" | "et" | "ru" | "uk" | "ar" | "so" | "fa" | "ku" | "zh" | "sq" | "vi" | "th" | "tr" | "es" | "de" | "fr" | "tl" | "pl" | "it" | "pt" | "hi" | "ne" | "bn" | "ur" | "ro" | "hu" | "ja" | "lt" | "lv" | "nl" | "ko" | "other")[];
             /** @enum {string} */
-            field?: "tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other";
-            campus?: string;
+            education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
+            /** @enum {string} */
+            drinking?: "never" | "rarely" | "socially" | "often";
+            /** @enum {string} */
+            drugsAttitude?: "not_my_thing" | "dont_mind" | "fine_with_it";
+            hobbies?: ("hiking" | "cycling" | "running" | "skiing" | "swimming" | "sailing" | "foraging" | "fishing" | "climbing" | "gym" | "football" | "floorball" | "ice_hockey" | "yoga" | "dance" | "martial_arts" | "padel" | "photography" | "drawing" | "making_music" | "writing" | "crafts" | "theatre" | "cooking" | "baking" | "coffee" | "wine_and_beer" | "reading" | "cinema" | "museums" | "concerts" | "podcasts" | "board_games" | "video_games" | "chess" | "puzzles" | "gardening" | "sauna" | "cottage" | "diy" | "travelling" | "road_trips" | "learning_languages" | "dogs" | "cats" | "horses" | "birdwatching" | "programming" | "electronics" | "astronomy" | "volunteering" | "karaoke" | "pub_quiz" | "dinner_parties" | "meditation" | "winter_swimming" | "forest_walks" | "slow_mornings" | "other")[];
+            height?: number;
+            /** @enum {string} */
+            exercise?: "never" | "sometimes" | "weekly" | "daily";
+            pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
+            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
+            hideFromField?: boolean;
+            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
+            occupationTitle?: string;
+            politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them" | "kahvipuolue")[];
+            /** @enum {string} */
+            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
+            /** @enum {string} */
+            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };
         PromptAnswer: {
             key: components["schemas"]["PromptKey"];
@@ -2404,21 +2700,33 @@ export interface components {
             fields: components["schemas"]["ResearchFields"];
         };
         ResearchFields: {
-            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "so" | "de" | "fr" | "es" | "other")[];
             /** @enum {string} */
-            intent?: "long_term" | "short_term" | "figuring_out" | "friends";
+            intent?: "long_term" | "casual" | "open_to_either";
             /** @enum {string} */
-            relationship?: "monogamous" | "open" | "polyamorous" | "lat" | "undecided";
+            identityLabel?: "agender" | "genderfluid" | "genderqueer" | "bigender" | "two_spirit" | "questioning" | "non_binary";
             /** @enum {string} */
-            kids?: "have_want_more" | "have_done" | "want_someday" | "dont_want" | "not_sure";
+            monogamy?: "monogamous" | "non_monogamous";
             /** @enum {string} */
-            smoking?: "no" | "sometimes" | "yes" | "snus";
+            hasKids?: "no" | "yes_with_me" | "yes_not_with_me";
             /** @enum {string} */
-            alcohol?: "never" | "sometimes" | "often";
+            wantsKids?: "want" | "dont_want" | "not_sure";
             /** @enum {string} */
-            education?: "secondary" | "vocational" | "bachelor" | "master" | "doctorate" | "other";
+            smoking?: "never" | "sometimes" | "regularly" | "quitting";
+            languages?: ("fi" | "sv" | "en" | "se" | "et" | "ru" | "uk" | "ar" | "so" | "fa" | "ku" | "zh" | "sq" | "vi" | "th" | "tr" | "es" | "de" | "fr" | "tl" | "pl" | "it" | "pt" | "hi" | "ne" | "bn" | "ur" | "ro" | "hu" | "ja" | "lt" | "lv" | "nl" | "ko" | "other")[];
             /** @enum {string} */
-            field?: "tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other";
+            education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
+            /** @enum {string} */
+            drinking?: "never" | "rarely" | "socially" | "often";
+            /** @enum {string} */
+            drugsAttitude?: "not_my_thing" | "dont_mind" | "fine_with_it";
+            hobbies?: ("hiking" | "cycling" | "running" | "skiing" | "swimming" | "sailing" | "foraging" | "fishing" | "climbing" | "gym" | "football" | "floorball" | "ice_hockey" | "yoga" | "dance" | "martial_arts" | "padel" | "photography" | "drawing" | "making_music" | "writing" | "crafts" | "theatre" | "cooking" | "baking" | "coffee" | "wine_and_beer" | "reading" | "cinema" | "museums" | "concerts" | "podcasts" | "board_games" | "video_games" | "chess" | "puzzles" | "gardening" | "sauna" | "cottage" | "diy" | "travelling" | "road_trips" | "learning_languages" | "dogs" | "cats" | "horses" | "birdwatching" | "programming" | "electronics" | "astronomy" | "volunteering" | "karaoke" | "pub_quiz" | "dinner_parties" | "meditation" | "winter_swimming" | "forest_walks" | "slow_mornings" | "other")[];
+            /** @enum {string} */
+            exercise?: "never" | "sometimes" | "weekly" | "daily";
+            pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
+            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
+            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
+            /** @enum {string} */
+            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };
         ExportedGate: {
             /** Format: uuid */
@@ -2530,9 +2838,6 @@ export interface components {
             bioPreset: components["schemas"]["BioPreset"];
             fields: components["schemas"]["ProfileFields"];
             prompts: components["schemas"]["PromptAnswer"][];
-            specialCategoryConsent: {
-                version: string;
-            } | null;
         };
         CardPreviewResponse: {
             card: components["schemas"]["ProfileCard"];
@@ -2548,12 +2853,17 @@ export interface components {
                 /** @enum {boolean} */
                 verifiedByBank: true;
             };
+            gender: components["schemas"]["Gender"];
             pond: components["schemas"]["PondSummary"];
             photos: components["schemas"]["CardPhoto"][];
             fields: components["schemas"]["ProfileFields"];
             bio: string | null;
             bioPreset: components["schemas"]["BioPreset"];
             prompts: components["schemas"]["PromptAnswer"][];
+            shared: {
+                hobbies: string[];
+                languages: string[];
+            };
         } | null;
         CardPhoto: {
             id: components["schemas"]["PhotoId"];
@@ -2564,12 +2874,14 @@ export interface components {
         OnboardingStatus: {
             /** @enum {string} */
             state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
+            age: number;
             gender: components["schemas"]["Gender"];
             pond: components["schemas"]["PondSummary"];
             preferences: components["schemas"]["PreferencesResponse"];
             consents: {
                 terms: string | null;
                 privacy: string | null;
+                specialCategory: string | null;
                 research: {
                     version: string;
                     /** Format: date-time */
@@ -2577,6 +2889,12 @@ export interface components {
                 } | null;
             };
             currentVersions: components["schemas"]["ConsentVersions"];
+            nextChange: {
+                /** Format: date-time */
+                gender: string | null;
+                /** Format: date-time */
+                seeks: string | null;
+            };
             missing: components["schemas"]["OnboardingStep"][];
             complete: boolean;
         };
@@ -2585,9 +2903,10 @@ export interface components {
             terms: string;
             privacy: string;
             research: string;
+            special_category: string;
         };
         /** @enum {string} */
-        OnboardingStep: "gender" | "seeks" | "age_window" | "pond" | "terms" | "privacy";
+        OnboardingStep: "terms" | "privacy" | "name" | "gender" | "seeks" | "intent" | "age_window" | "photos" | "prompts_or_bio" | "pond";
         GenderUpdate: {
             gender: components["schemas"]["Gender"];
         };
@@ -2601,6 +2920,8 @@ export interface components {
             /** @enum {string} */
             locale: "fi" | "sv" | "en";
         };
+        /** @enum {string} */
+        WithdrawableConsentKind: "research" | "special_category";
         GateResponse: {
             state: components["schemas"]["GateState"];
             within: number | null;
@@ -2633,9 +2954,21 @@ export interface components {
             /** Format: uuid */
             pondId: string;
         };
+        DealBreakersResponse: {
+            dealBreakers: components["schemas"]["StoredDealBreaker"][];
+            max: number;
+        };
+        DealBreakersUpdate: {
+            dealBreakers: components["schemas"]["DealBreaker"][];
+        };
+        DealBreaker: {
+            field: components["schemas"]["DealBreakerField"];
+            accept: string[];
+            includeUnknown: boolean;
+        };
         PreferencesUpdate: {
-            seeks: components["schemas"]["Gender"][];
-            ageWindow: components["schemas"]["AgeWindow"];
+            seeks?: components["schemas"]["Gender"][];
+            ageWindow?: components["schemas"]["AgeWindow"];
         };
     };
     responses: never;

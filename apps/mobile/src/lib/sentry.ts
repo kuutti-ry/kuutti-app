@@ -1,14 +1,11 @@
 import type { ReactNativeOptions } from "@sentry/react-native";
+import { type AppEnvironment, appEnvironmentOf } from "./environment";
 
-export type SentryEnvironment = "development" | "preview" | "staging" | "production";
+export type SentryEnvironment = AppEnvironment;
 
-/** The EAS Update channel names the environment; a dev client on Metro has none. */
-export function sentryEnvironment(channel: string | null | undefined): SentryEnvironment {
-  if (!channel) return "development";
-  if (channel === "production") return "production";
-  if (channel.startsWith("pr-")) return "preview";
-  return "staging";
-}
+/** The environment an error is filed under: the channel's, as everything else reads it (#143). */
+export const sentryEnvironment = (channel: string | null | undefined): SentryEnvironment =>
+  appEnvironmentOf(channel);
 
 type Breadcrumb =
   NonNullable<ReactNativeOptions["beforeBreadcrumb"]> extends (b: infer B) => unknown ? B : never;

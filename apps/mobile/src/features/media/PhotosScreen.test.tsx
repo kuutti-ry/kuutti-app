@@ -88,6 +88,7 @@ beforeEach(async () => {
   FakeXhr.install();
   launch.mockReset();
   router.push.mockReset();
+  router.back.mockReset();
   setLocalCheck(null);
   await saveSession(session);
 });
@@ -109,8 +110,8 @@ describe("PhotosScreen", () => {
 
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // Photo 1: open, move later, remove. Photo 2: open, make main, move earlier, remove. Plus add.
-    expect(found).toHaveLength(8);
+    // Photo 1: open, move later, remove. Photo 2: open, make main, move earlier, remove. Plus add and done.
+    expect(found).toHaveLength(9);
     expect(screen.getByRole("button", { name: "Move later" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Make main photo" })).toBeTruthy();
   });
@@ -136,6 +137,13 @@ describe("PhotosScreen", () => {
       pathname: "/photos/[id]",
       params: { id: photo(2).id, blurhash: photo(2).blurhash, position: "2", total: "2" },
     });
+  });
+
+  it("Done returns to where the person came from, since no header offers a way back", async () => {
+    fetchMock([answersList(list(2)), answersUrls]);
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Done" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 
   it("reorders with buttons: move later sends the new order and renumbers", async () => {

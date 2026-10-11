@@ -1,0 +1,21 @@
+# Log out everywhere (#35): every session of the account ends at once, this
+# device's with them, and opening the app again does not bring it back.
+# Sanna; her profile is untouched, only her sessions end.
+appId: fi.kuutti.app
+name: Log out everywhere ends this device's session, and reopening the app does not bring it back
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "This device|Tämä laite|Den här enheten"
+    timeout: 15000
+- assertVisible: "Log out|Kirjaudu ulos|Logga ut"
+- tapOn: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+    timeout: 15000
+- stopApp
+- runFlow: ../common/open-app.yaml
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+- assertNotVisible: "Your area|Alueesi|Ditt område"

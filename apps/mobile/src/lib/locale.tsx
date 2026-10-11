@@ -10,8 +10,8 @@ import {
 } from "@kuutti/i18n";
 import { createReactI18n, I18nProvider, useT } from "@kuutti/i18n/react";
 import { useLocales } from "expo-localization";
-import * as Updates from "expo-updates";
 import * as React from "react";
+import { isProduction } from "./environment";
 import { readPreference, writePreference } from "./preferences";
 
 /** "system" follows the phone; anything else is the user's own choice and beats it (#13). */
@@ -28,8 +28,7 @@ const pseudo: Readonly<Record<string, string>> | undefined = __DEV__
  * other channel all of them, so a reviewer reads Swedish on staging before it
  * is released (#55, TD-17).
  */
-export const SERVED_LOCALES: readonly Locale[] =
-  Updates.channel === "production" ? RELEASED_LOCALES : LOCALES;
+export const SERVED_LOCALES: readonly Locale[] = isProduction() ? RELEASED_LOCALES : LOCALES;
 
 /** What the language picker offers: the served catalogues, and en-XA in dev builds. */
 export const OFFERED_LOCALES: readonly AnyLocale[] = pseudo
