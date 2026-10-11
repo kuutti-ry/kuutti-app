@@ -21,6 +21,8 @@
       ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
       button { font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
       button[data-persona] { display: block; width: 100%; min-height: 56px; padding: 10px 14px; text-align: left; }
+      .names { grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); }
+      .names button[data-persona] { min-height: 44px; padding: 8px 12px; font-weight: 600; }
       button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
       .name { display: block; font-weight: 600; }
       .note { display: block; color: var(--soft); font-size: 0.9375rem; }
@@ -38,6 +40,23 @@
         This stands in for bank identification on a developer's machine. Nobody here is a person:
         every code on this page is artificial.
       </p>
+      <section aria-labelledby="group-names">
+        <h2 id="group-names">Sign in as</h2>
+        <ul class="names">
+        <li><button type="button" data-persona="aino">Aino Virtanen</button></li>
+        <li><button type="button" data-persona="mikael">Mikael Lindqvist</button></li>
+        <li><button type="button" data-persona="sanna">Sanna Korhonen</button></li>
+        <li><button type="button" data-persona="onni">Onni Korhonen</button></li>
+        <li><button type="button" data-persona="noa">Noa Salmi</button></li>
+        <li><button type="button" data-persona="kerttu">Kerttu Åkerlund</button></li>
+        <li><button type="button" data-persona="tapio">Tapio Heikkinen</button></li>
+        <li><button type="button" data-persona="ilona">Ilona Öhman</button></li>
+        <li><button type="button" data-persona="eetu">Eetu Laine</button></li>
+        <li><button type="button" data-persona="venla">Venla Nieminen</button></li>
+        <li><button type="button" data-persona="lauri">Lauri Hämäläinen</button></li>
+        <li><button type="button" data-persona="siiri">Siiri Koskinen</button></li>
+        </ul>
+      </section>
     <section aria-labelledby="group-walkthrough">
       <h2 id="group-walkthrough">Newcomers</h2>
       <p class="lead">Never seen by Kuutti before the first login.</p>
