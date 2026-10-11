@@ -1,5 +1,4 @@
 import type { Completeness, ProfileDocument, ProfileUpdate, TipKind } from "@kuutti/schema";
-import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
@@ -38,8 +37,8 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
  * The person's profile as a draft they edit and save whole (#47): the API
  * stores the document, answers it back with what is still missing, and the
  * screen shows both. A prompt without an answer yet is kept in the draft and
- * left out of the save. The tip of #56 rides along; a focus reload refreshes
- * it after photos change on another screen without wiping an unsaved draft.
+ * left out of the save. The tip of #56 rides along and refreshes with each
+ * read (the list of #227 reloads after a section or photos change).
  */
 export function useProfile() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -51,12 +50,6 @@ export function useProfile() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
-  const asked = useRef(0);
-  const draftRef = useRef(draft);
-  const savedRef = useRef(saved);
-  draftRef.current = draft;
-  savedRef.current = saved;
-
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -64,34 +57,27 @@ export function useProfile() {
     };
   }, []);
 
-  const load = useCallback(async (quietly: boolean) => {
-    asked.current += 1;
-    const mine = asked.current;
-    // Of two reads under way the later one speaks (useGate's pattern).
-    const current = () => mounted.current && mine === asked.current;
-    if (!quietly) setStatus("loading");
+  // A read again (the list of #227 back in front after a section saved) keeps
+  // what is shown until the answer is there, and a failed one takes nothing
+  // away that was known, as the gate's read does.
+  const load = useCallback(async () => {
+    setStatus((was) => (was === "ready" ? was : "loading"));
     try {
       const response = await fetchProfile();
-      if (!current()) return;
+      if (!mounted.current) return;
       const document = response.profile ? toUpdate(response.profile) : EMPTY_PROFILE;
-      const dirty = canonical(draftRef.current) !== canonical(savedRef.current);
+      setDraft(document);
+      setSaved(document);
       setCompleteness(response.completeness);
       setTip(response.tip);
-      setSaved(document);
-      if (!dirty) setDraft(document);
       setStatus("ready");
     } catch {
-      if (!current()) return;
-      // A quiet re-read that fails keeps what is on screen.
-      setStatus((was) => (quietly && was === "ready" ? was : "error"));
+      if (mounted.current) setStatus((was) => (was === "ready" ? was : "error"));
     }
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      void load(true);
-    }, [load]),
-  );
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const update = useCallback((patch: Partial<ProfileUpdate>) => {
     setNotice(null);
@@ -112,8 +98,6 @@ export function useProfile() {
           .filter((p) => p.answer.trim().length > 0)
           .map((p) => ({ key: p.key, answer: p.answer.trim() })),
       });
-      // Drop any in-flight focus re-read so it cannot overwrite this answer.
-      asked.current += 1;
       if (!mounted.current) return true;
       // The stored document replaces the draft only if nothing was typed while
       // the save was in flight; otherwise those keystrokes would vanish.
@@ -153,7 +137,7 @@ export function useProfile() {
     dirty,
     update,
     save,
-    reload: () => load(false),
+    reload: load,
     dismissNotice,
   };
 }

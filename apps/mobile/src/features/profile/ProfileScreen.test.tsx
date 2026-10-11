@@ -11,92 +11,47 @@ const show = (ui: React.ReactElement) =>
     renderWithTheme(ui);
     await settle();
   });
-// Every event in its own act scope, settled before the next query: a state
-// update dispatched outside one is not flushed by a later act in this runtime.
 const press = (element: ReturnType<typeof screen.getByRole>) =>
   act(async () => {
     fireEvent.press(element);
-    await settle();
-  });
-const type = (element: ReturnType<typeof screen.getByLabelText>, text: string) =>
-  act(async () => {
-    fireEvent.changeText(element, text);
     await settle();
   });
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-const missing = ["display_name", "photos", "bio_or_prompts", "seeks", "age_window"];
 
-/** A stored document with these fields, as GET /profile answers it. */
-const stored = (fields: Record<string, unknown>) => ({
-  displayName: "Aino",
-  bio: null,
-  bioPreset: null,
-  fields,
-  prompts: [],
-  specialCategoryConsent: null,
-  updatedAt: "2026-09-26T10:00:00.000Z",
-});
-
-function fakeApi(
-  options: {
-    saveStatus?: number;
-    saveCode?: string;
-    profile?: ReturnType<typeof stored>;
-    tip?: string | null;
-  } = {},
-) {
-  const puts: unknown[] = [];
-  const tip = options.tip === undefined ? null : options.tip;
+/**
+ * GET /profile answering each read with the next list of what is missing, the
+ * last one again after that. `tip` is the advisory kind of #56 (null by default).
+ */
+function fakeApi(missingByRead: string[][], tip: string | null = null) {
+  let reads = 0;
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/profile" && request.method === "GET") {
+      const missing = missingByRead[Math.min(reads, missingByRead.length - 1)] ?? [];
+      reads += 1;
       return json({
-        profile: options.profile ?? null,
-        completeness: { complete: false, missing },
-        tip,
-      });
-    }
-    if (path === "/profile" && request.method === "PUT") {
-      const body = await request.json();
-      puts.push(body);
-      if (options.saveStatus) {
-        return json(
-          {
-            error: { code: options.saveCode ?? "validation_failed", message: "no", requestId: "r" },
-          },
-          options.saveStatus,
-        );
-      }
-      return json({
-        profile: {
-          ...(body as object),
-          specialCategoryConsent: null,
-          updatedAt: "2026-09-26T10:00:00.000Z",
-        },
-        completeness: { complete: false, missing: ["photos", "seeks", "age_window"] },
+        profile: null,
+        completeness: { complete: missing.length === 0, missing },
         tip,
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
-  return { puts };
+  return { reads: () => reads };
 }
 
-const { __navigation: navigation } = jest.requireMock("expo-router") as {
-  __navigation: {
-    addListener: jest.Mock;
-    dispatch: jest.Mock;
-    emit: (name: string, event: unknown) => void;
-  };
+const { __router: router, __focus: focus } = jest.requireMock("expo-router") as {
+  __router: { push: jest.Mock; back: jest.Mock };
+  __focus: () => void;
 };
 
 beforeEach(async () => {
-  navigation.addListener.mockClear();
-  navigation.dispatch.mockReset();
+  router.push.mockClear();
+  router.back.mockClear();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -107,104 +62,73 @@ beforeEach(async () => {
 });
 
 describe("ProfileScreen", () => {
-  it("renders every field, option, prompt and placeholder of the registry with a text, and every control labelled", async () => {
-    fakeApi();
+  it("lists the sections with what each holds, after what the card still needs, every row labelled", async () => {
+    fakeApi([["display_name", "photos"]]);
     await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText("Languages")).toBeTruthy());
-    expect(screen.getByText("Something long-term")).toBeTruthy();
-    expect(screen.getByText("My ideal Sunday")).toBeTruthy();
-    expect(screen.getByText(/too lazy to write/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
     expect(screen.getByText("At least 2 approved photos")).toBeTruthy();
-    // A text that is still its key means the catalogue and the registry disagree.
+    for (const title of [
+      "Prompts",
+      "Relationship and kids",
+      "Work and education",
+      "Lifestyle",
+      "Hobbies",
+      "Beliefs",
+    ]) {
+      expect(screen.getByRole("button", { name: title })).toBeTruthy();
+    }
+    expect(screen.getByText("Smoking, drinking, drugs, exercise and pets")).toBeTruthy();
+    // Nothing is edited on the list, so there is nothing to save.
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryAllByText(/^profile\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found.length).toBeGreaterThan(60);
+    // The back arrow, seven sections, and the card, the later questions and the deal-breakers.
+    expect(found).toHaveLength(11);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
   it("shows one tip under the completeness card and dismisses it for the session", async () => {
-    fakeApi({ tip: "sunglasses" });
+    fakeApi([[]], "sunglasses");
     await show(<ProfileScreen />);
     await waitFor(() => expect(screen.getByText("A tip for your photos")).toBeTruthy());
     expect(screen.getByText(/without sunglasses/)).toBeTruthy();
     expect(screen.queryAllByText(/^profile\.tip\./)).toEqual([]);
-    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
-      [],
-    );
+    const found = pressables(screen.toJSON() as HostNode);
+    // The eleven list rows plus the tip's dismiss.
+    expect(found).toHaveLength(12);
+    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     await press(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByText("A tip for your photos")).toBeNull();
   });
 
-  it("does not offer the identity label to everyone: only once it was given, to change it", async () => {
-    fakeApi();
+  it("opens a section, the card, the later questions and the deal-breakers", async () => {
+    fakeApi([[]]);
     await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText("Languages")).toBeTruthy());
-    expect(screen.queryByText("Agender")).toBeNull();
+    await waitFor(() => expect(screen.getByText("Lifestyle")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Lifestyle" }));
+    await press(screen.getByRole("button", { name: "See your card" }));
+    await press(screen.getByRole("button", { name: "Fill in the rest while you wait" }));
+    await press(screen.getByRole("button", { name: "Your deal-breakers" }));
+    expect(router.push.mock.calls.map(([path]) => path)).toEqual([
+      "/profile/section/lifestyle",
+      "/profile/card",
+      expect.stringMatching(/^\/profile\/later\//),
+      "/profile/deal-breakers",
+    ]);
   });
 
-  it("shows the identity label a non-binary person gave in onboarding", async () => {
-    fakeApi({ profile: stored({ identityLabel: "agender" }) });
+  it("reads the profile again when a section hands back, and the checklist follows", async () => {
+    const api = fakeApi([["display_name", "photos"], ["photos"]]);
     await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText("Agender")).toBeTruthy());
-  });
-
-  it("asks before leaving with unsaved edits, and leaves on the word", async () => {
-    fakeApi();
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText("Languages")).toBeTruthy());
-    // Nothing edited: nothing stands in the way of leaving.
-    expect(navigation.addListener).not.toHaveBeenCalled();
-    await press(screen.getByRole("button", { name: "Something long-term" }));
-    await waitFor(() =>
-      expect(navigation.addListener).toHaveBeenCalledWith("beforeRemove", expect.any(Function)),
-    );
-    const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+    await waitFor(() => expect(screen.getByText("A name on the card")).toBeTruthy());
+    expect(api.reads()).toBe(1);
     await act(async () => {
-      navigation.emit("beforeRemove", event);
+      focus();
       await settle();
     });
-    expect(event.preventDefault).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Leave without saving?")).toBeTruthy();
-    await press(screen.getByRole("button", { name: "Keep editing" }));
-    expect(screen.queryByText("Leave without saving?")).toBeNull();
-    expect(navigation.dispatch).not.toHaveBeenCalled();
-    await act(async () => {
-      navigation.emit("beforeRemove", event);
-      await settle();
-    });
-    await press(screen.getByRole("button", { name: "Leave without saving" }));
-    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
-  });
-
-  it("saves the document: the name, a choice, two languages and an answered prompt", async () => {
-    const { puts } = fakeApi();
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
-    await type(screen.getByLabelText("Name on your card"), "Aino");
-    await press(screen.getByRole("button", { name: "Something long-term" }));
-    await press(screen.getByRole("button", { name: "suomi" }));
-    await press(screen.getByRole("button", { name: "English" }));
-    await press(screen.getByRole("button", { name: "My ideal Sunday" }));
-    await type(screen.getByLabelText("Your answer to: My ideal Sunday"), "A long breakfast.");
-    await press(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0]).toMatchObject({
-      displayName: "Aino",
-      bio: null,
-      bioPreset: null,
-      fields: { intent: "long_term", languages: ["fi", "en"] },
-      prompts: [{ key: "sunday", answer: "A long breakfast." }],
-    });
-    expect(screen.getByText("Saved.")).toBeTruthy();
+    expect(api.reads()).toBe(2);
     expect(screen.queryByText("A name on the card")).toBeNull();
-  });
-
-  it("says why a save was refused, in words", async () => {
-    fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
-    await type(screen.getByLabelText("Name on your card"), "aino@example.com");
-    await press(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(screen.getByText(/e-mail address, a link/)).toBeTruthy());
+    // The list stays while it reads: no loading screen in between.
+    expect(screen.getByText("At least 2 approved photos")).toBeTruthy();
   });
 });

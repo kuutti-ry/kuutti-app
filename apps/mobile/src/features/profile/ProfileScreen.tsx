@@ -1,104 +1,87 @@
-import type { PlainMessageKey } from "@kuutti/i18n";
-import {
-  BIO_MAX,
-  BIO_MIN_FOR_COMPLETENESS,
-  BIO_PRESETS,
-  DISPLAY_NAME_MAX,
-  PROFILE_FIELD_KEYS,
-  PROFILE_FIELDS,
-  type TipKind,
-} from "@kuutti/schema";
-import { useNavigation, useRouter } from "expo-router";
-// Expo Router 57 vendors React Navigation and exposes the hook that holds a
-// native stack's swipe-back only from the vendored core: a plain beforeRemove
-// listener cannot stop a native removal (the screen leaves the stack natively
-// while JS keeps it; 09/10/2026, the simulator).
-import { usePreventRemove } from "expo-router/build/react-navigation/core";
-import { Fragment, useState } from "react";
+import type { TipKind } from "@kuutti/schema";
+import { useFocusEffect, useRouter } from "expo-router";
+import ArrowLeft from "lucide-react-native/icons/arrow-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
+import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
-import { FieldEditor, SpecialCategoryNote } from "./FieldEditor";
-import { completenessText, presetKey, tipText } from "./keys";
+import { completenessText, tipText } from "./keys";
 import { FIRST_LATER_FIELD, laterPath } from "./later/LaterFieldScreen";
-import { PromptsEditor } from "./PromptsEditor";
-import { type ProfileNotice, useProfile } from "./useProfile";
+import { PROFILE_SECTIONS, sectionPath, sectionSummaryKey, sectionTitleKey } from "./sections";
+import { useProfile } from "./useProfile";
 
-type LeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]["data"]["action"];
+type Row = { key: string; title: string; summary?: string; onPress: () => void };
 
-/** The API's refusals the screen has its own words for; anything else is the generic line. */
-const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
-  ["text_contact_details", "profile.error.text_contact_details"],
-  ["consent_required", "errors.special_category_locked"],
-]);
-
-function noticeText(notice: NonNullable<ProfileNotice>, t: ReturnType<typeof useT>["t"]): string {
-  if (notice.kind === "saved") return t("profile.saved");
-  return t(ERROR_TEXT.get(notice.code ?? "") ?? "profile.error.generic");
-}
-
-/** One choice: a button that says whether it is chosen, never a colour alone. */
-function Chip({
-  label,
-  selected,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
+/**
+ * One group of rows, each a button that opens a screen: the title names it,
+ * the summary says what is in it (a screen reader hears it as the hint), and
+ * the chevron says it opens.
+ */
+function RowGroup({ rows }: { rows: readonly Row[] }) {
   return (
-    <Button
-      variant={selected ? "default" : "outline"}
-      accessibilityState={{ selected }}
-      onPress={onPress}
-    >
-      {label}
-    </Button>
+    <Card className="gap-0 py-0">
+      {rows.map((row, index) => (
+        <Button
+          key={row.key}
+          variant="ghost"
+          accessibilityLabel={row.title}
+          accessibilityHint={row.summary}
+          className={cn(
+            "justify-between gap-3 rounded-none px-4 py-3",
+            index < rows.length - 1 && "border-b border-border",
+          )}
+          onPress={row.onPress}
+        >
+          <View className="flex-1 gap-0.5">
+            <Text>{row.title}</Text>
+            {row.summary && (
+              <Text className="text-sm font-normal text-muted-foreground">{row.summary}</Text>
+            )}
+          </View>
+          <Icon as={ChevronRight} className="text-muted-foreground" />
+        </Button>
+      ))}
+    </Card>
   );
 }
 
 /**
- * The profile as the person writes it (#47, ADR-009, ADR-019): a name, a bio
- * or a placeholder line, the fields of the registry (choices as chips, a
- * number, a text, a setting as a switch), the article 9 fields behind their
- * consent, up to three prompts with short answers, and the checklist of what
- * the card still needs. Every decision is a button; every control carries its
- * label (CLAUDE.md Accessibility). The screens of #148 take the optional
- * fields one at a time; this is the whole document on one page.
+ * The profile as a list (#227, ADR-009, ADR-019): what the card still needs,
+ * then one advisory photo tip (#56), then the sections, each its own screen
+ * that saves on leaving, then the card preview, the later questions (#148)
+ * and the deal-breakers (#149). Nothing is edited here, so there is nothing
+ * to save; the list reads the profile again when a section hands back, and
+ * the checklist and tip follow.
  */
 export function ProfileScreen() {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
   const profile = useProfile();
-  const { draft, update } = profile;
-  const navigation = useNavigation();
-  // The document saves whole, on Save, and the screen has no header: the back
-  // gesture was the only way out and lost unsaved edits without a word
-  // (09/10/2026, Kerttu's smoking answer). Leaving with edits asks first; the
-  // action handed back remembers it was held here, so dispatching it leaves.
-  const [leaving, setLeaving] = useState<LeaveAction | null>(null);
+  const { reload } = profile;
   // Tip kind dismissed this session (#56); no server store. The API sends one
   // tip at a time, so dismiss hides it until a different kind arrives.
   const [dismissedTip, setDismissedTip] = useState<TipKind | null>(null);
-  usePreventRemove(profile.dirty, ({ data }) => setLeaving(data.action));
-
-  const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
+  // The first focus is the mount, which the hook reads already.
+  const shown = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (shown.current) void reload();
+      shown.current = true;
+    }, [reload]),
+  );
+  const open = (path: Parameters<typeof router.push>[0]) => () => {
+    tap();
+    router.push(path);
+  };
   const tip = profile.tip && profile.tip !== dismissedTip ? profile.tip : null;
 
   if (profile.status === "loading") {
@@ -123,13 +106,23 @@ export function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView
-        contentContainerClassName="flex-grow gap-6 p-6"
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.title")}
-        </Text>
+      <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
+        <View className="flex-row items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel={t("profile.back")}
+            onPress={() => {
+              tap();
+              router.back();
+            }}
+          >
+            <Icon as={ArrowLeft} />
+          </Button>
+          <Text variant="h1" accessibilityRole="header" className="flex-1">
+            {t("profile.title")}
+          </Text>
+        </View>
         <Text>{t("profile.explain")}</Text>
 
         {profile.completeness && (
@@ -171,138 +164,30 @@ export function ProfileScreen() {
           </Card>
         )}
 
-        <View className="gap-2">
-          <Text variant="small">{t("profile.displayName.label")}</Text>
-          <Input
-            accessibilityLabel={t("profile.displayName.label")}
-            value={draft.displayName}
-            maxLength={DISPLAY_NAME_MAX}
-            autoCapitalize="words"
-            onChangeText={(displayName) => update({ displayName })}
-          />
-          <Text variant="muted">{t("profile.displayName.hint", { max: DISPLAY_NAME_MAX })}</Text>
-        </View>
-
-        <View className="gap-2">
-          <Text variant="small">{t("profile.bio.label")}</Text>
-          <Input
-            accessibilityLabel={t("profile.bio.label")}
-            value={draft.bio ?? ""}
-            maxLength={BIO_MAX}
-            multiline
-            // Room for four lines and more as the bio grows: a capped field scrolled
-            // its start out of sight at large text sizes (10/10/2026).
-            className="min-h-28"
-            onChangeText={(text) =>
-              update({
-                bio: text.length > 0 ? text : null,
-                bioPreset: text.length > 0 ? null : draft.bioPreset,
-              })
-            }
-          />
-          <Text variant="muted">{t("profile.bio.hint", { min: BIO_MIN_FOR_COMPLETENESS })}</Text>
-          <Text variant="small">{t("profile.bio.orPreset")}</Text>
-          <View className="flex-row flex-wrap gap-2">
-            {BIO_PRESETS.map((preset) => (
-              <Chip
-                key={preset}
-                label={t(presetKey(preset))}
-                selected={draft.bioPreset === preset}
-                onPress={() => {
-                  tap();
-                  update(
-                    draft.bioPreset === preset
-                      ? { bioPreset: null }
-                      : { bioPreset: preset, bio: null },
-                  );
-                }}
-              />
-            ))}
-          </View>
-        </View>
-
-        {PROFILE_FIELD_KEYS.map((key) => {
-          // The identity label is offered after a non-binary gender only, in
-          // onboarding (the registry's rule, #146); here it shows when it was
-          // given, to change or clear it, and is not offered to everyone.
-          if (key === "identityLabel" && draft.fields.identityLabel === undefined) return null;
-          // The article 9 fields stand under the note on their consent (ADR-019 §4, #204):
-          // anyone active gave it at the seeks step; Settings is where it is withdrawn.
-          return (
-            <Fragment key={key}>
-              {key === firstSpecial && <SpecialCategoryNote />}
-              <FieldEditor field={key} draft={draft} update={update} />
-            </Fragment>
-          );
-        })}
-
-        <PromptsEditor draft={draft} update={update} />
-
-        {profile.notice && (
-          <Text accessibilityLiveRegion="assertive">{noticeText(profile.notice, t)}</Text>
-        )}
-        {profile.saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
-        <Button
-          disabled={profile.saving}
-          onPress={() => {
-            tap();
-            void profile.save();
-          }}
-        >
-          {t("profile.save")}
-        </Button>
-        <Button
-          variant="outline"
-          onPress={() => {
-            tap();
-            router.push("/profile/card");
-          }}
-        >
-          {t("profile.card.open")}
-        </Button>
-        <Button
-          variant="outline"
-          onPress={() => {
-            tap();
-            router.push(laterPath(FIRST_LATER_FIELD));
-          }}
-        >
-          {t("profile.later.open")}
-        </Button>
-        <Button
-          variant="outline"
-          onPress={() => {
-            tap();
-            router.push(DEAL_BREAKERS_PATH);
-          }}
-        >
-          {t("profile.dealBreakers.open")}
-        </Button>
+        <RowGroup
+          rows={PROFILE_SECTIONS.map(({ id }) => ({
+            key: id,
+            title: t(sectionTitleKey(id)),
+            summary: t(sectionSummaryKey(id)),
+            onPress: open(sectionPath(id)),
+          }))}
+        />
+        <RowGroup
+          rows={[
+            { key: "card", title: t("profile.card.open"), onPress: open("/profile/card") },
+            {
+              key: "later",
+              title: t("profile.later.open"),
+              onPress: open(laterPath(FIRST_LATER_FIELD)),
+            },
+            {
+              key: "dealBreakers",
+              title: t("profile.dealBreakers.open"),
+              onPress: open(DEAL_BREAKERS_PATH),
+            },
+          ]}
+        />
       </ScrollView>
-
-      <Dialog open={leaving !== null} onOpenChange={(open) => !open && setLeaving(null)}>
-        <DialogContent closeLabel={t("profile.discard.close")}>
-          <DialogHeader>
-            <DialogTitle>{t("profile.discard.title")}</DialogTitle>
-            <DialogDescription>{t("profile.discard.body")}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onPress={() => setLeaving(null)}>
-              {t("profile.discard.keep")}
-            </Button>
-            <Button
-              variant="destructive"
-              onPress={() => {
-                const action = leaving;
-                setLeaving(null);
-                if (action) navigation.dispatch(action);
-              }}
-            >
-              {t("profile.discard.leave")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </SafeAreaView>
   );
 }

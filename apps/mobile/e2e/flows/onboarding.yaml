@@ -27,6 +27,7 @@ name: A registered person is taken through onboarding one question per screen, a
     element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 
 # 2: the name, typed, never the bank's.
@@ -62,6 +63,7 @@ name: A registered person is taken through onboarding one question per screen, a
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible:
     text: "Continue|Jatka|Fortsätt"
     enabled: false
@@ -69,7 +71,7 @@ name: A registered person is taken through onboarding one question per screen, a
 # text's beside it. So the switch is the "0" right of them. The consent is
 # saved before Continue opens.
 - tapOn:
-    text: "0"
+    text: "0|(I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker), off"
     rightOf: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
 - extendedWaitUntil:
     visible:
@@ -81,6 +83,7 @@ name: A registered person is taken through onboarding one question per screen, a
     element: "Continue|Jatka|Fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Continue|Jatka|Fortsätt"
 
 # 5: the intent. Closed here and opened again: the screen's memory is gone,
@@ -130,22 +133,23 @@ name: A registered person is taken through onboarding one question per screen, a
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
-      CELL: "17%,43%"
+      INDEX: 0
       COUNT: "1 photo, at most 6|1 kuva, enintään 6|1 foto, högst 6"
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
-      CELL: "50%,43%"
+      INDEX: 1
       COUNT: "2 photos, at most 6|2 kuvaa, enintään 6|2 foton, högst 6"
 - runFlow:
     file: ../common/pick-photo.yaml
     env:
-      CELL: "83%,43%"
+      INDEX: 2
       COUNT: "3 photos, at most 6|3 kuvaa, enintään 6|3 foton, högst 6"
 - scrollUntilVisible:
     element: "Done|Valmis|Klar"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Done|Valmis|Klar"
 
 # 9: a bio of at least 50 characters instead of two prompts.
@@ -162,6 +166,7 @@ name: A registered person is taken through onboarding one question per screen, a
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 
 # 10: research, optional, on its own screen.

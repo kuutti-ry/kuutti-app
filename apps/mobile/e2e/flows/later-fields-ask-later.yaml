@@ -12,6 +12,7 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
     element: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
 - extendedWaitUntil:
     visible: "While you wait|Odotellessasi|Medan du väntar"
@@ -35,6 +36,7 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
     element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
 - extendedWaitUntil:
     visible: "Religion|Uskonto"

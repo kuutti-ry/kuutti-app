@@ -3,14 +3,15 @@
 # refusal, which is what the refusal flows assert on. The persona is named as the
 # mock bank's page names them (packages/db/src/seed/personas.ts, given + family).
 # No env header: a default there would override the PERSONA a caller passes.
+# The page opens in the system browser: Safari on iOS, Chrome on Android.
 appId: fi.kuutti.app
 ---
 # The sign-in button, or after a refusal the same button saying "Try again".
 # A tap that lands while the screen still settles is lost, so it is tapped
 # again while the button is still there; never once the browser is open.
-# A fresh simulator's Safari greets the first page with sheets to continue past,
-# a moment after the page: wait for either. The page's heading, not the
-# persona's card: most of the cast lies below the first screenful.
+# A fresh browser greets the first page with its own screens, a moment after
+# the page: wait for either. The page's heading, not the persona's card: most
+# of the cast lies below the first screenful.
 - retry:
     maxRetries: 2
     commands:
@@ -20,26 +21,63 @@ appId: fi.kuutti.app
           commands:
             - tapOn: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen"
       - extendedWaitUntil:
-          visible: "Mock bank|Continue|Jatka|Fortsätt"
-          timeout: 15000
-# At most three taps past Safari's sheets, so our own Continue button can never trap the loop.
+          visible: "Mock bank|Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks"
+          timeout: 20000
+# Past the browser's first-use screens, the most private answer each time:
+# Safari's sheets (Continue), Chrome's welcome (without an account) and its
+# questions (notifications, sync); and a busy emulator's "not responding",
+# waited for (never closed: it may be ours). A bounded loop, so our own Continue button can never trap it.
 - repeat:
-    times: 3
+    times: 6
     while:
-      visible: "Continue|Jatka|Fortsätt"
+      visible: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
     commands:
-      - tapOn: "Continue|Jatka|Fortsätt"
-# The mock bank's page opens in the system browser: one button per persona, whose
-# accessible name is the person's name followed by the note under it.
-# Safari's address bar lies over the bottom of the page: the card is scrolled to the middle first.
-- scrollUntilVisible:
-    element: ".*${PERSONA}.*"
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- tapOn: ".*${PERSONA}.*"
-# iOS asks before handing the link back to the app.
-- extendedWaitUntil:
-    visible: "Open|Avaa|Öppna"
-    timeout: 15000
-- tapOn: "Open|Avaa|Öppna"
+      - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
+# One button per persona, whose accessible name is the person's name followed by
+# the note under it. On iOS Safari's bar lies over the bottom of the page and a
+# card under it counts as visible: the card is scrolled to the middle, down and,
+# should a scroll have passed it, back up. On Android Chrome's bar is at the top
+# and covers nothing, while its toolbar moves the page as it hides, so a swipe
+# can jump over the middle both ways: a card in full view is enough there.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: DOWN
+          centerElement: true
+          timeout: 40000
+          optional: true
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: UP
+          centerElement: true
+          timeout: 40000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element: ".*${PERSONA}.*"
+          direction: DOWN
+          timeout: 60000
+# iOS asks before handing the link back to the app; Chrome hands it on. A tap
+# on a page that still moves is lost: tapped again while the card is there.
+- waitForAnimationToEnd
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible: ".*${PERSONA}.*"
+          commands:
+            - tapOn: ".*${PERSONA}.*"
+      - extendedWaitUntil:
+          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+          timeout: 20000
+- runFlow:
+    when:
+      visible: "Open|Avaa|Öppna"
+    commands:
+      - tapOn: "Open|Avaa|Öppna"

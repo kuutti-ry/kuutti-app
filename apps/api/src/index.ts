@@ -200,12 +200,25 @@ async function main(): Promise<void> {
   );
   scheduleNightly(jobs, logger);
 
-  const server = serve({ fetch: app.fetch, port: config.PORT, hostname: "0.0.0.0" }, (address) => {
-    logger.info(
-      { port: address.port, appEnv: config.APP_ENV, version: info.version, commit: info.commit },
-      "API listening",
-    );
-  });
+  const server = serve(
+    {
+      fetch: app.fetch,
+      port: config.PORT,
+      hostname: "0.0.0.0",
+      // Idle connections stay open past what a client or proxy keeps them for (#225).
+      // Node closes them after 5 s; Android's OkHttp checks a pooled connection for a
+      // POST only once it has been idle 10 s, so an upload sent 5 to 10 s after the
+      // previous call went out on a closed socket and failed before reaching us. The
+      // headers timeout stays above it, as Node's documentation asks.
+      serverOptions: { keepAliveTimeout: 65_000, headersTimeout: 66_000 },
+    },
+    (address) => {
+      logger.info(
+        { port: address.port, appEnv: config.APP_ENV, version: info.version, commit: info.commit },
+        "API listening",
+      );
+    },
+  );
 
   server.on("error", (error: NodeJS.ErrnoException) => {
     if (error.code === "EADDRINUSE") {

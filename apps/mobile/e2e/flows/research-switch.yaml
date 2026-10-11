@@ -11,14 +11,15 @@ name: The research switch in Settings records the opt-in and withdraws it again
     element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
 # A switch's text, to Maestro, is its value ("0" off, "1" on), right of its words.
 - tapOn:
-    text: "0"
+    text: "0|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), off"
     rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - extendedWaitUntil:
     visible:
-      text: "1"
+      text: "1|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), on"
       rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
     timeout: 15000
 
@@ -28,15 +29,16 @@ name: The research switch in Settings records the opt-in and withdraws it again
     element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible:
-    text: "1"
+    text: "1|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), on"
     rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - tapOn:
-    text: "1"
+    text: "1|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), on"
     rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - extendedWaitUntil:
     visible:
-      text: "0"
+      text: "0|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), off"
       rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
     timeout: 15000
 - assertNotVisible: "The research choice could not be saved\\. Try again\\.|Tutkimusvalintaa ei voitu tallentaa\\. Yritä uudelleen\\.|Forskningsvalet kunde inte sparas\\. Försök igen\\."

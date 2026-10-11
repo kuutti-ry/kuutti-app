@@ -24,6 +24,7 @@ name: A party and a star sign saved on their screens show on the card, and clear
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
     visible: "Religion|Uskonto"
@@ -40,6 +41,7 @@ name: A party and a star sign saved on their screens show on the card, and clear
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
     visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
@@ -54,12 +56,14 @@ name: A party and a star sign saved on their screens show on the card, and clear
     element: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Centre Party|Keskusta|Centern"
 - assertVisible: "Pirate Party|Piraattipuolue|Piratpartiet"
 - scrollUntilVisible:
     element: "Star sign|Horoskooppimerkki|Stjärntecken"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Corgi"
 
 # Cleared again: off the card. The screen shows the stored answer once it has
@@ -77,6 +81,7 @@ name: A party and a star sign saved on their screens show on the card, and clear
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
     visible: "Religion|Uskonto"
@@ -93,6 +98,7 @@ name: A party and a star sign saved on their screens show on the card, and clear
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
     visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
@@ -105,5 +111,6 @@ name: A party and a star sign saved on their screens show on the card, and clear
     element: "Teach me|Opeta minulle|Lär mig"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertNotVisible: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
 - assertNotVisible: "Corgi"

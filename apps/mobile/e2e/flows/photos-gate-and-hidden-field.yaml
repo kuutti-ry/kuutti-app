@@ -24,10 +24,12 @@ name: With two approved photos the gate says the profile lacks something, and a 
     element: "Being reviewed|Tarkistuksessa|Granskas|Waiting for review|Odottaa tarkistusta|Väntar på granskning"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - scrollUntilVisible:
     element: "Add a photo|Lisää kuva|Lägg till ett foto"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible:
     text: "Add a photo|Lisää kuva|Lägg till ett foto"
     enabled: false
@@ -38,7 +40,7 @@ name: With two approved photos the gate says the profile lacks something, and a 
     visible: "Your profile|Profiilisi|Din profil"
     timeout: 15000
 - assertVisible: "Before your card can be shown|Ennen kuin korttisi voidaan näyttää|Innan ditt kort kan visas"
-- assertVisible: "At least 3 approved photos|Vähintään 3 hyväksyttyä kuvaa|Minst 3 godkända foton"
+- assertVisible: "At least 2 approved photos|Vähintään 2 hyväksyttyä kuvaa|Minst 2 godkända foton"
 
 # The card: the approved photos only; the work, not the field.
 - openLink: kuutti://profile/card
@@ -50,5 +52,6 @@ name: With two approved photos the gate says the profile lacks something, and a 
     element: "Work|Työ|Arbete"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Science and research|Tiede ja tutkimus|Vetenskap och forskning"
 - assertNotVisible: "Field|Ala|Bransch"

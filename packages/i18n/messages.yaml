@@ -69,51 +69,142 @@ profile.retry:
   sv: "Försök igen"
   machine: { fi: true, sv: true }
 
-profile.save:
-  en: "Save"
-  description: "The save button of the profile screen."
-  fi: "Tallenna"
-  sv: "Spara"
+profile.back:
+  en: "Back"
+  description: "Screen-reader label of the back arrow of the profile list (#227)."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+profile.section.back:
+  en: "Back to your profile"
+  description: "Screen-reader label of the back arrow of a profile section (#227); going back saves the section."
+  fi: "Takaisin profiiliisi"
+  sv: "Tillbaka till din profil"
+  machine: { fi: true, sv: true }
+
+profile.section.basics.title:
+  en: "The basics"
+  description: "Title of the basics section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Perustiedot"
+  sv: "Grunderna"
+  machine: { fi: true, sv: true }
+
+profile.section.basics.summary:
+  en: "Name, a few words about you, height and languages"
+  description: "Second line of the basics section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Nimi, muutama sana itsestäsi, pituus ja kielet"
+  sv: "Namn, några ord om dig, längd och språk"
+  machine: { fi: true, sv: true }
+
+profile.section.prompts.title:
+  en: "Prompts"
+  description: "Title of the prompts section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Kysymykset"
+  sv: "Frågor"
+  machine: { fi: true, sv: true }
+
+profile.section.prompts.summary:
+  en: "Up to three questions, answered in your own words"
+  description: "Second line of the prompts section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Enintään kolme kysymystä, omin sanoin vastattuna"
+  sv: "Upp till tre frågor, besvarade med egna ord"
+  machine: { fi: true, sv: true }
+
+profile.section.relationship.title:
+  en: "Relationship and kids"
+  description: "Title of the relationship section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Parisuhde ja lapset"
+  sv: "Relation och barn"
+  machine: { fi: true, sv: true }
+
+profile.section.relationship.summary:
+  en: "What you are looking for, relationship structure and kids"
+  description: "Second line of the relationship section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Mitä etsit, suhteen muoto ja lapset"
+  sv: "Vad du söker, relationsform och barn"
+  machine: { fi: true, sv: true }
+
+profile.section.work.title:
+  en: "Work and education"
+  description: "Title of the work section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Työ ja koulutus"
+  sv: "Arbete och utbildning"
+  machine: { fi: true, sv: true }
+
+profile.section.work.summary:
+  en: "Education, field, work and job title"
+  description: "Second line of the work section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Koulutus, ala, työ ja tehtävänimike"
+  sv: "Utbildning, bransch, arbete och yrkestitel"
+  machine: { fi: true, sv: true }
+
+profile.section.lifestyle.title:
+  en: "Lifestyle"
+  description: "Title of the lifestyle section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Elämäntavat"
+  sv: "Livsstil"
+  machine: { fi: true, sv: true }
+
+profile.section.lifestyle.summary:
+  en: "Smoking, drinking, drugs, exercise and pets"
+  description: "Second line of the lifestyle section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Tupakointi, alkoholi, huumeet, liikunta ja lemmikit"
+  sv: "Rökning, alkohol, droger, motion och husdjur"
+  machine: { fi: true, sv: true }
+
+profile.section.hobbies.title:
+  en: "Hobbies"
+  description: "Title of the hobbies section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Harrastukset"
+  sv: "Hobbyer"
+  machine: { fi: true, sv: true }
+
+profile.section.hobbies.summary:
+  en: "Up to five things you like doing"
+  description: "Second line of the hobbies section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Enintään viisi asiaa, joita teet mielelläsi"
+  sv: "Upp till fem saker du gärna gör"
+  machine: { fi: true, sv: true }
+
+profile.section.beliefs.title:
+  en: "Beliefs"
+  description: "Title of the beliefs section of the profile (#227): its row on the profile list and its screen's heading."
+  fi: "Vakaumus"
+  sv: "Övertygelse"
+  machine: { fi: true, sv: true }
+
+profile.section.beliefs.summary:
+  en: "Parties you could vote for, religion and star sign"
+  description: "Second line of the beliefs section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
+  fi: "Puolueet, joita voisit äänestää, uskonto ja horoskooppimerkki"
+  sv: "Partier du kunde rösta på, religion och stjärntecken"
   machine: { fi: true, sv: true }
 
 profile.saving:
   en: "Saving…"
-  description: "Shown while PUT /profile is in flight."
+  description: "Shown on a profile section while PUT /profile is in flight, on leaving it (#227)."
   fi: "Tallennetaan…"
   sv: "Sparar…"
   machine: { fi: true, sv: true }
 
-profile.saved:
-  en: "Saved."
-  description: "Notice after a successful save."
-  fi: "Tallennettu."
-  sv: "Sparat."
-  machine: { fi: true, sv: true }
-
 profile.discard.title:
   en: Leave without saving?
-  description: Title of the dialog shown when a person leaves the profile screen with edits that are not saved (the profile saves whole, on Save).
+  description: "Title of the dialog shown when leaving a profile section did not save (#227): a refusal or a failure; the reason is the dialog's text."
   fi: Poistutaanko tallentamatta?
   sv: Lämna utan att spara?
   machine: { fi: true, sv: true }
 
-profile.discard.body:
-  en: What you changed here is not saved yet. Save first, or leave and lose it.
-  description: Body of the leave-without-saving dialog of the profile screen.
-  fi: Tekemiäsi muutoksia ei ole vielä tallennettu. Tallenna ensin, tai poistu ja menetä ne.
-  sv: Det du ändrade här är inte sparat ännu. Spara först, eller lämna och förlora det.
-  machine: { fi: true, sv: true }
-
 profile.discard.keep:
   en: Keep editing
-  description: Button of the leave-without-saving dialog that stays on the profile screen.
+  description: Button of the leave-without-saving dialog that stays on the profile section to fix what was refused.
   fi: Jatka muokkaamista
   sv: Fortsätt redigera
   machine: { fi: true, sv: true }
 
 profile.discard.leave:
   en: Leave without saving
-  description: Button of the leave-without-saving dialog that leaves the profile screen and loses the edits.
+  description: Button of the leave-without-saving dialog that leaves the profile section and loses its edits.
   fi: Poistu tallentamatta
   sv: Lämna utan att spara
   machine: { fi: true, sv: true }

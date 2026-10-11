@@ -15,7 +15,7 @@ name: At most two deal-breakers, each with an accepted answer; a third is refuse
 - assertNotVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
 
 # One on: it waits for an answer that is fine with her before it can be saved.
-- tapOn: "Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn"
+- tapOn: "(Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn)(, .*)?"
 - assertVisible: "Fine with me|Sopii minulle|Okej för mig"
 - assertVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
 - assertVisible:
@@ -31,18 +31,19 @@ name: At most two deal-breakers, each with an accepted answer; a third is refuse
     enabled: true
 
 # Two on: the second is fine too.
-- tapOn: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
+- tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Never|En koskaan|Aldrig"
 
 # A third: refused in words, and the switch stays off.
 - scrollUntilVisible:
-    element: "Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk"
+    element: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
     direction: DOWN
     centerElement: true
-- tapOn: "Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk"
+    timeout: 60000
+- tapOn: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
 - assertVisible: "That is 2 already\\.|Niitä on jo 2\\.|Det är redan 2\\."
 - assertVisible:
-    text: "0"
+    text: "0|(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk), off"
     rightOf: "Languages|Kielet|Språk"
 
 # Left unsaved: opened again, nothing is on.

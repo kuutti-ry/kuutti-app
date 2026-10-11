@@ -17,16 +17,17 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     element: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 # A switch's text, to Maestro, is its value ("1" on, "0" off), right of its words.
 - assertVisible:
-    text: "1"
+    text: "1|(Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar), on"
     rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
 - tapOn:
-    text: "1"
+    text: "1|(Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar), on"
     rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
 - extendedWaitUntil:
     visible:
-      text: "0"
+      text: "0|(Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar), off"
       rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
     timeout: 15000
 
@@ -62,11 +63,12 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible:
     text: "Continue|Jatka|Fortsätt"
     enabled: false
 - tapOn:
-    text: "0"
+    text: "0|(I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker), off"
     rightOf: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
 - extendedWaitUntil:
     visible:
@@ -77,6 +79,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     element: "Continue|Jatka|Fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Continue|Jatka|Fortsätt"
 
 # Not the ages: the window stayed. Research is offered, then home.

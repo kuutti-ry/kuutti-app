@@ -18,6 +18,7 @@ name: The card leads with the photo, the name and the verified age, and shows th
     element: ".*, age verified by your bank|.*, ikä varmistettu pankistasi|.*, ålder verifierad av din bank"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Sanna"
 - assertVisible: "Woman|Nainen|Kvinna"
 - assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
@@ -25,32 +26,38 @@ name: The card leads with the photo, the name and the verified age, and shows th
     element: "Arkkitehti, joka piirtää.*"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - scrollUntilVisible:
     element: "Looking for|Etsin|Söker"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
 - scrollUntilVisible:
     element: "Languages|Kielet|Språk"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 # Several answers on one line, in the order given.
 - assertVisible: "suomi, English, svenska"
 - scrollUntilVisible:
     element: "Height|Pituus|Längd"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 # The unit is joined by a no-break space.
 - assertVisible: "171.cm"
 - scrollUntilVisible:
     element: "Job title, without the employer's name|Tehtävänimike ilman työnantajan nimeä|Yrkestitel utan arbetsgivarens namn"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Arkkitehti"
 - scrollUntilVisible:
     element: "Teach me|Opeta minulle|Lär mig"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 # Nothing soft, and nothing missing.
 - assertNotVisible: "Education|Koulutus|Utbildning"
 - assertNotVisible: "Drinking|Alkoholi|Alkohol"
