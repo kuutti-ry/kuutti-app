@@ -12,7 +12,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
+- tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Never|En koskaan|Aldrig"
 - tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
 - extendedWaitUntil:
@@ -32,6 +32,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
     notVisible: "Smoking|Tupakointi|Rökning"
@@ -57,6 +58,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 - extendedWaitUntil:
     notVisible: "Smoking|Tupakointi|Rökning"
@@ -69,7 +71,7 @@ name: Taking one's own answer back pauses the deal-breaker on it, and answering 
 - assertNotVisible: "Paused until you answer it yourself\\.|Tauolla, kunnes vastaat siihen itse\\.|Pausad tills du själv svarar på det\\."
 
 # Back as it began: no deal-breaker.
-- tapOn: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
+- tapOn: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
 - tapOn: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."

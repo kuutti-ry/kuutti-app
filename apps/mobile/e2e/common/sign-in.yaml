@@ -12,6 +12,17 @@ appId: fi.kuutti.app
     file: bank-login.yaml
     env:
       PERSONA: ${PERSONA || "Sanna Korhonen"}
+# Back from the browser a busy Android emulator may say Kuutti is not
+# responding while the app catches up: waited for, never closed, as in
+# open-app.yaml.
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|.* isn't responding"
+    timeout: 30000
+- runFlow:
+    when:
+      visible: ".* isn't responding"
+    commands:
+      - tapOn: "Wait"
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
     timeout: 30000

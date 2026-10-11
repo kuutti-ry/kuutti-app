@@ -14,16 +14,38 @@ name: A phone number in the bio is refused with the reason, and the stored bio s
     element: "Arkkitehti, joka piirtää.*"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 # Typed into the bio where the tap puts the cursor: a number anywhere in it is refused.
 - tapOn: "Arkkitehti, joka piirtää.*"
 - inputText: " Soita minulle 040 123 4567, niin sovitaan retki Nuuksioon. "
-# The profile is ten screens long; Save is at its end.
-- scrollUntilVisible:
-    element: "Save|Tallenna|Spara"
-    direction: DOWN
-    centerElement: true
-    speed: 80
-    timeout: 60000
+# The profile is ten screens long; Save is at its end, and a keyboard left up
+# lies over it while Maestro counts it as visible. hideKeyboard is not
+# enough: on iOS it taps what lies below the field, and on Android the
+# keyboard stayed up in CI. A tap on the field's label, which is no button,
+# closes it on both (the screen lets such a tap close it); the field itself
+# carries the same words as its name, hence above its text. Android then
+# swipes in the margin, clear of the search boxes.
+- tapOn:
+    text: "About you|Sinusta|Om dig"
+    above: "Arkkitehti, joka piirtää.*"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element: "Save|Tallenna|Spara"
+          direction: DOWN
+          centerElement: true
+          speed: 80
+          timeout: 60000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - runFlow:
+          file: ../common/scroll-to.yaml
+          env:
+            ELEMENT: "Save|Tallenna|Spara"
 - tapOn: "Save|Tallenna|Spara"
 - extendedWaitUntil:
     visible: "Your text has an e-mail address, a link, a phone number or a social media handle\\. Those come after a match\\.|Tekstissäsi on sähköpostiosoite, linkki, puhelinnumero tai somekäyttäjänimi\\. Ne tulevat mätsin jälkeen\\.|Din text har en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier\\. De kommer efter en match\\."
@@ -43,4 +65,5 @@ name: A phone number in the bio is refused with the reason, and the stored bio s
     element: "Arkkitehti, joka piirtää.*"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertNotVisible: ".*040 123 4567.*"
