@@ -1,0 +1,34 @@
+# A way back in (#148 j3, ADR-009): an optional e-mail address for a lost
+# phone. A malformed address is refused in words, a valid one is saved and
+# said to be set, and it can be removed again. Sanna has none; the flow
+# removes the one it saves.
+appId: fi.kuutti.app
+name: A malformed e-mail is refused in words, a valid one is saved, and it can be removed
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://account/email
+- extendedWaitUntil:
+    visible: "A way back in|Tie takaisin sisään|En väg tillbaka in"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Save the address|Tallenna osoite|Spara adressen"
+    enabled: false
+# The keyboard stays up: Save is above it, and hiding it taps whatever lies below.
+- tapOn: "E-mail address|Sähköpostiosoite|E-postadress"
+- inputText: "not-an-address"
+- tapOn: "Save the address|Tallenna osoite|Spara adressen"
+- extendedWaitUntil:
+    visible: "That does not look like an e-mail address\\.|Tuo ei näytä sähköpostiosoitteelta\\.|Det ser inte ut som en e-postadress\\."
+    timeout: 15000
+- tapOn: "not-an-address"
+- eraseText: 30
+- inputText: "sanna.demo@example.com"
+- tapOn: "Save the address|Tallenna osoite|Spara adressen"
+- extendedWaitUntil:
+    visible: "An address is set\\.|Osoite on tallennettu\\.|En adress är sparad\\."
+    timeout: 15000
+- tapOn: "Remove the address|Poista osoite|Ta bort adressen"
+- extendedWaitUntil:
+    notVisible: "An address is set\\.|Osoite on tallennettu\\.|En adress är sparad\\."
+    timeout: 15000

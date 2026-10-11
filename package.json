@@ -23,7 +23,7 @@
     "format": "biome format --write .",
     "test": "pnpm -r run test",
     "check:scenarios": "node scripts/check-scenarios.ts",
-    "e2e": "PATH=\"$(brew --prefix openjdk 2>/dev/null)/bin:$PATH\" maestro test apps/mobile/e2e/flows",
+    "e2e": "node scripts/e2e.ts",
     "i18n:build": "pnpm --filter @kuutti/i18n run build",
     "i18n:check": "pnpm --filter @kuutti/i18n run check",
     "i18n:translate": "pnpm --filter @kuutti/i18n translate",

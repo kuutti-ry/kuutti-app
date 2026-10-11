@@ -1,0 +1,33 @@
+# The home screen of an onboarded person (#53, #54, #94): the area in the
+# person's language with its numbers in steps of ten, where they stand at the
+# gate in words, and the four ways on. Outside production the wrench opens
+# the tech screen, which names the environment and the API it talks to.
+# Locally the release of pictures has no pool, so Sanna's gate says how many
+# more people are needed. Read only.
+appId: fi.kuutti.app
+name: Home names the area with its numbers and the gate in words, and the wrench names the API
+---
+- runFlow: ../common/sign-in.yaml
+- assertVisible: "Your area|Alueesi|Ditt område"
+- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- assertVisible: "\\d+ people have identified with their bank|\\d+ ihmistä on tunnistautunut pankkitunnuksilla|\\d+ personer har identifierat sig med bank-id"
+- assertVisible: "\\d+ women, \\d+ men, \\d+ non-binary|\\d+ naista, \\d+ miestä, \\d+ muunsukupuolista|\\d+ kvinnor, \\d+ män, \\d+ icke-binära"
+- assertVisible: "Matching|Seuranhaku|Matchning"
+- assertVisible: "About \\d+ more people are needed before matching opens for you\\.|Tarvitaan vielä noin \\d+ ihmistä, ennen kuin seuranhaku avautuu sinulle\\.|Det behövs ungefär \\d+ personer till innan matchningen öppnar för dig\\.|You are among the next \\d+ in line for your area\\.|Olet alueesi jonossa seuraavien \\d+ joukossa\\.|Du är bland de \\d+ närmaste i kön till ditt område\\.|Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+- assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
+- scrollUntilVisible:
+    element: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Your profile|Profiilisi|Din profil"
+- assertVisible: "Your photos|Kuvasi|Dina bilder"
+- assertVisible: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+
+- openLink: kuutti://tech
+- extendedWaitUntil:
+    visible: "Tech config|Tekniset tiedot|Teknisk vy"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: ".*git commit [0-9a-f]+.*|.*git-commit [0-9a-f]+.*"
+    timeout: 15000
+- assertNotVisible: "API unreachable|API ei vastaa|API:et svarar inte"

@@ -1,0 +1,24 @@
+# Sign out if the app is signed in, so a flow begins where a new person does.
+# Runs after open-app.yaml.
+appId: fi.kuutti.app
+---
+- runFlow:
+    when:
+      visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+    commands:
+      - openLink: kuutti://settings
+      - extendedWaitUntil:
+          visible: "Settings|Asetukset|Inställningar"
+          timeout: 15000
+      # A session the reset erased is already gone: Settings says so and has no button.
+      - runFlow:
+          when:
+            visible: "Log out|Kirjaudu ulos|Logga ut"
+          commands:
+            - tapOn: "Log out|Kirjaudu ulos|Logga ut"
+      # Opened over an onboarding step, Settings stays on screen after the logout
+      # ("No session on this device"): the root route is the sign-in screen.
+      - openLink: kuutti://
+      - extendedWaitUntil:
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+          timeout: 15000

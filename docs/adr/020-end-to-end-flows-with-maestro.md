@@ -17,5 +17,5 @@ Routes have their `app.request()` tests and the demo stories run through the rea
 ## Consequences
 
 - `apps/mobile/e2e/common/sign-in.yaml` and the first feature flow, `flows/language.yaml`; a README for the next flows; `pnpm e2e` in the root and in CLAUDE.md's commands.
-- The chart of manual checks of 10/10/2026 (#213, #146, #178) is the backlog of flows to write next, in Opus's hands.
+- The chart of manual checks of 10/10/2026 (#213, #146, #178) was the backlog; it and the cast's stories are now flows, one persona to each where it changes something, so the order does not matter (`apps/mobile/e2e/README.md` has the table). The workspace is `apps/mobile/e2e` (its `config.yaml` runs `flows/*`), so `common/` and the copy of the pictures `scripts/e2e.ts` makes for `addMedia` lie inside it.
 - Left for later, each its own change: the admin panel with Playwright; Android in CI; a dev-only sign-in link that completes the mock IdP's login for a named persona, if the system browser proves flaky under Maestro (it touches identity: an ADR and the security reviewer); the storyboard's scenes as flows; a `--only <persona>` reset.

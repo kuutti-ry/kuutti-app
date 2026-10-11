@@ -1,0 +1,34 @@
+# A consent names the version of the text it is for (ADR-010 §4): Kerttu
+# accepted an older wording of the terms, so the app asks her to accept the
+# current one, and nothing she has answered is asked again; research, which
+# she never answered, is offered once. Her profile is finished (four approved
+# photos, two prompts), so home does not say it lacks anything. One run per
+# `pnpm demo:reset`: afterwards she has accepted the current wording.
+appId: fi.kuutti.app
+name: A person who accepted an older wording of the terms is asked for the current one, and nothing else is asked again
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Kerttu Åkerlund
+- extendedWaitUntil:
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här"
+    timeout: 15000
+- assertVisible: "Step 1 of 10|Vaihe 1 / 10|Steg 1 av 10"
+- scrollUntilVisible:
+    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+    direction: DOWN
+    centerElement: true
+- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+
+# Straight to research: the name, the gender, whom she seeks and the rest stand.
+- extendedWaitUntil:
+    visible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
+    timeout: 15000
+- assertVisible: "Step 10 of 10|Vaihe 10 / 10|Steg 10 av 10"
+- tapOn: "Not now|Ei nyt|Inte nu"
+
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000
+- assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."

@@ -1,0 +1,45 @@
+# From the sign-in screen, through the mock bank as PERSONA and back into the app
+# (#164, ADR-020 §2). It stops when the app has the link: signed in, or showing a
+# refusal, which is what the refusal flows assert on. The persona is named as the
+# mock bank's page names them (packages/db/src/seed/personas.ts, given + family).
+# No env header: a default there would override the PERSONA a caller passes.
+appId: fi.kuutti.app
+---
+# The sign-in button, or after a refusal the same button saying "Try again".
+# A tap that lands while the screen still settles is lost, so it is tapped
+# again while the button is still there; never once the browser is open.
+# A fresh simulator's Safari greets the first page with sheets to continue past,
+# a moment after the page: wait for either. The page's heading, not the
+# persona's card: most of the cast lies below the first screenful.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen"
+          commands:
+            - tapOn: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen"
+      - extendedWaitUntil:
+          visible: "Mock bank|Continue|Jatka|Fortsätt"
+          timeout: 15000
+# At most three taps past Safari's sheets, so our own Continue button can never trap the loop.
+- repeat:
+    times: 3
+    while:
+      visible: "Continue|Jatka|Fortsätt"
+    commands:
+      - tapOn: "Continue|Jatka|Fortsätt"
+# The mock bank's page opens in the system browser: one button per persona, whose
+# accessible name is the person's name followed by the note under it.
+# Safari's address bar lies over the bottom of the page: the card is scrolled to the middle first.
+- scrollUntilVisible:
+    element: ".*${PERSONA}.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: ".*${PERSONA}.*"
+# iOS asks before handing the link back to the app.
+- extendedWaitUntil:
+    visible: "Open|Avaa|Öppna"
+    timeout: 15000
+- tapOn: "Open|Avaa|Öppna"

@@ -1,0 +1,109 @@
+# An answer saved on its later screen shows on the card under its label, and
+# taking it back takes it off (#148, #213). The article 9 fields take the
+# consent given with whom one seeks (#204): Sanna's parties show on her card,
+# several on one row, and the star signs include the corgi. The glyph before
+# each name is decorative and invisible to Maestro, as to a screen reader;
+# the name beside it is what is asserted. The flow clears what it saved.
+appId: fi.kuutti.app
+name: A party and a star sign saved on their screens show on the card, and clearing them takes them off
+---
+- runFlow: ../common/sign-in.yaml
+
+# Two parties: chosen and saved.
+- openLink: kuutti://profile/later/politics
+- extendedWaitUntil:
+    visible: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Centre Party|Keskusta|Centern"
+- tapOn: "Pirate Party|Piraattipuolue|Piratpartiet"
+- assertVisible:
+    text: "Pirate Party|Piraattipuolue|Piratpartiet"
+    selected: true
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    visible: "Religion|Uskonto"
+    timeout: 15000
+
+# The corgi, between Virgo and Libra.
+- openLink: kuutti://profile/later/zodiac
+- extendedWaitUntil:
+    visible: "Star sign|Horoskooppimerkki|Stjärntecken"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Corgi"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
+    timeout: 15000
+
+# On the card, under their labels.
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Centre Party|Keskusta|Centern"
+- assertVisible: "Pirate Party|Piraattipuolue|Piratpartiet"
+- scrollUntilVisible:
+    element: "Star sign|Horoskooppimerkki|Stjärntecken"
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Corgi"
+
+# Cleared again: off the card. The screen shows the stored answer once it has
+# read it; a tap before that is overwritten, so the flow waits for it.
+- openLink: kuutti://profile/later/politics
+- extendedWaitUntil:
+    visible:
+      text: "Centre Party|Keskusta|Centern"
+      selected: true
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Centre Party|Keskusta|Centern"
+- tapOn: "Pirate Party|Piraattipuolue|Piratpartiet"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    visible: "Religion|Uskonto"
+    timeout: 15000
+- openLink: kuutti://profile/later/zodiac
+- extendedWaitUntil:
+    visible:
+      text: "Corgi"
+      selected: true
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Corgi"
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+- extendedWaitUntil:
+    visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
+    timeout: 15000
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Teach me|Opeta minulle|Lär mig"
+    direction: DOWN
+    centerElement: true
+- assertNotVisible: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
+- assertNotVisible: "Corgi"

@@ -1,0 +1,80 @@
+# Several fields and lines of work, up to three each (#178, ADR-019 §1): the
+# chips take three, a fourth tap does nothing, and Ask me later keeps what
+# was stored. A list of twelve or more has a search box (#148), which filters
+# the chips as one types. Sanna's field and work are both arts and culture;
+# nothing is saved.
+appId: fi.kuutti.app
+name: Field and work take up to three choices each, a fourth tap does nothing, and long lists can be searched
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/later/field
+- extendedWaitUntil:
+    visible: "Field|Ala|Bransch"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible: "Search|Hae|Sök"
+- assertVisible: "Hide me from people in my field|Piilota minut oman alani ihmisiltä|Dölj mig för folk inom mitt område"
+- assertVisible:
+    text: "Arts and culture|Taide ja kulttuuri|Konst och kultur"
+    selected: true
+- tapOn: "Tech|Teknologia|Teknik"
+- tapOn: "Science|Tiede|Vetenskap"
+- assertVisible:
+    text: "Tech|Teknologia|Teknik"
+    selected: true
+- assertVisible:
+    text: "Science|Tiede|Vetenskap"
+    selected: true
+- tapOn: "Health care|Terveysala|Vård"
+- assertVisible:
+    text: "Health care|Terveysala|Vård"
+    selected: false
+# Ask me later writes nothing: opened again, only the stored answer.
+- scrollUntilVisible:
+    element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- openLink: kuutti://profile/later/field
+- extendedWaitUntil:
+    visible: "Field|Ala|Bransch"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Tech|Teknologia|Teknik"
+    selected: false
+
+- openLink: kuutti://profile/later/occupation
+- extendedWaitUntil:
+    visible: "Work|Työ|Arbete"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "Arts and culture|Taide ja kulttuuri|Konst och kultur"
+    selected: true
+- tapOn: "Student|Opiskelija|Studerande"
+- tapOn: "Retired|Eläkkeellä|Pensionerad"
+- tapOn: "Entrepreneur|Yrittäjä|Företagare"
+- assertVisible:
+    text: "Entrepreneur|Yrittäjä|Företagare"
+    selected: false
+- scrollUntilVisible:
+    element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+
+# The languages are their own names, the same in every catalogue.
+- openLink: kuutti://profile/later/languages
+- extendedWaitUntil:
+    visible: "Languages|Kielet|Språk"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Search|Hae|Sök"
+- inputText: "eesti"
+- assertVisible: "eesti"
+# The chips follow each keystroke; the last one takes a moment.
+- extendedWaitUntil:
+    notVisible: "svenska"
+    timeout: 10000
+- hideKeyboard

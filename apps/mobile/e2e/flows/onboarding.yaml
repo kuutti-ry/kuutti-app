@@ -1,0 +1,179 @@
+# Onboarding from the bank login to the home screen, one question per screen
+# in the field sheet's order, every answer a button (#146, ADR-010 §9 to §13):
+# the norms and both texts on one button; the name; the gender, and the label
+# only after non-binary; whom one seeks, which waits for the article 9 consent
+# on the same screen; the intent; the ages as two steppers around the person's
+# own age; the area, one button per pond (#174); three photos; a bio; research,
+# optional. The app is closed after whom one seeks and opens again at the intent
+# with the answer kept (#219). Onni (26) is registered and never onboarded after
+# `pnpm demo:reset`; the photos are his from the release of pictures, which the
+# local check queues, so home says the profile still lacks something.
+appId: fi.kuutti.app
+name: A registered person is taken through onboarding one question per screen, and resumes at the intent after the app is closed
+---
+- addMedia:
+    - ../media/faces/onni/1.jpg
+    - ../media/faces/onni/2.jpg
+    - ../media/faces/onni/3.jpg
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Onni Korhonen
+
+# 1: the norms and both texts, accepted with one button.
+- assertVisible: "How we do things here|Näin täällä toimitaan|Så här gör vi här"
+- assertVisible: "Step 1 of 10|Vaihe 1 / 10|Steg 1 av 10"
+- scrollUntilVisible:
+    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+    direction: DOWN
+    centerElement: true
+- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+
+# 2: the name, typed, never the bank's.
+- extendedWaitUntil:
+    visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
+    timeout: 15000
+- assertVisible: "Step 2 of 10|Vaihe 2 / 10|Steg 2 av 10"
+- tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
+- inputText: "Onni"
+- hideKeyboard
+- tapOn: "Continue|Jatka|Fortsätt"
+
+# 3: the gender; non-binary opens the label, still step 3, and it can be skipped.
+- extendedWaitUntil:
+    visible: "How do you describe yourself\\?|Miten kuvailet itseäsi\\?|Hur beskriver du dig själv\\?"
+    timeout: 15000
+- assertVisible: "Step 3 of 10|Vaihe 3 / 10|Steg 3 av 10"
+- tapOn: "Non-binary|Muunsukupuolinen|Icke-binär"
+- tapOn: "Continue|Jatka|Fortsätt"
+- extendedWaitUntil:
+    visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
+    timeout: 15000
+- assertVisible: "Step 3 of 10|Vaihe 3 / 10|Steg 3 av 10"
+- tapOn: "Skip|Ohita|Hoppa över"
+
+# 4: whom one seeks; nothing moves on before the article 9 consent on this screen.
+- extendedWaitUntil:
+    visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
+    timeout: 15000
+- assertVisible: "Step 4 of 10|Vaihe 4 / 10|Steg 4 av 10"
+- tapOn: "Anyone|Kenet tahansa|Vem som helst"
+- scrollUntilVisible:
+    element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    text: "Continue|Jatka|Fortsätt"
+    enabled: false
+# A switch's text, to Maestro, is its value ("0" off, "1" on); its words are the
+# text's beside it. So the switch is the "0" right of them. The consent is
+# saved before Continue opens.
+- tapOn:
+    text: "0"
+    rightOf: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
+- extendedWaitUntil:
+    visible:
+      text: "Continue|Jatka|Fortsätt"
+      enabled: true
+    timeout: 15000
+# The button lies half under the screen's bottom edge, where a tap misses it.
+- scrollUntilVisible:
+    element: "Continue|Jatka|Fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Continue|Jatka|Fortsätt"
+
+# 5: the intent. Closed here and opened again: the screen's memory is gone,
+# whom one seeks was saved on leaving its screen.
+- extendedWaitUntil:
+    visible: "What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?"
+    timeout: 15000
+- stopApp
+- runFlow: ../common/open-app.yaml
+- extendedWaitUntil:
+    visible: "What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?"
+    timeout: 15000
+- assertVisible: "Step 5 of 10|Vaihe 5 / 10|Steg 5 av 10"
+- assertNotVisible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
+- tapOn: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
+- tapOn: "Continue|Jatka|Fortsätt"
+
+# 6: the ages start five years either side of 26 and move by buttons.
+- extendedWaitUntil:
+    visible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
+    timeout: 15000
+- assertVisible: "Step 6 of 10|Vaihe 6 / 10|Steg 6 av 10"
+- assertVisible: "21"
+- assertVisible: "31"
+- tapOn: "Oldest, one year older|Vanhin, vuotta vanhempi|Äldsta, ett år äldre"
+- tapOn: "Oldest, one year older|Vanhin, vuotta vanhempi|Äldsta, ett år äldre"
+- assertVisible: "33"
+- tapOn: "Continue|Jatka|Fortsätt"
+
+# 7: two ponds without a parent, so the area is the person's choice (#174).
+- extendedWaitUntil:
+    visible: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
+    timeout: 15000
+- assertVisible: "Step 7 of 10|Vaihe 7 / 10|Steg 7 av 10"
+- assertVisible: "Finland|Suomi"
+- tapOn: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+
+# 8: three photos, the reason first, through the system picker one at a time.
+- extendedWaitUntil:
+    visible: "Three photos of you|Kolme kuvaa sinusta|Tre bilder på dig"
+    timeout: 15000
+- assertVisible: "Step 8 of 10|Vaihe 8 / 10|Steg 8 av 10"
+- tapOn: "Add photos|Lisää kuvia|Lägg till bilder"
+- extendedWaitUntil:
+    visible: "Your photos|Kuvasi|Dina foton"
+    timeout: 15000
+- runFlow:
+    file: ../common/pick-photo.yaml
+    env:
+      CELL: "17%,43%"
+      COUNT: "1 photo, at most 6|1 kuva, enintään 6|1 foto, högst 6"
+- runFlow:
+    file: ../common/pick-photo.yaml
+    env:
+      CELL: "50%,43%"
+      COUNT: "2 photos, at most 6|2 kuvaa, enintään 6|2 foton, högst 6"
+- runFlow:
+    file: ../common/pick-photo.yaml
+    env:
+      CELL: "83%,43%"
+      COUNT: "3 photos, at most 6|3 kuvaa, enintään 6|3 foton, högst 6"
+- scrollUntilVisible:
+    element: "Done|Valmis|Klar"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Done|Valmis|Klar"
+
+# 9: a bio of at least 50 characters instead of two prompts.
+- extendedWaitUntil:
+    visible: "A few words|Muutama sana|Några ord"
+    timeout: 15000
+- assertVisible: "Step 9 of 10|Vaihe 9 / 10|Steg 9 av 10"
+# The field, below its label of the same name; an empty field has no text to match.
+- tapOn:
+    below: "About you|Sinusta|Om dig"
+- inputText: "Frisbeegolfia Keskuspuistossa ja kahvia termarista. Etsin juttuseuraa."
+- hideKeyboard
+- scrollUntilVisible:
+    element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
+
+# 10: research, optional, on its own screen.
+- extendedWaitUntil:
+    visible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
+    timeout: 15000
+- assertVisible: "Step 10 of 10|Vaihe 10 / 10|Steg 10 av 10"
+- tapOn: "Not now|Ei nyt|Inte nu"
+
+# Home: the chosen area's counter; the photos wait in the local queue, so matching waits for them.
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000
+- assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
+- assertVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."

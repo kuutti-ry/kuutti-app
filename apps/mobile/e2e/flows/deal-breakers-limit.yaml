@@ -1,0 +1,54 @@
+# Deal-breakers (#149, TD-16, features/matching/preferences.feature): at most
+# deal_breakers_max (2) of them, each on a field the person answered
+# themselves; one with no accepted answer cannot be saved, and a third is
+# refused in words and stays off. Sanna answered all five fields and has none
+# set; the flow saves nothing, so it leaves her as it found her.
+appId: fi.kuutti.app
+name: At most two deal-breakers, each with an accepted answer; a third is refused in words
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- assertVisible: "Up to 2\\. Only on what you answered yourself.*|Enintään 2\\. Vain siitä, mihin vastasit itse.*|Högst 2\\. Bara om det du själv svarat på.*"
+- assertNotVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
+
+# One on: it waits for an answer that is fine with her before it can be saved.
+- tapOn: "Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn"
+- assertVisible: "Fine with me|Sopii minulle|Okej för mig"
+- assertVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
+- assertVisible:
+    text: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    enabled: false
+- tapOn: "No kids|Ei lapsia|Inga barn"
+- assertVisible:
+    text: "No kids|Ei lapsia|Inga barn"
+    selected: true
+- assertNotVisible: "Pick at least one answer that is fine with you\\.|Valitse ainakin yksi vastaus, joka sopii sinulle\\.|Välj minst ett svar som är okej för dig\\."
+- assertVisible:
+    text: "Save the deal-breakers|Tallenna rajat|Spara gränserna"
+    enabled: true
+
+# Two on: the second is fine too.
+- tapOn: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
+- tapOn: "Never|En koskaan|Aldrig"
+
+# A third: refused in words, and the switch stays off.
+- scrollUntilVisible:
+    element: "Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk"
+    direction: DOWN
+    centerElement: true
+- tapOn: "Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk"
+- assertVisible: "That is 2 already\\.|Niitä on jo 2\\.|Det är redan 2\\."
+- assertVisible:
+    text: "0"
+    rightOf: "Languages|Kielet|Språk"
+
+# Left unsaved: opened again, nothing is on.
+- openLink: kuutti://
+- openLink: kuutti://profile/deal-breakers
+- extendedWaitUntil:
+    visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
+    timeout: 15000
+- assertNotVisible: "Fine with me|Sopii minulle|Okej för mig"
