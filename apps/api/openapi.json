@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -2092,11 +2092,18 @@
           },
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
+          },
+          "tips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TipKind"
+            }
           }
         },
         "required": [
           "profile",
-          "completeness"
+          "completeness",
+          "tips"
         ]
       },
       "Completeness": {
@@ -2126,6 +2133,18 @@
           "bio_or_prompts",
           "seeks",
           "age_window"
+        ]
+      },
+      "TipKind": {
+        "type": "string",
+        "enum": [
+          "sunglasses",
+          "mirror_selfie",
+          "tight_crop",
+          "group_photo",
+          "poor_lighting",
+          "blurry",
+          "few_photos"
         ]
       },
       "ProfileUpdate": {
@@ -4041,7 +4060,7 @@
     "/profile": {
       "get": {
         "summary": "The caller's profile and what it still needs",
-        "description": "The profile as saved (null before the first save) and the completeness rule's verdict: what is missing before the profile can enter a round.",
+        "description": "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the advisory tips for the owner that apply, highest priority first.",
         "security": [
           {
             "session": []
@@ -4090,7 +4109,7 @@
         },
         "responses": {
           "200": {
-            "description": "Saved; the profile as stored, with its completeness.",
+            "description": "Saved; the profile as stored, with its completeness and its advisory tips.",
             "content": {
               "application/json": {
                 "schema": {

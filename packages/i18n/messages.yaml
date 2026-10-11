@@ -2344,6 +2344,69 @@ profile.completeness.age_window:
   sv: "Ditt åldersspann (anges i introduktionen)"
   machine: { fi: true, sv: true }
 
+profile.tip.title:
+  en: "A tip for your photos"
+  description: "Heading of the advisory tip card on the profile screen (#56)."
+  fi: "Vinkki kuviisi"
+  sv: "Ett tips för dina foton"
+  machine: { fi: true, sv: true }
+
+profile.tip.dismiss:
+  en: "Got it"
+  description: "Button that dismisses the current tip for this run of the app; the next one, if any, shows instead (#56)."
+  fi: "Selvä"
+  sv: "Okej"
+  machine: { fi: true, sv: true }
+
+profile.tip.sunglasses:
+  en: "Try a photo where your eyes are clear, without sunglasses."
+  description: "Advisory tip when every approved photo has sunglasses (#56)."
+  fi: "Kokeile kuvaa, jossa silmäsi näkyvät selvästi, ilman aurinkolaseja."
+  sv: "Prova ett foto där ögonen syns tydligt, utan solglasögon."
+  machine: { fi: true, sv: true }
+
+profile.tip.mirror_selfie:
+  en: "Try a photo that is not a mirror selfie."
+  description: "Advisory tip when every approved photo looks like a mirror or bathroom selfie (#56)."
+  fi: "Kokeile kuvaa, joka ei ole peiliselfie."
+  sv: "Prova ett foto som inte är en spegelselfie."
+  machine: { fi: true, sv: true }
+
+profile.tip.tight_crop:
+  en: "Try a photo that shows a little more of you than a close-up face."
+  description: "Advisory tip when every approved photo is a tight face crop (#56)."
+  fi: "Kokeile kuvaa, jossa sinusta näkyy hieman enemmän kuin lähikuva kasvoista."
+  sv: "Prova ett foto som visar lite mer än bara en närbild på ansiktet."
+  machine: { fi: true, sv: true }
+
+profile.tip.group_photo:
+  en: "Try a photo where you are the only person in the frame."
+  description: "Advisory tip when every approved photo has several faces (#56)."
+  fi: "Kokeile kuvaa, jossa olet ainoa henkilö kuvassa."
+  sv: "Prova ett foto där du är den enda personen i bilden."
+  machine: { fi: true, sv: true }
+
+profile.tip.poor_lighting:
+  en: "Try a photo taken in clearer light."
+  description: "Advisory tip when every approved photo is poorly lit (#56)."
+  fi: "Kokeile kuvaa, joka on otettu selkeämmässä valossa."
+  sv: "Prova ett foto taget i klarare ljus."
+  machine: { fi: true, sv: true }
+
+profile.tip.blurry:
+  en: "Try a sharper photo."
+  description: "Advisory tip when every approved photo is blurry (#56)."
+  fi: "Kokeile terävämpää kuvaa."
+  sv: "Prova ett skarpare foto."
+  machine: { fi: true, sv: true }
+
+profile.tip.few_photos:
+  en: "More approved photos would help others get a fuller picture of you."
+  description: "Advisory tip when the profile has enough photos to be complete but fewer than matching_config's suggested count, photos in review included (#56)."
+  fi: "Useampi hyväksytty kuva auttaisi muita saamaan sinusta kattavamman kuvan."
+  sv: "Fler godkända foton skulle hjälpa andra att få en fylligare bild av dig."
+  machine: { fi: true, sv: true }
+
 profile.card.open:
   en: "See your card"
   description: "Button that opens the card preview."
@@ -3367,17 +3430,17 @@ onboarding.age.years:
   machine: { fi: true, sv: true }
 
 onboarding.photos.title:
-  en: "Three photos of you"
+  en: "Two photos of you"
   description: "Heading of the photos step (#146)."
-  fi: "Kolme kuvaa sinusta"
-  sv: "Tre bilder på dig"
+  fi: "Kaksi kuvaa sinusta"
+  sv: "Två bilder på dig"
   machine: { fi: true, sv: true }
 
 onboarding.photos.explain:
-  en: "Profiles with a face photo get seen; that is the honest reason. At least three, your face in each. They stay inside Kuutti."
+  en: "Profiles with a face photo get seen; that is the honest reason. At least two, your face in each. They stay inside Kuutti."
   description: "Explanation under the photos step's heading (#146): the honest reason first, as the sheet asks."
-  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kolme, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
-  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst tre, ditt ansikte i var och en. De stannar inne i Kuutti."
+  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kaksi, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
+  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst två, ditt ansikte i var och en. De stannar inne i Kuutti."
   machine: { fi: true, sv: true }
 
 onboarding.photos.open:

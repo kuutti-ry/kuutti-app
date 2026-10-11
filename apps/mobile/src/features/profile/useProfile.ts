@@ -1,9 +1,9 @@
-import type { Completeness, ProfileDocument, ProfileUpdate } from "@kuutti/schema";
+import type { Completeness, ProfileDocument, ProfileUpdate, TipKind } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
 
-export type ProfileNotice = { kind: "saved" } | { kind: "error"; code: string | undefined } | null;
+export type ProfileNotice = { kind: "error"; code: string | undefined } | null;
 
 export const EMPTY_PROFILE: ProfileUpdate = {
   displayName: "",
@@ -37,7 +37,8 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
  * The person's profile as a draft they edit and save whole (#47): the API
  * stores the document, answers it back with what is still missing, and the
  * screen shows both. A prompt without an answer yet is kept in the draft and
- * left out of the save.
+ * left out of the save. The tips of #56 ride along and refresh with each
+ * read (the list of #227 reloads after a section or photos change).
  */
 export function useProfile() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -45,6 +46,7 @@ export function useProfile() {
   /** The document as the API last gave it, in the draft's shape. */
   const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
   const [completeness, setCompleteness] = useState<Completeness | null>(null);
+  const [tips, setTips] = useState<readonly TipKind[]>([]);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
@@ -67,6 +69,7 @@ export function useProfile() {
       setDraft(document);
       setSaved(document);
       setCompleteness(response.completeness);
+      setTips(response.tips);
       setStatus("ready");
     } catch {
       if (mounted.current) setStatus((was) => (was === "ready" ? was : "error"));
@@ -105,7 +108,7 @@ export function useProfile() {
         setDraft((current) => (current === submitted ? document : current));
       }
       setCompleteness(response.completeness);
-      setNotice({ kind: "saved" });
+      setTips(response.tips);
       return true;
     } catch (error) {
       if (mounted.current) {
@@ -117,8 +120,6 @@ export function useProfile() {
     }
   }, [draft]);
 
-  const dismissNotice = useCallback(() => setNotice(null), []);
-
   /** Whether the draft differs from what is saved: what leaving the screen would lose. */
   const dirty = canonical(draft) !== canonical(saved);
 
@@ -127,12 +128,12 @@ export function useProfile() {
     draft,
     saved,
     completeness,
+    tips,
     saving,
     notice,
     dirty,
     update,
     save,
     reload: load,
-    dismissNotice,
   };
 }

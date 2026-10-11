@@ -93,6 +93,8 @@ describe("profile routes", () => {
       complete: false,
       missing: ["display_name", "photos", "bio_or_prompts", "seeks", "age_window"],
     });
+    // Photos are missing; a tip would say it twice.
+    expect(body.tips).toEqual([]);
   });
 
   test("PUT /profile saves the whole document and answers it back with its completeness", async ({
@@ -113,6 +115,7 @@ describe("profile routes", () => {
     });
     // Two prompts stand in for the bio; photos and onboarding are still missing.
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
+    expect(body.tips).toEqual([]);
     const again = await put(app, a.headers, { ...update, displayName: "Aino V.", prompts: [] });
     expect(ProfileResponse.parse(await again.json()).profile?.displayName).toBe("Aino V.");
     const { rows } = await ctx.client.query<{ n: string }>(
@@ -398,11 +401,50 @@ describe("profile routes", () => {
     expect(body.card?.photos.map((p) => p.id)).toEqual([approved]);
     expect(body.card?.pond).toBeNull();
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
+    // The pending upload becomes the second approved photo: enough for
+    // completeness on photos; the tip for one more is on GET /profile.
+    await ctx.client.query("UPDATE photo SET state = 'approved' WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    const preview = async () =>
+      CardPreviewResponse.parse(
+        await (await app.request("/profile/card", { headers: a.headers })).json(),
+      );
+    const profile = async () =>
+      ProfileResponse.parse(await (await app.request("/profile", { headers: a.headers })).json());
+    const two = await preview();
+    expect(two.card?.photos).toHaveLength(2);
+    expect(two.completeness.missing).toEqual(["seeks", "age_window"]);
+    expect((await profile()).tips).toEqual(["few_photos"]);
+    // A third clears it.
+    await approvedPhotos(ctx, app, a.headers, 1);
+    const three = await preview();
+    expect(three.card?.photos).toHaveLength(3);
+    expect((await profile()).tips).toEqual([]);
     // A preview records nothing.
     const { rows } = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = $1", [
       a.accountId,
     ]);
     expect(rows).toHaveLength(0);
+  });
+
+  test("GET /profile answers a label tip from photo_review against matching_config", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const ids = await approvedPhotos(ctx, app, a.headers, 2);
+    for (const id of ids) {
+      await ctx.client.query(
+        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
+         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
+        [id, JSON.stringify([{ name: "Sunglasses", parentName: "Face", confidence: 80 }])],
+      );
+    }
+    const body = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: a.headers })).json(),
+    );
+    expect(body.tips).toEqual(["sunglasses", "few_photos"]);
   });
 
   test("the card for another viewer: a complete subject is served and recorded, an incomplete or deleted one is not, and the day has a budget", async ({

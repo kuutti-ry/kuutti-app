@@ -19,7 +19,8 @@ export const BIO_MIN_FOR_COMPLETENESS = 50;
 export const PROMPT_ANSWER_MAX = 160;
 export const PROMPTS_MAX = 3;
 export const PROMPTS_FOR_COMPLETENESS = 2;
-export const PHOTOS_FOR_COMPLETENESS = 3;
+/** Approved photos a profile needs before it is complete (#47; two since #56). */
+export const PHOTOS_FOR_COMPLETENESS = 2;
 
 /** The prompts a person may answer; texts are i18n keys profile.prompt.<key>. */
 export const PROMPT_KEYS = [
@@ -94,6 +95,25 @@ export const Completeness = z
   .meta({ id: "Completeness" });
 export type Completeness = z.infer<typeof Completeness>;
 
+/**
+ * Advisory profile tips for the owner (#56). One tip at a time; never gates
+ * completeness, moderation, or matching. A kind names what was noticed; the
+ * words for it are the client's. Order of the enum is not priority — the
+ * tips rule of apps/api holds that.
+ */
+export const TipKind = z
+  .enum([
+    "sunglasses",
+    "mirror_selfie",
+    "tight_crop",
+    "group_photo",
+    "poor_lighting",
+    "blurry",
+    "few_photos",
+  ])
+  .meta({ id: "TipKind" });
+export type TipKind = z.infer<typeof TipKind>;
+
 /** The stored profile, as the owner reads it back. */
 export const ProfileDocument = z
   .object({
@@ -116,6 +136,8 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
+    /** The tips that apply, highest priority first; the app shows one at a time. */
+    tips: z.array(TipKind),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;

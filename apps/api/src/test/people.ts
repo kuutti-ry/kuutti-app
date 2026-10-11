@@ -10,7 +10,7 @@ export type PeopleOptions = {
   gender?: "woman" | "man" | "non_binary" | null;
   state?: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
   standing?: "ok" | "suspended" | "banned";
-  /** A complete profile by the rule of #47: a name, a bio, three approved photos, both hard rows, active. */
+  /** A complete profile by the rule of #47: a name, a bio, three approved photos (one more than the rule asks), both hard rows, active. */
   complete?: boolean;
   /** With `complete`: whom they seek (default: men) and the ages (default: 25 to 40). */
   seeks?: ("woman" | "man" | "non_binary")[];

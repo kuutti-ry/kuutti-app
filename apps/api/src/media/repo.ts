@@ -50,6 +50,37 @@ export async function listApprovedPhotos(db: Queryable, accountId: string): Prom
   return rows.map(photoFrom);
 }
 
+/**
+ * The photos the tips of #56 count, approved or still in review, with the
+ * signals photo_review keeps. Scoped by account_id. A missing review row reads
+ * as no labels and zero faces, so a photo approved where no check ran does not
+ * invent tips.
+ */
+export type PhotoTipInput = {
+  state: Exclude<PhotoState, "rejected">;
+  labels: ModerationLabel[];
+  faces: number;
+};
+
+export async function listPhotoTipInputs(
+  db: Queryable,
+  accountId: string,
+): Promise<PhotoTipInput[]> {
+  const { rows } = await db.query<Row>(
+    `SELECT p.state, coalesce(r.labels, '[]'::jsonb) AS labels, coalesce(r.faces, 0) AS faces
+     FROM photo p
+     LEFT JOIN photo_review r ON r.photo_id = p.id
+     WHERE p.account_id = $1 AND p.state <> 'rejected'
+     ORDER BY p.position, p.created_at`,
+    [accountId],
+  );
+  return rows.map((r: Row) => ({
+    state: r.state as PhotoTipInput["state"],
+    labels: (r.labels as ModerationLabel[]) ?? [],
+    faces: Number(r.faces ?? 0),
+  }));
+}
+
 export async function countPhotos(db: Queryable, accountId: string): Promise<number> {
   const { rows } = await db.query<{ n: string }>(
     "SELECT count(*) AS n FROM photo WHERE account_id = $1",

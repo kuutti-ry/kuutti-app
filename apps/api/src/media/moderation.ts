@@ -1,6 +1,8 @@
 import {
   DetectFacesCommand,
+  DetectLabelsCommand,
   DetectModerationLabelsCommand,
+  type FaceDetail,
   type RekognitionClient,
 } from "@aws-sdk/client-rekognition";
 import { type Queryable, transaction } from "@kuutti/db";
@@ -17,12 +19,16 @@ import { type MediaStore, objectKey } from "./store.ts";
 // and a face count, never the image. Three outcomes: approved (nothing
 // flagged, a face present), queued (anything flagged, or no face: a person
 // decides), rejected (only ever by a person). Thresholds are matching_config
-// rows, never constants here.
+// rows, never constants here. Labels kept for the tips of #56 are stored with
+// the moderation ones; only the moderation ones can send a photo to the queue.
 
 /** What one look at a photo yields. `checked: false` means no automatic check ran. */
 export type Inspection = {
   checked: boolean;
+  /** Moderation labels only; decideModeration reads these. */
   labels: ModerationLabel[];
+  /** Scene and face tip signals (#56); never used for the queue decision. */
+  tipLabels: ModerationLabel[];
   /** One confidence per face DetectFaces found, whatever its value. */
   faceConfidences: number[];
   modelVersion: string | null;
@@ -48,16 +54,76 @@ export const FACE_THRESHOLD_KEY = "photo_moderation_face_threshold";
 export const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
 const REKOGNITION_MIN_CONFIDENCE = 30;
+/**
+ * Scene labels tips care about; DetectLabels is filtered to these. Sunglasses
+ * come from the face (DetectFaces), not the scene: a pair on the head or in a
+ * hand covers no eyes.
+ */
+const SCENE_TIP_LABELS = ["Mirror", "Bathroom"] as const;
 export const NOT_CHECKED = "not_checked";
 export const NO_FACE = "no_face";
 
 export type Decision = { decision: "approved" | "queued"; flagged: string[]; faces: number };
 
+const roundConfidence = (n: number) => Math.round(n * 100) / 100;
+
+const asLabel = (name: string, parentName: string, confidence: number): ModerationLabel => ({
+  name: name.slice(0, 100),
+  parentName: parentName.slice(0, 100),
+  confidence: roundConfidence(confidence),
+});
+
+/**
+ * Tip signals from DetectLabels + DetectFaces (#56). Pure, so the tips rule
+ * can read the same shapes from photo_review later. Never used by
+ * decideModeration.
+ */
+export function tipLabelsFrom(
+  scene: ReadonlyArray<{ Name?: string; Parents?: { Name?: string }[]; Confidence?: number }>,
+  faces: ReadonlyArray<FaceDetail>,
+): ModerationLabel[] {
+  const out: ModerationLabel[] = [];
+  for (const label of scene) {
+    if (typeof label.Name !== "string" || label.Name.length === 0) continue;
+    out.push(asLabel(label.Name, label.Parents?.[0]?.Name ?? "", label.Confidence ?? 0));
+  }
+  let largest: FaceDetail | undefined;
+  let largestArea = 0;
+  for (const face of faces) {
+    const area = (face.BoundingBox?.Width ?? 0) * (face.BoundingBox?.Height ?? 0);
+    if (area >= largestArea) {
+      largestArea = area;
+      largest = face;
+    }
+  }
+  if (largest) {
+    if (largest.Sunglasses?.Value) {
+      out.push(asLabel("Sunglasses", "Face", largest.Sunglasses.Confidence ?? 0));
+    }
+    // Face area as a fraction × 100 when known; matching_config is the tip threshold (#56).
+    // A box can reach past the frame (a face closer than the crop): capped at
+    // the whole frame, so the value stays within a label's 0 to 100.
+    if (largestArea > 0) out.push(asLabel("TightCrop", "Face", Math.min(largestArea, 1) * 100));
+    if (largest.Quality?.Brightness != null) {
+      out.push(asLabel("Brightness", "Face", largest.Quality.Brightness));
+    }
+    if (largest.Quality?.Sharpness != null) {
+      out.push(asLabel("Sharpness", "Face", largest.Quality.Sharpness));
+    }
+  }
+  return out.slice(0, MAX_LABELS);
+}
+
+/** What photo_review keeps: moderation labels first, then tip signals, capped. */
+export function storedLabels(inspection: Inspection): ModerationLabel[] {
+  return [...inspection.labels, ...inspection.tipLabels].slice(0, MAX_LABELS);
+}
+
 /**
  * The decision, pure (features/media/moderation.feature): unchecked goes to a
- * person; any label at or above the threshold goes to a person, by name; no
- * face at or above its threshold goes to a person as no_face; the rest is
- * approved. Rejection is never automatic.
+ * person; any moderation label at or above the threshold goes to a person, by
+ * name; no face at or above its threshold goes to a person as no_face; the
+ * rest is approved. Tip signals are ignored. Rejection is never automatic.
  */
 export function decideModeration(inspection: Inspection, thresholds: Thresholds): Decision {
   const faces = inspection.faceConfidences.filter((c) => c >= thresholds.faceThreshold).length;
@@ -73,7 +139,7 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
   return { decision: flagged.length > 0 ? "queued" : "approved", flagged, faces };
 }
 
-/** Rekognition through the instance role: two calls per photo, the card variant as JPEG, nothing stored there. */
+/** Rekognition through the instance role: three calls per photo, the card variant as JPEG, nothing stored there. */
 export function rekognitionModerator(client: RekognitionClient): Moderator {
   return {
     kind: "rekognition",
@@ -88,29 +154,47 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
       })
         .jpeg({ quality: 90 })
         .toBuffer();
-      const [moderation, faces] = await Promise.all([
+      const image = { Bytes: bytes };
+      const [moderation, faces, scene] = await Promise.all([
         client.send(
           new DetectModerationLabelsCommand({
-            Image: { Bytes: bytes },
+            Image: image,
             MinConfidence: REKOGNITION_MIN_CONFIDENCE,
           }),
         ),
-        client.send(new DetectFacesCommand({ Image: { Bytes: bytes }, Attributes: ["DEFAULT"] })),
+        // BoundingBox and Quality come with DEFAULT; ask for Sunglasses too.
+        // Not ALL: that includes Gender, and we do not store it.
+        client.send(
+          new DetectFacesCommand({ Image: image, Attributes: ["DEFAULT", "SUNGLASSES"] }),
+        ),
+        // Advice only (#56): a failed scene call leaves the tips without the
+        // scene and never holds the moderation decision; the log line then
+        // counts two calls.
+        client
+          .send(
+            new DetectLabelsCommand({
+              Image: image,
+              MinConfidence: REKOGNITION_MIN_CONFIDENCE,
+              Features: ["GENERAL_LABELS"],
+              Settings: {
+                GeneralLabels: { LabelInclusionFilters: [...SCENE_TIP_LABELS] },
+              },
+            }),
+          )
+          .catch(() => null),
       ]);
+      const faceDetails = faces.FaceDetails ?? [];
       const labels: ModerationLabel[] = (moderation.ModerationLabels ?? [])
         .filter((label) => typeof label.Name === "string" && label.Name.length > 0)
         .slice(0, MAX_LABELS)
-        .map((label) => ({
-          name: (label.Name ?? "").slice(0, 100),
-          parentName: (label.ParentName ?? "").slice(0, 100),
-          confidence: Math.round((label.Confidence ?? 0) * 100) / 100,
-        }));
+        .map((label) => asLabel(label.Name ?? "", label.ParentName ?? "", label.Confidence ?? 0));
       return {
         checked: true,
         labels,
-        faceConfidences: (faces.FaceDetails ?? []).map((face) => face.Confidence ?? 0),
+        tipLabels: tipLabelsFrom(scene?.Labels ?? [], faceDetails),
+        faceConfidences: faceDetails.map((face) => face.Confidence ?? 0),
         modelVersion: moderation.ModerationModelVersion ?? null,
-        calls: 2,
+        calls: scene ? 3 : 2,
       };
     },
   };
@@ -119,13 +203,21 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
 /**
  * No automatic check: everything goes to a person. What a developer's machine
  * runs (no Rekognition without the instance role), and the fail-closed answer
- * wherever the check is not configured. Never approves anything.
+ * wherever the check is not configured. Never approves anything. No tip
+ * signals either (MODERATION=queue): without labels there are no tips.
  */
 export function queueAllModerator(): Moderator {
   return {
     kind: "queue",
     async inspect() {
-      return { checked: false, labels: [], faceConfidences: [], modelVersion: null, calls: 0 };
+      return {
+        checked: false,
+        labels: [],
+        tipLabels: [],
+        faceConfidences: [],
+        modelVersion: null,
+        calls: 0,
+      };
     },
   };
 }
@@ -164,13 +256,14 @@ export async function moderatePhoto(
     return null;
   }
   const decided = decideModeration(inspection, thresholds);
+  const labels = storedLabels(inspection);
   const at = deps.now();
   // The record and the move are one unit: a photo never ends up pending with
   // a review row that says it was checked (the sweep would skip it forever).
   const moved = await transaction(deps.db, async (tx) => {
     await repo.upsertAutomaticReview(tx, {
       photoId: input.photoId,
-      labels: inspection.labels,
+      labels,
       faces: decided.faces,
       flagged: decided.flagged,
       modelVersion: inspection.modelVersion,
@@ -186,7 +279,7 @@ export async function moderatePhoto(
       moderator: deps.moderator.kind,
       decision: decided.decision,
       moved,
-      labels: inspection.labels.length,
+      labels: labels.length,
       flagged: decided.flagged.length,
       faces: decided.faces,
       rekognitionCalls: inspection.calls,

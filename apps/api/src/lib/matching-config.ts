@@ -25,3 +25,30 @@ export async function matchingConfigNumber(db: Queryable, key: string): Promise<
   }
   return value;
 }
+
+/**
+ * Several numbers in one statement, the latest version of each key; a missing
+ * or non-numeric key fails as matchingConfigNumber does.
+ */
+export async function matchingConfigNumbers<K extends string>(
+  db: Queryable,
+  keys: readonly K[],
+): Promise<Record<K, number>> {
+  const { rows } = await db.query<{ key: string; value: unknown }>(
+    "SELECT DISTINCT ON (key) key, value FROM matching_config WHERE key = ANY($1) ORDER BY key, version DESC",
+    [keys],
+  );
+  const latest = new Map(rows.map((row) => [row.key, row.value]));
+  const out = {} as Record<K, number>;
+  for (const key of keys) {
+    if (!latest.has(key)) {
+      throw new AppError(500, "internal_error", `matching_config has no row for ${key}`, { key });
+    }
+    const value = latest.get(key);
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new AppError(500, "internal_error", `matching_config ${key} is not a number`, { key });
+    }
+    out[key] = value;
+  }
+  return out;
+}
