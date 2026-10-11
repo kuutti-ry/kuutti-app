@@ -37,7 +37,8 @@ name: A registered person is taken through onboarding one question per screen, a
 - assertVisible: "Step 2 of 10|Vaihe 2 / 10|Steg 2 av 10"
 - tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
 - inputText: "Onni"
-- hideKeyboard
+# A tap on the question, which is no button, closes the keyboard (README, the keyboard).
+- tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
 - tapOn: "Continue|Jatka|Fortsätt"
 
 # 3: the gender; non-binary opens the label, still step 3, and it can be skipped.
@@ -161,7 +162,7 @@ name: A registered person is taken through onboarding one question per screen, a
 - tapOn:
     below: "About you|Sinusta|Om dig"
 - inputText: "Frisbeegolfia Keskuspuistossa ja kahvia termarista. Etsin juttuseuraa."
-- hideKeyboard
+- tapOn: "A few words|Muutama sana|Några ord"
 - scrollUntilVisible:
     element: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
     direction: DOWN
