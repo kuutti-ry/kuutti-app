@@ -49,5 +49,5 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 ## Tests
 
 - `app.request()` per route: happy path, validation failure, unauthenticated, wrong-user. Real Postgres, transaction rolled back per test.
-- fast-check property tests for hetu parsing and HMAC derivation. Coverage thresholds on `src/identity` only.
+- fast-check property tests for hetu parsing and HMAC derivation. Coverage floor for the API in `vitest.config.ts`, identity's the strictest (ADR-021).
 - A test asserts that no PII pattern appears in log output.

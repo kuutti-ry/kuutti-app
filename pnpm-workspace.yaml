@@ -16,6 +16,8 @@ autoInstallPeers: false
 catalog:
   typescript: ~6.0.3
   vitest: ^5.0.3
+  # Its peer is the exact vitest version: the two move together.
+  "@vitest/coverage-v8": ^5.0.3
   react: 19.3.0
   react-dom: 19.3.0
   "@types/react": ~19.3.0

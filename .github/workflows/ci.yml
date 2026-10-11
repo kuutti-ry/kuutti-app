@@ -80,8 +80,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm
+      # With coverage: below the floor of jest.config.js fails the job (ADR-021).
       - name: jest-expo
-        run: pnpm --filter @kuutti/mobile test
+        run: pnpm --filter @kuutti/mobile test:coverage
       # WCAG contrast of every token pair in every theme (#12).
       - name: Token contrast
         run: pnpm --filter @kuutti/mobile check:contrast
@@ -217,7 +218,9 @@ jobs:
           pnpm --filter @kuutti/db migrate
           pnpm --filter @kuutti/db seed --env development
 
-      - name: API and db tests against compose Postgres and the S3 stand-in
+      # Coverage runs here, where every service is up: a package below its
+      # floor (its vitest.config.ts) fails the job (ADR-021).
+      - name: API and package tests with coverage against compose Postgres and the S3 stand-in
         env:
           DATABASE_URL: postgres://kuutti:kuutti@127.0.0.1:5432/kuutti_test
           S3_ENDPOINT: http://127.0.0.1:9000
@@ -225,9 +228,7 @@ jobs:
           S3_ACCESS_KEY: kuutti
           S3_SECRET_KEY: kuutti-dev-only
         run: |
-          pnpm --filter @kuutti/tunnistus-oidc test
-          pnpm --filter @kuutti/db test
-          pnpm --filter @kuutti/api test
+          pnpm -r --filter '!@kuutti/mobile' run test:coverage
 
       - name: Stack logs on failure
         if: failure()
