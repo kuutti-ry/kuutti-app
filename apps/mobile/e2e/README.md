@@ -9,7 +9,7 @@ Flows that drive the app on a simulator against the local environment: the real 
 3. `pnpm env:up` in one terminal: the database, the API on 3000, Metro on 8081.
 4. A booted simulator with the dev client installed (`pnpm dev:mobile` has built it before).
 5. `pnpm demo:reset`: the flows start from the cast's stories (below), and some can run once per reset. Once, `pnpm demo:population` as well: an area shows its numbers from ten people up, and the home flow reads them.
-6. `pnpm e2e` runs every flow under `flows/`; `pnpm e2e -- --device <udid>` picks one simulator of several; `pnpm e2e -- apps/mobile/e2e/flows/language.yaml` runs one flow. `maestro studio`, or `maestro hierarchy` on the screen as a flow left it, shows what Maestro sees, the way to find a text that does not match.
+6. `pnpm e2e` runs every flow under `flows/`; `pnpm e2e -- --device <udid>` picks one simulator of several; `pnpm e2e -- apps/mobile/e2e/flows/language.yaml` runs one flow; `pnpm e2e -- --shard 2/4` runs the second of four stretches of the order, as a CI job does. `maestro studio`, or `maestro hierarchy` on the screen as a flow left it, shows what Maestro sees, the way to find a text that does not match.
 
 `pnpm e2e` (`scripts/e2e.ts`) copies the cached release to `apps/mobile/e2e/media`, since `addMedia` reads files inside the flows' workspace and follows no link out of it; git ignores the copy. A simulator named with `--device` is booted if it is not, and shut down when the run ends, passed or failed: left booted between runs, one gathered 127 web content processes, some 6 GB, in an hour (11/10/2026). An Android emulator stays up, since its serial cannot start it again.
 
@@ -24,11 +24,11 @@ Then `pnpm e2e -- --device emulator-5554`. A dev client takes its bundle only fr
 
 ### In CI
 
-`.github/workflows/e2e.yml` runs the flows on every push to `main`, on a pull request that carries the label `e2e` and changes the app, the API, the packages, the mock bank or the stack (each push while the label stays), and by hand (`gh workflow run e2e.yml --ref <branch>`), since a run costs close to an hour (ADR-020 §6, #226): on `ubuntu-latest`, whose emulator has KVM, the stack from `docker compose` with `env.example`, the API from source, the dev client built for x86_64 or restored by its Android fingerprint, Metro, Maestro by its checksum, and the API 36 emulator set up as above. The JUnit report, the API's and Metro's logs and Maestro's screenshots of a failure are the run's artifact for a week.
+`.github/workflows/e2e.yml` runs the flows on every push to `main`, on a pull request that carries the label `e2e` and changes the app, the API, the packages, the mock bank or the stack (each push while the label stays), and by hand (`gh workflow run e2e.yml --ref <branch>`) (ADR-020 §6). It runs in four jobs, each a stretch of the order with an emulator and a stack of its own, after one job that finds the dev client by its fingerprint or builds it (ADR-020 §7, #226): on `ubuntu-latest`, whose emulator has KVM, the stack from `docker compose` with `env.example`, the API from source, the dev client built for x86_64 or restored by its Android fingerprint, Metro, Maestro by its checksum, and the API 36 emulator set up as above. Each job's JUnit report, the API's and Metro's logs and Maestro's screenshots of a failure are its artifact (`e2e-android-1` to `-4`) for a week.
 
 ## The flows and their cast
 
-Each flow has a persona to itself where it changes something that another flow reads, so the order does not matter. Those marked *once* change their persona for good and need a `pnpm demo:reset` before they run again; the others leave their persona as they found it.
+Each flow has a persona to itself where it changes something that another flow reads, so no flow needs another to run before it. They run in the order of `config.yaml`'s `executionOrder`, each persona's flows together, which CI cuts into its four stretches; a new flow goes into that list by its `name:`, or `pnpm e2e` refuses to run, since Maestro would quietly cut the order short at a name it cannot find. Those marked *once* change their persona for good and need a `pnpm demo:reset` before they run again; the others leave their persona as they found it.
 
 | flow | persona | what it holds |
 |---|---|---|
