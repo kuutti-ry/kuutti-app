@@ -5,30 +5,58 @@ name: E2E
 # Postgres, the S3 stand-in and the mock bank from docker compose, the API from
 # source, the dev client built here, Metro serving the bundle. The emulator
 # reaches them on its own 127.0.0.1 through adb reverse, so nothing in the
-# flows or the app names another host. On every pull request for now, to see
-# what a run costs; the flows' order does not matter (the README's table).
+# flows or the app names another host. The flows' order does not matter (the
+# README's table).
+#
+# When (ADR-020 §6): a run costs close to an hour, about 13 minutes for the dev
+# client and 1.4 a flow (11/10/2026), so every push to main, a pull request that
+# carries the label e2e (each push while it stays) and changes what the flows
+# exercise, and by hand. Faster flows are #226.
 
 on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - "apps/mobile/**"
+      - "apps/api/**"
+      - "packages/**"
+      - "services/mock-idp/**"
+      - "scripts/e2e.ts"
+      - "docker-compose.yml"
+      - "env.example"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".npmrc"
+      - ".github/actions/pnpm/**"
+      - ".github/workflows/e2e.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   e2e-android:
     name: e2e-android
+    # A pull request only with the label: put on now, or there already when a
+    # push comes. Another label put on is no reason to run.
+    if: >-
+      github.event_name != 'pull_request'
+      || (contains(github.event.pull_request.labels.*.name, 'e2e')
+          && (github.event.action != 'labeled' || github.event.label.name == 'e2e'))
+    # On the job, not the workflow: a run whose job is skipped must not cancel
+    # the one in progress.
+    concurrency:
+      group: e2e-android-${{ github.ref }}
+      cancel-in-progress: true
     # x86_64: hardware acceleration of the emulator is proven on the standard
     # Linux runners (free for a public repository), and docker compose runs as
     # on a laptop. The rest of CI is arm64.
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    # About 55 minutes when it passes; a hung emulator or flow ends here.
+    timeout-minutes: 75
     env:
       MAESTRO_VERSION: 2.11.0
       MAESTRO_SHA256: 5384593cb4e7a106489e75a821d157dd43f4e438df6bc308b72e82c685e1283a
