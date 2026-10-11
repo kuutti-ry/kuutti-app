@@ -14,13 +14,22 @@ appId: fi.kuutti.app
       PERSONA: ${PERSONA || "Sanna Korhonen"}
 # Back from the browser a busy Android emulator may say Kuutti is not
 # responding while the app catches up: waited for, never closed, as in
-# open-app.yaml.
+# open-app.yaml. iOS has no such dialog; on Android its absence is asked as
+# `notVisible`, in half a second, where a `visible` that fails costs 7 s (README).
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|.* isn't responding"
     timeout: 30000
+- evalScript: ${output.notResponding = true}
 - runFlow:
     when:
-      visible: ".* isn't responding"
+      platform: Android
+      notVisible: ".* isn't responding"
+    commands:
+      - evalScript: ${output.notResponding = false}
+- runFlow:
+    when:
+      platform: Android
+      true: ${output.notResponding}
     commands:
       - tapOn: "Wait"
 - extendedWaitUntil:
