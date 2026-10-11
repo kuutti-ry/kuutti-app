@@ -56,7 +56,8 @@ jobs:
       # By hand, with the SDK the runner carries: the repository allows only
       # GitHub's own actions and those of verified creators, and the emulator
       # actions are neither. Started here, so it boots while the rest is built;
-      # the image and device are those of the local emulator, Chrome included.
+      # the image is the local emulator's, Chrome included, on a phone of the
+      # same screen (the runner's tools know no Pixel 8).
       # `yes` ends on a broken pipe once the licences are taken, hence `|| true`.
       - name: Start the emulator
         run: |
@@ -65,7 +66,8 @@ jobs:
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           (yes || true) | "$tools/sdkmanager" --licenses > /dev/null
           "$tools/sdkmanager" emulator platform-tools "$image" > /dev/null
-          echo no | "$tools/avdmanager" create avd --name e2e --package "$image" --device pixel_8
+          echo no | "$tools/avdmanager" create avd --name e2e --package "$image" --device pixel_7 \
+            || { "$tools/avdmanager" list device --compact; exit 1; }
           nohup "$ANDROID_HOME/emulator/emulator" -avd e2e -no-window -no-audio -no-boot-anim \
             -no-snapshot -gpu swiftshader_indirect -camera-back none -camera-front none \
             > emulator.log 2>&1 &
