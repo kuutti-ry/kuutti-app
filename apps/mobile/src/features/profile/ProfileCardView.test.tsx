@@ -80,7 +80,7 @@ describe("ProfileCardView", () => {
     );
     expect(screen.getByText("171 cm")).toBeTruthy();
     expect(screen.getByText("Something casual")).toBeTruthy();
-    expect(screen.getByText("suomi (you too), English")).toBeTruthy();
+    expect(screen.getByText("Finnish (you too), English")).toBeTruthy();
   });
 
   it("names the photos by position and hands a refused one to the screen", async () => {

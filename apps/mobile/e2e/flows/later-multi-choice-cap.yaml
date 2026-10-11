@@ -66,18 +66,19 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
     timeout: 60000
 - tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
 
-# The languages are their own names, the same in every catalogue.
+# The languages are named in the app's language (#238); Tagalog is the one
+# name the three catalogues share, so one search finds it in any of them.
 - openLink: kuutti://profile/later/languages
 - extendedWaitUntil:
     visible: "Languages|Kielet|Språk"
     timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Search|Hae|Sök"
-- inputText: "eesti"
-- assertVisible: "eesti"
+- inputText: "taga"
+- assertVisible: "Tagalog"
 # The chips follow each keystroke; the last one takes a moment.
 - extendedWaitUntil:
-    notVisible: "svenska"
+    notVisible: "Swedish|Ruotsi|Svenska"
     timeout: 10000
 # Closed with a tap on the field's label, which is no button.
 - tapOn: "Languages|Kielet|Språk"

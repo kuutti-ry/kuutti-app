@@ -79,9 +79,9 @@ describe("FieldEditor: several choices", () => {
   it("takes no more than the field's limit", async () => {
     const five = ["fi", "sv", "en", "es", "de"];
     await show("languages", { languages: five } as ProfileFields);
-    await fireEvent.press(screen.getByRole("button", { name: "français" }));
+    await fireEvent.press(screen.getByRole("button", { name: "French" }));
     expect(fields).toEqual({ languages: five });
-    expect(chosen("français")).toBe(false);
+    expect(chosen("French")).toBe(false);
   });
 
   it("puts a glyph before a party's name and still names the button by the party alone", async () => {
@@ -96,10 +96,10 @@ describe("FieldEditor: several choices", () => {
 describe("FieldEditor: a long list", () => {
   it("offers a search that narrows the chips to the matching ones", async () => {
     await show("languages");
-    expect(screen.getByRole("button", { name: "suomi" })).toBeTruthy();
-    await fireEvent.changeText(screen.getByLabelText("Search"), "  DEUT ");
-    expect(screen.getByRole("button", { name: "Deutsch" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "suomi" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Finnish" })).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText("Search"), "  GERM ");
+    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Finnish" })).toBeNull();
   });
 
   it("shows the hobbies in their groups, hides a group with no match, and keeps something else apart", async () => {

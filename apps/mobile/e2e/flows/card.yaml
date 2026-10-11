@@ -39,7 +39,7 @@ name: The card leads with the photo, the name and the verified age, and shows th
     centerElement: true
     timeout: 60000
 # Several answers on one line, in the order given.
-- assertVisible: "suomi, English, svenska"
+- assertVisible: "Finnish, English, Swedish|Suomi, Englanti, Ruotsi|Finska, Engelska, Svenska"
 - scrollUntilVisible:
     element: "Height|Pituus|Längd"
     direction: DOWN

@@ -101,3 +101,71 @@ describe("the profile client", () => {
     });
   });
 });
+
+describe("the profile client: a save on its way (#238)", () => {
+  const update = { displayName: "Aino", bio: null, bioPreset: null, fields: {}, prompts: [] };
+  /** A fetch that answers only when the test says, so the order of the requests shows. */
+  function holding() {
+    const waiting: Array<{ request: Request; answer: (response: Response) => void }> = [];
+    globalThis.fetch = jest.fn((input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      return new Promise<Response>((answer) => waiting.push({ request, answer }));
+    }) as unknown as typeof fetch;
+    return waiting;
+  }
+  const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
+  const sent = (waiting: ReturnType<typeof holding>) =>
+    waiting.map(({ request }) => `${request.method} ${pathOf(request)}`);
+
+  it("holds a read of the profile, the card or the deal-breakers until the save before it has landed", async () => {
+    const waiting = holding();
+    const save = saveProfile(update);
+    const reads = [fetchProfile(), fetchCardPreview(), fetchDealBreakers()];
+    await flush();
+    expect(sent(waiting)).toEqual(["PUT /profile"]);
+    waiting[0]?.answer(json(EMPTY));
+    expect(await save).toEqual(EMPTY);
+    await flush();
+    expect(sent(waiting)).toEqual([
+      "PUT /profile",
+      "GET /profile",
+      "GET /profile/card",
+      "GET /preferences/deal-breakers",
+    ]);
+    for (const { answer } of waiting.slice(1)) answer(refusal("internal_error", 500));
+    for (const read of reads) await expect(read).rejects.toBeInstanceOf(ApiError);
+  });
+
+  it("sends a second save only once the first has its answer, and a refused one holds up nothing after it", async () => {
+    const waiting = holding();
+    const first = saveProfile(update);
+    const second = saveProfile({ ...update, displayName: "Aino K" });
+    await flush();
+    expect(sent(waiting)).toEqual(["PUT /profile"]);
+    waiting[0]?.answer(refusal("text_contact_details", 400));
+    await expect(first).rejects.toMatchObject({ code: "text_contact_details" });
+    await flush();
+    expect(sent(waiting)).toEqual(["PUT /profile", "PUT /profile"]);
+    expect(JSON.parse(await (waiting[1] as (typeof waiting)[number]).request.text())).toMatchObject(
+      {
+        displayName: "Aino K",
+      },
+    );
+    waiting[1]?.answer(json(EMPTY));
+    expect(await second).toEqual(EMPTY);
+    const read = fetchProfile();
+    await flush();
+    waiting[2]?.answer(json(EMPTY));
+    expect(await read).toEqual(EMPTY);
+  });
+
+  it("lets a read through at once when a save failed on the network", async () => {
+    const waiting = holding();
+    const save = saveProfile(update);
+    await flush();
+    globalThis.fetch = jest.fn(async () => json(EMPTY)) as unknown as typeof fetch;
+    waiting[0]?.answer(Promise.reject(new TypeError("Network request failed")) as never);
+    await expect(save).rejects.toBeInstanceOf(TypeError);
+    expect(await fetchProfile()).toEqual(EMPTY);
+  });
+});

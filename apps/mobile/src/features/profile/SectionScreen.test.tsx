@@ -1,17 +1,20 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
-import { saveSession } from "@/lib/session";
+import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { SectionScreen } from "./SectionScreen";
 import { PROFILE_SECTIONS } from "./sections";
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10));
-const show = (ui: React.ReactElement) =>
-  act(async () => {
-    renderWithTheme(ui);
+const show = async (ui: React.ReactElement) => {
+  let view: Awaited<ReturnType<typeof renderWithTheme>> | undefined;
+  await act(async () => {
+    view = await renderWithTheme(ui);
     await settle();
   });
+  return view as NonNullable<typeof view>;
+};
 // Every event in its own act scope, settled before the next query: a state
 // update dispatched outside one is not flushed by a later act in this runtime.
 const press = (element: ReturnType<typeof screen.getByRole>) =>
@@ -87,23 +90,35 @@ const { __navigation: navigation, __router: router } = jest.requireMock("expo-ro
     dispatch: jest.Mock;
     emit: (name: string, event: unknown) => void;
   };
-  __router: { replace: jest.Mock; back: jest.Mock };
+  __router: { replace: jest.Mock; back: jest.Mock; push: jest.Mock };
 };
 
 /** The back gesture, the back button or Android's back key, as the stack reports it. */
-const leave = () =>
-  act(async () => {
-    navigation.emit("beforeRemove", {
-      preventDefault: jest.fn(),
-      data: { action: { type: "GO_BACK" } },
-    });
+const leave = async () => {
+  const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+  await act(async () => {
+    navigation.emit("beforeRemove", event);
     await settle();
   });
+  return event;
+};
+
+/** Leaving as the stack does it: the screen goes at once, its save on the way after it (#238). */
+const leaveAndGo = async (view: Awaited<ReturnType<typeof show>>) => {
+  const event = await leave();
+  await act(async () => {
+    view.unmount();
+    await settle();
+  });
+  return event;
+};
 
 beforeEach(async () => {
   navigation.addListener.mockClear();
   navigation.dispatch.mockReset();
   router.replace.mockClear();
+  router.push.mockClear();
+  router.back.mockClear();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -170,63 +185,108 @@ describe("SectionScreen", () => {
     const { puts } = fakeApi();
     await show(<SectionScreen section="relationship" />);
     await waitFor(() => expect(screen.getByText("Looking for")).toBeTruthy());
-    expect(navigation.addListener).not.toHaveBeenCalled();
+    const event = await leave();
+    expect(event.preventDefault).not.toHaveBeenCalled();
     expect(puts).toEqual([]);
+    expect(router.push).not.toHaveBeenCalled();
   });
 
-  it("saves the whole document once on leaving with an edit, then leaves", async () => {
+  it("saves the whole document once on leaving with an edit, and never holds the leaving", async () => {
     const { puts } = fakeApi({ profile: stored({ smoking: "never" }) });
-    await show(<SectionScreen section="basics" />);
+    const view = await show(<SectionScreen section="basics" />);
     await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
     await type(screen.getByLabelText("Name on your card"), " Aino K ");
-    await press(screen.getByRole("button", { name: "suomi" }));
+    await press(screen.getByRole("button", { name: "Finnish" }));
     await press(screen.getByRole("button", { name: "English" }));
-    await waitFor(() =>
-      expect(navigation.addListener).toHaveBeenCalledWith("beforeRemove", expect.any(Function)),
-    );
-    await leave();
+    // Held, the native swipe on iOS went back, forth and back again (#238).
+    const event = await leaveAndGo(view);
+    expect(event.preventDefault).not.toHaveBeenCalled();
     expect(puts).toHaveLength(1);
     // The rest of the document goes with it: a section saves the whole profile.
     expect(puts[0]).toMatchObject({
       displayName: "Aino K",
       fields: { smoking: "never", languages: ["fi", "en"] },
     });
-    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
-    expect(screen.queryByText("Leave without saving?")).toBeNull();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
   });
 
   it("saves an answered prompt on leaving the prompts", async () => {
     const { puts } = fakeApi();
-    await show(<SectionScreen section="prompts" />);
+    const view = await show(<SectionScreen section="prompts" />);
     await waitFor(() => expect(screen.getByText("My ideal Sunday")).toBeTruthy());
     await press(screen.getByRole("button", { name: "My ideal Sunday" }));
     await type(screen.getByLabelText("Your answer to: My ideal Sunday"), "A long breakfast.");
-    await leave();
+    await leaveAndGo(view);
     expect(puts[0]).toMatchObject({ prompts: [{ key: "sunday", answer: "A long breakfast." }] });
-    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
   });
 
-  it("stays on a refusal, says why, and leaves without saving only on the word", async () => {
-    const { puts } = fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
+  it("saves once however often the stack reports the leaving", async () => {
+    const { puts } = fakeApi();
     await show(<SectionScreen section="basics" />);
     await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
-    await type(screen.getByLabelText("Name on your card"), "aino@example.com");
+    await type(screen.getByLabelText("Name on your card"), "Aino K");
+    await leave();
     await leave();
     expect(puts).toHaveLength(1);
-    expect(navigation.dispatch).not.toHaveBeenCalled();
-    expect(screen.getByText("Leave without saving?")).toBeTruthy();
+  });
+
+  it("brings a refused section back with the draft and the reason, and asks before leaving without saving", async () => {
+    const { puts } = fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
+    const view = await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    await type(screen.getByLabelText("Name on your card"), "aino@example.com");
+    await leaveAndGo(view);
+    expect(puts).toHaveLength(1);
+    expect(router.push).toHaveBeenCalledWith("/profile/section/basics");
+
+    // The stack opens the section again: what was typed is there, and why it was refused.
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
+    expect(screen.getByLabelText("Name on your card").props.value).toBe("aino@example.com");
     expect(screen.getAllByText(/e-mail address, a link/).length).toBeGreaterThan(0);
 
     await press(screen.getByRole("button", { name: "Keep editing" }));
     expect(screen.queryByText("Leave without saving?")).toBeNull();
     // The reason stays on the screen while the person fixes it.
     expect(screen.getByText(/e-mail address, a link/)).toBeTruthy();
-    expect(navigation.dispatch).not.toHaveBeenCalled();
-
+    // Fixed, it saves on leaving like any other edit, and nothing opens again.
+    const after = fakeApi();
+    await type(screen.getByLabelText("Name on your card"), "Aino");
     await leave();
-    expect(puts).toHaveLength(2);
+    expect(after.puts).toEqual([expect.objectContaining({ displayName: "Aino" })]);
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets a refused draft go on the word, with no save on the way out", async () => {
+    const { puts } = fakeApi({ saveStatus: 400, saveCode: "text_contact_details" });
+    const view = await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    await type(screen.getByLabelText("Name on your card"), "aino@example.com");
+    await leaveAndGo(view);
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Leave without saving" }));
-    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
+    expect(router.back).toHaveBeenCalledTimes(1);
+    await leave();
+    expect(puts).toHaveLength(1);
+  });
+
+  it("opens nothing again when the session ended while the save was on its way", async () => {
+    fakeApi({ saveStatus: 401, saveCode: "unauthenticated" });
+    const view = await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    await type(screen.getByLabelText("Name on your card"), "Aino K");
+    await act(async () => {
+      await clearSession();
+    });
+    await leaveAndGo(view);
+    expect(router.push).not.toHaveBeenCalled();
+    // And nothing is held for the next time the section opens.
+    fakeApi();
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    expect(screen.queryByText("Leave without saving?")).toBeNull();
   });
 
   it("takes a written bio over a placeholder", async () => {
@@ -278,72 +338,39 @@ describe("SectionScreen", () => {
     await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
   });
 
-  it("says it is saving, holds the back button, and saves once however often the person tries to leave", async () => {
-    let answer: ((response: Response) => void) | undefined;
-    const puts: unknown[] = [];
-    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
-      const request = input instanceof Request ? input : new Request(input, init);
-      if (request.method === "GET") {
-        return json({ profile: stored({}), completeness: { complete: false, missing }, tips: [] });
-      }
-      puts.push(await request.json());
-      return new Promise<Response>((resolve) => {
-        answer = resolve;
-      });
-    }) as unknown as typeof fetch;
-    await show(<SectionScreen section="basics" />);
-    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
-    await type(screen.getByLabelText("Name on your card"), "Aino K");
-    await leave();
-    expect(screen.getByText("Saving…")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Back to your profile" }).props.accessibilityState
-        ?.disabled,
-    ).toBe(true);
-    await leave();
-    expect(puts).toHaveLength(1);
-    await act(async () => {
-      answer?.(
-        json({
-          profile: stored({}),
-          completeness: { complete: false, missing },
-          tips: [],
-        }),
-      );
-      await settle();
-    });
-    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("Saving…")).toBeNull();
-  });
-
   it("names a refusal for the sensitive answers, and gives any other the generic line", async () => {
     fakeApi({ saveStatus: 403, saveCode: "consent_required" });
-    await show(<SectionScreen section="beliefs" />);
+    const view = await show(<SectionScreen section="beliefs" />);
     await waitFor(() => expect(screen.getByText("Parties you could vote for")).toBeTruthy());
     await press(screen.getByRole("button", { name: "National Coalition Party" }));
-    await leave();
-    expect(
-      screen.getAllByText("This field needs your explicit consent first.").length,
-    ).toBeGreaterThan(0);
+    await leaveAndGo(view);
+    await show(<SectionScreen section="beliefs" />);
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("This field needs your explicit consent first.").length,
+      ).toBeGreaterThan(0),
+    );
   });
 
   it("gives a refusal it has no words for the generic line, and the close control keeps the person here", async () => {
     fakeApi({ saveStatus: 422, saveCode: "validation_failed" });
-    await show(<SectionScreen section="lifestyle" />);
+    const view = await show(<SectionScreen section="lifestyle" />);
     await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Dog" }));
-    await leave();
-    expect(
-      screen.getAllByText("Saving did not work. Check the fields and try again.").length,
-    ).toBeGreaterThan(0);
+    await leaveAndGo(view);
+    await show(<SectionScreen section="lifestyle" />);
+    await waitFor(() =>
+      expect(
+        screen.getAllByText("Saving did not work. Check the fields and try again.").length,
+      ).toBeGreaterThan(0),
+    );
     await press(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByText("Leave without saving?")).toBeNull();
-    expect(navigation.dispatch).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
   });
 
   it("goes back to the list with its back button", async () => {
     fakeApi();
-    router.back.mockClear();
     await show(<SectionScreen section="hobbies" />);
     await waitFor(() => expect(screen.getByRole("heading", { name: "Hobbies" })).toBeTruthy());
     await press(screen.getByRole("button", { name: "Back to your profile" }));
