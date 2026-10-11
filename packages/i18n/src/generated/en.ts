@@ -641,6 +641,7 @@ export const en: Readonly<Record<string, string>> = {
   "signIn.opening": "Your bank opens in the browser. Come back here when it is done.",
   "signIn.title": "Sign in",
   "signIn.tryAgain": "Try again",
+  "signIn.unavailable": "There is no bank sign-in here: the web version and pull-request previews have none. Try the change locally, with the mock bank.",
   "tech.api.check": "Check again",
   "tech.api.commit": "git commit {commit}",
   "tech.api.database": "database {db} · migrations {migrations}",

@@ -1,10 +1,12 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
-import { Linking } from "react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { Linking, Platform } from "react-native";
 import { apiBaseUrl } from "@/lib/api";
+import { LocaleProvider } from "@/lib/locale";
 import { clearSession, currentSession, markLoginStarted, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { SignInScreen } from "./SignInScreen";
+import { SessionProvider } from "./session";
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; setParams: jest.Mock };
@@ -139,6 +141,30 @@ describe("SignInScreen", () => {
   it("shows the cooldown with its date in the app's locale", async () => {
     await renderWithTheme(<SignInScreen error="auth_cooldown" until="2026-10-22T10:00:00.000Z" />);
     expect(await screen.findByText(/The earliest day for a new one: 22.10.2026/)).toBeTruthy();
+  });
+
+  it("says so when the API has no bank, as a pull-request preview has none", async () => {
+    await renderWithTheme(<SignInScreen error="auth_unavailable" />);
+    expect(await screen.findByText(/There is no bank sign-in here/)).toBeTruthy();
+  });
+
+  it("on the web, says there is no bank sign-in instead of offering a button", async () => {
+    // Without ThemeProvider: its web path sets the colour scheme on a DOM
+    // that jest-expo's iOS preset does not have.
+    const os = jest.replaceProperty(Platform, "OS", "web");
+    try {
+      await render(
+        <LocaleProvider>
+          <SessionProvider>
+            <SignInScreen />
+          </SessionProvider>
+        </LocaleProvider>,
+      );
+      expect(await screen.findByText(/There is no bank sign-in here/)).toBeTruthy();
+      expect(screen.queryByRole("button")).toBeNull();
+    } finally {
+      os.restore();
+    }
   });
 
   it("shows the generic text for a code it has no words for", async () => {

@@ -591,6 +591,7 @@ export const sv: Readonly<Record<string, string>> = {
   "signIn.opening": "Din bank öppnas i webbläsaren. Kom tillbaka hit när det är klart.",
   "signIn.title": "Logga in",
   "signIn.tryAgain": "Försök igen",
+  "signIn.unavailable": "Här finns ingen bankinloggning: webbversionen och förhandsversionerna av pull requests har ingen. Prova ändringen lokalt med testbanken.",
   "tech.api.check": "Kontrollera igen",
   "tech.api.commit": "git-commit {commit}",
   "tech.api.database": "databas {db} · migreringar {migrations}",

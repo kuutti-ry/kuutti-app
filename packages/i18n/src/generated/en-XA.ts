@@ -641,6 +641,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "signIn.opening": "［ÝÝóóúúr bááñk óópééñš ííñ théé bróówšéér. Çóóméé bááçk hééréé whééñ íít ííš dóóñéé.］",
   "signIn.title": "［Šíígñ ííñ］",
   "signIn.tryAgain": "［Trýý áágááííñ］",
+  "signIn.unavailable": "［Thééréé ííš ñóó bááñk šíígñ-ííñ hééréé: théé wééb vééršííóóñ ááñd púúll-rééqúúééšt préévííééwš háávéé ñóóñéé. Trýý théé çhááñgéé lóóçáállýý, wííth théé móóçk bááñk.］",
   "tech.api.check": "［Çhééçk áágááííñ］",
   "tech.api.commit": "［gíít çóómmíít {commit}］",
   "tech.api.database": "［dáátáábáášéé {db} · míígráátííóóñš {migrations}］",

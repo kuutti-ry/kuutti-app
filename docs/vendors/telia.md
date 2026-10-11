@@ -21,7 +21,7 @@ Sales entry, for the record: https://www.telia.fi/yrityksille/palvelut/tietoturv
 | item | ours |
 |---|---|
 | public keys, RSA 2048 or longer, **two separate JWKs**: `"use": "sig"` (signs our request objects and client assertions) and `"use": "enc"` (Telia encrypts the ID token to it) | generated per `infra/README.md` Secrets; the private halves live in SSM `/kuutti/<env>/telia-signing-key` and `/kuutti/<env>/telia-encryption-key`; the public JWKs go to Telia by e-mail (an OpenID Federation entity statement is the alternative; not used yet) |
-| redirect URIs, HTTPS, **no wildcards** | staging `https://api.staging.kuutti.app/auth/callback`; production `https://api.kuutti.app/auth/callback` (#25). Pull-request previews cannot be registered, so they stay on the mock IdP |
+| redirect URIs, HTTPS, **no wildcards** | staging `https://api.staging.kuutti.app/auth/callback`; production `https://api.kuutti.app/auth/callback` (#25). Pull-request previews cannot be registered, and no mock IdP is deployed beside them, so they have no bank login (ADR-014 §1) |
 | display name `ftn_spname`, at most 40 characters, shown to the user during login | `Kuutti` |
 | technical contact (Appendix 4) | the maintainer, with the project mailbox in copy |
 

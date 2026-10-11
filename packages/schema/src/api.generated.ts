@@ -75,7 +75,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Redirect to the broker. */
+                /** @description Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable. */
                 302: {
                     headers: {
                         [name: string]: unknown;
@@ -91,7 +91,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description No identification broker is configured. */
+                /** @description No identification broker is configured (anywhere but a preview). */
                 503: {
                     headers: {
                         [name: string]: unknown;

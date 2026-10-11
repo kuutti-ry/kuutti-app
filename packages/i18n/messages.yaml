@@ -2991,6 +2991,13 @@ signIn.error.unexpected_link:
   sv: Den här inloggningslänken begärdes inte från den här telefonen. Starta inloggningen här med knappen.
   machine: { fi: true, sv: true }
 
+signIn.unavailable:
+  en: "There is no bank sign-in here: the web version and pull-request previews have none. Try the change locally, with the mock bank."
+  description: Sign-in screen where no bank login exists at all, so only testers see it. The web target shows it instead of the button; a pull-request preview, whose API has no broker (ADR-014 §1), sends the deep link's auth_unavailable. "The mock bank" is the local stand-in for the bank login (services/mock-idp).
+  fi: "Pankkitunnistusta ei ole täällä: verkkoversiossa ja pull requestien esikatseluissa sitä ei ole. Kokeile muutosta paikallisesti testipankilla."
+  sv: "Här finns ingen bankinloggning: webbversionen och förhandsversionerna av pull requests har ingen. Prova ändringen lokalt med testbanken."
+  machine: { fi: true, sv: true }
+
 signIn.error.generic:
   en: Something went wrong. Try again.
   description: Sign-in screen, any other failure (network, an unexpected answer).

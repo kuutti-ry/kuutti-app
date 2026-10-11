@@ -65,3 +65,8 @@ Feature: Bank login through the identification broker
     Given no identification broker is configured
     When the app asks for a login
     Then the answer is auth_provider_error with status 503
+
+  Scenario: A preview's login sends the app back with auth_unavailable
+    Given a pull-request preview, which never has a broker
+    When the app asks for a login
+    Then the browser is sent to the app with auth_unavailable
