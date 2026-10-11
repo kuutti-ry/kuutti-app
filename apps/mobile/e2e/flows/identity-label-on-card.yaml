@@ -21,7 +21,8 @@ name: A label chosen after non-binary shows on the card after the gender
     timeout: 15000
 - tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
 - inputText: "Eetu"
-- hideKeyboard
+# A tap on the question, which is no button, closes the keyboard (README, the keyboard).
+- tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
 - tapOn: "Continue|Jatka|Fortsätt"
 - extendedWaitUntil:
     visible: "How do you describe yourself\\?|Miten kuvailet itseäsi\\?|Hur beskriver du dig själv\\?"

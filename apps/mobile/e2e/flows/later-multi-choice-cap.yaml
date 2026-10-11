@@ -79,4 +79,5 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
 - extendedWaitUntil:
     notVisible: "svenska"
     timeout: 10000
-- hideKeyboard
+# Closed with a tap on the field's label, which is no button.
+- tapOn: "Languages|Kielet|Språk"
