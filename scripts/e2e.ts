@@ -2,7 +2,7 @@
  * e2e: the Maestro flows on a booted simulator (#164, ADR-020).
  *
  *   pnpm e2e                                   every flow under apps/mobile/e2e/flows (config.yaml)
- *   pnpm e2e -- --device <udid>                one simulator of two booted
+ *   pnpm e2e -- --device <udid>                one simulator, booted for the run and shut down after
  *   pnpm e2e -- apps/mobile/e2e/flows/x.yaml   one flow
  *
  * The flows start from the cast's stories, so `pnpm demo:reset` comes first,
@@ -35,6 +35,11 @@ cpSync(photos, MEDIA, { recursive: true, force: true });
 const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const device = args.indexOf("--device");
 const global = device >= 0 ? args.splice(device, 2) : [];
+// A simulator named by its UDID is booted if it is not and shut down after the run, passed or
+// failed: left booted between runs, one gathered 127 web content processes, some 6 GB, in an
+// hour of runs (11/10/2026). An emulator's serial cannot start it again, so Android stays up.
+const simulator = global.find((arg) => /^[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$/i.test(arg));
+if (simulator) spawnSync("xcrun", ["simctl", "bootstatus", simulator, "-b"], { stdio: "inherit" });
 const target = args.some((arg) => arg.endsWith(".yaml")) ? [] : [WORKSPACE];
 
 const brew = spawnSync("brew", ["--prefix", "openjdk"], { encoding: "utf8" });
@@ -44,4 +49,5 @@ const run = spawnSync("maestro", [...global, "test", ...args, ...target], {
   stdio: "inherit",
   env: { ...process.env, PATH: `${jdk}${process.env.PATH ?? ""}` },
 });
+if (simulator) spawnSync("xcrun", ["simctl", "shutdown", simulator], { stdio: "inherit" });
 process.exit(run.status ?? 1);
