@@ -1,0 +1,97 @@
+# The profile as a list of sections, each its own screen with no Save button
+# (#227): an answer given in a section is saved by going back, shows on the
+# card, and taking it back the same way takes it off. Sanna has no exercise
+# answer; the flow leaves her without one.
+appId: fi.kuutti.app
+name: A section saves on going back, and the card shows what it saved
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "The basics|Perustiedot|Grunderna"
+    timeout: 15000
+# A row is one button named by its title; the line under it is its hint, which
+# Maestro does not read as text.
+- assertVisible: "Relationship and kids|Parisuhde ja lapset|Relation och barn"
+- waitForAnimationToEnd
+- tapOn: "Lifestyle|Elämäntavat|Livsstil"
+- extendedWaitUntil:
+    visible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertNotVisible: "Save|Tallenna|Spara"
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Weekly|Viikoittain|Varje vecka"
+- assertVisible:
+    text: "Weekly|Viikoittain|Varje vecka"
+    selected: true
+
+# Back to the list: the answer is saved on the way.
+- scrollUntilVisible:
+    element: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+    direction: UP
+    centerElement: true
+    timeout: 60000
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "The basics|Perustiedot|Grunderna"
+    timeout: 15000
+- openLink: kuutti://profile/card
+- extendedWaitUntil:
+    visible: "Your card|Korttisi|Ditt kort"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Exercise|Liikunta|Motion"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "Weekly|Viikoittain|Varje vecka"
+
+# Taken back the same way, from the list: tapped again, which clears it, and
+# going back.
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "The basics|Perustiedot|Grunderna"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Lifestyle|Elämäntavat|Livsstil"
+- extendedWaitUntil:
+    visible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Weekly|Viikoittain|Varje vecka"
+- assertVisible:
+    text: "Weekly|Viikoittain|Varje vecka"
+    selected: false
+- scrollUntilVisible:
+    element: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+    direction: UP
+    centerElement: true
+    timeout: 60000
+- tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
+- extendedWaitUntil:
+    visible: "The basics|Perustiedot|Grunderna"
+    timeout: 15000
+# Opened again, the section reads what was stored: nothing chosen.
+- waitForAnimationToEnd
+- tapOn: "Lifestyle|Elämäntavat|Livsstil"
+- extendedWaitUntil:
+    visible: "Smoking|Tupakointi|Rökning"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Weekly|Viikoittain|Varje vecka"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible:
+    text: "Weekly|Viikoittain|Varje vecka"
+    selected: false
