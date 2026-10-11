@@ -125,6 +125,10 @@ function ItemEditor({
 }
 
 /** Drafts the API refused after their section had gone, by section (#238). */
+// shortcut: a refused section comes back on top of whatever is open; had the
+// person already edited another section there, both save the whole document
+// and the one left last wins. Only after a refusal slower than opening and
+// editing another section; a save of the changed fields alone would lift it.
 const refusedDrafts = new Map<string, HeldDraft>();
 
 /**
