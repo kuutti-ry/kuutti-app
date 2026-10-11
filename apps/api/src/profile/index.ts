@@ -22,4 +22,4 @@ export {
   saveProfile,
   withdrawSpecialCategoryAnswers,
 } from "./service.ts";
-export { type TipSnapshot, tipFor } from "./tips.ts";
+export { type TipSnapshot, tips } from "./tips.ts";

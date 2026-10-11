@@ -25,11 +25,11 @@ export {
   uploadPhoto,
 } from "./photos.ts";
 export {
-  type ApprovedPhotoTipInput,
   type CardServed,
   listApprovedPhotos,
-  listApprovedPhotoTipInputs,
   listPhotos,
+  listPhotoTipInputs,
+  type PhotoTipInput,
   recordCardServed,
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";

@@ -52,7 +52,7 @@ function fakeApi(
       return json({
         profile: options.profile ?? null,
         completeness: { complete: false, missing },
-        tip: null,
+        tips: [],
       });
     }
     if (path === "/profile" && request.method === "PUT") {
@@ -73,7 +73,7 @@ function fakeApi(
           updatedAt: "2026-09-26T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos", "seeks", "age_window"] },
-        tip: null,
+        tips: [],
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);

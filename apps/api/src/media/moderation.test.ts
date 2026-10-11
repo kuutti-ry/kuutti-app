@@ -116,6 +116,12 @@ describe("tip signals for photo_review", () => {
     ]);
   });
 
+  it("caps the face area at the whole frame", () => {
+    expect(
+      tipLabelsFrom([], [{ Confidence: 99, BoundingBox: { Width: 1.2, Height: 1.1 } }]),
+    ).toEqual([{ name: "TightCrop", parentName: "Face", confidence: 100 }]);
+  });
+
   it("stores moderation labels ahead of tip signals, capped", () => {
     const labels = Array.from({ length: 48 }, (_, i) => ({
       name: `M${i}`,
@@ -180,6 +186,37 @@ describe("The Rekognition adapter", () => {
       tipLabels: [],
       faceConfidences: [99.5],
       calls: 3,
+    });
+  });
+
+  it("decides without the scene when DetectLabels fails, and never asks the scene for sunglasses", async () => {
+    let filters: string[] | undefined;
+    const client = {
+      async send(
+        command: DetectModerationLabelsCommand | DetectFacesCommand | DetectLabelsCommand,
+      ) {
+        if (command instanceof DetectLabelsCommand) {
+          filters = command.input.Settings?.GeneralLabels?.LabelInclusionFilters;
+          throw new Error("AccessDeniedException");
+        }
+        if (command instanceof DetectFacesCommand) {
+          return {
+            FaceDetails: [{ Confidence: 99.5, Sunglasses: { Value: true, Confidence: 97 } }],
+          };
+        }
+        return { ModerationLabels: [], ModerationModelVersion: "7.0" };
+      },
+    };
+    const inspection = await rekognitionModerator(client as unknown as RekognitionClient).inspect(
+      await fixtureWebp(800, 1067),
+    );
+    expect(filters).toEqual(["Mirror", "Bathroom"]);
+    expect(inspection).toMatchObject({
+      checked: true,
+      labels: [],
+      tipLabels: [{ name: "Sunglasses", parentName: "Face", confidence: 97 }],
+      faceConfidences: [99.5],
+      calls: 2,
     });
   });
 });

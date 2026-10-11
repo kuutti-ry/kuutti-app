@@ -6,8 +6,8 @@ import { currentConsent } from "../identity/index.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { readPreferences } from "../matching/index.ts";
-import type { CardDeps } from "./card.ts";
-import { previewCard, readProfile, saveProfile } from "./service.ts";
+import { buildCard, type CardDeps } from "./card.ts";
+import { readProfile, saveProfile } from "./service.ts";
 
 const errorContent = (description: string) => ({
   description,
@@ -22,7 +22,7 @@ const readRoute = createRoute({
   path: "/profile",
   summary: "The caller's profile and what it still needs",
   description:
-    "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and one advisory tip for the owner when one applies.",
+    "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the advisory tips for the owner that apply, highest priority first.",
   ...bearer,
   responses: {
     200: { description: "The profile.", ...json(ProfileResponse) },
@@ -40,8 +40,7 @@ const saveRoute = createRoute({
   request: { body: { required: true, ...json(ProfileUpdate) } },
   responses: {
     200: {
-      description:
-        "Saved; the profile as stored, with its completeness and one advisory tip when one applies.",
+      description: "Saved; the profile as stored, with its completeness and its advisory tips.",
       ...json(ProfileResponse),
     },
     400: errorContent(
@@ -60,7 +59,7 @@ const cardRoute = createRoute({
   path: "/profile/card",
   summary: "The caller's own card, as others will see it",
   description:
-    "The card built the way a round builds it for someone else, with the age from the bank-verified year and month, the approved photos in order (bytes through GET /photos/{id}/{variant}), what is still missing, and one advisory tip when one applies. Nothing is recorded: this is the owner looking at themselves.",
+    "The card built the way a round builds it for someone else, with the age from the bank-verified year and month, the approved photos in order (bytes through GET /photos/{id}/{variant}) and what is still missing. Nothing is recorded: this is the owner looking at themselves.",
   ...bearer,
   responses: {
     200: { description: "The card, or null before the first save.", ...json(CardPreviewResponse) },
@@ -93,7 +92,12 @@ export function profileRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
   });
 
   app.openapi(cardRoute, async (c) => {
-    return c.json(await previewCard(cardDeps, callerOf(c).accountId), 200);
+    const { accountId } = callerOf(c);
+    const preview = await buildCard(cardDeps, {
+      viewerAccountId: accountId,
+      subjectAccountId: accountId,
+    });
+    return c.json(preview, 200);
   });
 
   return app;

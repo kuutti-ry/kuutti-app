@@ -211,13 +211,14 @@ export async function giveHistory(
   }
   if (history.profile) await writer.profile(accountId, history.profile);
   // The pictures (#142), through the pipeline like anybody's: the faces of the
-  // story approved where no check decides, the negatives left to the queue.
+  // story approved where no check decides (but the last `facesInReview`),
+  // the negatives left to the queue.
   // Without the release nobody gets a photo, and the profile says so.
   let photos = 0;
   if (writer.assets && (history.photos > 0 || (history.negatives?.length ?? 0) > 0)) {
     const pictures = picturesOf(writer.assets, history);
     const faces = await writer.photos(accountId, pictures.faces);
-    await writer.approve(accountId, faces);
+    await writer.approve(accountId, faces.slice(0, faces.length - (history.facesInReview ?? 0)));
     const negatives = await writer.photos(accountId, pictures.negatives);
     photos = faces.length + negatives.length;
   }

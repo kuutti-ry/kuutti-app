@@ -2353,7 +2353,7 @@ profile.tip.title:
 
 profile.tip.dismiss:
   en: "Got it"
-  description: "Button that dismisses the current tip for this session (#56)."
+  description: "Button that dismisses the current tip for this run of the app; the next one, if any, shows instead (#56)."
   fi: "Selvä"
   sv: "Okej"
   machine: { fi: true, sv: true }
@@ -2401,10 +2401,10 @@ profile.tip.blurry:
   machine: { fi: true, sv: true }
 
 profile.tip.few_photos:
-  en: "A third approved photo would help others get a fuller picture of you."
-  description: "Advisory tip when the profile has enough photos to be complete but fewer than the suggested count (#56)."
-  fi: "Kolmas hyväksytty kuva auttaisi muita saamaan paremman kuvan sinusta."
-  sv: "Ett tredje godkänt foto skulle hjälpa andra att få en fylligare bild av dig."
+  en: "More approved photos would help others get a fuller picture of you."
+  description: "Advisory tip when the profile has enough photos to be complete but fewer than matching_config's suggested count, photos in review included (#56)."
+  fi: "Useampi hyväksytty kuva auttaisi muita saamaan sinusta kattavamman kuvan."
+  sv: "Fler godkända foton skulle hjälpa andra att få en fylligare bild av dig."
   machine: { fi: true, sv: true }
 
 profile.card.open:
@@ -3430,17 +3430,17 @@ onboarding.age.years:
   machine: { fi: true, sv: true }
 
 onboarding.photos.title:
-  en: "Three photos of you"
+  en: "Two photos of you"
   description: "Heading of the photos step (#146)."
-  fi: "Kolme kuvaa sinusta"
-  sv: "Tre bilder på dig"
+  fi: "Kaksi kuvaa sinusta"
+  sv: "Två bilder på dig"
   machine: { fi: true, sv: true }
 
 onboarding.photos.explain:
-  en: "Profiles with a face photo get seen; that is the honest reason. At least three, your face in each. They stay inside Kuutti."
+  en: "Profiles with a face photo get seen; that is the honest reason. At least two, your face in each. They stay inside Kuutti."
   description: "Explanation under the photos step's heading (#146): the honest reason first, as the sheet asks."
-  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kolme, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
-  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst tre, ditt ansikte i var och en. De stannar inne i Kuutti."
+  fi: "Profiilit, joissa on kasvokuva, tulevat nähdyiksi; se on rehellinen syy. Vähintään kaksi, kasvosi jokaisessa. Ne pysyvät Kuutin sisällä."
+  sv: "Profiler med en ansiktsbild blir sedda; det är den ärliga orsaken. Minst två, ditt ansikte i var och en. De stannar inne i Kuutti."
   machine: { fi: true, sv: true }
 
 onboarding.photos.open:

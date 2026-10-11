@@ -1,7 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import {
-  type CardPreviewResponse,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
   type ProfileDocument,
@@ -10,11 +9,10 @@ import {
   SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
-import { matchingConfigNumber } from "../lib/matching-config.ts";
-import { listApprovedPhotoTipInputs } from "../media/index.ts";
+import { matchingConfigNumbers } from "../lib/matching-config.ts";
+import { listPhotoTipInputs } from "../media/index.ts";
 import { track } from "../research/index.ts";
 import {
-  buildCard,
   type CardDeps,
   completenessOf,
   noConsentYet,
@@ -22,7 +20,7 @@ import {
 } from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
-import { TIP_THRESHOLD_KEYS, type TipSnapshot, type TipThresholds, tipFor } from "./tips.ts";
+import { TIP_THRESHOLD_KEYS, type TipSnapshot, type TipThresholds, tips } from "./tips.ts";
 
 /**
  * The consent_version of the special-category wording as built
@@ -100,21 +98,26 @@ function noteDropped(deps: CardDeps, row: repo.ProfileRow | null): void {
   }
 }
 
-/** The tip thresholds from matching_config; missing keys fail closed. */
+/** The tip thresholds from matching_config, in one statement; missing keys fail closed. */
 async function readTipThresholds(db: Queryable): Promise<TipThresholds> {
   const fields = Object.keys(TIP_THRESHOLD_KEYS) as (keyof typeof TIP_THRESHOLD_KEYS)[];
-  const values = await Promise.all(
-    fields.map((field) => matchingConfigNumber(db, TIP_THRESHOLD_KEYS[field])),
+  const values = await matchingConfigNumbers(
+    db,
+    fields.map((field) => TIP_THRESHOLD_KEYS[field]),
   );
-  return Object.fromEntries(fields.map((field, i) => [field, values[i]])) as TipThresholds;
+  return Object.fromEntries(
+    fields.map((field) => [field, values[TIP_THRESHOLD_KEYS[field]]]),
+  ) as TipThresholds;
 }
 
+/** The approved photos carry the signals; the ones in review only count. */
 async function tipSnapshotOf(deps: CardDeps, accountId: string): Promise<TipSnapshot> {
-  const [photos, thresholds] = await Promise.all([
-    listApprovedPhotoTipInputs(deps.db, accountId),
+  const [uploaded, thresholds] = await Promise.all([
+    listPhotoTipInputs(deps.db, accountId),
     readTipThresholds(deps.db),
   ]);
-  return { photos, thresholds };
+  const photos = uploaded.filter((photo) => photo.state === "approved");
+  return { photos, inReview: uploaded.length - photos.length, thresholds };
 }
 
 export async function readProfile(deps: CardDeps, accountId: string): Promise<ProfileResponse> {
@@ -127,16 +130,8 @@ export async function readProfile(deps: CardDeps, accountId: string): Promise<Pr
   return {
     profile: row ? toDocument(row, consent) : null,
     completeness: await completenessOf(deps, accountId, row, tipSnapshot.photos.length),
-    tip: tipFor(tipSnapshot),
+    tips: tips(tipSnapshot),
   };
-}
-
-export async function previewCard(deps: CardDeps, accountId: string): Promise<CardPreviewResponse> {
-  const { card, completeness } = await buildCard(deps, {
-    viewerAccountId: accountId,
-    subjectAccountId: accountId,
-  });
-  return { card, completeness };
 }
 
 export async function saveProfile(
@@ -192,7 +187,7 @@ export async function saveProfile(
   return {
     profile: toDocument(row, consent),
     completeness: completenessNow,
-    tip: tipFor(tipSnapshot),
+    tips: tips(tipSnapshot),
   };
 }
 

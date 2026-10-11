@@ -51,7 +51,7 @@ function fakeApi(profile: Profile | null = null) {
         }
       : null,
     completeness: { complete: false, missing: ["photos"] },
-    tip: null,
+    tips: [],
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);

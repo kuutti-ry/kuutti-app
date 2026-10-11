@@ -94,7 +94,7 @@ describe("profile routes", () => {
       missing: ["display_name", "photos", "bio_or_prompts", "seeks", "age_window"],
     });
     // Photos are missing; a tip would say it twice.
-    expect(body.tip).toBeNull();
+    expect(body.tips).toEqual([]);
   });
 
   test("PUT /profile saves the whole document and answers it back with its completeness", async ({
@@ -115,7 +115,7 @@ describe("profile routes", () => {
     });
     // Two prompts stand in for the bio; photos and onboarding are still missing.
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
-    expect(body.tip).toBeNull();
+    expect(body.tips).toEqual([]);
     const again = await put(app, a.headers, { ...update, displayName: "Aino V.", prompts: [] });
     expect(ProfileResponse.parse(await again.json()).profile?.displayName).toBe("Aino V.");
     const { rows } = await ctx.client.query<{ n: string }>(
@@ -415,12 +415,12 @@ describe("profile routes", () => {
     const two = await preview();
     expect(two.card?.photos).toHaveLength(2);
     expect(two.completeness.missing).toEqual(["seeks", "age_window"]);
-    expect((await profile()).tip).toBe("few_photos");
+    expect((await profile()).tips).toEqual(["few_photos"]);
     // A third clears it.
     await approvedPhotos(ctx, app, a.headers, 1);
     const three = await preview();
     expect(three.card?.photos).toHaveLength(3);
-    expect((await profile()).tip).toBeNull();
+    expect((await profile()).tips).toEqual([]);
     // A preview records nothing.
     const { rows } = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = $1", [
       a.accountId,
@@ -444,7 +444,7 @@ describe("profile routes", () => {
     const body = ProfileResponse.parse(
       await (await app.request("/profile", { headers: a.headers })).json(),
     );
-    expect(body.tip).toBe("sunglasses");
+    expect(body.tips).toEqual(["sunglasses", "few_photos"]);
   });
 
   test("the card for another viewer: a complete subject is served and recorded, an incomplete or deleted one is not, and the day has a budget", async ({

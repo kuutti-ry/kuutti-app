@@ -54,6 +54,13 @@ function RowGroup({ rows }: { rows: readonly Row[] }) {
 }
 
 /**
+ * Tips dismissed in this run of the app (#56): kept outside the screen, so
+ * leaving the profile and coming back does not bring one back. Nothing is
+ * stored; the next start shows them again.
+ */
+const dismissedTips = new Set<TipKind>();
+
+/**
  * The profile as a list (#227, ADR-009, ADR-019): what the card still needs,
  * then one advisory photo tip (#56), then the sections, each its own screen
  * that saves on leaving, then the card preview, the later questions (#148)
@@ -67,9 +74,8 @@ export function ProfileScreen() {
   const tap = useHapticTap();
   const profile = useProfile();
   const { reload } = profile;
-  // Tip kind dismissed this session (#56); no server store. The API sends one
-  // tip at a time, so dismiss hides it until a different kind arrives.
-  const [dismissedTip, setDismissedTip] = useState<TipKind | null>(null);
+  // Renders again after a dismissal; the kinds themselves are in dismissedTips.
+  const [, setDismissals] = useState(0);
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -82,7 +88,8 @@ export function ProfileScreen() {
     tap();
     router.push(path);
   };
-  const tip = profile.tip && profile.tip !== dismissedTip ? profile.tip : null;
+  // One at a time (#56): the first that applies and was not dismissed.
+  const tip = profile.tips.find((kind) => !dismissedTips.has(kind)) ?? null;
 
   if (profile.status === "loading") {
     return (
@@ -155,7 +162,8 @@ export function ProfileScreen() {
                 variant="outline"
                 onPress={() => {
                   tap();
-                  setDismissedTip(tip);
+                  dismissedTips.add(tip);
+                  setDismissals((n) => n + 1);
                 }}
               >
                 {t("profile.tip.dismiss")}

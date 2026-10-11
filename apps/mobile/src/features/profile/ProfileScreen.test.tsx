@@ -23,9 +23,9 @@ const json = (body: unknown, status = 200) =>
 
 /**
  * GET /profile answering each read with the next list of what is missing, the
- * last one again after that. `tip` is the advisory kind of #56 (null by default).
+ * last one again after that. `tips` are the advisory kinds of #56 (none by default).
  */
-function fakeApi(missingByRead: string[][], tip: string | null = null) {
+function fakeApi(missingByRead: string[][], tips: string[] = []) {
   let reads = 0;
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -36,7 +36,7 @@ function fakeApi(missingByRead: string[][], tip: string | null = null) {
       return json({
         profile: null,
         completeness: { complete: missing.length === 0, missing },
-        tip,
+        tips,
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
@@ -87,16 +87,24 @@ describe("ProfileScreen", () => {
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
   });
 
-  it("shows one tip under the completeness card and dismisses it for the session", async () => {
-    fakeApi([[]], "sunglasses");
+  it("shows one tip at a time; a dismissed one gives way to the next and stays dismissed", async () => {
+    fakeApi([[]], ["sunglasses", "few_photos"]);
     await show(<ProfileScreen />);
     await waitFor(() => expect(screen.getByText("A tip for your photos")).toBeTruthy());
     expect(screen.getByText(/without sunglasses/)).toBeTruthy();
+    expect(screen.queryByText(/fuller picture/)).toBeNull();
     expect(screen.queryAllByText(/^profile\.tip\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
     // The eleven list rows plus the tip's dismiss.
     expect(found).toHaveLength(12);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+    await press(screen.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByText(/without sunglasses/)).toBeNull();
+    expect(screen.getByText(/fuller picture/)).toBeTruthy();
+    // A profile screen opened again keeps the dismissal for this run.
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByText(/fuller picture/)).toBeTruthy());
+    expect(screen.queryByText(/without sunglasses/)).toBeNull();
     await press(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByText("A tip for your photos")).toBeNull();
   });

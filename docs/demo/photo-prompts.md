@@ -20,7 +20,7 @@ Chosen 09/10/2026.
 | `faces/mikael/1.jpg` … `4.jpg` | Mikael's camera roll: the walkthrough in Swedish | 4 | a man of 56, Swedish-speaking |
 | `faces/sanna/1.jpg` … `5.jpg` | Sanna's profile (complete) | 5 | a woman of 49, an architect who birdwatches |
 | `faces/onni/1.jpg` … `8.jpg` | Onni's camera roll, for a demo that onboards him | 8 | a man of 26 |
-| `faces/noa/1.jpg` … `2.jpg` | Noa's profile (incomplete: two of three) | 2 | a non-binary person of 43, a doctoral researcher who climbs |
+| `faces/noa/1.jpg` … `2.jpg` | Noa's profile (incomplete: the second face waits in review) | 2 | a non-binary person of 43, a doctoral researcher who climbs |
 | `faces/kerttu/1.jpg` … `4.jpg` | Kerttu's profile | 4 | a woman of 46, Swedish-speaking, by the sea with a book and coffee |
 | `faces/tapio/1.jpg` … `3.jpg` | nothing today: Tapio is banned and refused at login, and his story uploads nothing; the set lets a later story give him a profile without a new release | 3 | a man of 56 |
 | `faces/ilona/1.jpg` … `3.jpg` | nothing today: Ilona deleted her account and is refused at login; the same reason | 3 | a woman of 56 |

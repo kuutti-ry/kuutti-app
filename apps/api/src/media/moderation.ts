@@ -54,8 +54,12 @@ export const FACE_THRESHOLD_KEY = "photo_moderation_face_threshold";
 export const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
 const REKOGNITION_MIN_CONFIDENCE = 30;
-/** Scene labels tips care about; DetectLabels is filtered to these. */
-const SCENE_TIP_LABELS = ["Mirror", "Bathroom", "Sunglasses"] as const;
+/**
+ * Scene labels tips care about; DetectLabels is filtered to these. Sunglasses
+ * come from the face (DetectFaces), not the scene: a pair on the head or in a
+ * hand covers no eyes.
+ */
+const SCENE_TIP_LABELS = ["Mirror", "Bathroom"] as const;
 export const NOT_CHECKED = "not_checked";
 export const NO_FACE = "no_face";
 
@@ -97,7 +101,9 @@ export function tipLabelsFrom(
       out.push(asLabel("Sunglasses", "Face", largest.Sunglasses.Confidence ?? 0));
     }
     // Face area as a fraction × 100 when known; matching_config is the tip threshold (#56).
-    if (largestArea > 0) out.push(asLabel("TightCrop", "Face", largestArea * 100));
+    // A box can reach past the frame (a face closer than the crop): capped at
+    // the whole frame, so the value stays within a label's 0 to 100.
+    if (largestArea > 0) out.push(asLabel("TightCrop", "Face", Math.min(largestArea, 1) * 100));
     if (largest.Quality?.Brightness != null) {
       out.push(asLabel("Brightness", "Face", largest.Quality.Brightness));
     }
@@ -161,16 +167,21 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
         client.send(
           new DetectFacesCommand({ Image: image, Attributes: ["DEFAULT", "SUNGLASSES"] }),
         ),
-        client.send(
-          new DetectLabelsCommand({
-            Image: image,
-            MinConfidence: REKOGNITION_MIN_CONFIDENCE,
-            Features: ["GENERAL_LABELS"],
-            Settings: {
-              GeneralLabels: { LabelInclusionFilters: [...SCENE_TIP_LABELS] },
-            },
-          }),
-        ),
+        // Advice only (#56): a failed scene call leaves the tips without the
+        // scene and never holds the moderation decision; the log line then
+        // counts two calls.
+        client
+          .send(
+            new DetectLabelsCommand({
+              Image: image,
+              MinConfidence: REKOGNITION_MIN_CONFIDENCE,
+              Features: ["GENERAL_LABELS"],
+              Settings: {
+                GeneralLabels: { LabelInclusionFilters: [...SCENE_TIP_LABELS] },
+              },
+            }),
+          )
+          .catch(() => null),
       ]);
       const faceDetails = faces.FaceDetails ?? [];
       const labels: ModerationLabel[] = (moderation.ModerationLabels ?? [])
@@ -180,10 +191,10 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
       return {
         checked: true,
         labels,
-        tipLabels: tipLabelsFrom(scene.Labels ?? [], faceDetails),
+        tipLabels: tipLabelsFrom(scene?.Labels ?? [], faceDetails),
         faceConfidences: faceDetails.map((face) => face.Confidence ?? 0),
         modelVersion: moderation.ModerationModelVersion ?? null,
-        calls: 3,
+        calls: scene ? 3 : 2,
       };
     },
   };

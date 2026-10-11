@@ -61,6 +61,7 @@ describe("seed", () => {
           photo_tip_brightness_below: 40,
           photo_tip_sharpness_below: 20,
           photo_tip_group_photo_min_faces: 2,
+          photo_tip_photos_suggested: 3,
           exposure_cards_per_day: 60,
           photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
           waitlist_k: 10,

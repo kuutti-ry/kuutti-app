@@ -37,7 +37,7 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
  * The person's profile as a draft they edit and save whole (#47): the API
  * stores the document, answers it back with what is still missing, and the
  * screen shows both. A prompt without an answer yet is kept in the draft and
- * left out of the save. The tip of #56 rides along and refreshes with each
+ * left out of the save. The tips of #56 ride along and refresh with each
  * read (the list of #227 reloads after a section or photos change).
  */
 export function useProfile() {
@@ -46,7 +46,7 @@ export function useProfile() {
   /** The document as the API last gave it, in the draft's shape. */
   const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
   const [completeness, setCompleteness] = useState<Completeness | null>(null);
-  const [tip, setTip] = useState<TipKind | null>(null);
+  const [tips, setTips] = useState<readonly TipKind[]>([]);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
@@ -69,7 +69,7 @@ export function useProfile() {
       setDraft(document);
       setSaved(document);
       setCompleteness(response.completeness);
-      setTip(response.tip);
+      setTips(response.tips);
       setStatus("ready");
     } catch {
       if (mounted.current) setStatus((was) => (was === "ready" ? was : "error"));
@@ -108,7 +108,7 @@ export function useProfile() {
         setDraft((current) => (current === submitted ? document : current));
       }
       setCompleteness(response.completeness);
-      setTip(response.tip);
+      setTips(response.tips);
       return true;
     } catch (error) {
       if (mounted.current) {
@@ -128,7 +128,7 @@ export function useProfile() {
     draft,
     saved,
     completeness,
-    tip,
+    tips,
     saving,
     notice,
     dirty,

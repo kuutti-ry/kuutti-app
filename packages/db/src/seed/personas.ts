@@ -119,7 +119,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1983, month: 8, day: 3 },
     individual: 925,
     group: "history",
-    note: "Onboarded, with a profile; two photos and the four pictures the check refuses, so the profile says what is missing and the queue has work.",
+    note: "Onboarded, with a profile; two photos, the second still in review, and the four pictures the check refuses, so the profile says what is missing and the queue has work.",
     bank: { name: "Nordea", user: "DEMOUSER3" },
   },
   {

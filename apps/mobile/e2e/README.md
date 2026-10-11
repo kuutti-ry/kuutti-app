@@ -44,7 +44,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `deal-breakers-own-answer` | Noa | only on what she answered; Answer it opens the field |
 | `deal-breaker-paused` | Sanna | her own answer taken back pauses it in words; answering lifts it |
 | `card` | Sanna | photo, name, verified age, the information fields, nothing soft |
-| `photos-gate-and-hidden-field` | Noa | two approved photos: the gate and the profile wait; the hidden field leaves the card |
+| `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the gate and the profile wait; the hidden field leaves the card |
 | `photos-screen` | Sanna | states and moves in words; full size and back; removal asked |
 | `profile-sections` | Sanna | the list of sections; an answer saved by going back, on the card, and off again (#227) |
 | `profile-contact-details` | Sanna | a phone number in the bio refused on leaving the basics, with the reason |

@@ -128,7 +128,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       ? { ...server.profile, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" }
       : null,
     completeness: { complete: false, missing: [] },
-    tip: null,
+    tips: [],
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -265,7 +265,7 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Oldest, one year older" }));
     await press(screen.getByRole("button", { name: "Continue" }));
     await flush();
-    await waitFor(() => expect(screen.getByText("Three photos of you")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
     expect(server.seeks).toEqual(["man", "non_binary"]);
     expect(server.ageWindow).toEqual({ min: 30, max: 42 });
     checkA11y();
@@ -459,7 +459,7 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Anyone" }));
     await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
     await press(screen.getByRole("button", { name: "Continue" }));
-    await waitFor(() => expect(screen.getByText("Three photos of you")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
     expect(screen.queryByText("What ages?")).toBeNull();
     expect(server.seeks).toEqual(["woman", "man", "non_binary"]);
     expect(server.ageWindow).toEqual({ min: 35, max: 50 });

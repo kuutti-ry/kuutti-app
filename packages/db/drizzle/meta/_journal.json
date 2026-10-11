@@ -204,6 +204,13 @@
       "when": 1791706131298,
       "tag": "0028_photo_tip_thresholds",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791724372759,
+      "tag": "0029_photo_tip_photos_suggested",
+      "breakpoints": true
     }
   ]
 }

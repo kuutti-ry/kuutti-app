@@ -21,8 +21,6 @@ export const PROMPTS_MAX = 3;
 export const PROMPTS_FOR_COMPLETENESS = 2;
 /** Approved photos a profile needs before it is complete (#47; two since #56). */
 export const PHOTOS_FOR_COMPLETENESS = 2;
-/** A profile with enough photos to be complete, but fewer than this, gets the tip to add one (#56). */
-export const PHOTOS_SUGGESTED = 3;
 
 /** The prompts a person may answer; texts are i18n keys profile.prompt.<key>. */
 export const PROMPT_KEYS = [
@@ -138,8 +136,8 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
-    /** The highest-priority tip, or null when none applies. */
-    tip: TipKind.nullable(),
+    /** The tips that apply, highest priority first; the app shows one at a time. */
+    tips: z.array(TipKind),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;

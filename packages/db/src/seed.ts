@@ -56,6 +56,7 @@ export const MATCHING_CONFIG_V1 = {
   photo_tip_brightness_below: 40,
   photo_tip_sharpness_below: 20,
   photo_tip_group_photo_min_faces: 2,
+  photo_tip_photos_suggested: 3,
   // #52 (TD-6, ADR-008): the exposure budget. Cards an account may be served
   // per day (the card route of #47 counts against it; a round of 12 and up to
   // 10 pending likes fit several times over) and signed photo URLs per

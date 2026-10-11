@@ -8,7 +8,7 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 
 1. `pnpm env:up`: the database, the S3 stand-in, the mock bank, the API, Metro.
 2. `pnpm demo:assets`: the release of pictures into `~/.cache/kuutti-demo-photos/v1`, verified. Without it nobody has a photo and the storyboard's photo scenes do not work.
-3. `pnpm demo:reset`: everybody forgotten through the erasure path, then the six stories through the API's own routes, with their pictures (Sanna 5, Noa 2 + the queue's 4, Kerttu 4; the faces approved locally, the negatives queued), then the counter and the gates counted.
+3. `pnpm demo:reset`: everybody forgotten through the erasure path, then the six stories through the API's own routes, with their pictures (Sanna 5, Noa 2 + the queue's 4, Kerttu 4; the faces approved locally but Noa's second, the negatives queued), then the counter and the gates counted.
 4. `pnpm demo:population -- --photos`: three hundred people in the one pond, with faces of the pool by seed; the counter and the gates counted anew.
 5. Aino's camera roll: `xcrun simctl addmedia booted ~/.cache/kuutti-demo-photos/v1/faces/aino/*.jpg` (the simulator must be booted). On a device, AirDrop the five files.
 6. `pnpm dev:mobile` and open the dev client on the simulator; the tech config screen (the wrench on the home screen) shows the API it talks to.
@@ -33,7 +33,7 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 | the build | the dev client opens Metro | the tech config screen: channel `staging`, the API above, the runtime's fingerprint matches the installed build |
 | the counter | `curl -s localhost:3000/waitlist`: Pääkaupunkiseutu with a total and a split | the same against staging |
 | the gate | sign in as Sanna: "Matching is open for you." | the same, through Nordea `DEMOUSER4` |
-| the queue | the panel lists Noa's three negatives | the same |
+| the queue | the panel lists Noa's negatives and her second face | Noa's negatives (the check approves her faces) |
 | the refusals | Tapio refused as banned, Ilona with the date | the same, through OP and Aktia |
 | the camera roll | the five pictures are there | the same |
 | the clock | the gate was counted after the population was written (the reset and the population both count); the nightly count runs at 04:00 Helsinki | the same |

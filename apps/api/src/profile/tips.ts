@@ -1,19 +1,19 @@
-import { PHOTOS_FOR_COMPLETENESS, PHOTOS_SUGGESTED, type TipKind } from "@kuutti/schema";
+import { PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
 
 /**
  * Advisory tips for the profile owner (#56). Pure: callers gather photos,
- * their photo_review signals, and the matching_config thresholds. One tip at
- * a time on the wire (the first of `tips()`); never changes completeness,
- * moderation, or matching eligibility.
+ * their photo_review signals, and the matching_config thresholds. Every tip
+ * that applies goes on the wire, highest priority first, and the app shows one
+ * at a time; never changes completeness, moderation, or matching eligibility.
  *
  * A tip is advice on top of a rule that already holds. What completeness asks
  * for is not said twice: too few photos to be complete is
- * `completeness.missing`, and only a profile with enough of them is told that
- * one more would help. Label tips fire only when every approved photo fails
+ * `completeness.missing`, and only a profile with enough of them, and none
+ * waiting in review, is told that more would help. Label tips fire only when every approved photo fails
  * that check (collection-wide), so one good photo clears the kind.
  */
 
-/** matching_config keys the tips rule reads; values live in the seed / migration 0028. */
+/** matching_config keys the tips rule reads; values live in the seed / migrations 0028 and 0029. */
 export const TIP_THRESHOLD_KEYS = {
   mirrorConfidenceMin: "photo_tip_mirror_confidence_min",
   bathroomConfidenceMin: "photo_tip_bathroom_confidence_min",
@@ -22,6 +22,7 @@ export const TIP_THRESHOLD_KEYS = {
   brightnessBelow: "photo_tip_brightness_below",
   sharpnessBelow: "photo_tip_sharpness_below",
   groupPhotoMinFaces: "photo_tip_group_photo_min_faces",
+  photosSuggested: "photo_tip_photos_suggested",
 } as const;
 
 export type TipThresholds = {
@@ -33,6 +34,8 @@ export type TipThresholds = {
   brightnessBelow: number;
   sharpnessBelow: number;
   groupPhotoMinFaces: number;
+  /** Photos, approved or in review, below which a complete profile hears that more would help. */
+  photosSuggested: number;
 };
 
 export type TipPhoto = {
@@ -41,7 +44,10 @@ export type TipPhoto = {
 };
 
 export type TipSnapshot = {
+  /** The approved photos; only these carry signals a tip reads. */
   photos: readonly TipPhoto[];
+  /** Photos uploaded and not decided yet (pending or queued). */
+  inReview: number;
   thresholds: TipThresholds;
 };
 
@@ -89,15 +95,12 @@ const kindApplies: Record<TipKind, (snapshot: TipSnapshot) => boolean> = {
     everyPhoto(photos, (p) => labelBelow(p, "Brightness", t.brightnessBelow)),
   blurry: ({ photos, thresholds: t }) =>
     everyPhoto(photos, (p) => labelBelow(p, "Sharpness", t.sharpnessBelow)),
-  few_photos: ({ photos }) =>
-    photos.length >= PHOTOS_FOR_COMPLETENESS && photos.length < PHOTOS_SUGGESTED,
+  // A photo still in review already answers this one.
+  few_photos: ({ photos, inReview, thresholds: t }) =>
+    photos.length >= PHOTOS_FOR_COMPLETENESS && photos.length + inReview < t.photosSuggested,
 };
 
+/** Every tip that applies, highest priority first. */
 export function tips(snapshot: TipSnapshot): TipKind[] {
   return TIP_KIND_ORDER.filter((kind) => kindApplies[kind](snapshot));
-}
-
-/** Highest-priority tip, or null when none applies. */
-export function tipFor(snapshot: TipSnapshot): TipKind | null {
-  return tips(snapshot)[0] ?? null;
 }

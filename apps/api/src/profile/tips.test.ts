@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { type TipPhoto, type TipThresholds, tipFor, tips } from "./tips.ts";
+import { type TipPhoto, type TipThresholds, tips } from "./tips.ts";
 
-/** Seed / migration 0028 defaults. */
+/** Seed / migrations 0028 and 0029 defaults. */
 const thresholds: TipThresholds = {
   mirrorConfidenceMin: 50,
   bathroomConfidenceMin: 50,
@@ -10,6 +10,7 @@ const thresholds: TipThresholds = {
   brightnessBelow: 40,
   sharpnessBelow: 20,
   groupPhotoMinFaces: 2,
+  photosSuggested: 3,
 };
 
 const label = (name: string, confidence: number) => ({ name, confidence });
@@ -19,17 +20,21 @@ const photo = (labels: TipPhoto["labels"] = [], faces = 1): TipPhoto => ({
   faces,
 });
 
-const snapshot = (photos: TipPhoto[]) => ({ photos, thresholds });
+const snapshot = (photos: TipPhoto[], inReview = 0) => ({ photos, inReview, thresholds });
 
 describe("the tips rule", () => {
   it.each([
     // Below what completeness asks for, `missing` says it; a tip would say it twice.
-    ["no photos", [], null],
-    ["one photo, no signals", [photo()], null],
-    ["two photos, enough to be complete", [photo(), photo()], "few_photos"],
-    ["three photos, no signals", [photo(), photo(), photo()], null],
-  ] as const)("%s", (_name, photos, tip) => {
-    expect(tipFor(snapshot([...photos]))).toBe(tip);
+    ["no photos", [], []],
+    ["one photo, no signals", [photo()], []],
+    ["two photos, enough to be complete", [photo(), photo()], ["few_photos"]],
+    ["three photos, no signals", [photo(), photo(), photo()], []],
+  ] as const)("%s", (_name, photos, expected) => {
+    expect(tips(snapshot([...photos]))).toEqual([...expected]);
+  });
+
+  it("does not ask for more photos while one is in review", () => {
+    expect(tips(snapshot([photo(), photo()], 1))).toEqual([]);
   });
 
   it("fires a label tip only when every approved photo fails that check", () => {
@@ -72,7 +77,6 @@ describe("the tips rule", () => {
       "blurry",
       "few_photos",
     ]);
-    expect(tipFor(snapshot(bad))).toBe("sunglasses");
   });
 
   it.each([
