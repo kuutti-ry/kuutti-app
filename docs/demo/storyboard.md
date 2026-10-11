@@ -43,7 +43,7 @@ Show "Fill in the rest while you wait" for one field and skip it; show "Your dea
 Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button; on staging Nordea `DEMOUSER4`). Her story is complete: a profile, five approved photos, the gate open.
 
 - Home: "Matching is open for you."
-- "Your profile" → "See your card": the card as others see it (#150): the first photo, "Sanna", "49, age verified by your bank", "Woman", the pond, one prompt answer, the other photos, the fields that are information (languages by their own names, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference.
+- "Your profile" → "See your card": the card as others see it (#150): the first photo, "Sanna", "49, age verified by your bank", "Woman", the pond, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference.
 
 ## Scene 5: The moderation queue (2 min)
 

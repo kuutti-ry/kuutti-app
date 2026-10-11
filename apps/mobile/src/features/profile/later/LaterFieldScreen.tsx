@@ -137,8 +137,8 @@ export function LaterFieldScreen({ field }: { field: string }) {
           disabled={profile.saving}
           onPress={() => {
             tap();
-            void profile.save().then((saved) => {
-              if (saved) moveOn();
+            void profile.save().then((refusal) => {
+              if (!refusal) moveOn();
             });
           }}
         >

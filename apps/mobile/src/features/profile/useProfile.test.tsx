@@ -144,11 +144,11 @@ describe("useProfile: editing and saving", () => {
         ],
       }),
     );
-    let ok: boolean | undefined;
+    let refusal: unknown;
     await act(async () => {
-      ok = await result.current.save();
+      refusal = await result.current.save();
     });
-    expect(ok).toBe(true);
+    expect(refusal).toBeNull();
     expect(saved[0]).toMatchObject({
       displayName: "Aino",
       bio: null,
@@ -174,7 +174,7 @@ describe("useProfile: editing and saving", () => {
     );
     const { result } = await ready();
     await act(async () => result.current.update({ displayName: "Aino K" }));
-    let saving: Promise<boolean> | undefined;
+    let saving: Promise<unknown> | undefined;
     await act(async () => {
       saving = result.current.save();
     });
@@ -200,14 +200,14 @@ describe("useProfile: editing and saving", () => {
     expect(result.current.saved.displayName).toBe("Aino");
   });
 
-  it("answers false and says why when the save is refused, and clears that on the next edit", async () => {
+  it("answers and says why when the save is refused, and clears that on the next edit", async () => {
     serve([() => json(stored(DOCUMENT))], [() => refusal("validation_failed", 422)]);
     const { result } = await ready();
-    let ok: boolean | undefined;
+    let answer: unknown;
     await act(async () => {
-      ok = await result.current.save();
+      answer = await result.current.save();
     });
-    expect(ok).toBe(false);
+    expect(answer).toEqual({ kind: "error", code: "validation_failed" });
     expect(result.current.notice).toEqual({ kind: "error", code: "validation_failed" });
     expect(result.current.saving).toBe(false);
     await act(async () => result.current.update({ displayName: "Aino K." }));
@@ -228,5 +228,69 @@ describe("useProfile: editing and saving", () => {
       await result.current.save();
     });
     expect(result.current.notice).toEqual({ kind: "error", code: undefined });
+  });
+});
+
+describe("useProfile: a section that has gone (#238)", () => {
+  it("puts a held draft back over the stored document, with the reason, on the first read only", async () => {
+    serve([() => json(stored(DOCUMENT))]);
+    const held = {
+      draft: { ...DOCUMENT, bio: "Call me on 040 123 4567." },
+      notice: { kind: "error", code: "text_contact_details" } as const,
+    };
+    const view = await renderHook(() => useProfile(held));
+    await waitFor(() => expect(view.result.current.status).toBe("ready"));
+    expect(view.result.current.draft.bio).toBe("Call me on 040 123 4567.");
+    expect(view.result.current.saved.bio).toBe("Long walks.");
+    expect(view.result.current.dirty).toBe(true);
+    expect(view.result.current.notice).toEqual(held.notice);
+    await act(async () => {
+      await view.result.current.reload();
+    });
+    expect(view.result.current.draft.bio).toBe("Long walks.");
+  });
+
+  it("answers a refusal to a screen that has already gone", async () => {
+    let answer: ((response: Response) => void) | undefined;
+    serve(
+      [() => json(stored(DOCUMENT))],
+      [
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      ],
+    );
+    const { result, unmount } = await ready();
+    await act(async () => result.current.update({ bio: "aino@example.com" }));
+    let saving: Promise<unknown> | undefined;
+    await act(async () => {
+      saving = result.current.save();
+    });
+    await act(async () => unmount());
+    answer?.(refusal("text_contact_details", 400));
+    expect(await saving).toEqual({ kind: "error", code: "text_contact_details" });
+  });
+
+  it("answers null to a screen that has already gone when the save is taken", async () => {
+    let answer: ((response: Response) => void) | undefined;
+    serve(
+      [() => json(stored(DOCUMENT))],
+      [
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          }),
+      ],
+    );
+    const { result, unmount } = await ready();
+    await act(async () => result.current.update({ displayName: "Aino K" }));
+    let saving: Promise<unknown> | undefined;
+    await act(async () => {
+      saving = result.current.save();
+    });
+    await act(async () => unmount());
+    answer?.(json(stored({ ...DOCUMENT, displayName: "Aino K" })));
+    expect(await saving).toBeNull();
   });
 });

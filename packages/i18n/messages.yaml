@@ -1841,241 +1841,241 @@ profile.option.zodiac.corgi:
   machine: { fi: true, sv: true }
 
 profile.option.languages.fi:
-  en: "suomi"
-  description: "Option fi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "suomi"
-  sv: "suomi"
+  en: "Finnish"
+  description: "Option fi of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Suomi"
+  sv: "Finska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.sv:
-  en: "svenska"
-  description: "Option sv of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "svenska"
-  sv: "svenska"
+  en: "Swedish"
+  description: "Option sv of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Ruotsi"
+  sv: "Svenska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.en:
   en: "English"
-  description: "Option en of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "English"
-  sv: "English"
+  description: "Option en of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Englanti"
+  sv: "Engelska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.se:
-  en: "davvisámegiella"
-  description: "Option se of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "davvisámegiella"
-  sv: "davvisámegiella"
+  en: "Northern Sami"
+  description: "Option se of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Pohjoissaame"
+  sv: "Nordsamiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.et:
-  en: "eesti"
-  description: "Option et of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "eesti"
-  sv: "eesti"
+  en: "Estonian"
+  description: "Option et of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Viro"
+  sv: "Estniska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ru:
-  en: "русский"
-  description: "Option ru of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "русский"
-  sv: "русский"
+  en: "Russian"
+  description: "Option ru of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Venäjä"
+  sv: "Ryska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.uk:
-  en: "українська"
-  description: "Option uk of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "українська"
-  sv: "українська"
+  en: "Ukrainian"
+  description: "Option uk of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Ukraina"
+  sv: "Ukrainska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ar:
-  en: "العربية"
-  description: "Option ar of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "العربية"
-  sv: "العربية"
+  en: "Arabic"
+  description: "Option ar of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Arabia"
+  sv: "Arabiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.so:
-  en: "Soomaali"
-  description: "Option so of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "Soomaali"
-  sv: "Soomaali"
+  en: "Somali"
+  description: "Option so of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Somali"
+  sv: "Somaliska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.fa:
-  en: "فارسی"
-  description: "Option fa of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "فارسی"
-  sv: "فارسی"
+  en: "Persian"
+  description: "Option fa of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Persia"
+  sv: "Persiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ku:
-  en: "Kurdî"
-  description: "Option ku of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "Kurdî"
-  sv: "Kurdî"
+  en: "Kurdish"
+  description: "Option ku of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Kurdi"
+  sv: "Kurdiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.zh:
-  en: "中文"
-  description: "Option zh of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "中文"
-  sv: "中文"
+  en: "Chinese"
+  description: "Option zh of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Kiina"
+  sv: "Kinesiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.sq:
-  en: "shqip"
-  description: "Option sq of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "shqip"
-  sv: "shqip"
+  en: "Albanian"
+  description: "Option sq of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Albania"
+  sv: "Albanska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.vi:
-  en: "Tiếng Việt"
-  description: "Option vi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "Tiếng Việt"
-  sv: "Tiếng Việt"
+  en: "Vietnamese"
+  description: "Option vi of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Vietnam"
+  sv: "Vietnamesiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.th:
-  en: "ไทย"
-  description: "Option th of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "ไทย"
-  sv: "ไทย"
+  en: "Thai"
+  description: "Option th of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Thai"
+  sv: "Thailändska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.tr:
-  en: "Türkçe"
-  description: "Option tr of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "Türkçe"
-  sv: "Türkçe"
+  en: "Turkish"
+  description: "Option tr of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Turkki"
+  sv: "Turkiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.es:
-  en: "español"
-  description: "Option es of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "español"
-  sv: "español"
+  en: "Spanish"
+  description: "Option es of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Espanja"
+  sv: "Spanska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.de:
-  en: "Deutsch"
-  description: "Option de of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "Deutsch"
-  sv: "Deutsch"
+  en: "German"
+  description: "Option de of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Saksa"
+  sv: "Tyska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.fr:
-  en: "français"
-  description: "Option fr of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "français"
-  sv: "français"
+  en: "French"
+  description: "Option fr of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Ranska"
+  sv: "Franska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.tl:
   en: "Tagalog"
-  description: "Option tl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
+  description: "Option tl of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
   fi: "Tagalog"
   sv: "Tagalog"
   machine: { fi: true, sv: true }
 
 profile.option.languages.pl:
-  en: "polski"
-  description: "Option pl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "polski"
-  sv: "polski"
+  en: "Polish"
+  description: "Option pl of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Puola"
+  sv: "Polska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.it:
-  en: "italiano"
-  description: "Option it of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "italiano"
-  sv: "italiano"
+  en: "Italian"
+  description: "Option it of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Italia"
+  sv: "Italienska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.pt:
-  en: "português"
-  description: "Option pt of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "português"
-  sv: "português"
+  en: "Portuguese"
+  description: "Option pt of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Portugali"
+  sv: "Portugisiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.hi:
-  en: "हिन्दी"
-  description: "Option hi of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "हिन्दी"
-  sv: "हिन्दी"
+  en: "Hindi"
+  description: "Option hi of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Hindi"
+  sv: "Hindi"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ne:
-  en: "नेपाली"
-  description: "Option ne of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "नेपाली"
-  sv: "नेपाली"
+  en: "Nepali"
+  description: "Option ne of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Nepali"
+  sv: "Nepali"
   machine: { fi: true, sv: true }
 
 profile.option.languages.bn:
-  en: "বাংলা"
-  description: "Option bn of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "বাংলা"
-  sv: "বাংলা"
+  en: "Bengali"
+  description: "Option bn of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Bengali"
+  sv: "Bengali"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ur:
-  en: "اردو"
-  description: "Option ur of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "اردو"
-  sv: "اردو"
+  en: "Urdu"
+  description: "Option ur of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Urdu"
+  sv: "Urdu"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ro:
-  en: "română"
-  description: "Option ro of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "română"
-  sv: "română"
+  en: "Romanian"
+  description: "Option ro of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Romania"
+  sv: "Rumänska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.hu:
-  en: "magyar"
-  description: "Option hu of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "magyar"
-  sv: "magyar"
+  en: "Hungarian"
+  description: "Option hu of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Unkari"
+  sv: "Ungerska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ja:
-  en: "日本語"
-  description: "Option ja of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "日本語"
-  sv: "日本語"
+  en: "Japanese"
+  description: "Option ja of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Japani"
+  sv: "Japanska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.lt:
-  en: "lietuvių"
-  description: "Option lt of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "lietuvių"
-  sv: "lietuvių"
+  en: "Lithuanian"
+  description: "Option lt of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Liettua"
+  sv: "Litauiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.lv:
-  en: "latviešu"
-  description: "Option lv of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "latviešu"
-  sv: "latviešu"
+  en: "Latvian"
+  description: "Option lv of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Latvia"
+  sv: "Lettiska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.nl:
-  en: "Nederlands"
-  description: "Option nl of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "Nederlands"
-  sv: "Nederlands"
+  en: "Dutch"
+  description: "Option nl of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Hollanti"
+  sv: "Nederländska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.ko:
-  en: "한국어"
-  description: "Option ko of the languages field: the language's own name, the same in every catalogue (#145, ADR-019 §3)."
-  fi: "한국어"
-  sv: "한국어"
+  en: "Korean"
+  description: "Option ko of the languages field: the language's name in the reader's language, as every option is (ADR-019 §3, amended 11/10/2026, #238)."
+  fi: "Korea"
+  sv: "Koreanska"
   machine: { fi: true, sv: true }
 
 profile.option.languages.other:

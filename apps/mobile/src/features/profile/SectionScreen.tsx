@@ -8,13 +8,8 @@ import {
   SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
-// Expo Router 57 vendors React Navigation and exposes the hook that holds a
-// native stack's swipe-back only from the vendored core: a plain beforeRemove
-// listener cannot stop a native removal (the screen leaves the stack natively
-// while JS keeps it; 09/10/2026, the simulator).
-import { usePreventRemove } from "expo-router/build/react-navigation/core";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
@@ -30,14 +25,14 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
+import { currentSession } from "@/lib/session";
 import { useHapticTap } from "@/theme/haptics";
 import { Chip, FieldEditor, SpecialCategoryNote } from "./FieldEditor";
 import { presetKey } from "./keys";
 import { PromptsEditor } from "./PromptsEditor";
-import { findSection, type SectionItem, sectionTitleKey } from "./sections";
-import { type ProfileNotice, useProfile } from "./useProfile";
+import { findSection, type SectionItem, sectionPath, sectionTitleKey } from "./sections";
+import { type HeldDraft, type ProfileNotice, useProfile } from "./useProfile";
 
-type LeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]["data"]["action"];
 type Update = (patch: Partial<ProfileUpdate>) => void;
 
 /** The API's refusals the screen has its own words for; anything else is the generic line. */
@@ -129,20 +124,30 @@ function ItemEditor({
   return <FieldEditor field={item} draft={draft} update={update} />;
 }
 
+/** Drafts the API refused after their section had gone, by section (#238). */
+const refusedDrafts = new Map<string, HeldDraft>();
+
 /**
  * One section of the profile (#227): its editors only, and no Save button.
  * Leaving (the back button, the swipe, Android's back key) saves the whole
- * document once when something changed, then goes; a refusal keeps the
- * screen, says why, and offers to stay or to leave without saving. Not a save
- * per tap: each save is a `profile_saved` research event (ADR-011), and a
- * refused bio is best said on the screen that holds it.
+ * document once when something changed. The leaving is never held up: held,
+ * the native swipe on iOS popped the screen, put it back and popped it again
+ * (#238). So the save goes as the screen goes, and a refusal brings the
+ * section back with the draft and the reason, and asks before leaving without
+ * saving. Not a save per tap: each save is a `profile_saved` research event
+ * (ADR-011), and a refused bio is best said on the screen that holds it.
  */
 export function SectionScreen({ section: id }: { section: string }) {
   const { t } = useT();
   const router = useRouter();
   const navigation = useNavigation();
   const tap = useHapticTap();
-  const profile = useProfile();
+  // Read once: a section opened again for a refused draft takes it up.
+  const [held] = useState(() => refusedDrafts.get(id));
+  useEffect(() => {
+    refusedDrafts.delete(id);
+  }, [id]);
+  const profile = useProfile(held);
   const { draft, update } = profile;
   const section = findSection(id);
   // Anything that is not a section goes to the list: a typed address, an old link.
@@ -150,18 +155,20 @@ export function SectionScreen({ section: id }: { section: string }) {
     if (!section) router.replace("/profile");
   }, [section, router]);
 
-  const [refused, setRefused] = useState<LeaveAction | null>(null);
-  const leaving = useRef(false);
-  // The action handed back remembers it was held here, so dispatching it leaves.
-  usePreventRemove(profile.dirty, ({ data }) => {
-    if (leaving.current) return;
-    leaving.current = true;
-    void profile.save().then((saved) => {
-      leaving.current = false;
-      if (saved) navigation.dispatch(data.action);
-      else setRefused(data.action);
+  const [asking, setAsking] = useState(held !== undefined);
+  // Once per screen: saved on the way out, or let go unsaved on the word.
+  const left = useRef(false);
+  const onLeave = useEffectEvent(() => {
+    if (left.current || !section || !profile.dirty) return;
+    left.current = true;
+    void profile.save().then((notice) => {
+      // A session that ended has taken the person to the sign-in, and the draft with it.
+      if (!notice || !currentSession()) return;
+      refusedDrafts.set(id, { draft, notice });
+      router.push(sectionPath(section.id));
     });
   });
+  useEffect(() => navigation.addListener("beforeRemove", () => onLeave()), [navigation]);
 
   if (!section) return null;
   const firstSpecial = section.items.find((item) =>
@@ -199,7 +206,6 @@ export function SectionScreen({ section: id }: { section: string }) {
             variant="ghost"
             size="icon"
             accessibilityLabel={t("profile.section.back")}
-            disabled={profile.saving}
             onPress={() => {
               tap();
               router.back();
@@ -211,7 +217,6 @@ export function SectionScreen({ section: id }: { section: string }) {
             {t(sectionTitleKey(section.id))}
           </Text>
         </View>
-        {profile.saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
         {profile.notice?.kind === "error" && (
           <Text accessibilityLiveRegion="assertive">{errorText(profile.notice, t)}</Text>
         )}
@@ -226,22 +231,22 @@ export function SectionScreen({ section: id }: { section: string }) {
         ))}
       </ScrollView>
 
-      <Dialog open={refused !== null} onOpenChange={(open) => !open && setRefused(null)}>
+      <Dialog open={asking} onOpenChange={setAsking}>
         <DialogContent closeLabel={t("profile.discard.close")}>
           <DialogHeader>
             <DialogTitle>{t("profile.discard.title")}</DialogTitle>
             <DialogDescription>{errorText(profile.notice, t)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onPress={() => setRefused(null)}>
+            <Button variant="outline" onPress={() => setAsking(false)}>
               {t("profile.discard.keep")}
             </Button>
             <Button
               variant="destructive"
               onPress={() => {
-                const action = refused;
-                setRefused(null);
-                if (action) navigation.dispatch(action);
+                left.current = true;
+                setAsking(false);
+                router.back();
               }}
             >
               {t("profile.discard.leave")}

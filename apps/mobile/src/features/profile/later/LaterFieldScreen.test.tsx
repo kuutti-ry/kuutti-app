@@ -167,10 +167,10 @@ describe("LaterFieldScreen", () => {
   it("searches a long list, and shows the hobbies in their groups", async () => {
     fakeApi(named({}));
     await show(<LaterFieldScreen field="languages" />);
-    await waitFor(() => expect(screen.getByText("suomi")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Finnish")).toBeTruthy());
     expect(screen.getByText("English")).toBeTruthy();
-    await type(screen.getByLabelText("Search"), "suo");
-    expect(screen.getByText("suomi")).toBeTruthy();
+    await type(screen.getByLabelText("Search"), "fin");
+    expect(screen.getByText("Finnish")).toBeTruthy();
     expect(screen.queryByText("English")).toBeNull();
   });
 

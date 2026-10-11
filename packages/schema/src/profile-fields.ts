@@ -77,9 +77,9 @@ const integer = (min: number, max: number, r: Roles) => ({
 const flag = (r: Roles) => ({ kind: "flag" as const, ...roles(r), schema: z.boolean() });
 
 /**
- * Languages by ISO 639-1 code, the texts endonyms in every catalogue (suomi,
- * svenska, English): a language is not a country and no flag stands for one
- * (ADR-019 §3). The first three are pinned in the picker; the rest is the
+ * Languages by ISO 639-1 code, named in the reader's language like every
+ * other option (Finnish, suomi, finska; ADR-019 §3 as amended by #238): a
+ * language is not a country and no flag stands for one. The first three are pinned in the picker; the rest is the
  * languages spoken most in Finland, searchable, with "other" for the rest.
  */
 const LANGUAGES = [

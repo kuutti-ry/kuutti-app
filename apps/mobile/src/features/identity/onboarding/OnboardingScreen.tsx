@@ -545,6 +545,7 @@ export function OnboardingScreen() {
             <Text>{t("onboarding.age.explain", { min: AGE_MIN, max: AGE_MAX })}</Text>
             <View className="flex-row gap-3">
               <Stepper
+                className="flex-1"
                 label={t("onboarding.age.youngest")}
                 value={ages.min}
                 shown={t("onboarding.age.years", { years: ages.min })}
@@ -555,6 +556,7 @@ export function OnboardingScreen() {
                 onChange={(min) => setAges({ ...ages, min })}
               />
               <Stepper
+                className="flex-1"
                 label={t("onboarding.age.oldest")}
                 value={ages.max}
                 shown={t("onboarding.age.years", { years: ages.max })}

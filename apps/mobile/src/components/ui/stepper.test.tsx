@@ -54,4 +54,19 @@ describe("Stepper", () => {
     await fireEvent.press(up);
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  // The class of the stepper's own root, found by the classes it always has.
+  const rootClass = () =>
+    JSON.stringify(screen.toJSON()).match(/"className":"([^"]*\bitems-center gap-1\b[^"]*)"/)?.[1];
+
+  it("takes no flex of its own, so a column cannot shrink it under what follows (#238)", async () => {
+    await show();
+    expect(rootClass()).toBeDefined();
+    expect(rootClass()).not.toMatch(/\bflex-1\b/);
+  });
+
+  it("takes the flex a row gives it", async () => {
+    await show({ className: "flex-1" });
+    expect(rootClass()).toMatch(/\bflex-1\b/);
+  });
 });

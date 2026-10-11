@@ -182,14 +182,14 @@ describe("DealBreakersScreen", () => {
     await show(<DealBreakersScreen />);
     await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
     await press(screen.getByLabelText("Deal-breaker: Languages"));
-    expect(screen.getByRole("button", { name: "suomi" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Finnish" })).toBeTruthy();
     await act(async () => {
-      fireEvent.changeText(screen.getByLabelText("Search"), " DEUT ");
+      fireEvent.changeText(screen.getByLabelText("Search"), " GERM ");
       await settle();
     });
-    expect(screen.getByRole("button", { name: "Deutsch" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "suomi" })).toBeNull();
-    expect(screen.getByLabelText("Search").props.value).toBe(" DEUT ");
+    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Finnish" })).toBeNull();
+    expect(screen.getByLabelText("Search").props.value).toBe(" GERM ");
   });
 
   it("takes an accepted answer back, and switches a deal-breaker off again", async () => {

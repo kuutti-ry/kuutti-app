@@ -5,6 +5,9 @@ import { fetchProfile, saveProfile } from "./client";
 
 export type ProfileNotice = { kind: "error"; code: string | undefined } | null;
 
+/** A draft the API refused after its screen had gone, and why (#238): a screen opened with it resumes there. */
+export type HeldDraft = { draft: ProfileUpdate; notice: NonNullable<ProfileNotice> };
+
 export const EMPTY_PROFILE: ProfileUpdate = {
   displayName: "",
   bio: null,
@@ -38,9 +41,11 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
  * stores the document, answers it back with what is still missing, and the
  * screen shows both. A prompt without an answer yet is kept in the draft and
  * left out of the save. The tips of #56 ride along and refresh with each
- * read (the list of #227 reloads after a section or photos change).
+ * read (the list of #227 reloads after a section or photos change). Given a
+ * held draft, the first read puts it back over the stored document, with the
+ * reason it was refused.
  */
-export function useProfile() {
+export function useProfile(held?: HeldDraft) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [draft, setDraft] = useState<ProfileUpdate>(EMPTY_PROFILE);
   /** The document as the API last gave it, in the draft's shape. */
@@ -50,6 +55,7 @@ export function useProfile() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
+  const resume = useRef(held);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -66,8 +72,11 @@ export function useProfile() {
       const response = await fetchProfile();
       if (!mounted.current) return;
       const document = response.profile ? toUpdate(response.profile) : EMPTY_PROFILE;
-      setDraft(document);
+      const resumed = resume.current;
+      resume.current = undefined;
+      setDraft(resumed?.draft ?? document);
       setSaved(document);
+      if (resumed) setNotice(resumed.notice);
       setCompleteness(response.completeness);
       setTips(response.tips);
       setStatus("ready");
@@ -84,8 +93,12 @@ export function useProfile() {
     setDraft((previous) => ({ ...previous, ...patch }));
   }, []);
 
-  /** Saves the draft; true when the API took it, false when it refused or failed (the notice says why). */
-  const save = useCallback(async (): Promise<boolean> => {
+  /**
+   * Saves the draft; null when the API took it, else why not, which the notice
+   * also says while the screen is there. A screen already gone gets the answer
+   * all the same (#238).
+   */
+  const save = useCallback(async (): Promise<ProfileNotice> => {
     setSaving(true);
     setNotice(null);
     const submitted = draft;
@@ -98,7 +111,7 @@ export function useProfile() {
           .filter((p) => p.answer.trim().length > 0)
           .map((p) => ({ key: p.key, answer: p.answer.trim() })),
       });
-      if (!mounted.current) return true;
+      if (!mounted.current) return null;
       // The stored document replaces the draft only if nothing was typed while
       // the save was in flight; otherwise those keystrokes would vanish.
       const stored = response.profile;
@@ -109,12 +122,14 @@ export function useProfile() {
       }
       setCompleteness(response.completeness);
       setTips(response.tips);
-      return true;
+      return null;
     } catch (error) {
-      if (mounted.current) {
-        setNotice({ kind: "error", code: error instanceof ApiError ? error.code : undefined });
-      }
-      return false;
+      const refusal = {
+        kind: "error",
+        code: error instanceof ApiError ? error.code : undefined,
+      } as const;
+      if (mounted.current) setNotice(refusal);
+      return refusal;
     } finally {
       if (mounted.current) setSaving(false);
     }

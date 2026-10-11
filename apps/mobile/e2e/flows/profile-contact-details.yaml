@@ -1,7 +1,8 @@
 # The text rule (#47, TD-6): contact details come after a match, so a bio with
 # a phone number is refused with the reason, and nothing is stored. The basics
-# save on leaving (#227): the refusal keeps the screen and asks, with the
-# reason, before leaving without saving. Sanna's bio is untouched afterwards.
+# save on leaving (#227), and the leaving is not held (#238): the refusal brings
+# the screen back with the draft and asks, with the reason, before leaving
+# without saving. Sanna's bio is untouched afterwards.
 appId: fi.kuutti.app
 name: A phone number in the bio is refused on leaving with the reason, and the stored bio stays
 ---

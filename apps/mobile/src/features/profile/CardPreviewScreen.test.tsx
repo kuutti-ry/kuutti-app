@@ -112,8 +112,8 @@ describe("CardPreviewScreen", () => {
     expect(screen.getByText("Non-binary")).toBeTruthy();
     expect(screen.getByText("Genderfluid")).toBeTruthy();
     expect(screen.getByText("Espoo")).toBeTruthy();
-    // Languages by their own names, the same in every catalogue (ADR-019 §3); what both answered said in words.
-    expect(screen.getByText("suomi, English (you too)")).toBeTruthy();
+    // Languages in the reader's language, as every option (ADR-019 §3, #238); what both answered said in words.
+    expect(screen.getByText("Finnish, English (you too)")).toBeTruthy();
     expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
     expect(screen.getByText("Something long-term")).toBeTruthy();
     expect(screen.getByText("Architect")).toBeTruthy();
