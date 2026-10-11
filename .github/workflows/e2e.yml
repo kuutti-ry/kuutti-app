@@ -3,10 +3,10 @@ name: E2E
 # The Maestro flows of apps/mobile/e2e on an Android emulator against the local
 # stack, the way a developer runs them on the iOS simulator (ADR-020 §4, #164):
 # Postgres, the S3 stand-in and the mock bank from docker compose, the API from
-# source, the dev client built here, Metro serving the bundle. The emulator
-# reaches them on its own 127.0.0.1 through adb reverse, so nothing in the
-# flows or the app names another host. The flows' order does not matter (the
-# README's table).
+# source, the dev client built here (or restored by its fingerprint), Metro
+# serving the bundle. The emulator reaches them on its own 127.0.0.1 through
+# adb reverse, so nothing in the flows or the app names another host. The
+# flows' order does not matter (the README's table).
 #
 # When (ADR-020 §6): a run costs close to an hour, about 13 minutes for the dev
 # client and 1.4 a flow (11/10/2026), so every push to main, a pull request that
@@ -66,14 +66,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/pnpm
 
-      # Gradle's caches keyed on the lockfile: android/ is generated later, by
-      # prebuild, from what the lockfile installs.
+      # Java for Maestro, and for Gradle when the dev client is built. No Gradle
+      # cache: the dev client is cached whole below, and a Gradle cache would be
+      # restored on every run for the few that build.
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
           java-version: "17"
-          cache: gradle
-          cache-dependency-path: pnpm-lock.yaml
 
       - name: The emulator may use KVM
         run: |
@@ -133,12 +132,43 @@ jobs:
       - name: The cast's stories
         run: pnpm demo:reset
 
+      # The dev client holds only the native side, which its fingerprint names
+      # (the one preview.yml and eas-build.yml compare; the commit in `extra`
+      # is left out, and Metro serves the config anyway). A pull request that
+      # leaves the native side alone restores main's in seconds; one that
+      # changes it builds once, and its later pushes restore that. The key's
+      # tail names how it is built, so a change of the build changes the key.
+      # Saved as soon as it is built, so a red run still leaves it.
+      - name: Fingerprint of the dev client
+        id: fingerprint
+        working-directory: apps/mobile
+        run: |
+          hash=$(node ../../node_modules/@expo/fingerprint/bin/cli.js fingerprint:generate --platform android | jq -r .hash)
+          echo "android fingerprint $hash"
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the dev client
+        id: dev-client
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dev-client/app-debug.apk
+          key: e2e-dev-client-${{ steps.fingerprint.outputs.hash }}-debug-x86_64
+
       - name: Build the dev client
+        if: steps.dev-client.outputs.cache-hit != 'true'
         working-directory: apps/mobile
         run: |
           CI=1 npx expo prebuild --platform android --no-install
-          cd android
-          ./gradlew assembleDebug --console=plain -PreactNativeArchitectures=x86_64
+          (cd android && ./gradlew assembleDebug --console=plain -PreactNativeArchitectures=x86_64)
+          mkdir -p ../../dev-client
+          cp android/app/build/outputs/apk/debug/app-debug.apk ../../dev-client/
+
+      - name: Save the dev client
+        if: steps.dev-client.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dev-client/app-debug.apk
+          key: ${{ steps.dev-client.outputs.cache-primary-key }}
 
       - name: Start Metro
         run: |
@@ -171,7 +201,7 @@ jobs:
           done
           adb shell settings put secure stylus_handwriting_enabled 0
           for port in 3000 8080 8081 9000; do adb reverse "tcp:$port" "tcp:$port"; done
-          adb install -r apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          adb install -r dev-client/app-debug.apk
 
       - name: The flows on the emulator
         run: node scripts/e2e.ts --format junit --output e2e-report.xml

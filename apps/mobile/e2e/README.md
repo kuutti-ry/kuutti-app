@@ -24,7 +24,7 @@ Then `pnpm e2e -- --device emulator-5554`. A dev client takes its bundle only fr
 
 ### In CI
 
-`.github/workflows/e2e.yml` runs the flows on every push to `main`, on a pull request that carries the label `e2e` and changes the app, the API, the packages, the mock bank or the stack (each push while the label stays), and by hand (`gh workflow run e2e.yml --ref <branch>`), since a run costs close to an hour (ADR-020 §6, #226): on `ubuntu-latest`, whose emulator has KVM, the stack from `docker compose` with `env.example`, the API from source, the dev client built for x86_64, Metro, Maestro by its checksum, and the API 36 emulator set up as above. The JUnit report, the API's and Metro's logs and Maestro's screenshots of a failure are the run's artifact for a week.
+`.github/workflows/e2e.yml` runs the flows on every push to `main`, on a pull request that carries the label `e2e` and changes the app, the API, the packages, the mock bank or the stack (each push while the label stays), and by hand (`gh workflow run e2e.yml --ref <branch>`), since a run costs close to an hour (ADR-020 §6, #226): on `ubuntu-latest`, whose emulator has KVM, the stack from `docker compose` with `env.example`, the API from source, the dev client built for x86_64 or restored by its Android fingerprint, Metro, Maestro by its checksum, and the API 36 emulator set up as above. The JUnit report, the API's and Metro's logs and Maestro's screenshots of a failure are the run's artifact for a week.
 
 ## The flows and their cast
 
