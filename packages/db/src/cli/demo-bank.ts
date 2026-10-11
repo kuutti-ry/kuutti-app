@@ -10,10 +10,7 @@ import { resolve } from "node:path";
 import { renderBankPage } from "../seed/bank-page.ts";
 import { DEMO_PERSONAS } from "../seed/personas.ts";
 
-export const BANK_PAGE_PATH = resolve(
-  import.meta.dirname,
-  "../../../../services/mock-idp/login.html",
-);
+const BANK_PAGE_PATH = resolve(import.meta.dirname, "../../../../services/mock-idp/login.html");
 
 const page = renderBankPage(DEMO_PERSONAS);
 if (process.argv.includes("--check")) {

@@ -108,8 +108,4 @@ export const account = pgTable(
 );
 
 export type Identity = typeof identity.$inferSelect;
-export type NewIdentity = typeof identity.$inferInsert;
-export type IdentityStanding = Identity["standing"];
 export type Account = typeof account.$inferSelect;
-export type NewAccount = typeof account.$inferInsert;
-export type AccountState = Account["state"];

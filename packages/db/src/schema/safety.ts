@@ -30,6 +30,3 @@ export const auditLog = pgTable(
     index("audit_log_actor_at_idx").on(table.actorIdentityId, table.at),
   ],
 );
-
-export type AuditLog = typeof auditLog.$inferSelect;
-export type NewAuditLog = typeof auditLog.$inferInsert;

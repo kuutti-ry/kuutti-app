@@ -42,8 +42,7 @@ export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 /** Refused from the file header before the decoder runs; the app sends 1600 px, so this is a backstop. */
 export const PHOTO_MAX_INPUT_PIXELS = 30_000_000;
 /** What the API decodes. An animated GIF is refused, never reduced to a frame. */
-export const PHOTO_INPUT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-export type PhotoInputType = (typeof PHOTO_INPUT_TYPES)[number];
+const PHOTO_INPUT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
 export const PhotoUploadRequest = z
   .object({
@@ -122,19 +121,6 @@ export const PhotoUrlResponse = z
   })
   .meta({ id: "PhotoUrlResponse" });
 export type PhotoUrlResponse = z.infer<typeof PhotoUrlResponse>;
-
-/** Stable error codes of the photo routes (the envelope's `code`); messages come from messages.yaml. */
-export const MEDIA_ERROR_CODES = [
-  "photo_unsupported",
-  "photo_invalid",
-  "photo_too_many_pixels",
-  "photo_limit",
-  "photo_order_invalid",
-  "media_busy",
-  "media_unavailable",
-  "photo_budget_exceeded",
-] as const;
-export type MediaErrorCode = (typeof MEDIA_ERROR_CODES)[number];
 
 /** The shape of matching_config.photo_fetches_per_day (#52, TD-6): signed URLs per variant per Finnish day. */
 export const PhotoFetchBudget = z

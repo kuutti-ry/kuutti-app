@@ -36,6 +36,3 @@ export const session = pgTable(
     index("session_retired_refresh_hash_idx").on(table.retiredRefreshHash),
   ],
 );
-
-export type Session = typeof session.$inferSelect;
-export type NewSession = typeof session.$inferInsert;

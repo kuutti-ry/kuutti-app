@@ -2,15 +2,7 @@ import type { Queryable } from "@kuutti/db";
 import { escapeIdentifier } from "pg";
 
 /** `kuutti_pr_<n>` on the staging instance, one per open pull request (#9, TD-19). */
-export const PREVIEW_DATABASE_PATTERN = /^kuutti_pr_[0-9]{1,7}$/;
-
-export function previewDatabaseName(prNumber: string): string {
-  const name = `kuutti_pr_${prNumber}`;
-  if (!PREVIEW_DATABASE_PATTERN.test(name)) {
-    throw new Error(`not a preview database name: ${name}`);
-  }
-  return name;
-}
+const PREVIEW_DATABASE_PATTERN = /^kuutti_pr_[0-9]{1,7}$/;
 
 /**
  * Creates the pull request's database when it does not exist yet. CREATE

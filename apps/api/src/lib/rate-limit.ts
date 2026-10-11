@@ -85,7 +85,7 @@ export function clientAddress(c: Context, trusted: TrustedProxy): string | null 
       return viewer ? viewerAddress(viewer) : null;
     }
     case "traefik":
-      return hops.length > 0 ? (hops[hops.length - 1] ?? null) : null;
+      return hops.at(-1) ?? null;
     case "none":
       try {
         return getConnInfo(c).remote.address ?? null;

@@ -34,7 +34,7 @@ export const AuthCallbackQuery = z
 export type AuthCallbackQuery = z.infer<typeof AuthCallbackQuery>;
 
 /** 32 random bytes as base64url: 43 characters, single use, 60 seconds. */
-export const ONE_TIME_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+const ONE_TIME_CODE_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export const AuthExchangeRequest = z
   .object({
@@ -47,7 +47,7 @@ export const AuthExchangeRequest = z
 export type AuthExchangeRequest = z.infer<typeof AuthExchangeRequest>;
 
 /** 32 random bytes as base64url, like the one-time code: the shape of both session tokens. */
-export const SESSION_TOKEN_PATTERN = ONE_TIME_CODE_PATTERN;
+const SESSION_TOKEN_PATTERN = ONE_TIME_CODE_PATTERN;
 const SessionToken = z.string().regex(SESSION_TOKEN_PATTERN);
 
 /**
@@ -97,19 +97,3 @@ export const SessionResponse = z
   })
   .meta({ id: "SessionResponse" });
 export type SessionResponse = z.infer<typeof SessionResponse>;
-
-/** Stable error codes of the login (the envelope's `code`); messages come from messages.yaml. */
-export const AUTH_ERROR_CODES = [
-  "auth_state_mismatch",
-  "auth_code_used",
-  "auth_under_18",
-  "auth_provider_error",
-  "auth_banned",
-  "auth_suspended",
-  "auth_cooldown",
-  "auth_cancelled",
-  "auth_unavailable",
-  "session_expired",
-  "session_revoked",
-] as const;
-export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];

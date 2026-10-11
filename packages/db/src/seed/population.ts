@@ -49,8 +49,8 @@ type GenderShares = Readonly<Record<Gender, number>>;
 
 export type PondPlan = {
   slug: string;
-  /** People in the pond whatever the size of the population, or a share of those left over. */
-  people: { fixed: number } | { share: number };
+  /** The pond's share of the people who onboarded. */
+  people: { share: number };
   genders: GenderShares;
   why: string;
 };
@@ -163,21 +163,8 @@ export function planSizes(size: number): { ponds: Record<string, number>; neverO
     throw new Error(`a population is 1 to ${DEMO_SIZE_MAX} people, not ${size}`);
   }
   const neverOnboarded = Math.round(size * NEVER_ONBOARDED_SHARE);
-  let left = size - neverOnboarded;
-  const ponds: Record<string, number> = {};
-  for (const plan of POND_PLANS) {
-    if ("fixed" in plan.people) {
-      ponds[plan.slug] = Math.min(plan.people.fixed, left);
-      left -= ponds[plan.slug] ?? 0;
-    }
-  }
-  const shares = Object.fromEntries(
-    POND_PLANS.flatMap((plan) =>
-      "share" in plan.people ? [[plan.slug, plan.people.share] as const] : [],
-    ),
-  );
-  Object.assign(ponds, apportion(left, shares));
-  return { ponds, neverOnboarded };
+  const shares = Object.fromEntries(POND_PLANS.map((plan) => [plan.slug, plan.people.share]));
+  return { ponds: apportion(size - neverOnboarded, shares), neverOnboarded };
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;

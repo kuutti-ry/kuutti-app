@@ -19,7 +19,6 @@ export type AuditEntry = {
   detail?: Record<string, string | number | boolean | null>;
 };
 
-/** Writes before the thing happens: a view whose audit row failed is a view that does not happen. */
 /**
  * Whether the role boundary of ADR-006 is in place: audit_log and its trigger
  * function owned by another role, and this connection without UPDATE, DELETE
@@ -85,6 +84,7 @@ export async function auditBoundary(db: Queryable): Promise<{
   };
 }
 
+/** Writes before the thing happens: a view whose audit row failed is a view that does not happen. */
 export async function recordAudit(db: Queryable, entry: AuditEntry): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO public.audit_log (actor_identity_id, action, subject_type, subject_id, detail)

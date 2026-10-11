@@ -114,14 +114,6 @@ export const cardShown = pgTable(
   ],
 );
 
-export type Photo = typeof photo.$inferSelect;
-export type NewPhoto = typeof photo.$inferInsert;
-export type CardShown = typeof cardShown.$inferSelect;
-export type NewCardShown = typeof cardShown.$inferInsert;
-export type PhotoState = Photo["state"];
-export type PhotoAccess = typeof photoAccess.$inferSelect;
-export type NewPhotoAccess = typeof photoAccess.$inferInsert;
-
 /**
  * What moderation saw and decided for one photo (#49, TD-8, ADR-006). The
  * automatic check writes the labels Rekognition returned (bounded, with
@@ -155,6 +147,3 @@ export const photoReview = pgTable(
   },
   (table) => [index("photo_review_decision_idx").on(table.decision, table.checkedAt)],
 );
-
-export type PhotoReview = typeof photoReview.$inferSelect;
-export type NewPhotoReview = typeof photoReview.$inferInsert;

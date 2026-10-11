@@ -60,11 +60,6 @@ export function tOf<E extends Env>(c: Context<E, string>): TFunction {
   return typeof t === "function" ? (t as TFunction) : fallbackT;
 }
 
-export function localeOf<E extends Env>(c: Context<E, string>): Locale {
-  const locale: unknown = c.get("locale" as never);
-  return typeof locale === "string" ? (locale as Locale) : DEFAULT_LOCALE;
-}
-
 /**
  * Error codes whose user-facing message lives in messages.yaml. The code stays
  * the stable, machine-readable part of the envelope; the message is for people

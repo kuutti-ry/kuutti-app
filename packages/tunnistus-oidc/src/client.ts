@@ -140,11 +140,10 @@ export async function createTunnistusClient(
 
   // Guide 2.6.2 has the client assertion's aud as the token endpoint, where
   // the library would put the issuer. The hook runs at token-request time,
-  // when discovery has filled the endpoint.
+  // after the library has refused metadata without a token endpoint.
   const assertionAudience: client.ModifyAssertionOptions = {
     [client.modifyAssertion]: (_header, payload) => {
-      const tokenEndpoint = configuration.serverMetadata().token_endpoint;
-      if (tokenEndpoint) payload.aud = tokenEndpoint;
+      payload.aud = configuration.serverMetadata().token_endpoint;
     },
   };
   const configuration: client.Configuration = await client.discovery(

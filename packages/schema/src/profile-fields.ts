@@ -82,7 +82,7 @@ const flag = (r: Roles) => ({ kind: "flag" as const, ...roles(r), schema: z.bool
  * (ADR-019 §3). The first three are pinned in the picker; the rest is the
  * languages spoken most in Finland, searchable, with "other" for the rest.
  */
-export const LANGUAGES = [
+const LANGUAGES = [
   "fi",
   "sv",
   "en",
@@ -232,8 +232,8 @@ export const HOBBY_GROUPS: Readonly<Record<HobbyGroup, readonly Hobby[]>> = {
   wellbeing: ["meditation", "winter_swimming", "forest_walks", "slow_mornings"],
 };
 
-export const HEIGHT_MIN_CM = 140;
-export const HEIGHT_MAX_CM = 220;
+const HEIGHT_MIN_CM = 140;
+const HEIGHT_MAX_CM = 220;
 
 /**
  * The parties by their usual abbreviation: the nine of the parliament and the
@@ -420,9 +420,6 @@ export const PROFILE_FIELDS = {
 
 export type ProfileFieldKey = keyof typeof PROFILE_FIELDS;
 export const PROFILE_FIELD_KEYS = Object.keys(PROFILE_FIELDS) as ProfileFieldKey[];
-
-export type ProfileFieldSpec = (typeof PROFILE_FIELDS)[ProfileFieldKey];
-export type ProfileFieldKind = ProfileFieldSpec["kind"];
 
 /** The fields whose value needs the explicit consent of the current wording first (ADR-009 §2, ADR-019 §4). */
 export const SPECIAL_CATEGORY_FIELDS = PROFILE_FIELD_KEYS.filter(

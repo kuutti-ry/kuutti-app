@@ -15,14 +15,12 @@ export const SEED_PONDS = [
     slug: "paakaupunkiseutu",
     nameNominative: "Pääkaupunkiseutu",
     nameInessive: "Pääkaupunkiseudulla",
-    parent: null,
   },
   // The rest of the country, a sibling of the capital region (#174, ADR-010 §12); migration 0027 writes the same row.
   {
     slug: "suomi",
     nameNominative: "Suomi",
     nameInessive: "Suomessa",
-    parent: null,
   },
 ] as const;
 
@@ -106,14 +104,14 @@ export const SEED_IDENTITIES = [
 ] as const;
 
 /** The seeded live account's profile (#47), so the card preview has something to show against the mock IdP. */
-export const SEED_PROFILE = {
+const SEED_PROFILE = {
   displayName: "Seed",
   bio: "A seeded profile for local development: long enough to count as a bio, short enough to read.",
   fields: { languages: ["fi", "en"], intent: "long_term", occupationTitle: "Seed gardener" },
   prompts: [{ key: "sunday", answer: "Sauna, then a long breakfast." }],
 } as const;
 
-export const seedHetuHmac = (label: string): string =>
+const seedHetuHmac = (label: string): string =>
   createHash("sha256").update(`kuutti seed identity: ${label}`).digest("hex");
 
 export type SeedResult = { ponds: number; matchingConfig: number; identities: number };
@@ -123,24 +121,20 @@ export async function seed(pool: Pool, createdBy = "seed"): Promise<SeedResult> 
   const db = drizzle(pool);
 
   for (const pond of SEED_PONDS) {
-    const parentId = pond.parent
-      ? (await db.select({ id: ponds.id }).from(ponds).where(eq(ponds.slug, pond.parent)))[0]?.id
-      : null;
-    if (pond.parent && !parentId) throw new Error(`seed order: parent ${pond.parent} missing`);
     await db
       .insert(ponds)
       .values({
         slug: pond.slug,
         nameNominative: pond.nameNominative,
         nameInessive: pond.nameInessive,
-        parentId: parentId ?? null,
+        parentId: null,
       })
       .onConflictDoUpdate({
         target: ponds.slug,
         set: {
           nameNominative: pond.nameNominative,
           nameInessive: pond.nameInessive,
-          parentId: parentId ?? null,
+          parentId: null,
         },
       });
   }

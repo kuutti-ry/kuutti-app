@@ -28,6 +28,3 @@ export const waitlistSnapshot = pgTable("waitlist_snapshot", {
   finishing: integer("finishing").notNull(),
   takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
 });
-
-export type WaitlistSnapshot = typeof waitlistSnapshot.$inferSelect;
-export type NewWaitlistSnapshot = typeof waitlistSnapshot.$inferInsert;

@@ -1,39 +1,23 @@
 export {
-  type AdminSession,
   adminSession,
-  type ModeratorRoleRow,
   moderatorRole,
   moderatorRoles,
-  type NewAdminSession,
 } from "./admin.ts";
-export { type AuthRequest, authRequest, type NewAuthRequest } from "./auth-request.ts";
-export { type Consent, consent, consentKind, type NewConsent } from "./consent.ts";
-export { type Gate, gate, type NewGate } from "./gate.ts";
+export { type AuthRequest, authRequest } from "./auth-request.ts";
+export { consent, consentKind } from "./consent.ts";
+export { gate } from "./gate.ts";
 export {
   type Account,
-  type AccountState,
   account,
   accountState,
   gender,
   type Identity,
-  type IdentityStanding,
   identity,
   identityStanding,
-  type NewAccount,
-  type NewIdentity,
 } from "./identity.ts";
-export { type MatchingConfigRow, matchingConfig } from "./matching-config.ts";
+export { matchingConfig } from "./matching-config.ts";
 export {
-  type CardShown,
   cardShown,
-  type NewCardShown,
-  type NewPhoto,
-  type NewPhotoAccess,
-  type NewPhotoReview,
-  type Photo,
-  type PhotoAccess,
-  type PhotoReview,
-  type PhotoState,
   photo,
   photoAccess,
   photoDecision,
@@ -42,19 +26,13 @@ export {
   photoState,
   photoVariant,
 } from "./media.ts";
-export { type NewPond, type Pond, ponds } from "./ponds.ts";
+export { ponds } from "./ponds.ts";
 export {
-  type NewPreference,
-  type Preference,
   preferenceMode,
   preferences,
 } from "./preferences.ts";
-export { type NewProfile, type Profile, profile } from "./profile.ts";
-export { type NewResearchSubject, type ResearchSubject, researchSubject } from "./research.ts";
-export { type AuditLog, auditLog, type NewAuditLog } from "./safety.ts";
-export { type NewSession, type Session, session } from "./sessions.ts";
-export {
-  type NewWaitlistSnapshot,
-  type WaitlistSnapshot,
-  waitlistSnapshot,
-} from "./waitlist.ts";
+export { profile } from "./profile.ts";
+export { researchSubject } from "./research.ts";
+export { auditLog } from "./safety.ts";
+export { session } from "./sessions.ts";
+export { waitlistSnapshot } from "./waitlist.ts";

@@ -19,7 +19,7 @@ import { WAITLIST_K_MIN } from "./waitlist.ts";
  * one other person. One flat object, not a union: the OpenAPI generator
  * turns a union into a type the client cannot narrow (see `WaitlistPond`).
  */
-export const GATE_STATES = ["incomplete", "pending", "waiting", "closed", "open"] as const;
+const GATE_STATES = ["incomplete", "pending", "waiting", "closed", "open"] as const;
 export const GateState = z.enum(GATE_STATES).meta({ id: "GateState" });
 export type GateState = z.infer<typeof GateState>;
 
