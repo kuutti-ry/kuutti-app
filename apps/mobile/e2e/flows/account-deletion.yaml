@@ -18,7 +18,9 @@ name: Deleting the account asks first, signs the person out, and the next login 
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible: "Your account|Tilisi|Ditt konto"
+# The account card's own buttons, not its heading: on Android the card is
+# taller and centring the button puts the heading off the screen.
+- assertVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 
 # Asked first; keeping the account deletes nothing.
 - tapOn: "Delete my account|Poista tilini|Ta bort mitt konto"
@@ -26,7 +28,7 @@ name: Deleting the account asks first, signs the person out, and the next login 
 - assertVisible: ".*30.*"
 - tapOn: "Keep my account|Säilytä tilini|Behåll mitt konto"
 - assertNotVisible: "Delete your account\\?|Poistetaanko tilisi\\?|Ta bort ditt konto\\?"
-- assertVisible: "Your account|Tilisi|Ditt konto"
+- assertVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 
 # Deleted: signed out at once.
 - tapOn: "Delete my account|Poista tilini|Ta bort mitt konto"
