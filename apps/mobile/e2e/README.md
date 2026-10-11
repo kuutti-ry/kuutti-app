@@ -13,6 +13,19 @@ Flows that drive the app on a simulator against the local environment: the real 
 
 `pnpm e2e` (`scripts/e2e.ts`) copies the cached release to `apps/mobile/e2e/media`, since `addMedia` reads files inside the flows' workspace and follows no link out of it; git ignores the copy.
 
+### On an Android emulator
+
+The same flows, the same command; what differs is the device. Once: a dev client for the emulator, built from the checkout (`cd apps/mobile && CI=1 npx expo prebuild --platform android --no-install && cd android && ./gradlew assembleDebug`, with JDK 17 and `ANDROID_HOME` set; `-PreactNativeArchitectures=arm64-v8a` on a Mac keeps it to one architecture), then `adb install android/app/build/outputs/apk/debug/app-debug.apk`. Each time the emulator boots:
+
+- `adb reverse tcp:3000 tcp:3000`, and the same for 8080, 8081 and 9000: the emulator's 127.0.0.1 is then the host's API, mock bank, Metro and S3 stand-in, so nothing in the flows names another host;
+- `adb shell settings put secure stylus_handwriting_enabled 0`: on Android 14 and later Gboard answers a synthesized tap on a field with its stylus tutorial, and the text goes nowhere.
+
+Then `pnpm e2e -- --device emulator-5554`. A dev client takes its bundle only from a Metro whose fingerprint matches its build, and the generated `android/` folder is part of the fingerprint: a dev client built in a worktree wants that worktree's Metro, started on another port, named with `METRO_PORT=8082 pnpm e2e -- --device emulator-5554`.
+
+### In CI
+
+`.github/workflows/e2e.yml` runs the flows on every pull request (for now, to learn what a run costs), on `main` and by hand: on `ubuntu-latest`, whose emulator has KVM, the stack from `docker compose` with `env.example`, the API from source, the dev client built for x86_64, Metro, Maestro by its checksum, and the API 36 emulator set up as above. The JUnit report, the API's and Metro's logs and Maestro's screenshots of a failure are the run's artifact for a week.
+
 ## The flows and their cast
 
 Each flow has a persona to itself where it changes something that another flow reads, so the order does not matter. Those marked *once* change their persona for good and need a `pnpm demo:reset` before they run again; the others leave their persona as they found it.
@@ -54,13 +67,15 @@ Mikael is left out: given the moderator role on a machine, he is spared by `pnpm
 - `common/` holds the steps flows share; `flows/` holds one file per behaviour, named for it. `flows/` is what `pnpm e2e` runs.
 - A flow starts with `runFlow: ../common/sign-in.yaml`, which opens the app (`open-app.yaml`), signs out if needed (`sign-out.yaml`) and signs in at the mock bank (`bank-login.yaml`) as `PERSONA`: the persona's given and family name as the mock bank's page shows them, `Sanna Korhonen` unless the flow passes another. A flow that expects a refusal calls `open-app`, `sign-out` and `bank-login` itself, since sign-in waits for a signed-in screen. A subflow takes its persona from the caller: a default in its `env:` header would override what the caller passes, so the default is written as `${PERSONA || "Sanna Korhonen"}`.
 - Texts are matched as Maestro's regular expressions, in full, and the app speaks three languages, so a tap or an assertion names the text in all three (`"Settings|Asetukset|Inställningar"`), taken from `packages/i18n/messages.yaml`; `?`, `.` and parentheses are escaped. A decorative image (a glyph, the mark) is hidden from Maestro as from a screen reader: assert the text beside it.
-- A switch's text, to Maestro, is its value: `"0"` off, `"1"` on. Its words are its accessibility label, which Maestro matches when nothing else on screen says them ("Deal-breaker: Kids"); where the text beside it says the same, the switch is `text: "0"` with `rightOf:` those words.
+- A switch, to Maestro, says its state differently on the two platforms: on iOS its text is its value (`"0"` off, `"1"` on), on Android its label carries the state ("Deal-breaker: Kids, off"). A switch with words of its own is its label with an optional state, `"(Deal-breaker: Kids|…)(, .*)?"`; one whose label repeats the text beside it is `text: "0|(<the words>), off"` (or `"1|(…), on"`) with `rightOf:` those words.
 - A field with a visible label of the same name is tapped by its contents, or by `below:` its label when empty. `eraseText` deletes backwards from where the tap left the cursor.
-- An element half under the screen's edge counts as visible, and a tap at its centre misses: every `scrollUntilVisible` sets `centerElement: true`. A tap during a screen's opening animation is lost: after a deep link to a screen with chips, `waitForAnimationToEnd` before the first tap. `assertNotVisible` hardly waits; for something that is going, `extendedWaitUntil: notVisible:`. `hideKeyboard` taps what lies below the field; where a button is above the keyboard, leave it up.
+- An element half under the screen's edge counts as visible, and a tap at its centre misses: every `scrollUntilVisible` sets `centerElement: true`, and a timeout of 60 s, since an emulator reads a long screen slowly. On the profile, ten screens of chips, `common/scroll-to.yaml` swipes in the margin: a swipe that starts on a search box focuses it. A tap during a screen's opening animation is lost: after a deep link to a screen with chips, `waitForAnimationToEnd` before the first tap. `assertNotVisible` hardly waits; for something that is going, `extendedWaitUntil: notVisible:`.
+- The keyboard: on iOS `hideKeyboard` taps what lies below the field, so where a button is above the keyboard it stays up; on Android it presses back, which closes an open keyboard, and the keyboard takes half the screen, so a flow that scrolls on hides it there (`when: platform: Android`).
+- The system browser greets its first page with screens of its own (Safari's sheets, Chrome's welcome and its notifications question); `bank-login.yaml` answers each the most private way. Chrome hands the link back without iOS's "Open in Kuutti?".
 - The system photo picker has no names to tap by: `common/pick-photo.yaml` taps a cell by position, and `addMedia` puts the flow's pictures first.
 - Screens are reached by deep link (`openLink: kuutti://settings`, `kuutti://profile/later/politics`), the way the handoff's manual checks did; `kuutti://` is the root, the sign-in screen when signed out.
 - A flow leaves the app as it found it where it can (the language flow ends on the phone's language), so the next one starts clean.
 
 ## Not here yet
 
-The admin panel (Playwright), so the moderator's decision on Noa's photos and the gate opening; Android in CI; a dev-only sign-in link should the system browser prove flaky under Maestro; the 15-minute token refresh and the two-device logout; Larger Text and dark mode as a whole-app pass, which only a screenshot judges. ADR-020 lists them.
+The admin panel (Playwright), so the moderator's decision on Noa's photos and the gate opening; iOS in CI (macOS runners have no Docker); a dev-only sign-in link should the system browser prove flaky under Maestro; the 15-minute token refresh and the two-device logout; Larger Text and dark mode as a whole-app pass, which only a screenshot judges. ADR-020 lists them.

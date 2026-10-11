@@ -36,27 +36,32 @@ appId: fi.kuutti.app
 # One button per persona, whose accessible name is the person's name followed by
 # the note under it. The browser's bar lies over the bottom of the page: the
 # card is scrolled to the middle first. Chrome's toolbar moves the page as it
-# hides, so a scroll can pass the card: slowly down, and if it went past, back up.
+# hides, so a scroll can pass the card: down, and if it went past, back up.
 - scrollUntilVisible:
     element: ".*${PERSONA}.*"
     direction: DOWN
     centerElement: true
-    speed: 25
-    visibilityPercentage: 60
     timeout: 40000
     optional: true
 - scrollUntilVisible:
     element: ".*${PERSONA}.*"
     direction: UP
     centerElement: true
-    speed: 25
-    visibilityPercentage: 60
     timeout: 40000
-- tapOn: ".*${PERSONA}.*"
-# iOS asks before handing the link back to the app; Chrome hands it on.
-- extendedWaitUntil:
-    visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
-    timeout: 30000
+# iOS asks before handing the link back to the app; Chrome hands it on. A tap
+# on a page that still moves is lost: tapped again while the card is there.
+- waitForAnimationToEnd
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible: ".*${PERSONA}.*"
+          commands:
+            - tapOn: ".*${PERSONA}.*"
+      - extendedWaitUntil:
+          visible: "Open|Avaa|Öppna|Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+          timeout: 20000
 - runFlow:
     when:
       visible: "Open|Avaa|Öppna"
