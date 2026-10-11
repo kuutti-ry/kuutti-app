@@ -63,6 +63,10 @@ jobs:
         run: |
           image="system-images;android-36;google_apis;x86_64"
           tools="$ANDROID_HOME/cmdline-tools/latest/bin"
+          # avdmanager and the emulator look for devices in different homes
+          # on the runner; one folder for both.
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           (yes || true) | "$tools/sdkmanager" --licenses > /dev/null
           "$tools/sdkmanager" emulator platform-tools "$image" > /dev/null
@@ -126,8 +130,9 @@ jobs:
       # and S3 stand-in; on Android 14 and later Gboard answers a synthesized tap
       # on a field with its stylus tutorial, so handwriting is off (README).
       - name: Wait for the emulator
+        timeout-minutes: 10
         run: |
-          adb wait-for-device
+          timeout 300 adb wait-for-device || { cat emulator.log; exit 1; }
           for _ in $(seq 1 150); do
             [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ] && break
             sleep 2
