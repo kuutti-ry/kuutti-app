@@ -98,11 +98,14 @@ describe("track", () => {
   test("records one row with the consent version, the pond slug, the age band, gender and closed-list fields only", async ({
     ctx,
   }) => {
+    const at = new Date("2026-09-26T12:00:00Z"); // 36 by the Finnish calendar
+    // The fixed instant's month, whatever today is; before the opt-in writes its
+    // event, so this test never waits for the partition lock holding a write to
+    // events that another test's partition creation waits for (a deadlock).
+    await ensureEventPartitions(ctx.client, at);
     const a = await signedInAccount(ctx.client); // born 1990-06
     await onboarded(ctx, a.accountId);
     await researchConsent(ctx, a.headers);
-    const at = new Date("2026-09-26T12:00:00Z"); // 36 by the Finnish calendar
-    await ensureEventPartitions(ctx.client, at); // the fixed instant's month, whatever today is
     const { deps } = await trackDeps(ctx, at);
     const result = await track(deps, a.accountId, "profile_saved", {
       complete: true,
@@ -225,5 +228,51 @@ describe("track", () => {
       [b.accountId],
     );
     expect(Number(all[0]?.n)).toBe(0);
+  });
+});
+
+describe("track, the remaining branches", () => {
+  test("an account without a bank-verified year and month records nothing and says why, without the values", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    await researchConsent(ctx, a.headers);
+    await ctx.client.query(
+      "UPDATE account SET birth_year = NULL, birth_month = NULL WHERE id = $1",
+      [a.accountId],
+    );
+    // Refused before any write, so no partition is needed for the instant.
+    const at = new Date("2026-09-26T12:00:00Z");
+    const { deps, lines } = await trackDeps(ctx, at);
+    const result = await track(deps, a.accountId, "profile_saved", {
+      complete: false,
+      approvedPhotos: 0,
+    });
+    expect(result).toEqual({ recorded: false, reason: "incomplete" });
+    expect(await eventsOf(ctx, a.accountId, "profile_saved", at)).toEqual([]);
+    expect(
+      lines().find((l) => l.msg === "research event dropped: no year and month"),
+    ).toMatchObject({ accountId: a.accountId, event: "profile_saved" });
+  });
+
+  test("the age band counts whole years by the Finnish month: a birthday later in the year is not yet a year", async ({
+    ctx,
+  }) => {
+    // Born in November 1991: on 26 September 2026 that is 34, not 35, so 30-34.
+    const at = new Date("2026-09-26T12:00:00Z");
+    await ensureEventPartitions(ctx.client, at); // before any event is written, as above
+    const a = await signedInAccount(ctx.client);
+    await researchConsent(ctx, a.headers);
+    await ctx.client.query("UPDATE account SET birth_year = 1991, birth_month = 11 WHERE id = $1", [
+      a.accountId,
+    ]);
+    const { deps } = await trackDeps(ctx, at);
+    expect(
+      await track(deps, a.accountId, "profile_saved", { complete: false, approvedPhotos: 0 }),
+    ).toEqual({ recorded: true });
+    const rows = await eventsOf(ctx, a.accountId, "profile_saved", at);
+    expect(rows.map((r) => [r.age_band, r.snapshot])).toEqual([
+      ["30-34", { gender: null, fields: {} }],
+    ]);
   });
 });

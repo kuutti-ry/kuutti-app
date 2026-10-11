@@ -1,5 +1,6 @@
 import type { GateResponse, PondSummary, WaitlistResponse } from "@kuutti/schema";
 import { fireEvent, screen, userEvent } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -97,6 +98,25 @@ describe("HomeScreen", () => {
     expect(screen.queryByText("Otaniemi")).toBeNull();
   });
 
+  it("leads to the questions that can wait and to the deal-breakers", async () => {
+    await renderWithTheme(<HomeScreen />);
+    const user = userEvent.setup();
+    await user.press(screen.getByRole("button", { name: "Fill in the rest while you wait" }));
+    await user.press(screen.getByRole("button", { name: "Your deal-breakers" }));
+    expect(router.push.mock.calls.map((c) => c[0])).toEqual([
+      "/profile/later/hasKids",
+      "/profile/deal-breakers",
+    ]);
+  });
+
+  it("shows the profile and the photos but no pond before the account has one", async () => {
+    mockGate = { status: "complete", pond: null };
+    await renderWithTheme(<HomeScreen />);
+    expect(screen.getByRole("button", { name: "Your profile" })).toBeTruthy();
+    expect(screen.queryByText("Otaniemi")).toBeNull();
+    expect(screen.queryByText(/more people are needed/)).toBeNull();
+  });
+
   it("says that it is checking while the status is in flight", async () => {
     mockGate = { status: "checking" };
     await renderWithTheme(<HomeScreen />);
@@ -117,5 +137,12 @@ describe("HomeRoute", () => {
     await renderWithTheme(<HomeRoute />);
     expect(await screen.findByRole("heading", { name: "Kuutti" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
+  });
+
+  it("shows only that it is loading while the stored session is read", async () => {
+    (SecureStore.getItemAsync as jest.Mock).mockReturnValueOnce(new Promise(() => undefined));
+    await renderWithTheme(<HomeRoute />);
+    expect(screen.getByText("Loading…")).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

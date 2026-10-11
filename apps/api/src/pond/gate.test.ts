@@ -533,3 +533,60 @@ describe("a change of what a person declares", () => {
     expect(joinsAContest(man(["woman"]), { gender: null, seeks: ["woman"] })).toBe(false);
   });
 });
+
+describe("the edges of the rules", () => {
+  it("two who registered at the same instant stand in the order of their ids, whichever is listed first", () => {
+    const at = new Date(T0);
+    const inside = group(2, "woman", ["man"], { admitted: true });
+    const b: Applicant = {
+      id: "m-b",
+      gender: "man",
+      seeks: ["woman"],
+      admitted: false,
+      registeredAt: at,
+    };
+    const a: Applicant = {
+      id: "m-a",
+      gender: "man",
+      seeks: ["woman"],
+      admitted: false,
+      registeredAt: at,
+    };
+    // Room for three men with two women inside (0.6): all let in, in the order of their ids.
+    expect(admit([...inside, b, a], 0.6).admitted).toEqual(["m-a", "m-b"]);
+    expect(admit([...inside, a, b], 0.6).admitted).toEqual(["m-a", "m-b"]);
+    // In an empty pond the first of the group has room and the second waits: the lower id goes first.
+    expect(admit([b, a], 0.6)).toEqual({ admitted: ["m-a"], waiting: new Map([["m-b", 1]]) });
+  });
+
+  it("a first ask about somebody not in the pond lets nobody in and gives no place", () => {
+    const people = group(2, "man", ["woman"]);
+    expect(admitsAlone(people, "nobody", 0.6)).toBe(false);
+    expect(placeAlone(people, "nobody")).toBeNull();
+  });
+
+  it("a first ask about somebody already let in keeps them in, however the pond stands", () => {
+    // Five men inside for one woman: far over the ratio, and nobody is let out.
+    const people = [
+      ...group(5, "man", ["woman"], { admitted: true }),
+      ...group(1, "woman", ["man"], { admitted: true }),
+    ];
+    expect(admitsAlone(people, people[0]?.id as string, 0.6)).toBe(true);
+  });
+
+  it("a gender the registry does not know is no declaration: nobody joins a contest by it", () => {
+    expect(
+      joinsAContest({ gender: "robot", seeks: ["woman"] }, { gender: "man", seeks: ["woman"] }),
+    ).toBe(true);
+    expect(
+      joinsAContest({ gender: "man", seeks: ["woman"] }, { gender: "robot", seeks: ["woman"] }),
+    ).toBe(false);
+    // An unknown gender among those sought counts for nothing.
+    expect(
+      joinsAContest(
+        { gender: "man", seeks: ["woman"] },
+        { gender: "man", seeks: ["woman", "robot"] },
+      ),
+    ).toBe(false);
+  });
+});

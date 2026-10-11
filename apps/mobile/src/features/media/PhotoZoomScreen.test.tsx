@@ -77,4 +77,30 @@ describe("PhotoZoomScreen", () => {
       ).toBeTruthy(),
     );
   });
+
+  it("says the generic line for a refusal it has no words of its own for, and nothing before", async () => {
+    let answer: ((response: Response) => void) | undefined;
+    globalThis.fetch = jest.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    ) as unknown as typeof fetch;
+    await act(async () => {
+      renderWithTheme(
+        <PhotoZoomScreen id={ID} blurhash="LEHV6nWB2yk8pyo0adR*.7kCMdnj" position={1} total={1} />,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    });
+    expect(screen.queryByText("The photo could not be uploaded. Try again.")).toBeNull();
+    // A gateway's page, not the API's envelope: a refusal without a code.
+    await act(async () => {
+      answer?.(new Response("<html>Bad gateway</html>", { status: 502 }));
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    });
+    expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy();
+    expect(
+      screen.queryByText("That is enough photos for today. They load again after midnight."),
+    ).toBeNull();
+  });
 });

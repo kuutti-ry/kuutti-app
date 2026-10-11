@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import * as Sentry from "@sentry/node";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const captured = vi.hoisted(() => ({
   exceptions: [] as unknown[],
@@ -20,7 +21,14 @@ vi.mock("@sentry/node", () => ({
   ),
 }));
 
-import { collectNothing, sentryOptions, sentryReporter, stripRequestData } from "./sentry.ts";
+import {
+  collectNothing,
+  flushSentry,
+  initSentry,
+  sentryOptions,
+  sentryReporter,
+  stripRequestData,
+} from "./sentry.ts";
 
 const base = { APP_ENV: "staging" as const, APP_VERSION: "1.2.3", GIT_COMMIT: "abc1234" };
 
@@ -94,5 +102,74 @@ describe("sentry options", () => {
     sentryReporter()(error, { requestId: "req-1", route: "/health" });
     expect(captured.exceptions).toEqual([error]);
     expect(captured.tags).toEqual({ requestId: "req-1", route: "/health" });
+  });
+});
+
+describe("sentry at boot and exit", () => {
+  beforeEach(() => {
+    vi.mocked(Sentry.init).mockClear();
+    vi.mocked(Sentry.flush).mockClear();
+    captured.exceptions.length = 0;
+    for (const key of Object.keys(captured.tags)) delete captured.tags[key];
+  });
+
+  it("initialises the SDK only when a DSN is configured, and says whether it did", () => {
+    expect(initSentry({ ...base, SENTRY_DSN: undefined })).toBe(false);
+    expect(Sentry.init).not.toHaveBeenCalled();
+    expect(initSentry({ ...base, SENTRY_DSN: "https://k@o1.ingest.de.sentry.io/2" })).toBe(true);
+    expect(Sentry.init).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(Sentry.init).mock.calls[0]?.[0]).toMatchObject({
+      dsn: "https://k@o1.ingest.de.sentry.io/2",
+      environment: "staging",
+      dataCollection: collectNothing,
+    });
+  });
+
+  it("names a release without an injected commit as unknown", () => {
+    expect(sentryOptions({ ...base, GIT_COMMIT: undefined, SENTRY_DSN: undefined }).release).toBe(
+      "kuutti-api@1.2.3+unknown",
+    );
+  });
+
+  it("reports an error outside a route with the request id alone", () => {
+    const error = new Error("self-test");
+    sentryReporter()(error, { requestId: "self-test" });
+    expect(captured.exceptions).toEqual([error]);
+    expect(captured.tags).toEqual({ requestId: "self-test" });
+  });
+
+  it("gives queued events two seconds by default to leave, and a failing flush never stops the exit", async () => {
+    await flushSentry();
+    expect(Sentry.flush).toHaveBeenLastCalledWith(2000);
+    await flushSentry(50);
+    expect(Sentry.flush).toHaveBeenLastCalledWith(50);
+    vi.mocked(Sentry.flush).mockRejectedValueOnce(new Error("transport down"));
+    await expect(flushSentry()).resolves.toBeUndefined();
+  });
+});
+
+describe("events with less to strip", () => {
+  it("drops a user without an id altogether, rather than keeping an empty one", () => {
+    const event = stripRequestData({
+      type: undefined,
+      user: { email: "a@b.fi", ip_address: "10.0.0.1" },
+    });
+    expect(event.user).toBeUndefined();
+    expect(JSON.stringify(event)).not.toContain("a@b.fi");
+  });
+
+  it("leaves an event with no user, breadcrumbs or stack frames as it was, request data aside", () => {
+    const event = stripRequestData({
+      type: undefined,
+      message: "boom",
+      tags: { requestId: "req-1" },
+      exception: { values: [{ type: "Error", value: "boom" }] },
+    });
+    expect(event).toEqual({
+      type: undefined,
+      message: "boom",
+      tags: { requestId: "req-1" },
+      exception: { values: [{ type: "Error", value: "boom" }] },
+    });
   });
 });

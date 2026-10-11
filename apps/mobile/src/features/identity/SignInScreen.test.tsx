@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import { Linking, Platform } from "react-native";
 import { apiBaseUrl } from "@/lib/api";
 import { LocaleProvider } from "@/lib/locale";
@@ -188,5 +189,53 @@ describe("SignInScreen", () => {
     ) as typeof import("@/lib/session");
     expect(await takeLoginStarted()).toBe(true);
     expect(await takeLoginStarted()).toBe(false); // once
+  });
+
+  it("says something went wrong when the exchange fails without a word from the API", async () => {
+    await markLoginStarted();
+    fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
+    await renderWithTheme(<SignInScreen code={CODE} />);
+    expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
+    expect(currentSession()).toBeNull();
+  });
+
+  it("asks for the bank's chooser in the app's language", async () => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: "sv-FI" }]);
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    try {
+      await renderWithTheme(<SignInScreen />);
+      await fireEvent.press(await screen.findByRole("button", { name: "Logga in med din bank" }));
+      expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios&locale=sv`);
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      openURL.mockRestore();
+    }
+  });
+
+  it("says something went wrong when the browser cannot be opened, and offers to try again", async () => {
+    const openURL = jest.spyOn(Linking, "openURL").mockRejectedValue(new Error("no browser"));
+    try {
+      await renderWithTheme(<SignInScreen />);
+      await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
+      expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    } finally {
+      openURL.mockRestore();
+    }
+  });
+
+  it("names no day for a cooldown whose link carries none, or one that is not a date", async () => {
+    const view = await renderWithTheme(<SignInScreen error="auth_cooldown" />);
+    expect(
+      await screen.findByText(
+        "You deleted your account recently. The earliest day for a new one: ",
+      ),
+    ).toBeTruthy();
+    await view.rerender(underProviders(<SignInScreen error="auth_cooldown" until="not a date" />));
+    expect(
+      await screen.findByText(
+        "You deleted your account recently. The earliest day for a new one: ",
+      ),
+    ).toBeTruthy();
   });
 });

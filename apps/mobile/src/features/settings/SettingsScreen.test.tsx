@@ -124,4 +124,56 @@ describe("the settings screen", () => {
     expect(screen.getByRole("button", { name: "Download my data" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete my account" })).toBeTruthy();
   });
+
+  it("turns high contrast on and off from its label too", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    await fireEvent.press(screen.getByText("High contrast"));
+    await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("true"));
+    expect(
+      screen.getByRole("switch", { name: "High contrast" }).props.accessibilityState,
+    ).toMatchObject({
+      checked: true,
+    });
+    await fireEvent.press(screen.getByText("High contrast"));
+    await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("false"));
+  });
+
+  it("logs this device out", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await fireEvent.press(await screen.findByRole("button", { name: "Log out" }));
+    expect(await screen.findByText("No session on this device.")).toBeTruthy();
+  });
+
+  it("logs out everywhere, and keeps the device signed in without a word when that fails", async () => {
+    await saveSession(tokens);
+    const answers = globalThis.fetch;
+    let failing = true;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname === "/auth/logout-all") {
+        return failing
+          ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+          : new Response(null, { status: 204 });
+      }
+      return answers(input, init);
+    }) as unknown as typeof fetch;
+    await renderWithTheme(<SettingsScreen />);
+    await fireEvent.press(await screen.findByRole("button", { name: "Log out everywhere" }));
+    await settle();
+    expect(screen.getByRole("button", { name: "Log out everywhere" })).toBeTruthy();
+    failing = false;
+    await fireEvent.press(screen.getByRole("button", { name: "Log out everywhere" }));
+    expect(await screen.findByText("No session on this device.")).toBeTruthy();
+  });
+
+  it("leaves the source offer out while the API cannot say where the source is", async () => {
+    globalThis.fetch = jest.fn(async () => {
+      throw new TypeError("Network request failed");
+    }) as unknown as typeof fetch;
+    await renderWithTheme(<SettingsScreen />);
+    await settle();
+    expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
+    expect(screen.queryByText("Source code")).toBeNull();
+  });
 });

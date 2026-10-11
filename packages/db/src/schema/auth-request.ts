@@ -33,4 +33,3 @@ export const authRequest = pgTable(
 );
 
 export type AuthRequest = typeof authRequest.$inferSelect;
-export type NewAuthRequest = typeof authRequest.$inferInsert;

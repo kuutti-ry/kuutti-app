@@ -314,13 +314,14 @@ jobs:
           fi
 
       # Native code, auth, push or camera: the paths from #9. Everything else
-      # native is caught by the fingerprint below.
+      # native is caught by the fingerprint below. The paths come from the
+      # files API: `gh pr diff` refuses a diff over 20,000 lines (#236).
       - name: Paths that need a native preview
         id: paths
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          changed=$(gh pr diff "$PR_NUMBER" --name-only)
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files?per_page=100" --jq '.[].filename')
           if grep -Eq '^apps/mobile/(app\.json|app\.config\.[^/]+|package\.json|plugins/|src/lib/auth/|src/features/(notifications|media)/)' <<< "$changed"; then
             echo "matched=true" >> "$GITHUB_OUTPUT"
             grep -E '^apps/mobile/' <<< "$changed"

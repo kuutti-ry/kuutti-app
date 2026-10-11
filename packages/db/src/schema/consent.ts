@@ -33,6 +33,3 @@ export const consent = pgTable(
   },
   (table) => [index("consent_account_kind_idx").on(table.accountId, table.kind)],
 );
-
-export type Consent = typeof consent.$inferSelect;
-export type NewConsent = typeof consent.$inferInsert;

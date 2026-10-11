@@ -182,4 +182,75 @@ describe("CardPreviewScreen", () => {
     await show();
     await waitFor(() => expect(screen.getByText(/Save your profile first/)).toBeTruthy());
   });
+
+  it("says it is loading, and then that the card could not be loaded", async () => {
+    let answer: ((response: Response) => void) | undefined;
+    globalThis.fetch = jest.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    ) as unknown as typeof fetch;
+    await show();
+    expect(screen.getByText("Loading your card…")).toBeTruthy();
+    await act(async () => {
+      answer?.(json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500));
+      await settle();
+    });
+    expect(screen.getByText("Your card could not be loaded.")).toBeTruthy();
+    expect(screen.queryByText("Loading your card…")).toBeNull();
+  });
+
+  it("shows no checklist for a complete card", async () => {
+    serveCard({ complete: true, missing: [] });
+    await show();
+    await waitFor(() => expect(screen.getByText("Aino")).toBeTruthy());
+    expect(screen.queryByText("Before your card can be shown")).toBeNull();
+  });
+
+  const refusingPhotos = (code: string, status: number) => {
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const path = new URL(request.url).pathname;
+      if (path === "/profile/card") {
+        return json({ card, completeness: { complete: true, missing: [] } });
+      }
+      return json({ error: { code, message: "x", requestId: "r" } }, status);
+    }) as unknown as typeof fetch;
+  };
+
+  it("says so under the card when the day's budget holds the photos back", async () => {
+    refusingPhotos("photo_budget_exceeded", 429);
+    await show();
+    await waitFor(() =>
+      expect(
+        screen.getByText("That is enough photos for today. They load again after midnight."),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("says the generic line under the card for any other refused photo", async () => {
+    refusingPhotos("not_found", 404);
+    await show();
+    await waitFor(() =>
+      expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy(),
+    );
+    expect(
+      screen.queryByText("That is enough photos for today. They load again after midnight."),
+    ).toBeNull();
+  });
+
+  it("says the generic line under the card for a photo refused without the API's word", async () => {
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname === "/profile/card") {
+        return json({ card, completeness: { complete: true, missing: [] } });
+      }
+      return new Response("<html>Bad gateway</html>", { status: 502 });
+    }) as unknown as typeof fetch;
+    await show();
+    await waitFor(() =>
+      expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy(),
+    );
+  });
 });

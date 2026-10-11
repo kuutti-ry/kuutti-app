@@ -43,8 +43,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     void loadSession().then((session) => {
       if (mounted) setState(fromStored(session));
     });
+    // Unsubscribed in the same cleanup that ends `mounted`: no call comes after it.
     const unsubscribe = onSessionChange((session) => {
-      if (mounted) setState((previous) => merge(previous, fromStored(session)));
+      setState((previous) => merge(previous, fromStored(session)));
     });
     return () => {
       mounted = false;

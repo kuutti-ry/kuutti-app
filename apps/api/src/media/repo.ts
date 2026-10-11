@@ -76,8 +76,8 @@ export async function listPhotoTipInputs(
   );
   return rows.map((r: Row) => ({
     state: r.state as PhotoTipInput["state"],
-    labels: (r.labels as ModerationLabel[]) ?? [],
-    faces: Number(r.faces ?? 0),
+    labels: r.labels as ModerationLabel[],
+    faces: Number(r.faces),
   }));
 }
 
@@ -125,18 +125,6 @@ export async function insertPhoto(
   return rows[0] ? photoFrom(rows[0]) : null;
 }
 
-export async function findPhoto(
-  db: Queryable,
-  accountId: string,
-  photoId: string,
-): Promise<PhotoRow | null> {
-  const { rows } = await db.query<Row>(
-    `SELECT ${COLUMNS} FROM photo WHERE id = $1 AND account_id = $2`,
-    [photoId, accountId],
-  );
-  return rows[0] ? photoFrom(rows[0]) : null;
-}
-
 /**
  * The photo the caller may be issued a URL for (#52, TD-6): their own in any
  * state, or another account's approved photo on a card they were shown (the
@@ -157,27 +145,6 @@ export async function findVisiblePhoto(
     [accountId, photoId],
   );
   return rows[0] ? photoFrom(rows[0]) : null;
-}
-
-/**
- * What the card route writes when it serves a card (#47): the viewer's own
- * account id and the photos of the card the server built, never ids from a
- * request body. The shown-record rule of #52 reads it.
- */
-export async function recordCardShown(
-  db: Queryable,
-  accountId: string,
-  photoIds: string[],
-  at: Date,
-): Promise<number> {
-  if (photoIds.length === 0) return 0;
-  // Set membership is all the visibility rule reads, so a photo shown again is one row.
-  const result = await db.query(
-    `INSERT INTO card_shown (account_id, photo_id, at) SELECT $1, unnest($2::uuid[]), $3
-     ON CONFLICT (account_id, photo_id) DO NOTHING`,
-    [accountId, photoIds, at],
-  );
-  return result.rowCount ?? 0;
 }
 
 export type CardServed = {
@@ -526,7 +493,6 @@ export async function deletePhotoAccessOfAccount(
 
 /** Of the given keys, those no photo row references any more. */
 export async function orphanedKeys(db: Queryable, keys: string[]): Promise<string[]> {
-  if (keys.length === 0) return [];
   const { rows } = await db.query<{ key: string }>(
     `SELECT k.key FROM unnest($1::text[]) AS k(key)
      WHERE NOT EXISTS (SELECT 1 FROM photo p WHERE p.key = k.key)`,

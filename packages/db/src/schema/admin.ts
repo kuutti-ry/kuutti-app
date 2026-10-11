@@ -42,7 +42,3 @@ export const adminSession = pgTable(
   },
   (table) => [index("admin_session_identity_idx").on(table.identityId)],
 );
-
-export type ModeratorRoleRow = typeof moderatorRoles.$inferSelect;
-export type AdminSession = typeof adminSession.$inferSelect;
-export type NewAdminSession = typeof adminSession.$inferInsert;

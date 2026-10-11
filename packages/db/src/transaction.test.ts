@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { createPool, transaction } from "./index.ts";
+import { createPool, type PoolClient, type Queryable, transaction } from "./index.ts";
 
 // The unit-of-work seam (#49): commit, rollback on a throw, and a savepoint
 // when the caller is already inside a transaction, which is how every route
@@ -49,6 +49,78 @@ describe("transaction", () => {
       const { rows } = await client.query<{ n: number }>("SELECT n FROM tx_probe_sp ORDER BY n");
       expect(rows.map((r) => r.n)).toEqual([1, 3]);
       await client.query("ROLLBACK");
+    } finally {
+      client.release();
+    }
+  });
+});
+
+describe("the pool", () => {
+  it("names itself kuutti, holds ten connections and waits five seconds for one, unless told otherwise", async () => {
+    const plain = createPool({ connectionString: URL });
+    const tuned = createPool({
+      connectionString: URL,
+      max: 3,
+      applicationName: "kuutti-probe",
+      connectionTimeoutMillis: 250,
+    });
+    try {
+      expect(plain.options).toMatchObject({
+        max: 10,
+        application_name: "kuutti",
+        connectionTimeoutMillis: 5_000,
+      });
+      expect(tuned.options).toMatchObject({
+        max: 3,
+        application_name: "kuutti-probe",
+        connectionTimeoutMillis: 250,
+      });
+      const name = async (db: Queryable) =>
+        (await db.query<{ name: string }>("SELECT current_setting('application_name') AS name"))
+          .rows[0]?.name;
+      expect(await name(plain)).toBe("kuutti");
+      expect(await name(tuned)).toBe("kuutti-probe");
+    } finally {
+      await plain.end();
+      await tuned.end();
+    }
+  });
+});
+
+describe("a transaction whose rollback fails", () => {
+  it("throws the error of the work, and discards the connection instead of returning it to the pool", async () => {
+    const own = createPool({ connectionString: URL, max: 1 });
+    try {
+      await expect(
+        transaction(own, async (tx) => {
+          // The connection goes away under the work, so ROLLBACK cannot be sent.
+          await (tx as PoolClient).end();
+          throw new Error("the work failed");
+        }),
+      ).rejects.toThrow("the work failed");
+      expect(own.totalCount).toBe(0);
+      // The next unit of work gets a fresh connection that works.
+      await expect(
+        transaction(own, async (tx) => (await tx.query("SELECT 1 AS one")).rows),
+      ).resolves.toEqual([{ one: 1 }]);
+    } finally {
+      await own.end();
+    }
+  });
+
+  it("inside an open transaction, throws the error of the work when its savepoint is gone", async () => {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await expect(
+        transaction(client, async (tx) => {
+          // The work ends the outer transaction, and the savepoint with it.
+          await tx.query("ROLLBACK");
+          throw new Error("inner");
+        }),
+      ).rejects.toThrow("inner");
+      // The connection is still usable outside any transaction.
+      expect((await client.query("SELECT 1 AS one")).rows).toEqual([{ one: 1 }]);
     } finally {
       client.release();
     }

@@ -188,7 +188,7 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     const missing = result.error.issues
       .filter((i) => i.code === "invalid_type" && i.input === undefined)
       .map((i) => i.path.join("."));
-    const issues = result.error.issues.map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`);
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
     throw new ConfigError(missing, issues);
   }
   const env = result.data;

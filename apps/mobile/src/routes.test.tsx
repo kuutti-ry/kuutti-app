@@ -1,0 +1,206 @@
+import * as Sentry from "@sentry/react-native";
+import { render, screen } from "@testing-library/react-native";
+import type * as React from "react";
+import RootLayout from "../app/_layout";
+import NotFoundRoute from "../app/+not-found";
+import EmailRoute from "../app/account/email";
+import AuthReturnRoute from "../app/auth";
+import IndexRoute from "../app/index";
+import OnboardingRoute from "../app/onboarding";
+import PhotoZoomRoute from "../app/photos/[id]";
+import PhotosRoute from "../app/photos/index";
+// The slice boundary's glob matches any path with a `profile` segment; these
+// are Expo Router's route files under app/, not the profile slice's internals.
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import CardPreviewRoute from "../app/profile/card";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import DealBreakersRoute from "../app/profile/deal-breakers";
+import ProfileRoute from "../app/profile/index";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import LaterFieldRoute from "../app/profile/later/[field]";
+// biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
+import ProfileSectionRoute from "../app/profile/section/[id]";
+import SettingsRoute from "../app/settings";
+import TechRoute from "../app/tech";
+
+// The route files of app/ (rules/layout.md: routes only, thin): each renders
+// its slice's screen and hands it the route's params, with the defaults a
+// missing or repeated param falls back to. Expo Router wants nothing but
+// routes in app/, so their test lives here. The screens are stand-ins that
+// show the props they were given; each slice tests its own screens.
+
+// The stylesheet is NativeWind's, compiled by Metro; the test runner has no use for it.
+jest.mock("../global.css", () => ({}));
+jest.mock("@/features/identity", () => {
+  const { createElement, Fragment } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  const probe = (name: string) => (props: object) =>
+    createElement(Text, { testID: name }, JSON.stringify(props));
+  return {
+    EmailScreen: probe("EmailScreen"),
+    OnboardingScreen: probe("OnboardingScreen"),
+    SignInScreen: probe("SignInScreen"),
+    SignedOutToStart: probe("SignedOutToStart"),
+    SessionProvider: ({ children }: { children: React.ReactNode }) =>
+      createElement(Fragment, null, children),
+  };
+});
+jest.mock("@/features/home", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  return {
+    HomeRoute: (props: object) =>
+      createElement(Text, { testID: "HomeRoute" }, JSON.stringify(props)),
+  };
+});
+jest.mock("@/features/media", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  const probe = (name: string) => (props: object) =>
+    createElement(Text, { testID: name }, JSON.stringify(props));
+  return { PhotosScreen: probe("PhotosScreen"), PhotoZoomScreen: probe("PhotoZoomScreen") };
+});
+jest.mock("@/features/profile", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  const probe = (name: string) => (props: object) =>
+    createElement(Text, { testID: name }, JSON.stringify(props));
+  return {
+    CardPreviewScreen: probe("CardPreviewScreen"),
+    DealBreakersScreen: probe("DealBreakersScreen"),
+    LaterFieldScreen: probe("LaterFieldScreen"),
+    ProfileScreen: probe("ProfileScreen"),
+    SectionScreen: probe("SectionScreen"),
+  };
+});
+jest.mock("@/features/settings", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  const probe = (name: string) => (props: object) =>
+    createElement(Text, { testID: name }, JSON.stringify(props));
+  return { SettingsScreen: probe("SettingsScreen"), TechConfigScreen: probe("TechConfigScreen") };
+});
+
+/** The jest.setup.js stand-in for Expo Router, with what the route files need beyond it. */
+const router = jest.requireMock("expo-router") as {
+  useLocalSearchParams: () => Record<string, string | string[] | undefined>;
+  Redirect?: (props: { href: string }) => React.ReactElement;
+  Stack?: (props: object) => React.ReactElement;
+};
+const params = (value: Record<string, string | string[] | undefined>) => {
+  router.useLocalSearchParams = () => value;
+};
+/** The props a stand-in screen was rendered with. */
+const propsOf = (name: string) =>
+  JSON.parse(String(screen.getByTestId(name).props.children)) as Record<string, unknown>;
+
+beforeAll(() => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  router.Redirect = ({ href }) => createElement(Text, { testID: "Redirect" }, href);
+  router.Stack = (props) => createElement(Text, { testID: "Stack" }, JSON.stringify(props));
+});
+beforeEach(() => params({}));
+
+describe("the screens without params", () => {
+  it.each([
+    ["/", IndexRoute, "HomeRoute"],
+    ["/account/email", EmailRoute, "EmailScreen"],
+    ["/onboarding", OnboardingRoute, "OnboardingScreen"],
+    ["/photos", PhotosRoute, "PhotosScreen"],
+    ["/profile", ProfileRoute, "ProfileScreen"],
+    ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
+    ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
+    ["/settings", SettingsRoute, "SettingsScreen"],
+    ["/tech", TechRoute, "TechConfigScreen"],
+  ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
+    await render(<Route />);
+    expect(propsOf(name)).toEqual({});
+  });
+
+  it("sends a link it has no screen for to the start", async () => {
+    await render(<NotFoundRoute />);
+    expect(screen.getByTestId("Redirect").props.children).toBe("/");
+  });
+});
+
+describe("the bank login's return, /auth", () => {
+  it("hands the code, the refusal and its date to the sign-in screen", async () => {
+    params({ code: "c", error: "auth_cooldown", until: "2026-10-22" });
+    await render(<AuthReturnRoute />);
+    expect(propsOf("SignInScreen")).toEqual({
+      code: "c",
+      error: "auth_cooldown",
+      until: "2026-10-22",
+    });
+  });
+
+  it("takes the first of a param that came twice, and leaves out what did not come", async () => {
+    params({ code: ["first", "second"] });
+    await render(<AuthReturnRoute />);
+    expect(propsOf("SignInScreen")).toEqual({ code: "first" });
+  });
+});
+
+describe("the zoom screen, /photos/[id]", () => {
+  it("hands the photo, its placeholder and its place in the grid as numbers", async () => {
+    params({ id: "p1", blurhash: "LEHV6n", position: "2", total: "3" });
+    await render(<PhotoZoomRoute />);
+    expect(propsOf("PhotoZoomScreen")).toEqual({
+      id: "p1",
+      blurhash: "LEHV6n",
+      position: 2,
+      total: 3,
+    });
+  });
+
+  it("falls back to no placeholder and one photo of one", async () => {
+    params({ id: "p1" });
+    await render(<PhotoZoomRoute />);
+    expect(propsOf("PhotoZoomScreen")).toEqual({
+      id: "p1",
+      blurhash: "",
+      position: 1,
+      total: 1,
+    });
+  });
+});
+
+describe("the profile's routes with a param", () => {
+  it("hands a later field's key to its screen, and an empty one when the link has none", async () => {
+    params({ field: "smoking" });
+    const view = await render(<LaterFieldRoute />);
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "smoking" });
+    await view.unmount();
+    params({});
+    await render(<LaterFieldRoute />);
+    expect(propsOf("LaterFieldScreen")).toEqual({ field: "" });
+  });
+
+  it("hands a section's id to its screen, and an empty one when the link has none", async () => {
+    params({ id: "basics" });
+    const view = await render(<ProfileSectionRoute />);
+    expect(propsOf("SectionScreen")).toEqual({ section: "basics" });
+    await view.unmount();
+    params({});
+    await render(<ProfileSectionRoute />);
+    expect(propsOf("SectionScreen")).toEqual({ section: "" });
+  });
+});
+
+describe("the root layout", () => {
+  it("keeps error reporting off in a build without a DSN", () => {
+    // _layout.tsx calls Sentry.init when it loads, with the options of src/lib/sentry.ts.
+    expect(Sentry.init).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false, sendDefaultPii: false }),
+    );
+  });
+
+  it("puts the stack without headers under the providers, with the signed-out watcher beside it", async () => {
+    await render(<RootLayout />);
+    expect(propsOf("Stack")).toEqual({
+      screenOptions: { headerShown: false, contentStyle: { backgroundColor: "transparent" } },
+    });
+    expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
+  });
+});

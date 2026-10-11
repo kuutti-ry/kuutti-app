@@ -33,8 +33,8 @@ const missing = ["display_name", "photos", "bio_or_prompts", "seeks", "age_windo
 /** A stored document with these fields, as GET /profile answers it. */
 const stored = (fields: Record<string, unknown>) => ({
   displayName: "Aino",
-  bio: null,
-  bioPreset: null,
+  bio: null as string | null,
+  bioPreset: null as string | null,
   fields,
   prompts: [],
   specialCategoryConsent: null,
@@ -87,7 +87,7 @@ const { __navigation: navigation, __router: router } = jest.requireMock("expo-ro
     dispatch: jest.Mock;
     emit: (name: string, event: unknown) => void;
   };
-  __router: { replace: jest.Mock };
+  __router: { replace: jest.Mock; back: jest.Mock };
 };
 
 /** The back gesture, the back button or Android's back key, as the stack reports it. */
@@ -227,5 +227,126 @@ describe("SectionScreen", () => {
     expect(puts).toHaveLength(2);
     await press(screen.getByRole("button", { name: "Leave without saving" }));
     expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
+  });
+
+  it("takes a written bio over a placeholder", async () => {
+    const { puts } = fakeApi({ profile: { ...stored({}), bioPreset: "photos_speak" } });
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
+    const preset = screen.getByRole("button", { name: "The photos say it. The rest over coffee." });
+    expect(preset.props.accessibilityState?.selected).toBe(true);
+    await type(screen.getByLabelText("About you"), "Long walks.");
+    await leave();
+    expect(puts[0]).toMatchObject({ bio: "Long walks.", bioPreset: null });
+  });
+
+  it("takes a placeholder over a written bio, and lets it go again", async () => {
+    const { puts } = fakeApi({ profile: { ...stored({}), bio: "Long walks." } });
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
+    const preset = () =>
+      screen.getByRole("button", { name: "The photos say it. The rest over coffee." });
+    await press(preset());
+    expect(screen.getByLabelText("About you").props.value).toBe("");
+    expect(preset().props.accessibilityState?.selected).toBe(true);
+    await press(preset());
+    expect(preset().props.accessibilityState?.selected).toBe(false);
+    await leave();
+    expect(puts[0]).toMatchObject({ bio: null, bioPreset: null });
+  });
+
+  it("saves an emptied bio as none", async () => {
+    const { puts } = fakeApi({ profile: { ...stored({}), bio: "Long walks." } });
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("About you")).toBeTruthy());
+    await type(screen.getByLabelText("About you"), "");
+    await leave();
+    expect(puts[0]).toMatchObject({ bio: null, bioPreset: null });
+  });
+
+  it("says when the profile could not be loaded and tries again on request", async () => {
+    let failing = true;
+    globalThis.fetch = jest.fn(async () =>
+      failing
+        ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+        : json({ profile: null, completeness: { complete: false, missing }, tips: [] }),
+    ) as unknown as typeof fetch;
+    await show(<SectionScreen section="lifestyle" />);
+    expect(screen.getByText("Your profile could not be loaded. Try again.")).toBeTruthy();
+    failing = false;
+    await press(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+  });
+
+  it("says it is saving, holds the back button, and saves once however often the person tries to leave", async () => {
+    let answer: ((response: Response) => void) | undefined;
+    const puts: unknown[] = [];
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.method === "GET") {
+        return json({ profile: stored({}), completeness: { complete: false, missing }, tips: [] });
+      }
+      puts.push(await request.json());
+      return new Promise<Response>((resolve) => {
+        answer = resolve;
+      });
+    }) as unknown as typeof fetch;
+    await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    await type(screen.getByLabelText("Name on your card"), "Aino K");
+    await leave();
+    expect(screen.getByText("Saving…")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Back to your profile" }).props.accessibilityState
+        ?.disabled,
+    ).toBe(true);
+    await leave();
+    expect(puts).toHaveLength(1);
+    await act(async () => {
+      answer?.(
+        json({
+          profile: stored({}),
+          completeness: { complete: false, missing },
+          tips: [],
+        }),
+      );
+      await settle();
+    });
+    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Saving…")).toBeNull();
+  });
+
+  it("names a refusal for the sensitive answers, and gives any other the generic line", async () => {
+    fakeApi({ saveStatus: 403, saveCode: "consent_required" });
+    await show(<SectionScreen section="beliefs" />);
+    await waitFor(() => expect(screen.getByText("Parties you could vote for")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "National Coalition Party" }));
+    await leave();
+    expect(
+      screen.getAllByText("This field needs your explicit consent first.").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("gives a refusal it has no words for the generic line, and the close control keeps the person here", async () => {
+    fakeApi({ saveStatus: 422, saveCode: "validation_failed" });
+    await show(<SectionScreen section="lifestyle" />);
+    await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Dog" }));
+    await leave();
+    expect(
+      screen.getAllByText("Saving did not work. Check the fields and try again.").length,
+    ).toBeGreaterThan(0);
+    await press(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("Leave without saving?")).toBeNull();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("goes back to the list with its back button", async () => {
+    fakeApi();
+    router.back.mockClear();
+    await show(<SectionScreen section="hobbies" />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Hobbies" })).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Back to your profile" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 });

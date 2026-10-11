@@ -88,14 +88,14 @@ export const ConsentKind = z.enum(CONSENT_KINDS).meta({ id: "ConsentKind" });
 export type ConsentKind = z.infer<typeof ConsentKind>;
 
 /** The kinds a person withdraws; terms and privacy end with the account (ADR-010 §4). */
-export const WITHDRAWABLE_CONSENT_KINDS = ["research", "special_category"] as const;
+const WITHDRAWABLE_CONSENT_KINDS = ["research", "special_category"] as const;
 export const WithdrawableConsentKind = z
   .enum(WITHDRAWABLE_CONSENT_KINDS)
   .meta({ id: "WithdrawableConsentKind" });
 export type WithdrawableConsentKind = z.infer<typeof WithdrawableConsentKind>;
 
 /** The languages the texts exist in; the Finnish wording is the binding one (TD-17). */
-export const CONSENT_LOCALES = ["fi", "sv", "en"] as const;
+const CONSENT_LOCALES = ["fi", "sv", "en"] as const;
 
 export const ConsentRequest = z
   .object({

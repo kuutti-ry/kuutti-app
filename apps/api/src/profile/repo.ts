@@ -34,7 +34,7 @@ export type ProfileRow = Omit<ProfileDocument, "specialCategoryConsent"> & {
  * whole document (ADR-009 §1: removing an option is a data change).
  */
 function storedFields(raw: unknown): { fields: ProfileFields; dropped: string[] } {
-  const source = (raw ?? {}) as Record<string, unknown>;
+  const source = raw as Record<string, unknown>;
   const fields: Record<string, unknown> = {};
   const dropped: string[] = [];
   for (const key of PROFILE_FIELD_KEYS) {

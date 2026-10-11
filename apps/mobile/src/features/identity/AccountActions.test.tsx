@@ -1,9 +1,11 @@
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
+import { Platform, Share } from "react-native";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { AccountActions } from "./AccountActions";
+import { AccountActions, shareExport } from "./AccountActions";
 
 // The account card (#51): export handed to the share sheet, deletion only
 // after the confirmation, the device signed out when the API says 204.
@@ -215,5 +217,149 @@ describe("AccountActions", () => {
     ).toBe(false);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+  });
+
+  /** The consents as the API holds them, for the bundled wording; research given or not. */
+  function consentsApi(options: { research: boolean; failGive?: boolean }) {
+    const versions = {
+      terms: CONSENT_VERSIONS.terms,
+      privacy: CONSENT_VERSIONS.privacy,
+      research: CONSENT_VERSIONS.research,
+      special_category: CONSENT_VERSIONS.special_category,
+    };
+    const record = (kind: string) => ({
+      kind,
+      version: CONSENT_VERSIONS.research,
+      locale: "en",
+      givenAt: "2026-09-26T10:00:00.000Z",
+      withdrawnAt: null,
+    });
+    let consents = options.research ? [record("research")] : [];
+    return fetchMock([
+      (req) => {
+        const path = new URL(req.url).pathname;
+        if (req.method === "GET" && path === "/consents") {
+          return json({ consents, currentVersions: versions });
+        }
+        if (req.method === "POST" && path === "/consents") {
+          if (options.failGive) {
+            return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
+          }
+          consents = [record("research")];
+          return json({ consents, currentVersions: versions });
+        }
+        return null;
+      },
+    ]);
+  }
+
+  it("gives the research consent for the wording built into the app, in the app's language", async () => {
+    const calls = consentsApi({ research: false });
+    await show(<AccountActions />);
+    const toggle = await screen.findByLabelText("Take part in research");
+    expect(toggle.props.accessibilityState?.checked).toBe(false);
+    await fireEvent(toggle, "press");
+    await waitFor(() =>
+      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
+        true,
+      ),
+    );
+    const post = calls.find((c) => c.method === "POST");
+    expect(JSON.parse(await (post as Request).text())).toEqual({
+      kind: "research",
+      version: CONSENT_VERSIONS.research,
+      locale: "en",
+    });
+  });
+
+  it("says so when the research choice could not be saved, and leaves the switch as it was", async () => {
+    consentsApi({ research: false, failGive: true });
+    await show(<AccountActions />);
+    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
+    expect(
+      await screen.findByText("The research choice could not be saved. Try again."),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
+      false,
+    );
+  });
+
+  it("hands the export to the phone's own share sheet when no other is given", async () => {
+    fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? json(exported) : null)]);
+    const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
+    await show(<AccountActions />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    share.mockRestore();
+  });
+
+  it("says it is preparing the data while the export runs, and holds both buttons", async () => {
+    fetchMock([
+      (req) =>
+        new URL(req.url).pathname === "/account/export"
+          ? (new Promise<Response>(() => undefined) as unknown as Response)
+          : null,
+    ]);
+    await show(<AccountActions share={jest.fn() as never} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    expect(await screen.findByText("Preparing your data…")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Delete my account" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+  });
+
+  it("closes the deletion question from its close control without deleting", async () => {
+    const requests = fetchMock([]);
+    await show(<AccountActions />);
+    await fireEvent.press(screen.getByRole("button", { name: "Delete my account" }));
+    expect(await screen.findByText("Delete your account?")).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    await settle();
+    expect(screen.queryByText("Delete your account?")).toBeNull();
+    expect(requests.filter((r) => r.method !== "GET")).toHaveLength(0);
+  });
+
+  it("shows nothing for a signed-out device", async () => {
+    await clearSession();
+    fetchMock([]);
+    await show(<AccountActions />);
+    expect(screen.queryByText("Your account")).toBeNull();
+  });
+});
+
+describe("shareExport on the web preview", () => {
+  it("downloads the export as a JSON file instead of sharing it, and lets the URL go later", async () => {
+    jest.useFakeTimers();
+    const os = jest.replaceProperty(Platform, "OS", "web");
+    const click = jest.fn();
+    const anchor: { href?: string; download?: string; click: jest.Mock } = { click };
+    const globals = globalThis as unknown as {
+      document?: unknown;
+      URL: { createObjectURL?: unknown; revokeObjectURL?: unknown };
+    };
+    globals.document = { createElement: jest.fn(() => anchor) };
+    const created = jest.fn(() => "blob:kuutti/1");
+    const revoked = jest.fn();
+    const original = { create: globals.URL.createObjectURL, revoke: globals.URL.revokeObjectURL };
+    globals.URL.createObjectURL = created;
+    globals.URL.revokeObjectURL = revoked;
+    try {
+      const share = jest.fn();
+      await shareExport(exported as never, "Your Kuutti data", share);
+      expect(share).not.toHaveBeenCalled();
+      expect(anchor).toMatchObject({ href: "blob:kuutti/1", download: "kuutti-export.json" });
+      expect(click).toHaveBeenCalledTimes(1);
+      const [blob] = created.mock.calls[0] as unknown as [Blob];
+      expect(blob.type).toBe("application/json");
+      expect(revoked).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(60_000);
+      expect(revoked).toHaveBeenCalledWith("blob:kuutti/1");
+    } finally {
+      os.restore();
+      delete globals.document;
+      globals.URL.createObjectURL = original.create;
+      globals.URL.revokeObjectURL = original.revoke;
+      jest.useRealTimers();
+    }
   });
 });

@@ -17,5 +17,3 @@ export const matchingConfig = pgTable(
   },
   (table) => [uniqueIndex("matching_config_key_version_idx").on(table.key, table.version)],
 );
-
-export type MatchingConfigRow = typeof matchingConfig.$inferSelect;

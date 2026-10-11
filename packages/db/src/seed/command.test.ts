@@ -3,9 +3,11 @@ import { createPool } from "../pool.ts";
 import { TEST_DATABASE_URL } from "../test/temporary-database.ts";
 import {
   assertDemoTarget,
+  assertStagingProcess,
   DemoCommandError,
   type DemoTarget,
   describeTarget,
+  NEVER_GIVEN_ON_STAGING,
   parseDemoCommand,
 } from "./command.ts";
 
@@ -140,5 +142,86 @@ describe("the server the rows would go to", () => {
         DemoCommandError,
       );
     }
+  });
+});
+
+describe("the command's faces", () => {
+  it("are asked for with --photos, for a write or a dry run", () => {
+    expect(parseDemoCommand(["--photos"], undefined)).toMatchObject({
+      action: "write",
+      photos: true,
+    });
+    expect(parseDemoCommand(["--dry-run", "--photos"], "test")).toMatchObject({
+      action: "dry-run",
+      photos: true,
+    });
+  });
+
+  it.each([
+    [["--photos=yes"], /--photos takes no value/],
+    [["--dry-run=1"], /--dry-run takes no value/],
+    [["--photos", "--remove"], /--photos is for writing/],
+    [["--photos", "--photos"], /--photos is given twice/],
+  ])("are refused as %o", (args, message) => {
+    expect(() => parseDemoCommand(args, undefined)).toThrow(message);
+  });
+});
+
+describe("an environment named without a value", () => {
+  it.each([[["--env"]], [["--env="]], [["--size", "10", "--env"]]])(
+    "is refused, never taken as development: %o",
+    (args) => {
+      expect(() => parseDemoCommand(args, undefined)).toThrow(/refusing: --env is ""/);
+    },
+  );
+
+  it("is refused even when APP_ENV is an allowed one", () => {
+    expect(() => parseDemoCommand(["--env"], "development")).toThrow(DemoCommandError);
+  });
+
+  it("says which number it could not read", () => {
+    expect(() => parseDemoCommand(["--seed"], undefined)).toThrow(
+      "--seed takes a whole number, not nothing",
+    );
+    expect(() => parseDemoCommand(["--size", "1e3"], undefined)).toThrow(
+      "--size takes a whole number, not 1e3",
+    );
+    expect(() => parseDemoCommand(["--size=0"], undefined)).toThrow(
+      "a population is 1 to 5000 people, not 0",
+    );
+  });
+
+  it("takes the extremes of the size", () => {
+    expect(parseDemoCommand(["--size", "1"], undefined).size).toBe(1);
+    expect(parseDemoCommand(["--size=5000"], undefined).size).toBe(5000);
+    expect(parseDemoCommand(["--seed", "0"], undefined).seed).toBe(0);
+  });
+});
+
+describe("the staging process (ADR-018)", () => {
+  it("is staging's container with nothing given by hand", () => {
+    expect(() => assertStagingProcess({ APP_ENV: "staging", PATH: "/usr/bin" })).not.toThrow();
+  });
+
+  it.each([
+    [{}, 'refusing: APP_ENV is "unset"'],
+    [{ APP_ENV: "production" }, 'refusing: APP_ENV is "production"'],
+    [{ APP_ENV: "Staging" }, 'refusing: APP_ENV is "Staging"'],
+    [{ APP_ENV: "development" }, 'refusing: APP_ENV is "development"'],
+  ])("is refused when APP_ENV is not staging: %o", (env, message) => {
+    expect(() => assertStagingProcess(env)).toThrow(message);
+    expect(() => assertStagingProcess(env)).toThrow(DemoCommandError);
+  });
+
+  it.each(NEVER_GIVEN_ON_STAGING)("is refused when %s is given to the process", (name) => {
+    expect(() => assertStagingProcess({ APP_ENV: "staging", [name]: "x" })).toThrow(
+      `refusing: ${name} given to the process`,
+    );
+  });
+
+  it("names every value given by hand at once, and counts an empty one as given", () => {
+    expect(() =>
+      assertStagingProcess({ APP_ENV: "staging", DATABASE_URL: "", HETU_HMAC_KEY: "k" }),
+    ).toThrow("refusing: DATABASE_URL, HETU_HMAC_KEY given to the process");
   });
 });

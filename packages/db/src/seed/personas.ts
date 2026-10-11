@@ -209,8 +209,8 @@ export function personaBirth(persona: DemoPersona, at: Date): FixedBirth {
   return { year: Math.floor(months / 12), month: (months % 12) + 1, day: 1 };
 }
 
-export const ARTIFICIAL_MIN = 900;
-export const ARTIFICIAL_MAX = 999;
+const ARTIFICIAL_MIN = 900;
+const ARTIFICIAL_MAX = 999;
 
 /** A persona whose code could be a person's is refused, wherever it comes from. */
 export function assertArtificial(persona: DemoPersona): void {

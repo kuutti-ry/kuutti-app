@@ -15,6 +15,3 @@ export const ponds = pgTable("ponds", {
   parentId: uuid("parent_id").references((): AnyPgColumn => ponds.id),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
-
-export type Pond = typeof ponds.$inferSelect;
-export type NewPond = typeof ponds.$inferInsert;

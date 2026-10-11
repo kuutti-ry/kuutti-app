@@ -1,5 +1,6 @@
 import type { SessionTokens } from "@kuutti/schema";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import { api, sessionMiddleware } from "./api";
 import {
   accessTokenIsStale,
@@ -10,6 +11,7 @@ import {
   onSessionChange,
   refreshSession,
   saveSession,
+  takeLoginStarted,
 } from "./session";
 
 // The device's session (#35): stored in the secure store as one JSON value,
@@ -144,5 +146,46 @@ describe("the client's session middleware", () => {
     const { response } = await api.GET("/auth/session");
     expect(response.status).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("without a session", () => {
+  it("refreshing asks the API nothing and answers signed out", async () => {
+    expect(await refreshSession()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("on the web preview", () => {
+  // No product surface on the web (rule 8): the preview keeps its session in
+  // memory only, and the secure store is never asked.
+  beforeEach(() => {
+    jest.replaceProperty(Platform, "OS", "web");
+    for (const fn of [
+      SecureStore.getItemAsync,
+      SecureStore.setItemAsync,
+      SecureStore.deleteItemAsync,
+    ]) {
+      (fn as jest.Mock).mockClear();
+    }
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  it("keeps the session in memory only", async () => {
+    await saveSession(tokens(3));
+    expect(await loadSession()).toEqual(tokens(3));
+    await clearSession();
+    expect(await loadSession()).toBeNull();
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
+  it("keeps the login mark in memory, good once", async () => {
+    await markLoginStarted(BASE);
+    expect(await takeLoginStarted(BASE + 1000)).toBe(true);
+    expect(await takeLoginStarted(BASE + 2000)).toBe(false);
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
   });
 });

@@ -17,6 +17,7 @@ import {
   moderatePhoto,
   NO_FACE,
   NOT_CHECKED,
+  queueAllModerator,
   RECHECK_AFTER_MS,
   rekognitionModerator,
   storedLabels,
@@ -497,5 +498,179 @@ describe("moderation of uploads", () => {
     });
     expect(after.rows[0]?.decided_by).toBe(staff.rows[0]?.id);
     void store;
+  });
+});
+
+/** A Rekognition client answering each of the three calls with what it is given. */
+function answering(answers: {
+  moderation?: Record<string, unknown>;
+  faces?: Record<string, unknown>;
+  scene?: Record<string, unknown>;
+}): RekognitionClient {
+  return {
+    async send(command: unknown) {
+      if (command instanceof DetectFacesCommand) return answers.faces ?? {};
+      if (command instanceof DetectLabelsCommand) return answers.scene ?? {};
+      return answers.moderation ?? {};
+    },
+  } as unknown as RekognitionClient;
+}
+
+describe("what the Rekognition adapter makes of sparse answers", () => {
+  it("an answer with nothing in it is a check that saw nothing: no labels, no faces, no model version", async () => {
+    const seen = await rekognitionModerator(answering({})).inspect(await fixtureWebp(80, 107));
+    expect(seen).toEqual({
+      checked: true,
+      labels: [],
+      tipLabels: [],
+      faceConfidences: [],
+      modelVersion: null,
+      calls: 3,
+    });
+    // No face, so a person decides, by the same rule as any other check.
+    expect(decideModeration(seen, { labelThreshold: 60, faceThreshold: 90 })).toEqual({
+      decision: "queued",
+      flagged: [NO_FACE],
+      faces: 0,
+    });
+  });
+
+  it("drops a label without a name, reads a missing parent as none and a missing confidence as zero, and keeps fifty at most", async () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      Name: `Label ${i}`,
+      ParentName: "Parent",
+      Confidence: 55.555,
+    }));
+    const seen = await rekognitionModerator(
+      answering({
+        moderation: {
+          ModerationLabels: [
+            { Confidence: 99 },
+            { Name: "", Confidence: 99 },
+            { Name: "Suggestive" },
+            ...many,
+          ],
+          ModerationModelVersion: "7.0",
+        },
+        faces: { FaceDetails: [{ Confidence: 98 }, {}] },
+      }),
+    ).inspect(await fixtureWebp(80, 107));
+    expect(seen.labels).toHaveLength(50);
+    expect(seen.labels[0]).toEqual({ name: "Suggestive", parentName: "", confidence: 0 });
+    expect(seen.labels[1]).toEqual({ name: "Label 0", parentName: "Parent", confidence: 55.56 });
+    expect(seen.faceConfidences).toEqual([98, 0]);
+    expect(seen.modelVersion).toBe("7.0");
+  });
+});
+
+describe("tip signals from sparse answers", () => {
+  it("skips a scene label without a name and reads a missing parent or confidence as none", () => {
+    expect(
+      tipLabelsFrom([{ Confidence: 90 }, { Name: "", Confidence: 90 }, { Name: "Bathroom" }], []),
+    ).toEqual([{ name: "Bathroom", parentName: "", confidence: 0 }]);
+  });
+
+  it("a face with no box, no sunglasses worn and no quality gives no face signal", () => {
+    expect(
+      tipLabelsFrom(
+        [],
+        [{ Confidence: 99, Sunglasses: { Value: false, Confidence: 99 }, Quality: {} }],
+      ),
+    ).toEqual([]);
+  });
+
+  it("reads the largest face, and sunglasses without a confidence as zero", () => {
+    expect(
+      tipLabelsFrom(
+        [],
+        [
+          { Confidence: 99, BoundingBox: { Width: 0.2, Height: 0.2 }, Quality: { Brightness: 80 } },
+          {
+            Confidence: 99,
+            BoundingBox: { Width: 0.5, Height: 0.4 },
+            Sunglasses: { Value: true },
+            Quality: { Sharpness: 0 },
+          },
+          { Confidence: 99, BoundingBox: { Width: 0.1 } },
+        ],
+      ),
+    ).toEqual([
+      { name: "Sunglasses", parentName: "Face", confidence: 0 },
+      { name: "TightCrop", parentName: "Face", confidence: 20 },
+      { name: "Sharpness", parentName: "Face", confidence: 0 },
+    ]);
+  });
+});
+
+describe("no automatic check (MODERATION=queue)", () => {
+  test("every upload goes to a person as not checked, and nothing is approved by itself", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, queueAllModerator());
+    const me = await signedInAccount(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 600, height: 800, exif: false })),
+    });
+    expect(res.status).toBe(201);
+    const photo = await res.json();
+    expect(photo.state).toBe("queued");
+    const review = await ctx.client.query(
+      "SELECT decision, flagged, labels, faces, model_version FROM photo_review WHERE photo_id = $1",
+      [photo.id],
+    );
+    expect(review.rows[0]).toEqual({
+      decision: "queued",
+      flagged: [NOT_CHECKED],
+      labels: [],
+      faces: 0,
+      model_version: null,
+    });
+    expect(logs().find((l) => l.msg === "photo moderated")).toMatchObject({
+      moderator: "queue",
+      decision: "queued",
+      rekognitionCalls: 0,
+    });
+  });
+});
+
+describe("the nightly sweep's failures", () => {
+  test("a pending photo whose card variant is gone, and one whose check fails again, both stay pending and are counted", async ({
+    ctx,
+  }) => {
+    const { app, store, logs, logger } = await appWith(ctx, scripted(new Error("down")));
+    const me = await signedInAccount(ctx.client);
+    const ids: string[] = [];
+    for (const width of [500, 501]) {
+      const res = await app.request("/photos", {
+        method: "POST",
+        headers: me.headers,
+        body: multipart(await fixtureJpeg({ width, height: 700, exif: false })),
+      });
+      ids.push((await res.json()).id as string);
+    }
+    // The first loses its card variant; the second keeps it, and the check is still down.
+    const key =
+      (await ctx.client.query<{ key: string }>("SELECT key FROM photo WHERE id = $1", [ids[0]]))
+        .rows[0]?.key ?? "";
+    await store.delete([objectKey(key, "card")]);
+    const stillDown = scripted(new Error("still down"));
+    const swept = await sweepPendingPhotos({
+      db: ctx.client,
+      logger,
+      now: () => new Date(Date.now() + RECHECK_AFTER_MS + 1000),
+      moderator: stillDown,
+      store,
+    });
+    expect(swept).toEqual({ rechecked: 0, failed: 2 });
+    expect(stillDown.seen).toHaveLength(1);
+    expect(
+      logs().find((l) => l.msg === "pending photo has no card variant to check"),
+    ).toMatchObject({ photoId: ids[0] });
+    const states = await ctx.client.query("SELECT state FROM photo WHERE id = ANY($1::uuid[])", [
+      ids,
+    ]);
+    expect(states.rows).toEqual([{ state: "pending" }, { state: "pending" }]);
   });
 });

@@ -61,4 +61,26 @@ describe("sentry options", () => {
     expect(http.data).toEqual({ method: "GET", status_code: 500 });
     expect(JSON.stringify([nav, http])).not.toMatch(/a@b\.fi|010190-123A|chat-7/);
   });
+
+  it("strips xhr and fetch breadcrumbs the same way, and one without data keeps nothing", () => {
+    for (const category of ["xhr", "fetch"]) {
+      expect(
+        stripBreadcrumb({
+          category,
+          data: { method: "POST", status_code: 201, url: "https://api/photos?x=1", body: "secret" },
+        }).data,
+      ).toEqual({ method: "POST", status_code: 201 });
+    }
+    expect(stripBreadcrumb({ category: "fetch" }).data).toEqual({
+      method: undefined,
+      status_code: undefined,
+    });
+  });
+
+  it("leaves a navigation breadcrumb without data, and any other category, as it was", () => {
+    const bare = { category: "navigation", message: "opened" };
+    expect(stripBreadcrumb(bare)).toBe(bare);
+    const logged = { category: "console", message: "warn", data: { arguments: ["x"] } };
+    expect(stripBreadcrumb(logged)).toBe(logged);
+  });
 });

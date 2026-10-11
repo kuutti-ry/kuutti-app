@@ -1,0 +1,121 @@
+import { act, renderHook, waitFor } from "@testing-library/react-native";
+import { AppState } from "react-native";
+import { saveSession } from "@/lib/session";
+import { useGate } from "./useGate";
+
+// Where the person stands at the gate (#94): read on focus and on coming back
+// to the foreground, quietly (what is shown stays until the answer is there),
+// loudly on a retry; of two reads under way the later one speaks.
+
+const { __focus: focus } = jest.requireMock("expo-router") as { __focus: () => void };
+const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+const closed = (needed: number) => ({ state: "closed", within: null, needed, step: 10 });
+
+/** Each read of /gate waits for the test to answer it. */
+function pendingReads() {
+  const waiting: Array<(response: Response) => void> = [];
+  globalThis.fetch = jest.fn(
+    () =>
+      new Promise<Response>((resolve) => {
+        waiting.push(resolve);
+      }),
+  ) as unknown as typeof fetch;
+  return waiting;
+}
+function answering(...answers: Array<() => Response>) {
+  let n = 0;
+  globalThis.fetch = jest.fn(async () => {
+    const answer = answers[Math.min(n, answers.length - 1)];
+    n += 1;
+    if (!answer) throw new Error("no answer prepared");
+    return answer();
+  }) as unknown as typeof fetch;
+  return () => n;
+}
+
+let appStateListener: ((state: string) => void) | undefined;
+beforeEach(async () => {
+  appStateListener = undefined;
+  jest.spyOn(AppState, "addEventListener").mockImplementation((_event, listener) => {
+    appStateListener = listener as (state: string) => void;
+    return { remove: jest.fn() } as never;
+  });
+  await saveSession({
+    sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+    accessToken: token("access"),
+    accessExpiresAt: "2030-01-01T00:15:00.000Z",
+    refreshToken: token("refresh"),
+    refreshExpiresAt: "2030-04-01T00:00:00.000Z",
+  });
+});
+afterEach(() => jest.restoreAllMocks());
+
+describe("useGate", () => {
+  it("reads the gate when the screen has the focus", async () => {
+    answering(() => json(closed(20)));
+    const { result } = await renderHook(() => useGate());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current).toMatchObject({ status: "ready", gate: closed(20) });
+  });
+
+  it("says it failed when the first read fails, and loads again on a retry", async () => {
+    answering(
+      () => json({ error: { code: "internal_error" } }, 500),
+      () => json(closed(10)),
+    );
+    const { result } = await renderHook(() => useGate());
+    await waitFor(() => expect(result.current.status).toBe("failed"));
+    await act(async () => result.current.retry());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+  });
+
+  it("shows loading on a retry, but keeps what it showed when a quiet read fails", async () => {
+    const waiting = pendingReads();
+    const { result } = await renderHook(() => useGate());
+    await act(async () => waiting.shift()?.(json(closed(20))));
+    expect(result.current.status).toBe("ready");
+    // Focus again: a quiet read that fails takes nothing away.
+    await act(async () => focus());
+    await act(async () => waiting.shift()?.(json({ error: { code: "internal_error" } }, 500)));
+    expect(result.current).toMatchObject({ status: "ready", gate: closed(20) });
+    // A retry is loud: loading, then failed when it fails.
+    await act(async () => result.current.retry());
+    expect(result.current.status).toBe("loading");
+    await act(async () => waiting.shift()?.(json({ error: { code: "internal_error" } }, 500)));
+    expect(result.current.status).toBe("failed");
+  });
+
+  it("reads again when the app comes back to the foreground, not when it leaves", async () => {
+    const reads = answering(
+      () => json(closed(20)),
+      () => json(closed(10)),
+    );
+    const { result } = await renderHook(() => useGate());
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    await act(async () => appStateListener?.("background"));
+    expect(reads()).toBe(1);
+    await act(async () => appStateListener?.("active"));
+    await waitFor(() => expect(result.current).toMatchObject({ gate: closed(10) }));
+    expect(reads()).toBe(2);
+  });
+
+  it("lets the later of two reads speak, whichever answers first", async () => {
+    const waiting = pendingReads();
+    const { result } = await renderHook(() => useGate());
+    await act(async () => result.current.retry());
+    const [first, second] = waiting;
+    await act(async () => second?.(json(closed(10))));
+    expect(result.current).toMatchObject({ status: "ready", gate: closed(10) });
+    // The earlier read answers last, with an answer or a failure: neither is shown.
+    await act(async () => first?.(json(closed(90))));
+    expect(result.current).toMatchObject({ gate: closed(10) });
+    await act(async () => result.current.retry());
+    await act(async () => focus());
+    const [, , third, fourth] = waiting;
+    await act(async () => fourth?.(json(closed(30))));
+    await act(async () => third?.(json({ error: { code: "internal_error" } }, 500)));
+    expect(result.current).toMatchObject({ status: "ready", gate: closed(30) });
+  });
+});

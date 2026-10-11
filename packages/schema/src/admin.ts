@@ -107,11 +107,3 @@ export const PhotoDecisionResponse = z
   })
   .meta({ id: "PhotoDecisionResponse" });
 export type PhotoDecisionResponse = z.infer<typeof PhotoDecisionResponse>;
-
-/** Stable error codes of the admin routes; messages come from messages.yaml. */
-export const ADMIN_ERROR_CODES = [
-  "admin_not_allowed",
-  "admin_forbidden",
-  "photo_not_queued",
-] as const;
-export type AdminErrorCode = (typeof ADMIN_ERROR_CODES)[number];

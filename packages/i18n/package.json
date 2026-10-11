@@ -18,13 +18,16 @@
     "translate": "node scripts/translate.ts",
     "review": "node scripts/review.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.131.0",
     "@types/node": "^22.20.5",
     "@types/react": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "react": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "yaml": "2.9.1",

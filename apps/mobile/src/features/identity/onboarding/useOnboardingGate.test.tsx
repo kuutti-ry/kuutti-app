@@ -1,6 +1,6 @@
 import { act, screen, waitFor } from "@testing-library/react-native";
 import { Text } from "react-native";
-import { saveSession } from "@/lib/session";
+import { clearSession, saveSession } from "@/lib/session";
 import { renderWithTheme } from "@/test/render";
 import { useOnboardingGate } from "./useOnboardingGate";
 
@@ -54,8 +54,10 @@ const status = (missing: string[]) => ({
 let missing: string[] = [];
 let reads = 0;
 
+let retry: (() => void) | undefined;
 function Probe() {
   const gate = useOnboardingGate();
+  retry = gate.retry;
   return <Text>{gate.status}</Text>;
 }
 
@@ -115,6 +117,57 @@ describe("the home screen's onboarding gate", () => {
       await settle();
     });
     expect(screen.getByText("complete")).toBeTruthy();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps the gate closed when the status cannot be read, and opens it on a retry that can", async () => {
+    let failing = true;
+    globalThis.fetch = jest.fn(async () => {
+      reads += 1;
+      return failing
+        ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+        : json(status([]));
+    }) as unknown as typeof fetch;
+    await act(async () => {
+      renderWithTheme(<Probe />);
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("unknown")).toBeTruthy());
+    failing = false;
+    await act(async () => {
+      retry?.();
+      await settle();
+    });
+    await waitFor(() => expect(screen.getByText("complete")).toBeTruthy());
+    expect(reads).toBe(2);
+  });
+
+  it("reads nothing for a signed-out device", async () => {
+    await clearSession();
+    await act(async () => {
+      renderWithTheme(<Probe />);
+      await settle();
+    });
+    expect(screen.getByText("signed-out")).toBeTruthy();
+    expect(reads).toBe(0);
+  });
+
+  it("does not send a person to onboarding from a screen they already left", async () => {
+    missing = ["seeks"];
+    let answer: ((response: Response) => void) | undefined;
+    globalThis.fetch = jest.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          answer = resolve;
+        }),
+    ) as unknown as typeof fetch;
+    const view = await renderWithTheme(<Probe />);
+    await waitFor(() => expect(answer).toBeDefined());
+    await view.unmount();
+    await act(async () => {
+      answer?.(json(status(missing)));
+      await settle();
+    });
     expect(router.replace).not.toHaveBeenCalled();
   });
 });

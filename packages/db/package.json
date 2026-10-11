@@ -13,6 +13,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "generate": "drizzle-kit generate",
     "check": "drizzle-kit check",
     "migrate": "node --env-file-if-exists=../../.env --import tsx src/cli/migrate.ts",
@@ -28,6 +29,7 @@
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/pg": "^8.15.0",
+    "@vitest/coverage-v8": "catalog:",
     "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",
     "typescript": "catalog:",

@@ -390,3 +390,148 @@ describe("photo routes", () => {
     expect(up.status).toBe(503);
   });
 });
+
+/** Every way the guard refuses a caller, with the code the app acts on (re-login, refresh, or nothing). */
+async function refusedCallers(ctx: TestContext) {
+  const ended = await signedInAccount(ctx.client);
+  await ctx.client.query("UPDATE session SET revoked_at = now() WHERE id = $1", [ended.sessionId]);
+  const expired = await signedInAccount(ctx.client);
+  await ctx.client.query(
+    "UPDATE session SET access_expires_at = now() - interval '1 minute' WHERE id = $1",
+    [expired.sessionId],
+  );
+  return [
+    ["no token", {}, "unauthenticated"],
+    ["a malformed token", { authorization: "Bearer not-a-token" }, "unauthenticated"],
+    ["a token nobody issued", { authorization: `Bearer ${"A".repeat(43)}` }, "unauthenticated"],
+    ["an ended session", ended.headers, "session_revoked"],
+    ["an expired access token", expired.headers, "session_expired"],
+  ] as const;
+}
+
+describe("photo routes, every branch of the guard and the parameters", () => {
+  test("an ended, expired or unknown session is refused on every photo route with its own code", async ({
+    ctx,
+  }) => {
+    const { app, store } = await appWith(ctx);
+    const owner = await signedInAccount(ctx.client);
+    const photo = Photo.parse(
+      await (await upload(app, owner.headers, await fixturePng(90, 90))).json(),
+    );
+    for (const [what, headers, code] of await refusedCallers(ctx)) {
+      const attempts = [
+        app.request("/photos", { headers }),
+        app.request("/photos", {
+          method: "POST",
+          headers,
+          body: multipart(await fixturePng(91, 91)),
+        }),
+        app.request(`/photos/${photo.id}`, { method: "DELETE", headers }),
+        app.request("/photos/order", {
+          method: "PUT",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ order: [photo.id] }),
+        }),
+        app.request(`/photos/${photo.id}/thumb`, { headers }),
+      ];
+      for (const res of await Promise.all(attempts)) {
+        expect(res.status, what).toBe(401);
+        expect(await errorCode(res), what).toBe(code);
+      }
+    }
+    // Nothing of the owner's moved: one photo, its three objects, no fetch row.
+    expect(store.objects.size).toBe(3);
+    const access = await ctx.client.query("SELECT count(*) AS n FROM photo_access");
+    expect(Number(access.rows[0]?.n)).toBe(0);
+  });
+
+  test("a variant that does not exist, or an id that is not one, is refused before anything is read", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const me = await signedInAccount(ctx.client);
+    const photo = Photo.parse(
+      await (await upload(app, me.headers, await fixturePng(92, 92))).json(),
+    );
+    for (const path of [
+      `/photos/${photo.id}/original`,
+      `/photos/${photo.id}/FULL`,
+      "/photos/not-a-uuid/thumb",
+    ]) {
+      const res = await app.request(path, { headers: me.headers });
+      expect(res.status, path).toBe(400);
+      expect(await errorCode(res), path).toBe("validation_failed");
+    }
+    const access = await ctx.client.query("SELECT count(*) AS n FROM photo_access");
+    expect(Number(access.rows[0]?.n)).toBe(0);
+    expect(logs().some((l) => l.msg === "photo url issued")).toBe(false);
+  });
+
+  test("a photo id nobody has is refused like another account's photo, and the miss is logged", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const me = await signedInAccount(ctx.client);
+    const id = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+    const res = await app.request(`/photos/${id}/card`, { headers: me.headers });
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe("not_found");
+    expect(logs().find((l) => l.msg === "photo refused")).toMatchObject({
+      accountId: me.accountId,
+      photoId: id,
+      variant: "card",
+      reason: "not_visible",
+    });
+  });
+
+  test("without object storage every photo route answers media_unavailable and writes nothing", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, { media: false });
+    const me = await signedInAccount(ctx.client);
+    const photo = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, position)
+       VALUES ($1, 'k-off', 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 10, 10, 0) RETURNING id`,
+      [me.accountId],
+    );
+    const id = photo.rows[0]?.id ?? "";
+    for (const res of [
+      await app.request(`/photos/${id}`, { method: "DELETE", headers: me.headers }),
+      await app.request("/photos/order", {
+        method: "PUT",
+        headers: { ...me.headers, "content-type": "application/json" },
+        body: JSON.stringify({ order: [id] }),
+      }),
+      await app.request(`/photos/${id}/thumb`, { headers: me.headers }),
+    ]) {
+      expect(res.status).toBe(503);
+      expect(await errorCode(res)).toBe("media_unavailable");
+    }
+    const rows = await ctx.client.query("SELECT id FROM photo WHERE account_id = $1", [
+      me.accountId,
+    ]);
+    expect(rows.rows).toEqual([{ id }]);
+    const access = await ctx.client.query("SELECT count(*) AS n FROM photo_access");
+    expect(Number(access.rows[0]?.n)).toBe(0);
+  });
+
+  test("an order that names a photo twice and leaves another out is refused", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const me = await signedInAccount(ctx.client);
+    const ids = [
+      Photo.parse(await (await upload(app, me.headers, await fixturePng(93, 93))).json()).id,
+      Photo.parse(await (await upload(app, me.headers, await fixturePng(94, 94))).json()).id,
+    ];
+    const res = await app.request("/photos/order", {
+      method: "PUT",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ order: [ids[1], ids[1]] }),
+    });
+    expect(res.status).toBe(400);
+    expect(await errorCode(res)).toBe("photo_order_invalid");
+    const list = PhotoList.parse(
+      await (await app.request("/photos", { headers: me.headers })).json(),
+    );
+    expect(list.photos.map((p) => p.id)).toEqual(ids);
+  });
+});

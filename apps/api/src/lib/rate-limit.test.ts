@@ -83,3 +83,80 @@ describe("rate limit", () => {
     for (let i = 0; i < 5; i += 1) expect((await app.request("/free")).status).toBe(200);
   });
 });
+
+describe("rate limit with nothing in front (development, tests)", () => {
+  // What @hono/node-server hands a request: the socket it came in on.
+  const socket = (remoteAddress: string | undefined) => ({
+    incoming: { socket: { remoteAddress, remotePort: 40000, remoteFamily: "IPv4" } },
+  });
+
+  it("keys on the socket's address and takes no forwarded hop for it", async () => {
+    const app = limitedApp(() => 1_000, "none");
+    const forged = (hop: string) => ({ headers: { "x-forwarded-for": hop } });
+    await app.request("/", forged("198.51.100.1"), socket("192.0.2.1"));
+    await app.request("/", forged("198.51.100.2"), socket("192.0.2.1"));
+    expect((await app.request("/", forged("198.51.100.3"), socket("192.0.2.1"))).status).toBe(429);
+    expect((await app.request("/", {}, socket("192.0.2.2"))).status).toBe(200);
+  });
+
+  it("a request with no socket, or a socket with no address, shares the one bucket", async () => {
+    const app = limitedApp(() => 1_000, "none");
+    await app.request("/");
+    await app.request("/", {}, socket(undefined));
+    const third = await app.request("/");
+    expect(third.status).toBe(429);
+    expect(third.headers.get("ratelimit-remaining")).toBe("0");
+  });
+});
+
+describe("rate limit bookkeeping", () => {
+  it("says the limit and what is left on every answer", async () => {
+    const app = limitedApp(() => 1_000);
+    const client = from({ "x-forwarded-for": "203.0.113.7" });
+    const first = await app.request("/", client);
+    expect(first.headers.get("ratelimit-limit")).toBe("2");
+    expect(first.headers.get("ratelimit-remaining")).toBe("1");
+    await app.request("/", client);
+    const blocked = await app.request("/", client);
+    expect(blocked.headers.get("ratelimit-remaining")).toBe("0");
+    // The window began at 1 000 ms and lasts 1 000: one second left, never zero.
+    expect(blocked.headers.get("retry-after")).toBe("1");
+  });
+
+  it("answers in the envelope even where no request id was given, with an unknown one", async () => {
+    const app = new Hono();
+    app.use("*", rateLimit({ limit: 1, windowMs: 60_000, trustedProxy: "traefik", now: () => 0 }));
+    app.get("/", (c) => c.text("ok"));
+    const client = from({ "x-forwarded-for": "203.0.113.7" });
+    await app.request("/", client);
+    const blocked = await app.request("/", client);
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({
+      error: {
+        code: "rate_limited",
+        message: "Too many requests. Try again in 60 seconds.",
+        requestId: "unknown",
+      },
+    });
+  });
+
+  it("past ten thousand clients forgets the windows that are over, and only those", async () => {
+    let clock = 0;
+    const app = limitedApp(() => clock);
+    for (let i = 0; i <= 10_000; i += 1) {
+      const address = `10.${(i >> 16) & 255}.${(i >> 8) & 255}.${i & 255}`;
+      await app.request("/", from({ "x-forwarded-for": address }));
+    }
+    // A client still inside its window when the old ones are forgotten.
+    clock = 900;
+    const busy = from({ "x-forwarded-for": "198.51.100.9" });
+    await app.request("/", busy);
+    await app.request("/", busy);
+    expect((await app.request("/", busy)).status).toBe(429);
+    // The first windows are over; the next request forgets them, and not the busy one's.
+    clock = 1_500;
+    expect((await app.request("/", from({ "x-forwarded-for": "198.51.100.10" }))).status).toBe(200);
+    expect((await app.request("/", busy)).status).toBe(429);
+    expect((await app.request("/", from({ "x-forwarded-for": "10.0.0.0" }))).status).toBe(200);
+  });
+});

@@ -639,3 +639,62 @@ describe("onboarding and consents", () => {
     expect(JSON.stringify(logs())).not.toContain("vihr");
   });
 });
+
+describe("onboarding and consents: the quiet branches", () => {
+  test("Without a default pond named in matching_config the pond step stays and nothing is assigned", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    // The one-pond world in which the default would otherwise be assigned (ADR-010 §12).
+    await ctx.client.query("DELETE FROM ponds WHERE slug = 'suomi'");
+    await ctx.client.query(
+      "INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ('paakaupunkiseutu', 'Pääkaupunkiseutu', 'Pääkaupunkiseudulla') ON CONFLICT (slug) DO NOTHING",
+    );
+    for (const value of ['""', "7"]) {
+      await ctx.client.query(
+        `INSERT INTO matching_config (version, key, value, created_by) VALUES (99, 'default_pond', $1::jsonb, 'test')
+         ON CONFLICT (key, version) DO UPDATE SET value = EXCLUDED.value`,
+        [value],
+      );
+      const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+      const read = await status(app, a.headers);
+      expect(read.pond, value).toBeNull();
+      expect(read.missing, value).toContain("pond");
+      const stored = await ctx.client.query("SELECT pond_id FROM account WHERE id = $1", [
+        a.accountId,
+      ]);
+      expect(stored.rows, value).toEqual([{ pond_id: null }]);
+    }
+    expect(logs().filter((l) => l.msg === "pond assigned")).toEqual([]);
+  });
+
+  test("Withdrawing a special-category consent that was never given takes no answer with it", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
+    // A seek answer from before the consent existed (ADR-019 §4): no consent row to withdraw.
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'seeks', '["man"]', 'hard', false)`,
+      [a.accountId],
+    );
+    const res = await app.request("/consents/special_category", {
+      method: "DELETE",
+      headers: a.headers,
+    });
+    expect(res.status).toBe(200);
+    expect(ConsentsResponse.parse(await res.json()).consents).toEqual([]);
+    // Nothing was there, so nothing goes: the seek row stays, and the cadence is not sidestepped (#147).
+    const seeks = await ctx.client.query(
+      "SELECT value FROM preferences WHERE account_id = $1 AND field = 'seeks'",
+      [a.accountId],
+    );
+    expect(seeks.rows).toEqual([{ value: ["man"] }]);
+    expect(
+      logs().filter((l) =>
+        ["consent withdrawn", "special-category answers cleared"].includes(l.msg ?? ""),
+      ),
+    ).toEqual([]);
+  });
+});

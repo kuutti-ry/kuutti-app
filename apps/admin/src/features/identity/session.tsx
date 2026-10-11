@@ -78,10 +78,11 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
       // The fragment is consumed once: a reload must not exchange or show it again.
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
     }
+    // Up to its first await this runs inside the effect itself, where `mounted` is still true.
     void (async () => {
       if (fragment.error) {
         writeStored(null);
-        if (mounted) setState({ status: "signed-out", error: fragment.error });
+        setState({ status: "signed-out", error: fragment.error });
         return;
       }
       if (fragment.code) {
@@ -107,10 +108,9 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
       const stored = readStored();
       if (!stored) {
         // The second StrictMode run must not undo the first run's exchange in flight.
-        if (mounted)
-          setState((previous) =>
-            previous.status === "loading" ? { status: "signed-out" } : previous,
-          );
+        setState((previous) =>
+          previous.status === "loading" ? { status: "signed-out" } : previous,
+        );
         return;
       }
       // A stored token is checked against the API before anything is shown

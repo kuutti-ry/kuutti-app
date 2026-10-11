@@ -130,3 +130,94 @@ describe("photo pipeline", () => {
     await expect(processPhoto(header)).rejects.toMatchObject({ reason: "invalid" });
   });
 });
+
+/** A JPEG made of segments: SOI, then each given marker with its payload, as the header reader walks them. */
+function jpegOf(...segments: (number[] | [number, number])[]): Uint8Array {
+  return new Uint8Array([0xff, 0xd8, ...segments.flat()]);
+}
+/** A segment with a length field: marker, length (payload + 2), payload. */
+const segment = (marker: number, payload: number[]) => [
+  0xff,
+  marker,
+  (payload.length + 2) >> 8,
+  (payload.length + 2) & 0xff,
+  ...payload,
+];
+/** A baseline frame header (SOF0 or another) for 640×480. */
+const frame = (marker = 0xc0) => segment(marker, [0x08, 0x01, 0xe0, 0x02, 0x80, 0x03, 0x01]);
+
+describe("the header reader, segment by segment", () => {
+  it("steps over standalone markers before the frame header", () => {
+    for (const standalone of [0xd8, 0xd0, 0xd7, 0x01]) {
+      expect(inspectImage(jpegOf([0xff, standalone], frame())), standalone.toString(16)).toEqual({
+        format: "jpeg",
+        width: 640,
+        height: 480,
+      });
+    }
+  });
+
+  it("steps over a Huffman table, an arithmetic-coding table and JPG extension segment, which share the frame headers' range", () => {
+    // 0xc4 (DHT), 0xc8 (JPG) and 0xcc (DAC) sit among the SOFn markers but carry no dimensions.
+    const notFrames = [0xc4, 0xc8, 0xcc].map((marker) => segment(marker, [0xff, 0xff, 0xff, 0xff]));
+    expect(inspectImage(jpegOf(...notFrames, frame()))).toEqual({
+      format: "jpeg",
+      width: 640,
+      height: 480,
+    });
+  });
+
+  it("reads the size from a progressive frame header too", () => {
+    expect(inspectImage(jpegOf(frame(0xc2)))).toEqual({ format: "jpeg", width: 640, height: 480 });
+  });
+
+  it("refuses a stream that ends, starts its scan, breaks its markers or lies about a length before any frame header", () => {
+    const app0 = segment(0xe0, [0x4a, 0x46, 0x49, 0x46, 0x00]);
+    for (const [what, bytes] of [
+      ["end of image first", jpegOf(app0, [0xff, 0xd9])],
+      ["a scan first", jpegOf([0xff, 0xda, 0x00, 0x08])],
+      ["a byte that is no marker", jpegOf([0x00, 0xe0, 0x00, 0x04])],
+      ["a segment length under two", jpegOf([0xff, 0xe1, 0x00, 0x01])],
+      ["segments and then nothing", jpegOf(app0)],
+      ["a frame header cut short", jpegOf([0xff, 0xc0, 0x00, 0x11, 0x08])],
+    ] as const) {
+      expect(inspectImage(bytes), what).toBeNull();
+    }
+  });
+
+  it("refuses a PNG signature whose first chunk is not the image header", async () => {
+    const png = Buffer.from(await fixturePng(30, 20));
+    expect(inspectImage(png)).toEqual({ format: "png", width: 30, height: 20 });
+    png.write("IDAT", 12, "latin1");
+    expect(inspectImage(png)).toBeNull();
+  });
+
+  it("reads an extended WebP (with alpha) and refuses a RIFF that is not WebP or a WebP chunk it does not know", async () => {
+    const alpha = await sharp({
+      create: { width: 30, height: 20, channels: 4, background: { r: 9, g: 9, b: 9, alpha: 0.5 } },
+    })
+      .webp()
+      .toBuffer();
+    expect(alpha.subarray(12, 16).toString("latin1")).toBe("VP8X");
+    expect(inspectImage(alpha)).toEqual({ format: "webp", width: 30, height: 20 });
+
+    const notWebp = Buffer.from(alpha);
+    notWebp.write("WAVE", 8, "latin1");
+    expect(inspectImage(notWebp)).toBeNull();
+    const unknownChunk = Buffer.from(alpha);
+    unknownChunk.write("VP9 ", 12, "latin1");
+    expect(inspectImage(unknownChunk)).toBeNull();
+    expect(inspectImage(alpha.subarray(0, 29))).toBeNull();
+  });
+
+  it("a JPEG cut off in its scan passes the header and fails in the decoder as invalid", async () => {
+    const jpeg = await fixtureJpeg({ width: 400, height: 300, exif: false });
+    const cut = jpeg.subarray(0, Math.floor(jpeg.length * 0.7));
+    expect(inspectImage(cut)).toEqual({ format: "jpeg", width: 400, height: 300 });
+    await expect(processPhoto(cut)).rejects.toMatchObject({
+      name: "PipelineError",
+      reason: "invalid",
+      message: expect.stringMatching(/^sharp could not decode the image: /),
+    });
+  });
+});

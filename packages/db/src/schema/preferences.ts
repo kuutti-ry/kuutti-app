@@ -37,6 +37,3 @@ export const preferences = pgTable(
   },
   (table) => [uniqueIndex("preferences_account_field_idx").on(table.accountId, table.field)],
 );
-
-export type Preference = typeof preferences.$inferSelect;
-export type NewPreference = typeof preferences.$inferInsert;

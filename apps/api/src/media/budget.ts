@@ -73,7 +73,7 @@ function localParts(at: Date, timeZone: string): Parts {
     second: "numeric",
   }).formatToParts(at);
   const read = (type: Intl.DateTimeFormatPartTypes) =>
-    Number(parts.find((part) => part.type === type)?.value ?? Number.NaN);
+    Number(parts.find((part) => part.type === type)?.value);
   return {
     year: read("year"),
     month: read("month"),

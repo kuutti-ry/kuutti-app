@@ -22,6 +22,3 @@ export const researchSubject = pgTable("research_subject", {
   consentVersion: text("consent_version").notNull(),
   enrolledAt: timestamp("enrolled_at", { withTimezone: true }).notNull().defaultNow(),
 });
-
-export type ResearchSubject = typeof researchSubject.$inferSelect;
-export type NewResearchSubject = typeof researchSubject.$inferInsert;

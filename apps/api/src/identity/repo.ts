@@ -315,7 +315,6 @@ export async function findSessionByAccessHash(
  * any of them ends every session, for the access token and the refresh token
  * alike, and the same clause serves both paths.
  */
-export const LIVE_ACCOUNT_STATES = ["registered", "active", "paused", "shadow_banned"] as const;
 const SESSION_ALIVE = `EXISTS (
   SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
   WHERE a.id = session.account_id AND i.standing = 'ok'

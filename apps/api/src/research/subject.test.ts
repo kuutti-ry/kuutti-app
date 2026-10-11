@@ -41,7 +41,13 @@ async function eventsKeyedBy(ctx: TestContext, researchId: string): Promise<numb
   return Number(rows[0]?.n);
 }
 
-/** A fixed instant (the account of the harness is born 1990-06: 36, band 35-39) with its month ensured. */
+/**
+ * A fixed instant (the account of the harness is born 1990-06: 36, band 35-39)
+ * with its month ensured. Asked for first in a test, before anything writes
+ * an event: creating a partition waits for every open transaction that wrote
+ * to events, and a test that wrote one and then waited for the partition lock
+ * held by another test's creation deadlocked with it.
+ */
 const FIXED = new Date("2026-09-26T12:00:00Z");
 async function deps(ctx: TestContext) {
   const { logger } = await captureLogger();
@@ -53,6 +59,7 @@ describe("the research_id mapping", () => {
   test("The research opt-in creates the research_id mapping and withdrawal removes it", async ({
     ctx,
   }) => {
+    const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
     await consent(ctx, a.headers);
     const subject = await repo.findSubject(ctx.client, a.accountId);
@@ -60,7 +67,7 @@ describe("the research_id mapping", () => {
     expect(subject?.consentVersion).toBe(CURRENT_CONSENT_VERSIONS.research);
     const researchId = subject?.researchId ?? "";
     expect(
-      await track(await deps(ctx), a.accountId, "profile_saved", {
+      await track(research, a.accountId, "profile_saved", {
         complete: false,
         approvedPhotos: 0,
       }),
@@ -71,7 +78,7 @@ describe("the research_id mapping", () => {
     expect(await repo.findSubject(ctx.client, a.accountId)).toBeNull();
     expect(await eventsKeyedBy(ctx, researchId)).toBe(2);
     expect(
-      await track(await deps(ctx), a.accountId, "profile_saved", {
+      await track(research, a.accountId, "profile_saved", {
         complete: false,
         approvedPhotos: 0,
       }),
@@ -113,10 +120,11 @@ describe("the research_id mapping", () => {
   });
 
   test("Erasure removes the research_id mapping and keeps the events", async ({ ctx }) => {
+    const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
     await consent(ctx, a.headers);
     const researchId = (await repo.findSubject(ctx.client, a.accountId))?.researchId ?? "";
-    await track(await deps(ctx), a.accountId, "profile_saved", {
+    await track(research, a.accountId, "profile_saved", {
       complete: false,
       approvedPhotos: 0,
     });
@@ -140,11 +148,12 @@ describe("the research_id mapping", () => {
   test("The export shows the research enrolment and the events but never the research_id", async ({
     ctx,
   }) => {
+    const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
     await ctx.client.query("UPDATE account SET gender = 'man' WHERE id = $1", [a.accountId]);
     await consent(ctx, a.headers);
     const researchId = (await repo.findSubject(ctx.client, a.accountId))?.researchId ?? "";
-    await track(await deps(ctx), a.accountId, "profile_saved", {
+    await track(research, a.accountId, "profile_saved", {
       complete: false,
       approvedPhotos: 1,
     });

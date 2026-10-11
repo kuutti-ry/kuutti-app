@@ -185,9 +185,10 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
       ]);
       const faceDetails = faces.FaceDetails ?? [];
       const labels: ModerationLabel[] = (moderation.ModerationLabels ?? [])
-        .filter((label) => typeof label.Name === "string" && label.Name.length > 0)
-        .slice(0, MAX_LABELS)
-        .map((label) => asLabel(label.Name ?? "", label.ParentName ?? "", label.Confidence ?? 0));
+        .flatMap(({ Name, ParentName, Confidence }) =>
+          Name ? [asLabel(Name, ParentName ?? "", Confidence ?? 0)] : [],
+        )
+        .slice(0, MAX_LABELS);
       return {
         checked: true,
         labels,

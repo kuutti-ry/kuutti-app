@@ -158,15 +158,16 @@ function notReviewedHere(key: string): string | undefined {
   return undefined;
 }
 
-/** Why `text` cannot be the approved `locale` text of `key`, or undefined when it can. */
+/**
+ * Why `text` cannot be the approved `locale` text of `key`, or undefined when
+ * it can. The caller has refused legal.* and admin.* keys (notReviewedHere).
+ */
 function approvalProblem(
   key: string,
   message: Message,
   locale: TranslatedLocale,
   text: string,
 ): string | undefined {
-  const outside = notReviewedHere(key);
-  if (outside) return outside;
   const reason = rejectionReason(message.en, text, locale, message.max_length);
   if (reason) return reason;
   // The file's own rules over the approved text: arguments, plural and select

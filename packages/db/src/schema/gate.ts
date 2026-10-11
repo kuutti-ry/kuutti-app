@@ -47,6 +47,3 @@ export const gate = pgTable(
     check("gate_opened_check", sql`${table.openedAt} IS NULL OR ${table.admittedAt} IS NOT NULL`),
   ],
 );
-
-export type Gate = typeof gate.$inferSelect;
-export type NewGate = typeof gate.$inferInsert;

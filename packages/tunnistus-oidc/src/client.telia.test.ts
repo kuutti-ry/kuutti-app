@@ -159,15 +159,22 @@ describe("the Telia dialect against the guide", () => {
 
   it("refuses an ID token that is not encrypted, is signed by a stranger, names another nonce or another audience", async () => {
     const client = await clientFor(telia);
-    for (const misbehave of [
-      { plainIdToken: true },
-      { rogueKey: true },
-      { wrongNonce: true },
-      { wrongAudience: true },
+    for (const [misbehave, reason] of [
+      [{ plainIdToken: true }, "ID token was not encrypted"],
+      [{ rogueKey: true }, "invalid response encountered"],
+      [{ wrongNonce: true }, "unexpected JWT claim value encountered"],
+      [{ wrongAudience: true }, "unexpected JWT claim value encountered"],
     ] as const) {
       telia.misbehave = misbehave;
-      await expect((await login(client, telia)).identity()).rejects.toBeInstanceOf(TunnistusError);
+      const error = await (await login(client, telia)).identity().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(TunnistusError);
+      expect(error).toMatchObject({ reason });
     }
+    // The same client completes a login once the double behaves again.
+    telia.misbehave = {};
+    expect((await (await login(client, telia)).identity()).personalIdentityCode).toBe(
+      "010170-999R",
+    );
   });
 
   it("throws an error that carries the reason and nothing of the person, whatever the library attached", async () => {
@@ -249,5 +256,123 @@ describe("the Telia dialect against the guide", () => {
     expect(headerOf(request)).toMatchObject({ alg: "RS256", typ: "JWT" });
     expect(decodeJwt(request).ui_locales).toBeUndefined();
     expect(decodeJwt(request).prompt).toBeUndefined();
+  });
+});
+
+describe("the double's other answers, through the client", () => {
+  let telia: FakeTelia;
+  beforeEach(async () => {
+    telia = await fakeTelia();
+  });
+
+  it("refuses a callback from a person who cancelled, without asking the token endpoint", async () => {
+    const client = await clientFor(telia);
+    telia.userCancels = true;
+    const { back, state, nonce } = await login(client, telia);
+    await expect(client.completeLogin({ callbackUrl: back, state, nonce })).rejects.toMatchObject({
+      reason: "authorization response from the server is an error",
+    });
+    expect(telia.seen.tokenForm).toBeNull();
+  });
+
+  it("refuses a callback that carries another login's state, without asking the token endpoint", async () => {
+    const client = await clientFor(telia);
+    const { back, nonce } = await login(client, telia);
+    await expect(
+      client.completeLogin({ callbackUrl: back, state: random(), nonce }),
+    ).rejects.toMatchObject({ reason: "invalid response encountered" });
+    expect(telia.seen.tokenForm).toBeNull();
+  });
+
+  it("cannot use a code twice: the broker refuses the replay with invalid_grant", async () => {
+    const client = await clientFor(telia);
+    const { identity } = await login(client, telia);
+    await identity();
+    await expect(identity()).rejects.toMatchObject({
+      reason: "server responded with an error in the response body",
+    });
+  });
+
+  it("returns the person the broker authenticated, whoever it is", async () => {
+    telia = await fakeTelia({
+      person: {
+        hetu: "141002A909X",
+        dateOfBirth: "2002-10-14",
+        acr: ACR_LOATEST2,
+        amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.nordea.1"],
+      },
+    });
+    const answer = await (await login(await clientFor(telia), telia)).identity();
+    expect(answer).toMatchObject({
+      personalIdentityCode: "141002A909X",
+      dateOfBirth: "2002-10-14",
+      amr: ["https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.nordea.1"],
+    });
+  });
+
+  // A client set up otherwise than Telia registered it gets no further than the broker's refusal.
+  it.each([
+    [
+      "another client id",
+      { clientId: "not-the-registered-client" },
+      /^request object rejected: unexpected "iss" claim value$/,
+    ],
+    [
+      "another redirect URI",
+      { redirectUri: "https://api.kuutti.app/auth/callback" },
+      /^redirect_uri is not registered$/,
+    ],
+    ["no acr_values", { acrValues: null }, /^acr_values is mandatory \(Traficom 213\/2023 S\)$/],
+    ["the plain dialect", { dialect: "plain" as const }, /^no request object \(guide 2\.4\.1\)$/],
+  ])(
+    "is refused at the authorization endpoint when it has %s",
+    async (_name, overrides, refusal) => {
+      const client = await createTunnistusClient({
+        issuer: TELIA_ISSUER,
+        clientId: telia.clientId,
+        redirectUri: telia.redirectUri,
+        acrValues: ACR_LOATEST2,
+        signingKeyPem: telia.signingKeyPem,
+        encryptionKeyPem: telia.encryptionKeyPem,
+        fetch: telia.fetch,
+        ...overrides,
+      });
+      const url = await client.startLogin({ state: random(), nonce: random() });
+      await expect(telia.authorize(url)).rejects.toThrow(/^authorization endpoint answered 400: /);
+      expect(telia.seen.refusals).toHaveLength(1);
+      expect(telia.seen.refusals[0]).toMatch(refusal);
+    },
+  );
+
+  it("is refused at the authorization endpoint when it signs with a key Telia did not register", async () => {
+    const other = await fakeTelia(); // another set of client keys
+    const client = await createTunnistusClient({
+      issuer: TELIA_ISSUER,
+      clientId: telia.clientId,
+      redirectUri: telia.redirectUri,
+      acrValues: ACR_LOATEST2,
+      signingKeyPem: other.signingKeyPem,
+      encryptionKeyPem: telia.encryptionKeyPem,
+      fetch: telia.fetch,
+    });
+    await expect(
+      telia.authorize(await client.startLogin({ state: "s", nonce: "n" })),
+    ).rejects.toThrow(/signature verification failed/);
+  });
+
+  it("cannot read the ID token when its encryption key is not the one Telia registered", async () => {
+    const other = await fakeTelia();
+    const client = await createTunnistusClient({
+      issuer: TELIA_ISSUER,
+      clientId: telia.clientId,
+      redirectUri: telia.redirectUri,
+      acrValues: ACR_LOATEST2,
+      signingKeyPem: telia.signingKeyPem,
+      encryptionKeyPem: other.encryptionKeyPem,
+      fetch: telia.fetch,
+    });
+    await expect((await login(client, telia)).identity()).rejects.toMatchObject({
+      reason: "no applicable decryption key selected",
+    });
   });
 });

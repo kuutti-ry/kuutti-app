@@ -6,8 +6,8 @@ import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
-import { dayWindow, secondsUntil } from "./budget.ts";
-import { insertPhoto, insertPhotoAccess, recordCardServed, recordCardShown } from "./repo.ts";
+import { dayWindow, localYearMonth, secondsUntil } from "./budget.ts";
+import { insertPhoto, insertPhotoAccess, recordCardServed } from "./repo.ts";
 
 // The exposure budget and the shown-record rule (#52, TD-6, ADR-008),
 // features/safety/exposure.feature. Photos are uploaded through the API so
@@ -46,6 +46,18 @@ async function accessRows(ctx: TestContext, accountId: string, variant?: PhotoVa
     [accountId, variant ?? null],
   );
   return Number(rows[0]?.n ?? 0);
+}
+
+/** The viewer shown the subject's card, through what the card route writes; one day, a budget that never binds. */
+async function showCard(ctx: TestContext, viewer: string, subject: string, photoIds: string[]) {
+  return recordCardServed(ctx.client, {
+    viewerAccountId: viewer,
+    subjectAccountId: subject,
+    photoIds,
+    at: new Date("2026-10-11T09:00:00Z"),
+    since: new Date("2026-10-11T00:00:00+03:00"),
+    limit: 100,
+  });
 }
 
 async function errorCode(response: Response): Promise<string> {
@@ -138,8 +150,14 @@ describe("exposure", () => {
     const a = await signedInAccount(ctx.client);
     const b = await signedInAccount(ctx.client);
     const theirs = await upload(app, b.headers, await fixturePng(64, 64));
-    expect(await recordCardShown(ctx.client, a.accountId, [theirs.id], new Date())).toBe(1);
-    expect(await recordCardShown(ctx.client, a.accountId, [theirs.id], new Date())).toBe(0);
+    expect(await showCard(ctx, a.accountId, b.accountId, [theirs.id])).toEqual({
+      used: 0,
+      recorded: true,
+    });
+    expect(await showCard(ctx, a.accountId, b.accountId, [theirs.id])).toEqual({
+      used: 1,
+      recorded: true,
+    });
     const { rows } = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM card_shown WHERE account_id = $1",
       [a.accountId],
@@ -153,7 +171,7 @@ describe("exposure", () => {
     const b = await signedInAccount(ctx.client);
     const theirs = await upload(app, b.headers, await fixturePng(64, 64));
     await approve(ctx, theirs.id);
-    expect(await recordCardShown(ctx.client, a.accountId, [theirs.id], new Date())).toBe(1);
+    await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
     expect((await fetchUrl(app, a.headers, theirs.id, "card")).status).toBe(200);
     expect((await fetchUrl(app, a.headers, theirs.id, "full")).status).toBe(200);
     expect(await accessRows(ctx, a.accountId)).toBe(2);
@@ -165,7 +183,7 @@ describe("exposure", () => {
     const a = await signedInAccount(ctx.client);
     const b = await signedInAccount(ctx.client);
     const theirs = await upload(app, b.headers, await fixturePng(64, 64));
-    await recordCardShown(ctx.client, a.accountId, [theirs.id], new Date());
+    await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
     expect((await fetchUrl(app, a.headers, theirs.id, "card")).status).toBe(404);
     expect(await accessRows(ctx, a.accountId)).toBe(0);
   });
@@ -307,5 +325,32 @@ describe("the Finnish day", () => {
     const at = new Date("2026-07-15T20:59:59.900Z");
     expect(secondsUntil(dayWindow(at).end, at)).toBe(1);
     expect(secondsUntil(at, new Date(at.getTime() + 5_000))).toBe(1);
+  });
+});
+
+describe("a budget row that is not a budget", () => {
+  test.for([
+    ["a number", 300],
+    ["a variant missing", { thumb: 3, card: 2 }],
+    ["a negative count", { thumb: 3, card: -1, full: 1 }],
+  ] as const)("%s fails closed: no URL, no fetch-log row", async ([, value], { ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const photo = await upload(app, a.headers, await fixturePng(64, 64));
+    await withMatchingConfig(ctx.client, { photo_fetches_per_day: value });
+    const res = await fetchUrl(app, a.headers, photo.id, "thumb");
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error.code).toBe("internal_error");
+    expect(JSON.stringify(body)).not.toContain("Signature");
+    expect(await accessRows(ctx, a.accountId)).toBe(0);
+  });
+});
+
+describe("the Finnish year and month", () => {
+  it("is already the next month in Finland while it is still the last evening of the old one in UTC", () => {
+    const newYearsEve = new Date("2026-12-31T22:30:00Z"); // 00:30 on 1 January in Helsinki
+    expect(localYearMonth(newYearsEve)).toEqual({ year: 2027, month: 1 });
+    expect(localYearMonth(newYearsEve, "UTC")).toEqual({ year: 2026, month: 12 });
   });
 });

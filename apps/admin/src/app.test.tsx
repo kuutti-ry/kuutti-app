@@ -1,5 +1,6 @@
+import { formatTime } from "@kuutti/i18n";
 import { I18nProvider } from "@kuutti/i18n/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./app.tsx";
 import { StaffSessionProvider } from "./features/identity/index.ts";
@@ -16,7 +17,7 @@ const health = {
   migrations: "current",
 };
 
-function renderApp(answer: () => Promise<Response>) {
+function renderApp(answer: (input?: Request | string, init?: RequestInit) => Promise<Response>) {
   vi.stubGlobal("fetch", vi.fn(answer));
   render(
     <I18nProvider i18n={i18n}>
@@ -29,6 +30,29 @@ function renderApp(answer: () => Promise<Response>) {
 
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+
+const staff = {
+  accessToken: "a".repeat(43),
+  expiresAt: "2030-01-01T08:00:00.000Z",
+  role: "moderator",
+};
+
+/** The API a signed-in panel talks to, by method and path; records what was asked. */
+function staffApi(role = "moderator", calls: string[] = [], options = { logoutFails: false }) {
+  return async (input?: Request | string, init?: RequestInit) => {
+    const req = input instanceof Request ? input : new Request(input ?? "", init);
+    const key = `${req.method} ${new URL(req.url).pathname}`;
+    calls.push(key);
+    if (key === "GET /health") return json(health);
+    if (key === "GET /admin/whoami") return json({ role, expiresAt: staff.expiresAt });
+    if (key === "GET /admin/photos/queue") return json({ items: [], total: 0 });
+    if (key === "POST /admin/auth/logout") {
+      if (options.logoutFails) throw new TypeError("Failed to fetch");
+      return new Response(null, { status: 204 });
+    }
+    throw new Error(`unexpected ${key}`);
+  };
+}
 
 describe("App", () => {
   beforeEach(() => {
@@ -62,6 +86,64 @@ describe("App", () => {
     renderApp(async () => json({ ...health, source: "javascript:alert(1)" }));
     expect(await screen.findByText(/The API cannot be reached/)).toBeInTheDocument();
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("is busy while a sign-in is being completed", () => {
+    window.history.replaceState(null, "", `/#code=${"c".repeat(43)}`);
+    renderApp(() => new Promise<Response>(() => {}));
+    expect(screen.getByText("Loading the queue…")).toHaveAttribute("aria-busy", "true");
+    expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
+  });
+
+  it("signed in as a moderator, names the role and the session's end and opens the queue", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    renderApp(staffApi());
+    expect(await screen.findByText(/Signed in as moderator/)).toHaveTextContent(
+      `Session ends: ${formatTime("en", new Date(staff.expiresAt))}`,
+    );
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Your role does not allow the photo queue.")).toBeNull();
+  });
+
+  it("signed in as a researcher, says the role does not allow the queue and never asks for it", async () => {
+    window.sessionStorage.setItem(
+      "kuutti.admin.session",
+      JSON.stringify({ ...staff, role: "researcher" }),
+    );
+    const calls: string[] = [];
+    renderApp(staffApi("researcher", calls));
+    expect(
+      await screen.findByText("Your role does not allow the photo queue."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Signed in as researcher/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Photo review queue" })).toBeNull();
+    expect(calls).not.toContain("GET /admin/photos/queue");
+  });
+
+  it("signs out through the API, forgets the session and offers the bank login again", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    expect(
+      await screen.findByRole("button", { name: "Sign in with your bank" }),
+    ).toBeInTheDocument();
+    expect(calls).toContain("POST /admin/auth/logout");
+    expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
+    expect(screen.queryByText(/Signed in as/)).toBeNull();
+  });
+
+  it("signs out locally even when the API cannot be reached for the logout", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    renderApp(staffApi("moderator", [], { logoutFails: true }));
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeInTheDocument(),
+    );
+    expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
   });
 
   it("falls back to the local API on a development server only, never in a production build", () => {
