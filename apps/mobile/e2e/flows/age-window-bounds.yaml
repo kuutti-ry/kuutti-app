@@ -21,7 +21,8 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
     timeout: 15000
 - tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
 - inputText: "Siiri"
-- hideKeyboard
+# A tap on the question, which is no button, closes the keyboard (README, the keyboard).
+- tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
 - tapOn: "Continue|Jatka|Fortsätt"
 
 # A woman goes straight on to whom she seeks: no label step.
