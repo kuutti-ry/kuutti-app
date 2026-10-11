@@ -55,8 +55,11 @@ export function useProfile() {
     };
   }, []);
 
+  // A read again (the list of #227 back in front after a section saved) keeps
+  // what is shown until the answer is there, and a failed one takes nothing
+  // away that was known, as the gate's read does.
   const load = useCallback(async () => {
-    setStatus("loading");
+    setStatus((was) => (was === "ready" ? was : "loading"));
     try {
       const response = await fetchProfile();
       if (!mounted.current) return;
@@ -66,7 +69,7 @@ export function useProfile() {
       setCompleteness(response.completeness);
       setStatus("ready");
     } catch {
-      if (mounted.current) setStatus("error");
+      if (mounted.current) setStatus((was) => (was === "ready" ? was : "error"));
     }
   }, []);
   useEffect(() => {

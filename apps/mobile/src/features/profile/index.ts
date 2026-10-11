@@ -7,4 +7,5 @@ export { FIRST_LATER_FIELD, LaterFieldScreen, laterPath } from "./later/LaterFie
 export { ProfileCardView } from "./ProfileCardView";
 export { ProfileScreen } from "./ProfileScreen";
 export { PromptsEditor } from "./PromptsEditor";
+export { SectionScreen } from "./SectionScreen";
 export { useProfile } from "./useProfile";
