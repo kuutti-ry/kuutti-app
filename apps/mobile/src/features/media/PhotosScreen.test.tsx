@@ -260,4 +260,124 @@ describe("PhotosScreen", () => {
     expect(screen.getByText("1 photo, at most 3")).toBeTruthy();
     expect(FakeXhr.sent).toHaveLength(0);
   });
+
+  it("says so when the photo library cannot be opened", async () => {
+    fetchMock([answersList(list(1)), answersUrls]);
+    launch.mockRejectedValueOnce(new Error("permission denied"));
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Add a photo" }));
+    expect(
+      await screen.findByText(
+        "Kuutti could not open your photos. Allow access in the phone's settings and try again.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("gives a refusal it has no words of its own for the generic line", async () => {
+    fetchMock([answersList(list(1)), answersUrls]);
+    launch.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///a.jpg", width: 3000, height: 2000 }],
+    });
+    FakeXhr.answers = [{ status: 502, body: "<html>Bad gateway</html>" }];
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Add a photo" }));
+    expect(await screen.findByText("The photo could not be uploaded. Try again.")).toBeTruthy();
+  });
+
+  it("says it is choosing a photo while the picker is open, and holds the buttons", async () => {
+    fetchMock([answersList(list(2)), answersUrls]);
+    launch.mockReturnValueOnce(new Promise(() => undefined));
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Add a photo" }));
+    expect(screen.getByText("Choosing a photo…")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Make main photo" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+  });
+
+  const refusingThumbs = (code: string, status: number) => (req: Request) =>
+    /\/thumb$/.test(new URL(req.url).pathname)
+      ? json({ error: { code, message: "x", requestId: "r" } }, status)
+      : null;
+
+  it("tells the person when the day's budget hides the thumbs", async () => {
+    fetchMock([answersList(list(1)), refusingThumbs("photo_budget_exceeded", 429)]);
+    await show(<PhotosScreen />);
+    expect(
+      await screen.findByText("That is enough photos for today. They load again after midnight."),
+    ).toBeTruthy();
+  });
+
+  it("stays quiet about a thumb refused for another reason", async () => {
+    const { calls } = fetchMock([answersList(list(1)), refusingThumbs("not_found", 404)]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText("1 photo, at most 3")).toBeTruthy();
+    await waitFor(() => expect(calls.some((c) => /\/thumb$/.test(c.url))).toBe(true));
+    await act(settle);
+    expect(screen.queryByRole("button", { name: "OK" })).toBeNull();
+  });
+
+  it("removes nothing when the person keeps the photo or closes the question", async () => {
+    const { calls } = fetchMock([answersList(list(1)), answersUrls]);
+    await show(<PhotosScreen />);
+    await press(await screen.findByRole("button", { name: "Remove" }));
+    await press(screen.getByRole("button", { name: "Keep it" }));
+    expect(screen.queryByText("Remove this photo?")).toBeNull();
+    await press(screen.getByRole("button", { name: "Remove" }));
+    expect(await screen.findByText("Remove this photo?")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByText("Remove this photo?")).toBeNull();
+    expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+    expect(screen.getByText("1 photo, at most 3")).toBeTruthy();
+  });
+
+  it("says what state each photo is in, a rejection without a reason as not accepted", async () => {
+    fetchMock([
+      answersList({
+        photos: [
+          { ...photo(1), state: "queued" },
+          { ...photo(2), state: "rejected", rejectionReason: null },
+        ],
+        maxPhotos: 3,
+      }),
+      answersUrls,
+    ]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText("Being reviewed")).toBeTruthy();
+    expect(screen.getByText("Not accepted")).toBeTruthy();
+  });
+
+  it("makes a photo the main one, and moves the last one a step towards the front", async () => {
+    const orders: string[][] = [];
+    fetchMock([
+      answersList(list(3)),
+      answersUrls,
+      (req) =>
+        req.method === "PUT" && new URL(req.url).pathname === "/photos/order"
+          ? req.json().then((body: { order: string[] }) => {
+              orders.push(body.order);
+              return json({
+                photos: body.order.map((id, position) => ({ ...photo(1), id, position })),
+                maxPhotos: 3,
+              });
+            })
+          : null,
+    ]);
+    await show(<PhotosScreen />);
+    const [, makeThirdMain] = await screen.findAllByRole("button", { name: "Make main photo" });
+    await press(makeThirdMain as ReturnType<typeof screen.getByRole>);
+    await waitFor(() => expect(orders).toHaveLength(1));
+    // The second and the third tile have a "Move earlier"; the third's is pressed.
+    const [, moveLastEarlier] = screen.getAllByRole("button", { name: "Move earlier" });
+    await press(moveLastEarlier as ReturnType<typeof screen.getByRole>);
+    await waitFor(() => expect(orders).toHaveLength(2));
+    expect(orders).toEqual([
+      [photo(3).id, photo(1).id, photo(2).id],
+      [photo(3).id, photo(2).id, photo(1).id],
+    ]);
+  });
 });

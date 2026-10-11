@@ -1,9 +1,13 @@
 import { randomBytes } from "node:crypto";
-import { ACR_LOATEST2 } from "@kuutti/tunnistus-oidc";
+import { ACR_LOATEST2, keyIdOf } from "@kuutti/tunnistus-oidc";
+import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 import { type FakeTelia, fakeTelia, TELIA_ISSUER } from "@kuutti/tunnistus-oidc/testing";
 import { beforeEach, describe, expect, it } from "vitest";
+import { createApp } from "../app.ts";
+import { captureLogger, test, testConfig } from "../test/harness.ts";
 import { BrokerError } from "./broker.ts";
-import { OidcBroker } from "./oidc-broker.ts";
+import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
+import { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.ts";
 
 // What the adapter adds to the kit (ADR-017): the dialect itself is proven in
 // packages/tunnistus-oidc; here only Kuutti's part of a login is checked.
@@ -73,5 +77,147 @@ describe("OidcBroker, the adapter over @kuutti/tunnistus-oidc", () => {
         fetch: telia.fetch,
       }),
     ).rejects.toThrow(/TELIA_SIGNING_KEY and TELIA_ENCRYPTION_KEY/);
+  });
+});
+
+describe("the broker's configuration", () => {
+  const OIDC = {
+    OIDC_ISSUER: "https://broker.test/uas",
+    OIDC_CLIENT_ID: "kuutti-test",
+    OIDC_REDIRECT_URI: "https://api.test/auth/callback",
+  };
+
+  it("names no broker unless the issuer, the client and the redirect are all set", () => {
+    expect(brokerOptionsFromConfig(testConfig())).toBeNull();
+    for (const missing of Object.keys(OIDC)) {
+      expect(brokerOptionsFromConfig(testConfig({ ...OIDC, [missing]: undefined })), missing).toBe(
+        null,
+      );
+    }
+  });
+
+  it("carries the acr and the two keys when they are set, and null for each that is not", async () => {
+    expect(brokerOptionsFromConfig(testConfig(OIDC))).toEqual({
+      issuer: OIDC.OIDC_ISSUER,
+      clientId: OIDC.OIDC_CLIENT_ID,
+      redirectUri: OIDC.OIDC_REDIRECT_URI,
+      acrValues: null,
+      signingKeyPem: null,
+      encryptionKeyPem: null,
+    });
+    const telia = await fakeTelia();
+    const full = testConfig({
+      ...OIDC,
+      OIDC_ACR_VALUES: ACR_LOATEST2,
+      TELIA_SIGNING_KEY: telia.signingKeyPem,
+      TELIA_ENCRYPTION_KEY: telia.encryptionKeyPem,
+    });
+    expect(brokerOptionsFromConfig(full)).toMatchObject({
+      acrValues: ACR_LOATEST2,
+      signingKeyPem: telia.signingKeyPem,
+      encryptionKeyPem: telia.encryptionKeyPem,
+    });
+  });
+
+  it("logs the public key ids of the keys it has, and null for a key it lacks", async () => {
+    const telia = await fakeTelia();
+    expect(teliaKeyIds(testConfig())).toEqual({ signing: null, encryption: null });
+    const ids = teliaKeyIds(
+      testConfig({
+        TELIA_SIGNING_KEY: telia.signingKeyPem,
+        TELIA_ENCRYPTION_KEY: telia.encryptionKeyPem,
+      }),
+    );
+    expect(ids).toEqual({
+      signing: keyIdOf(telia.signingKeyPem),
+      encryption: keyIdOf(telia.encryptionKeyPem),
+    });
+    expect(ids.signing).not.toBe(ids.encryption);
+    // A kid is a thumbprint of the public half: nothing of the private key is in it.
+    expect(telia.signingKeyPem).not.toContain(ids.signing);
+    expect(teliaKeyIds(testConfig({ TELIA_SIGNING_KEY: telia.signingKeyPem }))).toEqual({
+      signing: keyIdOf(telia.signingKeyPem),
+      encryption: null,
+    });
+  });
+});
+
+describe("a bank login through the Telia test double, end to end", () => {
+  const KEY_HEX = "9a".repeat(32);
+
+  /** The double's person, with the individual number chosen: odd and even read as different legal sexes. */
+  const personWith = (individual: string) => ({
+    hetu: `010170-${individual}${checkCharacter("010170", individual)}`,
+    dateOfBirth: "1970-01-01",
+  });
+
+  test("keeps the HMAC, the year and the month, and no code, name, date of birth or legal sex", async ({
+    ctx,
+  }) => {
+    for (const individual of ["999", "998"]) {
+      const telia = await fakeTelia({ person: personWith(individual) });
+      const hetu = telia.person.hetu;
+      const { logger, lines } = await captureLogger();
+      const app = createApp({
+        config: testConfig({ HETU_HMAC_KEY: KEY_HEX }),
+        logger,
+        db: ctx.client,
+        broker: await brokerFor(telia),
+      });
+      const started = await app.request("/auth/start?platform=android&locale=sv");
+      expect(started.status).toBe(302);
+      const back = await telia.authorize(new URL(started.headers.get("location") ?? ""));
+      expect(telia.seen.requestObject).toMatchObject({ prompt: "login", ui_locales: "sv" });
+      const returned = await app.request(`/auth/callback${back.search}`);
+      expect(returned.status).toBe(302);
+      const code = new URL(returned.headers.get("location") ?? "").searchParams.get("code") ?? "";
+      const exchanged = await app.request("/auth/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      expect(exchanged.status).toBe(200);
+      const { accessToken } = (await exchanged.json()) as { accessToken: string };
+      const me = (await (
+        await app.request("/auth/session", { headers: { authorization: `Bearer ${accessToken}` } })
+      ).json()) as { accountId: string };
+
+      const { hetuHmac } = deriveIdentity(hetu, hmacKeyFromHex(KEY_HEX), new Date());
+      const account = await ctx.client.query(
+        "SELECT birth_year, birth_month, gender, state FROM account WHERE id = $1",
+        [me.accountId],
+      );
+      // Rule 3: the year and the month of birth, and a gender only the person will declare.
+      expect(account.rows).toEqual([
+        { birth_year: 1970, birth_month: 1, gender: null, state: "registered" },
+      ]);
+      const rows = await ctx.client.query(
+        `SELECT row_to_json(i) AS identity, row_to_json(a) AS account,
+                (SELECT json_agg(r) FROM auth_request r WHERE r.account_id = a.id) AS attempts,
+                (SELECT json_agg(s) FROM session s WHERE s.account_id = a.id) AS sessions
+         FROM identity i JOIN account a ON a.identity_id = i.id WHERE a.id = $1`,
+        [me.accountId],
+      );
+      expect(rows.rows[0]?.identity).toMatchObject({ hetu_hmac: hetuHmac, acr: ACR_LOATEST2 });
+      // Rule 1: the code is in no row and no log line, nor its date part; nor the name or the date of birth.
+      const stored = JSON.stringify(rows.rows);
+      const logged = JSON.stringify(lines());
+      for (const secret of [hetu, hetu.slice(0, 6), "Äyrämö", "Tero", "1970-01-01"]) {
+        expect(stored, `${individual}: ${secret}`).not.toContain(secret);
+        expect(logged, `${individual}: ${secret}`).not.toContain(secret);
+      }
+    }
+    // No column could hold them either: the hash is the only trace of the code.
+    const columns = await ctx.client.query<{ table_name: string; column_name: string }>(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name IN ('identity', 'account', 'auth_request', 'session')`,
+    );
+    const names = columns.rows.map((c) => `${c.table_name}.${c.column_name}`);
+    expect(names).toContain("identity.hetu_hmac");
+    expect(
+      names.filter((n) =>
+        /hetu|sex|birth_day|birth_date|date_of_birth|dob|given_name|surname/.test(n),
+      ),
+    ).toEqual(["identity.hetu_hmac"]);
   });
 });

@@ -139,4 +139,27 @@ describe("ProfileScreen", () => {
     // The list stays while it reads: no loading screen in between.
     expect(screen.getByText("At least 2 approved photos")).toBeTruthy();
   });
+
+  it("says when the profile could not be loaded and tries again on request", async () => {
+    let failing = true;
+    globalThis.fetch = jest.fn(async () =>
+      failing
+        ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+        : json({ profile: null, completeness: { complete: true, missing: [] }, tips: [] }),
+    ) as unknown as typeof fetch;
+    await show(<ProfileScreen />);
+    expect(screen.getByText("Your profile could not be loaded. Try again.")).toBeTruthy();
+    failing = false;
+    await press(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    expect(screen.getByText("Your card is complete.")).toBeTruthy();
+  });
+
+  it("goes back with its back button", async () => {
+    fakeApi([[]]);
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
+  });
 });

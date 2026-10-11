@@ -4,7 +4,7 @@ import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
-import { issueSession, sweepSessions } from "./sessions.ts";
+import { describeSession, issueSession, sweepSessions } from "./sessions.ts";
 
 // features/identity/sessions.feature (#35): scenario names verbatim, plus the
 // route checklist (validation, unauthenticated, wrong-user). Real Postgres,
@@ -283,5 +283,81 @@ describe("sessions", () => {
     expect(swept).toEqual({ sessions: 2, authRequests: 1 });
     const left = await ctx.client.query("SELECT id FROM session");
     expect(left.rows).toEqual([{ id: c.sessionId }]);
+  });
+
+  test("wrong user: a session is described only as its own account's, in the query itself", async ({
+    ctx,
+  }) => {
+    const a = await accountRow(ctx, "a");
+    const b = await accountRow(ctx, "b");
+    const bDevice = await device(ctx, b);
+    const deps = { db: ctx.client, now: () => new Date() };
+    // B's session asked for as A's: not found, whatever the session is (rule 6).
+    await expect(
+      describeSession(deps, { accountId: a, sessionId: bDevice.sessionId }),
+    ).rejects.toMatchObject({ status: 401, code: "session_revoked" });
+    expect(
+      await describeSession(deps, { accountId: b, sessionId: bDevice.sessionId }),
+    ).toMatchObject({ sessionId: bDevice.sessionId, accountId: b, platform: "ios" });
+  });
+
+  test("unauthenticated: every guarded route of the slice tells a bad token, an ended session and an expired one apart, and writes nothing", async ({
+    ctx,
+  }) => {
+    const account = await accountRow(ctx, "a");
+    const ended = await device(ctx, account);
+    const expired = await device(ctx, account);
+    await ctx.client.query(
+      "UPDATE session SET revoked_at = now(), revoked_reason = 'logout' WHERE id = $1",
+      [ended.sessionId],
+    );
+    await ctx.client.query(
+      "UPDATE session SET access_expires_at = now() - interval '1 second' WHERE id = $1",
+      [expired.sessionId],
+    );
+    const routes: Array<[string, string, unknown?]> = [
+      ["GET", "/auth/session"],
+      ["POST", "/auth/logout"],
+      ["POST", "/auth/logout-all"],
+      ["GET", "/account/email"],
+      ["PUT", "/account/email", { email: "guard.probe@example.fi" }],
+      ["DELETE", "/account/email"],
+      ["POST", "/account/delete", { confirm: true }],
+      ["GET", "/account/export"],
+      ["GET", "/onboarding"],
+      ["PUT", "/account/gender", { gender: "woman" }],
+      ["GET", "/consents"],
+      ["POST", "/consents", { kind: "research", version: "1", locale: "fi" }],
+      ["DELETE", "/consents/research"],
+    ];
+    const cases: Array<[string, Record<string, string>, string]> = [
+      ["no token", {}, "unauthenticated"],
+      ["not a bearer", { authorization: `Basic ${ended.accessToken}` }, "unauthenticated"],
+      ["malformed", bearer("not-a-token").headers, "unauthenticated"],
+      ["unknown", bearer("C".repeat(43)).headers, "unauthenticated"],
+      ["ended", bearer(ended.accessToken).headers, "session_revoked"],
+      ["expired", bearer(expired.accessToken).headers, "session_expired"],
+    ];
+    for (const [method, path, body] of routes) {
+      for (const [label, headers, code] of cases) {
+        const res = await ctx.app.request(path, {
+          method,
+          headers: { ...headers, "content-type": "application/json" },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        });
+        expect(res.status, `${method} ${path}, ${label}`).toBe(401);
+        expect(await errorCode(res), `${method} ${path}, ${label}`).toBe(code);
+      }
+    }
+    const { rows } = await ctx.client.query(
+      `SELECT a.state, a.email, a.gender, (SELECT count(*) FROM consent c WHERE c.account_id = a.id) AS consents,
+              (SELECT count(*) FROM session s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS live
+       FROM account a WHERE a.id = $1`,
+      [account],
+    );
+    // The expired device was not logged out by any of it either.
+    expect(rows).toEqual([
+      { state: "registered", email: null, gender: null, consents: "0", live: "1" },
+    ]);
   });
 });

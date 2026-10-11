@@ -37,6 +37,23 @@ describe("check:ui-strings", () => {
     ).toEqual([]);
   });
 
+  it.each(["accessibilityHint", "aria-label", "title", "alt", "label", "closeLabel"])(
+    "fails a literal in the %s prop",
+    (prop) => {
+      expect(hits(`const a = <Button ${prop}="Close" />;`)).toEqual([`${prop} prop: Close`]);
+    },
+  );
+
+  it("passes a literal in a prop nobody reads, a prop without a value, and a computed one", () => {
+    expect(
+      hits('const a = <Button testID="close" disabled title={label} accessibilityLabel={"✓"} />;'),
+    ).toEqual([]);
+  });
+
+  it("judges an element given as a prop by its own text", () => {
+    expect(hits("const a = <Screen title=<Text>Hi</Text> />;")).toEqual(["text between tags: Hi"]);
+  });
+
   it("reports where the string is", () => {
     expect(findUiStrings("probe.tsx", "const a = (\n  <Text>Hello</Text>\n);")[0]).toMatchObject({
       line: 2,

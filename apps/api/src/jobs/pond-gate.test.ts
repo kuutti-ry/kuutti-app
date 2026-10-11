@@ -254,6 +254,26 @@ describe("the gate", () => {
     expect((await askedBy(ctx, outdated)).gate.state).toBe("incomplete");
   });
 
+  test("a person short of one answer (the birth month, the intent, a finished profile) is not counted", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-short");
+    const [whole, noBirth, noIntent, noPhotos] = await people(ctx.client, pond, 4, ALIKE);
+    await ctx.client.query("UPDATE account SET birth_month = NULL WHERE id = $1", [noBirth]);
+    await ctx.client.query("UPDATE profile SET fields = fields - 'intent' WHERE account_id = $1", [
+      noIntent,
+    ]);
+    await ctx.client.query("DELETE FROM photo WHERE account_id = $1", [noPhotos]);
+
+    const { result } = await counted(ctx, NIGHT_1);
+    expect(result).toMatchObject({ ponds: 1, counted: 1 });
+    expect(await rowOf(ctx, whole)).toMatchObject({ admitted_at: NIGHT_1 });
+    for (const id of [noBirth, noIntent, noPhotos]) {
+      expect(await rowOf(ctx, id), id).toBeUndefined();
+      expect((await askedBy(ctx, id)).gate.state, id).toBe("incomplete");
+    }
+  });
+
   test("Counting twice changes nothing", async ({ ctx }) => {
     const pond = await setUp(ctx, "test-gate-twice");
     await people(ctx.client, pond, 4, MEN);

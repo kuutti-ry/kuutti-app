@@ -221,4 +221,114 @@ describe("LaterFieldScreen", () => {
     expect(router.replace).toHaveBeenCalledWith("/profile/later/hasKids");
     unmount();
   });
+
+  const ALL_ANSWERED = {
+    hasKids: "no",
+    wantsKids: "want",
+    smoking: "never",
+    languages: ["fi"],
+    education: "amk",
+    drinking: "never",
+    drugsAttitude: "not_my_thing",
+    hobbies: ["yoga"],
+    height: 170,
+    exercise: "weekly",
+    pets: ["dog"],
+    field: ["tech"],
+    occupation: ["tech"],
+    politics: ["kok"],
+    religion: "atheist",
+    zodiac: "aries",
+  };
+
+  it("stays on the first field when every later field is answered, and leads on to the e-mail", async () => {
+    fakeApi(named(ALL_ANSWERED));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("16 of 16 answered")).toBeTruthy());
+    expect(router.replace).not.toHaveBeenCalled();
+    await press(screen.getByRole("button", { name: "Ask me later" }));
+    expect(router.push).toHaveBeenCalledWith("/account/email");
+  });
+
+  it("says when the profile could not be loaded and tries again on request", async () => {
+    let failing = true;
+    globalThis.fetch = jest.fn(async () =>
+      failing
+        ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
+        : json({ profile: null, completeness: { complete: false, missing: [] }, tips: [] }),
+    ) as unknown as typeof fetch;
+    await show(<LaterFieldScreen field="smoking" />);
+    expect(screen.getByText("Your profile could not be loaded. Try again.")).toBeTruthy();
+    failing = false;
+    await press(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+  });
+
+  /** The profile read as usual; a save waits for the test, or is refused with a code. */
+  function refusingSaves(code: string | null) {
+    fakeApi(named({}));
+    const reads = globalThis.fetch;
+    let answer: ((response: Response) => void) | undefined;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.method !== "PUT") return reads(input, init);
+      if (code) return json({ error: { code, message: "x", requestId: "r" } }, 400);
+      return new Promise<Response>((resolve) => {
+        answer = resolve;
+      });
+    }) as unknown as typeof fetch;
+    return { answer: (response: Response) => answer?.(response) };
+  }
+
+  it("stays on a refused save and says a contact detail is not allowed yet", async () => {
+    refusingSaves("text_contact_details");
+    await show(<LaterFieldScreen field="occupation" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Job title, without the employer's name")).toBeTruthy(),
+    );
+    await type(
+      screen.getByLabelText("Job title, without the employer's name"),
+      "aino@example.test",
+    );
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    expect(screen.getByText(/Your text has an e-mail address, a link/)).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("gives any other refusal the generic line", async () => {
+    refusingSaves("validation_failed");
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Never" }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    expect(screen.getByText("Saving did not work. Check the fields and try again.")).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("says it is saving and holds both buttons meanwhile", async () => {
+    const server = refusingSaves(null);
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Never" }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    expect(screen.getByText("Saving…")).toBeTruthy();
+    for (const name of ["Save and continue", "Ask me later"]) {
+      expect(screen.getByRole("button", { name }).props.accessibilityState?.disabled).toBe(true);
+    }
+    await act(async () => {
+      server.answer(
+        json({
+          profile: {
+            ...named({ smoking: "never" }),
+            specialCategoryConsent: null,
+            updatedAt: "2026-10-08T10:00:00.000Z",
+          },
+          completeness: { complete: false, missing: ["photos"] },
+          tips: [],
+        }),
+      );
+      await settle();
+    });
+    expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
+  });
 });

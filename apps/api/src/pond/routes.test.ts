@@ -1,8 +1,10 @@
-import { PondList } from "@kuutti/schema";
+import type { Queryable } from "@kuutti/db";
+import { GateResponse, PondList } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
-import { signedInAccount } from "../test/account.ts";
+import { signedInAccount, signInAs } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { people, pondNamed } from "../test/people.ts";
 
 // features/pond/choice.feature (#46). Ponds are inserted inside the test's
 // transaction: the test database is migrated, not seeded.
@@ -108,5 +110,192 @@ describe("pond choice", () => {
     const app = await appWith(ctx);
     expect((await app.request("/ponds")).status).toBe(401);
     expect((await app.request("/account/pond", { method: "PUT" })).status).toBe(401);
+  });
+});
+
+const json = (headers: Record<string, string>) => ({
+  ...headers,
+  "content-type": "application/json",
+});
+const errorCode = async (res: Response) =>
+  ((await res.json()) as { error: { code: string } }).error.code;
+
+async function refusedCallers(ctx: TestContext) {
+  const ended = await signedInAccount(ctx.client);
+  await ctx.client.query("UPDATE session SET revoked_at = now() WHERE id = $1", [ended.sessionId]);
+  const expired = await signedInAccount(ctx.client);
+  await ctx.client.query(
+    "UPDATE session SET access_expires_at = now() - interval '1 minute' WHERE id = $1",
+    [expired.sessionId],
+  );
+  return [
+    ["no token", {}, "unauthenticated"],
+    ["a token nobody issued", { authorization: `Bearer ${"D".repeat(43)}` }, "unauthenticated"],
+    ["an ended session", ended.headers, "session_revoked"],
+    ["an expired access token", expired.headers, "session_expired"],
+  ] as const;
+}
+
+describe("the pond routes' remaining branches", () => {
+  test("every refused caller gets its own code on the ponds, the choice and the gate", async ({
+    ctx,
+  }) => {
+    const app = await appWith(ctx);
+    const otaniemi = await pond(ctx, "test-otaniemi");
+    for (const [what, headers, code] of await refusedCallers(ctx)) {
+      for (const res of [
+        await app.request("/ponds", { headers }),
+        await app.request("/account/pond", {
+          method: "PUT",
+          headers: json(headers),
+          body: JSON.stringify({ pondId: otaniemi }),
+        }),
+        await app.request("/gate", { headers }),
+      ]) {
+        expect(res.status, what).toBe(401);
+        expect(await errorCode(res), what).toBe(code);
+      }
+    }
+    const { rows } = await ctx.client.query(
+      "SELECT count(*) AS n FROM account WHERE pond_id = $1",
+      [otaniemi],
+    );
+    expect(Number(rows[0]?.n)).toBe(0);
+  });
+
+  test("a choice that is no pond id, or no choice at all, is refused before anything is read", async ({
+    ctx,
+  }) => {
+    const app = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    for (const body of [{ pondId: "otaniemi" }, {}, { pondId: null }]) {
+      const res = await app.request("/account/pond", {
+        method: "PUT",
+        headers: json(a.headers),
+        body: JSON.stringify(body),
+      });
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(await errorCode(res)).toBe("validation_failed");
+    }
+  });
+
+  test("a choice by an account erased after the guard is a 404 and moves nobody", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    const otaniemi = await pond(ctx, "test-otaniemi");
+    let erased = false;
+    const db = {
+      async query(text: string, values?: unknown[]) {
+        if (!erased && text.trimStart().startsWith("WITH moved AS")) {
+          erased = true;
+          await ctx.client.query(
+            "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+            [a.accountId],
+          );
+        }
+        return ctx.client.query(text, values);
+      },
+    } as Queryable;
+    const { logger, lines } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db });
+    const res = await app.request("/account/pond", {
+      method: "PUT",
+      headers: json(a.headers),
+      body: JSON.stringify({ pondId: otaniemi }),
+    });
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe("not_found");
+    const { rows } = await ctx.client.query("SELECT pond_id FROM account WHERE id = $1", [
+      a.accountId,
+    ]);
+    expect(rows[0]?.pond_id).toBeNull();
+    expect(lines().some((l) => l.msg === "pond chosen")).toBe(false);
+  });
+
+  test("moving to another pond leaves the place at the gate behind; choosing the same pond again keeps it", async ({
+    ctx,
+  }) => {
+    const app = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const espoo = await pond(ctx, "test-espoo");
+    const otaniemi = await pond(ctx, "test-otaniemi");
+    await ctx.client.query("UPDATE account SET pond_id = $2 WHERE id = $1", [a.accountId, espoo]);
+    await ctx.client.query(
+      `INSERT INTO gate (account_id, pond_id, admitted_at, place_said, pool_said, opened_at, counted_at)
+       VALUES ($1, $2, now(), NULL, 40, now(), now())`,
+      [a.accountId, espoo],
+    );
+    const gate = async () =>
+      (
+        await ctx.client.query(
+          `SELECT pond_id, admitted_at IS NOT NULL AS admitted, opened_at IS NOT NULL AS opened,
+                  counted_at IS NOT NULL AS counted, pool_said FROM gate WHERE account_id = $1`,
+          [a.accountId],
+        )
+      ).rows[0];
+    const choose = (pondId: string) =>
+      app.request("/account/pond", {
+        method: "PUT",
+        headers: json(a.headers),
+        body: JSON.stringify({ pondId }),
+      });
+
+    expect((await choose(espoo)).status).toBe(204);
+    expect(await gate()).toEqual({
+      pond_id: espoo,
+      admitted: true,
+      opened: true,
+      counted: true,
+      pool_said: 40,
+    });
+    expect((await choose(otaniemi)).status).toBe(204);
+    // Emptied, not removed, and what was said of the pool stays to be followed from.
+    expect(await gate()).toEqual({
+      pond_id: otaniemi,
+      admitted: false,
+      opened: false,
+      counted: false,
+      pool_said: 40,
+    });
+  });
+
+  test("the gate is the caller's own, never cached, and says incomplete before a pond is chosen", async ({
+    ctx,
+  }) => {
+    const app = await appWith(ctx);
+    const pondId = await pondNamed(ctx.client, "test-gate-route");
+    const [open] = await people(ctx.client, pondId, 1, {
+      complete: true,
+      consented: true,
+      gender: "woman",
+    });
+    await ctx.client.query(
+      `INSERT INTO gate (account_id, pond_id, admitted_at, pool_said, opened_at, counted_at)
+       VALUES ($1, $2, now(), 30, now(), now())`,
+      [open, pondId],
+    );
+    const theirs = await signInAs(ctx.client, open ?? "");
+    const mine = await signedInAccount(ctx.client);
+
+    const opened = await app.request("/gate", { headers: theirs.headers });
+    expect(opened.status).toBe(200);
+    expect(opened.headers.get("cache-control")).toBe("no-store");
+    expect(GateResponse.parse(await opened.json())).toEqual({
+      state: "open",
+      within: null,
+      needed: null,
+      step: 10,
+    });
+
+    const incomplete = await app.request("/gate", { headers: mine.headers });
+    expect(incomplete.status).toBe(200);
+    expect(incomplete.headers.get("cache-control")).toBe("no-store");
+    expect(GateResponse.parse(await incomplete.json())).toEqual({
+      state: "incomplete",
+      within: null,
+      needed: null,
+      step: 10,
+    });
   });
 });

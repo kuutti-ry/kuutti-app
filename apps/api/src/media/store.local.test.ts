@@ -48,4 +48,49 @@ describe.skipIf(!endpoint)("media store (compose stand-in)", () => {
       client.destroy();
     }
   });
+
+  it("a failure other than a missing object is thrown, never read as a missing object", async () => {
+    const client = createS3Client(config);
+    try {
+      const store = s3MediaStore(client, `no-such-bucket-${randomBytes(4).toString("hex")}`);
+      await expect(store.get(objectKey("anything", "thumb"))).rejects.toMatchObject({
+        name: "NoSuchBucket",
+      });
+    } finally {
+      client.destroy();
+    }
+  });
+
+  it("deleting nothing sends no request, so even a missing bucket cannot fail it", async () => {
+    const client = createS3Client(config);
+    try {
+      const store = s3MediaStore(client, `no-such-bucket-${randomBytes(4).toString("hex")}`);
+      await expect(store.delete([])).resolves.toBeUndefined();
+      // The same store with something to delete does reach the bucket, and fails.
+      await expect(store.delete([objectKey("anything", "thumb")])).rejects.toMatchObject({
+        name: "NoSuchBucket",
+      });
+    } finally {
+      client.destroy();
+    }
+  });
+
+  it("a delete that leaves an object behind is a failure naming how many and why", async () => {
+    const client = createS3Client(config);
+    const store = s3MediaStore(client, config.S3_BUCKET);
+    const key = objectKey(`test-${randomBytes(6).toString("hex")}`, "card");
+    // S3 refuses a key over 1024 bytes per object, inside a 200 answer.
+    const refused = "k".repeat(1100);
+    try {
+      await store.put(key, await fixtureWebp(16, 16), "image/webp");
+      await expect(store.delete([key, refused])).rejects.toThrow(
+        "DeleteObjects left 1 of 2 objects (KeyTooLongError)",
+      );
+      // The rest of the batch was still deleted.
+      expect(await store.get(key)).toBeNull();
+    } finally {
+      await store.delete([key]);
+      client.destroy();
+    }
+  });
 });

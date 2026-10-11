@@ -1,3 +1,4 @@
+import type { Queryable } from "@kuutti/db";
 import {
   AccountExport,
   CARD_FIELD_KEYS,
@@ -548,5 +549,92 @@ describe("profile routes", () => {
       a.accountId,
     ]);
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe("the profile routes' remaining branches", () => {
+  async function refusedCallers(ctx: TestContext) {
+    const ended = await signedInAccount(ctx.client);
+    await ctx.client.query("UPDATE session SET revoked_at = now() WHERE id = $1", [
+      ended.sessionId,
+    ]);
+    const expired = await signedInAccount(ctx.client);
+    await ctx.client.query(
+      "UPDATE session SET access_expires_at = now() - interval '1 minute' WHERE id = $1",
+      [expired.sessionId],
+    );
+    return [
+      ["a malformed token", { authorization: "Bearer x" }, "unauthenticated"],
+      ["a token nobody issued", { authorization: `Bearer ${"E".repeat(43)}` }, "unauthenticated"],
+      ["an ended session", ended.headers, "session_revoked"],
+      ["an expired access token", expired.headers, "session_expired"],
+    ] as const;
+  }
+
+  test("every refused caller gets its own code on the profile, its save and the card, and nothing is written", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    for (const [what, headers, code] of await refusedCallers(ctx)) {
+      for (const res of [
+        await app.request("/profile", { headers }),
+        await put(app, headers, update),
+        await app.request("/profile/card", { headers }),
+      ]) {
+        expect(res.status, what).toBe(401);
+        expect(await errorCode(res), what).toBe(code);
+      }
+    }
+    const { rows } = await ctx.client.query("SELECT count(*) AS n FROM profile");
+    expect(Number(rows[0]?.n)).toBe(0);
+  });
+
+  test("a save by an account erased after the guard is a 404 and writes no profile", async ({
+    ctx,
+  }) => {
+    const me = await signedInAccount(ctx.client);
+    let erased = false;
+    const db = {
+      async query(text: string, values?: unknown[]) {
+        if (
+          !erased &&
+          text.startsWith("SELECT id FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE")
+        ) {
+          erased = true;
+          await ctx.client.query(
+            "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+            [me.accountId],
+          );
+        }
+        return ctx.client.query(text, values);
+      },
+    } as Queryable;
+    await withMatchingConfig(ctx.client, { max_photos: 3 });
+    const { logger, lines } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db });
+    const res = await put(app, me.headers, update);
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe("not_found");
+    const { rows } = await ctx.client.query("SELECT 1 FROM profile WHERE account_id = $1", [
+      me.accountId,
+    ]);
+    expect(rows).toEqual([]);
+    expect(lines().some((l) => l.msg === "profile saved")).toBe(false);
+  });
+
+  test("the owner's card before the first save is null, with everything still missing", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const me = await signedInAccount(ctx.client);
+    const res = await app.request("/profile/card", { headers: me.headers });
+    expect(res.status).toBe(200);
+    expect(CardPreviewResponse.parse(await res.json())).toEqual({
+      card: null,
+      completeness: {
+        complete: false,
+        missing: ["display_name", "photos", "bio_or_prompts", "seeks", "age_window"],
+      },
+    });
   });
 });

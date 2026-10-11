@@ -35,6 +35,11 @@ describe("picking a photo", () => {
     });
   });
 
+  it("reads a finished pick that hands back no asset as a cancel", async () => {
+    launch.mockResolvedValueOnce({ canceled: false, assets: [] });
+    expect(await pickPhoto()).toEqual({ kind: "cancelled" });
+  });
+
   it("reads a picker that throws as a denied permission", async () => {
     launch.mockRejectedValueOnce(new Error("Missing permission"));
     expect(await pickPhoto()).toEqual({ kind: "denied" });

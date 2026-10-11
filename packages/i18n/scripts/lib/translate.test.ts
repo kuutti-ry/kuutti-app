@@ -320,3 +320,124 @@ describe("what the translation may not swap", () => {
     );
   });
 });
+
+describe("an answer that cannot be written", () => {
+  it.each(["", "   ", "\t"])("is refused when it is empty: %o", (text) => {
+    expect(rejectionReason("Hello", text, "fi")).toBe("empty");
+  });
+
+  it("is refused when it is not ICU, with the parser's reason", () => {
+    expect(rejectionReason("{n, number} likes", "{n, number tykkäystä", "fi")).toMatch(
+      /^not valid ICU \(/,
+    );
+  });
+
+  it("is refused when it drops a tag of the English", () => {
+    expect(rejectionReason("<b>New</b> match", "Uusi pari", "fi")).toBe(
+      "does not keep the tags of the English source",
+    );
+  });
+
+  it("is refused when it keeps a name but changes its type", () => {
+    expect(rejectionReason("{n, number} likes", "{n} tykkäystä", "fi")).toBe(
+      "does not keep the ICU arguments of the English source",
+    );
+  });
+
+  it("is written when nothing is wrong", () => {
+    expect(rejectionReason("{n, number} likes", "{n, number} tykkäystä", "fi")).toBeUndefined();
+  });
+});
+
+describe("writing a run's answers", () => {
+  const messages = parseMessages(SOURCE);
+
+  it("reports a key the translator left unanswered and writes the rest", () => {
+    const result = applyTranslations(SOURCE, messages, "fi", { "demo.greeting": "Hei" });
+    expect(result.written).toEqual(["demo.greeting"]);
+    expect(result.rejected).toEqual({
+      "demo.count": "the translator returned nothing for this key",
+      "demo.where": "the translator returned nothing for this key",
+    });
+  });
+
+  it("writes nothing for an item the file has no entry for", () => {
+    const ghost: TranslationItem = { key: "demo.ghost", en: "Ghost", description: "d" };
+    const result = applyTranslations(SOURCE, messages, "fi", { "demo.ghost": "Haamu" }, [ghost]);
+    expect(result).toEqual({ yaml: SOURCE, written: [], rejected: {} });
+  });
+
+  it("quotes a text with ICU braces, a colon or a hash, and leaves a plain one plain", () => {
+    const result = applyTranslations(SOURCE, messages, "fi", {
+      "demo.greeting": "  Hei  ",
+      "demo.count": "{likes, plural, one {# tykkäys} other {# tykkäystä}}",
+      "demo.where": "Lampesi: {pond}",
+    });
+    expect(result.yaml).toContain("  fi: Hei\n");
+    expect(result.yaml).toContain('  fi: "{likes, plural, one {# tykkäys} other {# tykkäystä}}"\n');
+    expect(result.yaml).toContain('  fi: "Lampesi: {pond}"\n');
+    // A machine map of the other language gains this one; an entry without one gets a new map.
+    expect(parseMessages(result.yaml)["demo.greeting"]?.machine).toEqual({ sv: true, fi: true });
+    expect(parseMessages(result.yaml)["demo.count"]?.machine).toEqual({ fi: true });
+  });
+});
+
+describe("a run's selection", () => {
+  const messages = parseMessages(SOURCE);
+
+  it("narrows to named keys and to a prefix, both at once", () => {
+    expect(
+      selectForTranslation(messages, "fi", {
+        mode: "missing",
+        keys: ["demo.count", "demo.where", "admin.title"],
+        prefix: "demo.c",
+      }).map((item) => item.key),
+    ).toEqual(["demo.count"]);
+  });
+
+  it("keeps a message's room on its item, and only when it has one", () => {
+    const sized = parseMessages(
+      `${SOURCE}demo.ok:\n  en: OK\n  description: d.\n  max_length: 4\n`,
+    );
+    const items = missingTranslations(sized, "fi");
+    expect(items.find((item) => item.key === "demo.ok")).toEqual({
+      key: "demo.ok",
+      en: "OK",
+      description: "d.",
+      max_length: 4,
+    });
+    expect(items.find((item) => item.key === "demo.where")).not.toHaveProperty("max_length");
+  });
+
+  it("splits one namespace into parts of at most the size, and a size of one into single keys", () => {
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      key: `demo.k${i}`,
+      en: "x",
+      description: "d",
+    }));
+    expect(planChunks(items, 2).map((chunk) => chunk.items.length)).toEqual([2, 2, 1]);
+    expect(planChunks(items, 1)).toHaveLength(5);
+    expect(planChunks([], 40)).toEqual([]);
+  });
+
+  it("gives at most the asked number of examples", () => {
+    const many = Object.fromEntries(
+      Array.from({ length: 25 }, (_, i) => [
+        `demo.k${i}`,
+        {
+          en: `E${i}`,
+          description: "d",
+          fi: `F${i}`,
+          reviewed: { fi: reviewHash(`E${i}`, `F${i}`) },
+        },
+      ]),
+    );
+    expect(reviewedExamples(many, "fi", "demo")).toHaveLength(20);
+    expect(reviewedExamples(many, "fi", "demo", 3)).toEqual([
+      { en: "E0", text: "F0" },
+      { en: "E1", text: "F1" },
+      { en: "E2", text: "F2" },
+    ]);
+    expect(reviewedExamples(many, "sv", "demo")).toEqual([]);
+  });
+});

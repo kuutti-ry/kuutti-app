@@ -176,4 +176,65 @@ describe("DealBreakersScreen", () => {
     await press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
   });
+
+  it("searches a long list of answers it accepts", async () => {
+    fakeApi(answeredAll);
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    await press(screen.getByLabelText("Deal-breaker: Languages"));
+    expect(screen.getByRole("button", { name: "suomi" })).toBeTruthy();
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText("Search"), " DEUT ");
+      await settle();
+    });
+    expect(screen.getByRole("button", { name: "Deutsch" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "suomi" })).toBeNull();
+    expect(screen.getByLabelText("Search").props.value).toBe(" DEUT ");
+  });
+
+  it("takes an accepted answer back, and switches a deal-breaker off again", async () => {
+    const { puts } = fakeApi(answeredAll, [
+      { field: "smoking", accept: ["never", "quitting"], includeUnknown: false },
+    ]);
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Quitting" }));
+    expect(
+      screen.getByRole("button", { name: "Quitting" }).props.accessibilityState?.selected,
+    ).toBe(false);
+    await press(screen.getByLabelText("Deal-breaker: Smoking"));
+    expect(screen.queryByRole("button", { name: "Never" })).toBeNull();
+    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
+    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+    expect(puts).toEqual([[]]);
+  });
+
+  it("says it is saving, and that the set could not be saved when the API refuses it", async () => {
+    fakeApi(answeredAll);
+    const reads = globalThis.fetch;
+    let answer: ((response: Response) => void) | undefined;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.method === "PUT") {
+        return new Promise<Response>((resolve) => {
+          answer = resolve;
+        });
+      }
+      return reads(input, init);
+    }) as unknown as typeof fetch;
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
+    expect(screen.getByText("Saving…")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Save the deal-breakers" }).props.accessibilityState
+        ?.disabled,
+    ).toBe(true);
+    await act(async () => {
+      answer?.(json({ error: { code: "deal_breakers_limit", message: "x", requestId: "r" } }, 422));
+      await settle();
+    });
+    expect(screen.getByText("They could not be saved. Try again.")).toBeTruthy();
+    expect(screen.queryByText("Saving…")).toBeNull();
+  });
 });

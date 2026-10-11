@@ -3,7 +3,7 @@ import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
-import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
+import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
 
 // The bank login end to end through the routes, with a broker that answers
@@ -43,7 +43,11 @@ function fakeBroker(
     },
     async completeLogin(input): Promise<BrokerIdentity> {
       completed.push(input.state);
-      if (input.callbackUrl.searchParams.get("code") === "broken") throw new Error("bad code");
+      const code = input.callbackUrl.searchParams.get("code");
+      if (code === "broken") throw new Error("bad code");
+      // The adapter's own refusal, and something that is not an Error at all.
+      if (code === "refused") throw new BrokerError("unexpected acr");
+      if (code === "garbage") throw { not: "an error" };
       return {
         hetu,
         subject: "2BY5CDNFBEOSUFSKNGFSY4Y3DZISGL4I",
@@ -321,5 +325,240 @@ describe("bank login", () => {
     expect(res.headers.get("location")).toBe("kuutti://auth?error=auth_unavailable");
     // A request the app could not have sent is still refused first.
     expect((await app.request("/auth/start?platform=web")).status).toBe(400);
+  });
+});
+
+describe("the callback's refusals and failures", () => {
+  /** The warning the callback writes for a refusal it turns into a redirect. */
+  const refusalLine = (logs: () => Array<Record<string, unknown>>, code: string) =>
+    logs().find((l) => l.code === code && l.level === 40);
+
+  test("A broker error in free text reaches the log as unnamed, never as its words", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, ADULT_HETU);
+    const words = "Something Odd Happened";
+    const res = await app.request(
+      `/auth/callback?error=${encodeURIComponent(words)}&state=${encodeURIComponent(await start(app))}`,
+    );
+    expect(refusal(res)).toEqual({ error: "auth_provider_error", until: null });
+    expect(refusalLine(logs, "auth_provider_error")).toMatchObject({
+      detail: { detail: "broker answered unnamed error" },
+    });
+    expect(JSON.stringify(logs())).not.toContain("Odd");
+  });
+
+  test("A suspended identity is refused with auth_suspended and the attempt is counted", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU);
+    const { hetuHmac } = deriveIdentity(ADULT_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac, standing) VALUES ($1, 'suspended') RETURNING id",
+      [hetuHmac],
+    );
+    const id = identity.rows[0]?.id;
+    expect(refusal(await callback(app, await start(app)))).toEqual({
+      error: "auth_suspended",
+      until: null,
+    });
+    expect(broker.completed).toHaveLength(1);
+    const rows = await ctx.client.query(
+      "SELECT refused_attempts, (SELECT count(*) FROM account WHERE identity_id = $1) AS accounts FROM identity WHERE id = $1",
+      [id],
+    );
+    expect(rows.rows[0]).toMatchObject({ refused_attempts: 1, accounts: "0" });
+  });
+
+  test("The adapter's refusal keeps its reason and anything else it throws is a provider error too", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, ADULT_HETU);
+    expect(refusal(await callback(app, await start(app), "refused")).error).toBe(
+      "auth_provider_error",
+    );
+    expect(refusalLine(logs, "auth_provider_error")).toMatchObject({
+      detail: { detail: "unexpected acr" },
+    });
+    expect(refusal(await callback(app, await start(app), "garbage")).error).toBe(
+      "auth_provider_error",
+    );
+    expect(
+      logs()
+        .filter((l) => l.code === "auth_provider_error")
+        .map((l) => l.detail),
+    ).toContainEqual({ detail: "broker failed" });
+    // Never a bare 500: no unhandled-error line for either.
+    expect(logs().filter((l) => l.msg === "unhandled error")).toEqual([]);
+  });
+
+  test("An invalid identity code from the broker is a provider error naming the check, never the code", async ({
+    ctx,
+  }) => {
+    const invalid = "010190-123B"; // a wrong check character
+    const { app, logs } = await appWith(ctx, invalid);
+    expect(refusal(await callback(app, await start(app))).error).toBe("auth_provider_error");
+    expect(refusalLine(logs, "auth_provider_error")).toMatchObject({
+      detail: {
+        detail: "the identification service returned an invalid personal identity code (checksum)",
+      },
+    });
+    expect(JSON.stringify(logs())).not.toContain(invalid);
+    expect(JSON.stringify(logs())).not.toContain("010190");
+    const rows = await ctx.client.query(
+      "SELECT count(*) AS n FROM identity WHERE broker_subject = '2BY5CDNFBEOSUFSKNGFSY4Y3DZISGL4I'",
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(0);
+  });
+
+  test("A callback without a state is refused as invalid before anything is looked up", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU);
+    for (const query of ["?code=good", "?code=good&state=", `?state=s&error=${"x".repeat(65)}`]) {
+      const res = await app.request(`/auth/callback${query}`);
+      expect(res.status, query).toBe(400);
+      expect(await errorCode(res), query).toBe("validation_failed");
+    }
+    expect(broker.completed).toEqual([]);
+  });
+
+  test("An attempt past its ten minutes is refused and the bank's answer is never exchanged", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU);
+    // Started without a language, eleven minutes ago.
+    await ctx.client.query(
+      `INSERT INTO auth_request (state, nonce, platform, expires_at)
+       VALUES ('st-stale', 'n-stale', 'ios', now() - interval '1 minute')`,
+    );
+    expect(refusal(await callback(app, "st-stale")).error).toBe("auth_state_mismatch");
+    expect(broker.completed).toEqual([]);
+  });
+
+  test("A callback reaching an API without a broker sends the browser back with auth_provider_error", async ({
+    ctx,
+  }) => {
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client });
+    expect(refusal(await callback(app, "any-state")).error).toBe("auth_provider_error");
+  });
+
+  test("A failure that is not a refusal is a 500 the error sink sees, not a redirect", async () => {
+    const { logger, lines } = await captureLogger();
+    const reported: unknown[] = [];
+    const down = {
+      query: () => Promise.reject(new Error("connection terminated unexpectedly")),
+    } as unknown as Parameters<typeof createApp>[0]["db"];
+    const app = createApp({
+      config: testConfig({ HETU_HMAC_KEY: KEY_HEX }),
+      logger,
+      db: down,
+      broker: fakeBroker(ADULT_HETU),
+      report: (error) => reported.push(error),
+    });
+    const res = await app.request("/auth/callback?code=good&state=some-state");
+    expect(res.status).toBe(500);
+    expect(res.headers.get("location")).toBeNull();
+    expect(await errorCode(res)).toBe("internal_error");
+    expect(reported).toHaveLength(1);
+    expect(lines().filter((l) => l.msg === "unhandled error")).toHaveLength(1);
+  });
+
+  test("A preview handed a broker still has no key, and sends the app back without asking the bank", async ({
+    ctx,
+  }) => {
+    const { logger } = await captureLogger();
+    const broker = fakeBroker(ADULT_HETU);
+    // A preview's configuration drops the HMAC key whatever is set (ADR-014 §1).
+    const config = testConfig({ APP_ENV: "preview", PR_NUMBER: "125", HETU_HMAC_KEY: KEY_HEX });
+    expect(config.HETU_HMAC_KEY).toBeUndefined();
+    const app = createApp({ config, logger, db: ctx.client, broker });
+    const res = await app.request("/auth/start?platform=ios");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("kuutti://auth?error=auth_unavailable");
+    expect(broker.started).toEqual([]);
+  });
+
+  test("The start refuses a language the bank chooser does not have", async ({ ctx }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU);
+    const res = await app.request("/auth/start?platform=ios&locale=de");
+    expect(res.status).toBe(400);
+    expect(await errorCode(res)).toBe("validation_failed");
+    expect(broker.started).toEqual([]);
+  });
+});
+
+describe("the exchange", () => {
+  async function loggedIn(ctx: { client: Parameters<typeof createApp>[0]["db"] }) {
+    const { app } = await appWith(ctx, ADULT_HETU);
+    const state = await start(app);
+    const code = await codeFrom(await callback(app, state));
+    return { app, state, code };
+  }
+
+  test("An expired one-time code is refused and opens no session", async ({ ctx }) => {
+    const { app, state, code } = await loggedIn(ctx);
+    await ctx.client.query(
+      "UPDATE auth_request SET code_expires_at = now() - interval '1 second' WHERE state = $1",
+      [state],
+    );
+    const res = await exchange(app, code);
+    expect(res.status).toBe(401);
+    expect(await errorCode(res)).toBe("auth_code_used");
+    const rows = await ctx.client.query(
+      "SELECT count(*) AS n FROM session WHERE account_id = (SELECT account_id FROM auth_request WHERE state = $1)",
+      [state],
+    );
+    expect(Number(rows.rows[0]?.n)).toBe(0);
+    // Refused before it was spent: the attempt still reads as never used.
+    const attempt = await ctx.client.query(
+      "SELECT code_used_at FROM auth_request WHERE state = $1",
+      [state],
+    );
+    expect(attempt.rows).toEqual([{ code_used_at: null }]);
+  });
+
+  test("The exchange takes exactly the code and nothing else", async ({ ctx }) => {
+    const { app, code } = await loggedIn(ctx);
+    for (const body of [{}, { code, extra: true }, { code: 42 }]) {
+      const res = await app.request("/auth/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(await errorCode(res)).toBe("validation_failed");
+    }
+    // None of the refused bodies spent the code.
+    expect((await exchange(app, code)).status).toBe(200);
+  });
+
+  test("The device is named by its user agent, cut to two hundred characters, or by nothing", async ({
+    ctx,
+  }) => {
+    const first = await loggedIn(ctx);
+    const res = await first.app.request("/auth/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json", "user-agent": `Kuutti/1 ${"x".repeat(300)}` },
+      body: JSON.stringify({ code: first.code }),
+    });
+    expect(res.status).toBe(200);
+    const long = (await res.json()) as { sessionId: string };
+    const second = await loggedIn(ctx);
+    const bare = await second.app.request("/auth/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: second.code }),
+    });
+    expect(bare.status).toBe(200);
+    const none = (await bare.json()) as { sessionId: string };
+    const rows = await ctx.client.query<{ id: string; user_agent: string | null }>(
+      "SELECT id, user_agent FROM session WHERE id = ANY($1)",
+      [[long.sessionId, none.sessionId]],
+    );
+    const agent = new Map(rows.rows.map((r) => [r.id, r.user_agent]));
+    expect(agent.get(long.sessionId)).toBe(`Kuutti/1 ${"x".repeat(191)}`);
+    expect(agent.get(none.sessionId)).toBeNull();
   });
 });

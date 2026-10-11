@@ -477,4 +477,186 @@ describe("OnboardingScreen", () => {
     expect(calls.filter((c) => c.method === "POST")).toEqual([]);
     expect(server.consents).toEqual([]);
   });
+
+  /** Everything answered but the research question, the one step never required. */
+  function atResearch(server: ReturnType<typeof fakeApi>["server"]) {
+    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
+    server.gender = "woman";
+    server.seeks = ["man"];
+    server.ageWindow = { min: 30, max: 40 };
+    server.profile = {
+      displayName: "Aino",
+      bio: "x".repeat(50),
+      bioPreset: null,
+      fields: { intent: "casual" },
+      prompts: [],
+    };
+    server.photos = 3;
+  }
+
+  /** The API answers one path with a refusal until `ok()` is called. */
+  function failingUntilOk(path: string, status = 500) {
+    const answers = globalThis.fetch;
+    let failing = true;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (failing && new URL(request.url).pathname === path) {
+        return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, status);
+      }
+      return answers(input, init);
+    }) as unknown as typeof fetch;
+    return {
+      ok: () => {
+        failing = false;
+      },
+    };
+  }
+
+  it("records the research consent for the wording it showed when the person says yes, and leaves", async () => {
+    const { server } = fakeApi();
+    atResearch(server);
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
+    // English is a translation: the Finnish text is the binding one.
+    expect(screen.getByText(/The Finnish text is the one that counts/)).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Yes, I take part" }));
+    await flush();
+    expect(server.consents.at(-1)).toEqual(consented("research"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+  });
+
+  it("asks for an app update instead of recording research for a wording it did not show", async () => {
+    const { server, calls } = fakeApi();
+    atResearch(server);
+    const answers = globalThis.fetch;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const response = await answers(input, init);
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname !== "/onboarding") return response;
+      const body = await response.json();
+      return json({ ...body, currentVersions: { ...body.currentVersions, research: "2027-01" } });
+    }) as unknown as typeof fetch;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
+    expect(screen.getByText(/Update the app to continue/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Yes, I take part" })).toBeNull();
+    await press(screen.getByRole("button", { name: "Not now" }));
+    expect(calls.filter((c) => c.method === "POST")).toEqual([]);
+  });
+
+  it("says the status could not be read, and reads it again on request", async () => {
+    fakeApi();
+    const api = failingUntilOk("/onboarding");
+    await show(<OnboardingScreen />);
+    await waitFor(() =>
+      expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+    );
+    api.ok();
+    await press(screen.getByRole("button", { name: "Try again" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
+  });
+
+  it("says the areas could not be read, and reads them again on request", async () => {
+    const { server } = fakeApi();
+    atResearch(server);
+    server.pond = null;
+    const api = failingUntilOk("/ponds");
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Where do you live?")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+    );
+    api.ok();
+    await press(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Finland" })).toBeTruthy());
+  });
+
+  it("says a step did not go through when the API refuses it for another reason than its cadence", async () => {
+    const { server } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"));
+    server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    failingUntilOk("/account/gender");
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Woman" }));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() =>
+      expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+    );
+    expect(screen.queryByText(/You changed this recently/)).toBeNull();
+    expect(screen.getByText("How do you describe yourself?")).toBeTruthy();
+  });
+
+  it("takes back a label, and a gender sought, pressed a second time", async () => {
+    const { server } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"));
+    server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Non-binary" }));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("A word for it, if you like")).toBeTruthy());
+    const continueDisabled = () =>
+      screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled;
+    await press(screen.getByRole("button", { name: "Genderfluid" }));
+    expect(continueDisabled()).toBe(false);
+    await press(screen.getByRole("button", { name: "Genderfluid" }));
+    expect(continueDisabled()).toBe(true);
+    await press(screen.getByRole("button", { name: "Skip" }));
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    const women = () => screen.getByRole("button", { name: "Women" });
+    await press(women());
+    expect(women().props.accessibilityState?.selected).toBe(true);
+    await press(women());
+    expect(women().props.accessibilityState?.selected).toBe(false);
+  });
+
+  it("keeps no bio when the one typed is cleared again", async () => {
+    const { server } = fakeApi();
+    atResearch(server);
+    server.profile = {
+      displayName: "Aino",
+      bio: null,
+      bioPreset: null,
+      fields: { intent: "casual" },
+      prompts: [],
+    };
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    await type(screen.getByLabelText("About you"), "Long walks.");
+    await type(screen.getByLabelText("About you"), "");
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await flush();
+    expect(server.profile?.bio).toBeNull();
+  });
+
+  it("asks for an app update instead of recording the sensitive-answers consent for a newer wording", async () => {
+    const { server, calls } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"));
+    server.profile = { displayName: "Noa", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    server.gender = "woman";
+    const answers = globalThis.fetch;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const response = await answers(input, init);
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname !== "/onboarding") return response;
+      const body = await response.json();
+      return json({
+        ...body,
+        currentVersions: { ...body.currentVersions, special_category: "2027-01" },
+      });
+    }) as unknown as typeof fetch;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    expect(screen.getByText(/Update the app to continue/)).toBeTruthy();
+    expect(screen.queryByLabelText("I consent to Kuutti storing whom I seek")).toBeNull();
+    await press(screen.getByRole("button", { name: "Women" }));
+    expect(
+      screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+    expect(calls.filter((c) => c.method === "POST")).toEqual([]);
+  });
 });

@@ -5,6 +5,7 @@ import { createApp } from "../app.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
+import { eraseAccount, exportAccount } from "./erasure.ts";
 import { REREGISTER_COOLDOWN_DAYS } from "./registration.ts";
 
 // features/identity/erasure.feature through the routes (#51, TD-7): real
@@ -365,5 +366,52 @@ describe("account erasure", () => {
       expect((await app.request("/account/export", { headers })).status).toBe(401);
     }
     expect(await count(ctx, "SELECT count(*) AS n FROM account WHERE state = 'deleted'")).toBe(0);
+  });
+});
+
+describe("account erasure and export: the edges", () => {
+  test("The export names each device by its platform and leaves out the ended ones", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client);
+    const { rows } = await ctx.client.query<{ id: string; platform: string }>(
+      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at, revoked_at)
+       VALUES ($1, 'android', 'edge-a1', now() + interval '15 minutes', 'edge-r1', now() + interval '90 days', NULL),
+              ($1, 'android', 'edge-a2', now() + interval '15 minutes', 'edge-r2', now() + interval '90 days', now())
+       RETURNING id, platform`,
+      [a.accountId],
+    );
+    const [android, ended] = rows;
+    const res = await app.request("/account/export", { headers: a.headers });
+    expect(res.status).toBe(200);
+    const body = AccountExport.parse(await res.json());
+    expect(
+      body.sessions
+        .map((s) => ({ id: s.sessionId, platform: s.platform }))
+        .sort((x, y) => x.platform.localeCompare(y.platform)),
+    ).toEqual([
+      { id: android?.id, platform: "android" },
+      { id: a.sessionId, platform: "ios" },
+    ]);
+    expect(body.sessions.map((s) => s.sessionId)).not.toContain(ended?.id);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("Erasure and export of an account that does not exist answer 404 and touch nothing", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    const deps = { db: ctx.client, logger, now: () => new Date("2026-10-01T12:00:00Z") };
+    const nobody = "00000000-0000-4000-8000-00000000dead";
+    await expect(eraseAccount(deps, nobody)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    await expect(exportAccount(deps, nobody)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    expect(lines().filter((l) => l.msg === "account erased")).toEqual([]);
   });
 });

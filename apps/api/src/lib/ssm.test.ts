@@ -47,3 +47,35 @@ describe("loadSsmParameters", () => {
     expect(calls[1]?.input.NextToken).toBe("t2");
   });
 });
+
+describe("parameters that do not fit", () => {
+  it("keys a parameter outside the prefix by its whole path", () => {
+    expect(parameterNameToEnvKey("/kuutti/shared/sentry-dsn", "/kuutti/staging/")).toBe(
+      "KUUTTI_SHARED_SENTRY_DSN",
+    );
+  });
+
+  it("skips a parameter without a name or a value, and a page without parameters", async () => {
+    const pages = [
+      {
+        Parameters: [
+          { Name: "/kuutti/staging/db-host", Value: "rds.internal" },
+          { Value: "a value with no name" },
+          { Name: "/kuutti/staging/db-name" },
+          // An empty string is a value: SSM stores none, but nothing here decides that.
+          { Name: "/kuutti/staging/log-level", Value: "" },
+        ],
+        NextToken: "t2",
+      },
+      { NextToken: "t3" },
+      {},
+    ];
+    let page = 0;
+    const client = { send: async () => pages[page++] ?? {} };
+    expect(await loadSsmParameters("/kuutti/staging/", client)).toEqual({
+      DB_HOST: "rds.internal",
+      LOG_LEVEL: "",
+    });
+    expect(page).toBe(3);
+  });
+});

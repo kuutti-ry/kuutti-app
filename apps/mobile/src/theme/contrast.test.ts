@@ -63,4 +63,27 @@ describe("contrast", () => {
     const { background: _dropped, ...withoutBackground } = light;
     expect(checkContrast({ ":root": withoutBackground }).some((f) => f.ratio === 0)).toBe(true);
   });
+
+  it("converts a grey without a hue and a hue past 240 degrees", () => {
+    expect(hslChannelsToRgb("0 0% 50%")).toEqual([0.5, 0.5, 0.5]);
+    expect(hslChannelsToRgb("300 100% 50%")?.map((c) => Math.round(c * 255))).toEqual([
+      255, 0, 255,
+    ]);
+  });
+
+  it("leaves out a block that declares no custom property", () => {
+    expect(parseTokenSets("body { margin: 0; } :root { --ring: 1 2% 3%; }")).toEqual({
+      ":root": { ring: "1 2% 3%" },
+    });
+  });
+
+  it("fails a pair whose text colour is missing", () => {
+    const light = parseTokenSets(TOKENS)[":root"];
+    if (!light) throw new Error("no :root set");
+    const { foreground: _dropped, ...withoutForeground } = light;
+    const failures = checkContrast({ ":root": withoutForeground });
+    expect(failures.filter((f) => f.foreground === "foreground").map((f) => f.ratio)).toEqual([
+      0, 0,
+    ]);
+  });
 });

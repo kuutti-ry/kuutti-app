@@ -1,9 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { ErrorResponse } from "@kuutti/schema";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { describe, expect, vi } from "vitest";
 import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
-import { AppError } from "./errors.ts";
+import type { AppEnv } from "./env.ts";
+import { AppError, notFound, onError } from "./errors.ts";
+import { serverRequestId } from "./request-id.ts";
 
 const echoRoute = createRoute({
   method: "post",
@@ -120,5 +124,77 @@ describe("error envelope", () => {
     });
     expect(res.status).toBe(413);
     expect(ErrorResponse.parse(await res.json()).error.code).toBe("payload_too_large");
+  });
+});
+
+describe("error envelope for what Hono itself throws", () => {
+  // Hono's own refusals (body limits, content types, its auth helpers) arrive as
+  // HTTPException: each status that has a catalogue code keeps it, any other is
+  // the generic http_error, and the status itself passes through.
+  test.each([
+    [415, "unsupported_media_type", "The request body is not in a form the API accepts."],
+    [401, "unauthenticated", "Sign in to continue."],
+    [413, "payload_too_large", "The request is too large."],
+    [405, "http_error", "The request failed."],
+    [400, "http_error", "The request failed."],
+  ] as const)(
+    "HTTPException %i answers %s with its status, logged as a warning",
+    async (status, code, message) => {
+      const { logger, lines } = await captureLogger();
+      const report = vi.fn();
+      const app = new Hono<AppEnv>();
+      app.use("*", serverRequestId());
+      app.onError(onError<AppEnv>(logger, report));
+      app.get("/refused", () => {
+        throw new HTTPException(status, { message: "detail only for the log" });
+      });
+      const res = await app.request("/refused");
+      expect(res.status).toBe(status);
+      const body = ErrorResponse.parse(await res.json());
+      expect(body.error).toMatchObject({ code, message });
+      expect(JSON.stringify(body)).not.toContain("detail only for the log");
+      const logged = lines().find((l) => l.msg === "detail only for the log");
+      expect(logged).toMatchObject({ level: 40, status, requestId: body.error.requestId });
+      // An answer, not a fault: nothing goes to the error reporter.
+      expect(report).not.toHaveBeenCalled();
+    },
+  );
+
+  test("a bare app without the request-id middleware still answers in the envelope, with an unknown request id", async () => {
+    const { logger, lines } = await captureLogger();
+    const app = new Hono<AppEnv>();
+    app.onError(onError<AppEnv>(logger));
+    app.notFound(notFound<AppEnv>());
+    app.get("/boom", () => {
+      throw new Error("kaboom");
+    });
+    const boom = ErrorResponse.parse(await (await app.request("/boom")).json());
+    expect(boom.error).toEqual({
+      code: "internal_error",
+      message: "Something went wrong on our side.",
+      requestId: "unknown",
+    });
+    expect(lines().find((l) => l.msg === "unhandled error")?.requestId).toBe("unknown");
+    const missing = ErrorResponse.parse(await (await app.request("/nope")).json());
+    expect(missing.error).toEqual({
+      code: "not_found",
+      message: "Not found.",
+      requestId: "unknown",
+    });
+  });
+
+  test("an empty request id is no id: the envelope says unknown", async () => {
+    const { logger } = await captureLogger();
+    const app = new Hono<AppEnv>();
+    app.use("*", async (c, next) => {
+      c.set("requestId", "");
+      await next();
+    });
+    app.onError(onError<AppEnv>(logger));
+    app.get("/teapot", () => {
+      throw new AppError(418, "teapot", "I am a teapot");
+    });
+    const body = ErrorResponse.parse(await (await app.request("/teapot")).json());
+    expect(body.error).toEqual({ code: "teapot", message: "I am a teapot", requestId: "unknown" });
   });
 });

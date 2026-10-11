@@ -1,3 +1,4 @@
+import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, PhotoList, PhotoReviewQueue, PhotoUrlResponse } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
@@ -283,5 +284,180 @@ describe("photo review queue", () => {
       0,
     );
     void TEST_MEDIA_BASE;
+  });
+});
+
+const auditRows = async (ctx: TestContext) =>
+  Number((await ctx.client.query("SELECT count(*) AS n FROM audit_log")).rows[0]?.n);
+
+describe("photo review queue, the remaining branches", () => {
+  test("An admin works the queue as a moderator does", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const admin = await staffSession(ctx.client, "admin");
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "queued");
+    expect((await app.request("/admin/photos/queue", { headers: admin.headers })).status).toBe(200);
+    expect((await app.request(`/admin/photos/${id}/card`, { headers: admin.headers })).status).toBe(
+      200,
+    );
+    expect((await decide(app, admin.headers, id, { decision: "approve" })).status).toBe(200);
+    const audit = await ctx.client.query(
+      "SELECT actor_identity_id, action FROM audit_log ORDER BY at",
+    );
+    expect(audit.rows.map((r) => r.action).sort()).toEqual(["photo.approve", "photo.view"]);
+    expect(new Set(audit.rows.map((r) => r.actor_identity_id))).toEqual(
+      new Set([admin.identityId]),
+    );
+  });
+
+  test("A staff session that was ended, has expired, lost its role or was never issued is refused with its own code", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "queued");
+    const ended = await staffSession(ctx.client);
+    await ctx.client.query("UPDATE admin_session SET revoked_at = now() WHERE id = $1", [
+      ended.sessionId,
+    ]);
+    const expired = await staffSession(ctx.client);
+    await ctx.client.query(
+      "UPDATE admin_session SET expires_at = now() - interval '1 minute' WHERE id = $1",
+      [expired.sessionId],
+    );
+    const demoted = await staffSession(ctx.client);
+    await ctx.client.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
+      demoted.identityId,
+    ]);
+    for (const [what, headers, code] of [
+      ["a malformed token", { authorization: "Bearer nope" }, "unauthenticated"],
+      ["a token nobody issued", { authorization: `Bearer ${"B".repeat(43)}` }, "unauthenticated"],
+      ["an ended session", ended.headers, "session_revoked"],
+      ["a role taken away", demoted.headers, "session_revoked"],
+      ["an expired session", expired.headers, "session_expired"],
+    ] as const) {
+      for (const res of [
+        await app.request("/admin/photos/queue", { headers }),
+        await app.request(`/admin/photos/${id}/card`, { headers }),
+        await decide(app, headers, id, { decision: "approve" }),
+      ]) {
+        expect(res.status, what).toBe(401);
+        expect(await errorCode(res), what).toBe(code);
+      }
+    }
+    expect(await auditRows(ctx)).toBe(0);
+    expect(
+      (await ctx.client.query("SELECT state FROM photo WHERE id = $1", [id])).rows[0]?.state,
+    ).toBe("queued");
+  });
+
+  test("Without object storage the card is media_unavailable and no view is audited", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { max_photos: 6 });
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client });
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "queued");
+    const res = await app.request(`/admin/photos/${id}/card`, { headers: staff.headers });
+    expect(res.status).toBe(503);
+    expect(await errorCode(res)).toBe("media_unavailable");
+    expect(await auditRows(ctx)).toBe(0);
+    // The queue and the decision need no storage.
+    expect((await app.request("/admin/photos/queue", { headers: staff.headers })).status).toBe(200);
+    expect((await decide(app, staff.headers, id, { decision: "approve" })).status).toBe(200);
+  });
+
+  test("The card of a photo nobody has audits nothing; a decision on one is a 404 and audits nothing", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const nobody = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+    expect(
+      (await app.request(`/admin/photos/${nobody}/card`, { headers: staff.headers })).status,
+    ).toBe(404);
+    const res = await decide(app, staff.headers, nobody, { decision: "reject", reason: "nudity" });
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe("not_found");
+    expect((await decide(app, staff.headers, "nope", { decision: "approve" })).status).toBe(400);
+    expect(await auditRows(ctx)).toBe(0);
+  });
+
+  test("Of two moderators deciding at once, the one whose update finds the photo decided is refused and its audit row goes with it", async ({
+    ctx,
+  }) => {
+    // The other moderator's decision lands between this one's read and its
+    // update: the update is keyed on the queued state and finds nothing.
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "queued");
+    let landed = false;
+    const db = {
+      async query(text: string, values?: unknown[]) {
+        const result = await ctx.client.query(text, values);
+        // Right after this moderator's read of the photo, the other's decision commits.
+        if (!landed && text.endsWith(", account_id FROM photo WHERE id = $1")) {
+          landed = true;
+          await ctx.client.query("UPDATE photo SET state = 'approved' WHERE id = $1", [id]);
+        }
+        return result;
+      },
+    } as Queryable;
+    await withMatchingConfig(ctx.client, { max_photos: 6 });
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db, media: testMediaDeps().deps });
+    const staff = await staffSession(ctx.client);
+    const res = await decide(app, staff.headers, id, { decision: "reject", reason: "nudity" });
+    expect(res.status).toBe(409);
+    expect(await errorCode(res)).toBe("photo_not_queued");
+    expect(await auditRows(ctx)).toBe(0);
+    const after = await ctx.client.query(
+      "SELECT p.state, p.rejection_reason, (SELECT count(*) FROM photo_review r WHERE r.photo_id = p.id) AS reviews FROM photo p WHERE p.id = $1",
+      [id],
+    );
+    expect(after.rows[0]).toEqual({ state: "approved", rejection_reason: null, reviews: "0" });
+  });
+
+  test("A queued photo the check never recorded shows with no labels, no faces and no check time", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "queued");
+    const queue = PhotoReviewQueue.parse(
+      await (await app.request("/admin/photos/queue", { headers: staff.headers })).json(),
+    );
+    expect(queue.items).toEqual([
+      expect.objectContaining({
+        photoId: id,
+        checkedAt: null,
+        labels: [],
+        faces: 0,
+        flagged: [],
+      }),
+    ]);
+  });
+
+  test("The queue answers twenty by default and refuses a limit over a hundred", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    for (let i = 0; i < 21; i += 1) await photoIn(ctx, owner.accountId, "queued", { ago: 100 - i });
+    const queue = PhotoReviewQueue.parse(
+      await (await app.request("/admin/photos/queue", { headers: staff.headers })).json(),
+    );
+    expect(queue.items).toHaveLength(20);
+    expect(queue.total).toBe(21);
+    for (const limit of ["101", "abc", "-1"]) {
+      const res = await app.request(`/admin/photos/queue?limit=${limit}`, {
+        headers: staff.headers,
+      });
+      expect(res.status, limit).toBe(400);
+      expect(await errorCode(res), limit).toBe("validation_failed");
+    }
   });
 });

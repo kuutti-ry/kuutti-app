@@ -5,7 +5,7 @@ import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { AppEnv } from "./env.ts";
 import { AppError } from "./errors.ts";
-import { requestLocale, servedLocales } from "./i18n.ts";
+import { isLocalisedErrorCode, requestLocale, servedLocales, tOf } from "./i18n.ts";
 
 describe("localised responses", () => {
   test("an API error response for a request with Accept-Language: fi carries the Finnish message", async ({
@@ -114,5 +114,30 @@ describe("localised responses", () => {
       t("does.not.exist");
     };
     expect(probe).toBeTypeOf("function");
+  });
+});
+
+describe("the request's language where the middleware has or has not run", () => {
+  test("tOf follows the locale middleware, and falls back to English without it", async () => {
+    const seen = (app: Hono<AppEnv>) =>
+      app.get("/x", (c) => c.json({ text: tOf(c)("errors.not_found") }));
+    const localised = new Hono<AppEnv>();
+    localised.use("*", requestLocale());
+    seen(localised);
+    const bare = new Hono<AppEnv>();
+    seen(bare);
+
+    const fi = { headers: { "accept-language": "fi" } };
+    expect(await (await localised.request("/x", fi)).json()).toEqual({ text: "Ei löytynyt." });
+    // A bare app (a test, a tool) has no locale: English, whatever the header says.
+    expect(await (await bare.request("/x", fi)).json()).toEqual({ text: "Not found." });
+  });
+
+  test("only a key of the catalogue's own is a localised code, never one an object inherits", () => {
+    expect(isLocalisedErrorCode("not_found")).toBe(true);
+    expect(isLocalisedErrorCode("consent_required")).toBe(true);
+    for (const code of ["teapot", "toString", "constructor", "__proto__", "hasOwnProperty"]) {
+      expect(isLocalisedErrorCode(code), code).toBe(false);
+    }
   });
 });

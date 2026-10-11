@@ -208,4 +208,120 @@ describe("PhotoQueue", () => {
     expect(await screen.findByText("Not checked automatically.")).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText("No face found")).toBeNull());
   });
+
+  it("refreshes on request, loading the queue again and showing what waits now", async () => {
+    let total = 2;
+    const calls = fetchMock([
+      (req) =>
+        req.method === "GET" && path(req) === "/admin/photos/queue"
+          ? json({ items: total > 1 ? [item(1), item(2)] : [item(3)], total })
+          : null,
+      cardUrls,
+    ]);
+    show();
+    expect(await screen.findByText("2 photos waiting")).toBeInTheDocument();
+    total = 1;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText("1 photo waiting")).toBeInTheDocument();
+    expect(calls.filter((c) => path(c) === "/admin/photos/queue")).toHaveLength(2);
+    expect(new URL(calls[0]?.url ?? "").searchParams.get("limit")).toBe("20");
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1));
+  });
+
+  it("keeps saying the photo is loading when its signed URL is refused, and never shows a broken image", async () => {
+    fetchMock([
+      (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
+      (req) =>
+        /\/card$/.test(path(req))
+          ? json({ error: { code: "not_found", message: "x", requestId: "r" } }, 404)
+          : null,
+    ]);
+    show();
+    const loading = await screen.findByText("Loading the photo…");
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByText("Loading the photo…")).toBeInTheDocument();
+  });
+
+  it("says no label passed the threshold when a face was found and nothing else", async () => {
+    fetchMock([
+      (req) =>
+        path(req) === "/admin/photos/queue"
+          ? json({ items: [item(1, { labels: [], faces: 2, flagged: ["several"] })], total: 1 })
+          : null,
+      cardUrls,
+    ]);
+    show();
+    expect(await screen.findByText("2 faces found")).toBeInTheDocument();
+    expect(screen.getByText("No labels above 30 % confidence.")).toBeInTheDocument();
+    // The owner is named by the first part of the pseudonymous id only.
+    expect(screen.getByText(/Account 6f1c1c4e$/)).toBeInTheDocument();
+  });
+
+  it("offers every rejection reason, and holds both buttons while a decision is saving", async () => {
+    let answer: ((response: Response) => void) | undefined;
+    fetchMock([
+      (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
+      cardUrls,
+      (req) =>
+        req.method === "POST"
+          ? new Promise<Response>((resolve) => {
+              answer = resolve;
+            })
+          : null,
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Reject…" }));
+    expect(
+      screen.getAllByRole("option").map((option) => (option as HTMLOptionElement).value),
+    ).toEqual([
+      "nudity",
+      "no_person",
+      "several_people",
+      "minor",
+      "violence",
+      "contact_details",
+      "other",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled());
+    expect(screen.getByRole("button", { name: "Reject…" })).toBeDisabled();
+    answer?.(json({ photoId: item(1).photoId, state: "approved", rejectionReason: null }));
+    expect(await screen.findByText("Approved")).toBeInTheDocument();
+  });
+
+  it("a decision that lands during a refresh does not take one off the fresh count", async () => {
+    let answerDecision: ((response: Response) => void) | undefined;
+    let answerQueue: ((response: Response) => void) | undefined;
+    let queueLoads = 0;
+    fetchMock([
+      (req) => {
+        if (path(req) !== "/admin/photos/queue") return null;
+        queueLoads += 1;
+        if (queueLoads === 1) return json({ items: [item(1)], total: 1 });
+        return new Promise<Response>((resolve) => {
+          answerQueue = resolve;
+        });
+      },
+      cardUrls,
+      (req) =>
+        req.method === "POST"
+          ? new Promise<Response>((resolve) => {
+              answerDecision = resolve;
+            })
+          : null,
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(answerDecision).toBeDefined());
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText("Loading the queue…")).toBeInTheDocument();
+    answerDecision?.(json({ photoId: item(1).photoId, state: "approved", rejectionReason: null }));
+    await waitFor(() => expect(answerQueue).toBeDefined());
+    answerQueue?.(json({ items: [item(2)], total: 1 }));
+    expect(await screen.findByText("1 photo waiting")).toBeInTheDocument();
+    expect(screen.queryByText("Nothing waiting")).toBeNull();
+  });
 });
