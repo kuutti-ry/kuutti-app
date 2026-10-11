@@ -10,7 +10,7 @@ appId: fi.kuutti.app
 ---
 - openLink: exp+kuutti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A${METRO_PORT || "8081"}
 - extendedWaitUntil:
-    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|This is the developer menu.*|Connected to:|.* isn't responding"
+    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|This is the developer menu.*|Connected to:|Runtime version.*|.* isn't responding"
     timeout: 120000
 # A busy Android emulator says an app is not responding, a system app of its
 # own or ours while its bundle loads: waited for, never closed, so ours lives.
@@ -28,6 +28,14 @@ appId: fi.kuutti.app
       - tapOn:
           text: "Continue"
           below: "This is the developer menu.*"
+# On Android a fresh install opens the dev client's menu itself over the
+# first load, naming the runtime version: the back key closes it.
+- runFlow:
+    when:
+      visible: "Runtime version.*"
+      platform: Android
+    commands:
+      - back
 # The dev client's own menu, should a tap have brushed its floating Tools
 # button, lies over the app as a sheet: swiped down, it goes.
 - runFlow:

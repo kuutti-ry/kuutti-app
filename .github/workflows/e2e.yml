@@ -132,6 +132,10 @@ jobs:
       - name: The cast's stories
         run: pnpm demo:reset
 
+      # The home screen shows an area's numbers from ten people up.
+      - name: The synthetic population
+        run: pnpm demo:population
+
       # The dev client holds only the native side, which its fingerprint names
       # (the one preview.yml and eas-build.yml compare; the commit in `extra`
       # is left out, and Metro serves the config anyway). A pull request that

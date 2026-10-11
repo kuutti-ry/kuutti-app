@@ -19,19 +19,19 @@ name: A phone number in the bio is refused with the reason, and the stored bio s
 - tapOn: "Arkkitehti, joka piirtää.*"
 - inputText: " Soita minulle 040 123 4567, niin sovitaan retki Nuuksioon. "
 # The profile is ten screens long; Save is at its end, and a keyboard left up
-# lies over it while Maestro counts it as visible. On iOS hideKeyboard would
-# tap what lies below the field, so the keyboard is closed by a tap on the
-# field's label, which is no button (the screen lets such a tap close it); the
-# field itself carries the same words as its name, hence above its text.
-# Android's back key closes its keyboard, and the swipes then run in the
-# margin, clear of the search boxes.
+# lies over it while Maestro counts it as visible. hideKeyboard is not
+# enough: on iOS it taps what lies below the field, and on Android the
+# keyboard stayed up in CI. A tap on the field's label, which is no button,
+# closes it on both (the screen lets such a tap close it); the field itself
+# carries the same words as its name, hence above its text. Android then
+# swipes in the margin, clear of the search boxes.
+- tapOn:
+    text: "About you|Sinusta|Om dig"
+    above: "Arkkitehti, joka piirtää.*"
 - runFlow:
     when:
       platform: iOS
     commands:
-      - tapOn:
-          text: "About you|Sinusta|Om dig"
-          above: "Arkkitehti, joka piirtää.*"
       - scrollUntilVisible:
           element: "Save|Tallenna|Spara"
           direction: DOWN
@@ -42,7 +42,6 @@ name: A phone number in the bio is refused with the reason, and the stored bio s
     when:
       platform: Android
     commands:
-      - hideKeyboard
       - runFlow:
           file: ../common/scroll-to.yaml
           env:
