@@ -18,18 +18,35 @@ name: A phone number in the bio is refused with the reason, and the stored bio s
 # Typed into the bio where the tap puts the cursor: a number anywhere in it is refused.
 - tapOn: "Arkkitehti, joka piirtää.*"
 - inputText: " Soita minulle 040 123 4567, niin sovitaan retki Nuuksioon. "
-# The profile is ten screens long; Save is at its end. Android's keyboard takes
-# half the screen and stays: its back key closes it (on iOS hideKeyboard would
-# tap what lies below the field, so the keyboard stays there).
+# The profile is ten screens long; Save is at its end, and a keyboard left up
+# lies over it while Maestro counts it as visible. On iOS hideKeyboard would
+# tap what lies below the field, so the keyboard is closed by a tap on the
+# field's label, which is no button (the screen lets such a tap close it); the
+# field itself carries the same words as its name, hence above its text.
+# Android's back key closes its keyboard, and the swipes then run in the
+# margin, clear of the search boxes.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: "About you|Sinusta|Om dig"
+          above: "Arkkitehti, joka piirtää.*"
+      - scrollUntilVisible:
+          element: "Save|Tallenna|Spara"
+          direction: DOWN
+          centerElement: true
+          speed: 80
+          timeout: 60000
 - runFlow:
     when:
       platform: Android
     commands:
       - hideKeyboard
-- runFlow:
-    file: ../common/scroll-to.yaml
-    env:
-      ELEMENT: "Save|Tallenna|Spara"
+      - runFlow:
+          file: ../common/scroll-to.yaml
+          env:
+            ELEMENT: "Save|Tallenna|Spara"
 - tapOn: "Save|Tallenna|Spara"
 - extendedWaitUntil:
     visible: "Your text has an e-mail address, a link, a phone number or a social media handle\\. Those come after a match\\.|Tekstissäsi on sähköpostiosoite, linkki, puhelinnumero tai somekäyttäjänimi\\. Ne tulevat mätsin jälkeen\\.|Din text har en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier\\. De kommer efter en match\\."
