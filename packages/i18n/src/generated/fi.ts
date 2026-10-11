@@ -590,6 +590,7 @@ export const fi: Readonly<Record<string, string>> = {
   "signIn.opening": "Pankkisi avautuu selaimessa. Palaa tänne, kun olet valmis.",
   "signIn.title": "Kirjaudu sisään",
   "signIn.tryAgain": "Yritä uudelleen",
+  "signIn.unavailable": "Pankkitunnistusta ei ole täällä: verkkoversiossa ja pull requestien esikatseluissa sitä ei ole. Kokeile muutosta paikallisesti testipankilla.",
   "tech.api.check": "Tarkista uudelleen",
   "tech.api.commit": "git-commit {commit}",
   "tech.api.database": "tietokanta {db} · migraatiot {migrations}",

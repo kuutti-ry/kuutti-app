@@ -242,9 +242,9 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   // the wrong database; a preview has no media and its photo routes answer 503.
   // And for the bank login (ADR-014 §1, docs/vendors/telia.md): a preview may
   // never use the real broker, and no mock bank is deployed beside it, so the
-  // Telia client and both private keys stay out of its memory and its auth
-  // routes answer 503. The HMAC key goes with them: with no login there is
-  // nothing to derive.
+  // Telia client and both private keys stay out of its memory: its login
+  // sends the app back with auth_unavailable, the other auth routes answer
+  // 503. The HMAC key goes with them: with no login there is nothing to derive.
   if (preview) {
     env.DB_APP_PASSWORD = undefined;
     env.MEDIA_URL_BASE = undefined;

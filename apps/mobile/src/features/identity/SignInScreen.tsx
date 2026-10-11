@@ -35,6 +35,7 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["auth_suspended", "signIn.error.auth_suspended"],
   ["auth_provider_error", "signIn.error.auth_provider_error"],
   ["auth_cancelled", "signIn.error.auth_cancelled"],
+  ["auth_unavailable", "signIn.unavailable"],
   ["unexpected_link", "signIn.error.unexpected_link"],
 ]);
 
@@ -153,7 +154,13 @@ export function SignInScreen({ code, error, until }: SignInParams) {
           </Card>
         )}
 
-        {phase.kind !== "exchanging" && phase.kind !== "done" && (
+        {/* The bank sends the browser back to the app's scheme, which a web
+            page does not have (AuthPlatform): no button that cannot work. */}
+        {Platform.OS === "web" && (
+          <Text className="w-full max-w-md text-center">{t("signIn.unavailable")}</Text>
+        )}
+
+        {Platform.OS !== "web" && phase.kind !== "exchanging" && phase.kind !== "done" && (
           <Button
             accessibilityLabel={phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")}
             className="w-full max-w-md"

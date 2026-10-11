@@ -311,4 +311,15 @@ describe("bank login", () => {
     expect(res.status).toBe(503);
     expect(await errorCode(res)).toBe("auth_provider_error");
   });
+
+  test("A preview's login sends the app back with auth_unavailable", async ({ ctx }) => {
+    const { logger } = await captureLogger();
+    const config = testConfig({ APP_ENV: "preview", PR_NUMBER: "125" });
+    const app = createApp({ config, logger, db: ctx.client });
+    const res = await app.request("/auth/start?platform=android");
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("kuutti://auth?error=auth_unavailable");
+    // A request the app could not have sent is still refused first.
+    expect((await app.request("/auth/start?platform=web")).status).toBe(400);
+  });
 });

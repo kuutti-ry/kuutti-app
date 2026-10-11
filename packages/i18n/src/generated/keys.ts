@@ -633,6 +633,7 @@ export type MessageParams = {
   "signIn.opening": Record<never, never>;
   "signIn.title": Record<never, never>;
   "signIn.tryAgain": Record<never, never>;
+  "signIn.unavailable": Record<never, never>;
   "tech.api.check": Record<never, never>;
   "tech.api.commit": { "commit": string };
   "tech.api.database": { "db": string; "migrations": string };

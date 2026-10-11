@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -2840,7 +2840,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Redirect to the broker."
+            "description": "Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable."
           },
           "400": {
             "description": "Validation failed.",
@@ -2853,7 +2853,7 @@
             }
           },
           "503": {
-            "description": "No identification broker is configured.",
+            "description": "No identification broker is configured (anywhere but a preview).",
             "content": {
               "application/json": {
                 "schema": {

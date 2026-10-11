@@ -35,6 +35,8 @@ body="$RUNNER_TEMP/preview-comment.md"
       echo "<a href=\"$NATIVE_QR\"><img src=\"$NATIVE_QR\" width=\"200\" height=\"200\" alt=\"QR code for the EAS Update\" /></a>"
       echo
     fi
+    echo "No bank and no photos on a preview (ADR-014 §1, ADR-005): nothing past the sign-in screen can be tried here. Run the branch locally with \`pnpm env:up\` and sign in as a persona of the mock bank."
+    echo
     echo "<sub>Rate limit 30 requests a minute, \`X-Robots-Tag: noindex\`. Removed when the pull request closes or after 7 days (\`preview-cleanup.yml\`); a push after that recreates it.</sub>"
   fi
 } > "$body"

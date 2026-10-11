@@ -73,7 +73,7 @@ On a phone, install the dev client build (see `apps/mobile/README.md`), open it,
 
 ## Pull request previews
 
-Every pull request from this repository gets a comment with three previews (#9): the API of that commit on the staging box with its own seeded database, the web target of the app on EAS Hosting pointed at that API, and, when native code, auth, push or camera changed, an EAS Update for the dev client with a QR code. They appear within about ten minutes of a push and disappear when the pull request closes or after seven days. At most three pull requests hold a preview at a time; the fourth gets a comment saying so. Forks and Dependabot get none: a preview needs the repository's own secrets. Details in `infra/README.md`, Previews.
+Every pull request from this repository gets a comment with three previews (#9): the API of that commit on the staging box with its own seeded database, the web target of the app on EAS Hosting pointed at that API, and, when native code, auth, push or camera changed, an EAS Update for the dev client with a QR code. A preview has no bank and no photos (ADR-014 §1, ADR-005), so neither lane gets past the sign-in screen: anything behind it is tried locally with `pnpm env:up` and the mock bank. They appear within about ten minutes of a push and disappear when the pull request closes or after seven days. At most three pull requests hold a preview at a time; the fourth gets a comment saying so. Forks and Dependabot get none: a preview needs the repository's own secrets. Details in `infra/README.md`, Previews.
 
 ## Releases
 
