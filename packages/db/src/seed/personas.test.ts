@@ -155,6 +155,19 @@ describe("the login page of the mock bank", () => {
     ).toBe(true);
   });
 
+  it("names every persona in a short button above the cards, the one a flow taps without scrolling (#226)", () => {
+    const names = page.indexOf('<ul class="names">');
+    const cards = page.indexOf('<section aria-labelledby="group-walkthrough">');
+    expect(names).toBeGreaterThan(-1);
+    expect(names).toBeLessThan(cards);
+    for (const p of DEMO_PERSONAS) {
+      const short = `<button type="button" data-persona="${p.key}">${p.given} ${p.family}</button>`;
+      // The first button a selector by the name finds is the short one.
+      expect(page.indexOf(short)).toBeGreaterThan(names);
+      expect(page.indexOf(short)).toBeLessThan(cards);
+    }
+  });
+
   it("computes, in its own script, the claims personaClaims computes", () => {
     const script = /<script>([\s\S]*?)<\/script>/.exec(page)?.[1];
     if (!script) throw new Error("the page has no script");

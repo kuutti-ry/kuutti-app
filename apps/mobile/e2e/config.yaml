@@ -2,3 +2,46 @@
 # their addMedia reads lie inside it; what runs is flows/ (ADR-020).
 flows:
   - "flows/*"
+# The order the flows run in, each persona's together (#226). Maestro knows a
+# flow here by its name, and a name it cannot find cuts the sequence short
+# without a word, so `pnpm e2e` refuses a flow missing here or a name no flow
+# has; `--shard i/n` runs the i-th of n stretches of about equal length. Without
+# continueOnFailure one failed flow would stop the rest.
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    # Refused at the bank, and the two it lets in: Siiri at 99, Eetu at 18.
+    - The bank login refuses the banned, the recently deleted and those under 18, and lets in 18 and 99
+    - At 99 the age window starts at 94 to 99 and neither end can leave the bounds
+    - A label chosen after non-binary shows on the card after the gender
+    # Onni, new.
+    - A registered person is taken through onboarding one question per screen, and resumes at the intent after the app is closed
+    # Kerttu, and kids-labels on from her to Sanna.
+    - A person who accepted an older wording of the terms is asked for the current one, and nothing else is asked again
+    - Once there are kids, the future-kids answers read want more, no more, not sure anymore
+    # Sanna: her profile and photos, the later fields, the deal-breakers, home,
+    # Settings, the sign-in links, and logging out everywhere last.
+    - The card leads with the photo, the name and the verified age, and shows the information fields but nothing soft
+    - A section saves on going back, and the card shows what it saved
+    - A phone number in the bio is refused on leaving with the reason, and the stored bio stays
+    - A photo opens full size and back, and removing one asks first
+    - Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
+    - Field and work take up to three choices each, a fourth tap does nothing, and long lists can be searched
+    - A party and a star sign saved on their screens show on the card, and clearing them takes them off
+    - The parties screen names the consent and where to withdraw it, with no switch of its own
+    - At most two deal-breakers, each with an accepted answer; a third is refused in words
+    - Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
+    - Home names the area with its numbers and the gate in words, and the wrench names the API
+    - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
+    - The research switch in Settings records the opt-in and withdraws it again
+    - Download my data hands the person's file to the share sheet
+    - The language choice in Settings changes the app's language at once
+    - The session, the theme and the language survive closing and reopening the app
+    - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
+    - Log out everywhere ends this device's session, and reopening the app does not bring it back
+    # Noa.
+    - A deal-breaker is offered only on what the person answered, and Answer it opens the field
+    - With two approved photos the gate says the profile lacks something, and a hidden field leaves the card
+    - Withdrawing the sensitive-answers consent asks whom one seeks again with the consent, and keeps the age window
+    # Aino, whose account goes: last.
+    - Deleting the account asks first, signs the person out, and the next login is refused until the cooldown ends

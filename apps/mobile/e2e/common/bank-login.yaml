@@ -10,8 +10,7 @@ appId: fi.kuutti.app
 # A tap that lands while the screen still settles is lost, so it is tapped
 # again while the button is still there; never once the browser is open.
 # A fresh browser greets the first page with its own screens, a moment after
-# the page: wait for either. The page's heading, not the persona's card: most
-# of the cast lies below the first screenful.
+# the page: wait for either, the page by its heading.
 - retry:
     maxRetries: 2
     commands:
@@ -50,36 +49,13 @@ appId: fi.kuutti.app
           commands:
             - tapOn: "Continue|Jatka|Fortsätt|Use without an account|Accept & continue|Don't allow|No thanks|Wait"
 # One button per persona, whose accessible name is the person's name followed by
-# the note under it. On iOS Safari's bar lies over the bottom of the page and a
-# card under it counts as visible: the card is scrolled to the middle, down and,
-# should a scroll have passed it, back up. On Android Chrome's bar is at the top
-# and covers nothing, while its toolbar moves the page as it hides, so a swipe
-# can jump over the middle both ways: a card in full view is enough there.
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - scrollUntilVisible:
-          element: ".*${PERSONA}.*"
-          direction: DOWN
-          centerElement: true
-          timeout: 40000
-          optional: true
-      - scrollUntilVisible:
-          element: ".*${PERSONA}.*"
-          direction: UP
-          centerElement: true
-          timeout: 40000
-- runFlow:
-    when:
-      platform: Android
-    commands:
-      - scrollUntilVisible:
-          element: ".*${PERSONA}.*"
-          direction: DOWN
-          timeout: 60000
+# the note under it, and above the cards a short one with the name alone, all of
+# them in view without scrolling: a selector by the name finds that one first,
+# and the flow taps it where it is (#226). Scrolled to a card, a flow could stop
+# with the card's edge at the screen's edge, a sliver Maestro counts as wholly
+# visible, and the tap there missed.
 # iOS asks before handing the link back to the app; Chrome hands it on. A tap
-# on a page that still moves is lost: tapped again while the card is there.
+# on a page that still moves is lost: tapped again while the button is there.
 - waitForAnimationToEnd
 - retry:
     maxRetries: 2
