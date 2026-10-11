@@ -13,6 +13,7 @@ name: Download my data hands the person's file to the share sheet
     element: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
 - tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 # The sheet covers the app; its file is named after the export's title.

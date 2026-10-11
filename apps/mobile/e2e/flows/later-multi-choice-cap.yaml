@@ -34,6 +34,7 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
     element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
 - openLink: kuutti://profile/later/field
 - extendedWaitUntil:
@@ -62,6 +63,7 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
     element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
 
 # The languages are their own names, the same in every catalogue.

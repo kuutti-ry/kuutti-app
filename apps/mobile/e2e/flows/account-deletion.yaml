@@ -17,6 +17,7 @@ name: Deleting the account asks first, signs the person out, and the next login 
     element: "Delete my account|Poista tilini|Ta bort mitt konto"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Your account|Tilisi|Ditt konto"
 
 # Asked first; keeping the account deletes nothing.

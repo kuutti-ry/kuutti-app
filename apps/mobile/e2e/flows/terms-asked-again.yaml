@@ -19,6 +19,7 @@ name: A person who accepted an older wording of the terms is asked for the curre
     element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 
 # Straight to research: the name, the gender, whom she seeks and the rest stand.

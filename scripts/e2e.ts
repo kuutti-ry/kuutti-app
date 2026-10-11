@@ -36,10 +36,13 @@ const args = process.argv.slice(2).filter((arg) => arg !== "--");
 const device = args.indexOf("--device");
 const global = device >= 0 ? args.splice(device, 2) : [];
 const target = args.some((arg) => arg.endsWith(".yaml")) ? [] : [WORKSPACE];
+// A second Metro (a worktree's beside the checkout's) is named by its port.
+const metro = process.env.METRO_PORT ? ["-e", `METRO_PORT=${process.env.METRO_PORT}`] : [];
 
+// Off a Mac (CI) there is no Homebrew, and the job puts its own JDK on the PATH.
 const brew = spawnSync("brew", ["--prefix", "openjdk"], { encoding: "utf8" });
 const jdk = brew.status === 0 ? `${brew.stdout.trim()}/bin:` : "";
-const run = spawnSync("maestro", [...global, "test", ...args, ...target], {
+const run = spawnSync("maestro", [...global, "test", ...metro, ...args, ...target], {
   cwd: ROOT,
   stdio: "inherit",
   env: { ...process.env, PATH: `${jdk}${process.env.PATH ?? ""}` },

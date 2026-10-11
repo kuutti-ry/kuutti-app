@@ -3,10 +3,30 @@
 # screen. Signed in, the app shows the home screen's area card or an onboarding
 # step under its welcome title; signed out, the sign-in screen, with its button or,
 # after a refusal, the button to try again. "Kuutti" alone would match the dev
-# client's loading screen.
+# client's loading screen. Metro is on 8081 unless METRO_PORT says otherwise (a
+# second Metro, from a worktree, beside the one of the checkout). On Android
+# the emulator's 127.0.0.1 is the host's through adb reverse.
 appId: fi.kuutti.app
 ---
-- openLink: exp+kuutti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081
+- openLink: exp+kuutti://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A${METRO_PORT || "8081"}
+- extendedWaitUntil:
+    visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Try again|Yritä uudelleen|Försök igen|Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti|This is the developer menu.*|Connected to:|.* isn't responding"
+    timeout: 120000
+# A busy Android emulator says a system app of its own is not responding; closed, it goes.
+- runFlow:
+    when:
+      visible: ".* isn't responding"
+    commands:
+      - tapOn: "Close app"
+# A fresh install (every CI run) greets the first load with the dev client's
+# own sheet about its menu, over the app.
+- runFlow:
+    when:
+      visible: "This is the developer menu.*"
+    commands:
+      - tapOn:
+          text: "Continue"
+          below: "This is the developer menu.*"
 # The dev client's own menu, should a tap have brushed its floating Tools
 # button, lies over the app as a sheet: swiped down, it goes.
 - runFlow:

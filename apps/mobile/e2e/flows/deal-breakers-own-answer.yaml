@@ -14,9 +14,9 @@ name: A deal-breaker is offered only on what the person answered, and Answer it 
 - extendedWaitUntil:
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"
     timeout: 15000
-- assertVisible: "Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk"
-- assertNotVisible: "Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning"
-- assertNotVisible: "Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn"
+- assertVisible: "(Deal-breaker: Languages|Ehdoton raja: Kielet|Absolut gräns: Språk)(, .*)?"
+- assertNotVisible: "(Deal-breaker: Smoking|Ehdoton raja: Tupakointi|Absolut gräns: Rökning)(, .*)?"
+- assertNotVisible: "(Deal-breaker: Kids|Ehdoton raja: Lapset|Absolut gräns: Barn)(, .*)?"
 - assertVisible: "To filter on this, share yours first\\.|Suodattaaksesi tällä kerro ensin omasi\\.|För att filtrera på det här, dela ditt eget först\\."
 # The second Answer it is the kids', which has a screen of its own among the later fields.
 - tapOn:

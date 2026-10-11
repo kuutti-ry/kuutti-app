@@ -29,14 +29,17 @@ name: The parties screen names the consent and where to withdraw it, with no swi
     element: "The Coffee Party|Kahvipuolue|Kaffepartiet"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "None of them|Ei mikään näistä|Inget av dem"
 # The note's button: Settings, at the one switch.
 - scrollUntilVisible:
     element: "Settings|Asetukset|Inställningar"
     direction: UP
     centerElement: true
+    timeout: 60000
 - tapOn: "Settings|Asetukset|Inställningar"
 - scrollUntilVisible:
     element: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
     direction: DOWN
     centerElement: true
+    timeout: 60000

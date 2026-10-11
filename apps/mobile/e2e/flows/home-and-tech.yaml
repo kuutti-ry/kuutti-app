@@ -19,6 +19,7 @@ name: Home names the area with its numbers and the gate in words, and the wrench
     element: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
     direction: DOWN
     centerElement: true
+    timeout: 60000
 - assertVisible: "Your profile|Profiilisi|Din profil"
 - assertVisible: "Your photos|Kuvasi|Dina bilder"
 - assertVisible: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
