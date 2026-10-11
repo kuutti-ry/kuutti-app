@@ -10,7 +10,8 @@ import {
   SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
-import { listApprovedPhotos } from "../media/index.ts";
+import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { listApprovedPhotoTipInputs } from "../media/index.ts";
 import { track } from "../research/index.ts";
 import {
   buildCard,
@@ -21,7 +22,7 @@ import {
 } from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
-import { tipFor } from "./tips.ts";
+import { TIP_THRESHOLD_KEYS, type TipSnapshot, type TipThresholds, tipFor } from "./tips.ts";
 
 /**
  * The consent_version of the special-category wording as built
@@ -99,28 +100,46 @@ function noteDropped(deps: CardDeps, row: repo.ProfileRow | null): void {
   }
 }
 
+/** The tip thresholds from matching_config; missing keys fail closed. */
+async function readTipThresholds(db: Queryable): Promise<TipThresholds> {
+  const fields = Object.keys(TIP_THRESHOLD_KEYS) as (keyof typeof TIP_THRESHOLD_KEYS)[];
+  const values = await Promise.all(
+    fields.map((field) => matchingConfigNumber(db, TIP_THRESHOLD_KEYS[field])),
+  );
+  return Object.fromEntries(fields.map((field, i) => [field, values[i]])) as TipThresholds;
+}
+
+async function tipSnapshotOf(deps: CardDeps, accountId: string): Promise<TipSnapshot> {
+  const [photos, thresholds] = await Promise.all([
+    listApprovedPhotoTipInputs(deps.db, accountId),
+    readTipThresholds(deps.db),
+  ]);
+  return { photos, thresholds };
+}
+
 export async function readProfile(deps: CardDeps, accountId: string): Promise<ProfileResponse> {
-  const [row, photos, consent] = await Promise.all([
+  const [row, consent, tipSnapshot] = await Promise.all([
     repo.findProfile(deps.db, accountId),
-    listApprovedPhotos(deps.db, accountId),
     readConsent(deps, accountId),
+    tipSnapshotOf(deps, accountId),
   ]);
   noteDropped(deps, row);
   return {
     profile: row ? toDocument(row, consent) : null,
-    completeness: await completenessOf(deps, accountId, row, photos.length),
-    tip: tipFor({ approvedPhotos: photos.length }),
+    completeness: await completenessOf(deps, accountId, row, tipSnapshot.photos.length),
+    tip: tipFor(tipSnapshot),
   };
 }
 
 export async function previewCard(deps: CardDeps, accountId: string): Promise<CardPreviewResponse> {
-  const { card, completeness } = await buildCard(deps, {
-    viewerAccountId: accountId,
-    subjectAccountId: accountId,
-  });
-  const approvedPhotos =
-    card?.photos.length ?? (await listApprovedPhotos(deps.db, accountId)).length;
-  return { card, completeness, tip: tipFor({ approvedPhotos }) };
+  const [{ card, completeness }, tipSnapshot] = await Promise.all([
+    buildCard(deps, {
+      viewerAccountId: accountId,
+      subjectAccountId: accountId,
+    }),
+    tipSnapshotOf(deps, accountId),
+  ]);
+  return { card, completeness, tip: tipFor(tipSnapshot) };
 }
 
 export async function saveProfile(
@@ -165,18 +184,18 @@ export async function saveProfile(
     if (!row) throw new AppError(404, "not_found", "No live account");
     return { row, consent };
   });
-  const photos = await listApprovedPhotos(deps.db, accountId);
+  const tipSnapshot = await tipSnapshotOf(deps, accountId);
   deps.logger.info({ accountId, prompts: update.prompts.length }, "profile saved");
-  const completenessNow = await completenessOf(deps, accountId, row, photos.length);
+  const completenessNow = await completenessOf(deps, accountId, row, tipSnapshot.photos.length);
   // Research (#50): whether profiles get finished; nothing of the text, and nothing without the consent.
   await track(deps, accountId, "profile_saved", {
     complete: completenessNow.complete,
-    approvedPhotos: photos.length,
+    approvedPhotos: tipSnapshot.photos.length,
   });
   return {
     profile: toDocument(row, consent),
     completeness: completenessNow,
-    tip: tipFor({ approvedPhotos: photos.length }),
+    tip: tipFor(tipSnapshot),
   };
 }
 

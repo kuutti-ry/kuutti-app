@@ -2136,6 +2136,12 @@
         "type": "string",
         "nullable": true,
         "enum": [
+          "sunglasses",
+          "mirror_selfie",
+          "tight_crop",
+          "group_photo",
+          "poor_lighting",
+          "blurry",
           "few_photos",
           null
         ]

@@ -2831,7 +2831,7 @@ export interface components {
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
         /** @enum {string|null} */
-        TipKind: "few_photos" | null;
+        TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | null;
         ProfileUpdate: {
             displayName: string;
             bio: string | null;

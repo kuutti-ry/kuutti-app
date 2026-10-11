@@ -427,6 +427,26 @@ describe("profile routes", () => {
     expect(rows).toHaveLength(0);
   });
 
+  test("GET /profile answers a label tip from photo_review against matching_config", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const ids = await approvedPhotos(ctx, app, a.headers, 2);
+    for (const id of ids) {
+      await ctx.client.query(
+        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
+         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
+        [id, JSON.stringify([{ name: "Sunglasses", parentName: "Face", confidence: 80 }])],
+      );
+    }
+    const body = ProfileResponse.parse(
+      await (await app.request("/profile", { headers: a.headers })).json(),
+    );
+    expect(body.tip).toBe("sunglasses");
+  });
+
+
   test("the card for another viewer: a complete subject is served and recorded, an incomplete or deleted one is not, and the day has a budget", async ({
     ctx,
   }) => {

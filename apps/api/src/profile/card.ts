@@ -5,7 +5,6 @@ import {
   cardFields,
   type ProfileCard,
   type ProfileFields,
-  type ProfileUpdate,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
@@ -82,7 +81,7 @@ export function ageInYears(birthYear: number, birthMonth: number, at: Date): num
 export async function completenessOf(
   deps: CardDeps,
   accountId: string,
-  profile: Pick<ProfileUpdate, "displayName" | "bio" | "prompts"> | null,
+  profile: repo.ProfileRow | null,
   approvedPhotos: number,
 ): Promise<Completeness> {
   const preferences = await (deps.readPreferences ?? noPreferencesYet)(deps.db, accountId);

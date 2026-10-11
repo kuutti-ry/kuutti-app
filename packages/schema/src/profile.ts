@@ -99,10 +99,21 @@ export type Completeness = z.infer<typeof Completeness>;
 
 /**
  * Advisory profile tips for the owner (#56). One tip at a time; never gates
- * completeness, moderation, or matching. Kinds grow as label rules land.
- * A kind names what was noticed; the words for it are the client's.
+ * completeness, moderation, or matching. A kind names what was noticed; the
+ * words for it are the client's. Order of the enum is not priority — the
+ * tips rule of apps/api holds that.
  */
-export const TipKind = z.enum(["few_photos"]).meta({ id: "TipKind" });
+export const TipKind = z
+  .enum([
+    "sunglasses",
+    "mirror_selfie",
+    "tight_crop",
+    "group_photo",
+    "poor_lighting",
+    "blurry",
+    "few_photos",
+  ])
+  .meta({ id: "TipKind" });
 export type TipKind = z.infer<typeof TipKind>;
 
 /** The stored profile, as the owner reads it back. */
