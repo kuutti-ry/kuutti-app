@@ -584,6 +584,15 @@ export type MessageParams = {
   "profile.saving": Record<never, never>;
   "profile.specialCategory.note": Record<never, never>;
   "profile.text.hint": { "max": number };
+  "profile.tip.blurry": Record<never, never>;
+  "profile.tip.dismiss": Record<never, never>;
+  "profile.tip.few_photos": Record<never, never>;
+  "profile.tip.group_photo": Record<never, never>;
+  "profile.tip.mirror_selfie": Record<never, never>;
+  "profile.tip.poor_lighting": Record<never, never>;
+  "profile.tip.sunglasses": Record<never, never>;
+  "profile.tip.tight_crop": Record<never, never>;
+  "profile.tip.title": Record<never, never>;
   "profile.title": Record<never, never>;
   "settings.about.title": Record<never, never>;
   "settings.back": Record<never, never>;

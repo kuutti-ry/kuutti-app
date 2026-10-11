@@ -6,6 +6,7 @@ import {
   DISPLAY_NAME_MAX,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
+  type TipKind,
 } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
 // Expo Router 57 vendors React Navigation and exposes the hook that holds a
@@ -32,7 +33,7 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
 import { FieldEditor, SpecialCategoryNote } from "./FieldEditor";
-import { completenessText, presetKey } from "./keys";
+import { completenessText, presetKey, tipText } from "./keys";
 import { FIRST_LATER_FIELD, laterPath } from "./later/LaterFieldScreen";
 import { PromptsEditor } from "./PromptsEditor";
 import { type ProfileNotice, useProfile } from "./useProfile";
@@ -92,9 +93,13 @@ export function ProfileScreen() {
   // (09/10/2026, Kerttu's smoking answer). Leaving with edits asks first; the
   // action handed back remembers it was held here, so dispatching it leaves.
   const [leaving, setLeaving] = useState<LeaveAction | null>(null);
+  // Tip kind dismissed this session (#56); no server store. The API sends one
+  // tip at a time, so dismiss hides it until a different kind arrives.
+  const [dismissedTip, setDismissedTip] = useState<TipKind | null>(null);
   usePreventRemove(profile.dirty, ({ data }) => setLeaving(data.action));
 
   const firstSpecial = PROFILE_FIELD_KEYS.find((key) => PROFILE_FIELDS[key].specialCategory);
+  const tip = profile.tip && profile.tip !== dismissedTip ? profile.tip : null;
 
   if (profile.status === "loading") {
     return (
@@ -143,6 +148,26 @@ export function ProfileScreen() {
                 ))}
               </CardContent>
             )}
+          </Card>
+        )}
+
+        {tip && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t("profile.tip.title")}</CardTitle>
+            </CardHeader>
+            <CardContent className="gap-3">
+              <Text>{tipText(t, tip)}</Text>
+              <Button
+                variant="outline"
+                onPress={() => {
+                  tap();
+                  setDismissedTip(tip);
+                }}
+              >
+                {t("profile.tip.dismiss")}
+              </Button>
+            </CardContent>
           </Card>
         )}
 

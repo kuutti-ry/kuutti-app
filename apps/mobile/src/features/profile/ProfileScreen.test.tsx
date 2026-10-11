@@ -41,14 +41,24 @@ const stored = (fields: Record<string, unknown>) => ({
 });
 
 function fakeApi(
-  options: { saveStatus?: number; saveCode?: string; profile?: ReturnType<typeof stored> } = {},
+  options: {
+    saveStatus?: number;
+    saveCode?: string;
+    profile?: ReturnType<typeof stored>;
+    tip?: string | null;
+  } = {},
 ) {
   const puts: unknown[] = [];
+  const tip = options.tip === undefined ? null : options.tip;
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
     const path = new URL(request.url).pathname;
     if (path === "/profile" && request.method === "GET") {
-      return json({ profile: options.profile ?? null, completeness: { complete: false, missing }, tip: null });
+      return json({
+        profile: options.profile ?? null,
+        completeness: { complete: false, missing },
+        tip,
+      });
     }
     if (path === "/profile" && request.method === "PUT") {
       const body = await request.json();
@@ -68,7 +78,7 @@ function fakeApi(
           updatedAt: "2026-09-26T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos", "seeks", "age_window"] },
-        tip: null,
+        tip,
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
@@ -104,12 +114,25 @@ describe("ProfileScreen", () => {
     expect(screen.getByText("Something long-term")).toBeTruthy();
     expect(screen.getByText("My ideal Sunday")).toBeTruthy();
     expect(screen.getByText(/too lazy to write/)).toBeTruthy();
-    expect(screen.getByText("At least 3 approved photos")).toBeTruthy();
+    expect(screen.getByText("At least 2 approved photos")).toBeTruthy();
     // A text that is still its key means the catalogue and the registry disagree.
     expect(screen.queryAllByText(/^profile\./)).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.length).toBeGreaterThan(60);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+  });
+
+  it("shows one tip under the completeness card and dismisses it for the session", async () => {
+    fakeApi({ tip: "sunglasses" });
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByText("A tip for your photos")).toBeTruthy());
+    expect(screen.getByText(/without sunglasses/)).toBeTruthy();
+    expect(screen.queryAllByText(/^profile\.tip\./)).toEqual([]);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+    await press(screen.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByText("A tip for your photos")).toBeNull();
   });
 
   it("does not offer the identity label to everyone: only once it was given, to change it", async () => {

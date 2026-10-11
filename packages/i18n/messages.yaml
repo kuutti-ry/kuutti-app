@@ -2253,6 +2253,69 @@ profile.completeness.age_window:
   sv: "Ditt åldersspann (anges i introduktionen)"
   machine: { fi: true, sv: true }
 
+profile.tip.title:
+  en: "A tip for your photos"
+  description: "Heading of the advisory tip card on the profile screen (#56)."
+  fi: "Vinkki kuviisi"
+  sv: "Ett tips för dina foton"
+  machine: { fi: true, sv: true }
+
+profile.tip.dismiss:
+  en: "Got it"
+  description: "Button that dismisses the current tip for this session (#56)."
+  fi: "Selvä"
+  sv: "Okej"
+  machine: { fi: true, sv: true }
+
+profile.tip.sunglasses:
+  en: "Try a photo where your eyes are clear, without sunglasses."
+  description: "Advisory tip when every approved photo has sunglasses (#56)."
+  fi: "Kokeile kuvaa, jossa silmäsi näkyvät selvästi, ilman aurinkolaseja."
+  sv: "Prova ett foto där ögonen syns tydligt, utan solglasögon."
+  machine: { fi: true, sv: true }
+
+profile.tip.mirror_selfie:
+  en: "Try a photo that is not a mirror selfie."
+  description: "Advisory tip when every approved photo looks like a mirror or bathroom selfie (#56)."
+  fi: "Kokeile kuvaa, joka ei ole peiliselfie."
+  sv: "Prova ett foto som inte är en spegelselfie."
+  machine: { fi: true, sv: true }
+
+profile.tip.tight_crop:
+  en: "Try a photo that shows a little more of you than a close-up face."
+  description: "Advisory tip when every approved photo is a tight face crop (#56)."
+  fi: "Kokeile kuvaa, jossa sinusta näkyy hieman enemmän kuin lähikuva kasvoista."
+  sv: "Prova ett foto som visar lite mer än bara en närbild på ansiktet."
+  machine: { fi: true, sv: true }
+
+profile.tip.group_photo:
+  en: "Try a photo where you are the only person in the frame."
+  description: "Advisory tip when every approved photo has several faces (#56)."
+  fi: "Kokeile kuvaa, jossa olet ainoa henkilö kuvassa."
+  sv: "Prova ett foto där du är den enda personen i bilden."
+  machine: { fi: true, sv: true }
+
+profile.tip.poor_lighting:
+  en: "Try a photo taken in clearer light."
+  description: "Advisory tip when every approved photo is poorly lit (#56)."
+  fi: "Kokeile kuvaa, joka on otettu selkeämmässä valossa."
+  sv: "Prova ett foto taget i klarare ljus."
+  machine: { fi: true, sv: true }
+
+profile.tip.blurry:
+  en: "Try a sharper photo."
+  description: "Advisory tip when every approved photo is blurry (#56)."
+  fi: "Kokeile terävämpää kuvaa."
+  sv: "Prova ett skarpare foto."
+  machine: { fi: true, sv: true }
+
+profile.tip.few_photos:
+  en: "A third approved photo would help others get a fuller picture of you."
+  description: "Advisory tip when the profile has enough photos to be complete but fewer than the suggested count (#56)."
+  fi: "Kolmas hyväksytty kuva auttaisi muita saamaan paremman kuvan sinusta."
+  sv: "Ett tredje godkänt foto skulle hjälpa andra att få en fylligare bild av dig."
+  machine: { fi: true, sv: true }
+
 profile.card.open:
   en: "See your card"
   description: "Button that opens the card preview."
