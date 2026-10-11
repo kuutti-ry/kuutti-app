@@ -38,4 +38,4 @@ A dating app without pre-publication photo moderation ships pornography and othe
 
 ## History
 
-- 2026-10-09: the first uploads on staging came back from Rekognition as `InvalidImageFormatException` and stayed pending: the check sent the stored card variant, which is WebP (ADR-005 §2), and Rekognition reads JPEG and PNG only. The adapter now re-encodes the card variant to JPEG in memory for its two calls; what is stored, what the queue shows and what the sweep re-checks from stay the WebP card. Nothing of §2 changes.
+- 2026-10-09: the first uploads on staging came back from Rekognition as `InvalidImageFormatException` and stayed pending: the check sent the stored card variant, which is WebP (ADR-005 §2), and Rekognition reads JPEG and PNG only. The adapter now re-encodes the card variant to JPEG in memory for its three calls; what is stored, what the queue shows and what the sweep re-checks from stay the WebP card. Nothing of §2 changes.

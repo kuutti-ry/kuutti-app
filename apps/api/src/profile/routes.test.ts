@@ -446,7 +446,6 @@ describe("profile routes", () => {
     expect(body.tip).toBe("sunglasses");
   });
 
-
   test("the card for another viewer: a complete subject is served and recorded, an incomplete or deleted one is not, and the day has a budget", async ({
     ctx,
   }) => {
