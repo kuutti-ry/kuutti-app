@@ -21,7 +21,10 @@ import { objectKey } from "./store.ts";
 
 const MAX_PHOTOS = 3;
 
-async function appWith(ctx: TestContext, options: { concurrency?: number; media?: false } = {}) {
+async function appWith(
+  ctx: TestContext,
+  options: { concurrency?: number; media?: false; now?: () => Date } = {},
+) {
   await withMatchingConfig(ctx.client, { max_photos: MAX_PHOTOS });
   const { logger, lines } = await captureLogger();
   const media = testMediaDeps({ concurrency: options.concurrency ?? 2 });
@@ -30,6 +33,7 @@ async function appWith(ctx: TestContext, options: { concurrency?: number; media?
     logger,
     db: ctx.client,
     ...(options.media === false ? {} : { media: media.deps }),
+    ...(options.now ? { now: options.now } : {}),
   });
   return { app, store: media.store, logs: lines };
 }
@@ -101,6 +105,29 @@ describe("photo routes", () => {
     // The key is never in a response or a log line.
     expect(JSON.stringify(body)).not.toContain(contentKey);
     expect(JSON.stringify(logs())).not.toContain(contentKey);
+  });
+
+  test("a signed URL stops working fifteen minutes after the clock that issued it", async ({
+    ctx,
+  }) => {
+    // A clock far from the wall's: what the URL says follows it, to the second.
+    const issued = new Date("2026-03-01T09:30:00.000Z");
+    const { app } = await appWith(ctx, { now: () => issued });
+    const me = await signedInAccount(ctx.client);
+    const photo = Photo.parse(
+      await (await upload(app, me.headers, await fixturePng(400, 300))).json(),
+    );
+    const res = await app.request(`/photos/${photo.id}/card`, { headers: me.headers });
+    expect(res.status).toBe(200);
+    const body = PhotoUrlResponse.parse(await res.json());
+    const until = new Date(issued.getTime() + 15 * 60 * 1000);
+    expect(body.expiresAt).toBe(until.toISOString());
+    // CloudFront's canned policy: the URL is refused from this second on.
+    expect(new URL(body.url).searchParams.get("Expires")).toBe(String(until.getTime() / 1000));
+    const access = await ctx.client.query("SELECT at FROM photo_access WHERE photo_id = $1", [
+      photo.id,
+    ]);
+    expect(access.rows).toEqual([{ at: issued }]);
   });
 
   test("a signed URL is issued for each variant of one's own photo, logged, and written to photo_access", async ({

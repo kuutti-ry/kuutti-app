@@ -140,7 +140,7 @@ const urlRoute = createRoute({
 
 export function photoRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
-  const now = () => new Date();
+  const now = deps.now ?? (() => new Date());
 
   const serviceDeps = (): PhotoServiceDeps => {
     if (!deps.media) {
