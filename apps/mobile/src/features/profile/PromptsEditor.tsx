@@ -12,12 +12,14 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { promptKey } from "./keys";
+import { answeredPrompts } from "./progress";
 
 /**
- * The prompts of the profile (#47, ADR-009 §4): the answered ones with their
- * text, and the ones still to pick while fewer than three are taken. The
- * profile screen and the prompts step of onboarding (#146) share it; the
- * draft and its update are the caller's.
+ * The prompts of the profile (#47, ADR-009 §4): how many of three hold an
+ * answer, the picked ones with their text, and the ones still to pick while
+ * fewer than three are taken. The prompts section and the prompts step of
+ * onboarding (#146) share it, each with its own heading; the draft and its
+ * update are the caller's.
  */
 export function PromptsEditor({
   draft,
@@ -29,10 +31,13 @@ export function PromptsEditor({
   const { t } = useT();
   const tap = useHapticTap();
   const chosen = new Set(draft.prompts.map((p) => p.key));
+  const progress = { answered: answeredPrompts(draft.prompts), total: PROMPTS_MAX };
   return (
     <View className="gap-3">
-      <Text variant="small">{t("profile.prompts.label")}</Text>
-      <Text variant="muted">{t("profile.prompts.hint", { max: PROMPTS_MAX })}</Text>
+      {/* How many are answered, and nothing more: the heading above names the prompts (#239). */}
+      <Text variant="muted" accessibilityLabel={t("profile.progress.answered", progress)}>
+        {t("profile.progress.short", progress)}
+      </Text>
       {draft.prompts.map((prompt) => {
         const question = t(promptKey(prompt.key));
         return (

@@ -48,6 +48,6 @@ name: A label chosen after non-binary shows on the card after the gender
 - extendedWaitUntil:
     visible: "Your card|Korttisi|Ditt kort"
     timeout: 15000
-- assertVisible: "Eetu"
+- assertVisible: "Eetu, \\d+"
 - assertVisible: "Non-binary|Muunsukupuolinen|Icke-binär"
 - assertVisible: "Genderqueer"

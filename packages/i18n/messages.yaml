@@ -99,13 +99,6 @@ profile.title:
   sv: "Din profil"
   machine: { fi: true, sv: true }
 
-profile.explain:
-  en: "What others see on your card: choices from lists, a few lines in your own words, and up to three prompts. No contact details before a match."
-  description: "Lead text of the profile edit screen; the plain-text rule in one sentence."
-  fi: "Mitä muut näkevät kortillasi: valintoja listoista, muutama rivi omin sanoin ja enintään kolme kysymystä. Ei yhteystietoja ennen mätsiä."
-  sv: "Det andra ser på ditt kort: val från listor, några rader med egna ord och upp till tre frågor. Inga kontaktuppgifter före en match."
-  machine: { fi: true, sv: true }
-
 profile.home.open:
   en: "Your profile"
   description: "Button on the home screen that opens the profile (#47)."
@@ -146,6 +139,20 @@ profile.section.back:
   description: "Screen-reader label of the back arrow of a profile section (#227); going back saves the section."
   fi: "Takaisin profiiliisi"
   sv: "Tillbaka till din profil"
+  machine: { fi: true, sv: true }
+
+profile.section.photos.title:
+  en: "Photos"
+  description: "Title of the photos row on the profile list (#239): photos are part of the profile; the row opens the photos screen."
+  fi: "Kuvat"
+  sv: "Foton"
+  machine: { fi: true, sv: true }
+
+profile.section.photos.summary:
+  en: "What others see first on your card"
+  description: "Second line of the photos row on the profile list (#239): what the photos screen holds; a screen reader hears it as the row's hint."
+  fi: "Mitä muut näkevät kortillasi ensimmäisenä"
+  sv: "Det andra ser först på ditt kort"
   machine: { fi: true, sv: true }
 
 profile.section.basics.title:
@@ -633,7 +640,7 @@ profile.dealBreakers.failed:
 
 profile.dealBreakers.open:
   en: "Your deal-breakers"
-  description: "Button on the home screen, the profile and the e-mail screen that opens the deal-breakers (#149)."
+  description: "Row on the profile list and button on the e-mail screen that opens the deal-breakers (#149, #239)."
   fi: "Ehdottomat rajasi"
   sv: "Dina absoluta gränser"
   machine: { fi: true, sv: true }
@@ -682,7 +689,7 @@ profile.later.done:
 
 profile.later.open:
   en: "Fill in the rest while you wait"
-  description: "Button on the home screen and the profile that opens the later screens (#148)."
+  description: "Row on the profile list that opens the later screens (#148), shown while a later field is unanswered (#239)."
   fi: "Täydennä loput odotellessasi"
   sv: "Fyll i resten medan du väntar"
   machine: { fi: true, sv: true }
@@ -1723,13 +1730,6 @@ profile.option.politics.none_of_them:
   sv: "Inget av dem"
   machine: { fi: true, sv: true }
 
-profile.option.politics.kahvipuolue:
-  en: "The Coffee Party"
-  description: "Option kahvipuolue of the politics field (#145 registry, ADR-019)."
-  fi: "Kahvipuolue"
-  sv: "Kaffepartiet"
-  machine: { fi: true, sv: true }
-
 profile.option.politics.pp:
   en: "Pirate Party"
   description: "Option pp of the politics field, Piraattipuolue (#213)."
@@ -2320,16 +2320,37 @@ profile.prompt.ask_me:
 
 profile.prompts.label:
   en: "Prompts"
-  description: "Heading of the prompts section."
+  description: "Heading of the prompts in onboarding's step for words of your own; the profile's prompts section has the section's title instead (#239)."
   fi: "Kysymykset"
   sv: "Frågor"
   machine: { fi: true, sv: true }
 
-profile.prompts.hint:
-  en: "Pick up to {max, number} and answer each in a line or two."
-  description: "Hint under the prompts heading; {max} is the cap."
-  fi: "Valitse enintään {max, number} ja vastaa kuhunkin rivillä tai kahdella."
-  sv: "Välj upp till {max, number} och svara på var och en med en rad eller två."
+profile.progress.short:
+  en: "{answered, number}/{total, number}"
+  description: "How much of a part of the profile is answered, as a count (#239): on a row of the profile list and over the prompts. A screen reader hears profile.progress.answered instead."
+  fi: "{answered, number}/{total, number}"
+  sv: "{answered, number}/{total, number}"
+  machine: { fi: true, sv: true }
+
+profile.progress.answered:
+  en: "{answered, number} of {total, number} answered"
+  description: "What a screen reader hears for the progress of a section of the profile that is not done yet (#239): the value of its row on the profile list, and the count over the prompts. The photos row has profile.progress.photos."
+  fi: "{answered, number}/{total, number} vastattu"
+  sv: "{answered, number} av {total, number} besvarade"
+  machine: { fi: true, sv: true }
+
+profile.progress.photos:
+  en: "{answered, number} of {total, number} approved"
+  description: "What a screen reader hears for the photos row of the profile list before the card has the photos it needs (#239): approved photos of the ones a card needs."
+  fi: "{answered, number}/{total, number} hyväksytty"
+  sv: "{answered, number} av {total, number} godkända"
+  machine: { fi: true, sv: true }
+
+profile.progress.done:
+  en: "Done"
+  description: "What a screen reader hears for a part of the profile that is fully answered (#239): the value of its row on the profile list, whose check mark says the same."
+  fi: "Valmis"
+  sv: "Klart"
   machine: { fi: true, sv: true }
 
 profile.prompts.answer:
@@ -2365,13 +2386,6 @@ profile.completeness.title:
   description: "Heading of the completeness checklist."
   fi: "Ennen kuin korttisi voidaan näyttää"
   sv: "Innan ditt kort kan visas"
-  machine: { fi: true, sv: true }
-
-profile.completeness.complete:
-  en: "Your card is complete."
-  description: "Shown when nothing is missing."
-  fi: "Korttisi on valmis."
-  sv: "Ditt kort är klart."
   machine: { fi: true, sv: true }
 
 profile.completeness.display_name:
@@ -2495,7 +2509,7 @@ profile.tip.fish_species:
 
 profile.card.open:
   en: "See your card"
-  description: "Button that opens the card preview."
+  description: "Accessibility label of the eye button at the top right of the profile list that opens the card preview (#239)."
   fi: "Katso korttisi"
   sv: "Se ditt kort"
   machine: { fi: true, sv: true }
@@ -2535,11 +2549,11 @@ profile.card.failed:
   sv: "Kortet kunde inte läsas in."
   machine: { fi: true, sv: true }
 
-profile.card.verifiedAge:
-  en: "{years, number}, age verified by your bank"
-  description: "The age line on the card (#47): whole years from the bank-verified year and month."
-  fi: "{years, number}, ikä varmistettu pankistasi"
-  sv: "{years, number}, ålder verifierad av din bank"
+profile.card.nameAge:
+  en: "{name}, {years, number}"
+  description: "Title of a card (#47, #239): the display name and the age in whole years from the bank's year and month. Every account is bank-verified, so the card does not say it."
+  fi: "{name}, {years, number}"
+  sv: "{name}, {years, number}"
   machine: { fi: true, sv: true }
 
 profile.card.photoLabel:
@@ -3580,16 +3594,16 @@ onboarding.prompts.save:
 
 photos.title:
   en: Your photos
-  description: Photos screen heading; also the button on the home screen that opens it.
+  description: Photos screen heading.
   fi: Kuvasi
   sv: Dina foton
   machine: { fi: true, sv: true }
 
 photos.explain:
-  en: "Up to {max, plural, one {# photo} other {# photos}}. The first one is your main photo. A new photo is checked before anyone else sees it."
-  description: Photos screen, the paragraph under the heading. {max} is max_photos from the API.
-  fi: "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Ensimmäinen on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
-  sv: "Högst {max, plural, one {# foto} other {# foton}}. Det första är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det."
+  en: "Up to {max, plural, one {# photo} other {# photos}}. The first one others can see is your main photo. A new photo is checked before anyone else sees it."
+  description: Photos screen, the paragraph under the heading. {max} is max_photos from the API. The main photo is the first approved one, the one the card leads with (ADR-009 §4, #239).
+  fi: "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Ensimmäinen, jonka muut voivat nähdä, on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
+  sv: "Högst {max, plural, one {# foto} other {# foton}}. Det första som andra kan se är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det."
   machine: { fi: true, sv: true }
 
 photos.count:
@@ -3615,7 +3629,7 @@ photos.add:
 
 photos.done:
   en: Done
-  description: Photos screen, the button at the end that returns to where the person came from (onboarding, which then moves to its next step, or the home screen). Headers are hidden, so without it the only way back on iOS is the edge swipe.
+  description: Photos screen, the button at the end that returns to where the person came from (onboarding, which then moves to its next step, or the profile list, whose Photos row opened it, #239). Headers are hidden, so without it the only way back on iOS is the edge swipe.
   fi: Valmis
   sv: Klar
   machine: { fi: true, sv: true }
@@ -3671,7 +3685,7 @@ photos.state.rejected:
 
 photos.main:
   en: Main photo
-  description: Photos screen, label on the first photo.
+  description: Photos screen, label on the first approved photo, the one the card leads with (ADR-009 §4, #239).
   fi: Pääkuva
   sv: Huvudfoto
   machine: { fi: true, sv: true }
@@ -4256,13 +4270,6 @@ account.specialCategory.explain:
   sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort och matchningen pausas; din profil finns kvar, och du får frågan om vem du söker igen innan matchningen fortsätter."
   machine: { fi: true, sv: true }
 
-profile.specialCategory.note:
-  en: "Stored under the sensitive-answers consent you gave when you signed up. You can withdraw it in Settings; that removes these answers and pauses matching until you say yes again."
-  description: "The line above the politics and religion fields on the profile and later screens (#204, ADR-019 §4): names the consent given at the seeks step and where it is withdrawn. A Settings button follows it."
-  fi: "Tallennetaan arkaluonteisten vastausten suostumuksella, jonka annoit rekisteröityessäsi. Voit perua sen asetuksissa; se poistaa nämä vastaukset ja keskeyttää yhdistämisen, kunnes sanot uudelleen kyllä."
-  sv: "Lagras under det samtycke till känsliga svar du gav när du registrerade dig. Du kan ta tillbaka det i inställningarna; då tas de här svaren bort och matchningen pausas tills du säger ja igen."
-  machine: { fi: true, sv: true }
-
 account.email.title:
   en: "A way back in"
   description: "Heading of the optional e-mail card (#148, TD-18)."
@@ -4543,13 +4550,6 @@ home.gate.retry:
   description: "Button under home.gate.failed: reads GET /onboarding again."
   fi: "Tarkista uudelleen"
   sv: "Kontrollera igen"
-  machine: { fi: true, sv: true }
-
-home.photos.open:
-  en: "Your photos"
-  description: "Home screen button to the photos screen (#48)."
-  fi: "Kuvasi"
-  sv: "Dina bilder"
   machine: { fi: true, sv: true }
 
 settings.back:

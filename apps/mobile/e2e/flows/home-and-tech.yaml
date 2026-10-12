@@ -1,6 +1,7 @@
 # The home screen of an onboarded person (#53, #54, #94): the area in the
 # person's language with its numbers in steps of ten, where they stand at the
-# gate in words, and the four ways on. Outside production the wrench opens
+# gate in words, and the way to the profile, which holds the photos, the
+# deal-breakers and the later questions (#239). Outside production the wrench opens
 # the tech screen, which names the environment and the API it talks to.
 # The numbers need the synthetic population (`pnpm demo:population`): an area
 # shows them from ten people up. The release of pictures has no pool, so
@@ -17,13 +18,12 @@ name: Home names the area with its numbers and the gate in words, and the wrench
 - assertVisible: "About \\d+ more people are needed before matching opens for you\\.|Tarvitaan vielä noin \\d+ ihmistä, ennen kuin seuranhaku avautuu sinulle\\.|Det behövs ungefär \\d+ personer till innan matchningen öppnar för dig\\.|You are among the next \\d+ in line for your area\\.|Olet alueesi jonossa seuraavien \\d+ joukossa\\.|Du är bland de \\d+ närmaste i kön till ditt område\\.|Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
 - assertNotVisible: "Matching opens for finished profiles\\. Yours still lacks something\\.|Seuranhaku avautuu valmiille profiileille\\. Sinun profiilistasi puuttuu vielä jotakin\\.|Matchningen öppnar för färdiga profiler\\. I din saknas ännu något\\."
 - scrollUntilVisible:
-    element: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
+    element: "Your profile|Profiilisi|Din profil"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible: "Your profile|Profiilisi|Din profil"
-- assertVisible: "Your photos|Kuvasi|Dina bilder"
-- assertVisible: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
+- assertNotVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
+- assertNotVisible: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
 
 - openLink: kuutti://tech
 - extendedWaitUntil:

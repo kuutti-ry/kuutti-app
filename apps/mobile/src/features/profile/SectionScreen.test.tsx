@@ -158,14 +158,12 @@ describe("SectionScreen", () => {
     expect(router.replace).toHaveBeenCalledWith("/profile");
   });
 
-  it("puts the note on the sensitive-answers consent at the head of the beliefs only", async () => {
+  it("asks the beliefs with no note on the sensitive-answers consent: Settings is the one place for it (#239)", async () => {
     fakeApi();
     await show(<SectionScreen section="beliefs" />);
     await waitFor(() => expect(screen.getByText("Parties you could vote for")).toBeTruthy());
-    expect(screen.getByText(/sensitive-answers consent/)).toBeTruthy();
-    await show(<SectionScreen section="lifestyle" />);
-    await waitFor(() => expect(screen.getAllByText("Smoking").length).toBeGreaterThan(0));
     expect(screen.queryByText(/sensitive-answers consent/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   });
 
   it("does not offer the identity label to everyone: only once it was given, to change it", async () => {

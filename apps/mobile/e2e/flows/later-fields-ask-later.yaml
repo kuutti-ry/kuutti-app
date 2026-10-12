@@ -1,5 +1,5 @@
-# The later fields (#148, ADR-019): "Fill in the rest" on the home screen
-# opens the first field not yet answered and walks the unanswered ones in the
+# The later fields (#148, ADR-019): "Fill in the rest" on the profile list
+# (#239) opens the first field not yet answered and walks the unanswered ones in the
 # sheet's order, one question per screen, each optional; "Ask me later" moves
 # on and writes nothing, so the count of answered fields stays. After the
 # last field comes the way back in (the e-mail) and the deal-breakers. Sanna
@@ -8,6 +8,11 @@ appId: fi.kuutti.app
 name: Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
 ---
 - runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile
+- extendedWaitUntil:
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element: "Fill in the rest while you wait|Täydennä loput odotellessasi|Fyll i resten medan du väntar"
     direction: DOWN

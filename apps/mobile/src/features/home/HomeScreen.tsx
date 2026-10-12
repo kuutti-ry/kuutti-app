@@ -11,7 +11,6 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useOnboardingGate } from "@/features/identity";
 import { GateCard, WaitlistCard } from "@/features/pond";
-import { DEAL_BREAKERS_PATH, FIRST_LATER_FIELD, laterPath } from "@/features/profile";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
@@ -32,7 +31,8 @@ const MARK_CLASS = cn("h-24 w-24 text-foreground", Platform.select({ web: "dark:
 
 /**
  * The home screen of a signed-in person (#143): where their pond and their
- * gate stand, the way to the profile and the photos, and the settings. The
+ * gate stand, the way to the profile (which holds the photos, the
+ * deal-breakers and the later questions, #239), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
  * finished onboarding (#46) is sent there first; until the status is known
@@ -102,37 +102,6 @@ export function HomeScreen() {
               }}
             >
               <Text>{t("profile.home.open")}</Text>
-            </Button>
-            <Button
-              variant="outline"
-              accessibilityLabel={t("home.photos.open")}
-              onPress={() => {
-                tap();
-                router.push("/photos");
-              }}
-            >
-              <Text>{t("home.photos.open")}</Text>
-            </Button>
-            {/* The optional fields, one at a time, while the person waits at the gate (#148, TD-16). */}
-            <Button
-              variant="outline"
-              accessibilityLabel={t("profile.later.open")}
-              onPress={() => {
-                tap();
-                router.push(laterPath(FIRST_LATER_FIELD));
-              }}
-            >
-              <Text>{t("profile.later.open")}</Text>
-            </Button>
-            <Button
-              variant="outline"
-              accessibilityLabel={t("profile.dealBreakers.open")}
-              onPress={() => {
-                tap();
-                router.push(DEAL_BREAKERS_PATH);
-              }}
-            >
-              <Text>{t("profile.dealBreakers.open")}</Text>
             </Button>
           </View>
         )}

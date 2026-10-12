@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.9.6",
+    "version": "0.10.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -871,36 +871,36 @@
                 "fi",
                 "sv",
                 "en",
-                "se",
-                "et",
                 "ru",
+                "et",
                 "uk",
                 "ar",
-                "so",
                 "fa",
-                "ku",
                 "zh",
-                "sq",
+                "so",
                 "vi",
-                "th",
-                "tr",
-                "es",
-                "de",
-                "fr",
+                "sq",
+                "ku",
                 "tl",
-                "pl",
-                "it",
-                "pt",
-                "hi",
-                "ne",
+                "th",
                 "bn",
+                "tr",
+                "ne",
+                "es",
                 "ur",
+                "de",
                 "ro",
-                "hu",
-                "ja",
-                "lt",
+                "pl",
+                "fr",
+                "hi",
+                "pt",
+                "it",
                 "lv",
+                "hu",
                 "nl",
+                "lt",
+                "ja",
+                "se",
                 "ko",
                 "other"
               ]
@@ -1108,12 +1108,11 @@
                 "sdp",
                 "vas",
                 "vihr",
-                "none_of_them",
-                "kahvipuolue"
+                "none_of_them"
               ]
             },
             "minItems": 1,
-            "maxItems": 12
+            "maxItems": 10
           },
           "religion": {
             "type": "string",
@@ -1236,7 +1235,7 @@
           "position": {
             "type": "integer",
             "minimum": 0,
-            "description": "0 is the main photo; the owner sets the order."
+            "description": "0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4)."
           },
           "createdAt": {
             "type": "string",
@@ -1566,36 +1565,36 @@
                 "fi",
                 "sv",
                 "en",
-                "se",
-                "et",
                 "ru",
+                "et",
                 "uk",
                 "ar",
-                "so",
                 "fa",
-                "ku",
                 "zh",
-                "sq",
+                "so",
                 "vi",
-                "th",
-                "tr",
-                "es",
-                "de",
-                "fr",
+                "sq",
+                "ku",
                 "tl",
-                "pl",
-                "it",
-                "pt",
-                "hi",
-                "ne",
+                "th",
                 "bn",
+                "tr",
+                "ne",
+                "es",
                 "ur",
+                "de",
                 "ro",
-                "hu",
-                "ja",
-                "lt",
+                "pl",
+                "fr",
+                "hi",
+                "pt",
+                "it",
                 "lv",
+                "hu",
                 "nl",
+                "lt",
+                "ja",
+                "se",
                 "ko",
                 "other"
               ]
@@ -1909,7 +1908,7 @@
           "position": {
             "type": "integer",
             "minimum": 0,
-            "description": "0 is the main photo; the owner sets the order."
+            "description": "0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4)."
           },
           "createdAt": {
             "type": "string",
@@ -3844,7 +3843,7 @@
     "/photos/order": {
       "put": {
         "summary": "Set the order of the photos",
-        "description": "Position 0 is the main photo. Every photo of the account exactly once.",
+        "description": "Every photo of the account exactly once, first to last. The main photo is the first approved one in this order (ADR-009 §4).",
         "security": [
           {
             "session": []

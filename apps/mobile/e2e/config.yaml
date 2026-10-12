@@ -21,14 +21,14 @@ executionOrder:
     - Once there are kids, the future-kids answers read want more, no more, not sure anymore
     # Sanna: her profile and photos, the later fields, the deal-breakers, home,
     # Settings, the sign-in links, and logging out everywhere last.
-    - The card leads with the photo, the name and the verified age, and shows the information fields but nothing soft
+    - The card leads with the photo, the name and the age, and shows the information fields but nothing soft
     - A section saves on going back, and the card shows what it saved
     - A phone number in the bio is refused on leaving with the reason, and the stored bio stays
     - A photo opens full size and back, and removing one asks first
     - Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
     - Field and work take up to three choices each, a fourth tap does nothing, and long lists can be searched
     - A party and a star sign saved on their screens show on the card, and clearing them takes them off
-    - The parties screen names the consent and where to withdraw it, with no switch of its own
+    - The parties screen lists the parties and none of them, which stands alone, with no note and no search
     - At most two deal-breakers, each with an accepted answer; a third is refused in words
     - Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
     - Home names the area with its numbers and the gate in words, and the wrench names the API

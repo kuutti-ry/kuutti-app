@@ -124,6 +124,72 @@ describe("migrate", () => {
     });
   });
 
+  it("migration 0037 takes the coffee party out of stored politics and leaves none of them alone (#239)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        // Answers written while the registry still listed the coffee party and allowed a mix.
+        const stored: Record<string, Record<string, unknown>> = {
+          joke: { politics: ["kahvipuolue"], smoking: "never" },
+          jokeAmong: { politics: ["vihr", "kahvipuolue", "sdp"] },
+          mix: { politics: ["none_of_them", "kok"] },
+          all: { politics: ["kok", "none_of_them", "kahvipuolue"] },
+          noneAndJoke: { politics: ["none_of_them", "kahvipuolue"] },
+          none: { politics: ["none_of_them"] },
+          parties: { politics: ["vas", "vihr"] },
+          unanswered: { religion: "atheist" },
+          empty: {},
+        };
+        const ids: Record<string, string> = {};
+        for (const [index, [name, fields]] of Object.entries(stored).entries()) {
+          const identity = await pool.query<{ id: string }>(
+            "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+            [index.toString(16).padStart(64, "e")],
+          );
+          const account = await pool.query<{ id: string }>(
+            "INSERT INTO account (identity_id) VALUES ($1) RETURNING id",
+            [identity.rows[0]?.id],
+          );
+          ids[name] = account.rows[0]?.id ?? "";
+          await pool.query(
+            `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts, created_at, updated_at)
+             VALUES ($1, 'A', NULL, NULL, $2::jsonb, '[]'::jsonb, now(), now())`,
+            [ids[name], JSON.stringify(fields)],
+          );
+        }
+        const sql = readFileSync(resolve(MIGRATIONS, "0037_politics_options.sql"), "utf8");
+        const after = async () => {
+          const rows = await pool.query<{ account_id: string; fields: Record<string, unknown> }>(
+            "SELECT account_id, fields FROM profile",
+          );
+          const byId = new Map(rows.rows.map((row) => [row.account_id, row.fields]));
+          return Object.fromEntries(
+            Object.keys(stored).map((name) => [name, byId.get(ids[name] ?? "")]),
+          );
+        };
+        const expected = {
+          joke: { smoking: "never" },
+          jokeAmong: { politics: ["vihr", "sdp"] },
+          mix: { politics: ["kok"] },
+          all: { politics: ["kok"] },
+          noneAndJoke: { politics: ["none_of_them"] },
+          none: { politics: ["none_of_them"] },
+          parties: { politics: ["vas", "vihr"] },
+          unanswered: { religion: "atheist" },
+          empty: {},
+        };
+        await pool.query(sql);
+        expect(await after()).toEqual(expected);
+        // Idempotent: a second run changes nothing.
+        await pool.query(sql);
+        expect(await after()).toEqual(expected);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   it("is a no-op the second time", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });

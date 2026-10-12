@@ -1,7 +1,7 @@
 # Several fields and lines of work, up to three each (#178, ADR-019 §1): the
 # chips take three, a fourth tap does nothing, and Ask me later keeps what
-# was stored. A list of twelve or more has a search box (#148), which filters
-# the chips as one types. Sanna's field and work are both arts and culture;
+# was stored. A list of fourteen or more has a search box (#148, #239), which
+# filters the chips as one types; the twelve fields fit a screen and have none. Sanna's field and work are both arts and culture;
 # nothing is saved.
 appId: fi.kuutti.app
 name: Field and work take up to three choices each, a fourth tap does nothing, and long lists can be searched
@@ -12,7 +12,7 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
     visible: "Field|Ala|Bransch"
     timeout: 15000
 - waitForAnimationToEnd
-- assertVisible: "Search|Hae|Sök"
+- assertNotVisible: "Search|Hae|Sök"
 - assertVisible: "Hide me from people in my field|Piilota minut oman alani ihmisiltä|Dölj mig för folk inom mitt område"
 - assertVisible:
     text: "Arts and culture|Taide ja kulttuuri|Konst och kultur"

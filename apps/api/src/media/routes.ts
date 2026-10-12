@@ -106,7 +106,8 @@ const orderRoute = createRoute({
   method: "put",
   path: "/photos/order",
   summary: "Set the order of the photos",
-  description: "Position 0 is the main photo. Every photo of the account exactly once.",
+  description:
+    "Every photo of the account exactly once, first to last. The main photo is the first approved one in this order (ADR-009 §4).",
   ...bearer,
   request: { body: { required: true, ...json(PhotoOrderRequest) } },
   responses: {

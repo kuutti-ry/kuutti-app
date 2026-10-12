@@ -7,7 +7,6 @@ import {
   type ProfileFields,
   type ProfileUpdate,
 } from "@kuutti/schema";
-import { useRouter } from "expo-router";
 import type React from "react";
 import { useState } from "react";
 import { View } from "react-native";
@@ -21,8 +20,48 @@ import { useHapticTap } from "@/theme/haptics";
 import { OptionGlyph, optionGlyph } from "./glyphs";
 import { fieldLabelKey, optionKey } from "./keys";
 
-/** Lists longer than this get a search box (#148): the languages, the hobbies, the lines of work. */
-export const SEARCHABLE_FROM = 12;
+/**
+ * Lists of this many options or more get a search box (#148): the languages,
+ * the hobbies, the lines of work. Not the thirteen star signs, the eleven
+ * answers of politics or the twelve fields: they fit on a screen, and a box
+ * over them was overkill (the maintainer, #239).
+ */
+export const SEARCHABLE_FROM = 14;
+
+/**
+ * The options a picker shows (#239): with something typed, every option whose
+ * text matches; with nothing typed, all of them, or, on a list that names how
+ * many lead it (the languages), those first ones, anything chosen already and
+ * "other", the rest left to the search.
+ */
+export function visibleOptions(
+  options: readonly string[],
+  shownFirst: number | undefined,
+  chosen: readonly string[],
+  search: string,
+  textOf: (option: string) => string,
+): readonly string[] {
+  const needle = search.trim().toLowerCase();
+  if (needle !== "") return options.filter((o) => textOf(o).toLowerCase().includes(needle));
+  if (shownFirst === undefined) return options;
+  return options.filter((o, i) => i < shownFirst || chosen.includes(o) || o === "other");
+}
+
+/**
+ * A multi-choice answer after a tap on one option (#239): a chosen option
+ * goes; an option that stands alone ("none of them") replaces the rest; any
+ * other joins, clearing an option that stands alone, while the cap allows.
+ */
+export function toggled(
+  current: readonly string[],
+  option: string,
+  spec: { max: number; alone: readonly string[] },
+): string[] {
+  if (current.includes(option)) return current.filter((o) => o !== option);
+  if (spec.alone.includes(option)) return [option];
+  const kept = current.filter((o) => !spec.alone.includes(o));
+  return kept.length < spec.max ? [...kept, option] : [...current];
+}
 
 type Draft = Pick<ProfileUpdate, "fields">;
 type Update = (patch: Partial<Draft>) => void;
@@ -80,35 +119,10 @@ export function Chip({
 }
 
 /**
- * The line above the article 9 fields (ADR-019 §4, #204): the consent was
- * given once, at the seeks step, and anyone active has it; here it is named,
- * with the one place it is withdrawn. No second switch.
- */
-export function SpecialCategoryNote() {
-  const { t } = useT();
-  const router = useRouter();
-  const tap = useHapticTap();
-  return (
-    <View className="gap-2">
-      <Text variant="muted">{t("profile.specialCategory.note")}</Text>
-      <Button
-        variant="outline"
-        accessibilityLabel={t("home.settings.open")}
-        onPress={() => {
-          tap();
-          router.push("/settings");
-        }}
-      >
-        {t("home.settings.open")}
-      </Button>
-    </View>
-  );
-}
-
-/**
  * One field of the registry as the person answers it (#47, #148, ADR-019):
- * choices as chips, with a search box over a long list and the hobbies in
- * their groups; a number as a stepper; a short text; a setting as a switch.
+ * choices as chips, with a search box over a long list, the first languages
+ * before it and the hobbies in their groups; a number as a stepper; a short
+ * text; a setting as a switch.
  * Nothing here is particular to a field beyond the widget its kind asks for
  * and the one adaptive text of the sheet. The profile screen and the later
  * screens share it; the draft and its update are the caller's.
@@ -127,6 +141,11 @@ export function FieldEditor({
   const [search, setSearch] = useState("");
   const spec = PROFILE_FIELDS[field];
   const value = (draft.fields as Record<string, unknown>)[field];
+  const chosen = Array.isArray(value) ? (value as string[]) : [];
+  // An option once pressed stays in view while the editor is open, chosen or
+  // not: taken back, a language beyond the first ten would vanish from under
+  // the finger and the screen reader's focus, with no way to undo (#239).
+  const [seen, setSeen] = useState<readonly string[]>([]);
   const label = t(fieldLabelKey(field));
   const setField = (next: unknown) => {
     const fields: Record<string, unknown> = { ...draft.fields };
@@ -173,12 +192,8 @@ export function FieldEditor({
         onPress={() => {
           tap();
           if (spec.kind === "multi") {
-            const current = Array.isArray(value) ? (value as string[]) : [];
-            const next = selected
-              ? current.filter((v) => v !== option)
-              : current.length < spec.max
-                ? [...current, option]
-                : current;
+            const next = toggled(chosen, option, spec);
+            if (!seen.includes(option)) setSeen([...seen, option]);
             setField(next.length > 0 ? next : undefined);
           } else {
             setField(selected ? undefined : option);
@@ -273,7 +288,13 @@ export function FieldEditor({
             </View>
           ) : (
             <View className="flex-row flex-wrap gap-2">
-              {spec.options.filter(matches).map(chip)}
+              {visibleOptions(
+                spec.options,
+                spec.kind === "multi" ? spec.shownFirst : undefined,
+                [...chosen, ...seen],
+                search,
+                (option) => t(optionTextKey(field, option, draft.fields)),
+              ).map(chip)}
             </View>
           )}
         </>

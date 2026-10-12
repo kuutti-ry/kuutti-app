@@ -137,6 +137,9 @@ describe("profile routes", () => {
       { ...update, fields: { ...update.fields, height: 139 } },
       { ...update, fields: { ...update.fields, hobbies: HOBBIES.slice(0, 6) } },
       { ...update, fields: { ...update.fields, campus: "Otaniemi" } },
+      // The coffee party left the list, and "none of them" stands alone (#239).
+      { ...update, fields: { ...update.fields, politics: ["kahvipuolue"] } },
+      { ...update, fields: { ...update.fields, politics: ["none_of_them", "kok"] } },
       { ...update, prompts: [update.prompts[0], update.prompts[0]] },
       { ...update, bio: "Hello there", bioPreset: "photos_speak" },
       { ...update, displayName: "" },

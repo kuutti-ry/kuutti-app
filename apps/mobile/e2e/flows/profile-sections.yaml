@@ -8,13 +8,14 @@ name: A section saves on going back, and the card shows what it saved
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile
 - extendedWaitUntil:
-    visible: "The basics|Perustiedot|Grunderna"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 # A row is one button named by its title; the line under it is its hint, which
-# Maestro does not read as text.
-- assertVisible: "Relationship and kids|Parisuhde ja lapset|Relation och barn"
+# Maestro does not read as text, and how far it is filled its value, which
+# Android joins to the name after a comma (#239).
+- assertVisible: "(Relationship and kids|Parisuhde ja lapset|Relation och barn)(, .*)?"
 - waitForAnimationToEnd
-- tapOn: "Lifestyle|Elämäntavat|Livsstil"
+- tapOn: "(Lifestyle|Elämäntavat|Livsstil)(, .*)?"
 - extendedWaitUntil:
     visible: "Smoking|Tupakointi|Rökning"
     timeout: 15000
@@ -38,7 +39,7 @@ name: A section saves on going back, and the card shows what it saved
     timeout: 60000
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
-    visible: "The basics|Perustiedot|Grunderna"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - openLink: kuutti://profile/card
 - extendedWaitUntil:
@@ -55,10 +56,10 @@ name: A section saves on going back, and the card shows what it saved
 # going back.
 - openLink: kuutti://profile
 - extendedWaitUntil:
-    visible: "The basics|Perustiedot|Grunderna"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Lifestyle|Elämäntavat|Livsstil"
+- tapOn: "(Lifestyle|Elämäntavat|Livsstil)(, .*)?"
 - extendedWaitUntil:
     visible: "Smoking|Tupakointi|Rökning"
     timeout: 15000
@@ -79,11 +80,11 @@ name: A section saves on going back, and the card shows what it saved
     timeout: 60000
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
-    visible: "The basics|Perustiedot|Grunderna"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 # Opened again, the section reads what was stored: nothing chosen.
 - waitForAnimationToEnd
-- tapOn: "Lifestyle|Elämäntavat|Livsstil"
+- tapOn: "(Lifestyle|Elämäntavat|Livsstil)(, .*)?"
 - extendedWaitUntil:
     visible: "Smoking|Tupakointi|Rökning"
     timeout: 15000

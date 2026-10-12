@@ -23,7 +23,6 @@ describe("the option glyphs (#213)", () => {
   it("exist for every party, for the religions with a symbol and for every sign, and for nothing else", () => {
     for (const party of PARTY_OPTIONS) expect(optionGlyph("politics", party)).not.toBeNull();
     expect(optionGlyph("politics", "none_of_them")).toBeNull();
-    expect(optionGlyph("politics", "kahvipuolue")).toBeNull();
     for (const sign of PROFILE_FIELDS.zodiac.options)
       expect(optionGlyph("zodiac", sign)).not.toBeNull();
     const symbols = [

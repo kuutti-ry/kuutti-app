@@ -146,16 +146,15 @@ describe("LaterFieldScreen", () => {
     expect(laterProgress({ hasKids: "yes_with_me" })).toEqual({ answered: 1, total: 16 });
   });
 
-  it("shows an article 9 field under the note on its consent, and saves the answer without a consent of its own", async () => {
+  it("asks an article 9 field with no note or switch of its own, and saves the answer without a consent of its own", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="politics" />);
     await waitFor(() => expect(screen.getByText("Greens")).toBeTruthy());
-    // No second switch (#204): the consent was given at the seeks step; Settings is where it is withdrawn.
+    // No second switch (#204) and no note (#239): the consent was given at the seeks step; Settings is the one place for it.
     expect(screen.queryByLabelText("Sensitive answers")).toBeNull();
-    expect(screen.getByText(/withdraw it in Settings/)).toBeTruthy();
+    expect(screen.queryByText(/withdraw it in Settings/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
     checkA11y();
-    await press(screen.getByRole("button", { name: "Settings" }));
-    expect(router.push).toHaveBeenCalledWith("/settings");
     await press(screen.getByRole("button", { name: "Greens" }));
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));

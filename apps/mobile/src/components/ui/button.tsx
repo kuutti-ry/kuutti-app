@@ -19,8 +19,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        // A transparent border of outline's width: a choice toggles between
+        // default (chosen) and outline, and without it the chosen chip was 2 px
+        // narrower, so a row of chips re-wrapped on every tap (#239). The
+        // background shows through it on every platform.
         default: cn(
-          "bg-primary active:bg-primary/90",
+          "border border-transparent bg-primary active:bg-primary/90",
           Platform.select({ web: "hover:bg-primary/90" }),
         ),
         destructive: cn(

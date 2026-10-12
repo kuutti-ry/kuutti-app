@@ -97,10 +97,10 @@ export const Photo = z
       description:
         "The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision.",
     }),
-    position: z
-      .int()
-      .min(0)
-      .meta({ description: "0 is the main photo; the owner sets the order." }),
+    position: z.int().min(0).meta({
+      description:
+        "0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4).",
+    }),
     createdAt: z.iso.datetime(),
   })
   .meta({ id: "Photo" });

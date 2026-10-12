@@ -52,10 +52,11 @@ beforeEach(async () => {
 });
 
 describe("ProfileCardView", () => {
-  it("shows the name as the title and the bank-verified age, and nothing the person did not give", async () => {
+  it("shows the name with the age as the title, and nothing the person did not give", async () => {
     await renderWithTheme(<ProfileCardView card={bare} />);
-    expect(screen.getByRole("heading", { name: "Aino" })).toBeTruthy();
-    expect(texts(screen.toJSON())).toEqual(["Aino", "36, age verified by your bank"]);
+    // The age as visible as the name, and no word on the bank: every account is verified (#239).
+    expect(screen.getByRole("heading", { name: "Aino, 36" })).toBeTruthy();
+    expect(texts(screen.toJSON())).toEqual(["Aino, 36"]);
     expect(screen.queryByRole("image")).toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

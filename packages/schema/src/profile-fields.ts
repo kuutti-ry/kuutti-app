@@ -49,13 +49,33 @@ const single = <T extends Options>(options: T, r: Roles) => ({
   schema: z.enum(options),
 });
 
-const multi = <T extends Options>(options: T, max: number, r: Roles) => ({
-  kind: "multi" as const,
-  options,
-  max,
-  ...roles(r),
-  schema: z.array(z.enum(options)).min(1).max(max),
-});
+/**
+ * What a multi-choice list may say beyond its options: `alone` names the
+ * options that are an answer only by themselves ("none of them" next to a
+ * party says both; the app clears the others and the contract refuses the
+ * mix, #239), `shownFirst` how many lead the picker before the rest is
+ * searched for (the languages, #239).
+ */
+type MultiExtra<T extends Options> = { alone?: readonly T[number][]; shownFirst?: number };
+
+const multi = <T extends Options>(options: T, max: number, r: Roles, extra: MultiExtra<T> = {}) => {
+  const alone: readonly string[] = extra.alone ?? [];
+  return {
+    kind: "multi" as const,
+    options,
+    max,
+    alone,
+    shownFirst: extra.shownFirst,
+    ...roles(r),
+    schema: z
+      .array(z.enum(options))
+      .min(1)
+      .max(max)
+      .refine((chosen) => chosen.length === 1 || !chosen.some((o) => alone.includes(o)), {
+        message: "an option that stands alone was chosen with others",
+      }),
+  };
+};
 
 const text = (maxLength: number, r: Roles) => ({
   kind: "text" as const,
@@ -79,47 +99,51 @@ const flag = (r: Roles) => ({ kind: "flag" as const, ...roles(r), schema: z.bool
 /**
  * Languages by ISO 639-1 code, named in the reader's language like every
  * other option (Finnish, suomi, finska; ADR-019 §3 as amended by #238): a
- * language is not a country and no flag stands for one. The first three are pinned in the picker; the rest is the
- * languages spoken most in Finland, searchable, with "other" for the rest.
+ * language is not a country and no flag stands for one. In the order of use
+ * (#239): the two national languages, English, then by the people of 20 to 64
+ * who speak each as their registered language (Statistics Finland, StatFin
+ * 11rl, 31.12.2025). The first LANGUAGES_SHOWN_FIRST lead the picker, the
+ * rest is found by search, and "other" stays last.
  */
 const LANGUAGES = [
   "fi",
   "sv",
   "en",
-  "se",
-  "et",
   "ru",
+  "et",
   "uk",
   "ar",
-  "so",
   "fa",
-  "ku",
   "zh",
-  "sq",
+  "so",
   "vi",
-  "th",
-  "tr",
-  "es",
-  "de",
-  "fr",
+  "sq",
+  "ku",
   "tl",
-  "pl",
-  "it",
-  "pt",
-  "hi",
-  "ne",
+  "th",
   "bn",
+  "tr",
+  "ne",
+  "es",
   "ur",
+  "de",
   "ro",
-  "hu",
-  "ja",
-  "lt",
+  "pl",
+  "fr",
+  "hi",
+  "pt",
+  "it",
   "lv",
+  "hu",
   "nl",
+  "lt",
+  "ja",
+  "se",
   "ko",
   "other",
 ] as const;
 export const LANGUAGES_MAX = 5;
+export const LANGUAGES_SHOWN_FIRST = 10;
 
 /**
  * The hobbies: a fixed list so that shared ones can be highlighted on a card
@@ -239,9 +263,10 @@ const HEIGHT_MAX_CM = 220;
  * The parties by their usual abbreviation: the nine of the parliament and the
  * Pirate Party, in the order of their Finnish names, each shown with its logo
  * before the name (#213, ADR-019 §3); the list is refreshed after the
- * election of April 2027. "None of them" is an answer of its own, and the
- * coffee party is the one joke the sheet asks for; both stand after the
- * parties, and neither has a logo.
+ * election of April 2027. "None of them" is an answer of its own, after the
+ * parties and without a logo, and it stands alone (#239). The coffee party
+ * left the list on the maintainer's word (#239); migration 0037 took it out
+ * of stored answers.
  */
 export const POLITICS_OPTIONS = [
   "kesk",
@@ -255,12 +280,9 @@ export const POLITICS_OPTIONS = [
   "vas",
   "vihr",
   "none_of_them",
-  "kahvipuolue",
 ] as const;
 /** The options of `politics` that are parties: the ones with a logo. */
-export const PARTY_OPTIONS = POLITICS_OPTIONS.filter(
-  (option) => option !== "none_of_them" && option !== "kahvipuolue",
-);
+export const PARTY_OPTIONS = POLITICS_OPTIONS.filter((option) => option !== "none_of_them");
 
 export const PROFILE_FIELDS = {
   /** Asked in onboarding (#146); "open to either" matches both others (#147). */
@@ -298,7 +320,12 @@ export const PROFILE_FIELDS = {
     role: "info",
     preferenceAbout: "deal_breaker",
   }),
-  languages: multi(LANGUAGES, LANGUAGES_MAX, { role: "info", preferenceAbout: "deal_breaker" }),
+  languages: multi(
+    LANGUAGES,
+    LANGUAGES_MAX,
+    { role: "info", preferenceAbout: "deal_breaker" },
+    { shownFirst: LANGUAGES_SHOWN_FIRST },
+  ),
   /** The Finnish levels; the preference is "similar to mine", with AMK and kandi adjacent (#87). */
   education: single(["peruskoulu", "toinen_aste", "amk", "kandi", "maisteri", "tohtori"], {
     role: "soft",
@@ -373,12 +400,13 @@ export const PROFILE_FIELDS = {
   ),
   /** A short title in the person's words and no employer's name: under the plain-text rule like every free text. */
   occupationTitle: text(40, { role: "info", preferenceAbout: "none" }),
-  /** Article 9: the parties the person could vote for; shown only when filled, never a filter. */
-  politics: multi(POLITICS_OPTIONS, POLITICS_OPTIONS.length, {
-    role: "info",
-    preferenceAbout: "none",
-    specialCategory: true,
-  }),
+  /** Article 9: the parties the person could vote for, or none of them; shown only when filled, never a filter. */
+  politics: multi(
+    POLITICS_OPTIONS,
+    PARTY_OPTIONS.length,
+    { role: "info", preferenceAbout: "none", specialCategory: true },
+    { alone: ["none_of_them"] },
+  ),
   /** Article 9; a deal-breaker only after the Ombudsman's answer (ADR-019 §4). The list is the maintainer's. */
   /** The religions by their share of the people of Finland (Statistics Finland, 2023; the maintainer, 10/10/2026), the stances after them. */
   religion: single(

@@ -31,6 +31,13 @@ export function findSection(id: string): ProfileSection | undefined {
   return PROFILE_SECTIONS.find((section) => section.id === id);
 }
 
+/** The section that holds an item; every item is in exactly one (the test holds it). */
+export function sectionOf(item: SectionItem): SectionId {
+  const section = PROFILE_SECTIONS.find((s) => (s.items as readonly SectionItem[]).includes(item));
+  if (!section) throw new Error(`no section holds ${item}`);
+  return section.id;
+}
+
 export const sectionTitleKey = (id: SectionId) => `profile.section.${id}.title` as PlainMessageKey;
 export const sectionSummaryKey = (id: SectionId) =>
   `profile.section.${id}.summary` as PlainMessageKey;

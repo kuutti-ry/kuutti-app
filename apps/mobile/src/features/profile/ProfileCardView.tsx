@@ -16,7 +16,7 @@ import { fieldLabelKey, genderKey, optionKey, presetKey, promptKey } from "./key
 
 /**
  * A card as others see it (#47, #150): the main photo in the card variant,
- * the name and the bank-verified age, the gender with the identity label
+ * the name and the age, the gender with the identity label
  * after it, then one answer in the person's own words (the sheet's Hinge
  * takeaway), the other photos as thumbs, the bio or its placeholder, the
  * info fields the API left on the card with what both answered marked in
@@ -76,8 +76,11 @@ export function ProfileCardView({
         />
       )}
       <CardHeader>
-        <CardTitle>{card.displayName}</CardTitle>
-        <Text variant="muted">{t("profile.card.verifiedAge", { years: card.age.years })}</Text>
+        {/* The age in the title, as visible as the name: every account is bank-verified,
+            so the card does not say so (#239). */}
+        <CardTitle>
+          {t("profile.card.nameAge", { name: card.displayName, years: card.age.years })}
+        </CardTitle>
         {card.gender && <Text variant="muted">{t(genderKey(card.gender))}</Text>}
         {identityLabel && (
           <Text variant="muted">{t(optionKey("identityLabel", identityLabel))}</Text>

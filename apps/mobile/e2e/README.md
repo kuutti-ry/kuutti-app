@@ -43,7 +43,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `deal-breakers-limit` | Sanna | an accepted answer before saving; two at most, the third refused |
 | `deal-breakers-own-answer` | Noa | only on what she answered; Answer it opens the field |
 | `deal-breaker-paused` | Sanna | her own answer taken back pauses it in words; answering lifts it |
-| `card` | Sanna | photo, name, verified age, the information fields, nothing soft |
+| `card` | Sanna | photo, name with the age, the information fields, nothing soft |
 | `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the gate and the profile wait; the hidden field leaves the card |
 | `photos-screen` | Sanna | states and moves in words; full size and back; removal asked |
 | `profile-sections` | Sanna | the list of sections; an answer saved by going back, on the card, and off again (#227) |
@@ -51,7 +51,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `later-fields-ask-later` | Sanna | the unanswered fields in order; Ask me later writes nothing |
 | `later-multi-choice-cap` | Sanna | three each for field and work (#178); the search box |
 | `later-answer-on-card` | Sanna | two parties and the corgi on the card, and off again (#213) |
-| `politics-consent-note` | Sanna | the note names the consent and Settings; no switch; twelve options |
+| `politics-none-alone` | Sanna | ten parties and none of them, which stands alone; no note, no search, no switch |
 | `kids-labels` | Kerttu, Sanna | the future-kids answers follow having kids (#148) |
 | `home-and-tech` | Sanna | the area and its numbers, the gate in words; the tech screen's API |
 | `email` | Sanna | malformed refused, valid saved, removed |

@@ -260,6 +260,13 @@
       "when": 1791816948975,
       "tag": "0036_photo_tip_fish_species",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1791830691109,
+      "tag": "0037_politics_options",
+      "breakpoints": true
     }
   ]
 }

@@ -241,7 +241,11 @@ function drawFields(random: Random, language: Language, consented: boolean): Pro
   if (random.chance(0.3)) fields.occupationTitle = random.pick(OCCUPATION_TITLES[language]);
   // Article 9 answers only behind the consent (ADR-019 §4), as the API would have it.
   if (consented) {
-    if (random.chance(0.7)) fields.politics = random.sample(POLITICS_OPTIONS, random.int(1, 3));
+    if (random.chance(0.7)) {
+      // "None of them" is an answer by itself (#239): drawn with parties, it is the answer alone.
+      const drawn = random.sample(POLITICS_OPTIONS, random.int(1, 3));
+      fields.politics = drawn.includes("none_of_them") ? ["none_of_them"] : drawn;
+    }
     if (random.chance(0.6)) fields.religion = random.pick(PROFILE_FIELDS.religion.options);
   }
   if (random.chance(0.45)) fields.zodiac = random.pick(PROFILE_FIELDS.zodiac.options);

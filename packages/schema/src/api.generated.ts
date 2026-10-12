@@ -1164,7 +1164,7 @@ export interface paths {
         get?: never;
         /**
          * Set the order of the photos
-         * @description Position 0 is the main photo. Every photo of the account exactly once.
+         * @description Every photo of the account exactly once, first to last. The main photo is the first approved one in this order (ADR-009 §4).
          */
         put: {
             parameters: {
@@ -2676,7 +2676,7 @@ export interface components {
             wantsKids?: "want" | "dont_want" | "not_sure";
             /** @enum {string} */
             smoking?: "never" | "sometimes" | "regularly" | "quitting";
-            languages?: ("fi" | "sv" | "en" | "se" | "et" | "ru" | "uk" | "ar" | "so" | "fa" | "ku" | "zh" | "sq" | "vi" | "th" | "tr" | "es" | "de" | "fr" | "tl" | "pl" | "it" | "pt" | "hi" | "ne" | "bn" | "ur" | "ro" | "hu" | "ja" | "lt" | "lv" | "nl" | "ko" | "other")[];
+            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
             /** @enum {string} */
             education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
             /** @enum {string} */
@@ -2692,7 +2692,7 @@ export interface components {
             hideFromField?: boolean;
             occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
             occupationTitle?: string;
-            politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them" | "kahvipuolue")[];
+            politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them")[];
             /** @enum {string} */
             religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
             /** @enum {string} */
@@ -2720,7 +2720,7 @@ export interface components {
             rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
             /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
             appealable: boolean;
-            /** @description 0 is the main photo; the owner sets the order. */
+            /** @description 0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4). */
             position: number;
             /** Format: date-time */
             createdAt: string;
@@ -2811,7 +2811,7 @@ export interface components {
             wantsKids?: "want" | "dont_want" | "not_sure";
             /** @enum {string} */
             smoking?: "never" | "sometimes" | "regularly" | "quitting";
-            languages?: ("fi" | "sv" | "en" | "se" | "et" | "ru" | "uk" | "ar" | "so" | "fa" | "ku" | "zh" | "sq" | "vi" | "th" | "tr" | "es" | "de" | "fr" | "tl" | "pl" | "it" | "pt" | "hi" | "ne" | "bn" | "ur" | "ro" | "hu" | "ja" | "lt" | "lv" | "nl" | "ko" | "other")[];
+            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
             /** @enum {string} */
             education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
             /** @enum {string} */
@@ -2860,7 +2860,7 @@ export interface components {
             rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
             /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
             appealable: boolean;
-            /** @description 0 is the main photo; the owner sets the order. */
+            /** @description 0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4). */
             position: number;
             /** Format: date-time */
             createdAt: string;
