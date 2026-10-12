@@ -7,7 +7,7 @@ import {
   PhotoUrlResponse,
 } from "@kuutti/schema";
 import { useCallback, useEffect, useState } from "react";
-import { api, failed } from "../../lib/api.ts";
+import { api } from "../../lib/api.ts";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
 // the photos the automatic check would not approve. Plain HTML, keyboard
@@ -101,29 +101,33 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   const [shown, setShown] = useState(!item.sensitive);
 
   // The card through a signed URL: one audit row per view, on the API's side.
+  // An item that goes away cancels its request, so nothing goes out after it;
+  // a request that fails leaves the picture loading, as a refused URL does.
   useEffect(() => {
     if (!shown) return;
-    let mounted = true;
+    const controller = new AbortController();
     void api
-      .GET("/admin/photos/{id}/card", { params: { path: { id: item.photoId } } })
+      .GET("/admin/photos/{id}/card", {
+        params: { path: { id: item.photoId } },
+        signal: controller.signal,
+      })
       .then(({ data }) => {
-        if (mounted && data) setUrl(PhotoUrlResponse.parse(data).url);
-      });
-    return () => {
-      mounted = false;
-    };
+        if (data) setUrl(PhotoUrlResponse.parse(data).url);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
   }, [item.photoId, shown]);
 
   const decide = async (
     body: { decision: "approve" } | { decision: "reject"; reason: PhotoRejectionReason },
   ) => {
     setState({ kind: "saving" });
-    const { data, error, response } = await api.POST("/admin/photos/{id}/decision", {
-      params: { path: { id: item.photoId } },
-      body,
-    });
+    // A network failure is a decision not saved, like a refusal: never a
+    // saving state that nothing will end.
+    const { data } = await api
+      .POST("/admin/photos/{id}/decision", { params: { path: { id: item.photoId } }, body })
+      .catch(() => ({ data: undefined }));
     if (!data) {
-      void failed(response, error, "decision");
       setState({ kind: "failed" });
       return;
     }

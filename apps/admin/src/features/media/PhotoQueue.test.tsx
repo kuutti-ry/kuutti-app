@@ -195,6 +195,28 @@ describe("PhotoQueue", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The queue could not be loaded.");
   });
 
+  it("says a decision was not saved when the network fails, and lets the moderator try again", async () => {
+    let attempts = 0;
+    fetchMock([
+      (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
+      cardUrls,
+      (req) => {
+        if (req.method !== "POST") return null;
+        attempts += 1;
+        if (attempts === 1) throw new TypeError("Failed to fetch");
+        return json({ photoId: item(1).photoId, state: "approved", rejectionReason: null });
+      },
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The decision was not saved");
+    // Not stuck saving: both buttons are back.
+    expect(screen.getByRole("button", { name: "Reject…" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Approved")).toBeInTheDocument();
+    expect(attempts).toBe(2);
+  });
+
   it("shows an unchecked photo as such", async () => {
     fetchMock([
       (req) =>
@@ -230,7 +252,7 @@ describe("PhotoQueue", () => {
     await waitFor(() => expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1));
   });
 
-  it("keeps saying the photo is loading when its signed URL is refused, and never shows a broken image", async () => {
+  it("keeps saying the photo is loading when its signed URL is refused or cannot be fetched, and never shows a broken image", async () => {
     fetchMock([
       (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
       (req) =>
@@ -244,6 +266,42 @@ describe("PhotoQueue", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.getByText("Loading the photo…")).toBeInTheDocument();
+    cleanup();
+    vi.unstubAllGlobals();
+    // A network failure rejects the request outright: still loading, and no
+    // unhandled rejection, which Vitest would fail the run on.
+    const calls = fetchMock([
+      (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
+      (req) => {
+        if (/\/card$/.test(path(req))) throw new TypeError("Failed to fetch");
+        return null;
+      },
+    ]);
+    show();
+    expect(await screen.findByText("Loading the photo…")).toBeInTheDocument();
+    await waitFor(() => expect(calls.filter((c) => /\/card$/.test(path(c)))).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getByText("Loading the photo…")).toBeInTheDocument();
+  });
+
+  it("cancels the photo's request when the item goes away before the answer", async () => {
+    // Without the cancel, a request still on its way when a test ends reached
+    // the real fetch once the stub was gone (main's CI on ec116d3).
+    let card: Request | undefined;
+    fetchMock([
+      (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
+      (req) => {
+        if (!/\/card$/.test(path(req))) return null;
+        card = req;
+        return new Promise<Response>(() => {});
+      },
+    ]);
+    show();
+    await waitFor(() => expect(card).toBeDefined());
+    expect(card?.signal.aborted).toBe(false);
+    cleanup();
+    expect(card?.signal.aborted).toBe(true);
   });
 
   it("says no label passed the threshold when a face was found and nothing else", async () => {
