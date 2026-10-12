@@ -30,11 +30,24 @@ export function setTokenSource(source: () => string | null): void {
   tokenSource = source;
 }
 
+/** What a 401 to a request that carried the token calls; the session module ends the session there. */
+let onUnauthorized: () => void = () => undefined;
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler;
+}
+
 const bearer: Middleware = {
   async onRequest({ request }) {
     const token = tokenSource();
     if (token) request.headers.set("authorization", `Bearer ${token}`);
     return request;
+  },
+  // A session the API no longer honours (revoked, expired) ends wherever it
+  // is found out, so every screen goes back to the sign-in instead of saying
+  // that its own request failed (#250).
+  async onResponse({ request, response }) {
+    if (response.status === 401 && request.headers.has("authorization")) onUnauthorized();
+    return response;
   },
 };
 
