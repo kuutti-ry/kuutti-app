@@ -6,10 +6,21 @@ import {
   type RekognitionClient,
 } from "@aws-sdk/client-rekognition";
 import { type Queryable, transaction } from "@kuutti/db";
-import { type ModerationLabel, PHOTO_VARIANT_SIZES } from "@kuutti/schema";
+import {
+  type ModerationLabel,
+  PHOTO_VARIANT_SIZES,
+  type PhotoRejectionReason,
+} from "@kuutti/schema";
 import sharp from "sharp";
 import type { Logger } from "../lib/logger.ts";
-import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { matchingConfigNumbers } from "../lib/matching-config.ts";
+import {
+  GROUP_REASON,
+  groupLineKeys,
+  groupOf,
+  LABEL_GROUPS,
+  type LabelGroup,
+} from "./label-groups.ts";
 import * as repo from "./repo.ts";
 import { type MediaStore, objectKey } from "./store.ts";
 
@@ -44,10 +55,12 @@ export interface Moderator {
 }
 
 export type Thresholds = {
-  /** A label at or above this confidence flags the photo. */
+  /** A label the check does not know goes to a person at or above this confidence. */
   labelThreshold: number;
   /** A face at or above this confidence counts as a person present. */
   faceThreshold: number;
+  /** Each hard group's lines (label-groups.ts): a person from `review`, the check's own rejection from `reject`. */
+  groups: Record<LabelGroup, { review: number; reject: number }>;
 };
 
 export const LABEL_THRESHOLD_KEY = "photo_moderation_label_threshold";
@@ -71,7 +84,7 @@ export type Decision = {
   flagged: string[];
   faces: number;
   /** What the owner is told, set when the check itself rejects. */
-  reason?: "no_person" | "several_people";
+  reason?: PhotoRejectionReason;
 };
 
 const roundConfidence = (n: number) => Math.round(n * 100) / 100;
@@ -130,23 +143,33 @@ export function storedLabels(inspection: Inspection): ModerationLabel[] {
 
 /**
  * The decision, pure (features/media/moderation.feature): unchecked goes to a
- * person; what the check is sure of it decides itself and the owner is told,
- * whatever else it saw: no face found at all is rejected as no_person (#253),
- * more than one face at or above the face threshold as several_people (#206).
- * What it is unsure of goes to a person: a face found but none at the
- * threshold (no_face), or a moderation label at or above its threshold beside
- * one sure face. The rest is approved. Tip signals are ignored.
+ * person. What the check is sure of it decides itself and the owner is told,
+ * in this order: a label of a hard group at or above that group's reject line
+ * (its reason, #253), no face found at all (no_person, #253), more than one
+ * face at or above the face threshold (several_people, #206). What it is
+ * unsure of goes to a person: a hard label between its group's lines, a label
+ * it does not know at or above `labelThreshold`, or faces found but none at
+ * the face threshold (no_face). Allowed labels and tip signals never decide.
  */
 export function decideModeration(inspection: Inspection, thresholds: Thresholds): Decision {
   const faces = inspection.faceConfidences.filter((c) => c >= thresholds.faceThreshold).length;
   if (!inspection.checked) return { decision: "queued", flagged: [NOT_CHECKED], faces };
-  const flagged = [
-    ...new Set(
-      inspection.labels
-        .filter((label) => label.confidence >= thresholds.labelThreshold)
-        .map((label) => label.name),
-    ),
-  ];
+  let sure: LabelGroup | undefined;
+  const flagged: string[] = [];
+  for (const label of inspection.labels) {
+    const group = groupOf(label.name);
+    if (group === "allowed") continue;
+    const lines = group ? thresholds.groups[group] : undefined;
+    if (lines && label.confidence >= lines.reject) {
+      // The first sure group found names the reason; LABEL_GROUPS ranks a tie.
+      if (!sure || LABEL_GROUPS.indexOf(group as LabelGroup) < LABEL_GROUPS.indexOf(sure)) {
+        sure = group as LabelGroup;
+      }
+    }
+    const askAt = lines ? lines.review : thresholds.labelThreshold;
+    if (label.confidence >= askAt && !flagged.includes(label.name)) flagged.push(label.name);
+  }
+  if (sure) return { decision: "rejected", flagged, faces, reason: GROUP_REASON[sure] };
   if (inspection.faceConfidences.length === 0) {
     return { decision: "rejected", flagged: [...flagged, NO_FACE], faces, reason: "no_person" };
   }
@@ -253,6 +276,23 @@ export type ModerationDeps = {
   now: () => Date;
 };
 
+/** Every line the decision reads, in one statement; a missing row fails loudly (matching-config.ts). */
+export async function readThresholds(db: Queryable): Promise<Thresholds> {
+  const groupKeys = LABEL_GROUPS.flatMap((group) => Object.values(groupLineKeys(group)));
+  const n = await matchingConfigNumbers(db, [
+    LABEL_THRESHOLD_KEY,
+    FACE_THRESHOLD_KEY,
+    ...groupKeys,
+  ]);
+  const groups = Object.fromEntries(
+    LABEL_GROUPS.map((group) => {
+      const keys = groupLineKeys(group);
+      return [group, { review: n[keys.review], reject: n[keys.reject] }];
+    }),
+  ) as Thresholds["groups"];
+  return { labelThreshold: n[LABEL_THRESHOLD_KEY], faceThreshold: n[FACE_THRESHOLD_KEY], groups };
+}
+
 /**
  * Runs the check on one photo and records the outcome: a photo_review row and
  * the photo's state, which moves only from pending (a person's decision is
@@ -265,10 +305,7 @@ export async function moderatePhoto(
   deps: ModerationDeps,
   input: { photoId: string; accountId: string; card: Uint8Array },
 ): Promise<Decision | null> {
-  const thresholds: Thresholds = {
-    labelThreshold: await matchingConfigNumber(deps.db, LABEL_THRESHOLD_KEY),
-    faceThreshold: await matchingConfigNumber(deps.db, FACE_THRESHOLD_KEY),
-  };
+  const thresholds = await readThresholds(deps.db);
   let inspection: Inspection;
   try {
     inspection = await deps.moderator.inspect(input.card);

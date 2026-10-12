@@ -1,28 +1,40 @@
 # features/media/moderation.feature
 Feature: Photo moderation before anyone else sees a photo
   A dating app without pre-publication photo moderation ships pornography
-  and other people's faces within a day (TD-8). The automatic check catches
-  the obvious; the decision on the rest is a person's; nothing is ever
-  rejected or deleted by a machine.
+  and other people's faces within a day (TD-8). The automatic check rejects
+  what it is sure of and tells the owner why; what it is unsure of is a
+  person's to decide (ADR-006 §2, #206, #253); nothing is ever deleted by a
+  machine. Each hard group of labels has two lines, 60 to ask a person and 90
+  to decide, as migration 0030 sets them.
 
   Scenario Outline: Automatic moderation decision
     Given the check found labels <labels> and faces <faces> at thresholds <label_threshold> and <face_threshold>
-    Then the outcome is <outcome> with <flagged> flagged
+    Then the outcome is <outcome> with <flagged> flagged and the owner told <reason>
 
     Examples:
-      | labels                        | faces      | label_threshold | face_threshold | outcome  | flagged                    |
-      | none                          | 99         | 60              | 90             | approved | nothing                    |
-      | Explicit Nudity 97            | 99         | 60              | 90             | queued   | Explicit Nudity            |
-      | Suggestive 45                 | 99         | 60              | 90             | approved | nothing                    |
-      | Suggestive 45                 | 99         | 40              | 90             | queued   | Suggestive                 |
-      | none                          | none       | 60              | 90             | rejected | no_face                    |
-      | Explicit Nudity 97            | none       | 60              | 90             | rejected | Explicit Nudity, no_face   |
-      | none                          | 70         | 60              | 90             | queued   | no_face                    |
-      | none                          | 99, 98, 95 | 60              | 90             | rejected | several_faces              |
-      | none                          | 99, 70     | 60              | 90             | approved | nothing                    |
-      | Explicit Nudity 97            | 99, 98     | 60              | 90             | rejected | Explicit Nudity, several_faces |
-      | Violence 80, Explicit Nudity 61 | 99       | 60              | 90             | queued   | Violence, Explicit Nudity  |
-      | unchecked                     | none       | 60              | 90             | queued   | not_checked                |
+      | labels                                          | faces      | label_threshold | face_threshold | outcome  | flagged                    | reason         |
+      | none                                            | 99         | 60              | 90             | approved | nothing                    | none           |
+      | Explicit Nudity 97                              | 99         | 60              | 90             | rejected | Explicit Nudity            | nudity         |
+      | Explicit Nudity 75                              | 99         | 60              | 90             | queued   | Explicit Nudity            | none           |
+      | Exposed Male Genitalia 95                       | none       | 60              | 90             | rejected | Exposed Male Genitalia     | nudity         |
+      | Implied Nudity 92                               | 99         | 60              | 90             | rejected | Implied Nudity             | nudity         |
+      | Bare Back 98, Exposed Male Nipple 97            | 99         | 60              | 90             | approved | nothing                    | none           |
+      | Female Swimwear or Underwear 99                 | 99         | 60              | 90             | approved | nothing                    | none           |
+      | Weapons 93                                      | 99         | 60              | 90             | rejected | Weapons                    | violence       |
+      | Hate Symbols 91                                 | 99         | 60              | 90             | rejected | Hate Symbols               | other          |
+      | Corpses 95                                      | 99         | 60              | 90             | rejected | Corpses                    | other          |
+      | Smoking 99, Alcoholic Beverages 98, Middle Finger 97 | 99    | 60              | 90             | approved | nothing                    | none           |
+      | Suggestive 45                                   | 99         | 60              | 90             | approved | nothing                    | none           |
+      | Suggestive 45                                   | 99         | 40              | 90             | queued   | Suggestive                 | none           |
+      | none                                            | none       | 60              | 90             | rejected | no_face                    | no_person      |
+      | Explicit Nudity 75                              | none       | 60              | 90             | rejected | Explicit Nudity, no_face   | no_person      |
+      | none                                            | 70         | 60              | 90             | queued   | no_face                    | none           |
+      | none                                            | 99, 98, 95 | 60              | 90             | rejected | several_faces              | several_people |
+      | none                                            | 99, 70     | 60              | 90             | approved | nothing                    | none           |
+      | Explicit Nudity 97                              | 99, 98     | 60              | 90             | rejected | Explicit Nudity            | nudity         |
+      | Violence 80, Explicit Nudity 61                 | 99         | 60              | 90             | queued   | Violence, Explicit Nudity  | none           |
+      | Weapons 95, Explicit Nudity 92                  | 99         | 60              | 90             | rejected | Weapons, Explicit Nudity   | nudity         |
+      | unchecked                                       | none       | 60              | 90             | queued   | not_checked                | none           |
 
   Scenario: An upload is checked and the photo leaves pending with what the check saw recorded
     Given an account uploads a photo

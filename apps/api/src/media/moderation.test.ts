@@ -22,6 +22,7 @@ import {
   rekognitionModerator,
   storedLabels,
   sweepPendingPhotos,
+  type Thresholds,
   tipLabelsFrom,
 } from "./moderation.ts";
 import { objectKey } from "./store.ts";
@@ -51,43 +52,92 @@ const inspection = (
   calls: 3,
 });
 
+/** Migration 0030's lines for every hard group, and the given lines for unknown labels and faces. */
+const lines = (labelThreshold: number, faceThreshold: number): Thresholds => ({
+  labelThreshold,
+  faceThreshold,
+  groups: {
+    nudity: { review: 60, reject: 90 },
+    violence: { review: 60, reject: 90 },
+    disturbing: { review: 60, reject: 90 },
+    hate: { review: 60, reject: 90 },
+  },
+});
+
 describe("Automatic moderation decision", () => {
   it.each([
-    ["none", "99", 60, 90, "approved", "nothing"],
-    ["Explicit Nudity 97", "99", 60, 90, "queued", "Explicit Nudity"],
-    ["Suggestive 45", "99", 60, 90, "approved", "nothing"],
-    ["Suggestive 45", "99", 40, 90, "queued", "Suggestive"],
+    ["none", "99", 60, 90, "approved", "nothing", "none"],
+    // A hard group decides at its reject line and asks a person between its lines (#253).
+    ["Explicit Nudity 97", "99", 60, 90, "rejected", "Explicit Nudity", "nudity"],
+    ["Explicit Nudity 75", "99", 60, 90, "queued", "Explicit Nudity", "none"],
+    ["Exposed Male Genitalia 95", "none", 60, 90, "rejected", "Exposed Male Genitalia", "nudity"],
+    ["Implied Nudity 92", "99", 60, 90, "rejected", "Implied Nudity", "nudity"],
+    // Shirtless, swimwear, smoking, a drink, a gesture: never a reason.
+    ["Bare Back 98, Exposed Male Nipple 97", "99", 60, 90, "approved", "nothing", "none"],
+    ["Female Swimwear or Underwear 99", "99", 60, 90, "approved", "nothing", "none"],
+    ["Weapons 93", "99", 60, 90, "rejected", "Weapons", "violence"],
+    ["Hate Symbols 91", "99", 60, 90, "rejected", "Hate Symbols", "other"],
+    ["Corpses 95", "99", 60, 90, "rejected", "Corpses", "other"],
+    [
+      "Smoking 99, Alcoholic Beverages 98, Middle Finger 97",
+      "99",
+      60,
+      90,
+      "approved",
+      "nothing",
+      "none",
+    ],
+    // A label the check does not know goes to a person from labelThreshold.
+    ["Suggestive 45", "99", 60, 90, "approved", "nothing", "none"],
+    ["Suggestive 45", "99", 40, 90, "queued", "Suggestive", "none"],
     // No face at all is the check's own rejection (#253); a face it is unsure of goes to a person.
-    ["none", "none", 60, 90, "rejected", NO_FACE],
-    ["Explicit Nudity 97", "none", 60, 90, "rejected", `Explicit Nudity, ${NO_FACE}`],
-    ["none", "70", 60, 90, "queued", NO_FACE],
+    ["none", "none", 60, 90, "rejected", NO_FACE, "no_person"],
+    ["Explicit Nudity 75", "none", 60, 90, "rejected", `Explicit Nudity, ${NO_FACE}`, "no_person"],
+    ["none", "70", 60, 90, "queued", NO_FACE, "none"],
     // Several faces are not accepted, by the check and not a person (#206);
     // a second face under the face threshold is not sure enough to count.
-    ["none", "99, 98, 95", 60, 90, "rejected", "several_faces"],
-    ["none", "99, 70", 60, 90, "approved", "nothing"],
-    ["Explicit Nudity 97", "99, 98", 60, 90, "rejected", "Explicit Nudity, several_faces"],
-    ["Violence 80, Explicit Nudity 61", "99", 60, 90, "queued", "Violence, Explicit Nudity"],
-    ["unchecked", "none", 60, 90, "queued", NOT_CHECKED],
+    ["none", "99, 98, 95", 60, 90, "rejected", "several_faces", "several_people"],
+    ["none", "99, 70", 60, 90, "approved", "nothing", "none"],
+    // A sure label names the reason before the faces do, and nudity before the rest.
+    ["Explicit Nudity 97", "99, 98", 60, 90, "rejected", "Explicit Nudity", "nudity"],
+    [
+      "Violence 80, Explicit Nudity 61",
+      "99",
+      60,
+      90,
+      "queued",
+      "Violence, Explicit Nudity",
+      "none",
+    ],
+    [
+      "Weapons 95, Explicit Nudity 92",
+      "99",
+      60,
+      90,
+      "rejected",
+      "Weapons, Explicit Nudity",
+      "nudity",
+    ],
+    ["unchecked", "none", 60, 90, "queued", NOT_CHECKED, "none"],
   ])(
-    "labels %s, faces %s, thresholds %d/%d → %s (%s)",
-    (labels, faces, labelThreshold, faceThreshold, outcome, flagged) => {
-      const decided = decideModeration(inspection(labels, faces), {
-        labelThreshold,
-        faceThreshold,
-      });
+    "labels %s, faces %s, thresholds %d/%d → %s (%s, %s)",
+    (labels, faces, labelThreshold, faceThreshold, outcome, flagged, reason) => {
+      const decided = decideModeration(
+        inspection(labels, faces),
+        lines(labelThreshold, faceThreshold),
+      );
       expect(decided.decision).toBe(outcome);
       expect(decided.flagged).toEqual(flagged === "nothing" ? [] : flagged.split(", "));
-      // The check names a reason only when it rejects: no person, or several.
-      const reason = flagged.includes("several_faces") ? "several_people" : "no_person";
-      expect(decided.reason).toBe(outcome === "rejected" ? reason : undefined);
+      // The check names a reason only when it rejects.
+      expect(decided.reason).toBe(reason === "none" ? undefined : reason);
     },
   );
 
   it("flags each label name once however many labels share it", () => {
-    const decided = decideModeration(inspection("Suggestive 70, Suggestive 65", "99"), {
-      labelThreshold: 60,
-      faceThreshold: 90,
-    });
+    const decided = decideModeration(
+      inspection("Suggestive 70, Suggestive 65", "99"),
+      lines(60, 90),
+    );
     expect(decided.flagged).toEqual(["Suggestive"]);
   });
 
@@ -97,7 +147,7 @@ describe("Automatic moderation decision", () => {
         { name: "Mirror", parentName: "", confidence: 99 },
         { name: "TightCrop", parentName: "Face", confidence: 80 },
       ]),
-      { labelThreshold: 60, faceThreshold: 90 },
+      lines(60, 90),
     );
     expect(decided).toEqual({ decision: "approved", flagged: [], faces: 1 });
   });
@@ -514,7 +564,7 @@ describe("moderation of uploads", () => {
     const line = logs().find((l) => l.msg === "photo moderated");
     expect(line).toMatchObject({
       accountId: me.accountId,
-      decision: "queued",
+      decision: "rejected",
       labels: 1,
       flagged: 1,
       faces: 1,
@@ -661,7 +711,7 @@ describe("what the Rekognition adapter makes of sparse answers", () => {
       calls: 3,
     });
     // No face found, so the check rejects it, by the same rule as any other check (#253).
-    expect(decideModeration(seen, { labelThreshold: 60, faceThreshold: 90 })).toEqual({
+    expect(decideModeration(seen, lines(60, 90))).toEqual({
       decision: "rejected",
       flagged: [NO_FACE],
       faces: 0,

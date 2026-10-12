@@ -42,10 +42,20 @@ export const MATCHING_CONFIG_V1 = {
   shown_cooldown_days: 30, // TD-12
   silent_match_archive_days: 7, // TD-13
   max_photos: 6, // #48: photos per account; the grid and the upload route read it
-  // #49: a moderation label at or above this confidence sends the photo to a person,
-  // and a photo needs one face found at or above this confidence to be approved without one.
+  // #49, #253: a moderation label the check does not know goes to a person at or
+  // above this confidence; a face counts as present at or above the face line.
   photo_moderation_label_threshold: 60,
   photo_moderation_face_threshold: 90,
+  // #253 (ADR-006 §2, migration 0030): each hard group of labels, a person from
+  // `review`, the check's own rejection from `reject`.
+  photo_moderation_nudity_review: 60,
+  photo_moderation_nudity_reject: 90,
+  photo_moderation_violence_review: 60,
+  photo_moderation_violence_reject: 90,
+  photo_moderation_disturbing_review: 60,
+  photo_moderation_disturbing_reject: 90,
+  photo_moderation_hate_review: 60,
+  photo_moderation_hate_reject: 90,
   // #56: profile photo tips; the tips rule reads these against photo_review signals.
   photo_tip_mirror_confidence_min: 50,
   photo_tip_bathroom_confidence_min: 50,
