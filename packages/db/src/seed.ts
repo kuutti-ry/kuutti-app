@@ -76,6 +76,8 @@ export const MATCHING_CONFIG_V1 = {
   // #253 (migration 0031): the main-photo tips, a lot of skin and a fish.
   photo_tip_revealing_confidence_min: 80,
   photo_tip_fish_confidence_min: 80,
+  // #253 (migration 0036): the fish tip names the species from this confidence.
+  photo_tip_fish_species_min: 70,
   // #52 (TD-6, ADR-008): the exposure budget. Cards an account may be served
   // per day (the card route of #47 counts against it; a round of 12 and up to
   // 10 pending likes fit several times over) and signed photo URLs per

@@ -11,7 +11,7 @@ export {
   exportPhotos,
   type PhotoErasure,
 } from "./erasure.ts";
-export { isRevealing } from "./label-groups.ts";
+export { fishSpeciesOf, isRevealing } from "./label-groups.ts";
 export {
   decideModeration,
   type Inspection,

@@ -117,6 +117,16 @@ export const TipKind = z
   .meta({ id: "TipKind" });
 export type TipKind = z.infer<typeof TipKind>;
 
+/**
+ * The fish the fish tip may name (#253): the species of Finland and nearby
+ * waters that Rekognition has a label for. A species it knows from elsewhere
+ * (tuna, sturgeon) is never named, however sure it is.
+ */
+export const FishSpecies = z
+  .enum(["pike", "perch", "salmon", "trout", "carp", "eel", "cod", "herring", "halibut"])
+  .meta({ id: "FishSpecies" });
+export type FishSpecies = z.infer<typeof FishSpecies>;
+
 /** The stored profile, as the owner reads it back. */
 export const ProfileDocument = z
   .object({
@@ -141,6 +151,12 @@ export const ProfileResponse = z
     completeness: Completeness,
     /** The tips that apply, highest priority first; the app shows one at a time. */
     tips: z.array(TipKind),
+    /**
+     * With the fish tip, the species the check is sure enough of on the main
+     * photo; null without the tip or without a sure species. Null when absent,
+     * so an app that is newer than its API still reads the answer.
+     */
+    fishSpecies: FishSpecies.nullable().default(null),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;

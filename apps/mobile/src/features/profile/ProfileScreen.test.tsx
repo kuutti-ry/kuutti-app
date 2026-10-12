@@ -23,9 +23,11 @@ const json = (body: unknown, status = 200) =>
 
 /**
  * GET /profile answering each read with the next list of what is missing, the
- * last one again after that. `tips` are the advisory kinds of #56 (none by default).
+ * last one again after that. `tips` are the advisory kinds of #56 (none by
+ * default); `fishSpecies` the fish the fish tip names (#253), absent by default
+ * as from an API older than it.
  */
-function fakeApi(missingByRead: string[][], tips: string[] = []) {
+function fakeApi(missingByRead: string[][], tips: string[] = [], fishSpecies?: string) {
   let reads = 0;
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -37,6 +39,7 @@ function fakeApi(missingByRead: string[][], tips: string[] = []) {
         profile: null,
         completeness: { complete: missing.length === 0, missing },
         tips,
+        ...(fishSpecies ? { fishSpecies } : {}),
       });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
@@ -107,6 +110,21 @@ describe("ProfileScreen", () => {
     expect(screen.queryByText(/without sunglasses/)).toBeNull();
     await press(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByText("A tip for your photos")).toBeNull();
+  });
+
+  it("names the fish of the fish tip when the API is sure of it (#253)", async () => {
+    fakeApi([[]], ["fish"], "pike");
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByText(/Is that a pike\?/)).toBeTruthy());
+  });
+
+  it("says the plain fish tip when the API names no fish", async () => {
+    fakeApi([[]], ["fish"]);
+    await show(<ProfileScreen />);
+    await waitFor(() =>
+      expect(screen.getByText(/A fish in the main photo is a classic/)).toBeTruthy(),
+    );
+    expect(screen.queryByText(/Is that/)).toBeNull();
   });
 
   it("opens a section, the card, the later questions and the deal-breakers", async () => {

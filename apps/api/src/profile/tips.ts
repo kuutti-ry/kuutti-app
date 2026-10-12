@@ -1,5 +1,5 @@
-import { PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
-import { isRevealing } from "../media/index.ts";
+import { type FishSpecies, PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
+import { fishSpeciesOf, isRevealing } from "../media/index.ts";
 
 /**
  * Advisory tips for the profile owner (#56). Pure: callers gather photos,
@@ -28,6 +28,7 @@ export const TIP_THRESHOLD_KEYS = {
   photosSuggested: "photo_tip_photos_suggested",
   revealingConfidenceMin: "photo_tip_revealing_confidence_min",
   fishConfidenceMin: "photo_tip_fish_confidence_min",
+  fishSpeciesMin: "photo_tip_fish_species_min",
 } as const;
 
 export type TipThresholds = {
@@ -45,6 +46,8 @@ export type TipThresholds = {
   revealingConfidenceMin: number;
   /** A Fish or Fishing scene label at or above this on the main photo (#253). */
   fishConfidenceMin: number;
+  /** A species label at or above this lets the fish tip name the fish (#253). */
+  fishSpeciesMin: number;
 };
 
 export type TipPhoto = {
@@ -130,4 +133,23 @@ const kindApplies: Record<TipKind, (snapshot: TipSnapshot) => boolean> = {
 /** Every tip that applies, highest priority first. */
 export function tips(snapshot: TipSnapshot): TipKind[] {
   return TIP_KIND_ORDER.filter((kind) => kindApplies[kind](snapshot));
+}
+
+/**
+ * The fish the fish tip names (#253): on the main photo, the species the check
+ * is surest of, at or above `fishSpeciesMin`, among those of Finland and
+ * nearby waters (FishSpecies); null when the fish tip does not apply, or no
+ * species is sure enough.
+ */
+export function fishSpecies(snapshot: TipSnapshot): FishSpecies | null {
+  const main = snapshot.photos[0];
+  if (!main || !kindApplies.fish(snapshot)) return null;
+  let best: { species: FishSpecies; confidence: number } | null = null;
+  for (const label of main.labels) {
+    const species = fishSpeciesOf(label.name);
+    if (!species || label.confidence < snapshot.thresholds.fishSpeciesMin) continue;
+    if (!best || label.confidence > best.confidence)
+      best = { species, confidence: label.confidence };
+  }
+  return best?.species ?? null;
 }

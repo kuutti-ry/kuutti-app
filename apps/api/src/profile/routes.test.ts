@@ -448,6 +448,34 @@ describe("profile routes", () => {
     expect(body.tips).toEqual(["sunglasses", "few_photos"]);
   });
 
+  test("GET /profile names the fish of the fish tip, a local one only, and says null otherwise (#253)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const [main, second] = await approvedPhotos(ctx, app, a.headers, 2);
+    const review = (id: string | undefined, labels: unknown[]) =>
+      ctx.client.query(
+        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
+         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
+        [id, JSON.stringify(labels)],
+      );
+    const read = async () => (await app.request("/profile", { headers: a.headers })).json();
+    // Sent as null, not left out: no fish yet.
+    expect((await read()).fishSpecies).toBeNull();
+    // What Rekognition said of the probe picture of a pike, and a tuna surer than the pike.
+    await review(main, [
+      { name: "Fish", parentName: "Animal", confidence: 94 },
+      { name: "Tuna", parentName: "Animal", confidence: 90 },
+      { name: "Pike", parentName: "Animal", confidence: 76.5 },
+      { name: "Cod", parentName: "Animal", confidence: 55.6 },
+    ]);
+    await review(second, []);
+    const body = ProfileResponse.parse(await read());
+    expect(body.tips).toContain("fish");
+    expect(body.fishSpecies).toBe("pike");
+  });
+
   test("the card for another viewer: a complete subject is served and recorded, an incomplete or deleted one is not, and the day has a budget", async ({
     ctx,
   }) => {

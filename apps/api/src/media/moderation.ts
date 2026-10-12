@@ -16,6 +16,7 @@ import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import { closerLookOf, recordPhotoCheckNote } from "../safety/index.ts";
 import {
+  FISH_SPECIES_LABELS,
   GROUP_REASON,
   groupLineKeys,
   groupOf,
@@ -74,11 +75,28 @@ export const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
 const REKOGNITION_MIN_CONFIDENCE = 30;
 /**
- * Scene labels tips care about; DetectLabels is filtered to these. Sunglasses
- * come from the face (DetectFaces), not the scene: a pair on the head or in a
- * hand covers no eyes.
+ * Scene labels tips care about; DetectLabels is filtered to these, and to the
+ * species the fish tip may name (label-groups.ts). Sunglasses come from the
+ * face (DetectFaces), not the scene: a pair on the head or in a hand covers
+ * no eyes.
  */
-const SCENE_TIP_LABELS = ["Mirror", "Bathroom", "Fish", "Fishing"] as const;
+const SCENE_TIP_LABELS = [
+  "Mirror",
+  "Bathroom",
+  "Fish",
+  "Fishing",
+  ...Object.values(FISH_SPECIES_LABELS),
+];
+/** The face's tip signals, which tipLabelsFrom stores beside the scene's (#56). */
+const FACE_TIP_SIGNALS = ["Sunglasses", "TightCrop", "Brightness", "Sharpness"];
+const TIP_SIGNALS: ReadonlySet<string> = new Set([...SCENE_TIP_LABELS, ...FACE_TIP_SIGNALS]);
+
+/**
+ * A tip signal stored with the moderation labels (#56): advice for the owner,
+ * never what a moderator decides on, so the queue leaves it out (#253: a scene
+ * label at its noise level, the nine fish among them, is only clutter there).
+ */
+export const isTipSignal = (name: string): boolean => TIP_SIGNALS.has(name);
 export const NOT_CHECKED = "not_checked";
 export const NO_FACE = "no_face";
 export const SEVERAL_FACES = "several_faces";

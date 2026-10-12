@@ -99,7 +99,14 @@ describe("photo review queue", () => {
     const owner = await signedInAccount(ctx.client);
     const older = await photoIn(ctx, owner.accountId, "queued", {
       ago: 600,
-      labels: [{ name: "Suggestive", parentName: "", confidence: 71.5 }],
+      labels: [
+        { name: "Suggestive", parentName: "", confidence: 71.5 },
+        // Tip signals stored beside it (#56): the owner's, never shown to a moderator.
+        { name: "Bathroom", parentName: "Indoors", confidence: 46 },
+        { name: "Cod", parentName: "Animal", confidence: 41 },
+        { name: "Sunglasses", parentName: "Face", confidence: 99 },
+        { name: "Brightness", parentName: "Face", confidence: 80 },
+      ],
       flagged: ["Suggestive"],
     });
     const newer = await photoIn(ctx, owner.accountId, "queued", {
