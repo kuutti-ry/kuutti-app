@@ -147,6 +147,7 @@ describe("migrate", () => {
           "moderator_roles",
           "photo",
           "photo_access",
+          "photo_check_note",
           "photo_review",
           "ponds",
           "preferences",

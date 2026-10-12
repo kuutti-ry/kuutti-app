@@ -1,3 +1,3 @@
 # safety
 
-Reports, blocks, sanctions, the audit log. TD-5, TD-6. The audit log (`audit.ts`, #49, ADR-006) is the first piece: append-only by trigger, one row per staff action or view; the rest arrives with M4.
+Reports, blocks, sanctions, the audit log. TD-5, TD-6. The audit log (`audit.ts`, #49, ADR-006) is the first piece: append-only by trigger, one row per staff action or view; the notes of the photo check (`photo-check.ts`, #253) are the second: which kind of photo the check did not show and when, the closer look two of them in 30 days start, nothing else; the rest arrives with M4.

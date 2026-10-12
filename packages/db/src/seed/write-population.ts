@@ -45,6 +45,8 @@ const ACCOUNT_TABLES = [
   "gate",
   "photo_access",
   "card_shown",
+  // The photo check writes these on staging too, where the population's photos go through it (#253).
+  "photo_check_note",
   "photo",
   "research_subject",
   "consent",

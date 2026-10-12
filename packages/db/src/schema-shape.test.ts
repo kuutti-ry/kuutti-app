@@ -39,6 +39,7 @@ describe("the tables", () => {
       "moderator_roles",
       "photo",
       "photo_access",
+      "photo_check_note",
       "photo_review",
       "ponds",
       "preferences",
@@ -115,6 +116,7 @@ describe("the foreign keys", () => {
       "gate",
       "photo",
       "photo_access",
+      "photo_check_note",
       "preferences",
       "profile",
       "research_subject",
@@ -136,6 +138,15 @@ describe("the foreign keys", () => {
   it("let the fetch log outlive the photo it names: photo_access.photo_id has no key", () => {
     expect(references.filter((reference) => reference.startsWith("photo_access."))).toEqual([
       "photo_access.account_id -> account.id no action",
+    ]);
+  });
+
+  it("let the photo check's note outlive its photo, without the link (#253)", () => {
+    expect(
+      references.filter((reference) => reference.startsWith("photo_check_note.")).sort(),
+    ).toEqual([
+      "photo_check_note.account_id -> account.id no action",
+      "photo_check_note.photo_id -> photo.id set null",
     ]);
   });
 
@@ -172,6 +183,7 @@ describe("the indexes", () => {
     ["session", "session_retired_refresh_hash_idx", ["retired_refresh_hash"]],
     ["auth_request", "auth_request_expires_at_idx", ["expires_at"]],
     ["photo_review", "photo_review_decision_idx", ["decision", "checked_at"]],
+    ["photo_check_note", "photo_check_note_account_at_idx", ["account_id", "at"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);

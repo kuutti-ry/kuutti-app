@@ -45,6 +45,7 @@ const exported = {
   consents: [],
   photos: [],
   photoAccessLog: [],
+  photoCheck: { about: "About the photo check.", photosNotShown: [], carefulCheckUntil: null },
   research: { enrolled: false, since: null, consentVersion: null, events: [] },
   gate: null,
 };

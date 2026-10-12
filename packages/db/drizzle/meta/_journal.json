@@ -239,6 +239,20 @@
       "when": 1791813096088,
       "tag": "0033_photo_appeal_nudity_line",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1791813775384,
+      "tag": "0034_photo_check_note",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791813775922,
+      "tag": "0035_photo_closer_look",
+      "breakpoints": true
     }
   ]
 }

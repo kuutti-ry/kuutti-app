@@ -3,7 +3,7 @@ import { AccountState } from "./account-state.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedGate } from "./gate.ts";
 import { AuthPlatform } from "./identity.ts";
-import { Photo, PhotoRejectionReason, PhotoVariant } from "./media.ts";
+import { Photo, PhotoCheckKind, PhotoRejectionReason, PhotoVariant } from "./media.ts";
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ResearchExport } from "./research.ts";
@@ -68,6 +68,31 @@ export const ExportedPhoto = Photo.extend({
 export type ExportedPhoto = z.infer<typeof ExportedPhoto>;
 
 /**
+ * What the photo check holds about the person (#253, ADR-007): the photos it
+ * did not show to others in the last twelve months, and whether new ones are
+ * checked a little more carefully for now. The texts are in the request's
+ * language, so the entry reads as plainly as the app does.
+ */
+export const ExportedPhotoCheck = z
+  .object({
+    about: z.string().meta({ description: "What this part is, in the request's language." }),
+    photosNotShown: z
+      .array(
+        z.object({
+          at: z.iso.datetime(),
+          kind: PhotoCheckKind,
+          reason: z.string().meta({ description: "The kind in words, in the request's language." }),
+        }),
+      )
+      .meta({ description: "Oldest first; each goes after twelve months." }),
+    carefulCheckUntil: z.iso.datetime().nullable().meta({
+      description: "Until when new photos are checked more carefully; null when they are not.",
+    }),
+  })
+  .meta({ id: "ExportedPhotoCheck" });
+export type ExportedPhotoCheck = z.infer<typeof ExportedPhotoCheck>;
+
+/**
  * Everything Kuutti holds about the person, as of now. What it does not hold
  * is as telling as what it does: no name, no date of birth beyond year and
  * month, no personal identity code (only its keyed hash, which is omitted
@@ -120,6 +145,8 @@ export const AccountExport = z
     photoAccessLog: z
       .array(z.object({ photoId: z.uuid(), variant: PhotoVariant, at: z.iso.datetime() }))
       .max(1000),
+    /** The photo check's notes and the closer look (#253). */
+    photoCheck: ExportedPhotoCheck,
     /** What research holds (#50, ADR-011): the enrolment and the events, never the research_id. */
     research: ResearchExport,
     /** The place at the pond gate (#94, ADR-015); null before the first count. */

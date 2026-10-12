@@ -1,5 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import type { AccountExport } from "@kuutti/schema";
+import type { TFunction } from "@kuutti/i18n";
+import type { AccountExport, ExportedPhotoCheck } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
@@ -17,6 +18,11 @@ import {
 import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
+import {
+  closerLookOf,
+  deletePhotoCheckNotesOfAccount,
+  listPhotoCheckNotes,
+} from "../safety/index.ts";
 import { currentConsent, exportConsents } from "./onboarding.ts";
 import { recordDeletion } from "./registration.ts";
 import * as repo from "./repo.ts";
@@ -29,6 +35,7 @@ import * as repo from "./repo.ts";
 // staff rows. Likes, matches, bookmarks and push tokens join here as their
 // slices land; the research_id mapping goes (#50), the events keyed by it stay.
 // The place at the pond gate (#94) goes, and is in the export as it is held.
+// The photo check's notes (#253) go too, and are in the export in plain words.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -72,6 +79,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const sessions = await repo.deleteAccountSessions(tx, accountId);
     const authRequests = await repo.deleteAuthRequestsOfAccount(tx, accountId);
     const photos: PhotoErasure = await erasePhotosOfAccount(tx, accountId);
+    // Not in the summary: the line that logs it carries the account id.
+    await deletePhotoCheckNotesOfAccount(tx, accountId);
     const profileRows = await eraseProfileOfAccount(tx, accountId);
     // The two hard rows go (TD-7); the consent rows stay as proof (ADR-010),
     // and the tombstone keeps neither gender nor pond.
@@ -120,8 +129,36 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
   return summary;
 }
 
-/** Everything Kuutti holds about the person, as of now. */
-export async function exportAccount(deps: ErasureDeps, accountId: string): Promise<AccountExport> {
+/**
+ * What the photo check holds (#253), with its texts in the request's language
+ * (`t`), so the person reads it as plainly as the app speaks.
+ */
+async function exportPhotoCheck(
+  deps: ErasureDeps,
+  accountId: string,
+  t: TFunction,
+): Promise<ExportedPhotoCheck> {
+  const [notes, closer] = await Promise.all([
+    listPhotoCheckNotes(deps.db, accountId),
+    closerLookOf(deps.db, accountId, deps.now()),
+  ]);
+  return {
+    about: t("account.export.photoCheck.about"),
+    photosNotShown: notes.map((note) => ({
+      at: note.at.toISOString(),
+      kind: note.kind,
+      reason: t(`account.export.photoCheck.reason.${note.kind}`),
+    })),
+    carefulCheckUntil: closer.until?.toISOString() ?? null,
+  };
+}
+
+/** Everything Kuutti holds about the person, as of now; `t` is the request's language. */
+export async function exportAccount(
+  deps: ErasureDeps,
+  accountId: string,
+  t: TFunction,
+): Promise<AccountExport> {
   const account = await repo.findAccountById(deps.db, accountId);
   const identity = await repo.findIdentitySummaryForAccount(deps.db, accountId);
   if (!account || !identity) throw new AppError(404, "not_found", "No such account");
@@ -135,14 +172,17 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
     accountId,
     await currentConsent(deps.db, accountId, "special_category"),
   );
-  const [pond, preferences, consents, research, gate, dealBreakers] = await Promise.all([
-    findPondOfAccount(deps.db, accountId),
-    readPreferences(deps.db, accountId),
-    exportConsents(deps.db, accountId),
-    exportResearch(deps.db, accountId),
-    exportGate(deps.db, accountId),
-    readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
-  ]);
+  const [pond, preferences, consents, research, gate, dealBreakers, photoCheck] = await Promise.all(
+    [
+      findPondOfAccount(deps.db, accountId),
+      readPreferences(deps.db, accountId),
+      exportConsents(deps.db, accountId),
+      exportResearch(deps.db, accountId),
+      exportGate(deps.db, accountId),
+      readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
+      exportPhotoCheck(deps, accountId, t),
+    ],
+  );
   return {
     exportedAt: deps.now().toISOString(),
     account: {
@@ -176,6 +216,7 @@ export async function exportAccount(deps: ErasureDeps, accountId: string): Promi
     profile,
     photos: photos.photos,
     photoAccessLog: photos.accessLog,
+    photoCheck,
     research,
     gate,
   };

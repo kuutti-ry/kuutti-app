@@ -2604,6 +2604,7 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             }[];
+            photoCheck: components["schemas"]["ExportedPhotoCheck"];
             research: components["schemas"]["ResearchExport"];
             gate: components["schemas"]["ExportedGate"];
         };
@@ -2755,6 +2756,25 @@ export interface components {
          * @enum {string}
          */
         PhotoVariant: "thumb" | "card" | "full";
+        ExportedPhotoCheck: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            /** @description Oldest first; each goes after twelve months. */
+            photosNotShown: {
+                /** Format: date-time */
+                at: string;
+                kind: components["schemas"]["PhotoCheckKind"];
+                /** @description The kind in words, in the request's language. */
+                reason: string;
+            }[];
+            /**
+             * Format: date-time
+             * @description Until when new photos are checked more carefully; null when they are not.
+             */
+            carefulCheckUntil: string | null;
+        };
+        /** @enum {string} */
+        PhotoCheckKind: "nudity" | "violence" | "disturbing" | "hate";
         ResearchExport: {
             enrolled: boolean;
             /** Format: date-time */

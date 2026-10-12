@@ -11,6 +11,7 @@ import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
+import { tOf } from "../lib/i18n.ts";
 import { type ErasureDeps, eraseAccount, exportAccount } from "./erasure.ts";
 import * as repo from "./repo.ts";
 
@@ -142,7 +143,7 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
   });
 
   app.openapi(exportRoute, async (c) => {
-    const body = await exportAccount(erasureDeps, callerOf(c).accountId);
+    const body = await exportAccount(erasureDeps, callerOf(c).accountId, tOf(c));
     c.header("Content-Disposition", 'attachment; filename="kuutti-export.json"');
     c.header("Cache-Control", "no-store");
     return c.json(body, 200);
