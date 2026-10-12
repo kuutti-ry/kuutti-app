@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { GROUP_REASON, groupLineKeys, groupOf, LABEL_GROUPS } from "./label-groups.ts";
+import {
+  FISH_SPECIES_LABELS,
+  fishSpeciesOf,
+  GROUP_REASON,
+  groupLineKeys,
+  groupOf,
+  LABEL_GROUPS,
+} from "./label-groups.ts";
 
 // What the check does with Rekognition's moderation labels (#253, ADR-006 §2):
 // the maintainer's groups of 12/10/2026, by the taxonomy's names, any case.
@@ -45,5 +52,25 @@ describe("label groups", () => {
       review: "photo_moderation_nudity_review",
       reject: "photo_moderation_nudity_reject",
     });
+  });
+});
+
+describe("the fish the fish tip may name (#253)", () => {
+  it("reads a species label of Finland's and nearby waters, any case", () => {
+    expect(fishSpeciesOf("Pike")).toBe("pike");
+    expect(fishSpeciesOf("herring")).toBe("herring");
+    expect(fishSpeciesOf("HALIBUT")).toBe("halibut");
+  });
+
+  it("names no fish of elsewhere and no other label", () => {
+    for (const name of ["Tuna", "Sturgeon", "Coho", "Fish", "Fishing", "Mirror"]) {
+      expect(fishSpeciesOf(name)).toBeUndefined();
+    }
+  });
+
+  it("maps every species to its own label and back", () => {
+    for (const [species, label] of Object.entries(FISH_SPECIES_LABELS)) {
+      expect(fishSpeciesOf(label)).toBe(species);
+    }
   });
 });

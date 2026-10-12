@@ -611,6 +611,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.tip.dismiss": "Got it",
   "profile.tip.few_photos": "More approved photos would help others get a fuller picture of you.",
   "profile.tip.fish": "A fish in the main photo is a classic. Try one of just you there, and let the fish come second.",
+  "profile.tip.fish_species": "A mighty catch, and we are proud of you! Is that {species, select, pike {a pike} perch {a perch} salmon {a salmon} trout {a trout} carp {a carp} eel {an eel} cod {a cod} herring {a herring} halibut {a halibut} other {a fish}}? For the main photo, though, try one without the catch, and let the fish come second.",
   "profile.tip.group_photo": "Try a photo where you are the only person in the frame.",
   "profile.tip.mirror_selfie": "Try a photo that is not a mirror selfie.",
   "profile.tip.poor_lighting": "Try a photo taken in clearer light.",

@@ -172,7 +172,20 @@ describe("the profile as its owner reads it back", () => {
       completeness: { complete: false, missing: ["display_name", "photos"] },
       tips: ["few_photos"],
     };
+    // An API older than the fish's species (#253) sends none: read as null.
+    expect(ProfileResponse.parse(response)).toEqual({ ...response, fishSpecies: null });
+  });
+
+  it("names the fish of the fish tip from Finland's and nearby waters only (#253)", () => {
+    const response = {
+      profile: null,
+      completeness: { complete: true, missing: [] },
+      tips: ["fish"],
+      fishSpecies: "pike",
+    };
     expect(ProfileResponse.parse(response)).toEqual(response);
+    expect(ProfileResponse.parse({ ...response, fishSpecies: null }).fishSpecies).toBeNull();
+    expect(codes(ProfileResponse, { ...response, fishSpecies: "tuna" })).toEqual(["invalid_value"]);
   });
 
   it.each([

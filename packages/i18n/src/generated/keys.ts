@@ -612,6 +612,7 @@ export type MessageParams = {
   "profile.tip.dismiss": Record<never, never>;
   "profile.tip.few_photos": Record<never, never>;
   "profile.tip.fish": Record<never, never>;
+  "profile.tip.fish_species": { "species": string };
   "profile.tip.group_photo": Record<never, never>;
   "profile.tip.mirror_selfie": Record<never, never>;
   "profile.tip.poor_lighting": Record<never, never>;

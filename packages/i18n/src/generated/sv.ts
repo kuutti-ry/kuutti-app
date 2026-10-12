@@ -558,6 +558,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.tip.dismiss": "Okej",
   "profile.tip.few_photos": "Fler godkända foton skulle hjälpa andra att få en fylligare bild av dig.",
   "profile.tip.fish": "En fisk på huvudbilden är en klassiker. Prova en bild på bara dig där, och låt fisken komma som nummer två.",
+  "profile.tip.fish_species": "En ståtlig fångst, vi är stolta över dig! Är det {species, select, pike {en gädda} perch {en abborre} salmon {en lax} trout {en öring} carp {en karp} eel {en ål} cod {en torsk} herring {en strömming} halibut {en hälleflundra} other {en fisk}}? Prova ändå en huvudbild utan fångsten, och låt fisken komma som nummer två.",
   "profile.tip.group_photo": "Prova ett foto där du är den enda personen i bilden.",
   "profile.tip.mirror_selfie": "Prova ett foto som inte är en spegelselfie.",
   "profile.tip.poor_lighting": "Prova ett foto taget i klarare ljus.",

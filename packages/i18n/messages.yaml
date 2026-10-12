@@ -2421,6 +2421,13 @@ profile.tip.fish:
   sv: "En fisk på huvudbilden är en klassiker. Prova en bild på bara dig där, och låt fisken komma som nummer två."
   machine: { fi: true, sv: true }
 
+profile.tip.fish_species:
+  en: "A mighty catch, and we are proud of you! Is that {species, select, pike {a pike} perch {a perch} salmon {a salmon} trout {a trout} carp {a carp} eel {an eel} cod {a cod} herring {a herring} halibut {a halibut} other {a fish}}? For the main photo, though, try one without the catch, and let the fish come second."
+  description: "The fish tip when the check is sure which fish it is (#253): the main photo shows a fish of Finland or nearby waters, named by its species; each language carries the species' own form (with its article in Swedish and English). Light and warm, never mocking."
+  fi: "Komea saalis, olemme ylpeitä sinusta! Onko se {species, select, pike {hauki} perch {ahven} salmon {lohi} trout {taimen} carp {karppi} eel {ankerias} cod {turska} herring {silakka} halibut {ruijanpallas} other {kala}}? Pääkuvaksi kannattaa silti kokeilla kuvaa ilman saalista, ja antaa kalan tulla toisena."
+  sv: "En ståtlig fångst, vi är stolta över dig! Är det {species, select, pike {en gädda} perch {en abborre} salmon {en lax} trout {en öring} carp {en karp} eel {en ål} cod {en torsk} herring {en strömming} halibut {en hälleflundra} other {en fisk}}? Prova ändå en huvudbild utan fångsten, och låt fisken komma som nummer två."
+  machine: { fi: true, sv: true }
+
 profile.card.open:
   en: "See your card"
   description: "Button that opens the card preview."

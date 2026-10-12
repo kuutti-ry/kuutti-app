@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { type TipPhoto, type TipThresholds, tips } from "./tips.ts";
+import { fishSpecies, type TipPhoto, type TipThresholds, tips } from "./tips.ts";
 
-/** Seed / migrations 0028, 0029 and 0031 defaults. */
+/** Seed / migrations 0028, 0029, 0031 and 0036 defaults. */
 const thresholds: TipThresholds = {
   mirrorConfidenceMin: 50,
   bathroomConfidenceMin: 50,
@@ -13,6 +13,7 @@ const thresholds: TipThresholds = {
   photosSuggested: 3,
   revealingConfidenceMin: 80,
   fishConfidenceMin: 80,
+  fishSpeciesMin: 70,
 };
 
 const label = (name: string, confidence: number) => ({ name, confidence });
@@ -172,6 +173,37 @@ describe("the tips rule", () => {
 
     it("says nothing without an approved photo", () => {
       expect(tips(snapshot([], 2))).toEqual([]);
+    });
+  });
+
+  describe("the fish the fish tip names (#253)", () => {
+    const three = (main: TipPhoto) => [main, photo(), photo()];
+
+    it("names the species the check is surest of on the main photo, from the line up", () => {
+      // What Rekognition said of the probe picture of a pike (12/10/2026).
+      const pike = photo([
+        label("Fish", 94),
+        label("Pike", 76.5),
+        label("Cod", 55.6),
+        label("Trout", 55.1),
+      ]);
+      expect(fishSpecies(snapshot(three(pike)))).toBe("pike");
+      expect(fishSpecies(snapshot(three(photo([label("Fish", 90), label("Perch", 70)]))))).toBe(
+        "perch",
+      );
+      const two = photo([label("Fish", 90), label("Salmon", 72), label("Trout", 81)]);
+      expect(fishSpecies(snapshot(three(two)))).toBe("trout");
+    });
+
+    it("names nothing under the line, a fish of elsewhere, or without the fish tip", () => {
+      const named = (main: TipPhoto) => fishSpecies(snapshot(three(main)));
+      expect(named(photo([label("Fish", 94), label("Pike", 69.9)]))).toBeNull();
+      expect(named(photo([label("Fish", 94), label("Tuna", 99)]))).toBeNull();
+      // The tip itself is not said: the Fish label under its line, or the pike on a later photo.
+      expect(named(photo([label("Fish", 70), label("Pike", 99)]))).toBeNull();
+      const later = [photo(), photo([label("Fish", 99), label("Pike", 99)]), photo()];
+      expect(fishSpecies(snapshot(later))).toBeNull();
+      expect(fishSpecies(snapshot([]))).toBeNull();
     });
   });
 });

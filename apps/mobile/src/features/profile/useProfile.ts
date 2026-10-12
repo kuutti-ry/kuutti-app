@@ -1,4 +1,10 @@
-import type { Completeness, ProfileDocument, ProfileUpdate, TipKind } from "@kuutti/schema";
+import type {
+  Completeness,
+  FishSpecies,
+  ProfileDocument,
+  ProfileUpdate,
+  TipKind,
+} from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
@@ -52,6 +58,7 @@ export function useProfile(held?: HeldDraft) {
   const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
   const [completeness, setCompleteness] = useState<Completeness | null>(null);
   const [tips, setTips] = useState<readonly TipKind[]>([]);
+  const [fishSpecies, setFishSpecies] = useState<FishSpecies | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
@@ -79,6 +86,7 @@ export function useProfile(held?: HeldDraft) {
       if (resumed) setNotice(resumed.notice);
       setCompleteness(response.completeness);
       setTips(response.tips);
+      setFishSpecies(response.fishSpecies);
       setStatus("ready");
     } catch {
       if (mounted.current) setStatus((was) => (was === "ready" ? was : "error"));
@@ -122,6 +130,7 @@ export function useProfile(held?: HeldDraft) {
       }
       setCompleteness(response.completeness);
       setTips(response.tips);
+      setFishSpecies(response.fishSpecies);
       return null;
     } catch (error) {
       const refusal = {
@@ -144,6 +153,7 @@ export function useProfile(held?: HeldDraft) {
     saved,
     completeness,
     tips,
+    fishSpecies,
     saving,
     notice,
     dirty,

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.8.1",
+    "version": "0.9.1",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -2174,6 +2174,9 @@
             "items": {
               "$ref": "#/components/schemas/TipKind"
             }
+          },
+          "fishSpecies": {
+            "$ref": "#/components/schemas/FishSpecies"
           }
         },
         "required": [
@@ -2224,6 +2227,23 @@
           "revealing",
           "fish"
         ]
+      },
+      "FishSpecies": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "pike",
+          "perch",
+          "salmon",
+          "trout",
+          "carp",
+          "eel",
+          "cod",
+          "herring",
+          "halibut",
+          null
+        ],
+        "default": null
       },
       "ProfileUpdate": {
         "type": "object",

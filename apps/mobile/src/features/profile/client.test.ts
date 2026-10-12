@@ -17,7 +17,12 @@ const json = (body: unknown, status = 200) =>
 const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
 
-const EMPTY = { profile: null, completeness: { complete: false, missing: ["photos"] }, tips: [] };
+const EMPTY = {
+  profile: null,
+  completeness: { complete: false, missing: ["photos"] },
+  tips: [],
+  fishSpecies: null,
+};
 const DEAL_BREAKERS = { dealBreakers: [], max: 3 };
 
 function answering(...answers: Response[]) {
