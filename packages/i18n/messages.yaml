@@ -3866,6 +3866,10 @@ admin.signIn.error.generic:
   en: Sign-in did not complete. Try again.
   description: Admin panel, any other sign-in failure (a used code, the API unreachable).
 
+admin.signIn.error.session_ended:
+  en: Your session has ended. Sign in again.
+  description: Admin panel, back at the sign-in because the API no longer honours the session (revoked, expired) while the panel was in use (#250).
+
 admin.session.role:
   en: "Signed in as {role}"
   description: Admin panel header. {role} is the role word from the API (moderator, admin, researcher), not translated.
@@ -3919,8 +3923,8 @@ admin.queue.labels:
   description: Admin panel, heading above the label list of one item.
 
 admin.queue.noLabels:
-  en: No labels above 30 % confidence.
-  description: Admin panel, when the automatic check returned no labels.
+  en: The automatic check found no moderation label.
+  description: Admin panel, when the automatic check returned no moderation label for a queued photo (it waits for another reason, such as an uncertain face; the list of what was flagged says which).
 
 admin.queue.notChecked:
   en: Not checked automatically.
@@ -3957,6 +3961,10 @@ admin.queue.reject:
 admin.queue.reason.label:
   en: Reason the person is told
   description: Admin panel, label of the reason select in the rejection form.
+
+admin.queue.reason.choose:
+  en: Choose a reason
+  description: Admin panel, the empty first choice of the reason select; a rejection needs a reason chosen on purpose, never a preset one (#250).
 
 admin.queue.reason.nudity:
   en: Nudity

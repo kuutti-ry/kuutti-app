@@ -56,6 +56,7 @@ export type MessageParams = {
   "admin.queue.loading": Record<never, never>;
   "admin.queue.noLabels": Record<never, never>;
   "admin.queue.notChecked": Record<never, never>;
+  "admin.queue.reason.choose": Record<never, never>;
   "admin.queue.reason.contact_details": Record<never, never>;
   "admin.queue.reason.label": Record<never, never>;
   "admin.queue.reason.minor": Record<never, never>;
@@ -77,6 +78,7 @@ export type MessageParams = {
   "admin.signIn.error.admin_not_allowed": Record<never, never>;
   "admin.signIn.error.generic": Record<never, never>;
   "admin.signIn.error.no_api": Record<never, never>;
+  "admin.signIn.error.session_ended": Record<never, never>;
   "admin.signIn.explain": Record<never, never>;
   "admin.signIn.title": Record<never, never>;
   "admin.signOut": Record<never, never>;

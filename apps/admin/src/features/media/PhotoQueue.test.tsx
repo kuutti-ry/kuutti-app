@@ -131,6 +131,11 @@ describe("PhotoQueue", () => {
     show();
     fireEvent.click(await screen.findByRole("button", { name: "Reject…" }));
     const select = screen.getByLabelText("Reason the person is told");
+    // No reason is preset (#250): the form starts empty and cannot be sent so.
+    expect((select as HTMLSelectElement).value).toBe("");
+    expect(screen.getByRole("button", { name: "Reject photo" })).toBeDisabled();
+    fireEvent.submit(select.closest("form") as HTMLFormElement);
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
     fireEvent.change(select, { target: { value: "no_person" } });
     expect(calls.some((c) => c.method === "POST")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Reject photo" }));
@@ -304,7 +309,7 @@ describe("PhotoQueue", () => {
     expect(card?.signal.aborted).toBe(true);
   });
 
-  it("says no label passed the threshold when a face was found and nothing else", async () => {
+  it("says the check found no moderation label when a face was found and nothing else", async () => {
     fetchMock([
       (req) =>
         path(req) === "/admin/photos/queue"
@@ -314,7 +319,7 @@ describe("PhotoQueue", () => {
     ]);
     show();
     expect(await screen.findByText("2 faces found")).toBeInTheDocument();
-    expect(screen.getByText("No labels above 30 % confidence.")).toBeInTheDocument();
+    expect(screen.getByText("The automatic check found no moderation label.")).toBeInTheDocument();
     // The owner is named by the first part of the pseudonymous id only.
     expect(screen.getByText(/Account 6f1c1c4e$/)).toBeInTheDocument();
   });
@@ -336,6 +341,8 @@ describe("PhotoQueue", () => {
     expect(
       screen.getAllByRole("option").map((option) => (option as HTMLOptionElement).value),
     ).toEqual([
+      // The empty first choice: no reason until one is chosen (#250).
+      "",
       "nudity",
       "no_person",
       "several_people",

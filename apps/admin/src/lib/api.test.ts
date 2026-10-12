@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, api, apiUrl, failed, setTokenSource } from "./api.ts";
+import { ApiError, api, apiUrl, failed, setTokenSource, setUnauthorizedHandler } from "./api.ts";
 
 // The panel's one client (ADR-003): where it points, the bearer it adds from
 // the session's token source, and the error it turns an answer into.
@@ -21,6 +21,7 @@ function recordRequests() {
 
 afterEach(() => {
   setTokenSource(() => null);
+  setUnauthorizedHandler(() => undefined);
   vi.unstubAllGlobals();
 });
 
@@ -66,6 +67,30 @@ describe("the client", () => {
       null,
       `Bearer ${"u".repeat(43)}`,
     ]);
+  });
+
+  it("ends the session on a 401 to a request that carried the token, and only then (#250)", async () => {
+    let status = 401;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ error: { code: "session_revoked", message: "x", requestId: "r" } }, status),
+      ),
+    );
+    const ended = vi.fn();
+    setUnauthorizedHandler(ended);
+    // Nobody signed in: a 401 says nothing about a session.
+    await api.GET("/admin/whoami");
+    expect(ended).not.toHaveBeenCalled();
+    setTokenSource(() => "t".repeat(43));
+    status = 403;
+    await api.GET("/admin/whoami");
+    expect(ended).not.toHaveBeenCalled();
+    status = 401;
+    const { response } = await api.GET("/admin/whoami");
+    expect(ended).toHaveBeenCalledTimes(1);
+    // The caller still gets the answer it asked for.
+    expect(response.status).toBe(401);
   });
 });
 

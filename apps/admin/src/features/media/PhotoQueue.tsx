@@ -88,7 +88,9 @@ export function PhotoQueue() {
 
 type ItemState =
   | { kind: "idle" }
-  | { kind: "rejecting"; reason: PhotoRejectionReason }
+  // No reason until one is chosen on purpose (#250): a preset one would tell a
+  // person their photo was rejected for it after one careless click.
+  | { kind: "rejecting"; reason: PhotoRejectionReason | null }
   | { kind: "saving" }
   | { kind: "decided"; decision: "approved" | "rejected" }
   | { kind: "failed" };
@@ -197,13 +199,14 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void decide({ decision: "reject", reason: state.reason });
+              if (state.reason) void decide({ decision: "reject", reason: state.reason });
             }}
           >
             <label>
               {t("admin.queue.reason.label")}
               <select
-                value={state.reason}
+                required
+                value={state.reason ?? ""}
                 onChange={(event) =>
                   setState({
                     kind: "rejecting",
@@ -211,6 +214,9 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                   })
                 }
               >
+                <option value="" disabled>
+                  {t("admin.queue.reason.choose")}
+                </option>
                 {REASONS.map((reason) => (
                   <option key={reason.value} value={reason.value}>
                     {t(reason.label)}
@@ -218,7 +224,9 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                 ))}
               </select>
             </label>
-            <button type="submit">{t("admin.queue.confirmReject")}</button>
+            <button type="submit" disabled={!state.reason}>
+              {t("admin.queue.confirmReject")}
+            </button>
             <button type="button" onClick={() => setState({ kind: "idle" })}>
               {t("admin.queue.cancel")}
             </button>
@@ -235,7 +243,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
             <button
               type="button"
               disabled={state.kind === "saving"}
-              onClick={() => setState({ kind: "rejecting", reason: "nudity" })}
+              onClick={() => setState({ kind: "rejecting", reason: null })}
             >
               {t("admin.queue.reject")}
             </button>
