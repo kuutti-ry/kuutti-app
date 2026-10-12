@@ -6,7 +6,7 @@ name: kuutti
 
 services:
   postgres:
-    image: postgres:17.9
+    image: postgres:17.10
     environment:
       POSTGRES_USER: kuutti
       POSTGRES_PASSWORD: kuutti
@@ -55,7 +55,7 @@ services:
   # Its login page is ours: a button per persona and a form for arbitrary
   # FTN-shaped claims (services/mock-idp/README.md, ADR-014).
   mock-idp:
-    image: ghcr.io/navikt/mock-oauth2-server:6.0.2
+    image: ghcr.io/navikt/mock-oauth2-server:6.0.5
     environment:
       SERVER_PORT: "8080"
       JSON_CONFIG_PATH: /config/config.json
