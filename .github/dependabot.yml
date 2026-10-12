@@ -41,6 +41,17 @@ updates:
       - dependency-name: "react-native-safe-area-context"
       - dependency-name: "react-native-screens"
       - dependency-name: "react-native-svg"
+      # The SDK's own packages are numbered after it and move together, in an
+      # SDK upgrade: one of them a major ahead is half an upgrade. SDK 58 came
+      # as five such pull requests (#244 to #248). Their patches still come.
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@expo/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jest-expo"
+        update-types: ["version-update:semver-major"]
       # NativeWind 4 compiles with Tailwind CSS 3; Tailwind 4 arrives with
       # NativeWind 5, as a deliberate migration (#116).
       - dependency-name: "tailwindcss"
