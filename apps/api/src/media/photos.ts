@@ -137,7 +137,9 @@ export async function uploadPhoto(
       { db: deps.db, logger: deps.logger, moderator: deps.moderator, now: deps.now },
       { photoId: row.id, accountId: input.accountId, card: processed.variants.card },
     );
-    if (decided) return toPhoto({ ...row, state: decided.decision });
+    if (decided) {
+      return toPhoto({ ...row, state: decided.decision, rejectionReason: decided.reason ?? null });
+    }
   }
   return toPhoto(row);
 }

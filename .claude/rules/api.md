@@ -32,7 +32,7 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 ## Media
 
 - Uploads: 10 MB cap, sharp with `limitInputPixels`, `p-limit` at vCPU count, 503 with `Retry-After` above the limit. Strip EXIF. Generate thumb 200x200, card 800x1067, full 1600 long edge, WebP, content-addressed keys. Never persist the original.
-- Rekognition moderation on upload; above threshold goes to the human queue, never auto-delete.
+- Rekognition moderation on upload; above threshold goes to the human queue, never auto-delete. No face and several faces are the check's own rejections, with the reason told to the owner (ADR-006 §2, #206, #253): keep the moderators' load to what the check is unsure of.
 - Signed CloudFront URLs: 15-minute TTL, issued only inside rate-limited responses, every issuance logged (`account_id`, `photo_id`, variant, time). URL issuance counts against the exposure budget.
 
 ## Events and logs
