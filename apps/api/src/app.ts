@@ -48,6 +48,8 @@ export type Deps = {
   broker?: IdentityBroker;
   /** Object storage and URL signing (#48); absent when neither is configured, and the photo routes answer 503. */
   media?: MediaDeps;
+  /** The photo routes' clock, which the fifteen minutes of a signed URL count from (#48); the wall clock when absent. Tests fix it. */
+  now?: () => Date;
 };
 
 const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
