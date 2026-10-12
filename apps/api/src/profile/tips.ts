@@ -1,4 +1,5 @@
 import { PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
+import { isRevealing } from "../media/index.ts";
 
 /**
  * Advisory tips for the profile owner (#56). Pure: callers gather photos,
@@ -10,7 +11,9 @@ import { PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
  * for is not said twice: too few photos to be complete is
  * `completeness.missing`, and only a profile with enough of them, and none
  * waiting in review, is told that more would help. Label tips fire only when every approved photo fails
- * that check (collection-wide), so one good photo clears the kind.
+ * that check (collection-wide), so one good photo clears the kind; the two of
+ * #253 read the main photo alone, the first one others see (the first approved
+ * one by position): a lot of skin there, or a fish.
  */
 
 /** matching_config keys the tips rule reads; values live in the seed / migrations 0028 and 0029. */
@@ -23,6 +26,8 @@ export const TIP_THRESHOLD_KEYS = {
   sharpnessBelow: "photo_tip_sharpness_below",
   groupPhotoMinFaces: "photo_tip_group_photo_min_faces",
   photosSuggested: "photo_tip_photos_suggested",
+  revealingConfidenceMin: "photo_tip_revealing_confidence_min",
+  fishConfidenceMin: "photo_tip_fish_confidence_min",
 } as const;
 
 export type TipThresholds = {
@@ -36,6 +41,10 @@ export type TipThresholds = {
   groupPhotoMinFaces: number;
   /** Photos, approved or in review, below which a complete profile hears that more would help. */
   photosSuggested: number;
+  /** A swimwear, underwear or partial-nudity label at or above this on the main photo (#253). */
+  revealingConfidenceMin: number;
+  /** A Fish or Fishing scene label at or above this on the main photo (#253). */
+  fishConfidenceMin: number;
 };
 
 export type TipPhoto = {
@@ -44,7 +53,7 @@ export type TipPhoto = {
 };
 
 export type TipSnapshot = {
-  /** The approved photos; only these carry signals a tip reads. */
+  /** The approved photos, main first; only these carry signals a tip reads. */
   photos: readonly TipPhoto[];
   /** Photos uploaded and not decided yet (pending or queued). */
   inReview: number;
@@ -56,10 +65,12 @@ export type TipSnapshot = {
  * count tip. Change here only.
  */
 export const TIP_KIND_ORDER = [
+  "revealing",
   "sunglasses",
   "mirror_selfie",
   "tight_crop",
   "group_photo",
+  "fish",
   "poor_lighting",
   "blurry",
   "few_photos",
@@ -74,6 +85,14 @@ const labelBelow = (photo: TipPhoto, name: string, max: number): boolean =>
 /** Every approved photo fails the check; an empty collection never tips. */
 const everyPhoto = (photos: readonly TipPhoto[], fails: (photo: TipPhoto) => boolean): boolean =>
   photos.length > 0 && photos.every(fails);
+
+/** The main photo, the first one others see, fails the check. */
+const mainPhoto = (photos: readonly TipPhoto[], fails: (photo: TipPhoto) => boolean): boolean => {
+  const main = photos[0];
+  return main !== undefined && fails(main);
+};
+
+const FISH = new Set(["Fish", "Fishing"]);
 
 /** Per-kind fail check; order comes only from TIP_KIND_ORDER. */
 const kindApplies: Record<TipKind, (snapshot: TipSnapshot) => boolean> = {
@@ -95,6 +114,14 @@ const kindApplies: Record<TipKind, (snapshot: TipSnapshot) => boolean> = {
     everyPhoto(photos, (p) => labelBelow(p, "Brightness", t.brightnessBelow)),
   blurry: ({ photos, thresholds: t }) =>
     everyPhoto(photos, (p) => labelBelow(p, "Sharpness", t.sharpnessBelow)),
+  revealing: ({ photos, thresholds: t }) =>
+    mainPhoto(photos, (p) =>
+      p.labels.some((l) => isRevealing(l.name) && l.confidence >= t.revealingConfidenceMin),
+    ),
+  fish: ({ photos, thresholds: t }) =>
+    mainPhoto(photos, (p) =>
+      p.labels.some((l) => FISH.has(l.name) && l.confidence >= t.fishConfidenceMin),
+    ),
   // A photo still in review already answers this one.
   few_photos: ({ photos, inReview, thresholds: t }) =>
     photos.length >= PHOTOS_FOR_COMPLETENESS && photos.length + inReview < t.photosSuggested,

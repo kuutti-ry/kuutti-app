@@ -110,6 +110,9 @@ export const TipKind = z
     "poor_lighting",
     "blurry",
     "few_photos",
+    // #253: the main photo shows a lot of skin; the main photo has a fish.
+    "revealing",
+    "fish",
   ])
   .meta({ id: "TipKind" });
 export type TipKind = z.infer<typeof TipKind>;

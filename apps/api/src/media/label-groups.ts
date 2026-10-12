@@ -104,6 +104,27 @@ const BY_NAME: ReadonlyMap<string, LabelGroup | "allowed"> = new Map([
   ...ALLOWED.map((name) => [name.toLowerCase(), "allowed"] as const),
 ]);
 
+/**
+ * The allowed labels that show a lot of skin: swimwear and underwear, a
+ * shirtless chest, a bare back, partial nudity. Never a reason to hold a photo
+ * back; on the main photo, the owner hears a tip (#253, profile/tips.ts).
+ * Not the top level "...and Kissing", which a kiss alone also carries.
+ */
+const REVEALING: ReadonlySet<string> = new Set(
+  [
+    "Non-Explicit Nudity",
+    "Bare Back",
+    "Exposed Male Nipple",
+    "Partially Exposed Buttocks",
+    "Partially Exposed Female Breast",
+    "Swimwear or Underwear",
+    "Female Swimwear or Underwear",
+    "Male Swimwear or Underwear",
+  ].map((name) => name.toLowerCase()),
+);
+
+export const isRevealing = (name: string): boolean => REVEALING.has(name.toLowerCase());
+
 /** The group of a moderation label, `allowed`, or undefined for a name the check does not know. */
 export const groupOf = (name: string): LabelGroup | "allowed" | undefined =>
   BY_NAME.get(name.toLowerCase());

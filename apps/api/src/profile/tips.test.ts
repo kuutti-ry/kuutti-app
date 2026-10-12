@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type TipPhoto, type TipThresholds, tips } from "./tips.ts";
 
-/** Seed / migrations 0028 and 0029 defaults. */
+/** Seed / migrations 0028, 0029 and 0031 defaults. */
 const thresholds: TipThresholds = {
   mirrorConfidenceMin: 50,
   bathroomConfidenceMin: 50,
@@ -11,6 +11,8 @@ const thresholds: TipThresholds = {
   sharpnessBelow: 20,
   groupPhotoMinFaces: 2,
   photosSuggested: 3,
+  revealingConfidenceMin: 80,
+  fishConfidenceMin: 80,
 };
 
 const label = (name: string, confidence: number) => ({ name, confidence });
@@ -121,5 +123,55 @@ describe("the tips rule", () => {
 
   it("does not invent tips when photo_review left no signals", () => {
     expect(tips(snapshot([photo(), photo(), photo()]))).toEqual([]);
+  });
+
+  describe("the main photo's tips (#253)", () => {
+    const three = (main: TipPhoto) => [main, photo(), photo()];
+
+    it.each([
+      ["Female Swimwear or Underwear", 95],
+      ["male swimwear or underwear", 85],
+      ["Exposed Male Nipple", 90],
+      ["Bare Back", 81],
+      ["Partially Exposed Female Breast", 88],
+    ] as const)("tips on a main photo with %s at %d", (name, confidence) => {
+      expect(tips(snapshot(three(photo([label(name, confidence)]))))).toEqual(["revealing"]);
+    });
+
+    it("says nothing of skin on a later photo, under the line, or for a kiss", () => {
+      const later = [photo(), photo([label("Female Swimwear or Underwear", 99)]), photo()];
+      expect(tips(snapshot(later))).toEqual([]);
+      expect(tips(snapshot(three(photo([label("Bare Back", 79)]))))).toEqual([]);
+      const kiss = photo([
+        label("Non-Explicit Nudity of Intimate parts and Kissing", 97),
+        label("Kissing on the Lips", 97),
+      ]);
+      expect(tips(snapshot(three(kiss)))).toEqual([]);
+    });
+
+    it("tips on a fish or fishing in the main photo, and not on a later one", () => {
+      expect(tips(snapshot(three(photo([label("Fish", 92)]))))).toEqual(["fish"]);
+      expect(tips(snapshot(three(photo([label("Fishing", 85)]))))).toEqual(["fish"]);
+      expect(tips(snapshot([photo(), photo([label("Fish", 99)]), photo()]))).toEqual([]);
+      expect(tips(snapshot(three(photo([label("Fish", 70)]))))).toEqual([]);
+    });
+
+    it("puts skin first of all tips and the fish after the group photo", () => {
+      const main = photo(
+        [label("Swimwear or Underwear", 90), label("Fish", 90), label("Sunglasses", 90)],
+        2,
+      );
+      expect(tips(snapshot([main, main]))).toEqual([
+        "revealing",
+        "sunglasses",
+        "group_photo",
+        "fish",
+        "few_photos",
+      ]);
+    });
+
+    it("says nothing without an approved photo", () => {
+      expect(tips(snapshot([], 2))).toEqual([]);
+    });
   });
 });

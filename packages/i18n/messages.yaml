@@ -2407,6 +2407,20 @@ profile.tip.few_photos:
   sv: "Fler godkända foton skulle hjälpa andra att få en fylligare bild av dig."
   machine: { fi: true, sv: true }
 
+profile.tip.revealing:
+  en: "Try a main photo with more clothes on: it is the first one people see."
+  description: "Advisory tip when the main photo (the first approved one) shows swimwear, underwear, a shirtless chest or partial nudity; never a rejection (#253)."
+  fi: "Kokeile pääkuvaksi kuvaa, jossa on enemmän vaatteita: se on ensimmäinen kuva, jonka muut näkevät."
+  sv: "Prova en huvudbild med mer kläder på: det är den första bilden andra ser."
+  machine: { fi: true, sv: true }
+
+profile.tip.fish:
+  en: "A fish in the main photo is a classic. Try one of just you there, and let the fish come second."
+  description: "Light advisory tip when the main photo (the first approved one) shows a fish or fishing, the cliché of dating photos (#253)."
+  fi: "Kala pääkuvassa on klassikko. Kokeile siihen kuvaa pelkästään sinusta, ja anna kalan tulla toisena."
+  sv: "En fisk på huvudbilden är en klassiker. Prova en bild på bara dig där, och låt fisken komma som nummer två."
+  machine: { fi: true, sv: true }
+
 profile.card.open:
   en: "See your card"
   description: "Button that opens the card preview."

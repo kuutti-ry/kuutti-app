@@ -74,7 +74,7 @@ const REKOGNITION_MIN_CONFIDENCE = 30;
  * come from the face (DetectFaces), not the scene: a pair on the head or in a
  * hand covers no eyes.
  */
-const SCENE_TIP_LABELS = ["Mirror", "Bathroom"] as const;
+const SCENE_TIP_LABELS = ["Mirror", "Bathroom", "Fish", "Fishing"] as const;
 export const NOT_CHECKED = "not_checked";
 export const NO_FACE = "no_face";
 export const SEVERAL_FACES = "several_faces";
