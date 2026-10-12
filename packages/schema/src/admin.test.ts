@@ -107,6 +107,8 @@ describe("the review queue", () => {
     labels: [],
     faces: 0,
     flagged: [],
+    appealed: false,
+    sensitive: false,
   };
 
   it("lists a photo with what the automatic check saw", () => {

@@ -56,6 +56,8 @@ export const MATCHING_CONFIG_V1 = {
   photo_moderation_disturbing_reject: 90,
   photo_moderation_hate_review: 60,
   photo_moderation_hate_reject: 90,
+  // #253 (migration 0033): a nudity label this sure leaves the owner no appeal.
+  photo_moderation_nudity_no_appeal: 95,
   // #56: profile photo tips; the tips rule reads these against photo_review signals.
   photo_tip_mirror_confidence_min: 50,
   photo_tip_bathroom_confidence_min: 50,

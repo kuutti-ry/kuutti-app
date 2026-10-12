@@ -1,7 +1,7 @@
 import type { Photo, PhotoList } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
-import { deletePhoto, listPhotos, reorderPhotos, uploadPhoto } from "./client";
+import { appealPhoto, deletePhoto, listPhotos, reorderPhotos, uploadPhoto } from "./client";
 import { checkPhoto } from "./localCheck";
 import { pickPhoto, prepareForUpload } from "./pick";
 
@@ -11,6 +11,7 @@ export type PhotosBusy =
   | { kind: "preparing" }
   | { kind: "uploading"; percent: number }
   | { kind: "removing"; id: string }
+  | { kind: "appealing"; id: string }
   | { kind: "reordering" };
 
 /** What the screen tells the person after something did not go as asked; one at a time. */
@@ -115,6 +116,29 @@ export function usePhotos() {
     [update],
   );
 
+  // The check's rejection to a person (#253): the photo comes back queued, in its place.
+  const appeal = useCallback(
+    async (id: string) => {
+      update({ busy: { kind: "appealing", id }, notice: null });
+      try {
+        const photo = await appealPhoto(id);
+        setState((previous) => ({
+          ...previous,
+          busy: { kind: "idle" },
+          list: previous.list
+            ? {
+                ...previous.list,
+                photos: previous.list.photos.map((p) => (p.id === id ? photo : p)),
+              }
+            : null,
+        }));
+      } catch (error) {
+        update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+      }
+    },
+    [update],
+  );
+
   const reorder = useCallback(
     async (photos: Photo[]) => {
       const before = state.list;
@@ -164,7 +188,7 @@ export function usePhotos() {
     [update],
   );
 
-  return { ...state, reload, add, remove, move, makeMain, dismissNotice, reportRefusal };
+  return { ...state, reload, add, remove, appeal, move, makeMain, dismissNotice, reportRefusal };
 }
 
 function renumber(list: PhotoList, photos: Photo[]): PhotoList {

@@ -27,11 +27,13 @@ const photoFrom = (r: Row): PhotoRow => ({
   height: r.height as number,
   state: r.state as PhotoState,
   rejectionReason: (r.rejection_reason as PhotoRejectionReason | null) ?? null,
+  appealable: r.appealable === true,
   position: r.position as number,
   createdAt: (r.created_at as Date).toISOString(),
 });
 
-const COLUMNS = "id, key, blurhash, width, height, state, rejection_reason, position, created_at";
+const COLUMNS =
+  "id, key, blurhash, width, height, state, rejection_reason, appealable, position, created_at";
 
 export async function listPhotos(db: Queryable, accountId: string): Promise<PhotoRow[]> {
   const { rows } = await db.query<Row>(
@@ -362,10 +364,11 @@ export async function movePendingPhoto(
   photoId: string,
   decision: "approved" | "queued" | "rejected",
   reason: PhotoRejectionReason | null = null,
+  appealable = false,
 ): Promise<boolean> {
   const result = await db.query(
-    "UPDATE photo SET state = $2, rejection_reason = $3 WHERE id = $1 AND state = 'pending'",
-    [photoId, decision, reason],
+    "UPDATE photo SET state = $2, rejection_reason = $3, appealable = $4 WHERE id = $1 AND state = 'pending'",
+    [photoId, decision, reason, appealable],
   );
   return result.rowCount === 1;
 }
@@ -407,10 +410,39 @@ const reviewItemFrom = (r: Row): PhotoReviewItem => ({
   labels: (r.labels as ModerationLabel[] | null) ?? [],
   faces: (r.faces as number | null) ?? 0,
   flagged: (r.flagged as string[] | null) ?? [],
+  appealed: r.appealed_at != null,
+  // The route decides from the labels and the lines in force (admin-routes.ts).
+  sensitive: false,
 });
 
+/**
+ * The owner asks a person to look at the check's rejection (#253): rejected
+ * and appealable becomes queued, once; the review row keeps when, and goes
+ * back to queued for the panel. Scoped by the account in the statement (rule
+ * 6). Null when the photo is not this account's or not appealable.
+ */
+export async function appealPhoto(
+  db: Queryable,
+  input: { accountId: string; photoId: string; at: Date },
+): Promise<PhotoRow | null> {
+  const { rows } = await db.query<Row>(
+    `UPDATE photo SET state = 'queued', rejection_reason = NULL, appealable = false
+     WHERE id = $1 AND account_id = $2 AND state = 'rejected' AND appealable
+     RETURNING ${COLUMNS}`,
+    [input.photoId, input.accountId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  await db.query(
+    `UPDATE photo_review SET appealed_at = $2, decision = 'queued', reason = NULL
+     WHERE photo_id = $1 AND decided_by IS NULL`,
+    [input.photoId, input.at],
+  );
+  return photoFrom(row);
+}
+
 const QUEUE_COLUMNS = `p.id, p.account_id, p.state, p.blurhash, p.width, p.height, p.created_at,
-  r.checked_at, r.labels, r.faces, r.flagged`;
+  r.checked_at, r.labels, r.faces, r.flagged, r.appealed_at`;
 
 /** The human queue: queued photos, oldest first. */
 export async function listQueue(db: Queryable, limit: number): Promise<PhotoReviewItem[]> {

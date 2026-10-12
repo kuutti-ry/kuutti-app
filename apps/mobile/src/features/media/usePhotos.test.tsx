@@ -18,6 +18,7 @@ const photo = (n: number) => ({
   height: 1200,
   state: "approved",
   rejectionReason: null,
+  appealable: false,
   position: n - 1,
   createdAt: "2026-09-25T12:00:00.000Z",
 });
@@ -201,6 +202,45 @@ describe("usePhotos: adding", () => {
     await act(async () => result.current.add());
     expect(result.current.notice).toEqual({ kind: "refused_local" });
     expect(FakeXhr.sent).toHaveLength(0);
+  });
+});
+
+describe("usePhotos: appealing (#253)", () => {
+  it("puts the photo back as the API answers it, queued, in its place", async () => {
+    const queued = { ...photo(2), state: "queued" };
+    const seen = serve(
+      listing(() => json(list(1, 2))),
+      (r) => (r.method === "POST" && r.url.endsWith("/appeal") ? json(queued) : null),
+    );
+    const { result } = await ready();
+    await act(async () => result.current.appeal(photo(2).id));
+    expect(writes(seen).map((r) => new URL(r.url).pathname)).toEqual([
+      `/photos/${photo(2).id}/appeal`,
+    ]);
+    expect(result.current.list?.photos.map((p) => p.state)).toEqual([photo(1).state, "queued"]);
+    expect(result.current.busy).toEqual({ kind: "idle" });
+  });
+
+  it("keeps the photo and says why when the ask is refused", async () => {
+    serve(
+      listing(() => json(list(1, 2))),
+      (r) => (r.method === "POST" ? refusal("photo_not_appealable", 409) : null),
+    );
+    const { result } = await ready();
+    await act(async () => result.current.appeal(photo(2).id));
+    expect(result.current.notice).toEqual({ kind: "error", code: "photo_not_appealable" });
+    expect(result.current.list).toEqual(list(1, 2));
+  });
+
+  it("appeals with no list to update when the list never loaded", async () => {
+    serve(
+      listing(() => refusal("internal_error", 500)),
+      (r) => (r.method === "POST" ? json({ ...photo(1), state: "queued" }) : null),
+    );
+    const { result } = await ready();
+    await act(async () => result.current.appeal(photo(1).id));
+    expect(result.current.list).toBeNull();
+    expect(result.current.busy).toEqual({ kind: "idle" });
   });
 });
 

@@ -1077,6 +1077,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/photos/{id}/appeal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask a person to look at the check's rejection
+         * @description Once per photo, for a photo the automatic check rejected (`appealable`); never after a nudity label the check was very sure of, or a person's decision. The photo goes back to the queue and stays unseen by others until a person approves it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["schemas"]["PhotoId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The photo, queued again. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Photo"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not a photo of this account. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description photo_not_appealable: not the check's own rejection, or appealed already. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/photos/order": {
         parameters: {
             query?: never;
@@ -2640,6 +2717,8 @@ export interface components {
              * @enum {string|null}
              */
             rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+            /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
+            appealable: boolean;
             /** @description 0 is the main photo; the owner sets the order. */
             position: number;
             /** Format: date-time */
@@ -2759,6 +2838,8 @@ export interface components {
              * @enum {string|null}
              */
             rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+            /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
+            appealable: boolean;
             /** @description 0 is the main photo; the owner sets the order. */
             position: number;
             /** Format: date-time */
@@ -2800,6 +2881,8 @@ export interface components {
             labels: components["schemas"]["ModerationLabel"][];
             faces: number;
             flagged: string[];
+            appealed: boolean;
+            sensitive: boolean;
         };
         ModerationLabel: {
             name: string;

@@ -2802,6 +2802,13 @@ errors.photo_order_invalid:
   sv: Fotoordningen innehöll inte alla foton. Ladda om och försök igen.
   machine: { fi: true, sv: true }
 
+errors.photo_not_appealable:
+  en: A person cannot be asked to look at this photo.
+  description: Photo appeal (409), the photo was not rejected by the automatic check, was appealed already, or showed nudity the check was very sure of (#253).
+  fi: Tätä kuvaa ei voi pyytää ihmisen katsottavaksi.
+  sv: Det går inte att be en person titta på det här fotot.
+  machine: { fi: true, sv: true }
+
 errors.media_busy:
   en: Many photos are being processed right now. Try again in a moment.
   description: Photo upload (503 with Retry-After), image processing is at its concurrency limit.
@@ -3625,6 +3632,13 @@ photos.remove:
   sv: Ta bort
   machine: { fi: true, sv: true }
 
+photos.appeal:
+  en: Ask a person to look
+  description: Photos screen, button under a photo the automatic check rejected; a person then decides (#253). Not offered after a nudity label the check was very sure of.
+  fi: Pyydä ihmistä katsomaan
+  sv: Be en person titta
+  machine: { fi: true, sv: true }
+
 photos.remove.title:
   en: Remove this photo?
   description: Photos screen, heading of the confirmation before a photo is removed.
@@ -3728,6 +3742,13 @@ photos.error.photo_order_invalid:
   description: Photos screen, the API refused a reorder because the app's list was stale (a photo added or removed elsewhere); the screen has already reloaded the list.
   fi: Kuvien järjestys oli vanhentunut, joten se ladattiin uudelleen. Kokeile siirtoa uudelleen.
   sv: Fotoordningen var inaktuell, så den laddades om. Försök flytta igen.
+  machine: { fi: true, sv: true }
+
+photos.error.photo_not_appealable:
+  en: A person cannot be asked to look at this photo. Remove it and try another one.
+  description: "Photos screen, the appeal was refused (409): appealed already, or not the check's own rejection (#253)."
+  fi: Tätä kuvaa ei voi pyytää ihmisen katsottavaksi. Poista se ja kokeile toista.
+  sv: Det går inte att be en person titta på det här fotot. Ta bort det och prova ett annat.
   machine: { fi: true, sv: true }
 
 photos.error.media_unavailable:
@@ -3897,6 +3918,18 @@ admin.queue.noLabels:
 admin.queue.notChecked:
   en: Not checked automatically.
   description: Admin panel, the item was queued without an automatic check (no Rekognition where the API runs).
+
+admin.queue.appealed:
+  en: The owner asked a person to look at the automatic rejection.
+  description: Admin panel, the photo is in the queue because its owner appealed the automatic check's rejection (#253).
+
+admin.queue.sensitive:
+  en: Hidden until you choose to look. The check saw something sensitive.
+  description: Admin panel, in place of a picture with a hard label (nudity, violence, disturbing, hate) at or above its review line; not loaded until the moderator asks (#253).
+
+admin.queue.show:
+  en: Show the picture
+  description: Admin panel, button that loads and shows a hidden sensitive picture (#253).
 
 admin.queue.faces:
   en: "{faces, plural, =0 {No face found} one {# face found} other {# faces found}}"

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1225,6 +1225,10 @@
             ],
             "description": "Set when state is rejected: the reason the owner is told."
           },
+          "appealable": {
+            "type": "boolean",
+            "description": "The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision."
+          },
           "position": {
             "type": "integer",
             "minimum": 0,
@@ -1278,6 +1282,7 @@
           "height",
           "state",
           "rejectionReason",
+          "appealable",
           "position",
           "createdAt",
           "urls",
@@ -1839,6 +1844,10 @@
             ],
             "description": "Set when state is rejected: the reason the owner is told."
           },
+          "appealable": {
+            "type": "boolean",
+            "description": "The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision."
+          },
           "position": {
             "type": "integer",
             "minimum": 0,
@@ -1856,6 +1865,7 @@
           "height",
           "state",
           "rejectionReason",
+          "appealable",
           "position",
           "createdAt"
         ]
@@ -1987,6 +1997,12 @@
               "maxLength": 100
             },
             "maxItems": 50
+          },
+          "appealed": {
+            "type": "boolean"
+          },
+          "sensitive": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -2000,7 +2016,9 @@
           "checkedAt",
           "labels",
           "faces",
-          "flagged"
+          "flagged",
+          "appealed",
+          "sensitive"
         ]
       },
       "ModerationLabel": {
@@ -3661,6 +3679,79 @@
           },
           "404": {
             "description": "Not a photo of this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/photos/{id}/appeal": {
+      "post": {
+        "summary": "Ask a person to look at the check's rejection",
+        "description": "Once per photo, for a photo the automatic check rejected (`appealable`); never after a nudity label the check was very sure of, or a person's decision. The photo goes back to the queue and stays unseen by others until a person approves it.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/PhotoId"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The photo, queued again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Photo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a photo of this account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "photo_not_appealable: not the check's own rejection, or appealed already.",
             "content": {
               "application/json": {
                 "schema": {

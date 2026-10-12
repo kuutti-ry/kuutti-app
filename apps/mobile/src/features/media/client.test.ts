@@ -2,7 +2,14 @@ import { Platform } from "react-native";
 import { ApiError } from "@/lib/api";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { FakeXhr, partsOf } from "@/test/xhr";
-import { deletePhoto, fetchPhotoUrl, listPhotos, reorderPhotos, uploadPhoto } from "./client";
+import {
+  appealPhoto,
+  deletePhoto,
+  fetchPhotoUrl,
+  listPhotos,
+  reorderPhotos,
+  uploadPhoto,
+} from "./client";
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const session = {
@@ -19,6 +26,7 @@ const stored = {
   height: 1200,
   state: "pending",
   rejectionReason: null,
+  appealable: false,
   position: 0,
   createdAt: "2026-09-25T12:00:00.000Z",
 };
@@ -150,6 +158,19 @@ describe("the photo routes", () => {
       status: 500,
       code: "internal_error",
       message: "photos answered 500",
+    });
+  });
+
+  it("asks a person to look at a photo by its id, and fails a refusal with its code (#253)", async () => {
+    const queued = { ...stored, state: "queued" };
+    const seen = answering(json(queued), refusal("photo_not_appealable", 409));
+    expect(await appealPhoto(stored.id)).toEqual(queued);
+    expect(seen[0]?.method).toBe("POST");
+    expect(pathOf(seen[0])).toBe(`/photos/${stored.id}/appeal`);
+    await expect(appealPhoto(stored.id)).rejects.toMatchObject({
+      status: 409,
+      code: "photo_not_appealable",
+      message: "photo appeal answered 409",
     });
   });
 

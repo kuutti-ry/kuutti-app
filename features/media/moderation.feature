@@ -59,6 +59,27 @@ Feature: Photo moderation before anyone else sees a photo
     Then the photo is rejected as several_people with no person's name on the decision
     And the owner's list says why, and the moderators' queue never sees it
 
+  Scenario: An owner asks a person to look at a photo the check rejected, once
+    Given the automatic check rejected a photo of the owner
+    When the owner asks a person to look
+    Then the photo waits in the queue again, marked as appealed, and a second ask is refused
+
+  Scenario: A photo the check was very sure showed nudity offers no appeal
+    Given the automatic check rejected a photo with a nudity label at 95 or more
+    Then the owner cannot ask a person to look, so no moderator is sent the picture
+
+  Scenario: A person's rejection offers no appeal, and neither does an approved photo
+    Given a photo a moderator rejected, and one the check approved
+    Then the owner cannot ask a person to look at either
+
+  Scenario: The appeal answers 401 without a session, 404 for another account's photo, 400 for a bad id
+    Given a photo the check rejected
+    Then nobody but its owner can appeal it
+
+  Scenario: The queue marks a photo with a sensitive label, and one the owner appealed
+    Given queued photos with a hard label at its review line, with swimwear, and appealed by the owner
+    Then the queue marks the first sensitive, so the panel hides it until asked, and the last appealed
+
   Scenario: No label name reaches a log line
     Given the automatic check returns a label
     Then the log carries counts and the outcome, never the label's name

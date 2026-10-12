@@ -216,6 +216,7 @@ describe("one upload as the persona", () => {
     height: 1600,
     state: "queued",
     rejectionReason: null,
+    appealable: false,
     position: 0,
     createdAt: "2026-10-11T09:00:00.000Z",
   };
@@ -289,6 +290,7 @@ describe("the local hands, before and after a login", () => {
             height: 1600,
             state: "queued",
             rejectionReason: null,
+            appealable: false,
             position: uploads - 1,
             createdAt: "2026-10-11T09:00:00.000Z",
           },

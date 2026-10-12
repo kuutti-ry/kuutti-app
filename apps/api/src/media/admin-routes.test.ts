@@ -57,6 +57,42 @@ const decide = (
   });
 
 describe("photo review queue", () => {
+  test("The queue marks a photo with a sensitive label, and one the owner appealed", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const nude = await photoIn(ctx, owner.accountId, "queued", {
+      labels: [{ name: "Explicit Nudity", parentName: "Explicit", confidence: 75 }],
+      ago: 30,
+    });
+    const swim = await photoIn(ctx, owner.accountId, "queued", {
+      labels: [
+        {
+          name: "Female Swimwear or Underwear",
+          parentName: "Swimwear or Underwear",
+          confidence: 99,
+        },
+      ],
+      ago: 20,
+    });
+    const appealed = await photoIn(ctx, owner.accountId, "queued", { labels: [], ago: 10 });
+    await ctx.client.query("UPDATE photo_review SET appealed_at = now() WHERE photo_id = $1", [
+      appealed,
+    ]);
+    const res = await app.request("/admin/photos/queue", { headers: staff.headers });
+    const queue = PhotoReviewQueue.parse(await res.json());
+    const flags = Object.fromEntries(
+      queue.items.map((i) => [i.photoId, { sensitive: i.sensitive, appealed: i.appealed }]),
+    );
+    expect(flags).toEqual({
+      [nude]: { sensitive: true, appealed: false },
+      [swim]: { sensitive: false, appealed: false },
+      [appealed]: { sensitive: false, appealed: true },
+    });
+  });
+
   test("The queue shows queued photos oldest first with what the check saw", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const staff = await staffSession(ctx.client);
