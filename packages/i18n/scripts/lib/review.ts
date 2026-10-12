@@ -396,7 +396,9 @@ export function exportSheet(
     };
   });
   if (format === "md") {
-    const md = (text: string): string => text.replace(/\|/g, "\\|");
+    // Backslashes first: Markdown reads one before punctuation as an escape
+    // and drops it. Then the pipes, whose escape must stay single.
+    const md = (text: string): string => text.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
     return [
       `| key | where it shows | en | ${locale} | note |`,
       "| --- | --- | --- | --- | --- |",

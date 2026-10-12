@@ -271,7 +271,7 @@ jobs:
           python-version: "3.13"
       - name: zizmor and the permission invariants
         run: |
-          pip install --quiet zizmor==1.30.1 pyyaml==6.0.2
+          pip install --quiet --require-hashes -r .github/requirements.txt
           zizmor --no-progress --min-severity medium --min-confidence medium .github/workflows
           python .github/scripts/check-workflow-permissions.py
       - name: what the sweep withdraws, and what it leaves

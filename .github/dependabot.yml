@@ -116,3 +116,16 @@ updates:
     groups:
       providers:
         patterns: ["*"]
+
+  # The Python tools of CI's workflows job, pinned by hash
+  # (.github/requirements.txt). Not under .github/scripts/: that path starts
+  # infra.yml, which would plan and apply staging for every bump.
+  - package-ecosystem: "pip"
+    directory: "/.github"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      workflow-tools:
+        patterns: ["*"]
