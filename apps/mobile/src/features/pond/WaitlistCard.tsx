@@ -1,7 +1,6 @@
 import type { PondSummary } from "@kuutti/schema";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
