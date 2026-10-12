@@ -197,6 +197,23 @@ describe("exposure", () => {
   });
 });
 
+describe("A photo held back by moderation is not served from a shown card", () => {
+  // The read serves others only an approved photo (#49); a shown card is no way round it.
+  test.for(["queued", "rejected"] as const)("%s", async (state, { ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const theirs = await upload(app, b.headers, await fixturePng(64, 64));
+    await ctx.client.query("UPDATE photo SET state = $2 WHERE id = $1", [theirs.id, state]);
+    await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
+    expect((await fetchUrl(app, a.headers, theirs.id, "card")).status).toBe(404);
+    expect((await fetchUrl(app, a.headers, theirs.id, "full")).status).toBe(404);
+    expect(await accessRows(ctx, a.accountId)).toBe(0);
+    // The owner still sees their own photo, to replace it or to read why.
+    expect((await fetchUrl(app, b.headers, theirs.id, "card")).status).toBe(200);
+  });
+});
+
 describe("the card budget across days", () => {
   test("A card seen on an earlier day counts against today once", async ({ ctx }) => {
     const { app } = await appWith(ctx);

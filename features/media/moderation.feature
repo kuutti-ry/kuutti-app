@@ -35,6 +35,11 @@ Feature: Photo moderation before anyone else sees a photo
     Given the automatic check returns a label
     Then the log carries counts and the outcome, never the label's name
 
+  Scenario: Neither a label nor its confidence reaches the owner or a log line
+    Given the automatic check returns a label and a tip signal, each with a confidence
+    When the owner uploads, lists their photos, reads their profile and exports their data
+    Then no answer to the owner and no log line carries a label's name or a confidence, while the review row keeps them for the queue
+
   Scenario: A moderator approves a queued photo
     Given a queued photo
     When a moderator approves it

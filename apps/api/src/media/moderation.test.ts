@@ -424,6 +424,41 @@ describe("moderation of uploads", () => {
     });
   });
 
+  test("Neither a label nor its confidence reaches the owner or a log line", async ({ ctx }) => {
+    // Names and numbers nothing else in an answer or a log line would carry.
+    const probe: Inspection = {
+      checked: true,
+      labels: [
+        { name: "Probe Label Kuutti", parentName: "Probe Parent Kuutti", confidence: 77.7777 },
+      ],
+      tipLabels: [{ name: "Sunglasses", parentName: "Probe Face Kuutti", confidence: 66.6666 }],
+      faceConfidences: [99],
+      modelVersion: "7.0",
+      calls: 3,
+    };
+    const { app, logs } = await appWith(ctx, scripted(probe));
+    const me = await signedInAccount(ctx.client);
+    const uploaded = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 600, height: 800, exif: false })),
+    });
+    expect(uploaded.status).toBe(201);
+    const answers = [await uploaded.text()];
+    for (const path of ["/photos", "/profile", "/account/export"]) {
+      const res = await app.request(path, { headers: me.headers });
+      expect(res.status).toBe(200);
+      answers.push(await res.text());
+    }
+    // What the check saw is kept, for the moderator's queue and nobody else.
+    const review = await ctx.client.query<{ labels: unknown }>("SELECT labels FROM photo_review");
+    expect(JSON.stringify(review.rows)).toContain("Probe Label Kuutti");
+    const seen = [...answers, JSON.stringify(logs())].join("\n");
+    for (const secret of ["Probe Label", "Probe Parent", "Probe Face", "77.77", "66.66"]) {
+      expect(seen).not.toContain(secret);
+    }
+  });
+
   test("Tip signals are recorded with the review and do not queue the photo", async ({ ctx }) => {
     const moderator = scripted(
       inspection("none", "99", [
