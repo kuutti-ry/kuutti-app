@@ -115,6 +115,9 @@ describe("pnpm --filter @kuutti/db seed", () => {
     ["--env production", ["--env", "production"], undefined],
     ["APP_ENV=production", [], "production"],
     ["--env production over APP_ENV=development", ["--env", "production"], "development"],
+    // A flag never talks the seed past the environment it runs in (#250).
+    ["APP_ENV=production under --env development", ["--env", "development"], "production"],
+    ["APP_ENV=production under a bare --env", ["--env"], "production"],
   ])("refuses production (%s) before it reads DATABASE_URL", async (_, args, appEnv) => {
     // No DATABASE_URL: a refusal after reading it would say so with exit 1.
     expect(await run("seed", args, { APP_ENV: appEnv })).toEqual({
