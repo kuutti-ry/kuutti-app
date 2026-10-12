@@ -53,6 +53,16 @@ Feature: Exposure is budgeted and counted
     When this account fetches its card variant
     Then the answer is 404
 
+  Scenario Outline: A photo held back by moderation is not served from a shown card
+    Given a <state> photo of another account on a card this account was shown
+    When this account fetches its card and its full variant
+    Then both answers are 404, no access row is written, and the owner is still served
+
+    Examples:
+      | state    |
+      | queued   |
+      | rejected |
+
   Scenario: Fetching the photos of the account itself ignores the shown record
     Given a pending photo of the account itself and no shown record
     When the account fetches its full variant

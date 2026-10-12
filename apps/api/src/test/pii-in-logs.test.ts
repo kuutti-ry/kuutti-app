@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { captureLogger, closeTestPool, type LogLine, testConfig, testPool } from "./harness.ts";
+import { testMediaDeps } from "./media.ts";
 
 /**
  * The enforcement behind "logs never carry hetu, message text or email"
@@ -85,7 +86,13 @@ describe("PII in logs", () => {
 
   it("no fixture reaches a log line through any registered route", async () => {
     const { logger, lines } = await captureLogger();
-    const app = createApp({ config: testConfig(), logger, db: testPool() });
+    // Built with media, so the photo routes run their own code and not the 503 of a bare app (#49).
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db: testPool(),
+      media: testMediaDeps().deps,
+    });
     const routes = registeredRoutes(app);
     expect(routes.length).toBeGreaterThan(0);
     await exercise(app, routes);

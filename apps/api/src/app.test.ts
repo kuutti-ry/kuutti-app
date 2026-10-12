@@ -1,6 +1,46 @@
+import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 import { createApp, PUBLIC_ROUTES } from "./app.ts";
 import { captureLogger, testConfig, testPool } from "./test/harness.ts";
+
+type GuardedRoute = { key: string; path: string; guards: string[] };
+
+/**
+ * Every handler route with the guards that run before it. Registration order
+ * is execution order: a guard counts only when it was registered on the
+ * handler's exact path before the handler. Middleware is what takes (c, next);
+ * everything else, on any method or pattern, is a route.
+ */
+function guardedRoutes(app: ReturnType<typeof createApp>): GuardedRoute[] {
+  const guards: { name: string; path: string; index: number }[] = [];
+  const routes: { key: string; path: string; index: number }[] = [];
+  app.routes.forEach(({ method, path, handler }, index) => {
+    // The product guard or the staff guard (#49).
+    if (handler.name === "requireSession" || handler.name === "requireAdmin") {
+      guards.push({ name: handler.name, path, index });
+      return;
+    }
+    if (handler.length === 2) return;
+    routes.push({ key: `${method} ${path}`, path, index });
+  });
+  return routes.map(({ key, path, index }) => ({
+    key,
+    path,
+    guards: guards.filter((g) => g.path === path && g.index < index).map((g) => g.name),
+  }));
+}
+
+/** The staff routes that a product session could pass: no staff guard before them (#49). */
+const adminRoutesWithoutStaffGuard = (routes: GuardedRoute[]) =>
+  routes
+    .filter(({ key, path }) => path.startsWith("/admin/") && !PUBLIC_ROUTES.has(key))
+    .filter(({ guards }) => !guards.includes("requireAdmin"))
+    .map(({ key }) => key);
+
+async function bareApp() {
+  const { logger } = await captureLogger();
+  return createApp({ config: testConfig(), logger, db: testPool() });
+}
 
 /**
  * Rule 6's structural half (#35): a route that is not on the public list is
@@ -10,33 +50,32 @@ import { captureLogger, testConfig, testPool } from "./test/harness.ts";
  */
 describe("route table", () => {
   it("every route outside PUBLIC_ROUTES sits behind requireSession", async () => {
-    const { logger } = await captureLogger();
-    const app = createApp({ config: testConfig(), logger, db: testPool() });
-    // Registration order is execution order: the guard counts only when it was
-    // registered on the handler's exact path before the handler. Middleware is
-    // what takes (c, next); everything else, on any method or pattern, is a route.
-    const guardedAt = new Map<string, number>();
-    const routes: { key: string; path: string; index: number }[] = [];
-    app.routes.forEach(({ method, path, handler }, index) => {
-      // The product guard or the staff guard (#49): either makes the route non-public.
-      if (handler.name === "requireSession" || handler.name === "requireAdmin") {
-        if (!guardedAt.has(path)) guardedAt.set(path, index);
-        return;
-      }
-      if (handler.length === 2) return;
-      routes.push({ key: `${method} ${path}`, path, index });
-    });
+    const routes = guardedRoutes(await bareApp());
     expect(routes.length).toBeGreaterThan(0);
     const unguarded = routes
-      .filter(({ key, path, index }) => {
-        const guard = guardedAt.get(path);
-        return !PUBLIC_ROUTES.has(key) && (guard === undefined || guard > index);
-      })
+      .filter(({ key, guards }) => !PUBLIC_ROUTES.has(key) && guards.length === 0)
       .map(({ key }) => key);
     expect(unguarded).toEqual([]);
     // And the public list is not silently wider than the router.
     const keys = new Set(routes.map((r) => r.key));
     for (const key of PUBLIC_ROUTES) expect(keys.has(key)).toBe(true);
+  });
+
+  it("every staff route outside PUBLIC_ROUTES sits behind requireAdmin, not the product guard alone", async () => {
+    const routes = guardedRoutes(await bareApp());
+    expect(routes.some(({ path, guards }) => path.startsWith("/admin/") && guards.length > 0)).toBe(
+      true,
+    );
+    expect(adminRoutesWithoutStaffGuard(routes)).toEqual([]);
+  });
+
+  it("would catch a staff route behind the product guard alone", async () => {
+    const app = await bareApp();
+    // The mistake the check exists for: a product session admitted to staff data.
+    const requireSession: MiddlewareHandler = async (_c, next) => next();
+    app.use("/admin/probe", requireSession);
+    app.get("/admin/probe", (c) => c.json({ ok: true }));
+    expect(adminRoutesWithoutStaffGuard(guardedRoutes(app))).toEqual(["GET /admin/probe"]);
   });
 });
 
