@@ -178,9 +178,44 @@ export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [
     purpose: "persona:tapio",
   },
   {
+    path: "negatives/aubergine.jpg",
+    sha256: "1239fd79294903b5dc9f30b12e7c85cfca3b2ed6d1e4fae9dc3c19beac394a5c",
+    purpose: "negative:aubergine",
+  },
+  {
+    path: "negatives/beer.jpg",
+    sha256: "5bab6ddf692156055f89e37d76e42721ffb3bc83babee27dfcb286d1947904f2",
+    purpose: "negative:beer",
+  },
+  {
     path: "negatives/exif-location.jpg",
     sha256: "e205f1dff627ea167cffa2064529700fb31a04bb1b40f1ce63071da16efad290",
     purpose: "negative:exif-location",
+  },
+  {
+    path: "negatives/finger.jpg",
+    sha256: "5d84ae45d1215e957ab42eb68c0be3da2055eaf77b3455d7830ee0a7fb135409",
+    purpose: "negative:finger",
+  },
+  {
+    path: "negatives/fish.jpg",
+    sha256: "c709cd424dd18d95c787cabbc802c319c2bcb95c6e70f79c9589bee6f253122e",
+    purpose: "negative:fish",
+  },
+  {
+    path: "negatives/halloween.jpg",
+    sha256: "172c4799580983bb4d0c026b4077abc24a0f0b2c86e15708906f5559581d28f6",
+    purpose: "negative:halloween",
+  },
+  {
+    path: "negatives/market.jpg",
+    sha256: "481004d73c864c1be9558f34138cba891700a574ccf18d84d9053b57161bb3a7",
+    purpose: "negative:market",
+  },
+  {
+    path: "negatives/mirror.jpg",
+    sha256: "f1c6d0314880ef926ff4804da93e918c55a62ca9fe4ade955c6a43d4765a2d33",
+    purpose: "negative:mirror",
   },
   {
     path: "negatives/no-face.jpg",
@@ -188,9 +223,39 @@ export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [
     purpose: "negative:no-face",
   },
   {
+    path: "negatives/rifle.jpg",
+    sha256: "da370ad7a8ee87ffa3d374f45e38b34490713a039292576a9f29e85d57b88725",
+    purpose: "negative:rifle",
+  },
+  {
+    path: "negatives/sauna-porch.jpg",
+    sha256: "830884b7bb7f9e37956b28e0fa305dfdb3441621d62ebd47a004f6d9fe1e1546",
+    purpose: "negative:sauna-porch",
+  },
+  {
+    path: "negatives/sauna-towel.jpg",
+    sha256: "1b5cf3eff04e74c67a706cc9856f460d89f9dd26a030ef29c7e7b62c0f336616",
+    purpose: "negative:sauna-towel",
+  },
+  {
     path: "negatives/several-people.jpg",
     sha256: "eacf619dfb293d68db56c0832e0ea5248b8668993c5f337405cf1b55efc1ed24",
     purpose: "negative:several-people",
+  },
+  {
+    path: "negatives/shirtless.jpg",
+    sha256: "1bd21678ce216ffbf5b5069ebb4da1b77a2ed73c4669d1bebeb0d3a295e50660",
+    purpose: "negative:shirtless",
+  },
+  {
+    path: "negatives/sunglasses.jpg",
+    sha256: "47a27cf9c1f322c5d180f58d5895a4f311d4a55adc02470c3994d7a5e5e17e32",
+    purpose: "negative:sunglasses",
+  },
+  {
+    path: "negatives/swimsuit.jpg",
+    sha256: "ef39f35c4946f5ce83ff89cb0f25d2d9be05ae2e016c1098e4f50e2bf78f71ae",
+    purpose: "negative:swimsuit",
   },
   {
     path: "negatives/text.jpg",

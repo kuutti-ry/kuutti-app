@@ -29,6 +29,19 @@ Chosen 09/10/2026.
 | `negatives/several-people.jpg` | a group photo | 1 | three people in one picture: more than one face, so the check rejects it and tells the owner why (ADR-006 §2, #206); queued only where the check queues everything |
 | `negatives/text.jpg` | no person | 1 | a picture that is mostly a page of text: no face, so rejected like the landscape |
 | `negatives/exif-location.jpg` | the stripping of EXIF (rule 4) | 1 | Noa's third picture (`p-noa-3`), re-saved with an invented GPS position and camera in its EXIF; the pipeline's output has none. It is uploaded for Noa, and a face passes the check, so it shows on Noa's card: it must be Noa |
+| `negatives/sauna-towel.jpg` | a probe of the check: a sauna towel: the hard group nudity on Finland's most common photo | 1 | Kerttu; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved: no moderation label at all |
+| `negatives/sauna-porch.jpg` | a probe of the check: a bare chest at the sauna | 1 | Mikael; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved: Non-Explicit Nudity and Exposed Male Nipple at 99.9, both allowed |
+| `negatives/swimsuit.jpg` | a probe of the check: swimwear | 1 | Aino; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): **rejected as nudity**: Obstructed Female Nipple and Obstructed Intimate Parts at 94 (hard), Swimwear at 93 (allowed); appealable |
+| `negatives/shirtless.jpg` | a probe of the check: a bare chest after a swim | 1 | Onni; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved: Non-Explicit Nudity and Exposed Male Nipple at 99.8, allowed |
+| `negatives/market.jpg` | a probe of the check: a cucumber and an aubergine held up at a market | 1 | Onni; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved: no moderation label |
+| `negatives/aubergine.jpg` | a probe of the check: the joke picture: an aubergine at hip height, no face | 1 | nobody's face; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): rejected as no_person: no moderation label, no face |
+| `negatives/rifle.jpg` | a probe of the check: a hunting rifle | 1 | Tapio; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): rejected as violence: Weapons 99.8 |
+| `negatives/halloween.jpg` | a probe of the check: fake blood at a Halloween party | 1 | Ilona; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): rejected as violence: Blood & Gore 98.1; appealable |
+| `negatives/beer.jpg` | a probe of the check: a glass of beer | 1 | Mikael; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved: Alcohol 90.5, allowed |
+| `negatives/finger.jpg` | a probe of the check: a middle finger | 1 | Noa; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved: Middle Finger 73.8, allowed |
+| `negatives/fish.jpg` | a probe of the check: a pike: the fish tip | 1 | Tapio; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved; Fish 94, Pike 76.5 (unfiltered DetectLabels) |
+| `negatives/sunglasses.jpg` | a probe of the check: sunglasses: the sunglasses tip | 1 | Ilona; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved; Sunglasses 98 |
+| `negatives/mirror.jpg` | a probe of the check: a bathroom mirror selfie: the mirror tip | 1 | Onni; what the check said on 12/10/2026 (Rekognition 7.0, through `moderation.ts`): approved; Mirror 44, Bathroom 46 on the card variant: under the tip's 50, which a sauna porch also reaches (Bathroom 46) |
 
 Ages are the personas' on 09/10/2026, from their codes (`packages/db/src/seed/personas.ts`); the clothes, places and hobbies follow their stories (`packages/db/src/seed/histories.ts`) or, for those without a profile, give each a look of their own, so that no two personas could be taken for each other. Nothing in a picture reads as a real place name, a brand, a licence plate, a phone number or an address.
 
@@ -279,6 +292,81 @@ A candid smartphone photo of three adult friends in their thirties and forties o
 ```
 p-neg-text
 A smartphone photo taken from straight above of a handwritten page in a lined notebook on a kitchen table, the page filling most of the picture: a shopping list in Finnish in blue ballpoint (maitoa, ruisleipää, kahvia, omenoita, kaurahiutaleita), a pen beside it. No people, no names, no numbers, no addresses, no logos. Photorealistic, vertical 3:4.
+```
+
+### The probes of the check (12/10/2026)
+
+Pictures that test what the automatic check makes of the labels it meets in ordinary photos (#253): the hard groups on innocent pictures, the allowed labels, and the scene and face tips. Generated through the Gemini API with the same model and settings, the persona's picture 1 attached for the face, one request each; every prompt below ends with this paragraph:
+
+```
+Candid smartphone photo: natural available light, true colours, real skin texture, no retouching, no beauty filter, the framing slightly imperfect. An ordinary person, not a model. Exactly one person in the picture unless said otherwise. No text, letters, logos, brand names, licence plates, house numbers or signs anywhere. Photorealistic, vertical 3:4.
+```
+
+Edits, each "change nothing else": `market`, the blurred shoppers in the background removed; `fish` and `sunglasses`, a strip of the reference's background that bled into the top replaced with the scene's own.
+
+```
+p-neg-sauna-towel (with `p-kerttu-1`)
+Another photo of the same woman as in the attached picture: keep her face, hair, age and build exactly the same. She sits on the porch of a wooden sauna by the sea after bathing, wrapped in a large white bath towel tucked under her arms, shoulders and arms bare, damp hair combed back, cheeks flushed, a little steam rising, smiling at the camera; framed from the chest up. A calm grey sea and rocks behind her. Nothing suggestive: an ordinary, relaxed Finnish sauna evening.
+```
+
+```
+p-neg-sauna-porch (with `p-mikael-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He stands on the wooden steps of a sauna by the sea, shirtless with a white towel wrapped around his waist, steam rising from his shoulders, a birch whisk in one hand, laughing at the camera; framed from the waist up. Late summer evening light. An ordinary Finnish sauna evening, nothing posed.
+```
+
+```
+p-neg-swimsuit (with `p-aino-1`)
+Another photo of the same woman as in the attached picture: keep her face, hair, age and build exactly the same. She stands on a wooden jetty at a lake in a plain navy one-piece swimsuit, water drops on her shoulders, squinting a little in the sun and smiling; framed from the knees up. Pines on the far shore. An ordinary summer holiday snapshot taken by a friend, nothing posed or suggestive.
+```
+
+```
+p-neg-shirtless (with `p-onni-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He sits on the edge of a lake dock after a swim, shirtless in plain dark swim shorts, wet hair, a towel over one shoulder, grinning at the camera; framed from the waist up. A summer lake and birches behind him.
+```
+
+```
+p-neg-market (with `p-onni-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He stands at an outdoor summer market stall holding up a very large cucumber in one hand and a big aubergine in the other, laughing at how huge they are; framed from the waist up. Wooden crates of vegetables behind him, no price signs, no lettering.
+```
+
+```
+p-neg-aubergine
+A joke photo friends send each other: a close-up of a person's two hands holding a large glossy aubergine at hip height in front of plain blue jeans and a grey T-shirt hem. The frame shows only the hands, the aubergine and the clothed hips, from the waist to mid-thigh; no face, nobody else. Fully clothed, nothing exposed. A kitchen counter softly out of focus behind.
+```
+
+```
+p-neg-rifle (with `p-tapio-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He stands in an autumn spruce forest in a blaze-orange hunting vest and cap, a hunting rifle slung over his shoulder on its strap with the barrel pointing up and away from the camera, a calm, friendly smile; framed from the waist up. Moss and lingonberries under the trees. An ordinary elk-hunting season photo.
+```
+
+```
+p-neg-halloween (with `p-ilona-1`)
+Another photo of the same woman as in the attached picture: keep her face, hair, age and build exactly the same. She is at a Halloween party dressed as a zombie: theatrical fake blood running from her hairline and the corner of her mouth, pale make-up and dark circles, but she grins into the camera, clearly having fun; head and shoulders. String lights and a carved pumpkin behind her, out of focus. Nobody else in the picture.
+```
+
+```
+p-neg-beer (with `p-mikael-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He sits on a summer cottage terrace holding up a plain glass of lager with a foamy head, toasting the camera with a grin; framed from the waist up. A lake glinting through the trees behind him. The glass has no label or print.
+```
+
+```
+p-neg-finger (with `p-noa-1`)
+Another photo of the same person as in the attached picture: keep their face, hair, age and build exactly the same. They laugh and show the camera a playful middle finger, the way friends joke with each other; head and shoulders. A cosy living room behind them, out of focus.
+```
+
+```
+p-neg-fish (with `p-tapio-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He sits in a small wooden rowing boat on a calm lake holding up a large pike he just caught with both hands, a proud grin; framed from the waist up. Morning mist over the water.
+```
+
+```
+p-neg-sunglasses (with `p-ilona-1`)
+Another photo of the same woman as in the attached picture: keep her face, hair, age and build exactly the same. She walks along a sunny seaside promenade in summer wearing dark sunglasses that cover her eyes and a white linen shirt, smiling; head and shoulders. The sea and a few sailing boats behind her, no signs or shop fronts.
+```
+
+```
+p-neg-mirror (with `p-onni-1`)
+Another photo of the same man as in the attached picture: keep his face, hair, age and build exactly the same. He takes a selfie in a small bathroom mirror, holding a plain black phone with no logo at chest height so his face stays fully visible, wearing a grey T-shirt; framed from the waist up. White tiles, a sink and towels on a rail behind him, a slightly cluttered ordinary bathroom.
 ```
 
 ## From the model to the release
