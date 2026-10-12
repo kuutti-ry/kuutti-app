@@ -520,6 +520,13 @@ other.thing:
     );
     expect(exportSheet(piped, "fi", "md")).toContain("| A \\| B | A \\| B |");
   });
+
+  it("escape a backslash before the pipe, so the table shows the text as written", () => {
+    const slashed = parseMessages(
+      "demo.or:\n  en: 'A \\| B'\n  description: d.\n  fi: 'A \\| B'\n  machine: { fi: true }\n",
+    );
+    expect(exportSheet(slashed, "fi", "md")).toContain("| A \\\\\\| B | A \\\\\\| B |");
+  });
 });
 
 describe("an imported sheet", () => {

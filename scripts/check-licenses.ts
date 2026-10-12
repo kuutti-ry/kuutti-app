@@ -194,7 +194,7 @@ if (!same(reviewList("allow-licenses"), policy.allow)) {
   );
 }
 const exceptionUrls = [
-  ...policy.exceptions.map((e) => `pkg:npm/${e.name.replace("@", "%40")}`),
+  ...policy.exceptions.map((e) => `pkg:npm/${e.name.replaceAll("@", "%40")}`),
   // An action is a dependency of the workflows, not of the packages: the pull
   // request check sees it as pkg:githubactions, and nothing here installs it.
   // (The review config's list holds bare items only: a comment line inside

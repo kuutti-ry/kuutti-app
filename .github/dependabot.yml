@@ -116,3 +116,15 @@ updates:
     groups:
       providers:
         patterns: ["*"]
+
+  # The Python tools of CI's workflows job, pinned by hash
+  # (.github/scripts/requirements.txt).
+  - package-ecosystem: "pip"
+    directory: "/.github/scripts"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      workflow-tools:
+        patterns: ["*"]

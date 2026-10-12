@@ -429,9 +429,9 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       expect(JSON.stringify(lines())).not.toContain("PRIVATE KEY");
       const res = await startLogin(app);
       expect(res.status).toBe(302);
-      expect(res.headers.get("location")).toMatch(
-        new RegExp(`^${TELIA_AUTHORIZATION_ENDPOINT.replace(/[.]/g, "\\.")}\\?`),
-      );
+      const location = new URL(res.headers.get("location") ?? "");
+      expect(`${location.origin}${location.pathname}`).toBe(TELIA_AUTHORIZATION_ENDPOINT);
+      expect(location.search).not.toBe("");
     });
 
     it("an issuer on Telia's host without private_key_jwt is not the broker: a warning locally, a failed boot on staging", async () => {
