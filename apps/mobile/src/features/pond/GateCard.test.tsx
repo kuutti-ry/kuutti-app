@@ -98,7 +98,7 @@ describe("GateCard", () => {
     const screen = await renderWithTheme(<GateCard />);
     await settle();
     expect(screen.getByText("Where you stand could not be read.")).toBeTruthy();
-    const retry = screen.getByLabelText("Try again");
+    const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
       fireEvent.press(retry);

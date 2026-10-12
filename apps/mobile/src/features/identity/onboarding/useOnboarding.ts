@@ -6,7 +6,8 @@ import { fetchOnboarding } from "./client";
 
 export type OnboardingState =
   | { status: "loading" }
-  | { status: "error" }
+  /** `error` is why the read failed, for the screen to say so (LoadFailed). */
+  | { status: "error"; error: unknown }
   | { status: "ready"; onboarding: OnboardingStatus };
 
 /**
@@ -32,8 +33,8 @@ export function useOnboarding() {
     try {
       const onboarding = await fetchOnboarding();
       if (mounted.current) setState({ status: "ready", onboarding });
-    } catch {
-      if (mounted.current) setState({ status: "error" });
+    } catch (error) {
+      if (mounted.current) setState({ status: "error", error });
     }
   }, []);
   useFocusEffect(

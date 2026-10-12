@@ -6,6 +6,7 @@ import {
   ErrorResponse,
   ProfileResponse,
   type ProfileUpdate,
+  TipKind,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
@@ -28,11 +29,25 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 // out of order. Settled either way: a failed save is its screen's to report.
 let lastSave: Promise<unknown> = Promise.resolve();
 
+/**
+ * A tip is advice the API adds kinds to over time (#56, #253). A build that
+ * does not know a kind yet leaves that tip out instead of refusing the whole
+ * profile, so a new tip never locks an older app out of its own profile.
+ */
+export function readProfile(data: unknown): ProfileResponse {
+  const tips = (data as { tips?: unknown } | null)?.tips;
+  if (!Array.isArray(tips)) return ProfileResponse.parse(data);
+  return ProfileResponse.parse({
+    ...(data as object),
+    tips: tips.filter((kind) => TipKind.safeParse(kind).success),
+  });
+}
+
 export async function fetchProfile(): Promise<ProfileResponse> {
   await lastSave;
   const { data, error, response } = await api.GET("/profile");
   if (!data) throw failed(response, error, "profile");
-  return ProfileResponse.parse(data);
+  return readProfile(data);
 }
 
 export function saveProfile(update: ProfileUpdate): Promise<ProfileResponse> {
@@ -43,7 +58,7 @@ export function saveProfile(update: ProfileUpdate): Promise<ProfileResponse> {
       body: update as unknown as ApiComponents["schemas"]["ProfileUpdate"],
     });
     if (!data) throw failed(response, error, "profile save");
-    return ProfileResponse.parse(data);
+    return readProfile(data);
   });
   lastSave = sent.catch(() => undefined);
   return sent;

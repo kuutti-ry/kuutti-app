@@ -53,6 +53,8 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
  */
 export function useProfile(held?: HeldDraft) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  /** Why the last read failed, for the screen to say so (LoadFailed); null after a read that worked. */
+  const [error, setError] = useState<unknown>(null);
   const [draft, setDraft] = useState<ProfileUpdate>(EMPTY_PROFILE);
   /** The document as the API last gave it, in the draft's shape. */
   const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
@@ -87,9 +89,12 @@ export function useProfile(held?: HeldDraft) {
       setCompleteness(response.completeness);
       setTips(response.tips);
       setFishSpecies(response.fishSpecies);
+      setError(null);
       setStatus("ready");
-    } catch {
-      if (mounted.current) setStatus((was) => (was === "ready" ? was : "error"));
+    } catch (failure) {
+      if (!mounted.current) return;
+      setError(failure);
+      setStatus((was) => (was === "ready" ? was : "error"));
     }
   }, []);
   useEffect(() => {
@@ -149,6 +154,7 @@ export function useProfile(held?: HeldDraft) {
 
   return {
     status,
+    error,
     draft,
     saved,
     completeness,

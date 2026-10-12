@@ -166,11 +166,38 @@ describe("ProfileScreen", () => {
         : json({ profile: null, completeness: { complete: true, missing: [] }, tips: [] }),
     ) as unknown as typeof fetch;
     await show(<ProfileScreen />);
-    expect(screen.getByText("Your profile could not be loaded. Try again.")).toBeTruthy();
+    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    // Why, in words: the API answered 500.
+    expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
     await press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
     expect(screen.getByText("Your card is complete.")).toBeTruthy();
+  });
+
+  it("leaves out a tip this build does not know, and loads the rest", async () => {
+    // A newer API names a tip kind this app has no words for yet.
+    // mirror_selfie: a kind no earlier test dismisses for the app's run.
+    fakeApi([[]], ["a_kind_from_a_later_api", "mirror_selfie"]);
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    expect(screen.getByText("Try a photo that is not a mirror selfie.")).toBeTruthy();
+    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
+  });
+
+  it("offers to update the app when the API answers what this build cannot read", async () => {
+    globalThis.fetch = jest.fn(async () =>
+      json({
+        profile: null,
+        completeness: { complete: true, missing: ["a_later_item"] },
+        tips: [],
+      }),
+    ) as unknown as typeof fetch;
+    await show(<ProfileScreen />);
+    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    expect(screen.getByText(/older than Kuutti's server/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Update the app" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   });
 
   it("goes back with its back button", async () => {

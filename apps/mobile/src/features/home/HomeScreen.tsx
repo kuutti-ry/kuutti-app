@@ -5,6 +5,7 @@ import Wrench from "lucide-react-native/icons/wrench";
 import { cssInterop } from "nativewind";
 import { Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
@@ -83,14 +84,7 @@ export function HomeScreen() {
         )}
         {gate.status === "unknown" && (
           <View className="w-full max-w-md gap-3">
-            <Text accessibilityLiveRegion="assertive">{t("home.gate.failed")}</Text>
-            <Button
-              variant="outline"
-              accessibilityLabel={t("home.gate.retry")}
-              onPress={gate.retry}
-            >
-              <Text>{t("home.gate.retry")}</Text>
-            </Button>
+            <LoadFailed headline={t("home.gate.failed")} error={gate.error} onRetry={gate.retry} />
           </View>
         )}
 

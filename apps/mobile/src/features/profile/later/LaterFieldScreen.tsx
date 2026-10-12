@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -87,8 +88,11 @@ export function LaterFieldScreen({ field }: { field: string }) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <Text accessibilityLiveRegion="assertive">{t("profile.failed")}</Text>
-          <Button onPress={() => void profile.reload()}>{t("profile.retry")}</Button>
+          <LoadFailed
+            headline={t("profile.failed")}
+            error={profile.error}
+            onRetry={() => void profile.reload()}
+          />
         </View>
       </SafeAreaView>
     );

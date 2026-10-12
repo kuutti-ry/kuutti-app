@@ -5,6 +5,7 @@ import ChevronRight from "lucide-react-native/icons/chevron-right";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -104,8 +105,11 @@ export function ProfileScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <Text accessibilityLiveRegion="assertive">{t("profile.failed")}</Text>
-          <Button onPress={() => void profile.reload()}>{t("profile.retry")}</Button>
+          <LoadFailed
+            headline={t("profile.failed")}
+            error={profile.error}
+            onRetry={() => void profile.reload()}
+          />
         </View>
       </SafeAreaView>
     );

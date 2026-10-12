@@ -7,7 +7,8 @@ import { fetchGate } from "./client";
 export type GateView =
   | { status: "loading" }
   | { status: "ready"; gate: GateResponse }
-  | { status: "failed" };
+  /** `error` says why, for the card to say so (LoadFailed). */
+  | { status: "failed"; error: unknown };
 
 /**
  * Where the person stands at the pond gate (#94). Read when the screen comes
@@ -32,9 +33,9 @@ export function useGate(): GateView & { retry: () => void } {
       .then((gate) => {
         if (current()) setState({ status: "ready", gate });
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (!current()) return;
-        setState((was) => (quietly && was.status === "ready" ? was : { status: "failed" }));
+        setState((was) => (quietly && was.status === "ready" ? was : { status: "failed", error }));
       });
   }, []);
 

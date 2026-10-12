@@ -258,7 +258,9 @@ describe("LaterFieldScreen", () => {
         : json({ profile: null, completeness: { complete: false, missing: [] }, tips: [] }),
     ) as unknown as typeof fetch;
     await show(<LaterFieldScreen field="smoking" />);
-    expect(screen.getByText("Your profile could not be loaded. Try again.")).toBeTruthy();
+    expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
+    // Why, in words: the API answered 500.
+    expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     failing = false;
     await press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());

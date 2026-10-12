@@ -12,6 +12,7 @@ import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -192,8 +193,11 @@ export function SectionScreen({ section: id }: { section: string }) {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <Text accessibilityLiveRegion="assertive">{t("profile.failed")}</Text>
-          <Button onPress={() => void profile.reload()}>{t("profile.retry")}</Button>
+          <LoadFailed
+            headline={t("profile.failed")}
+            error={profile.error}
+            onRetry={() => void profile.reload()}
+          />
         </View>
       </SafeAreaView>
     );

@@ -92,7 +92,7 @@ describe("HomeScreen", () => {
     mockGate = { status: "unknown" };
     await renderWithTheme(<HomeScreen />);
     expect(screen.getByText("Your account setup could not be checked.")).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Check again" }));
+    fireEvent.press(screen.getByRole("button", { name: "Try again" }));
     expect(mockRetry).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "Your profile" })).toBeNull();
     expect(screen.queryByText("Otaniemi")).toBeNull();

@@ -169,9 +169,7 @@ describe("DealBreakersScreen", () => {
       json({ error: { code: "x", message: "no", requestId: "r" } }, 500),
     ) as unknown as typeof fetch;
     await show(<DealBreakersScreen />);
-    await waitFor(() =>
-      expect(screen.getByText("Your profile could not be loaded. Try again.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy());
     fakeApi(answeredAll);
     await press(screen.getByRole("button", { name: "Try again" }));
     await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -13,7 +14,7 @@ import { ProfileCardView } from "./ProfileCardView";
 
 type State =
   | { status: "loading" }
-  | { status: "error" }
+  | { status: "error"; error: unknown }
   | { status: "ready"; preview: CardPreviewResponse };
 
 /** The owner looking at their own card (#47): built the way a round builds it, nothing recorded. */
@@ -24,15 +25,18 @@ export function CardPreviewScreen() {
   const [state, setState] = useState<State>({ status: "loading" });
   // A photo URL the API refused (the day's budget, #52): said under the card, never a silent gap.
   const [refusal, setRefusal] = useState<string | null>(null);
+  // Bumped by "Try again": the read runs again.
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
+    setState({ status: "loading" });
     fetchCardPreview()
       .then((preview) => live && setState({ status: "ready", preview }))
-      .catch(() => live && setState({ status: "error" }));
+      .catch((error: unknown) => live && setState({ status: "error", error }));
     return () => {
       live = false;
     };
-  }, []);
+  }, [attempt]);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -54,7 +58,11 @@ export function CardPreviewScreen() {
           <Text accessibilityLiveRegion="polite">{t("profile.card.loading")}</Text>
         )}
         {state.status === "error" && (
-          <Text accessibilityLiveRegion="assertive">{t("profile.card.failed")}</Text>
+          <LoadFailed
+            headline={t("profile.card.failed")}
+            error={state.error}
+            onRetry={() => setAttempt((n) => n + 1)}
+          />
         )}
         {state.status === "ready" && !state.preview.card && <Text>{t("profile.card.empty")}</Text>}
         {state.status === "ready" && state.preview.card && (

@@ -71,7 +71,9 @@ describe("useOnboarding", () => {
   it("is an error when the status cannot be read", async () => {
     readsFail = true;
     const { result } = await ready();
-    expect(result.current.state).toEqual({ status: "error" });
+    expect(result.current.state).toMatchObject({ status: "error" });
+    // The reason stays with the state, for the screen to say it.
+    expect((result.current.state as { error?: unknown }).error).toBeInstanceOf(Error);
   });
 
   it("runs a step, is busy meanwhile, then reads the status again", async () => {

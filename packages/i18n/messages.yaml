@@ -25,6 +25,71 @@
 
 
 
+# --- When something does not load: why, in words, and the way out that fits ---
+
+load.failed.offline:
+  en: "Kuutti could not be reached. Check your connection and try again."
+  description: "Under a screen's own 'did not load' line: no answer came back from the API (no network, or the network dropped)."
+  fi: "Kuuttiin ei saatu yhteyttä. Tarkista verkkoyhteys ja yritä uudelleen."
+  sv: "Kuutti kunde inte nås. Kontrollera anslutningen och försök igen."
+  machine: { fi: true, sv: true }
+
+load.failed.server:
+  en: "Kuutti's server had a problem. Try again in a moment."
+  description: "Under a screen's own 'did not load' line: the API answered with a server error (5xx)."
+  fi: "Kuutin palvelimella oli ongelma. Yritä hetken päästä uudelleen."
+  sv: "Kuuttis server hade ett problem. Försök igen om en stund."
+  machine: { fi: true, sv: true }
+
+load.failed.outdated:
+  en: "This version of the app is older than Kuutti's server and cannot read its answer. Update the app to continue."
+  description: "Under a screen's own 'did not load' line: the API sent something this build does not know yet (a newer contract); trying again cannot help, updating can."
+  fi: "Tämä sovelluksen versio on vanhempi kuin Kuutin palvelin eikä osaa lukea sen vastausta. Päivitä sovellus jatkaaksesi."
+  sv: "Den här versionen av appen är äldre än Kuuttis server och kan inte läsa dess svar. Uppdatera appen för att fortsätta."
+  machine: { fi: true, sv: true }
+
+load.failed.other:
+  en: "Something unexpected went wrong. Try again."
+  description: "Under a screen's own 'did not load' line: any other failure."
+  fi: "Jokin meni odottamatta pieleen. Yritä uudelleen."
+  sv: "Något oväntat gick fel. Försök igen."
+  machine: { fi: true, sv: true }
+
+load.retry:
+  en: Try again
+  description: "Button under a failed load, for every failure but an outdated app."
+  fi: Yritä uudelleen
+  sv: Försök igen
+  machine: { fi: true, sv: true }
+
+load.update:
+  en: Update the app
+  description: "Button under a failed load when the app is older than the API: fetches the newest update for this build and restarts the app into it."
+  fi: Päivitä sovellus
+  sv: Uppdatera appen
+  machine: { fi: true, sv: true }
+
+load.updating:
+  en: Updating…
+  description: "The update button while the newest update is fetched; the app restarts when it is there."
+  fi: Päivitetään…
+  sv: Uppdaterar…
+  machine: { fi: true, sv: true }
+
+load.noUpdate:
+  en: "No update is available for this app yet. Install the newest version of Kuutti."
+  description: "After 'Update the app' found nothing for this build: only installing the app again helps (in production, from the store)."
+  fi: "Tälle sovellukselle ei ole vielä päivitystä. Asenna Kuutin uusin versio."
+  sv: "Det finns ingen uppdatering för den här appen ännu. Installera den senaste versionen av Kuutti."
+  machine: { fi: true, sv: true }
+
+load.install:
+  en: Open the install page
+  description: "Button outside production after no update was found: opens the page where the team installs the newest build."
+  fi: Avaa asennussivu
+  sv: Öppna installationssidan
+  machine: { fi: true, sv: true }
+
 # --- Profile (#47) ---
 
 profile.title:
@@ -56,10 +121,10 @@ profile.loading:
   machine: { fi: true, sv: true }
 
 profile.failed:
-  en: "Your profile could not be loaded. Try again."
-  description: "GET /profile failed."
-  fi: "Profiilia ei voitu ladata. Yritä uudelleen."
-  sv: "Profilen kunde inte läsas in. Försök igen."
+  en: "Your profile could not be loaded."
+  description: "Profile edit screens, the headline when the profile could not be read; why and the way out follow under it (load.*)."
+  fi: "Profiiliasi ei voitu ladata."
+  sv: "Din profil kunde inte läsas in."
   machine: { fi: true, sv: true }
 
 profile.retry:
@@ -3112,6 +3177,13 @@ onboarding.changeFrom:
   description: "Under errors.change_too_soon in onboarding: the day from which the gender, or whom one seeks, may be changed again, from the status's nextChange (#147, ADR-015 §9). {date} is d.M.yyyy (formatDate)."
   fi: "Seuraava muutos mahdollinen: {date}."
   sv: "Nästa ändring möjlig: {date}."
+  machine: { fi: true, sv: true }
+
+onboarding.loadFailed:
+  en: "Where you are in getting started could not be loaded."
+  description: "Onboarding, the headline when the onboarding status or the profile could not be read; why and the way out follow under it (load.*)."
+  fi: "Aloituksen vaihetta ei voitu ladata."
+  sv: "Var du är i kom-igång-stegen kunde inte läsas in."
   machine: { fi: true, sv: true }
 
 onboarding.failed:
