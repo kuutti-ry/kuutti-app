@@ -101,17 +101,21 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   const [shown, setShown] = useState(!item.sensitive);
 
   // The card through a signed URL: one audit row per view, on the API's side.
+  // An item that goes away cancels its request, so nothing goes out after it;
+  // a request that fails leaves the picture loading, as a refused URL does.
   useEffect(() => {
     if (!shown) return;
-    let mounted = true;
+    const controller = new AbortController();
     void api
-      .GET("/admin/photos/{id}/card", { params: { path: { id: item.photoId } } })
+      .GET("/admin/photos/{id}/card", {
+        params: { path: { id: item.photoId } },
+        signal: controller.signal,
+      })
       .then(({ data }) => {
-        if (mounted && data) setUrl(PhotoUrlResponse.parse(data).url);
-      });
-    return () => {
-      mounted = false;
-    };
+        if (data) setUrl(PhotoUrlResponse.parse(data).url);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
   }, [item.photoId, shown]);
 
   const decide = async (

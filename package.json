@@ -1,7 +1,7 @@
 {
   "name": "kuutti",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.8.1",
   "type": "module",
   "description": "Kuutti monorepo root. Workspace members arrive with the M1 scaffold (#2).",
   "license": "SEE LICENSE IN LICENSE-EXCEPTION",

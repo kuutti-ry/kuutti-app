@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/api",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "description": "Hono on Node. One process: HTTP routes, WebSockets, nightly jobs.",
