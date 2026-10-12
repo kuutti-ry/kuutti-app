@@ -59,8 +59,11 @@ describe("Automatic moderation decision", () => {
     ["Suggestive 45", "99", 40, 90, "queued", "Suggestive"],
     ["none", "none", 60, 90, "queued", NO_FACE],
     ["none", "70", 60, 90, "queued", NO_FACE],
-    // Several faces approve like one (#206): the tip, not the queue, speaks to a group photo.
-    ["none", "99, 98, 95", 60, 90, "approved", "nothing"],
+    // Several faces are not accepted, by the check and not a person (#206);
+    // a second face under the face threshold is not sure enough to count.
+    ["none", "99, 98, 95", 60, 90, "rejected", "several_faces"],
+    ["none", "99, 70", 60, 90, "approved", "nothing"],
+    ["Explicit Nudity 97", "99, 98", 60, 90, "rejected", "Explicit Nudity, several_faces"],
     ["Violence 80, Explicit Nudity 61", "99", 60, 90, "queued", "Violence, Explicit Nudity"],
     ["unchecked", "none", 60, 90, "queued", NOT_CHECKED],
   ])(
@@ -72,6 +75,8 @@ describe("Automatic moderation decision", () => {
       });
       expect(decided.decision).toBe(outcome);
       expect(decided.flagged).toEqual(flagged === "nothing" ? [] : flagged.split(", "));
+      // The check names a reason only when it rejects, and then only this one.
+      expect(decided.reason).toBe(outcome === "rejected" ? "several_people" : undefined);
     },
   );
 
@@ -401,6 +406,50 @@ describe("moderation of uploads", () => {
     expect(Object.fromEntries(states.rows.map((r) => [r.id, r.state]))).toEqual({
       [halfWritten]: "approved",
       [decidedByPerson]: "pending",
+    });
+  });
+
+  test("A photo with several people is not accepted, and its owner is told why without a moderator", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, scripted(inspection("none", "99, 97")));
+    const me = await signedInAccount(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 800, height: 800, exif: false })),
+    });
+    expect(res.status).toBe(201);
+    const photo = await res.json();
+    expect(photo).toMatchObject({ state: "rejected", rejectionReason: "several_people" });
+    const review = await ctx.client.query(
+      "SELECT decision, reason, flagged, faces, decided_by FROM photo_review WHERE photo_id = $1",
+      [photo.id],
+    );
+    expect(review.rows[0]).toEqual({
+      decision: "rejected",
+      reason: "several_people",
+      flagged: ["several_faces"],
+      faces: 2,
+      decided_by: null,
+    });
+    // The owner's list says why; the queue (queued photos only) never holds it.
+    const mine = await app.request("/photos", { headers: me.headers });
+    expect((await mine.json()).photos).toEqual([
+      expect.objectContaining({
+        id: photo.id,
+        state: "rejected",
+        rejectionReason: "several_people",
+      }),
+    ]);
+    const queued = await ctx.client.query(
+      "SELECT count(*)::int AS n FROM photo WHERE state = 'queued'",
+    );
+    expect(queued.rows[0]?.n).toBe(0);
+    expect(logs().find((l) => l.msg === "photo moderated")).toMatchObject({
+      decision: "rejected",
+      faces: 2,
+      flagged: 1,
     });
   });
 

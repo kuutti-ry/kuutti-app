@@ -330,16 +330,18 @@ export async function upsertAutomaticReview(
     flagged: string[];
     modelVersion: string | null;
     checkedAt: Date;
-    decision: "approved" | "queued";
+    decision: "approved" | "queued" | "rejected";
+    /** Set when the check itself rejects (#206); decided_by stays null, as for every automatic row. */
+    reason: PhotoRejectionReason | null;
   },
 ): Promise<void> {
   await db.query(
-    `INSERT INTO photo_review (photo_id, labels, faces, flagged, model_version, checked_at, decision)
-     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7)
+    `INSERT INTO photo_review (photo_id, labels, faces, flagged, model_version, checked_at, decision, reason)
+     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (photo_id) DO UPDATE
        SET labels = EXCLUDED.labels, faces = EXCLUDED.faces, flagged = EXCLUDED.flagged,
            model_version = EXCLUDED.model_version, checked_at = EXCLUDED.checked_at,
-           decision = EXCLUDED.decision
+           decision = EXCLUDED.decision, reason = EXCLUDED.reason
        WHERE photo_review.decided_by IS NULL`,
     [
       input.photoId,
@@ -349,20 +351,22 @@ export async function upsertAutomaticReview(
       input.modelVersion,
       input.checkedAt,
       input.decision,
+      input.reason,
     ],
   );
 }
 
-/** pending → approved or queued; true when this call moved it (a person's decision stands). */
+/** pending → approved, queued, or rejected with the reason the owner is told; true when this call moved it (a person's decision stands). */
 export async function movePendingPhoto(
   db: Queryable,
   photoId: string,
-  decision: "approved" | "queued",
+  decision: "approved" | "queued" | "rejected",
+  reason: PhotoRejectionReason | null = null,
 ): Promise<boolean> {
-  const result = await db.query("UPDATE photo SET state = $2 WHERE id = $1 AND state = 'pending'", [
-    photoId,
-    decision,
-  ]);
+  const result = await db.query(
+    "UPDATE photo SET state = $2, rejection_reason = $3 WHERE id = $1 AND state = 'pending'",
+    [photoId, decision, reason],
+  );
   return result.rowCount === 1;
 }
 

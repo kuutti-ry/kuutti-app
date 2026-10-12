@@ -108,9 +108,9 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
     // the two a profile needs (#56), so the gate and the profile wait.
     facesInReview: 1,
     // Four more pictures for the check (#142): no face and text wait for a
-    // person; several people and the one whose EXIF location the pipeline
-    // strips have faces, so the check approves them (ADR-006 §2, #206).
-    // Locally the check queues everything (ADR-006 §4): all five wait.
+    // person; several people is not accepted and Noa is told why; the one
+    // whose EXIF location the pipeline strips is a face and is approved
+    // (ADR-006 §2, #206). Locally the check queues everything (§4): all wait.
     negatives: ["no-face", "several-people", "text", "exif-location"],
     afterwards: "nothing",
   },

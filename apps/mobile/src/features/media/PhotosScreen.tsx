@@ -33,7 +33,7 @@ const STATE_TEXT: Record<PhotoState, PlainMessageKey> = {
   rejected: "photos.state.rejected",
 };
 
-/** A rejected photo says why, in words the moderator chose from a list (#49); never a label name. */
+/** A rejected photo says why, in words from a list (#49): a moderator's choice, or the check's for several people (#206); never a label name. */
 const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   nudity: "photos.rejected.nudity",
   no_person: "photos.rejected.no_person",
