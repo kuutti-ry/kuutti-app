@@ -2,8 +2,9 @@ import { accountState } from "@kuutti/db";
 import { AccountExport, AccountState, Photo } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
+import { prunePhotoCheckNotes } from "../safety/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
-import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
+import { captureLogger, englishT, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
 import { eraseAccount, exportAccount } from "./erasure.ts";
 import { REREGISTER_COOLDOWN_DAYS } from "./registration.ts";
@@ -408,10 +409,93 @@ describe("account erasure and export: the edges", () => {
       status: 404,
       code: "not_found",
     });
-    await expect(exportAccount(deps, nobody)).rejects.toMatchObject({
+    await expect(exportAccount(deps, nobody, englishT)).rejects.toMatchObject({
       status: 404,
       code: "not_found",
     });
     expect(lines().filter((l) => l.msg === "account erased")).toEqual([]);
+  });
+});
+
+describe("the photo check's notes in erasure and export (#253)", () => {
+  const DAY = 86_400_000;
+  const note = (ctx: TestContext, accountId: string, at: Date, kind = "nudity", photoId?: string) =>
+    ctx.client.query(
+      "INSERT INTO photo_check_note (account_id, photo_id, kind, at) VALUES ($1, $2, $3, $4)",
+      [accountId, photoId ?? null, kind, at],
+    );
+  const notesOf = (ctx: TestContext, accountId: string) =>
+    count(ctx, "SELECT count(*) AS n FROM photo_check_note WHERE account_id = $1", [accountId]);
+
+  test("The notes go after twelve months, and with the account", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const now = new Date();
+    const photo = await upload(app, a.headers, await fixturePng(111, 111));
+    await note(ctx, a.accountId, new Date(now.getTime() - 366 * DAY));
+    await note(ctx, a.accountId, new Date(now.getTime() - 364 * DAY));
+    await note(ctx, a.accountId, new Date(now.getTime() - DAY), "violence", photo.id);
+    await note(ctx, b.accountId, new Date(now.getTime() - 400 * DAY));
+    await note(ctx, b.accountId, new Date(now.getTime() - DAY));
+
+    expect(await prunePhotoCheckNotes(ctx.client, now)).toBe(2);
+    expect(await notesOf(ctx, a.accountId)).toBe(2);
+    expect(await notesOf(ctx, b.accountId)).toBe(1);
+
+    expect((await del(app, a.headers)).status).toBe(204);
+    expect(await notesOf(ctx, a.accountId)).toBe(0);
+    // Only the caller's: the other account keeps its own.
+    expect(await notesOf(ctx, b.accountId)).toBe(1);
+  });
+
+  test("The person reads the notes in their export in plain words", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const now = Date.now();
+    const first = new Date(now - 20 * DAY);
+    const second = new Date(now - 9 * DAY);
+    await note(ctx, a.accountId, first);
+    await note(ctx, a.accountId, second, "hate");
+
+    const fi = await app.request("/account/export", {
+      headers: { ...a.headers, "accept-language": "fi" },
+    });
+    expect(fi.status).toBe(200);
+    const body = AccountExport.parse(await fi.json());
+    expect(body.photoCheck.about).toMatch(/^Kuutti tarkistaa jokaisen kuvan/);
+    expect(body.photoCheck.photosNotShown).toEqual([
+      {
+        at: first.toISOString(),
+        kind: "nudity",
+        reason: "Saattaa näyttää enemmän kuin Kuutti sallii",
+      },
+      {
+        at: second.toISOString(),
+        kind: "hate",
+        reason: "Saattaa näyttää symbolin, jota Kuutti ei salli",
+      },
+    ]);
+    expect(body.photoCheck.carefulCheckUntil).toBe(
+      new Date(second.getTime() + 30 * DAY).toISOString(),
+    );
+
+    // In English too, and in words that accuse nobody.
+    const en = AccountExport.parse(
+      await (await app.request("/account/export", { headers: a.headers })).json(),
+    );
+    expect(en.photoCheck.photosNotShown.map((p) => p.reason)).toEqual([
+      "May show more than Kuutti allows",
+      "May show a symbol Kuutti does not allow",
+    ]);
+    expect(JSON.stringify(en.photoCheck)).not.toMatch(/strike|flag|violat|offen[cs]e|suspic|ban/i);
+
+    // Another account's export holds none of it.
+    const theirs = AccountExport.parse(
+      await (await app.request("/account/export", { headers: b.headers })).json(),
+    );
+    expect(theirs.photoCheck.photosNotShown).toEqual([]);
+    expect(theirs.photoCheck.carefulCheckUntil).toBeNull();
   });
 });

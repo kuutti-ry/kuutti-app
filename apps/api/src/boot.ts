@@ -24,7 +24,7 @@ import { ensurePreviewDatabase } from "./lib/preview-database.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
 import { createMediaDeps, sweepPendingPhotos } from "./media/index.ts";
 import { ensureEventPartitions, researchEventsJob } from "./research/index.ts";
-import { auditBoundary } from "./safety/index.ts";
+import { auditBoundary, prunePhotoCheckNotes } from "./safety/index.ts";
 
 export type BootOptions = {
   config: Config;
@@ -189,6 +189,11 @@ export async function boot({
     waitlistJob({ db: pool, logger, now }),
     // Who is let into each pond, and for whom matching opens (#94).
     gateJob({ db: pool, logger, now }),
+    // The photo check's notes keep twelve months (#253).
+    {
+      name: "prune-photo-check-notes",
+      run: async () => ({ pruned: await prunePhotoCheckNotes(pool, now()) }),
+    },
   ];
   // Photos the automatic check missed get one more look (#49); none without a moderator.
   const mediaDeps = media.deps;

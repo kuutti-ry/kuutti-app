@@ -149,6 +149,11 @@ function anExport(): Record<string, unknown> {
     profile: null,
     photos: [photo(0)],
     photoAccessLog: [{ photoId: uuid(100), variant: "thumb", at }],
+    photoCheck: {
+      about: "Kuutti checks every photo before anyone else sees it.",
+      photosNotShown: [{ at, kind: "nudity", reason: "May show more than Kuutti allows" }],
+      carefulCheckUntil: at,
+    },
     research: { enrolled: false, since: null, consentVersion: null, events: [] },
     gate: null,
   };
@@ -185,6 +190,21 @@ describe("the account export", () => {
     };
     erased.preferences = { seeks: null, ageWindow: null };
     expect(AccountExport.safeParse(erased).success).toBe(true);
+  });
+
+  it("names the photo check's kinds from a closed list, and the end of the closer look or null (#253)", () => {
+    const parsed = AccountExport.parse(anExport());
+    expect(parsed.photoCheck.photosNotShown[0]?.kind).toBe("nudity");
+    const unknown = anExport();
+    unknown.photoCheck = {
+      about: "x",
+      photosNotShown: [{ at: new Date().toISOString(), kind: "explicit", reason: "x" }],
+      carefulCheckUntil: null,
+    };
+    expect(codes(AccountExport, unknown)).toEqual(["invalid_value"]);
+    const none = anExport();
+    none.photoCheck = { about: "x", photosNotShown: [], carefulCheckUntil: null };
+    expect(AccountExport.safeParse(none).success).toBe(true);
   });
 
   it("refuses a negative deletion count and a fractional birth year", () => {

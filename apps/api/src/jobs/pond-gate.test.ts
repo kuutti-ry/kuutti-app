@@ -6,7 +6,14 @@ import { it } from "vitest";
 import { eraseAccount, exportAccount } from "../identity/index.ts";
 import { savePreferences } from "../matching/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
-import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
+import {
+  captureLogger,
+  describe,
+  englishT,
+  expect,
+  type TestContext,
+  test,
+} from "../test/harness.ts";
 import { type PeopleOptions, people, pondNamed } from "../test/people.ts";
 import { countGates, GATE_LOCK_KEY, gateJob, gateOf } from "./pond-gate.ts";
 
@@ -735,10 +742,10 @@ describe("the person's own gate", () => {
     await people(ctx.client, pond, 1, WOMEN);
     const { logger } = await captureLogger();
     const deps = { db: ctx.client, logger, now: () => NIGHT_2 };
-    expect((await exportAccount(deps, she as string)).gate).toBeNull();
+    expect((await exportAccount(deps, she as string, englishT)).gate).toBeNull();
 
     await counted(ctx, NIGHT_1);
-    expect((await exportAccount(deps, she as string)).gate).toEqual({
+    expect((await exportAccount(deps, she as string, englishT)).gate).toEqual({
       pondId: pond,
       admittedAt: NIGHT_1.toISOString(),
       placeSaid: null,
@@ -746,7 +753,7 @@ describe("the person's own gate", () => {
       openedAt: null,
       countedAt: NIGHT_1.toISOString(),
     });
-    expect((await exportAccount(deps, waits as string)).gate).toMatchObject({
+    expect((await exportAccount(deps, waits as string, englishT)).gate).toMatchObject({
       admittedAt: null,
       placeSaid: 10,
       poolSaid: 0,

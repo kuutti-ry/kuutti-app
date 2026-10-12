@@ -14,7 +14,7 @@ import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
-import { recordAudit } from "../safety/index.ts";
+import { recordAudit, withdrawPhotoCheckNote } from "../safety/index.ts";
 import { groupOf } from "./label-groups.ts";
 import { readThresholds } from "./moderation.ts";
 import type { MediaDeps } from "./photos.ts";
@@ -183,6 +183,10 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
         at: now(),
       });
       if (!updated) throw notQueued();
+      // Approved on appeal: the check was wrong, and its note goes (#253).
+      if (decision === "approved") {
+        await withdrawPhotoCheckNote(tx, { accountId: before.accountId, photoId: id });
+      }
       return updated;
     });
     deps.logger.info(

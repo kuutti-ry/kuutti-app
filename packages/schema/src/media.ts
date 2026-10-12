@@ -70,6 +70,16 @@ export const PhotoRejectionReason = z
   .meta({ id: "PhotoRejectionReason" });
 export type PhotoRejectionReason = z.infer<typeof PhotoRejectionReason>;
 
+/**
+ * The hard groups of the automatic check (#253): what a photo it did not show
+ * to others may have shown. Kept as a note for twelve months, read by the
+ * person in their export and by nobody else.
+ */
+export const PhotoCheckKind = z
+  .enum(["nudity", "violence", "disturbing", "hate"])
+  .meta({ id: "PhotoCheckKind" });
+export type PhotoCheckKind = z.infer<typeof PhotoCheckKind>;
+
 /** What the owner knows about one of their photos. Never the key, never a URL. */
 export const Photo = z
   .object({

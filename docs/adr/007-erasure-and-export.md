@@ -31,3 +31,7 @@ The erasure table of TD-7 says what deletion removes (profile, photos, preferenc
 **Anonymising by overwriting with placeholders.** Rejected: null says "gone" without inventing a value; the columns were made nullable instead.
 
 **A zipped export with the image bytes.** Rejected for now: the fifteen-minute URLs give the same bytes without the API assembling archives on one box; the client can fetch them. Revisit if a store review asks for a single file.
+
+## History
+
+- 2026-10-12: the photo check's notes (#253, ADR-006 §2) join both halves. `eraseAccount` deletes them in its transaction (the tombstone keeps the account row, so no cascade would). The export carries them as `photoCheck`: what the check is, each photo it did not show with its date and its kind, in words, and until when new photos are checked more carefully, all in the request's language. They are the export's first texts in a language: a person reading their file should read what a note means, gently, not guess at a bare `hate`. The stored kind is there too, for a machine reading the file.

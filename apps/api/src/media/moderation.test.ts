@@ -7,10 +7,12 @@ import {
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
-import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { closerLookOf } from "../safety/index.ts";
+import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixtureWebp, testMediaDeps } from "../test/media.ts";
 import {
+  closerLines,
   decideModeration,
   type Inspection,
   type Moderator,
@@ -974,5 +976,234 @@ describe("the owner's appeal (#253)", () => {
       photo.id,
     ]);
     expect(state.rows[0]).toEqual({ state: "rejected", appealable: true });
+  });
+});
+
+describe("the closer look's lines (#253)", () => {
+  it("lowers every hard group's reject line to the closer look's, and keeps the rest", () => {
+    const usual = lines(60, 90);
+    const closer = closerLines(
+      { ...usual, groups: { ...usual.groups, hate: { review: 50, reject: 70 } } },
+      75,
+    );
+    expect(closer.groups).toEqual({
+      nudity: { review: 60, reject: 75 },
+      violence: { review: 60, reject: 75 },
+      disturbing: { review: 60, reject: 75 },
+      // Already lower than the closer look's: it stays.
+      hate: { review: 50, reject: 70 },
+    });
+    expect(closer).toMatchObject({ labelThreshold: 60, faceThreshold: 90, noAppealNudity: 95 });
+  });
+
+  it("names the group a sure label rejected for, and none for any other outcome", () => {
+    expect(decideModeration(inspection("Weapons 95", "99"), lines(60, 90)).group).toBe("violence");
+    expect(decideModeration(inspection("none", "none"), lines(60, 90)).group).toBeUndefined();
+    expect(
+      decideModeration(inspection("Explicit Nudity 75", "99"), lines(60, 90)).group,
+    ).toBeUndefined();
+  });
+});
+
+describe("notes of the photo check and the closer look (#253)", () => {
+  const DAY = 86_400_000;
+  const T = new Date("2026-10-01T12:00:00Z");
+  const daysFrom = (base: Date, days: number) => new Date(base.getTime() + days * DAY);
+
+  const pendingPhoto = async (ctx: TestContext, accountId: string) => {
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       VALUES ($1, $2, 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'pending',
+               (SELECT coalesce(max(position) + 1, 0) FROM photo WHERE account_id = $1)) RETURNING id`,
+      [accountId, `k-${Math.random().toString(36).slice(2)}`],
+    );
+    return rows[0]?.id ?? "";
+  };
+  const note = (ctx: TestContext, accountId: string, at: Date) =>
+    ctx.client.query(
+      "INSERT INTO photo_check_note (account_id, kind, at) VALUES ($1, 'nudity', $2)",
+      [accountId, at],
+    );
+  const notesOf = async (ctx: TestContext, accountId: string) =>
+    (
+      await ctx.client.query<{ kind: string; at: Date; photo_id: string | null }>(
+        "SELECT kind, at, photo_id FROM photo_check_note WHERE account_id = $1 ORDER BY at",
+        [accountId],
+      )
+    ).rows;
+  /** The check at `now` on a fresh pending photo of the account. */
+  const checkAt = async (ctx: TestContext, accountId: string, labels: string, now: Date) => {
+    const { logger } = await captureLogger();
+    const photoId = await pendingPhoto(ctx, accountId);
+    const decided = await moderatePhoto(
+      { db: ctx.client, logger, moderator: scripted(inspection(labels, "99")), now: () => now },
+      { photoId, accountId, card: await fixtureJpeg({ width: 300, height: 300, exif: false }) },
+    );
+    return { photoId, decided };
+  };
+
+  test("A photo the check is sure of leaves a note of its kind", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, scripted(inspection("Weapons 93", "99")));
+    const me = await signedInAccount(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 600, height: 800, exif: false })),
+    });
+    expect(res.status).toBe(201);
+    const photo = (await res.json()) as { id: string; state: string; rejectionReason: string };
+    expect(photo).toMatchObject({ state: "rejected", rejectionReason: "violence" });
+    const notes = await notesOf(ctx, me.accountId);
+    expect(notes).toEqual([{ kind: "violence", at: expect.any(Date), photo_id: photo.id }]);
+    // The note is which kind and when: nothing of the picture, no label, no confidence.
+    const columns = await ctx.client.query<{ column_name: string }>(
+      "SELECT column_name FROM information_schema.columns WHERE table_name = 'photo_check_note' ORDER BY column_name",
+    );
+    expect(columns.rows.map((r) => r.column_name)).toEqual([
+      "account_id",
+      "at",
+      "id",
+      "kind",
+      "photo_id",
+    ]);
+    // Nor does any log line say what kind of photo it was.
+    expect(JSON.stringify(logs())).not.toMatch(/violence|weapons/i);
+  });
+
+  test("Two notes within thirty days make the check stricter for thirty days", async ({ ctx }) => {
+    const me = await signedInAccount(ctx.client);
+    const second = daysFrom(T, -9);
+    await note(ctx, me.accountId, daysFrom(T, -20));
+    await note(ctx, me.accountId, second);
+
+    const under = await checkAt(ctx, me.accountId, "Explicit Nudity 80", T);
+    expect(under.decided).toMatchObject({
+      decision: "rejected",
+      reason: "nudity",
+      appealable: true,
+    });
+    const state = await ctx.client.query("SELECT state, appealable FROM photo WHERE id = $1", [
+      under.photoId,
+    ]);
+    expect(state.rows[0]).toEqual({ state: "rejected", appealable: true });
+
+    // The last moment of the closer look, and the first after it.
+    const last = await checkAt(
+      ctx,
+      me.accountId,
+      "Explicit Nudity 80",
+      daysFrom(second, 30 - 1 / 86_400),
+    );
+    expect(last.decided?.decision).toBe("rejected");
+    const after = await checkAt(ctx, me.accountId, "Explicit Nudity 80", daysFrom(second, 30));
+    expect(after.decided?.decision).toBe("queued");
+    // Below the closer look's line, a person is asked as before.
+    const low = await checkAt(ctx, me.accountId, "Explicit Nudity 70", T);
+    expect(low.decided?.decision).toBe("queued");
+  });
+
+  test("What only the closer look rejected leaves no note", async ({ ctx }) => {
+    const me = await signedInAccount(ctx.client);
+    const second = daysFrom(T, -9);
+    await note(ctx, me.accountId, daysFrom(T, -20));
+    await note(ctx, me.accountId, second);
+    const closer = await checkAt(ctx, me.accountId, "Violence 85", T);
+    expect(closer.decided).toMatchObject({ decision: "rejected", reason: "violence" });
+    expect(await notesOf(ctx, me.accountId)).toHaveLength(2);
+    expect((await closerLookOf(ctx.client, me.accountId, T)).until).toEqual(daysFrom(second, 30));
+
+    // What the usual line is sure of is noted, and moves the end.
+    const sure = await checkAt(ctx, me.accountId, "Violence 95", T);
+    expect(sure.decided).toMatchObject({ decision: "rejected", group: "violence" });
+    expect(await notesOf(ctx, me.accountId)).toHaveLength(3);
+    expect((await closerLookOf(ctx.client, me.accountId, T)).until).toEqual(daysFrom(T, 30));
+  });
+
+  test("under the closer look the note names the group the owner was told of", async ({ ctx }) => {
+    const me = await signedInAccount(ctx.client);
+    await note(ctx, me.accountId, daysFrom(T, -20));
+    await note(ctx, me.accountId, daysFrom(T, -9));
+    // The usual lines are sure of the weapon; the closer look's, of the nudity too, which ranks first.
+    const both = await checkAt(ctx, me.accountId, "Weapons 92, Explicit Nudity 80", T);
+    expect(both.decided).toMatchObject({ decision: "rejected", reason: "nudity", group: "nudity" });
+    const notes = await notesOf(ctx, me.accountId);
+    expect(notes.at(-1)).toMatchObject({ kind: "nudity", photo_id: both.photoId });
+  });
+
+  test("a check that finds the photo decided by a person already leaves no note", async ({
+    ctx,
+  }) => {
+    const { logger } = await captureLogger();
+    const me = await signedInAccount(ctx.client);
+    const photoId = await pendingPhoto(ctx, me.accountId);
+    await ctx.client.query("UPDATE photo SET state = 'approved' WHERE id = $1", [photoId]);
+    const decided = await moderatePhoto(
+      {
+        db: ctx.client,
+        logger,
+        moderator: scripted(inspection("Explicit Nudity 97", "99")),
+        now: () => T,
+      },
+      {
+        photoId,
+        accountId: me.accountId,
+        card: await fixtureJpeg({ width: 300, height: 300, exif: false }),
+      },
+    );
+    expect(decided?.decision).toBe("rejected"); // what the machine would say
+    expect(await notesOf(ctx, me.accountId)).toEqual([]);
+  });
+
+  test("A photo a person approves on appeal takes its note away", async ({ ctx }) => {
+    const { app } = await appWith(ctx, scripted(inspection("Weapons 93", "99")));
+    const me = await signedInAccount(ctx.client);
+    const staff = await staffSession(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 600, height: 800, exif: false })),
+    });
+    const photo = (await res.json()) as { id: string; appealable: boolean };
+    expect(photo.appealable).toBe(true);
+    // One more note of another photo: with this one, two would start a closer look.
+    await note(ctx, me.accountId, new Date(Date.now() - DAY));
+    expect((await closerLookOf(ctx.client, me.accountId, new Date())).until).not.toBeNull();
+
+    expect(
+      (await app.request(`/photos/${photo.id}/appeal`, { method: "POST", headers: me.headers }))
+        .status,
+    ).toBe(200);
+    const decided = await app.request(`/admin/photos/${photo.id}/decision`, {
+      method: "POST",
+      headers: { ...staff.headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "approve" }),
+    });
+    expect(decided.status).toBe(200);
+    const left = await notesOf(ctx, me.accountId);
+    expect(left).toHaveLength(1);
+    expect(left[0]?.photo_id).toBeNull();
+    expect((await closerLookOf(ctx.client, me.accountId, new Date())).until).toBeNull();
+  });
+
+  test("a person who rejects the appealed photo leaves its note as it was", async ({ ctx }) => {
+    const { app } = await appWith(ctx, scripted(inspection("Weapons 93", "99")));
+    const me = await signedInAccount(ctx.client);
+    const staff = await staffSession(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 600, height: 800, exif: false })),
+    });
+    const photo = (await res.json()) as { id: string };
+    await app.request(`/photos/${photo.id}/appeal`, { method: "POST", headers: me.headers });
+    const decided = await app.request(`/admin/photos/${photo.id}/decision`, {
+      method: "POST",
+      headers: { ...staff.headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "reject", reason: "violence" }),
+    });
+    expect(decided.status).toBe(200);
+    expect(await notesOf(ctx, me.accountId)).toEqual([
+      { kind: "violence", at: expect.any(Date), photo_id: photo.id },
+    ]);
   });
 });

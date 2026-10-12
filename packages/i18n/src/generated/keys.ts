@@ -25,6 +25,11 @@ export type MessageParams = {
   "account.export.button": Record<never, never>;
   "account.export.explain": Record<never, never>;
   "account.export.failed": Record<never, never>;
+  "account.export.photoCheck.about": Record<never, never>;
+  "account.export.photoCheck.reason.disturbing": Record<never, never>;
+  "account.export.photoCheck.reason.hate": Record<never, never>;
+  "account.export.photoCheck.reason.nudity": Record<never, never>;
+  "account.export.photoCheck.reason.violence": Record<never, never>;
   "account.export.title": Record<never, never>;
   "account.export.working": Record<never, never>;
   "account.research.explain": Record<never, never>;

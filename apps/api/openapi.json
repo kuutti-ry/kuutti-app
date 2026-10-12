@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -539,6 +539,9 @@
             },
             "maxItems": 1000
           },
+          "photoCheck": {
+            "$ref": "#/components/schemas/ExportedPhotoCheck"
+          },
           "research": {
             "$ref": "#/components/schemas/ResearchExport"
           },
@@ -557,6 +560,7 @@
           "profile",
           "photos",
           "photoAccessLog",
+          "photoCheck",
           "research",
           "gate"
         ]
@@ -1348,6 +1352,60 @@
           "full"
         ],
         "description": "thumb: 200×200 for lists. card: 800×1067 when a profile is opened. full: 1600 px long edge, requested only from the zoom screen."
+      },
+      "ExportedPhotoCheck": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "What this part is, in the request's language."
+          },
+          "photosNotShown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "kind": {
+                  "$ref": "#/components/schemas/PhotoCheckKind"
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "The kind in words, in the request's language."
+                }
+              },
+              "required": [
+                "at",
+                "kind",
+                "reason"
+              ]
+            },
+            "description": "Oldest first; each goes after twelve months."
+          },
+          "carefulCheckUntil": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "Until when new photos are checked more carefully; null when they are not."
+          }
+        },
+        "required": [
+          "about",
+          "photosNotShown",
+          "carefulCheckUntil"
+        ]
+      },
+      "PhotoCheckKind": {
+        "type": "string",
+        "enum": [
+          "nudity",
+          "violence",
+          "disturbing",
+          "hate"
+        ]
       },
       "ResearchExport": {
         "type": "object",

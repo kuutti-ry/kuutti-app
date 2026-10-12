@@ -58,6 +58,12 @@ export const MATCHING_CONFIG_V1 = {
   photo_moderation_hate_reject: 90,
   // #253 (migration 0033): a nudity label this sure leaves the owner no appeal.
   photo_moderation_nudity_no_appeal: 95,
+  // #253 (migration 0035): two hard rejections in 30 days make the check
+  // stricter for that account for 30 days, its reject line at 75.
+  photo_closer_look_attempts: 2,
+  photo_closer_look_window_days: 30,
+  photo_closer_look_days: 30,
+  photo_closer_look_reject: 75,
   // #56: profile photo tips; the tips rule reads these against photo_review signals.
   photo_tip_mirror_confidence_min: 50,
   photo_tip_bathroom_confidence_min: 50,

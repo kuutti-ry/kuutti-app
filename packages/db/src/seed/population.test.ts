@@ -330,7 +330,16 @@ describe("writing the population", () => {
         expect(await marked()).toBe(100);
         expect(await count("SELECT count(*) AS n FROM identity")).toBe(others + 100);
 
+        // The photo check may leave a note on a synthetic account (#253); it goes with the rest.
+        await pool.query(
+          `INSERT INTO photo_check_note (account_id, kind)
+           SELECT a.id, 'nudity' FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject = $1`,
+          [`${DEMO_SUBJECT_PREFIX}demo-0001`],
+        );
+        expect(await count("SELECT count(*) AS n FROM photo_check_note")).toBe(1);
         expect(await removePopulation(pool)).toEqual({ removed: 100, spared: 0 });
+        expect(await count("SELECT count(*) AS n FROM photo_check_note")).toBe(0);
         expect(await marked()).toBe(0);
         expect(await count("SELECT count(*) AS n FROM identity")).toBe(others);
         expect(await count("SELECT count(*) AS n FROM profile")).toBe(1);

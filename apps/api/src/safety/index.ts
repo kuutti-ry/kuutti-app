@@ -7,3 +7,13 @@ export {
   auditBoundary,
   recordAudit,
 } from "./audit.ts";
+// What the photo check did not show, and the closer look it leads to (#253).
+export {
+  type CloserLook,
+  closerLookOf,
+  deletePhotoCheckNotesOfAccount,
+  listPhotoCheckNotes,
+  prunePhotoCheckNotes,
+  recordPhotoCheckNote,
+  withdrawPhotoCheckNote,
+} from "./photo-check.ts";

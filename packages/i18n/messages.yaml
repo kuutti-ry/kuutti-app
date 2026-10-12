@@ -4041,6 +4041,41 @@ account.export.failed:
   sv: Nedladdningen misslyckades. Försök igen.
   machine: { fi: true, sv: true }
 
+account.export.photoCheck.about:
+  en: "Kuutti checks every photo before anyone else sees it. Below are the photos of yours the check did not show to others in the last twelve months, and until when your new photos are checked a little more carefully, if they are. Nothing else follows from them, and both end by themselves."
+  description: "Inside the downloaded data file (#253), the text that opens the photo check part. Plain and calm: a person reads what the check holds about them; never accusing words (strike, flag, violation, offence, suspicious)."
+  fi: "Kuutti tarkistaa jokaisen kuvan ennen kuin kukaan muu näkee sen. Alla ovat kuvasi, joita tarkistus ei näyttänyt muille viimeisten kahdentoista kuukauden aikana, ja mihin asti uudet kuvasi tarkistetaan hieman tarkemmin, jos tarkistetaan. Niistä ei seuraa mitään muuta, ja molemmat päättyvät itsestään."
+  sv: "Kuutti granskar varje foto innan någon annan ser det. Nedan finns de av dina foton som granskningen inte visade för andra under de senaste tolv månaderna, och till när dina nya foton granskas lite noggrannare, om de gör det. Inget annat följer av dem, och båda upphör av sig själva."
+  machine: { fi: true, sv: true }
+
+account.export.photoCheck.reason.nudity:
+  en: May show more than Kuutti allows
+  description: Inside the downloaded data file (#253), why the check did not show a photo to others; the nudity group, said gently.
+  fi: Saattaa näyttää enemmän kuin Kuutti sallii
+  sv: Kan visa mer än Kuutti tillåter
+  machine: { fi: true, sv: true }
+
+account.export.photoCheck.reason.violence:
+  en: May show violence or weapons
+  description: Inside the downloaded data file (#253), why the check did not show a photo to others; the violence group, weapons included.
+  fi: Saattaa näyttää väkivaltaa tai aseita
+  sv: Kan visa våld eller vapen
+  machine: { fi: true, sv: true }
+
+account.export.photoCheck.reason.disturbing:
+  en: May show something distressing
+  description: Inside the downloaded data file (#253), why the check did not show a photo to others; the disturbing group.
+  fi: Saattaa näyttää jotain järkyttävää
+  sv: Kan visa något upprörande
+  machine: { fi: true, sv: true }
+
+account.export.photoCheck.reason.hate:
+  en: May show a symbol Kuutti does not allow
+  description: Inside the downloaded data file (#253), why the check did not show a photo to others; the hate symbols group, said without naming it.
+  fi: Saattaa näyttää symbolin, jota Kuutti ei salli
+  sv: Kan visa en symbol som Kuutti inte tillåter
+  machine: { fi: true, sv: true }
+
 account.delete.button:
   en: Delete my account
   description: Account card, the button that opens the deletion confirmation.

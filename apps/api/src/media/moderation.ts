@@ -14,6 +14,7 @@ import {
 import sharp from "sharp";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
+import { closerLookOf, recordPhotoCheckNote } from "../safety/index.ts";
 import {
   GROUP_REASON,
   groupLineKeys,
@@ -90,6 +91,8 @@ export type Decision = {
   reason?: PhotoRejectionReason;
   /** Set when the check itself rejects: whether the owner may ask a person to look. */
   appealable?: boolean;
+  /** The hard group the check was sure of, when that is why it rejected. */
+  group?: LabelGroup;
 };
 
 const roundConfidence = (n: number) => Math.round(n * 100) / 100;
@@ -179,7 +182,14 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
     (label) => groupOf(label.name) === "nudity" && label.confidence >= thresholds.noAppealNudity,
   );
   if (sure) {
-    return { decision: "rejected", flagged, faces, reason: GROUP_REASON[sure], appealable };
+    return {
+      decision: "rejected",
+      flagged,
+      faces,
+      reason: GROUP_REASON[sure],
+      appealable,
+      group: sure,
+    };
   }
   if (inspection.faceConfidences.length === 0) {
     return {
@@ -318,12 +328,30 @@ export async function readThresholds(db: Queryable): Promise<Thresholds> {
 }
 
 /**
+ * The lines of a closer look (#253): every hard group rejects from `reject`,
+ * or from its own line where that is lower already; the review lines and the
+ * no-appeal line stay.
+ */
+export function closerLines(thresholds: Thresholds, reject: number): Thresholds {
+  const groups = Object.fromEntries(
+    LABEL_GROUPS.map((group) => {
+      const lines = thresholds.groups[group];
+      return [group, { review: lines.review, reject: Math.min(lines.reject, reject) }];
+    }),
+  ) as Thresholds["groups"];
+  return { ...thresholds, groups };
+}
+
+/**
  * Runs the check on one photo and records the outcome: a photo_review row and
  * the photo's state, which moves only from pending (a person's decision is
  * never overwritten by the machine). A failing check leaves the photo pending
- * and logs why; the nightly sweep tries again. The log line carries counts,
- * never a label name (security checklist: nothing about a person's photo
- * beyond the count reaches a line with their account id).
+ * and logs why; the nightly sweep tries again. A rejection for a hard label
+ * the usual lines are sure of leaves a note (safety/photo-check.ts), and an
+ * account with enough recent notes is checked with the closer look's lines
+ * (#253). The log line carries counts, never a label name nor the closer look
+ * (security checklist: nothing about a person's photo beyond the count reaches
+ * a line with their account id).
  */
 export async function moderatePhoto(
   deps: ModerationDeps,
@@ -340,9 +368,17 @@ export async function moderatePhoto(
     );
     return null;
   }
-  const decided = decideModeration(inspection, thresholds);
-  const labels = storedLabels(inspection);
   const at = deps.now();
+  const usual = decideModeration(inspection, thresholds);
+  const closer = inspection.checked ? await closerLookOf(deps.db, input.accountId, at) : null;
+  const decided = closer?.until
+    ? decideModeration(inspection, closerLines(thresholds, closer.reject))
+    : usual;
+  // Only what the usual lines are sure of is noted, so a closer look never
+  // prolongs itself on what it alone rejected; under the stricter lines the
+  // note names the group the owner was told of.
+  const noted = usual.group ? decided.group : undefined;
+  const labels = storedLabels(inspection);
   // The record and the move are one unit: a photo never ends up pending with
   // a review row that says it was checked (the sweep would skip it forever).
   const moved = await transaction(deps.db, async (tx) => {
@@ -356,13 +392,22 @@ export async function moderatePhoto(
       decision: decided.decision,
       reason: decided.reason ?? null,
     });
-    return repo.movePendingPhoto(
+    const movedNow = await repo.movePendingPhoto(
       tx,
       input.photoId,
       decided.decision,
       decided.reason ?? null,
       decided.appealable === true,
     );
+    if (movedNow && noted) {
+      await recordPhotoCheckNote(tx, {
+        accountId: input.accountId,
+        photoId: input.photoId,
+        kind: noted,
+        at,
+      });
+    }
+    return movedNow;
   });
   deps.logger.info(
     {

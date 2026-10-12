@@ -1,4 +1,5 @@
 import { createPool, type Pool, type PoolClient } from "@kuutti/db";
+import { createI18n, typedT } from "@kuutti/i18n";
 import { test as base } from "vitest";
 import { type App, createApp } from "../app.ts";
 import { type Config, parseConfig } from "../lib/config.ts";
@@ -20,6 +21,9 @@ export function testConfig(overrides: Record<string, string | undefined> = {}): 
     ...overrides,
   });
 }
+
+/** English t(), for a function that takes the request's language (the export, #253). */
+export const englishT = typedT(createI18n({ locale: "en" }), "en");
 
 export type LogLine = Record<string, unknown> & {
   level?: number;
