@@ -1,29 +1,39 @@
 version: 2
+
+# Every entry runs on the first of the month and proposes a release only once
+# it is seven days old (cooldown; GitHub's default is three days): most
+# malicious releases are found and pulled within days. Security updates skip
+# both and open when the alert does. What is added by hand meets pnpm's own
+# one-day minimumReleaseAge (pnpm-workspace.yaml).
 updates:
   # Keep the actions used in .github/workflows current. Actions are pinned to
   # commit SHAs; Dependabot bumps the SHA and the version comment together.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
     groups:
       github-actions:
         patterns: ["*"]
 
   # The pnpm workspace. Minor and patch bumps arrive as one pull request a
-  # week; majors come alone so they get read.
+  # month; majors come alone so they get read.
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
     ignore:
       # The Expo SDK pins these, patch included (`npx expo install --check`
       # in apps/mobile names each one): they move with an SDK upgrade through
-      # `npx expo install --fix`, never one by one. With them in the weekly
-      # group, the whole group failed typecheck and test-mobile (#113).
+      # `npx expo install --fix`, never one by one. With them in the group,
+      # the whole group failed typecheck and test-mobile (#113).
       - dependency-name: "react-native"
       - dependency-name: "@react-native/jest-preset"
       - dependency-name: "react-native-reanimated"
@@ -58,17 +68,40 @@ updates:
   - package-ecosystem: "docker"
     directory: "/apps/api"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
     ignore:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
 
+  # The images of the local and CI stack (docker-compose.yml). Postgres keeps
+  # the major RDS runs (infra/modules/data/main.tf); a new major goes there
+  # first, by hand.
+  - package-ecosystem: "docker-compose"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
+    groups:
+      compose-images:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+
   # Provider version bumps for the infrastructure code, one per root with a
-  # lockfile.
-  - package-ecosystem: "terraform"
+  # lockfile. The lockfiles are OpenTofu's (registry.opentofu.org); as
+  # `terraform` this entry read the Terraform registry and proposed nothing
+  # ("No update possible", 10 October 2026) while four AWS provider releases
+  # went by.
+  - package-ecosystem: "opentofu"
     directories: ["/infra/bootstrap", "/infra/envs/staging", "/infra/envs/prod"]
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    cooldown:
+      default-days: 7
     groups:
       providers:
         patterns: ["*"]
