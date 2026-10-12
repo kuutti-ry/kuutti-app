@@ -36,6 +36,7 @@ export type MessageParams = {
   "admin.empty": Record<never, never>;
   "admin.forbidden": Record<never, never>;
   "admin.queue.account": { "account": string };
+  "admin.queue.appealed": Record<never, never>;
   "admin.queue.approve": Record<never, never>;
   "admin.queue.cancel": Record<never, never>;
   "admin.queue.confirmReject": Record<never, never>;
@@ -60,6 +61,8 @@ export type MessageParams = {
   "admin.queue.reason.violence": Record<never, never>;
   "admin.queue.refresh": Record<never, never>;
   "admin.queue.reject": Record<never, never>;
+  "admin.queue.sensitive": Record<never, never>;
+  "admin.queue.show": Record<never, never>;
   "admin.queue.title": Record<never, never>;
   "admin.queue.total": { "total": number };
   "admin.queue.uploaded": { "time": string };
@@ -98,6 +101,7 @@ export type MessageParams = {
   "errors.photo_budget_exceeded": Record<never, never>;
   "errors.photo_invalid": Record<never, never>;
   "errors.photo_limit": Record<never, never>;
+  "errors.photo_not_appealable": Record<never, never>;
   "errors.photo_order_invalid": Record<never, never>;
   "errors.photo_too_many_pixels": Record<never, never>;
   "errors.photo_unsupported": Record<never, never>;
@@ -186,6 +190,7 @@ export type MessageParams = {
   "onboarding.welcome.norm4": Record<never, never>;
   "onboarding.welcome.title": Record<never, never>;
   "photos.add": Record<never, never>;
+  "photos.appeal": Record<never, never>;
   "photos.count": { "photos": number; "max": number };
   "photos.dialog.close": Record<never, never>;
   "photos.done": Record<never, never>;
@@ -197,6 +202,7 @@ export type MessageParams = {
   "photos.error.photo_budget_exceeded": Record<never, never>;
   "photos.error.photo_invalid": Record<never, never>;
   "photos.error.photo_limit": Record<never, never>;
+  "photos.error.photo_not_appealable": Record<never, never>;
   "photos.error.photo_order_invalid": Record<never, never>;
   "photos.error.photo_unsupported": Record<never, never>;
   "photos.error.tooLarge": Record<never, never>;

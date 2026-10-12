@@ -61,10 +61,13 @@ export type Thresholds = {
   faceThreshold: number;
   /** Each hard group's lines (label-groups.ts): a person from `review`, the check's own rejection from `reject`. */
   groups: Record<LabelGroup, { review: number; reject: number }>;
+  /** A nudity label at or above this leaves the owner no appeal: no moderator is sent a picture the check is this sure of (#253). */
+  noAppealNudity: number;
 };
 
 export const LABEL_THRESHOLD_KEY = "photo_moderation_label_threshold";
 export const FACE_THRESHOLD_KEY = "photo_moderation_face_threshold";
+export const NO_APPEAL_NUDITY_KEY = "photo_moderation_nudity_no_appeal";
 /** Labels stored per photo, at most; Rekognition returns a few, never dozens. */
 export const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
@@ -85,6 +88,8 @@ export type Decision = {
   faces: number;
   /** What the owner is told, set when the check itself rejects. */
   reason?: PhotoRejectionReason;
+  /** Set when the check itself rejects: whether the owner may ask a person to look. */
+  appealable?: boolean;
 };
 
 const roundConfidence = (n: number) => Math.round(n * 100) / 100;
@@ -169,9 +174,21 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
     const askAt = lines ? lines.review : thresholds.labelThreshold;
     if (label.confidence >= askAt && !flagged.includes(label.name)) flagged.push(label.name);
   }
-  if (sure) return { decision: "rejected", flagged, faces, reason: GROUP_REASON[sure] };
+  // Every rejection of the check may be appealed, but not over a nudity label this sure (#253).
+  const appealable = !inspection.labels.some(
+    (label) => groupOf(label.name) === "nudity" && label.confidence >= thresholds.noAppealNudity,
+  );
+  if (sure) {
+    return { decision: "rejected", flagged, faces, reason: GROUP_REASON[sure], appealable };
+  }
   if (inspection.faceConfidences.length === 0) {
-    return { decision: "rejected", flagged: [...flagged, NO_FACE], faces, reason: "no_person" };
+    return {
+      decision: "rejected",
+      flagged: [...flagged, NO_FACE],
+      faces,
+      reason: "no_person",
+      appealable,
+    };
   }
   if (faces > 1) {
     return {
@@ -179,6 +196,7 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
       flagged: [...flagged, SEVERAL_FACES],
       faces,
       reason: "several_people",
+      appealable,
     };
   }
   if (faces === 0) flagged.push(NO_FACE);
@@ -282,6 +300,7 @@ export async function readThresholds(db: Queryable): Promise<Thresholds> {
   const n = await matchingConfigNumbers(db, [
     LABEL_THRESHOLD_KEY,
     FACE_THRESHOLD_KEY,
+    NO_APPEAL_NUDITY_KEY,
     ...groupKeys,
   ]);
   const groups = Object.fromEntries(
@@ -290,7 +309,12 @@ export async function readThresholds(db: Queryable): Promise<Thresholds> {
       return [group, { review: n[keys.review], reject: n[keys.reject] }];
     }),
   ) as Thresholds["groups"];
-  return { labelThreshold: n[LABEL_THRESHOLD_KEY], faceThreshold: n[FACE_THRESHOLD_KEY], groups };
+  return {
+    labelThreshold: n[LABEL_THRESHOLD_KEY],
+    faceThreshold: n[FACE_THRESHOLD_KEY],
+    groups,
+    noAppealNudity: n[NO_APPEAL_NUDITY_KEY],
+  };
 }
 
 /**
@@ -332,7 +356,13 @@ export async function moderatePhoto(
       decision: decided.decision,
       reason: decided.reason ?? null,
     });
-    return repo.movePendingPhoto(tx, input.photoId, decided.decision, decided.reason ?? null);
+    return repo.movePendingPhoto(
+      tx,
+      input.photoId,
+      decided.decision,
+      decided.reason ?? null,
+      decided.appealable === true,
+    );
   });
   deps.logger.info(
     {

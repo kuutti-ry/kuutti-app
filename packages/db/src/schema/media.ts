@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -49,8 +50,11 @@ export const photo = pgTable(
     height: integer("height").notNull(),
     // pending until moderation (#49) says otherwise; the owner sees it, nobody else.
     state: photoState("state").notNull().default("pending"),
-    // Set with state rejected by a moderator's decision; the app shows its text.
+    // Set with state rejected, by a moderator or the check; the app shows its text.
     rejectionReason: photoRejectionReason("rejection_reason"),
+    // The owner may ask a person to look (#253): set when the check rejects,
+    // unless it was sure of nudity; cleared by the appeal or a person's decision.
+    appealable: boolean("appealable").notNull().default(false),
     // 0 is the main photo. The owner orders; the API renumbers 0..n-1.
     position: smallint("position").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -144,6 +148,8 @@ export const photoReview = pgTable(
     decidedBy: uuid("decided_by").references(() => identity.id),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     reason: photoRejectionReason("reason"),
+    // When the owner asked a person to look at the check's rejection (#253); once per photo.
+    appealedAt: timestamp("appealed_at", { withTimezone: true }),
   },
   (table) => [index("photo_review_decision_idx").on(table.decision, table.checkedAt)],
 );

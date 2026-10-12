@@ -72,6 +72,10 @@ export const PhotoReviewItem = z
     faces: z.int().min(0),
     /** Why the automatic check did not approve: label names above the threshold, or no face. */
     flagged: z.array(z.string().max(100)).max(50),
+    /** The owner asked a person to look at the check's rejection (#253). */
+    appealed: z.boolean(),
+    /** A label of a hard group at or above its review line: the panel blurs the picture until a tap (#253). */
+    sensitive: z.boolean(),
   })
   .meta({ id: "PhotoReviewItem" });
 export type PhotoReviewItem = z.infer<typeof PhotoReviewItem>;

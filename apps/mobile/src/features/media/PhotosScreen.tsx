@@ -58,6 +58,7 @@ function stateText(photo: Photo, t: ReturnType<typeof useT>["t"]): string {
 const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["photo_limit", "photos.error.photo_limit"],
   ["photo_unsupported", "photos.error.photo_unsupported"],
+  ["photo_not_appealable", "photos.error.photo_not_appealable"],
   ["photo_invalid", "photos.error.photo_invalid"],
   ["photo_too_many_pixels", "photos.error.tooLarge"],
   ["payload_too_large", "photos.error.tooLarge"],
@@ -169,10 +170,24 @@ export function PhotosScreen() {
                 {index === 0 && <Text variant="small">{t("photos.main")}</Text>}
                 <Text variant="muted">{stateText(photo, t)}</Text>
               </View>
+              {photo.state === "rejected" && photo.appealable && (
+                <Button
+                  variant="outline"
+                  accessibilityLabel={t("photos.appeal")}
+                  disabled={busy}
+                  onPress={() => {
+                    tap();
+                    void photos.appeal(photo.id);
+                  }}
+                >
+                  {t("photos.appeal")}
+                </Button>
+              )}
               {/* Two rows on purpose: four 44-point targets never fit one row of a half-width tile, and a wrap that depends on the font size put the remove button on a row of its own. */}
               <View className="gap-1">
                 <View className="flex-row gap-1">
-                  {index !== 0 && (
+                  {/* A rejected photo is shown to nobody: no main photo, no place in the order (#250). */}
+                  {index !== 0 && photo.state !== "rejected" && (
                     <Button
                       variant="outline"
                       size="icon"
@@ -199,7 +214,7 @@ export function PhotosScreen() {
                     <Icon as={Trash} />
                   </Button>
                 </View>
-                {total > 1 && (
+                {total > 1 && photo.state !== "rejected" && (
                   <View className="flex-row gap-1">
                     {index !== 0 && (
                       <Button

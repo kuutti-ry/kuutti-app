@@ -15,6 +15,8 @@ import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { recordAudit } from "../safety/index.ts";
+import { groupOf } from "./label-groups.ts";
+import { readThresholds } from "./moderation.ts";
 import type { MediaDeps } from "./photos.ts";
 import * as repo from "./repo.ts";
 import { objectKey } from "./store.ts";
@@ -105,11 +107,25 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
 
   app.openapi(queueRoute, async (c) => {
     const { limit } = c.req.valid("query");
-    const [items, total] = await Promise.all([
+    const [items, total, lines] = await Promise.all([
       repo.listQueue(deps.db, limit),
       repo.countQueue(deps.db),
+      readThresholds(deps.db),
     ]);
-    return c.json({ items, total }, 200);
+    // Blurred in the panel until a tap: a hard label at or above its review line (#253).
+    const sensitive = (labels: (typeof items)[number]["labels"]) =>
+      labels.some((label) => {
+        const group = groupOf(label.name);
+        return (
+          group !== undefined &&
+          group !== "allowed" &&
+          label.confidence >= lines.groups[group].review
+        );
+      });
+    return c.json(
+      { items: items.map((item) => ({ ...item, sensitive: sensitive(item.labels) })), total },
+      200,
+    );
   });
 
   app.openapi(cardRoute, async (c) => {

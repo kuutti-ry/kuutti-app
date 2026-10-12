@@ -225,6 +225,20 @@
       "when": 1791811950416,
       "tag": "0031_photo_tip_revealing_fish",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791813095560,
+      "tag": "0032_photo_appeal",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791813096088,
+      "tag": "0033_photo_appeal_nudity_line",
+      "breakpoints": true
     }
   ]
 }

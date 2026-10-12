@@ -97,9 +97,12 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   const { t, locale } = useT();
   const [state, setState] = useState<ItemState>({ kind: "idle" });
   const [url, setUrl] = useState<string | null>(null);
+  // A sensitive picture is not even fetched until the moderator chooses to look (#253).
+  const [shown, setShown] = useState(!item.sensitive);
 
   // The card through a signed URL: one audit row per view, on the API's side.
   useEffect(() => {
+    if (!shown) return;
     let mounted = true;
     void api
       .GET("/admin/photos/{id}/card", { params: { path: { id: item.photoId } } })
@@ -109,7 +112,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
     return () => {
       mounted = false;
     };
-  }, [item.photoId]);
+  }, [item.photoId, shown]);
 
   const decide = async (
     body: { decision: "approve" } | { decision: "reject"; reason: PhotoRejectionReason },
@@ -142,7 +145,14 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   return (
     <li className="item">
       <figure>
-        {url ? (
+        {!shown ? (
+          <div className="hidden-picture">
+            <p>{t("admin.queue.sensitive")}</p>
+            <button type="button" onClick={() => setShown(true)}>
+              {t("admin.queue.show")}
+            </button>
+          </div>
+        ) : url ? (
           <img src={url} alt={t("admin.queue.image")} width={400} height={533} />
         ) : (
           <p aria-busy="true">{t("admin.queue.imageLoading")}</p>
@@ -153,6 +163,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
         </figcaption>
       </figure>
       <div className="check">
+        {item.appealed && <p className="appealed">{t("admin.queue.appealed")}</p>}
         <h3>{t("admin.queue.labels")}</h3>
         {notChecked ? (
           <p>{t("admin.queue.notChecked")}</p>

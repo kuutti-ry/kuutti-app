@@ -96,6 +96,7 @@ describe("a photo as its owner reads it", () => {
     height: 1600,
     state: "pending",
     rejectionReason: null,
+    appealable: false,
     position: 0,
     createdAt: at,
   };

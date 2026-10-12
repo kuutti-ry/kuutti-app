@@ -1,4 +1,4 @@
-import type { Queryable } from "@kuutti/db";
+import { type Queryable, transaction } from "@kuutti/db";
 import {
   PHOTO_VARIANTS,
   type Photo,
@@ -138,7 +138,12 @@ export async function uploadPhoto(
       { photoId: row.id, accountId: input.accountId, card: processed.variants.card },
     );
     if (decided) {
-      return toPhoto({ ...row, state: decided.decision, rejectionReason: decided.reason ?? null });
+      return toPhoto({
+        ...row,
+        state: decided.decision,
+        rejectionReason: decided.reason ?? null,
+        appealable: decided.appealable === true,
+      });
     }
   }
   return toPhoto(row);
@@ -157,6 +162,35 @@ export async function deletePhoto(
     await deps.store.delete(PHOTO_VARIANTS.map((variant) => objectKey(row.key, variant)));
   }
   deps.logger.info({ accountId, photoId }, "photo deleted");
+}
+
+/**
+ * The owner asks a person to look at the check's own rejection (#253): once,
+ * and never after a nudity label the check was very sure of or a person's
+ * decision. The photo waits in the queue again; nobody else sees it before a
+ * person approves it.
+ */
+export async function appealPhoto(
+  deps: PhotoServiceDeps,
+  accountId: string,
+  photoId: string,
+): Promise<Photo> {
+  const row = await transaction(deps.db, (tx) =>
+    repo.appealPhoto(tx, { accountId, photoId, at: deps.now() }),
+  );
+  if (row) {
+    deps.logger.info({ accountId, photoId }, "photo appealed");
+    return toPhoto(row);
+  }
+  const mine = await repo.listPhotos(deps.db, accountId);
+  if (!mine.some((photo) => photo.id === photoId)) {
+    throw new AppError(404, "not_found", "No such photo of this account");
+  }
+  throw new AppError(
+    409,
+    "photo_not_appealable",
+    "Only the check's own rejection is appealed, once",
+  );
 }
 
 /** The order must name every photo of the account exactly once. */

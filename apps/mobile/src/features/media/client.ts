@@ -35,6 +35,15 @@ export async function deletePhoto(id: string): Promise<void> {
   if (!response.ok) throw failed(response, error, "photo removal");
 }
 
+/** Ask a person to look at the check's rejection (#253); the photo comes back queued. */
+export async function appealPhoto(id: string): Promise<Photo> {
+  const { data, error, response } = await api.POST("/photos/{id}/appeal", {
+    params: { path: { id } },
+  });
+  if (!data) throw failed(response, error, "photo appeal");
+  return Photo.parse(data);
+}
+
 export async function reorderPhotos(order: string[]): Promise<PhotoList> {
   const { data, error, response } = await api.PUT("/photos/order", { body: { order } });
   if (!data) throw failed(response, error, "photo order");

@@ -62,6 +62,7 @@ const lines = (labelThreshold: number, faceThreshold: number): Thresholds => ({
     disturbing: { review: 60, reject: 90 },
     hate: { review: 60, reject: 90 },
   },
+  noAppealNudity: 95,
 });
 
 describe("Automatic moderation decision", () => {
@@ -150,6 +151,28 @@ describe("Automatic moderation decision", () => {
       lines(60, 90),
     );
     expect(decided).toEqual({ decision: "approved", flagged: [], faces: 1 });
+  });
+});
+
+describe("whether the owner may appeal the check's rejection (#253)", () => {
+  it.each([
+    ["none", "none", true],
+    ["none", "99, 98", true],
+    ["Weapons 99", "99", true],
+    ["Explicit Nudity 92", "99", true],
+    ["Explicit Nudity 95", "99", false],
+    ["Exposed Male Genitalia 97", "none", false],
+  ])("labels %s, faces %s → appealable %s", (labels, faces, appealable) => {
+    const decided = decideModeration(inspection(labels, faces), lines(60, 90));
+    expect(decided.decision).toBe("rejected");
+    expect(decided.appealable).toBe(appealable);
+  });
+
+  it("names no appeal for what the check approves or queues", () => {
+    expect(decideModeration(inspection("none", "99"), lines(60, 90)).appealable).toBeUndefined();
+    expect(
+      decideModeration(inspection("Explicit Nudity 75", "99"), lines(60, 90)).appealable,
+    ).toBeUndefined();
   });
 });
 
@@ -716,6 +739,7 @@ describe("what the Rekognition adapter makes of sparse answers", () => {
       flagged: [NO_FACE],
       faces: 0,
       reason: "no_person",
+      appealable: true,
     });
   });
 
@@ -856,5 +880,99 @@ describe("the nightly sweep's failures", () => {
       ids,
     ]);
     expect(states.rows).toEqual([{ state: "pending" }, { state: "pending" }]);
+  });
+});
+
+describe("the owner's appeal (#253)", () => {
+  const upload = async (app: ReturnType<typeof createApp>, headers: Record<string, string>) => {
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers,
+      body: multipart(await fixtureJpeg({ width: 600, height: 800, exif: false })),
+    });
+    expect(res.status).toBe(201);
+    return (await res.json()) as { id: string; state: string; appealable: boolean };
+  };
+  const appeal = (app: ReturnType<typeof createApp>, headers: Record<string, string>, id: string) =>
+    app.request(`/photos/${id}/appeal`, { method: "POST", headers });
+  const codeOf = async (res: Response) =>
+    ((await res.json()) as { error: { code: string } }).error.code;
+
+  test("An owner asks a person to look at a photo the check rejected, once", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, scripted(inspection("none", "none")));
+    const me = await signedInAccount(ctx.client);
+    const photo = await upload(app, me.headers);
+    expect(photo).toMatchObject({ state: "rejected", appealable: true });
+
+    const res = await appeal(app, me.headers, photo.id);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      id: photo.id,
+      state: "queued",
+      rejectionReason: null,
+      appealable: false,
+    });
+    const review = await ctx.client.query(
+      "SELECT decision, reason, appealed_at IS NOT NULL AS appealed FROM photo_review WHERE photo_id = $1",
+      [photo.id],
+    );
+    expect(review.rows[0]).toEqual({ decision: "queued", reason: null, appealed: true });
+    expect(logs().find((l) => l.msg === "photo appealed")).toMatchObject({
+      accountId: me.accountId,
+      photoId: photo.id,
+    });
+
+    // Once: a second ask is refused, and nothing moves.
+    const again = await appeal(app, me.headers, photo.id);
+    expect(again.status).toBe(409);
+    expect(await codeOf(again)).toBe("photo_not_appealable");
+  });
+
+  test("A photo the check was very sure showed nudity offers no appeal", async ({ ctx }) => {
+    const { app } = await appWith(ctx, scripted(inspection("Explicit Nudity 97", "99")));
+    const me = await signedInAccount(ctx.client);
+    const photo = await upload(app, me.headers);
+    expect(photo).toMatchObject({ state: "rejected", appealable: false });
+    const res = await appeal(app, me.headers, photo.id);
+    expect(res.status).toBe(409);
+    expect(await codeOf(res)).toBe("photo_not_appealable");
+    const state = await ctx.client.query("SELECT state FROM photo WHERE id = $1", [photo.id]);
+    expect(state.rows[0]?.state).toBe("rejected");
+  });
+
+  test("A person's rejection offers no appeal, and neither does an approved photo", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, scripted(inspection("none", "99")));
+    const me = await signedInAccount(ctx.client);
+    const approved = await upload(app, me.headers);
+    expect(approved.state).toBe("approved");
+    expect(await codeOf(await appeal(app, me.headers, approved.id))).toBe("photo_not_appealable");
+    // A moderator's rejection leaves appealable as it was: false.
+    await ctx.client.query(
+      "UPDATE photo SET state = 'rejected', rejection_reason = 'other' WHERE id = $1",
+      [approved.id],
+    );
+    const res = await appeal(app, me.headers, approved.id);
+    expect(res.status).toBe(409);
+    expect(await codeOf(res)).toBe("photo_not_appealable");
+  });
+
+  test("The appeal answers 401 without a session, 404 for another account's photo, 400 for a bad id", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, scripted(inspection("none", "none")));
+    const owner = await signedInAccount(ctx.client);
+    const other = await signedInAccount(ctx.client);
+    const photo = await upload(app, owner.headers);
+    expect((await app.request(`/photos/${photo.id}/appeal`, { method: "POST" })).status).toBe(401);
+    const theirs = await appeal(app, other.headers, photo.id);
+    expect(theirs.status).toBe(404);
+    expect((await appeal(app, owner.headers, "not-a-uuid")).status).toBe(400);
+    // The owner's photo is untouched by the stranger's try.
+    const state = await ctx.client.query("SELECT state, appealable FROM photo WHERE id = $1", [
+      photo.id,
+    ]);
+    expect(state.rows[0]).toEqual({ state: "rejected", appealable: true });
   });
 });

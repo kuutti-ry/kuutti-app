@@ -45,6 +45,7 @@ const photo = (n: number) => ({
   height: 1200,
   state: n === 1 ? "approved" : "pending",
   rejectionReason: null,
+  appealable: false,
   position: n - 1,
   createdAt: "2026-09-25T12:00:00.000Z",
 });
@@ -127,6 +128,62 @@ describe("PhotosScreen", () => {
     await show(<PhotosScreen />);
     expect(await screen.findByText(/A profile photo has to show you/)).toBeTruthy();
     expect(screen.queryByText("Not accepted")).toBeNull();
+  });
+
+  it("offers to ask a person to look at the check's rejection, and shows it queued again (#253)", async () => {
+    const rejected = {
+      ...photo(2),
+      state: "rejected",
+      rejectionReason: "no_person",
+      appealable: true,
+    };
+    const { calls } = fetchMock([
+      answersList({ photos: [photo(1), rejected], maxPhotos: 3 }),
+      answersUrls,
+      (req) =>
+        req.method === "POST" && new URL(req.url).pathname === `/photos/${rejected.id}/appeal`
+          ? json({ ...rejected, state: "queued", rejectionReason: null, appealable: false })
+          : null,
+    ]);
+    await show(<PhotosScreen />);
+    // A rejected photo is shown to nobody: no making it the main photo, no moving it (#250).
+    expect(await screen.findByText(/A profile photo has to show you/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Make main photo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Move earlier" })).toBeNull();
+    const ask = screen.getByRole("button", { name: "Ask a person to look" });
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+    await press(ask);
+    expect(
+      calls.some((c) => c.method === "POST" && /\/appeal$/.test(new URL(c.url).pathname)),
+    ).toBe(true);
+    expect(await screen.findByText("Being reviewed")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Ask a person to look" })).toBeNull();
+  });
+
+  it("offers no appeal where the API says there is none, and says so when the ask is refused", async () => {
+    const sure = { ...photo(1), state: "rejected", rejectionReason: "nudity", appealable: false };
+    const stale = {
+      ...photo(2),
+      state: "rejected",
+      rejectionReason: "no_person",
+      appealable: true,
+    };
+    fetchMock([
+      answersList({ photos: [sure, stale], maxPhotos: 3 }),
+      answersUrls,
+      (req) =>
+        req.method === "POST" && /\/appeal$/.test(new URL(req.url).pathname)
+          ? json({ error: { code: "photo_not_appealable", message: "x", requestId: "r" } }, 409)
+          : null,
+    ]);
+    await show(<PhotosScreen />);
+    expect(await screen.findAllByRole("button", { name: "Ask a person to look" })).toHaveLength(1);
+    await press(screen.getByRole("button", { name: "Ask a person to look" }));
+    expect(
+      await screen.findByText(
+        "A person cannot be asked to look at this photo. Remove it and try another one.",
+      ),
+    ).toBeTruthy();
   });
 
   it("opens the zoom screen for a tapped photo with what its label needs", async () => {

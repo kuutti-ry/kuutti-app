@@ -62,6 +62,7 @@ describe("seed", () => {
           photo_moderation_disturbing_reject: 90,
           photo_moderation_hate_review: 60,
           photo_moderation_hate_reject: 90,
+          photo_moderation_nudity_no_appeal: 95,
           photo_tip_mirror_confidence_min: 50,
           photo_tip_bathroom_confidence_min: 50,
           photo_tip_sunglasses_confidence_min: 50,

@@ -22,6 +22,8 @@ const item = (n: number, extra: Record<string, unknown> = {}) => ({
   labels: [{ name: "Suggestive", parentName: "", confidence: 71.4 }],
   faces: 1,
   flagged: ["Suggestive"],
+  appealed: false,
+  sensitive: false,
   ...extra,
 });
 
@@ -323,5 +325,41 @@ describe("PhotoQueue", () => {
     answerQueue?.(json({ items: [item(2)], total: 1 }));
     expect(await screen.findByText("1 photo waiting")).toBeInTheDocument();
     expect(screen.queryByText("Nothing waiting")).toBeNull();
+  });
+
+  it("hides a sensitive picture until the moderator chooses to look, and fetches it only then (#253)", async () => {
+    const calls = fetchMock([
+      (req) =>
+        req.method === "GET" && path(req) === "/admin/photos/queue"
+          ? json({ items: [item(1, { sensitive: true })], total: 1 })
+          : null,
+      cardUrls,
+    ]);
+    show();
+    expect(
+      await screen.findByText(
+        "Hidden until you choose to look. The check saw something sensitive.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("img")).toBeNull();
+    // No signed URL, so no audit row of a view that did not happen.
+    expect(calls.filter((req) => path(req).endsWith("/card"))).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Show the picture" }));
+    expect(await screen.findByRole("img")).toBeInTheDocument();
+    expect(calls.filter((req) => path(req).endsWith("/card"))).toHaveLength(1);
+  });
+
+  it("says when the owner asked a person to look", async () => {
+    fetchMock([
+      (req) =>
+        req.method === "GET" && path(req) === "/admin/photos/queue"
+          ? json({ items: [item(1, { appealed: true })], total: 1 })
+          : null,
+      cardUrls,
+    ]);
+    show();
+    expect(
+      await screen.findByText("The owner asked a person to look at the automatic rejection."),
+    ).toBeInTheDocument();
   });
 });

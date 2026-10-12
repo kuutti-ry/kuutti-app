@@ -83,6 +83,10 @@ export const Photo = z
     rejectionReason: PhotoRejectionReason.nullable().meta({
       description: "Set when state is rejected: the reason the owner is told.",
     }),
+    appealable: z.boolean().meta({
+      description:
+        "The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision.",
+    }),
     position: z
       .int()
       .min(0)

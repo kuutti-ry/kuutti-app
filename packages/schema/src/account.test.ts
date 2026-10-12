@@ -88,6 +88,7 @@ const photo = (n: number) => ({
   height: 1600,
   state: "approved",
   rejectionReason: null,
+  appealable: false,
   position: n,
   createdAt: at,
   urls: {
