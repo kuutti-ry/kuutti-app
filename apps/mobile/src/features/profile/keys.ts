@@ -65,5 +65,9 @@ export function tipText(t: ReturnType<typeof useT>["t"], kind: TipKind): string 
       return t("profile.tip.blurry");
     case "few_photos":
       return t("profile.tip.few_photos");
+    case "revealing":
+      return t("profile.tip.revealing");
+    case "fish":
+      return t("profile.tip.fish");
   }
 }

@@ -271,7 +271,7 @@ describe("The Rekognition adapter", () => {
     const inspection = await rekognitionModerator(client as unknown as RekognitionClient).inspect(
       await fixtureWebp(800, 1067),
     );
-    expect(filters).toEqual(["Mirror", "Bathroom"]);
+    expect(filters).toEqual(["Mirror", "Bathroom", "Fish", "Fishing"]);
     expect(inspection).toMatchObject({
       checked: true,
       labels: [],
