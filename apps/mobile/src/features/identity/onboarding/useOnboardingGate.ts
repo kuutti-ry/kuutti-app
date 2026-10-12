@@ -11,8 +11,8 @@ export type OnboardingGate =
   | { status: "complete"; pond: PondSummary | null }
   /** Sent to onboarding; the home screen shows nothing meanwhile. */
   | { status: "incomplete" }
-  /** The status could not be read: the gate stays closed and offers a retry (#65 review). */
-  | { status: "unknown" };
+  /** The status could not be read: the gate stays closed and offers a retry (#65 review); `error` says why (LoadFailed). */
+  | { status: "unknown"; error: unknown };
 
 /**
  * The home screen's gate (#46): a signed-in account that has not finished
@@ -47,8 +47,8 @@ export function useOnboardingGate(): OnboardingGate & { retry: () => void } {
           setGate({ status: "complete", pond: status.pond });
         }
       })
-      .catch(() => {
-        if (live) setGate({ status: "unknown" });
+      .catch((error: unknown) => {
+        if (live) setGate({ status: "unknown", error });
       });
     return () => {
       live = false;

@@ -17,6 +17,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -226,15 +227,22 @@ export function OnboardingScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <Text accessibilityLiveRegion="assertive">{t("onboarding.failed")}</Text>
-          <Button
-            onPress={() => {
+          <LoadFailed
+            headline={t("onboarding.loadFailed")}
+            // A status that has no step for this person (`stuck`) is no failed
+            // read: it reads as "other".
+            error={
+              state.status === "error"
+                ? state.error
+                : profile.status === "error"
+                  ? profile.error
+                  : null
+            }
+            onRetry={() => {
               void reload();
               void profile.reload();
             }}
-          >
-            {t("onboarding.retry")}
-          </Button>
+          />
         </View>
       </SafeAreaView>
     );

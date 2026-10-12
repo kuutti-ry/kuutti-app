@@ -4,6 +4,7 @@ import {
   fetchCardPreview,
   fetchDealBreakers,
   fetchProfile,
+  readProfile,
   saveDealBreakers,
   saveProfile,
 } from "./client";
@@ -104,6 +105,23 @@ describe("the profile client", () => {
       code: "deal_breakers_limit",
       message: "deal-breakers save answered 422",
     });
+  });
+});
+
+describe("readProfile", () => {
+  const answer = { profile: null, completeness: { complete: true, missing: [] } };
+
+  it("leaves out tip kinds this build does not know, and keeps the known ones in order", () => {
+    expect(
+      readProfile({ ...answer, tips: ["a_later_kind", "fish", "another_one", "few_photos"] }).tips,
+    ).toEqual(["fish", "few_photos"]);
+    expect(readProfile({ ...answer, tips: [] }).tips).toEqual([]);
+  });
+
+  it("still refuses an answer that is not the contract, tips or not", () => {
+    expect(() => readProfile({ ...answer, tips: "fish" })).toThrow();
+    expect(() => readProfile({ profile: null, tips: ["fish"] })).toThrow();
+    expect(() => readProfile(null)).toThrow();
   });
 });
 

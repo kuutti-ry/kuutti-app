@@ -549,8 +549,11 @@ describe("OnboardingScreen", () => {
     const api = failingUntilOk("/onboarding");
     await show(<OnboardingScreen />);
     await waitFor(() =>
-      expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+      expect(
+        screen.getByText("Where you are in getting started could not be loaded."),
+      ).toBeTruthy(),
     );
+    expect(screen.getByText("Kuutti's server had a problem. Try again in a moment.")).toBeTruthy();
     api.ok();
     await press(screen.getByRole("button", { name: "Try again" }));
     await flush();

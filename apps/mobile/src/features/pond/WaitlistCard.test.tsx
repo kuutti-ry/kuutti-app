@@ -110,7 +110,7 @@ describe("WaitlistCard", () => {
     const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
     await settle();
     expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
-    const retry = screen.getByLabelText("Try again");
+    const retry = screen.getByRole("button", { name: "Try again" });
     expect(retry.props.accessibilityRole).toBe("button");
     await act(async () => {
       fireEvent.press(retry);

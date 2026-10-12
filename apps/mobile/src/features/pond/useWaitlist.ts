@@ -6,7 +6,8 @@ export type WaitlistState =
   | { status: "loading" }
   /** What the counter says of the pond; `figures` is null when the list does not name the pond. */
   | { status: "ready"; k: number; figures: WaitlistPond | null }
-  | { status: "failed" };
+  /** `error` says why, for the card to say so (LoadFailed). */
+  | { status: "failed"; error: unknown };
 
 /** What the public counter says of one pond (#54). */
 export function useWaitlist(pondId: string): WaitlistState & { retry: () => void } {
@@ -21,8 +22,8 @@ export function useWaitlist(pondId: string): WaitlistState & { retry: () => void
         const figures = waitlist.ponds.find((entry) => entry.pond.id === pondId) ?? null;
         setState({ status: "ready", k: waitlist.k, figures });
       })
-      .catch(() => {
-        if (live) setState({ status: "failed" });
+      .catch((error: unknown) => {
+        if (live) setState({ status: "failed", error });
       });
     return () => {
       live = false;

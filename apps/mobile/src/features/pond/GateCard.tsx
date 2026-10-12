@@ -1,5 +1,5 @@
 import { View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -31,20 +31,14 @@ export function GateCard() {
             <Text accessibilityLiveRegion="polite">{t("pond.gate.loading")}</Text>
           )}
           {view.status === "failed" && (
-            <View className="gap-3">
-              <Text accessibilityLiveRegion="assertive">{t("pond.gate.failed")}</Text>
-              <Button
-                variant="outline"
-                accessibilityRole="button"
-                accessibilityLabel={t("pond.gate.retry")}
-                onPress={() => {
-                  tap();
-                  view.retry();
-                }}
-              >
-                <Text>{t("pond.gate.retry")}</Text>
-              </Button>
-            </View>
+            <LoadFailed
+              headline={t("pond.gate.failed")}
+              error={view.error}
+              onRetry={() => {
+                tap();
+                view.retry();
+              }}
+            />
           )}
           {gate?.state === "incomplete" && <Text>{t("pond.gate.incomplete")}</Text>}
           {gate?.state === "pending" && <Text>{t("pond.gate.pending")}</Text>}

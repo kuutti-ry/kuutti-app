@@ -10,6 +10,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -62,6 +63,7 @@ export function DealBreakersScreen() {
   const tap = useHapticTap();
   const profile = useProfile();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [failure, setFailure] = useState<unknown>(null);
   const [max, setMax] = useState(0);
   const [draft, setDraft] = useState<Draft>({});
   const [search, setSearch] = useState<Partial<Record<DealBreakerField, string>>>({});
@@ -75,7 +77,8 @@ export function DealBreakersScreen() {
       setMax(response.max);
       setDraft(draftOf(response.dealBreakers));
       setStatus("ready");
-    } catch {
+    } catch (error) {
+      setFailure(error);
       setStatus("error");
     }
   }, []);
@@ -96,15 +99,14 @@ export function DealBreakersScreen() {
     return (
       <SafeAreaView className="flex-1 bg-background">
         <View className="flex-1 items-center justify-center gap-4 p-6">
-          <Text accessibilityLiveRegion="assertive">{t("profile.failed")}</Text>
-          <Button
-            onPress={() => {
+          <LoadFailed
+            headline={t("profile.failed")}
+            error={profile.status === "error" ? profile.error : failure}
+            onRetry={() => {
               void profile.reload();
               void load();
             }}
-          >
-            {t("profile.retry")}
-          </Button>
+          />
         </View>
       </SafeAreaView>
     );

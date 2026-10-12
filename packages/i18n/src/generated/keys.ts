@@ -138,6 +138,15 @@ export type MessageParams = {
   "legal.special_category.title": Record<never, never>;
   "legal.terms.summary": Record<never, never>;
   "legal.terms.title": Record<never, never>;
+  "load.failed.offline": Record<never, never>;
+  "load.failed.other": Record<never, never>;
+  "load.failed.outdated": Record<never, never>;
+  "load.failed.server": Record<never, never>;
+  "load.install": Record<never, never>;
+  "load.noUpdate": Record<never, never>;
+  "load.retry": Record<never, never>;
+  "load.update": Record<never, never>;
+  "load.updating": Record<never, never>;
   "onboarding.age.explain": { "min": number; "max": number };
   "onboarding.age.oldest": Record<never, never>;
   "onboarding.age.oldestDown": Record<never, never>;
@@ -165,6 +174,7 @@ export type MessageParams = {
   "onboarding.identityLabel.title": Record<never, never>;
   "onboarding.intent.explain": Record<never, never>;
   "onboarding.intent.title": Record<never, never>;
+  "onboarding.loadFailed": Record<never, never>;
   "onboarding.loading": Record<never, never>;
   "onboarding.name.explain": Record<never, never>;
   "onboarding.name.title": Record<never, never>;

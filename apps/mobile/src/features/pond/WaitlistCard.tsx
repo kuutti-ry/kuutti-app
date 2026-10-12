@@ -1,6 +1,6 @@
 import type { PondSummary } from "@kuutti/schema";
 import { View } from "react-native";
-import { Button } from "@/components/ui/button";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -34,20 +34,14 @@ export function WaitlistCard({ pond }: { pond: PondSummary }) {
             <Text accessibilityLiveRegion="polite">{t("pond.waitlist.loading")}</Text>
           )}
           {waitlist.status === "failed" && (
-            <View className="gap-3">
-              <Text accessibilityLiveRegion="assertive">{t("pond.waitlist.failed")}</Text>
-              <Button
-                variant="outline"
-                accessibilityRole="button"
-                accessibilityLabel={t("pond.waitlist.retry")}
-                onPress={() => {
-                  tap();
-                  waitlist.retry();
-                }}
-              >
-                <Text>{t("pond.waitlist.retry")}</Text>
-              </Button>
-            </View>
+            <LoadFailed
+              headline={t("pond.waitlist.failed")}
+              error={waitlist.error}
+              onRetry={() => {
+                tap();
+                waitlist.retry();
+              }}
+            />
           )}
           {waitlist.status === "ready" &&
             (figures === null || figures.verified === null ? (
