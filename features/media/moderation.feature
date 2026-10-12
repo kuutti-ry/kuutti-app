@@ -15,7 +15,8 @@ Feature: Photo moderation before anyone else sees a photo
       | Explicit Nudity 97            | 99         | 60              | 90             | queued   | Explicit Nudity            |
       | Suggestive 45                 | 99         | 60              | 90             | approved | nothing                    |
       | Suggestive 45                 | 99         | 40              | 90             | queued   | Suggestive                 |
-      | none                          | none       | 60              | 90             | queued   | no_face                    |
+      | none                          | none       | 60              | 90             | rejected | no_face                    |
+      | Explicit Nudity 97            | none       | 60              | 90             | rejected | Explicit Nudity, no_face   |
       | none                          | 70         | 60              | 90             | queued   | no_face                    |
       | none                          | 99, 98, 95 | 60              | 90             | rejected | several_faces              |
       | none                          | 99, 70     | 60              | 90             | approved | nothing                    |
@@ -33,6 +34,12 @@ Feature: Photo moderation before anyone else sees a photo
     Then the photo stays pending with no review row
     When the nightly sweep runs after ten minutes
     Then the photo is checked from its stored card variant
+
+  Scenario: A photo without a face is not accepted, and its owner is told why without a moderator
+    Given the automatic check finds no face at all
+    When the owner uploads the photo
+    Then the photo is rejected as no_person with no person's name on the decision
+    And the owner's list says why, and the moderators' queue never sees it
 
   Scenario: A photo with several people is not accepted, and its owner is told why without a moderator
     Given the automatic check finds two faces above the face threshold

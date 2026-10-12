@@ -57,7 +57,9 @@ describe("Automatic moderation decision", () => {
     ["Explicit Nudity 97", "99", 60, 90, "queued", "Explicit Nudity"],
     ["Suggestive 45", "99", 60, 90, "approved", "nothing"],
     ["Suggestive 45", "99", 40, 90, "queued", "Suggestive"],
-    ["none", "none", 60, 90, "queued", NO_FACE],
+    // No face at all is the check's own rejection (#253); a face it is unsure of goes to a person.
+    ["none", "none", 60, 90, "rejected", NO_FACE],
+    ["Explicit Nudity 97", "none", 60, 90, "rejected", `Explicit Nudity, ${NO_FACE}`],
     ["none", "70", 60, 90, "queued", NO_FACE],
     // Several faces are not accepted, by the check and not a person (#206);
     // a second face under the face threshold is not sure enough to count.
@@ -75,8 +77,9 @@ describe("Automatic moderation decision", () => {
       });
       expect(decided.decision).toBe(outcome);
       expect(decided.flagged).toEqual(flagged === "nothing" ? [] : flagged.split(", "));
-      // The check names a reason only when it rejects, and then only this one.
-      expect(decided.reason).toBe(outcome === "rejected" ? "several_people" : undefined);
+      // The check names a reason only when it rejects: no person, or several.
+      const reason = flagged.includes("several_faces") ? "several_people" : "no_person";
+      expect(decided.reason).toBe(outcome === "rejected" ? reason : undefined);
     },
   );
 
@@ -409,6 +412,50 @@ describe("moderation of uploads", () => {
     });
   });
 
+  test("A photo without a face is not accepted, and its owner is told why without a moderator", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, scripted(inspection("none", "none")));
+    const me = await signedInAccount(ctx.client);
+    const res = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 800, height: 800, exif: false })),
+    });
+    expect(res.status).toBe(201);
+    const photo = await res.json();
+    expect(photo).toMatchObject({ state: "rejected", rejectionReason: "no_person" });
+    const review = await ctx.client.query(
+      "SELECT decision, reason, flagged, faces, decided_by FROM photo_review WHERE photo_id = $1",
+      [photo.id],
+    );
+    expect(review.rows[0]).toEqual({
+      decision: "rejected",
+      reason: "no_person",
+      flagged: ["no_face"],
+      faces: 0,
+      decided_by: null,
+    });
+    // The owner's list says why; the queue (queued photos only) never holds it.
+    const mine = await app.request("/photos", { headers: me.headers });
+    expect((await mine.json()).photos).toEqual([
+      expect.objectContaining({
+        id: photo.id,
+        state: "rejected",
+        rejectionReason: "no_person",
+      }),
+    ]);
+    const queued = await ctx.client.query(
+      "SELECT count(*)::int AS n FROM photo WHERE state = 'queued'",
+    );
+    expect(queued.rows[0]?.n).toBe(0);
+    expect(logs().find((l) => l.msg === "photo moderated")).toMatchObject({
+      decision: "rejected",
+      faces: 0,
+      flagged: 1,
+    });
+  });
+
   test("A photo with several people is not accepted, and its owner is told why without a moderator", async ({
     ctx,
   }) => {
@@ -613,11 +660,12 @@ describe("what the Rekognition adapter makes of sparse answers", () => {
       modelVersion: null,
       calls: 3,
     });
-    // No face, so a person decides, by the same rule as any other check.
+    // No face found, so the check rejects it, by the same rule as any other check (#253).
     expect(decideModeration(seen, { labelThreshold: 60, faceThreshold: 90 })).toEqual({
-      decision: "queued",
+      decision: "rejected",
       flagged: [NO_FACE],
       faces: 0,
+      reason: "no_person",
     });
   });
 

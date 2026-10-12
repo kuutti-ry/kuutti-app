@@ -47,11 +47,11 @@ Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button
 
 ## Scene 5: The moderation queue (2 min)
 
-Noa Salmi's story uploaded two faces and four more pictures for the check (#142): no face, several people, text, and one whose EXIF carried a location (which the pipeline stripped, so it is a face like any other). The check queues what has no face, rejects the group picture itself with the reason in words, and approves the rest (ADR-006 §2, #206): on staging the queue holds her landscape and her page of text; locally, where the check queues everything, it holds all but her first face.
+Noa Salmi's story uploaded two faces and four more pictures for the check (#142): no face, several people, text, and one whose EXIF carried a location (which the pipeline stripped, so it is a face like any other). On staging the check decides all of them itself (ADR-006 §2, #206, #253): the landscape, the page of text and the group picture are rejected with the reason in words, the faces and the EXIF one approved, and the queue stays empty, which is the point. Locally, where the check queues everything, the queue holds all but her first face: show the queue there.
 
-1. The admin panel (the runbook says where): sign in as the moderator through the bank.
+1. The admin panel (the runbook says where; locally for this scene): sign in as the moderator through the bank.
 2. The queue lists Noa's pictures: what the check saw (labels, faces), the picture, "Approve" and "Reject" with a reason from the list (no person, several people, text with contact details, and so on). Reject the one without a face as "no person".
-3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your photos" shows the rejection with its reason in her language; on staging the group picture says the same kind of thing without anybody having looked ("A profile photo shows you alone"). On staging her card shows her faces and the EXIF one, and her profile is complete; locally her card shows the one approved face and the gate says her profile still lacks something (one of two).
+3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your photos" shows the rejection with its reason in her language; on staging her three pictures say the same kind of thing without anybody having looked ("A profile photo has to show you", "A profile photo shows you alone"). On staging her card shows her faces and the EXIF one, and her profile is complete; locally her card shows the one approved face and the gate says her profile still lacks something (one of two).
 
 ## Scene 6: Refusals (1 min)
 

@@ -16,11 +16,11 @@ import { type MediaStore, objectKey } from "./store.ts";
 // Moderation of every uploaded photo before anyone else sees it (#49, TD-8,
 // ADR-006). Rekognition sees the card variant only, re-encoded as JPEG for
 // the call, from the API, through the instance role; what comes back is a bounded list of labels with confidences
-// and a face count, never the image. Three outcomes: approved (nothing
-// flagged, one face), queued (a moderation label, or no face: a person
-// decides), rejected (by a person, or by the check for one thing it is sure
-// of: several faces, #206, so the owner is told at once and no moderator is
-// asked). Thresholds are matching_config
+// and a face count, never the image. Three outcomes: approved (one sure face,
+// nothing flagged), rejected by the check itself where it is sure (no face at
+// all, or several sure faces: the owner is told at once and no moderator is
+// asked, #206, #253), queued where it is not (a moderation label beside one
+// face, or faces none of them sure: a person decides). Thresholds are matching_config
 // rows, never constants here. Labels kept for the tips of #56 are stored with
 // the moderation ones; only the moderation ones can send a photo to the queue.
 
@@ -71,7 +71,7 @@ export type Decision = {
   flagged: string[];
   faces: number;
   /** What the owner is told, set when the check itself rejects. */
-  reason?: "several_people";
+  reason?: "no_person" | "several_people";
 };
 
 const roundConfidence = (n: number) => Math.round(n * 100) / 100;
@@ -130,11 +130,12 @@ export function storedLabels(inspection: Inspection): ModerationLabel[] {
 
 /**
  * The decision, pure (features/media/moderation.feature): unchecked goes to a
- * person; more than one face at or above the face threshold is rejected as
- * several_people (the owner is told; a person is not asked, whatever else the
- * check saw, #206); any moderation label at or above the threshold goes to a
- * person, by name; no face at or above its threshold goes to a person as
- * no_face; the rest is approved. Tip signals are ignored.
+ * person; what the check is sure of it decides itself and the owner is told,
+ * whatever else it saw: no face found at all is rejected as no_person (#253),
+ * more than one face at or above the face threshold as several_people (#206).
+ * What it is unsure of goes to a person: a face found but none at the
+ * threshold (no_face), or a moderation label at or above its threshold beside
+ * one sure face. The rest is approved. Tip signals are ignored.
  */
 export function decideModeration(inspection: Inspection, thresholds: Thresholds): Decision {
   const faces = inspection.faceConfidences.filter((c) => c >= thresholds.faceThreshold).length;
@@ -146,6 +147,9 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
         .map((label) => label.name),
     ),
   ];
+  if (inspection.faceConfidences.length === 0) {
+    return { decision: "rejected", flagged: [...flagged, NO_FACE], faces, reason: "no_person" };
+  }
   if (faces > 1) {
     return {
       decision: "rejected",
