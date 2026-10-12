@@ -1,18 +1,20 @@
 /**
  * Seeds ponds and matching_config version 1. Idempotent.
  *   pnpm --filter @kuutti/db seed -- --env development
- * Refuses production before opening a connection. The environment comes from
- * --env, then APP_ENV, then "development".
+ * Refuses production before opening a connection, when either --env or
+ * APP_ENV names it: a flag never talks the seed past the environment it runs
+ * in (#250). The environment it reports comes from --env, then APP_ENV, then
+ * "development".
  */
 import { createPool } from "../pool.ts";
 import { seed } from "../seed.ts";
 
 const args = process.argv.slice(2);
 const flagIndex = args.indexOf("--env");
-const env =
-  (flagIndex >= 0 ? args[flagIndex + 1] : undefined) ?? process.env.APP_ENV ?? "development";
+const flag = flagIndex >= 0 ? args[flagIndex + 1] : undefined;
+const env = flag ?? process.env.APP_ENV ?? "development";
 
-if (env === "production") {
+if (flag === "production" || process.env.APP_ENV === "production") {
   console.error("refusing to seed production: previews and local databases only (TD-19)");
   process.exit(2);
 }
