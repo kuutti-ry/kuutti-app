@@ -17,6 +17,7 @@ Feature: Photo moderation before anyone else sees a photo
       | Suggestive 45                 | 99         | 40              | 90             | queued   | Suggestive                 |
       | none                          | none       | 60              | 90             | queued   | no_face                    |
       | none                          | 70         | 60              | 90             | queued   | no_face                    |
+      | none                          | 99, 98, 95 | 60              | 90             | approved | nothing                    |
       | Violence 80, Explicit Nudity 61 | 99       | 60              | 90             | queued   | Violence, Explicit Nudity  |
       | unchecked                     | none       | 60              | 90             | queued   | not_checked                |
 

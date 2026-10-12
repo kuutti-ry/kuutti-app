@@ -19,7 +19,7 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 Staging holds no real person (ADR-018). The three commands run inside the API's container and nowhere else; `infra/README.md`, "The demo on staging", says how to reach it. In order:
 
 1. `node dist/demo-assets.js` in the container, and again after every deploy: the cache is the container's own and a new container starts without it, so the stories, the population and the reset refuse until it is there. The release's tarball comes from the public repository over HTTPS into the cache, checked against the manifest; the job refuses a cache that is not the release's.
-2. `node dist/demo-reset.js --env staging`: the personas forgotten by their hash, the stories told anew through the service functions, the pictures through the pipeline with Rekognition deciding (faces approved, the negatives queued).
+2. `node dist/demo-reset.js --env staging`: the personas forgotten by their hash, the stories told anew through the service functions, the pictures through the pipeline with Rekognition deciding (faces approved, a group photo too; the pictures without a face queued).
 3. `node dist/demo-population.js --env staging --photos`.
 4. The phone: the `preview` build on channel `staging` (`apps/mobile/README.md`); the tech config screen shows `api.staging.kuutti.app` and the commit. A JS-only merge to `main` reaches it on the next launch; a native change needs the build reinstalled.
 5. Aino's five pictures on the phone's camera roll (AirDrop).
@@ -33,7 +33,7 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 | the build | the dev client opens Metro | the tech config screen: channel `staging`, the API above, the runtime's fingerprint matches the installed build |
 | the counter | `curl -s localhost:3000/waitlist`: Pääkaupunkiseutu with a total and a split | the same against staging |
 | the gate | sign in as Sanna: "Matching is open for you." | the same, through Nordea `DEMOUSER4` |
-| the queue | the panel lists Noa's negatives and her second face | Noa's negatives (the check approves her faces) |
+| the queue | the panel lists Noa's four negatives and her second face | Noa's landscape and page of text (the check approves her faces, the group picture and the EXIF one) |
 | the refusals | Tapio refused as banned, Ilona with the date | the same, through OP and Aktia |
 | the camera roll | the five pictures are there | the same |
 | the clock | the gate was counted after the population was written (the reset and the population both count); the nightly count runs at 04:00 Helsinki | the same |

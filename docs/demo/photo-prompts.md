@@ -26,7 +26,7 @@ Chosen 09/10/2026.
 | `faces/ilona/1.jpg` … `3.jpg` | nothing today: Ilona deleted her account and is refused at login; the same reason | 3 | a woman of 56 |
 | `faces/pool/001.jpg` … `060.jpg` | the synthetic population, drawn by seed | 60 | sixty different adults of 18 to 80, every gender, the mix of a Finnish city, one picture each, each a plausible first profile photo |
 | `negatives/no-face.jpg` | the moderation queue | 1 | a landscape, no person: the automatic check finds no face and queues it (ADR-006) |
-| `negatives/several-people.jpg` | the moderation queue | 1 | three people in one picture: more than one face |
+| `negatives/several-people.jpg` | a group photo | 1 | three people in one picture: more than one face, approved like one (ADR-006 §2, #206); queued only where the check queues everything |
 | `negatives/text.jpg` | the moderation queue | 1 | a picture that is mostly a page of text |
 | `negatives/exif-location.jpg` | the stripping of EXIF (rule 4) | 1 | Noa's third picture (`p-noa-3`), re-saved with an invented GPS position and camera in its EXIF; the pipeline's output has none. It is uploaded for Noa, and a face passes the check, so it shows on Noa's card: it must be Noa |
 

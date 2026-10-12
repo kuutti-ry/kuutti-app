@@ -59,6 +59,8 @@ describe("Automatic moderation decision", () => {
     ["Suggestive 45", "99", 40, 90, "queued", "Suggestive"],
     ["none", "none", 60, 90, "queued", NO_FACE],
     ["none", "70", 60, 90, "queued", NO_FACE],
+    // Several faces approve like one (#206): the tip, not the queue, speaks to a group photo.
+    ["none", "99, 98, 95", 60, 90, "approved", "nothing"],
     ["Violence 80, Explicit Nudity 61", "99", 60, 90, "queued", "Violence, Explicit Nudity"],
     ["unchecked", "none", 60, 90, "queued", NOT_CHECKED],
   ])(
