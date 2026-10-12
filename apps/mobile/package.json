@@ -42,7 +42,7 @@
     "expo-router": "~57.0.25",
     "expo-secure-store": "~57.0.4",
     "expo-status-bar": "~57.0.1",
-    "expo-updates": "~57.0.25",
+    "expo-updates": "~58.0.14",
     "lucide-react-native": "1.52.0",
     "nativewind": "4.2.7",
     "openapi-fetch": "^0.17.0",
