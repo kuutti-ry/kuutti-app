@@ -157,7 +157,7 @@ export function ProfileScreen() {
               <CardTitle>{t("profile.tip.title")}</CardTitle>
             </CardHeader>
             <CardContent className="gap-3">
-              <Text>{tipText(t, tip)}</Text>
+              <Text>{tipText(t, tip, profile.fishSpecies)}</Text>
               <Button
                 variant="outline"
                 onPress={() => {

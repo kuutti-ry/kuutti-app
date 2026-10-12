@@ -2926,6 +2926,7 @@ export interface components {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
             tips: components["schemas"]["TipKind"][];
+            fishSpecies?: components["schemas"]["FishSpecies"];
         };
         Completeness: {
             complete: boolean;
@@ -2935,6 +2936,11 @@ export interface components {
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
         /** @enum {string} */
         TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
+        /**
+         * @default null
+         * @enum {string|null}
+         */
+        FishSpecies: "pike" | "perch" | "salmon" | "trout" | "carp" | "eel" | "cod" | "herring" | "halibut" | null;
         ProfileUpdate: {
             displayName: string;
             bio: string | null;

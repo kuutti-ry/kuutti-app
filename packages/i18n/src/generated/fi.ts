@@ -566,6 +566,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.tip.dismiss": "Selvä",
   "profile.tip.few_photos": "Useampi hyväksytty kuva auttaisi muita saamaan sinusta kattavamman kuvan.",
   "profile.tip.fish": "Kala pääkuvassa on klassikko. Kokeile siihen kuvaa pelkästään sinusta, ja anna kalan tulla toisena.",
+  "profile.tip.fish_species": "Komea saalis, olemme ylpeitä sinusta! Onko se {species, select, pike {hauki} perch {ahven} salmon {lohi} trout {taimen} carp {karppi} eel {ankerias} cod {turska} herring {silakka} halibut {ruijanpallas} other {kala}}? Pääkuvaksi kannattaa silti kokeilla kuvaa ilman saalista, ja antaa kalan tulla toisena.",
   "profile.tip.group_photo": "Kokeile kuvaa, jossa olet ainoa henkilö kuvassa.",
   "profile.tip.mirror_selfie": "Kokeile kuvaa, joka ei ole peiliselfie.",
   "profile.tip.poor_lighting": "Kokeile kuvaa, joka on otettu selkeämmässä valossa.",

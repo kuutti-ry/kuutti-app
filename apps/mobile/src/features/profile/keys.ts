@@ -3,6 +3,7 @@ import {
   BIO_MIN_FOR_COMPLETENESS,
   type BioPreset,
   type CompletenessItem,
+  type FishSpecies,
   type Gender,
   PHOTOS_FOR_COMPLETENESS,
   type ProfileFieldKey,
@@ -48,8 +49,15 @@ export function completenessText(t: ReturnType<typeof useT>["t"], item: Complete
   }
 }
 
-/** One advisory tip for the owner (#56); kinds are the API's, words are the client's. */
-export function tipText(t: ReturnType<typeof useT>["t"], kind: TipKind): string {
+/**
+ * One advisory tip for the owner (#56); kinds are the API's, words are the
+ * client's. The fish tip names the fish when the API is sure of it (#253).
+ */
+export function tipText(
+  t: ReturnType<typeof useT>["t"],
+  kind: TipKind,
+  fishSpecies: FishSpecies | null = null,
+): string {
   switch (kind) {
     case "sunglasses":
       return t("profile.tip.sunglasses");
@@ -68,6 +76,8 @@ export function tipText(t: ReturnType<typeof useT>["t"], kind: TipKind): string 
     case "revealing":
       return t("profile.tip.revealing");
     case "fish":
-      return t("profile.tip.fish");
+      return fishSpecies
+        ? t("profile.tip.fish_species", { species: fishSpecies })
+        : t("profile.tip.fish");
   }
 }

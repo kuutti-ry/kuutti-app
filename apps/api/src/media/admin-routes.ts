@@ -16,7 +16,7 @@ import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { recordAudit, withdrawPhotoCheckNote } from "../safety/index.ts";
 import { groupOf } from "./label-groups.ts";
-import { readThresholds } from "./moderation.ts";
+import { isTipSignal, readThresholds } from "./moderation.ts";
 import type { MediaDeps } from "./photos.ts";
 import * as repo from "./repo.ts";
 import { objectKey } from "./store.ts";
@@ -122,10 +122,13 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
           label.confidence >= lines.groups[group].review
         );
       });
-    return c.json(
-      { items: items.map((item) => ({ ...item, sensitive: sensitive(item.labels) })), total },
-      200,
-    );
+    // What the check decided on; the tip signals stored beside it are the owner's (#56).
+    const shown = (item: (typeof items)[number]) => ({
+      ...item,
+      labels: item.labels.filter((label) => !isTipSignal(label.name)),
+      sensitive: sensitive(item.labels),
+    });
+    return c.json({ items: items.map(shown), total }, 200);
   });
 
   app.openapi(cardRoute, async (c) => {

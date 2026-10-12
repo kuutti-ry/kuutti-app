@@ -296,7 +296,22 @@ describe("The Rekognition adapter", () => {
     const inspection = await rekognitionModerator(client as unknown as RekognitionClient).inspect(
       await fixtureWebp(800, 1067),
     );
-    expect(filters).toEqual(["Mirror", "Bathroom", "Fish", "Fishing"]);
+    expect(filters).toEqual([
+      "Mirror",
+      "Bathroom",
+      "Fish",
+      "Fishing",
+      // The species the fish tip may name (#253).
+      "Pike",
+      "Perch",
+      "Salmon",
+      "Trout",
+      "Carp",
+      "Eel",
+      "Cod",
+      "Herring",
+      "Halibut",
+    ]);
     expect(inspection).toMatchObject({
       checked: true,
       labels: [],

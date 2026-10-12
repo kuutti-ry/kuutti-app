@@ -1,4 +1,4 @@
-import type { PhotoRejectionReason } from "@kuutti/schema";
+import type { FishSpecies, PhotoRejectionReason } from "@kuutti/schema";
 
 /**
  * What the check does with each of Rekognition's moderation labels (#253,
@@ -124,6 +124,35 @@ const REVEALING: ReadonlySet<string> = new Set(
 );
 
 export const isRevealing = (name: string): boolean => REVEALING.has(name.toLowerCase());
+
+/**
+ * Rekognition's scene label for each fish the fish tip may name (#253): the
+ * species of Finland and nearby waters it has a label for. On 12/10/2026 it
+ * had none for zander, whitefish, bream, burbot, grayling or vendace; a
+ * species of elsewhere (tuna, sturgeon) is left out so it is never named.
+ */
+export const FISH_SPECIES_LABELS: Readonly<Record<FishSpecies, string>> = {
+  pike: "Pike",
+  perch: "Perch",
+  salmon: "Salmon",
+  trout: "Trout",
+  carp: "Carp",
+  eel: "Eel",
+  cod: "Cod",
+  herring: "Herring",
+  halibut: "Halibut",
+};
+
+const SPECIES_BY_LABEL: ReadonlyMap<string, FishSpecies> = new Map(
+  (Object.entries(FISH_SPECIES_LABELS) as [FishSpecies, string][]).map(([species, label]) => [
+    label.toLowerCase(),
+    species,
+  ]),
+);
+
+/** The fish a scene label names, or undefined for any other label. */
+export const fishSpeciesOf = (name: string): FishSpecies | undefined =>
+  SPECIES_BY_LABEL.get(name.toLowerCase());
 
 /** The group of a moderation label, `allowed`, or undefined for a name the check does not know. */
 export const groupOf = (name: string): LabelGroup | "allowed" | undefined =>

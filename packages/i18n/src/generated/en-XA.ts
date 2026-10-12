@@ -611,6 +611,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.tip.dismiss": "［Góót íít］",
   "profile.tip.few_photos": "［Móóréé ááppróóvééd phóótóóš wóóúúld héélp óóthéérš géét áá fúúlléér pííçtúúréé óóf ýýóóúú.］",
   "profile.tip.fish": "［ÁÁ fííšh ííñ théé mááííñ phóótóó ííš áá çlááššííç. Trýý óóñéé óóf júúšt ýýóóúú thééréé, ááñd léét théé fííšh çóóméé šééçóóñd.］",
+  "profile.tip.fish_species": "［ÁÁ mííghtýý çáátçh, ááñd wéé ááréé próóúúd óóf ýýóóúú! ÍÍš tháát {species,select,carp{áá çáárp} cod{áá çóód} eel{ááñ éééél} halibut{áá háálííbúút} herring{áá héérrííñg} other{áá fííšh} perch{áá péérçh} pike{áá pííkéé} salmon{áá šáálmóóñ} trout{áá tróóúút}}? Fóór théé mááííñ phóótóó, thóóúúgh, trýý óóñéé wííthóóúút théé çáátçh, ááñd léét théé fííšh çóóméé šééçóóñd.］",
   "profile.tip.group_photo": "［Trýý áá phóótóó whééréé ýýóóúú ááréé théé óóñlýý pééršóóñ ííñ théé frááméé.］",
   "profile.tip.mirror_selfie": "［Trýý áá phóótóó tháát ííš ñóót áá míírróór šéélfííéé.］",
   "profile.tip.poor_lighting": "［Trýý áá phóótóó táákééñ ííñ çlééááréér lííght.］",

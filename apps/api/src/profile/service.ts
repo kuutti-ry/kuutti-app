@@ -20,7 +20,13 @@ import {
 } from "./card.ts";
 import * as repo from "./repo.ts";
 import { contactDetailsIn } from "./text.ts";
-import { TIP_THRESHOLD_KEYS, type TipSnapshot, type TipThresholds, tips } from "./tips.ts";
+import {
+  fishSpecies,
+  TIP_THRESHOLD_KEYS,
+  type TipSnapshot,
+  type TipThresholds,
+  tips,
+} from "./tips.ts";
 
 /**
  * The consent_version of the special-category wording as built
@@ -131,6 +137,7 @@ export async function readProfile(deps: CardDeps, accountId: string): Promise<Pr
     profile: row ? toDocument(row, consent) : null,
     completeness: await completenessOf(deps, accountId, row, tipSnapshot.photos.length),
     tips: tips(tipSnapshot),
+    fishSpecies: fishSpecies(tipSnapshot),
   };
 }
 
@@ -188,6 +195,7 @@ export async function saveProfile(
     profile: toDocument(row, consent),
     completeness: completenessNow,
     tips: tips(tipSnapshot),
+    fishSpecies: fishSpecies(tipSnapshot),
   };
 }
 
