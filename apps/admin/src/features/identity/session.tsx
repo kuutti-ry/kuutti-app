@@ -1,6 +1,6 @@
 import { AdminSession, AdminWhoAmI } from "@kuutti/schema";
 import * as React from "react";
-import { API_URL, api, failed, setTokenSource } from "../../lib/api.ts";
+import { API_URL, api, failed, setTokenSource, setUnauthorizedHandler } from "../../lib/api.ts";
 
 /**
  * The staff session (#49, rules/admin.md): eight hours, no refresh, one
@@ -58,11 +58,19 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
   const stateRef = React.useRef(state);
   stateRef.current = state;
 
-  // The client's middleware reads the token from here; never from storage directly.
+  // The client's middleware reads the token from here; never from storage
+  // directly. A 401 to a request that carried it ends the session here, from
+  // whichever screen asked: back to the sign-in, saying so (#250).
   React.useEffect(() => {
     setTokenSource(() =>
       stateRef.current.status === "signed-in" ? stateRef.current.session.accessToken : null,
     );
+    setUnauthorizedHandler(() => {
+      writeStored(null);
+      setState({ status: "signed-out", error: "session_ended" });
+    });
+    // A panel that has closed signs nobody out on a late answer.
+    return () => setUnauthorizedHandler(() => undefined);
   }, []);
 
   React.useEffect(() => {
@@ -123,13 +131,22 @@ export function StaffSessionProvider({ children }: { children: React.ReactNode }
       if (!mounted) return;
       if (!data) {
         writeStored(null);
-        setState({ status: "signed-out" });
+        // A 401 has already ended the session and said so; keep that.
+        setState((previous) =>
+          previous.status === "signed-out" ? previous : { status: "signed-out" },
+        );
       } else {
         const me = AdminWhoAmI.parse(data);
-        setState({
-          status: "signed-in",
-          session: { ...stored, role: me.role, expiresAt: me.expiresAt },
-        });
+        // Only a session still signed in is confirmed: a request that came
+        // back 401 while this one was out has ended it, and it stays ended.
+        setState((previous) =>
+          previous.status === "signed-in"
+            ? {
+                status: "signed-in",
+                session: { ...stored, role: me.role, expiresAt: me.expiresAt },
+              }
+            : previous,
+        );
       }
     })();
     return () => {

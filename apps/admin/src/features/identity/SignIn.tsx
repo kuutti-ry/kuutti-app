@@ -5,6 +5,7 @@ import { useStaffSession } from "./session.tsx";
 const ERRORS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["admin_not_allowed", "admin.signIn.error.admin_not_allowed"],
   ["no_api", "admin.signIn.error.no_api"],
+  ["session_ended", "admin.signIn.error.session_ended"],
 ]);
 
 /** The one thing a signed-out panel shows: the bank login, and the refusal if there was one. */

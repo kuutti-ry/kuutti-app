@@ -122,6 +122,26 @@ describe("staff session", () => {
     expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
   });
 
+  it("says the session ended when the API refuses the stored token, and not when it only failed (#250)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(session));
+    let status = 401;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ error: { code: "session_revoked", message: "x", requestId: "r" } }, status),
+      ),
+    );
+    show();
+    expect(await screen.findByText("Your session has ended. Sign in again.")).toBeInTheDocument();
+    cleanup();
+    // A server error is no verdict on the session: dropped, and nothing said about it ending.
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(session));
+    status = 500;
+    show();
+    await waitFor(() => expect(screen.getByTestId("state")).toHaveTextContent("signed-out"));
+    expect(screen.queryByText("Your session has ended. Sign in again.")).toBeNull();
+  });
+
   it("sends the stored token with the very first request after a reload", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(session));
     const seen: string[] = [];

@@ -123,6 +123,26 @@ describe("App", () => {
     expect(calls).not.toContain("GET /admin/photos/queue");
   });
 
+  it("a session revoked while the panel is open goes back to the sign-in, saying so (#250)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const signedIn = staffApi();
+    renderApp(async (input, init) => {
+      const req = input instanceof Request ? input : new Request(input ?? "", init);
+      // The role was taken away after the panel opened: the queue's request is refused.
+      if (new URL(req.url).pathname === "/admin/photos/queue") {
+        return new Response(
+          JSON.stringify({ error: { code: "session_revoked", message: "x", requestId: "r" } }),
+          { status: 401, headers: { "content-type": "application/json" } },
+        );
+      }
+      return signedIn(input, init);
+    });
+    expect(await screen.findByText("Your session has ended. Sign in again.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeInTheDocument();
+    expect(screen.queryByText("The queue could not be loaded.")).toBeNull();
+    expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
+  });
+
   it("signs out through the API, forgets the session and offers the bank login again", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     const calls: string[] = [];
