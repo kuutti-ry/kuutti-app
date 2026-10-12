@@ -3,7 +3,7 @@
  * repository, fetched into the cache and verified against the manifest this
  * repository holds, or the manifest written from a directory of pictures.
  *
- *   pnpm demo:assets                       fetch release v1 into ~/.cache/kuutti-demo-photos/v1 and verify it
+ *   pnpm demo:assets                       fetch release v2 into ~/.cache/kuutti-demo-photos/v2 and verify it
  *   pnpm demo:assets -- --tag v2           another release (the manifest must be that release's)
  *   pnpm demo:assets -- --check <dir>      verify a directory against the manifest; nothing is fetched
  *   pnpm demo:assets -- --manifest <dir>   write packages/db/src/seed/photos-manifest.ts from a directory of pictures

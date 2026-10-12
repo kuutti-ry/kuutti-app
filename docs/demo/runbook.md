@@ -7,10 +7,10 @@ How a demo is prepared and checked, locally and on staging (#144). The story its
 ### Locally (the simulator, the mock bank)
 
 1. `pnpm env:up`: the database, the S3 stand-in, the mock bank, the API, Metro.
-2. `pnpm demo:assets`: the release of pictures into `~/.cache/kuutti-demo-photos/v1`, verified. Without it nobody has a photo and the storyboard's photo scenes do not work.
+2. `pnpm demo:assets`: the release of pictures into `~/.cache/kuutti-demo-photos/v2`, verified. Without it nobody has a photo and the storyboard's photo scenes do not work.
 3. `pnpm demo:reset`: everybody forgotten through the erasure path, then the six stories through the API's own routes, with their pictures (Sanna 5, Noa 2 + the queue's 4, Kerttu 4; the faces approved locally but Noa's second, the negatives queued), then the counter and the gates counted.
 4. `pnpm demo:population -- --photos`: three hundred people in the one pond, with faces of the pool by seed; the counter and the gates counted anew.
-5. Aino's camera roll: `xcrun simctl addmedia booted ~/.cache/kuutti-demo-photos/v1/faces/aino/*.jpg` (the simulator must be booted). On a device, AirDrop the five files.
+5. Aino's camera roll: `xcrun simctl addmedia booted ~/.cache/kuutti-demo-photos/v2/faces/aino/*.jpg` (the simulator must be booted). On a device, AirDrop the five files.
 6. `pnpm dev:mobile` and open the dev client on the simulator; the tech config screen (the wrench on the home screen) shows the API it talks to.
 7. The admin panel: `pnpm dev:admin` at `http://localhost:5173`; the moderator is a persona that was given the role after its first login: `pnpm --filter @kuutti/db moderator -- grant <hetu_hmac> moderator --by "<your name>"`, the hash from the API's log line of that login (`infra/README.md`, Staff). Use Mikael: a moderator persona is spared by the reset, so never one with a story.
 
