@@ -7,7 +7,7 @@ import {
   PhotoUrlResponse,
 } from "@kuutti/schema";
 import { useCallback, useEffect, useState } from "react";
-import { api, failed } from "../../lib/api.ts";
+import { api } from "../../lib/api.ts";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
 // the photos the automatic check would not approve. Plain HTML, keyboard
@@ -122,12 +122,12 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
     body: { decision: "approve" } | { decision: "reject"; reason: PhotoRejectionReason },
   ) => {
     setState({ kind: "saving" });
-    const { data, error, response } = await api.POST("/admin/photos/{id}/decision", {
-      params: { path: { id: item.photoId } },
-      body,
-    });
+    // A network failure is a decision not saved, like a refusal: never a
+    // saving state that nothing will end.
+    const { data } = await api
+      .POST("/admin/photos/{id}/decision", { params: { path: { id: item.photoId } }, body })
+      .catch(() => ({ data: undefined }));
     if (!data) {
-      void failed(response, error, "decision");
       setState({ kind: "failed" });
       return;
     }

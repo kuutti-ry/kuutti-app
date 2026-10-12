@@ -195,6 +195,28 @@ describe("PhotoQueue", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The queue could not be loaded.");
   });
 
+  it("says a decision was not saved when the network fails, and lets the moderator try again", async () => {
+    let attempts = 0;
+    fetchMock([
+      (req) => (path(req) === "/admin/photos/queue" ? json({ items: [item(1)], total: 1 }) : null),
+      cardUrls,
+      (req) => {
+        if (req.method !== "POST") return null;
+        attempts += 1;
+        if (attempts === 1) throw new TypeError("Failed to fetch");
+        return json({ photoId: item(1).photoId, state: "approved", rejectionReason: null });
+      },
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("The decision was not saved");
+    // Not stuck saving: both buttons are back.
+    expect(screen.getByRole("button", { name: "Reject…" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    expect(await screen.findByText("Approved")).toBeInTheDocument();
+    expect(attempts).toBe(2);
+  });
+
   it("shows an unchecked photo as such", async () => {
     fetchMock([
       (req) =>
