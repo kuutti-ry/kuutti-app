@@ -57,20 +57,24 @@ export function ageBandOf(age: number): AgeBand {
 }
 
 /**
- * The profile fields an event may carry: the closed lists only (`single`,
- * `multi`), never a text, a number or a setting, and never a field flagged
- * `specialCategory` (ADR-009 §2, ADR-019 §4). Computed from the registry, so
- * a new field is out until it is one of those kinds, and a flag on a field
- * takes it out the same day.
+ * The profile fields an event may carry (ADR-011 §9): the ones the registry
+ * flags `research`. Only the registry's `single()` takes the flag, so a multi
+ * (a set of fifty-nine hobbies is a fingerprint, not a category), a text, a
+ * number or a setting cannot carry it by type; that a flagged field is
+ * neither `specialCategory` (ADR-009 §2, ADR-019 §4) nor hidden is the
+ * registry's test. Computed from the registry, so a field is out until it is
+ * flagged, and a flag on a field takes it out the same day.
  */
-export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => {
-  const spec = PROFILE_FIELDS[key];
-  return (
-    (spec.kind === "single" || spec.kind === "multi") &&
-    !spec.specialCategory &&
-    spec.role !== "hidden"
-  );
-});
+export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => PROFILE_FIELDS[key].research);
+
+/**
+ * The floor of k for the research block (ADR-011 §9): a cell of pond, age band
+ * and snapshot must hold at least this many pseudonyms in any copy that leaves
+ * the operational database, and the nightly census warns when the live table
+ * has a cell under it. The waitlist's floor (rules/schema.md), and like the
+ * retention a rule, not a `matching_config` row.
+ */
+export const RESEARCH_K_MIN = 10;
 
 const researchFieldShape = Object.fromEntries(
   RESEARCH_FIELD_KEYS.map((key) => [key, PROFILE_FIELDS[key].schema.optional()]),
