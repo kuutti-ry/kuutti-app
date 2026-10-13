@@ -7,6 +7,13 @@ body:
       value: |
         Kuutti will never build: compatibility or chemistry scores, desirability signals, infinite feeds, real-time engagement push, streaks, leaderboards, boosts or anything purchasable, ads, pre-match links to external profiles, under-18 access. A proposal in that direction will be closed with a pointer to that list.
   - type: textarea
+    id: summary
+    attributes:
+      label: In short
+      description: One or two sentences for a person, in plain words, saying what this is about and for whom. No file names; the detail goes below.
+    validations:
+      required: true
+  - type: textarea
     id: problem
     attributes:
       label: The problem
