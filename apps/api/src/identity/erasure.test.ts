@@ -340,10 +340,17 @@ describe("account erasure", () => {
     // One fetch before the export, plus the three URLs the export itself issued, newest first.
     expect(body.photoAccessLog).toHaveLength(4);
     expect(body.photoAccessLog.every((e) => e.photoId === photo.id)).toBe(true);
-    const text = JSON.stringify(body);
-    expect(text).not.toContain(b.accountId);
-    expect(text).not.toMatch(/hetu|hmac|research_id|researchId/i);
-    expect(text).not.toContain(staff.identityId);
+    // The signed URLs' signatures are random base64, and four of their letters
+    // can spell a word (CI, 13/10/2026: "hmac" inside one): the words are
+    // looked for in the document without the URLs, the ids in all of it.
+    const whole = JSON.stringify(body);
+    const words = JSON.stringify({
+      ...body,
+      photos: body.photos.map((photo) => ({ ...photo, urls: null })),
+    });
+    expect(whole).not.toContain(b.accountId);
+    expect(words).not.toMatch(/hetu|hmac|research_id|researchId/i);
+    expect(whole).not.toContain(staff.identityId);
   });
 
   test("The export works without object storage, with no URLs", async ({ ctx }) => {
