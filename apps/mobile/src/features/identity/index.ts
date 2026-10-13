@@ -1,6 +1,8 @@
 // Public surface of the identity slice in apps/mobile. Other slices import from here only.
 
 export { AccountActions } from "./AccountActions";
+export { BreakScreen } from "./BreakScreen";
+export { ConsentSwitches } from "./ConsentSwitches";
 export { EmailCard, EmailScreen } from "./EmailCard";
 export { OnboardingScreen } from "./onboarding/OnboardingScreen";
 export { type OnboardingGate, useOnboardingGate } from "./onboarding/useOnboardingGate";

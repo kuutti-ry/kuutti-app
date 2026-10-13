@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.14.0",
+    "version": "0.15.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -136,9 +136,10 @@
             "type": "string",
             "enum": [
               "created",
-              "resumed"
+              "resumed",
+              "unpaused"
             ],
-            "description": "created: a fresh account (first login or after a cooldown); resumed: the live account."
+            "description": "created: a fresh account (first login or after a cooldown); resumed: the live account; unpaused: the live account, back from a break (#170)."
           }
         },
         "required": [
@@ -345,6 +346,22 @@
               true
             ],
             "description": "Must be true: the person confirmed in the app."
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
+      "AccountPauseRequest": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Must be true: the person said they understand what a break means."
           }
         },
         "required": [
@@ -3332,6 +3349,72 @@
           },
           "404": {
             "description": "No live account: a second deletion that passed the session guard before the first committed (not_found).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/pause": {
+      "post": {
+        "summary": "Take a break: pause this account",
+        "description": "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountPauseRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Paused. Every token of this account has stopped working."
+          },
+          "400": {
+            "description": "Validation failed (confirm missing).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "not_active: onboarding is not finished, so there is nothing to hide yet; already_paused: another device paused the account first.",
             "content": {
               "application/json": {
                 "schema": {

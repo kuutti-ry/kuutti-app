@@ -74,6 +74,10 @@ export const account = pgTable(
       .references(() => identity.id),
     state: accountState("state").notNull().default("registered"),
     stateChangedAt: timestamp("state_changed_at", { withTimezone: true }),
+    // Taking a break (#170, ADR-022): the state the account had before it was
+    // paused, which the next bank login restores; null while not on a break.
+    // Kept so that a shadow ban survives a break without showing (ADR-013 §2).
+    pausedFrom: accountState("paused_from"),
     // Age is year and month only (rule 3), derived from the code at
     // registration; nulled at erasure (#51), when the row stays as the
     // anonymised tombstone of a deleted account.

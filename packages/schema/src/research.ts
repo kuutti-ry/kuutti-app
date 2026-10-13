@@ -30,6 +30,17 @@ export const RESEARCH_EVENTS = {
       approvedPhotos: z.int().min(0).max(50),
     }),
   },
+  account_paused: {
+    question: "How many people step away for a while rather than delete (#170)?",
+    props: props({}),
+  },
+  account_resumed: {
+    question: "How long do breaks last before the person comes back (#170)?",
+    props: props({
+      /** Whole days from the pause to the login that ended it: coarse on purpose, like sinceRegistrationD. */
+      afterDays: z.int().min(0),
+    }),
+  },
 } as const;
 
 export type ResearchEventName = keyof typeof RESEARCH_EVENTS;

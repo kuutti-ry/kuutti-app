@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
+import * as React from "react";
 import { Linking, Platform } from "react-native";
 import { apiBaseUrl } from "@/lib/api";
 import { LocaleProvider } from "@/lib/locale";
@@ -7,7 +8,7 @@ import { clearSession, currentSession, markLoginStarted, saveSession } from "@/l
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { SignInScreen } from "./SignInScreen";
-import { SessionProvider } from "./session";
+import { SessionProvider, useSession } from "./session";
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; setParams: jest.Mock };
@@ -44,6 +45,32 @@ describe("SignInScreen", () => {
     const found = pressables(screen.toJSON() as HostNode);
     expect(found).toHaveLength(1);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+  });
+
+  it("says the account is on a break right after this device paused it, and the way back", async () => {
+    await saveSession(tokens);
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    // The screen as the provider shows it once the break began on this device (#170).
+    function Pausing() {
+      const session = useSession();
+      const { status, pauseAccount } = session;
+      React.useEffect(() => {
+        if (status === "signed-in") void pauseAccount();
+      }, [status, pauseAccount]);
+      return <SignInScreen />;
+    }
+    await renderWithTheme(<Pausing />);
+    expect(await screen.findByText("Your account is on a break")).toBeTruthy();
+    expect(screen.getByText(/Sign in with your bank whenever you want to come back/)).toBeTruthy();
+    expect(currentSession()).toBeNull();
+    // The way back is the same button as always.
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+  });
+
+  it("says nothing of a break to a device that was simply signed out", async () => {
+    await renderWithTheme(<SignInScreen />);
+    expect(await screen.findByRole("heading", { name: "Sign in" })).toBeTruthy();
+    expect(screen.queryByText("Your account is on a break")).toBeNull();
   });
 
   it("opens the system browser at the API's /auth/start for this platform", async () => {

@@ -4,6 +4,7 @@ import {
   AccountEmail,
   AccountEmailResponse,
   AccountExport,
+  AccountPauseRequest,
   ErrorResponse,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
@@ -13,6 +14,7 @@ import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { tOf } from "../lib/i18n.ts";
 import { type ErasureDeps, eraseAccount, exportAccount } from "./erasure.ts";
+import { pauseAccount } from "./pause.ts";
 import * as repo from "./repo.ts";
 
 const errorContent = (description: string) => ({
@@ -54,6 +56,25 @@ const exportRoute = createRoute({
 });
 
 const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
+
+const pauseRoute = createRoute({
+  method: "post",
+  path: "/account/pause",
+  summary: "Take a break: pause this account",
+  description:
+    "The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.",
+  ...bearer,
+  request: { body: { required: true, ...json(AccountPauseRequest) } },
+  responses: {
+    204: { description: "Paused. Every token of this account has stopped working." },
+    400: errorContent("Validation failed (confirm missing)."),
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+    409: errorContent(
+      "not_active: onboarding is not finished, so there is nothing to hide yet; already_paused: another device paused the account first.",
+    ),
+  },
+});
 
 const emailRoute = createRoute({
   method: "get",
@@ -104,7 +125,7 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     now: () => new Date(),
     ...(deps.media ? { media: deps.media } : {}),
   };
-  const routes = [deleteRoute, exportRoute, emailRoute, setEmailRoute, clearEmailRoute];
+  const routes = [deleteRoute, exportRoute, pauseRoute, emailRoute, setEmailRoute, clearEmailRoute];
   for (const path of new Set(routes.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
@@ -139,6 +160,15 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
   app.openapi(deleteRoute, async (c) => {
     c.req.valid("json"); // confirm: true, or the validator has answered 400
     await eraseAccount(erasureDeps, callerOf(c).accountId);
+    return c.body(null, 204);
+  });
+
+  app.openapi(pauseRoute, async (c) => {
+    c.req.valid("json"); // confirm: true, or the validator has answered 400
+    await pauseAccount(
+      { db: deps.db, logger: deps.logger, now: () => new Date() },
+      callerOf(c).accountId,
+    );
     return c.body(null, 204);
   });
 

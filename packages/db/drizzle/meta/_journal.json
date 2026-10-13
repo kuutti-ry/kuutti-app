@@ -267,6 +267,13 @@
       "when": 1791830691109,
       "tag": "0037_politics_options",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1791891599381,
+      "tag": "0038_account_paused_from",
+      "breakpoints": true
     }
   ]
 }

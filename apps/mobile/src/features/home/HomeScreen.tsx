@@ -9,7 +9,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { useOnboardingGate } from "@/features/identity";
+import { useOnboardingGate, useSession } from "@/features/identity";
 import { GateCard, WaitlistCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
@@ -43,6 +43,7 @@ export function HomeScreen() {
   const router = useRouter();
   const tap = useHapticTap();
   const gate = useOnboardingGate();
+  const session = useSession();
   const technical = !isProduction();
 
   return (
@@ -78,6 +79,12 @@ export function HomeScreen() {
         <Text variant="h1" accessibilityRole="header">
           {t("home.title")}
         </Text>
+        {/* The login that ended a break (#170): said once, for as long as this sign-in's outcome is in memory. */}
+        {session.status === "signed-in" && session.outcome === "unpaused" && (
+          <Text accessibilityLiveRegion="polite" className="w-full max-w-md text-center">
+            {t("home.welcomeBack")}
+          </Text>
+        )}
 
         {gate.status === "checking" && (
           <Text accessibilityLiveRegion="polite">{t("home.gate.checking")}</Text>

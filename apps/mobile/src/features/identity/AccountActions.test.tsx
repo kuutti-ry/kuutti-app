@@ -1,4 +1,3 @@
-import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { Platform, Share } from "react-native";
@@ -6,6 +5,10 @@ import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { AccountActions, shareExport } from "./AccountActions";
+
+const { __router: router } = jest.requireMock("expo-router") as {
+  __router: { push: jest.Mock };
+};
 
 // The account card (#51): export handed to the share sheet, deletion only
 // after the confirmation, the device signed out when the API says 204.
@@ -88,13 +91,25 @@ afterEach(async () => {
 });
 
 describe("AccountActions", () => {
-  it("shows the two labelled buttons and nothing pressable is unlabelled or too small", async () => {
+  it("shows the three labelled buttons and nothing pressable is unlabelled or too small", async () => {
     fetchMock([]);
     await show(<AccountActions />);
     expect(await screen.findByText("Your account")).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found).toHaveLength(2);
+    expect(found).toHaveLength(3);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+    // The consents are the app's settings now, not the account's (#170).
+    expect(screen.queryByLabelText("Take part in research")).toBeNull();
+  });
+
+  it("opens the break screen from its button, and nothing happens before that", async () => {
+    const requests = fetchMock([]);
+    router.push.mockReset();
+    await show(<AccountActions />);
+    await fireEvent.press(screen.getByRole("button", { name: "Take a break" }));
+    expect(router.push).toHaveBeenCalledWith("/account/break");
+    expect(requests.filter((r) => r.method !== "GET")).toHaveLength(0);
+    expect(currentSession()).not.toBeNull();
   });
 
   it("hands the export to the share sheet as JSON", async () => {
@@ -171,124 +186,6 @@ describe("AccountActions", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Delete everything" }));
     expect(await screen.findByText("The deletion did not go through. Try again.")).toBeTruthy();
     expect(currentSession()?.sessionId).toBe(session.sessionId);
-  });
-
-  it("shows the research opt-in as a switch and withdraws it", async () => {
-    const version = "2026-09-draft-1";
-    const given: {
-      kind: string;
-      version: string;
-      locale: string;
-      givenAt: string;
-      withdrawnAt: string | null;
-    } = {
-      kind: "research",
-      version,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null,
-    };
-    const versions = {
-      terms: version,
-      privacy: version,
-      research: version,
-      special_category: "2026-10-draft-2",
-    };
-    let consents = [given];
-    fetchMock([
-      (req) => {
-        const path = new URL(req.url).pathname;
-        if (req.method === "GET" && path === "/consents") {
-          return json({ consents, currentVersions: versions });
-        }
-        if (req.method === "DELETE" && path === "/consents/research") {
-          consents = [{ ...given, withdrawnAt: "2026-09-26T11:00:00.000Z" }];
-          return json({ consents, currentVersions: versions });
-        }
-        return null;
-      },
-    ]);
-    await show(<AccountActions />);
-    const toggle = await screen.findByLabelText("Take part in research");
-    expect(toggle.props.accessibilityState?.checked).toBe(true);
-    expect(screen.getByText(/You can change this at any time/)).toBeTruthy();
-    await fireEvent(toggle, "press");
-    await waitFor(() =>
-      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-        false,
-      ),
-    );
-    // The special-category consent has its own switch, off here, and withdrawing it is a DELETE of its kind (#146).
-    expect(
-      screen.getByLabelText("Store my sensitive answers").props.accessibilityState?.checked,
-    ).toBe(false);
-    const found = pressables(screen.toJSON() as HostNode);
-    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-  });
-
-  /** The consents as the API holds them, for the bundled wording; research given or not. */
-  function consentsApi(options: { research: boolean; failGive?: boolean }) {
-    const versions = {
-      terms: CONSENT_VERSIONS.terms,
-      privacy: CONSENT_VERSIONS.privacy,
-      research: CONSENT_VERSIONS.research,
-      special_category: CONSENT_VERSIONS.special_category,
-    };
-    const record = (kind: string) => ({
-      kind,
-      version: CONSENT_VERSIONS.research,
-      locale: "en",
-      givenAt: "2026-09-26T10:00:00.000Z",
-      withdrawnAt: null,
-    });
-    let consents = options.research ? [record("research")] : [];
-    return fetchMock([
-      (req) => {
-        const path = new URL(req.url).pathname;
-        if (req.method === "GET" && path === "/consents") {
-          return json({ consents, currentVersions: versions });
-        }
-        if (req.method === "POST" && path === "/consents") {
-          if (options.failGive) {
-            return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
-          }
-          consents = [record("research")];
-          return json({ consents, currentVersions: versions });
-        }
-        return null;
-      },
-    ]);
-  }
-
-  it("gives the research consent for the wording built into the app, in the app's language", async () => {
-    const calls = consentsApi({ research: false });
-    await show(<AccountActions />);
-    const toggle = await screen.findByLabelText("Take part in research");
-    expect(toggle.props.accessibilityState?.checked).toBe(false);
-    await fireEvent(toggle, "press");
-    await waitFor(() =>
-      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-        true,
-      ),
-    );
-    const post = calls.find((c) => c.method === "POST");
-    expect(JSON.parse(await (post as Request).text())).toEqual({
-      kind: "research",
-      version: CONSENT_VERSIONS.research,
-      locale: "en",
-    });
-  });
-
-  it("says so when the research choice could not be saved, and leaves the switch as it was", async () => {
-    consentsApi({ research: false, failGive: true });
-    await show(<AccountActions />);
-    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
-    expect(
-      await screen.findByText("The research choice could not be saved. Try again."),
-    ).toBeTruthy();
-    expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
-      false,
-    );
   });
 
   it("hands the export to the phone's own share sheet when no other is given", async () => {

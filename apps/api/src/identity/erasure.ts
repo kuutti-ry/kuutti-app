@@ -74,7 +74,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
   const result = await transaction(deps.db, async (tx) => {
     // The account row first, under lock: a profile or preference write that
     // raced this transaction waits here and then sees the tombstone.
-    const locked = await repo.lockAccountForErasure(tx, accountId);
+    const locked = await repo.lockAccountRow(tx, accountId);
     if (!locked || locked.state === "deleted") {
       throw new AppError(404, "not_found", "No live account to erase");
     }

@@ -82,9 +82,9 @@ export const SessionTokens = z
 export type SessionTokens = z.infer<typeof SessionTokens>;
 
 export const AuthExchangeResponse = SessionTokens.extend({
-  outcome: z.enum(["created", "resumed"]).meta({
+  outcome: z.enum(["created", "resumed", "unpaused"]).meta({
     description:
-      "created: a fresh account (first login or after a cooldown); resumed: the live account.",
+      "created: a fresh account (first login or after a cooldown); resumed: the live account; unpaused: the live account, back from a break (#170).",
   }),
 }).meta({ id: "AuthExchangeResponse" });
 export type AuthExchangeResponse = z.infer<typeof AuthExchangeResponse>;

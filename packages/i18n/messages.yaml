@@ -3105,6 +3105,20 @@ signIn.error.auth_suspended:
   sv: Det här kontot är tills vidare avstängt.
   machine: { fi: true, sv: true }
 
+signIn.paused.title:
+  en: "Your account is on a break"
+  description: "Sign-in screen, card shown right after the person paused the account on this device (#170)."
+  fi: "Tilisi on tauolla"
+  sv: "Ditt konto är på paus"
+  machine: { fi: true, sv: true }
+
+signIn.paused.body:
+  en: "Sign in with your bank whenever you want to come back. Everything is as you left it."
+  description: "Sign-in screen, under the break card's title."
+  fi: "Kirjaudu pankkitunnuksilla, kun haluat palata. Kaikki on niin kuin sen jätit."
+  sv: "Logga in med din bank när du vill komma tillbaka. Allt är som du lämnade det."
+  machine: { fi: true, sv: true }
+
 signIn.error.auth_cooldown:
   en: "You deleted your account recently. The earliest day for a new one: {date}"
   description: Sign-in screen, inside the deletion cooldown; {date} is the day the cooldown ends, formatted for the locale (after a colon, so no language inflects it).
@@ -3159,6 +3173,27 @@ settings.session.label:
   description: Settings sheet, heading of the sign-out controls.
   fi: Tämä laite
   sv: Den här enheten
+  machine: { fi: true, sv: true }
+
+settings.group.app:
+  en: "App settings"
+  description: "Settings, heading of the first group: theme, contrast, language, the consents and the source offer (#170, the S-Pankki grouping)."
+  fi: "Sovelluksen asetukset"
+  sv: "Appinställningar"
+  machine: { fi: true, sv: true }
+
+settings.group.account:
+  en: "Account"
+  description: "Settings, heading of the second group: this device, the e-mail, the export, the break and the deletion (#170)."
+  fi: "Tili"
+  sv: "Konto"
+  machine: { fi: true, sv: true }
+
+settings.consents.label:
+  en: "Your consents"
+  description: "Settings, heading above the research and sensitive-answers switches (#170)."
+  fi: "Suostumuksesi"
+  sv: "Dina samtycken"
   machine: { fi: true, sv: true }
 
 settings.session.none:
@@ -4268,6 +4303,83 @@ account.delete.failed:
   sv: Borttagningen gick inte igenom. Försök igen.
   machine: { fi: true, sv: true }
 
+account.break.button:
+  en: "Take a break"
+  description: "Settings, account group: opens the screen that pauses the account (#170)."
+  fi: "Pidä tauko"
+  sv: "Ta en paus"
+  machine: { fi: true, sv: true }
+
+account.break.title:
+  en: "Take a break from Kuutti"
+  description: "Heading of the break screen (#170)."
+  fi: "Pidä tauko Kuutista"
+  sv: "Ta en paus från Kuutti"
+  machine: { fi: true, sv: true }
+
+account.break.intro:
+  en: "A break hides you without deleting anything. Three things happen:"
+  description: "Break screen, the line above the three consequences (#170)."
+  fi: "Tauko piilottaa sinut poistamatta mitään. Kolme asiaa tapahtuu:"
+  sv: "En paus döljer dig utan att något raderas. Tre saker händer:"
+  machine: { fi: true, sv: true }
+
+account.break.hidden:
+  en: "Your profile leaves everybody's view. Nobody new sees you while you are away."
+  description: "Break screen, the first consequence."
+  fi: "Profiilisi poistuu kaikkien näkyvistä. Kukaan uusi ei näe sinua tauon aikana."
+  sv: "Din profil försvinner ur allas vy. Ingen ny ser dig medan du är borta."
+  machine: { fi: true, sv: true }
+
+account.break.signedOut:
+  en: "You are signed out on every device, this one included."
+  description: "Break screen, the second consequence."
+  fi: "Sinut kirjataan ulos kaikilta laitteilta, myös tältä."
+  sv: "Du loggas ut på alla enheter, även den här."
+  machine: { fi: true, sv: true }
+
+account.break.comesBack:
+  en: "Your next bank login brings everything back as it was. Nothing is deleted and nothing is asked again."
+  description: "Break screen, the third consequence."
+  fi: "Seuraava pankkitunnistautuminen palauttaa kaiken ennalleen. Mitään ei poisteta eikä mitään kysytä uudelleen."
+  sv: "Nästa bankinloggning tar tillbaka allt som det var. Inget raderas och inget frågas igen."
+  machine: { fi: true, sv: true }
+
+account.break.understand:
+  en: "I understand what a break means"
+  description: "Break screen, the switch under the three lines; the button is enabled only once it is on (the S-mobiili pattern, #170)."
+  fi: "Ymmärrän, mitä tauko tarkoittaa"
+  sv: "Jag förstår vad en paus innebär"
+  machine: { fi: true, sv: true }
+
+account.break.confirm:
+  en: "Start the break"
+  description: "Break screen, the button that pauses the account; disabled until the person has said they understand."
+  fi: "Aloita tauko"
+  sv: "Börja pausen"
+  machine: { fi: true, sv: true }
+
+account.break.working:
+  en: "Starting your break…"
+  description: "Break screen, while the API pauses the account."
+  fi: "Aloitetaan taukoasi…"
+  sv: "Startar din paus…"
+  machine: { fi: true, sv: true }
+
+account.break.failed:
+  en: "The break could not be started. Try again."
+  description: "Break screen, after the API refused or could not be reached; the session stays."
+  fi: "Taukoa ei voitu aloittaa. Yritä uudelleen."
+  sv: "Pausen kunde inte startas. Försök igen."
+  machine: { fi: true, sv: true }
+
+account.break.back:
+  en: "Back"
+  description: "Screen-reader label of the back arrow of the break screen."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
 # --- Research opt-in on the account card, and the home screen's onboarding gate (#46) ---
 
 account.research.label:
@@ -4585,6 +4697,13 @@ home.gate.retry:
   description: "Button under home.gate.failed: reads GET /onboarding again."
   fi: "Tarkista uudelleen"
   sv: "Kontrollera igen"
+  machine: { fi: true, sv: true }
+
+home.welcomeBack:
+  en: "Welcome back. Your profile is visible again."
+  description: "Home screen, one line after a bank login that ended a break (#170)."
+  fi: "Tervetuloa takaisin. Profiilisi näkyy taas."
+  sv: "Välkommen tillbaka. Din profil syns igen."
   machine: { fi: true, sv: true }
 
 settings.back:
