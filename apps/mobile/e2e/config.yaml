@@ -34,7 +34,7 @@ executionOrder:
     - Home names the area with its numbers and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
     - The research switch in Settings records the opt-in and withdraws it again
-    - Download my data hands the person's file to the share sheet
+    - Download my data hands the person's file over
     - The language choice in Settings changes the app's language at once
     - The session, the theme and the language survive closing and reopening the app
     - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
