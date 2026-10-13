@@ -188,6 +188,18 @@ describe("LaterFieldScreen", () => {
     unmount();
   });
 
+  it("asks other nicotine on the smoking screen, and saves both with one press (#239)", async () => {
+    const { puts } = fakeApi(named({}));
+    await show(<LaterFieldScreen field="smoking" />);
+    await waitFor(() => expect(screen.getByText("Other nicotine")).toBeTruthy());
+    checkA11y();
+    await press(screen.getByRole("button", { name: "Vaping" }));
+    await press(screen.getByRole("button", { name: "Snus" }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await waitFor(() => expect(puts).toHaveLength(1));
+    expect(puts[0]).toMatchObject({ fields: { smoking: "vaping", nicotine: ["snus"] } });
+  });
+
   it("steps a number from the middle of its range, and clears it again", async () => {
     const { puts } = fakeApi(named({}));
     await show(<LaterFieldScreen field="height" />);

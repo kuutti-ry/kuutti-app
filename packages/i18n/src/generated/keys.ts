@@ -338,6 +338,7 @@ export type MessageParams = {
   "profile.field.intent": Record<never, never>;
   "profile.field.languages": Record<never, never>;
   "profile.field.monogamy": Record<never, never>;
+  "profile.field.nicotine": Record<never, never>;
   "profile.field.occupation": Record<never, never>;
   "profile.field.occupationTitle": Record<never, never>;
   "profile.field.pets": Record<never, never>;
@@ -510,6 +511,9 @@ export type MessageParams = {
   "profile.option.languages.zh": Record<never, never>;
   "profile.option.monogamy.monogamous": Record<never, never>;
   "profile.option.monogamy.non_monogamous": Record<never, never>;
+  "profile.option.nicotine.none": Record<never, never>;
+  "profile.option.nicotine.pouches": Record<never, never>;
+  "profile.option.nicotine.snus": Record<never, never>;
   "profile.option.occupation.agriculture": Record<never, never>;
   "profile.option.occupation.arts_culture": Record<never, never>;
   "profile.option.occupation.between_jobs": Record<never, never>;
@@ -560,6 +564,7 @@ export type MessageParams = {
   "profile.option.smoking.quitting": Record<never, never>;
   "profile.option.smoking.regularly": Record<never, never>;
   "profile.option.smoking.sometimes": Record<never, never>;
+  "profile.option.smoking.vaping": Record<never, never>;
   "profile.option.wantsKids.dont_want": Record<never, never>;
   "profile.option.wantsKids.not_sure": Record<never, never>;
   "profile.option.wantsKids.want": Record<never, never>;

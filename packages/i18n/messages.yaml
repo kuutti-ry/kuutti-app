@@ -219,10 +219,10 @@ profile.section.lifestyle.title:
   machine: { fi: true, sv: true }
 
 profile.section.lifestyle.summary:
-  en: "Smoking, drinking, drugs, exercise and pets"
+  en: "Smoking, nicotine, drinking, drugs, exercise and pets"
   description: "Second line of the lifestyle section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
-  fi: "Tupakointi, alkoholi, huumeet, liikunta ja lemmikit"
-  sv: "Rökning, alkohol, droger, motion och husdjur"
+  fi: "Tupakointi, nikotiini, alkoholi, huumeet, liikunta ja lemmikit"
+  sv: "Rökning, nikotin, alkohol, droger, motion och husdjur"
   machine: { fi: true, sv: true }
 
 profile.section.hobbies.title:
@@ -377,6 +377,13 @@ profile.field.smoking:
   description: "Label of the smoking field of the profile registry (#47)."
   fi: "Tupakointi"
   sv: "Rökning"
+  machine: { fi: true, sv: true }
+
+profile.field.nicotine:
+  en: "Other nicotine"
+  description: "Label of the nicotine field (#239): nicotine that is not smoked, snus and nicotine pouches; shown after smoking in the lifestyle section, on smoking's later screen and on the card."
+  fi: "Muu nikotiini"
+  sv: "Annat nikotin"
   machine: { fi: true, sv: true }
 
 profile.field.education:
@@ -958,6 +965,34 @@ profile.option.smoking.quitting:
   description: "Option quitting of the smoking field (#145 registry, ADR-019)."
   fi: "Lopettamassa"
   sv: "Håller på att sluta"
+  machine: { fi: true, sv: true }
+
+profile.option.smoking.vaping:
+  en: "Vaping"
+  description: "Option vaping of the smoking field (#239): smoking an e-cigarette, a way of smoking rather than a frequency."
+  fi: "Sähkötupakka"
+  sv: "E-cigarett"
+  machine: { fi: true, sv: true }
+
+profile.option.nicotine.snus:
+  en: "Snus"
+  description: "Option snus of the nicotine field (#239)."
+  fi: "Nuuska"
+  sv: "Snus"
+  machine: { fi: true, sv: true }
+
+profile.option.nicotine.pouches:
+  en: "Nicotine pouches"
+  description: "Option pouches of the nicotine field (#239): white, tobacco-free pouches."
+  fi: "Nikotiinipussit"
+  sv: "Nikotinpåsar"
+  machine: { fi: true, sv: true }
+
+profile.option.nicotine.none:
+  en: "No snus or pouches"
+  description: "Option none of the nicotine field (#239): neither snus nor pouches; it stands alone, so choosing it clears the other two. Shown under smoking's options on the edit screen and alone under Other nicotine on the card, so it names what it refers to; must not read like smoking's Never."
+  fi: "Ei nuuskaa eikä nikotiinipusseja"
+  sv: "Varken snus eller nikotinpåsar"
   machine: { fi: true, sv: true }
 
 profile.option.education.peruskoulu:

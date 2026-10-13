@@ -93,6 +93,23 @@ describe("FieldEditor: several choices", () => {
     expect(fields).toEqual({});
   });
 
+  it("lets 'No snus or pouches' stand alone, and takes snus and pouches together (#239)", async () => {
+    await show("nicotine");
+    await fireEvent.press(screen.getByRole("button", { name: "Snus" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Nicotine pouches" }));
+    expect(fields).toEqual({ nicotine: ["snus", "pouches"] });
+    await fireEvent.press(screen.getByRole("button", { name: "No snus or pouches" }));
+    expect(fields).toEqual({ nicotine: ["none"] });
+    await fireEvent.press(screen.getByRole("button", { name: "Snus" }));
+    expect(fields).toEqual({ nicotine: ["snus"] });
+  });
+
+  it("offers vaping among the ways of smoking (#239)", async () => {
+    await show("smoking");
+    await fireEvent.press(screen.getByRole("button", { name: "Vaping" }));
+    expect(fields).toEqual({ smoking: "vaping" });
+  });
+
   it("no longer offers the coffee party (#239)", async () => {
     await show("politics");
     expect(screen.queryByRole("button", { name: "The Coffee Party" })).toBeNull();

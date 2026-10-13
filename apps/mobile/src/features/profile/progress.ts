@@ -1,9 +1,7 @@
 import {
-  LATER_COMPANIONS,
   PHOTOS_FOR_COMPLETENESS,
   PROFILE_FIELDS,
   PROMPTS_MAX,
-  type ProfileFieldKey,
   type ProfileUpdate,
 } from "@kuutti/schema";
 import type { ProfileSection, SectionItem } from "./sections";
@@ -17,14 +15,12 @@ export const isDone = ({ answered, total }: Progress) => answered >= total;
 export const answeredPrompts = (prompts: ProfileUpdate["prompts"]): number =>
   prompts.filter((prompt) => prompt.answer.trim() !== "").length;
 
-const COMPANIONS: ReadonlySet<ProfileFieldKey> = new Set(Object.values(LATER_COMPANIONS));
-
 /**
  * What one item of a section adds to its progress. Not counted: the identity
  * label, which the section shows only once it is given; a setting (hide me
- * from my field), which off is a choice and not a gap; and a companion (the
- * job title), which the later screens do not count either, so a student or a
- * retired person is not left short forever.
+ * from my field), which off is a choice and not a gap; and a free text (the
+ * job title), so a student or a retired person is not left short forever.
+ * Every choice and number counts, other nicotine among them (#239).
  */
 function itemProgress(item: SectionItem, profile: ProfileUpdate): Progress {
   switch (item) {
@@ -40,7 +36,7 @@ function itemProgress(item: SectionItem, profile: ProfileUpdate): Progress {
     case "identityLabel":
       return { answered: 0, total: 0 };
     default:
-      if (PROFILE_FIELDS[item].kind === "flag" || COMPANIONS.has(item)) {
+      if (PROFILE_FIELDS[item].kind === "flag" || PROFILE_FIELDS[item].kind === "text") {
         return { answered: 0, total: 0 };
       }
       return { answered: profile.fields[item] === undefined ? 0 : 1, total: 1 };

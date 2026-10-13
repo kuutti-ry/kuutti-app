@@ -11,8 +11,9 @@ import { Text } from "@/components/ui/text";
 import { type OnRefused, PhotoImage } from "@/features/media";
 import { pondName } from "@/features/pond";
 import { useT } from "@/lib/locale";
+import { FieldLabel } from "./fieldIcons";
 import { hasGlyphs, OptionGlyph } from "./glyphs";
-import { fieldLabelKey, genderKey, optionKey, presetKey, promptKey } from "./keys";
+import { genderKey, optionKey, presetKey, promptKey } from "./keys";
 
 /**
  * A card as others see it (#47, #150): the main photo in the card variant,
@@ -115,7 +116,7 @@ export function ProfileCardView({
             const options = (Array.isArray(value) ? value : [value]).map(String);
             return (
               <View key={key} className="gap-0.5">
-                <Text variant="small">{t(fieldLabelKey(key))}</Text>
+                <FieldLabel field={key} />
                 <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
                   {options.map((option) => (
                     <View key={option} className="flex-row items-center gap-1">
@@ -131,7 +132,7 @@ export function ProfileCardView({
           if (shown === null) return null;
           return (
             <View key={key} className="gap-0.5">
-              <Text variant="small">{t(fieldLabelKey(key))}</Text>
+              <FieldLabel field={key} />
               <Text>{shown}</Text>
             </View>
           );
