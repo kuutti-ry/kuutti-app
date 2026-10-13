@@ -1,6 +1,6 @@
 # Sentry, once (maintainer)
 
-Error reporting only (TD-19, #11): unhandled errors from the API and the app, with readable stack traces. No tracing, no session replay, no user data: the code strips request bodies, headers and breadcrumb data before anything leaves (`apps/api/src/lib/sentry.ts`, `apps/mobile/src/lib/sentry.ts`, both asserted by tests). Until a DSN is configured the SDK is off everywhere, which is today.
+Error reporting only (TD-19, #11): unhandled errors from the API and the app, with readable stack traces. No tracing, no session replay, no user data: the code strips request bodies, headers and breadcrumb data before anything leaves (`apps/api/src/lib/sentry.ts`, `apps/mobile/src/lib/sentry.ts`, both asserted by tests). Without a DSN the SDK is off; staging has had one since 2026-09-20 (below), production gets its own with #25.
 
 The site is sentry.io. **The data region is chosen when the organisation is created and cannot be changed afterwards: choose the EU.** The organisation lives at `https://kuutti-fi.sentry.io` (slug `kuutti-fi`: `kuutti` was already taken on 2026-09-20; it is Sentry's own name and stayed when the GitHub organisation became `kuutti-ry`, #110) and its API at `https://de.sentry.io`. The `app.json` plugin block and the upload step in `deploy.yml` (`SENTRY_ORG`) both name it.
 
@@ -10,7 +10,7 @@ Done on 2026-09-20: every section. Both proofs of section 5 passed on staging (t
 
 1. https://sentry.io/signup/ with the project mailbox (TD-4: accounts belong to the association), not a personal address. Turn on two-factor authentication in User settings, Security, before anything else, and add the entry to `docs/runbooks/custody.md`.
 2. Create the organisation: name `Kuutti`, slug **`kuutti-fi`**, **Data storage location: European Union (EU)**.
-3. Plan: the free Developer plan is enough for M1 (one user, a monthly error quota). Sentry also sponsors open-source projects; applying is worth the ten minutes once the repository has some history.
+3. Plan: the free Developer plan is enough for now (one user, a monthly error quota). Sentry also sponsors open-source projects; applying is worth the ten minutes once the repository has some history.
 4. Organisation settings, Security & Privacy: turn on **Require two-factor authentication** and **Enhanced privacy**; leave "Data scrubber" and "Use default scrubbers" on. Set **Prevent storing of IP addresses** on. _Requiring 2FA removes every member who has none, the owner mailbox included: enable 2FA on every account first. Still to do as of 2026-09-20._
 
 Settings and projects can also be done over the API without pasting a token anywhere visible: create a personal auth token (User settings, Auth Tokens; `org:write`, `project:admin`, `team:write` and the reads), store it with `pnpm exec sentry-cli login` (the default server; `--url https://de.sentry.io` fails, its token check lives on sentry.io only), let the calls read `~/.sentryclirc`, and revoke the token afterwards. Organisation data is served from `https://de.sentry.io/api/0/organizations/kuutti-fi/...`; account endpoints from `https://sentry.io`. The alert-rule endpoints are retired: alerts are checked in the UI.

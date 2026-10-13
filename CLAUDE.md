@@ -19,14 +19,14 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `docs/` | security checklist, `adr/` | |
 | `features/` | Gherkin specs for the rules layer, one directory per slice | `.claude/rules/layout.md` |
 
-Inside each app, code is organised by vertical slice (identity, profile, media, pond, matching, chat, safety, research, rewards, notifications), never by layer; see `.claude/rules/layout.md`. Rules in `.claude/rules/` load automatically when you work on matching paths. The scaffold is Milestone 1; until it lands, treat this layout as the target, not a description.
+Inside each app, code is organised by vertical slice (identity, profile, media, pond, matching, chat, safety, research, rewards, notifications), never by layer; see `.claude/rules/layout.md`. Rules in `.claude/rules/` load automatically when you work on matching paths.
 
 ## Commands
 
 Root `package.json` is the source of truth; keep this list in sync with it.
 
 - `pnpm install --frozen-lockfile`. Node 22.18+ and pnpm come from `package.json` (`engines`, `packageManager`); run `corepack enable` once.
-- `pnpm env:up` starts the whole local environment: the database (docker compose once #5 lands, Homebrew PostgreSQL until then), migrate and seed, then the API on 3000, Metro on 8081 (app and web target), admin on 5173, with prefixed logs. It frees ports held by stale copies of our own processes and refuses to touch anything else. Ctrl+C stops the apps; `pnpm env:down` also stops the database; `pnpm env:status` shows who holds what.
+- `pnpm env:up` starts the whole local environment: the database (docker compose, or Homebrew PostgreSQL when Docker is absent), migrate and seed, then the API on 3000, Metro on 8081 (app and web target), admin on 5173, with prefixed logs. It frees ports held by stale copies of our own processes and refuses to touch anything else. Ctrl+C stops the apps; `pnpm env:down` also stops the database; `pnpm env:status` shows who holds what.
 - One at a time: `pnpm dev` runs the API with tsx watch on port 3000. `pnpm dev:mobile` starts the Expo dev client; never Expo Go. `pnpm dev:admin` starts Vite.
 - `pnpm typecheck`, `pnpm lint` (Biome, including the slice import boundary, then the inline-string check), `pnpm format`, `pnpm test` (Vitest for api and packages, jest-expo for mobile), `pnpm test:coverage` (every package against its coverage floor, ADR-021; the API's run needs the S3 stand-in and the mock bank, as in CI's compose job).
 - `pnpm e2e` runs the Maestro flows of `apps/mobile/e2e/flows` on a booted iOS simulator or Android emulator against the local environment (`pnpm env:up`, `pnpm demo:assets` and `pnpm demo:reset` first; `-- --device <udid>`, `-- <flow.yaml>`, `-- --shard i/n`; Maestro itself from Homebrew, `apps/mobile/e2e/README.md`; ADR-020). A flow names its texts in all three languages and has a persona to itself where it changes something; the README's table says which. CI runs them on Android emulators, in four jobs, on `main` and on a pull request labelled `e2e` (`.github/workflows/e2e.yml`, ADR-020 §6 and §7).
@@ -110,7 +110,7 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 - Code nothing uses is removed, once indirect use is ruled out (names in strings, routes called from outside, files loaded by convention); an unreachable branch stays only in ADR-021 §7's four cases. A bug a test finds gets its own change, with the test that failed first.
 - A test fails on PII patterns in log output.
 - Tests are deterministic: no real network, no wall-clock dependence, no random data without a seed.
-- Rules-layer behaviour (identity, matching, pond, safety, erasure) is specified in `features/<slice>/*.feature`. A `Scenario` is an `it()` with the scenario name verbatim; a `Scenario Outline` is a `describe()` with the outline name around `it.each` over the Examples rows. `pnpm check:scenarios` fails CI on any scenario without a same-named test; `@pending` marks a spec that lands before its code. If a `Given` needs more than three lines of setup, it is not a Gherkin scenario: write an ordinary test. ADR-002.
+- Rules-layer behaviour (identity, matching, pond, safety, erasure, and media's photo check) is specified in `features/<slice>/*.feature`. A `Scenario` is an `it()` with the scenario name verbatim; a `Scenario Outline` is a `describe()` with the outline name around `it.each` over the Examples rows. `pnpm check:scenarios` fails CI on any scenario without a same-named test; `@pending` marks a spec that lands before its code. If a `Given` needs more than three lines of setup, it is not a Gherkin scenario: write an ordinary test. ADR-002.
 
 ## Accessibility (mobile and admin)
 
@@ -126,4 +126,4 @@ The evidence base behind these is in the maintainers' private design document. N
 
 ## Decisions
 
-Anything that changes identity, upload, event flow, data retention, or infrastructure needs an ADR in `docs/adr/`, or a citation of the TD it follows, in the same change. Open questions you must not settle on your own: RPC style across the client-server boundary (lean: generated types via `@hono/zod-openapi`), Dokploy versus Kamal, which TD-6 anti-scraping items ship. Ask.
+Anything that changes identity, upload, event flow, data retention, or infrastructure needs an ADR in `docs/adr/`, or a citation of the TD it follows, in the same change. Open questions you must not settle on your own: Dokploy versus Kamal, and which of the TD-6 anti-scraping items of #86 ship. Settled since: the RPC style across the client-server boundary (ADR-003, generated types from the route contracts) and the M3 anti-scraping items (#52, ADR-008). Ask.

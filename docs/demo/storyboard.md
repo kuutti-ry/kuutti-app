@@ -71,4 +71,4 @@ Then `pnpm demo:reset` (locally) or the reset in the container (staging): everyb
 
 ## What is deliberately not shown
 
-No swipes, no scores, no streaks, no "people who liked you", no feed (CLAUDE.md, Product constraints). Rounds, likes and chat are M4; the demo ends at the gate.
+No swipes, no scores, no streaks, no "people who liked you", no feed (CLAUDE.md, Product constraints). Rounds and likes are the Match milestone, chat the Chat milestone; the demo ends at the gate.

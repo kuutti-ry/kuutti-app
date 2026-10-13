@@ -7,7 +7,7 @@ allowed-tools: Bash(git *), Bash(gh *), Read, Write
 
 Write `.claude/session-handoff.md` at the repository root, overwriting it. It is gitignored and injected into context by a SessionStart hook after `/clear`, `/compact`, and on startup, so it must be short: under 60 lines, facts only, no narrative.
 
-Gather first, do not guess: `git log --oneline -8`, `git status --short`, the open issue being worked on (`gh issue list --milestone "M1 Skeleton"` if unsure), and the last verification commands that were run.
+Gather first, do not guess: `git log --oneline -8`, `git status --short`, the open issue being worked on (`gh issue list --state open` if unsure), and the last verification commands that were run.
 
 Use exactly this shape:
 

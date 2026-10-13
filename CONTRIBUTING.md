@@ -1,6 +1,6 @@
 # Contributing to Kuutti
 
-Thanks for helping. Kuutti is a free, open-source dating app for Finland, run as a non-profit. This page covers the legal and mechanical side of contributing; product and technical decisions live in the project docs and, later, in `docs/adr`.
+Thanks for helping. Kuutti is a free, open-source dating app for Finland, run as a non-profit. This page covers the legal and mechanical side of contributing; the technical decisions live in `docs/adr`, the product's reasoning in the maintainers' private planning documents (`CLAUDE.md` says what they hold).
 
 ## Licence
 

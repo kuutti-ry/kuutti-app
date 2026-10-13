@@ -45,7 +45,7 @@ One AWS account, everything in eu-central-1. Vendor list: AWS, Expo/EAS, GitHub,
 ## CI (GitHub Actions)
 
 - Actions pinned to commit SHAs with a version comment; repository settings reject unpinned actions. `permissions: contents: read` at the top of every workflow, raised per job only when needed.
-- Jobs: typecheck, Biome, Vitest (api, packages), jest-expo (mobile), secret scan, DCO. arm64 runners for anything that builds images.
+- The fourteen required checks (`infra/README.md`, Ruleset switch): typecheck, lint, test-api-packages, test-mobile, i18n, licenses, audit, scenarios, schema-drift, compose, issue-link, workflows, DCO sign-off, TruffleHog. arm64 runners for anything that builds images.
 - Cloud access from CI through OIDC federation only. No long-lived AWS keys in repository secrets.
 - `pnpm install --frozen-lockfile`; `pnpm audit` blocks on high.
 
