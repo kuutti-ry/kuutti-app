@@ -2,6 +2,7 @@ import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import type { ConsentsResponse, WithdrawableConsentKind } from "@kuutti/schema";
 import { useCallback, useEffect, useState } from "react";
 import { View } from "react-native";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -85,18 +86,25 @@ function ConsentSwitch({
   if (consent.state !== "on" && consent.state !== "off" && consent.state !== "outdated") {
     return null;
   }
+  const locked = consent.busy || consent.state === "outdated";
+  const set = (on: boolean) => {
+    tap();
+    void consent.set(on);
+  };
   return (
     <View className="gap-2">
+      {/* The words toggle the switch too, as the high-contrast row's do: the
+          whole row is the target, which a thumb or a test reaches without
+          aiming at the thumb-sized switch at the screen's edge. */}
       <View className="flex-row items-center justify-between gap-3">
-        <Text className="flex-1">{label}</Text>
+        <Label className="flex-1" onPress={() => !locked && set(consent.state !== "on")}>
+          {label}
+        </Label>
         <Switch
           accessibilityLabel={label}
           checked={consent.state === "on"}
-          disabled={consent.busy || consent.state === "outdated"}
-          onCheckedChange={(on) => {
-            tap();
-            void consent.set(on);
-          }}
+          disabled={locked}
+          onCheckedChange={set}
         />
       </View>
       <Text variant="muted">
