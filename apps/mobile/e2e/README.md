@@ -59,6 +59,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `data-export` | Sanna | Download my data hands the file to the share sheet |
 | `settings-survive-relaunch` | Sanna | theme, language and session outlast closing the app |
 | `log-out-everywhere` | Sanna | signed out at once, not back on reopening |
+| `take-a-break` | Helmi | paused behind the tick, signed out with the reason, not back on reopening; the next bank login brings her back where she left off, the photos step (#170) |
 | `language` | Sanna | the language choice changes the app at once (#220) |
 
 Mikael is left out: given the moderator role on a machine, he is spared by `pnpm demo:reset`, which then exits with an error after doing the rest.

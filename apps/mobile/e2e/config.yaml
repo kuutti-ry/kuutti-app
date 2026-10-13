@@ -39,6 +39,8 @@ executionOrder:
     - The session, the theme and the language survive closing and reopening the app
     - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
     - Log out everywhere ends this device's session, and reopening the app does not bring it back
+    # Helmi, who takes a break and comes back.
+    - Taking a break signs the person out everywhere, and the next bank login brings them back
     # Noa.
     - A deal-breaker is offered only on what the person answered, and Answer it opens the field
     - With one approved photo the gate says the profile lacks something, and a hidden field leaves the card
