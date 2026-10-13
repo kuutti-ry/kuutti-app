@@ -13,6 +13,7 @@ import {
   ONE_TIME_CODE_TTL_MS,
 } from "./codes.ts";
 import { deriveIdentity, InvalidHetuError } from "./hetu.ts";
+import { resumeAccount } from "./pause.ts";
 import { decideRegistration } from "./registration.ts";
 import * as repo from "./repo.ts";
 
@@ -213,6 +214,11 @@ async function resolveAccount(
       }
       case "resume": {
         await repo.updateBrokerReference(deps.db, decision.account.identityId, derived.reference);
+        // A break ends with the login that follows it (#170, ADR-022); a second
+        // device's login that got there first leaves this one a plain resume.
+        if (decision.account.state === "paused" && (await resumeAccount(deps, decision.account))) {
+          return { accountId: decision.account.id, outcome: "unpaused" };
+        }
         return { accountId: decision.account.id, outcome: "resumed" };
       }
     }
@@ -285,6 +291,7 @@ export async function exchangeCode(
   return {
     accountId: request.accountId,
     platform: request.platform === "android" ? "android" : "ios",
-    outcome: request.outcome === "resumed" ? "resumed" : "created",
+    outcome:
+      request.outcome === "resumed" || request.outcome === "unpaused" ? request.outcome : "created",
   };
 }

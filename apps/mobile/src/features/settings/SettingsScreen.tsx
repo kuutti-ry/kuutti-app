@@ -9,7 +9,7 @@ import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { AccountActions, EmailCard, useSession } from "@/features/identity";
+import { AccountActions, ConsentSwitches, EmailCard, useSession } from "@/features/identity";
 import { fetchHealth } from "@/lib/api";
 import {
   LOCALE_FLAGS,
@@ -54,12 +54,13 @@ function Choice(props: { label: string; flag?: string; chosen: boolean; onPress:
 
 /**
  * The person's own settings, after login, in every build (#143; the team's
- * notes of 08/10): theme and high contrast (the OS's by default, kept across
- * restarts), the language (the phone's by default), this device's session,
- * the account (export, deletion, the research opt-in; #51) and the source
- * offer of AGPL-3.0 section 13, which stays visible to everybody. What is
- * technical (commits, the API, a test error) is the tech config screen and
- * exists outside production only.
+ * notes of 08/10), in two groups the way S-Pankki's app has them (#170): "App
+ * settings" is theme and high contrast (the OS's by default, kept across
+ * restarts), the language (the phone's by default), the two consents and the
+ * source offer of AGPL-3.0 section 13, which stays visible to everybody;
+ * "Account" is this device's session, the e-mail, the export, the break and
+ * the deletion (#51, #148, #170). What is technical (commits, the API, a test
+ * error) is the tech config screen and exists outside production only.
  */
 export function SettingsScreen() {
   const { t } = useT();
@@ -109,6 +110,10 @@ export function SettingsScreen() {
             {t("settings.title")}
           </Text>
         </View>
+
+        <Text variant="h3" accessibilityRole="header">
+          {t("settings.group.app")}
+        </Text>
 
         <View className="gap-2">
           <Text variant="small" accessibilityRole="header">
@@ -165,6 +170,31 @@ export function SettingsScreen() {
           </View>
         </View>
 
+        {/* The two withdrawable consents (#46, #146): a choice about the app, so with its settings. */}
+        {session.status === "signed-in" && (
+          <View className="gap-2">
+            <Text variant="small" accessibilityRole="header">
+              {t("settings.consents.label")}
+            </Text>
+            <ConsentSwitches />
+          </View>
+        )}
+
+        <View className="gap-2">
+          <Text variant="small" accessibilityRole="header">
+            {t("settings.about.title")}
+          </Text>
+          {source ? (
+            <SourceOffer source={source} />
+          ) : (
+            <Text variant="muted">{t("about.source.body")}</Text>
+          )}
+        </View>
+
+        <Text variant="h3" accessibilityRole="header">
+          {t("settings.group.account")}
+        </Text>
+
         {/* This device's session (#35): log out here, or everywhere, which is
             the recovery for a lost phone. Errors are swallowed: the local
             session is cleared either way, and the row expires on its own. */}
@@ -200,17 +230,6 @@ export function SettingsScreen() {
         <AccountActions />
         {/* The optional e-mail (#148): a way back in, never shown, never a login. */}
         <EmailCard />
-
-        <View className="gap-2">
-          <Text variant="small" accessibilityRole="header">
-            {t("settings.about.title")}
-          </Text>
-          {source ? (
-            <SourceOffer source={source} />
-          ) : (
-            <Text variant="muted">{t("about.source.body")}</Text>
-          )}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );

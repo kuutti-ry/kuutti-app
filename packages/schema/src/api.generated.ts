@@ -828,6 +828,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take a break: pause this account
+         * @description The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AccountPauseRequest"];
+                };
+            };
+            responses: {
+                /** @description Paused. Every token of this account has stopped working. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed (confirm missing). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_active: onboarding is not finished, so there is nothing to hide yet; already_paused: another device paused the account first. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account/export": {
         parameters: {
             query?: never;
@@ -2480,10 +2557,10 @@ export interface components {
              */
             refreshExpiresAt: string;
             /**
-             * @description created: a fresh account (first login or after a cooldown); resumed: the live account.
+             * @description created: a fresh account (first login or after a cooldown); resumed: the live account; unpaused: the live account, back from a break (#170).
              * @enum {string}
              */
-            outcome: "created" | "resumed";
+            outcome: "created" | "resumed" | "unpaused";
         };
         AuthExchangeRequest: {
             /** @description The one-time code the deep link carried. */
@@ -2549,6 +2626,13 @@ export interface components {
         AccountDeletionRequest: {
             /**
              * @description Must be true: the person confirmed in the app.
+             * @enum {boolean}
+             */
+            confirm: true;
+        };
+        AccountPauseRequest: {
+            /**
+             * @description Must be true: the person said they understand what a break means.
              * @enum {boolean}
              */
             confirm: true;

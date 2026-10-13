@@ -6,6 +6,7 @@ import {
   type PersonaHistory,
   personaOf,
 } from "@kuutti/db/demo";
+import type { AuthExchangeResponse } from "@kuutti/schema";
 import {
   ConsentsResponse,
   type Gender,
@@ -33,7 +34,7 @@ export type HistoryContext = BankContext & { db: Queryable; assets?: PhotoAssets
 export type Locale = PersonaHistory["locale"];
 export type HistoryConsentKind = "terms" | "privacy" | "special_category";
 export type HistoryLogin =
-  | { accountId: string; outcome: "created" | "resumed" }
+  | { accountId: string; outcome: AuthExchangeResponse["outcome"] }
   | { refused: string };
 
 export type HistoryWriter = {
@@ -75,7 +76,7 @@ export type HistoryResult = {
   /** Pictures uploaded for the persona this time: faces and negatives. */
   photos: number;
   /** `already`: the story's own ending (a ban, a deletion) refused the login, so it was told before. */
-  login: "created" | "resumed" | "already";
+  login: AuthExchangeResponse["outcome"] | "already";
   onboarded: boolean;
   profile: boolean;
   afterwards: PersonaHistory["afterwards"];

@@ -1,6 +1,8 @@
 import type { GateResponse, PondSummary, WaitlistResponse } from "@kuutti/schema";
 import { fireEvent, screen, userEvent } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
+import * as React from "react";
+import { useSession } from "@/features/identity";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -128,6 +130,38 @@ describe("HomeRoute", () => {
     await renderWithTheme(<HomeRoute />);
     expect(await screen.findByRole("heading", { name: "Kuutti" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
+  });
+
+  /** A login from the sign-in screen with the outcome the API gives it (#170). */
+  function loginAnswering(outcome: string) {
+    (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname === "/auth/exchange") return json({ ...tokens, outcome });
+      if (url.pathname === "/waitlist") return json(waitlist);
+      if (url.pathname === "/gate") return json(gate);
+      return json({ error: { code: "not_found" } }, 404);
+    });
+    return function Returning() {
+      const { status, signIn } = useSession();
+      React.useEffect(() => {
+        if (status === "signed-out") void signIn("c".repeat(43));
+      }, [status, signIn]);
+      return <HomeRoute />;
+    };
+  }
+
+  it("welcomes the person back once after a login that ended a break", async () => {
+    const Returning = loginAnswering("unpaused");
+    await renderWithTheme(<Returning />);
+    expect(await screen.findByText("Welcome back. Your profile is visible again.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Kuutti" })).toBeTruthy();
+  });
+
+  it("says nothing of a break after an ordinary login", async () => {
+    const Returning = loginAnswering("resumed");
+    await renderWithTheme(<Returning />);
+    expect(await screen.findByRole("heading", { name: "Kuutti" })).toBeTruthy();
+    expect(screen.queryByText(/Welcome back/)).toBeNull();
   });
 
   it("shows only that it is loading while the stored session is read", async () => {

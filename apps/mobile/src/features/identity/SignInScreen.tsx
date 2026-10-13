@@ -128,6 +128,18 @@ export function SignInScreen({ code, error, until }: SignInParams) {
         </Text>
         <Text className="w-full max-w-md text-center">{t("signIn.explain")}</Text>
 
+        {/* Right after a break began on this device (#170): why the sign-in is back, and that nothing is lost. */}
+        {session.status === "signed-out" && session.notice === "paused" && (
+          <Card className="w-full max-w-md">
+            <View accessibilityLabel={t("signIn.paused.title")} className="gap-6">
+              <CardHeader>
+                <CardTitle>{t("signIn.paused.title")}</CardTitle>
+                <CardDescription>{t("signIn.paused.body")}</CardDescription>
+              </CardHeader>
+            </View>
+          </Card>
+        )}
+
         {phase.kind === "error" && (
           <Card className="w-full max-w-md">
             {/* The words carry the state; the colour only repeats it. */}

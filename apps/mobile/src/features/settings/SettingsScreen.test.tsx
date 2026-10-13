@@ -114,6 +114,10 @@ describe("the settings screen", () => {
     expect(screen.queryByRole("button", { name: "Log out everywhere" })).toBeNull();
     expect(screen.getByText("About Kuutti")).toBeTruthy();
     expect(screen.getByText("https://github.com/kuutti-ry/kuutti-app")).toBeTruthy();
+    // The two groups stand whoever looks (#170); the consents need a person.
+    expect(screen.getByRole("heading", { name: "App settings" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Account" })).toBeTruthy();
+    expect(screen.queryByText("Your consents")).toBeNull();
     signedOut.unmount();
 
     await saveSession(tokens);
@@ -122,7 +126,30 @@ describe("the settings screen", () => {
     expect(await screen.findByRole("button", { name: "Log out" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Log out everywhere" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Download my data" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Take a break" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Delete my account" })).toBeTruthy();
+    expect(screen.getByText("Your consents")).toBeTruthy();
+    expect(await screen.findByLabelText("Take part in research")).toBeTruthy();
+  });
+
+  it("puts the app's settings before the account, the S-Pankki way (#170)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await settle();
+    const texts = (screen.toJSON() as HostNode[] | HostNode | null) ?? [];
+    const flat = JSON.stringify(texts);
+    const order = [
+      "App settings",
+      "Theme",
+      "Language",
+      "Your consents",
+      "About Kuutti",
+      "Account",
+      "This device",
+      "Your account",
+    ].map((label) => flat.indexOf(`"${label}"`));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
   it("turns high contrast on and off from its label too", async () => {

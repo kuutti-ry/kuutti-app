@@ -39,6 +39,7 @@ const accountFrom = (r: Row): Account => ({
   identityId: r.identity_id as string,
   state: r.state as Account["state"],
   stateChangedAt: (r.state_changed_at as Date | null) ?? null,
+  pausedFrom: (r.paused_from as Account["pausedFrom"]) ?? null,
   birthYear: (r.birth_year as number | null) ?? null,
   birthMonth: (r.birth_month as number | null) ?? null,
   gender: (r.gender as Account["gender"]) ?? null,
@@ -623,6 +624,32 @@ export async function tombstoneAccount(
   return result.rowCount === 1;
 }
 
+/**
+ * Taking a break (#170, ADR-022): the state is kept aside and the row is
+ * paused. Only a finished account can: a shadow-banned one like an active
+ * one, so the ban shows to nobody (ADR-013 §2); `registered` is refused by the
+ * row count, since there is nothing to hide yet and the resume would skip the
+ * activation rule (ADR-010 §6).
+ */
+export async function pauseAccount(db: Queryable, accountId: string, at: Date): Promise<boolean> {
+  const result = await db.query(
+    `UPDATE account SET paused_from = state, state = 'paused', state_changed_at = $2
+     WHERE id = $1 AND state IN ('active', 'shadow_banned')`,
+    [accountId, at],
+  );
+  return result.rowCount === 1;
+}
+
+/** The login that ends a break: the state kept aside comes back; `active` for a row paused before the column existed. */
+export async function resumeAccount(db: Queryable, accountId: string, at: Date): Promise<boolean> {
+  const result = await db.query(
+    `UPDATE account SET state = COALESCE(paused_from, 'active'), paused_from = NULL, state_changed_at = $2
+     WHERE id = $1 AND state = 'paused'`,
+    [accountId, at],
+  );
+  return result.rowCount === 1;
+}
+
 export async function recordIdentityDeletion(
   db: Queryable,
   identityId: string,
@@ -642,7 +669,7 @@ export async function recordIdentityDeletion(
  * behind the erasure. The state comes back so the caller can refuse a
  * tombstone before deleting anything.
  */
-export async function lockAccountForErasure(
+export async function lockAccountRow(
   db: Queryable,
   accountId: string,
 ): Promise<{ state: string } | null> {

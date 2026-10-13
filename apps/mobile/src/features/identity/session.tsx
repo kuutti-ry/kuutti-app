@@ -15,19 +15,24 @@ import {
  * signIn with the one-time code; a refresh the API refuses flips the state to
  * signed-out on its own, wherever the app is.
  */
+type AuthOutcome = AuthExchangeResponse["outcome"];
+
 export type SessionState =
   | { status: "loading" }
-  | { status: "signed-out" }
-  | { status: "signed-in"; sessionId: string; outcome?: "created" | "resumed" };
+  /** `notice` is what the sign-in screen says next: "paused" right after a break began on this device (#170). */
+  | { status: "signed-out"; notice?: "paused" }
+  | { status: "signed-in"; sessionId: string; outcome?: AuthOutcome };
 
 type SessionApi = SessionState & {
-  signIn: (code: string) => Promise<"created" | "resumed">;
+  signIn: (code: string) => Promise<AuthOutcome>;
   signOut: () => Promise<void>;
   signOutEverywhere: () => Promise<void>;
   /** Everything Kuutti holds about the person (#51), as the API answers it. */
   exportData: () => Promise<AccountExport>;
   /** Erasure per TD-7 (#51); the device is signed out locally at once. */
   deleteAccount: () => Promise<void>;
+  /** Taking a break (#170, ADR-022): the API pauses the account and ends every session; the device is signed out locally with the notice. */
+  pauseAccount: () => Promise<void>;
 };
 
 const SessionContext = React.createContext<SessionApi | null>(null);
@@ -101,9 +106,28 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     await clearSession();
   }, []);
 
+  // Like the deletion, but nothing is gone: the sign-in screen says so, once,
+  // from the notice; the store's own change arrives first and this state after it.
+  const pauseAccount = React.useCallback(async () => {
+    const { error, response } = await api.POST("/account/pause", { body: { confirm: true } });
+    if (!response.ok) {
+      throw new ApiError(`break answered ${response.status}`, response.status, error?.error.code);
+    }
+    await clearSession();
+    setState({ status: "signed-out", notice: "paused" });
+  }, []);
+
   const value = React.useMemo<SessionApi>(
-    () => ({ ...state, signIn, signOut, signOutEverywhere, exportData, deleteAccount }),
-    [state, signIn, signOut, signOutEverywhere, exportData, deleteAccount],
+    () => ({
+      ...state,
+      signIn,
+      signOut,
+      signOutEverywhere,
+      exportData,
+      deleteAccount,
+      pauseAccount,
+    }),
+    [state, signIn, signOut, signOutEverywhere, exportData, deleteAccount, pauseAccount],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

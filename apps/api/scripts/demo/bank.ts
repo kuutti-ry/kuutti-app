@@ -84,7 +84,7 @@ async function patient(context: BankContext, input: URL, init?: RequestInit): Pr
 }
 
 export type Login =
-  | { kind: "session"; outcome: "created" | "resumed"; accessToken: string }
+  | { kind: "session"; outcome: AuthExchangeResponse["outcome"]; accessToken: string }
   | { kind: "refused"; error: string; until: string | null };
 
 export class DemoError extends Error {

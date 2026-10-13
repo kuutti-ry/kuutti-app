@@ -257,6 +257,44 @@ describe("SessionProvider: the account", () => {
   });
 });
 
+describe("SessionProvider: the break (#170)", () => {
+  it("pauses the account with the confirmation, signs the device out and keeps the notice for the sign-in screen", async () => {
+    await saveSession(tokens());
+    const seen = serve({ "POST /account/pause": () => new Response(null, { status: 204 }) });
+    const { result } = await session();
+    await act(async () => result.current.pauseAccount());
+    expect(seen[0]).toEqual({ method: "POST", path: "/account/pause", body: { confirm: true } });
+    expect(result.current).toMatchObject({ status: "signed-out", notice: "paused" });
+    expect(currentSession()).toBeNull();
+  });
+
+  it("keeps the session and throws when the break is refused", async () => {
+    await saveSession(tokens());
+    serve({ "POST /account/pause": () => refusal("not_active", 409) });
+    const { result } = await session();
+    let error: unknown;
+    await act(async () => {
+      error = await result.current.pauseAccount().catch((caught: unknown) => caught);
+    });
+    expect(error).toMatchObject({ status: 409, code: "not_active" });
+    expect(result.current.status).toBe("signed-in");
+  });
+
+  it("reports a login that ended a break as unpaused", async () => {
+    const seen = serve({
+      "POST /auth/exchange": () => json({ ...tokens("b"), outcome: "unpaused" }),
+    });
+    const { result } = await session();
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.signIn("c".repeat(43));
+    });
+    expect(outcome).toBe("unpaused");
+    expect(seen[0]?.path).toBe("/auth/exchange");
+    expect(result.current).toMatchObject({ status: "signed-in", outcome: "unpaused" });
+  });
+});
+
 describe("useSession", () => {
   it("refuses to be used outside its provider", async () => {
     jest.spyOn(console, "error").mockImplementation(() => undefined);

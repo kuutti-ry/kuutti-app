@@ -226,6 +226,40 @@ describe("bank login", () => {
     expect(Number(accounts.rows[0]?.n)).toBe(1);
   });
 
+  test("The next bank login resumes a paused account as it was", async ({ ctx }) => {
+    const { app } = await appWith(ctx, ADULT_HETU);
+    const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+    const first = await (
+      await exchange(app, await codeFrom(await callback(app, await start(app))))
+    ).json();
+    // Onboarding finished, as the break requires (ADR-022 §1).
+    await ctx.client.query("UPDATE account SET state = 'active' WHERE state = 'registered'");
+    const paused = await app.request("/account/pause", {
+      method: "POST",
+      headers: { ...bearer(first.accessToken), "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true }),
+    });
+    expect(paused.status).toBe(204);
+    expect(
+      (await app.request("/auth/session", { headers: bearer(first.accessToken) })).status,
+    ).toBe(401);
+
+    const second = await (
+      await exchange(app, await codeFrom(await callback(app, await start(app))))
+    ).json();
+    expect(second.outcome).toBe("unpaused");
+    const { rows } = await ctx.client.query("SELECT state, paused_from FROM account");
+    expect(rows).toEqual([{ state: "active", paused_from: null }]);
+    expect(
+      (await app.request("/auth/session", { headers: bearer(second.accessToken) })).status,
+    ).toBe(200);
+    // The break has ended: the login after that is a plain resume.
+    const third = await (
+      await exchange(app, await codeFrom(await callback(app, await start(app))))
+    ).json();
+    expect(third.outcome).toBe("resumed");
+  });
+
   test("An unknown state, a used state and a broker failure each send the browser back with a code", async ({
     ctx,
   }) => {

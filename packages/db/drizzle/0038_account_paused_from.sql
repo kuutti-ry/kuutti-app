@@ -1,0 +1,1 @@
+ALTER TABLE "account" ADD COLUMN "paused_from" "account_state";

@@ -4,6 +4,17 @@ export type MessageParams = {
   "about.source.body": Record<never, never>;
   "about.source.open": Record<never, never>;
   "about.source.title": Record<never, never>;
+  "account.break.back": Record<never, never>;
+  "account.break.button": Record<never, never>;
+  "account.break.comesBack": Record<never, never>;
+  "account.break.confirm": Record<never, never>;
+  "account.break.failed": Record<never, never>;
+  "account.break.hidden": Record<never, never>;
+  "account.break.intro": Record<never, never>;
+  "account.break.signedOut": Record<never, never>;
+  "account.break.title": Record<never, never>;
+  "account.break.understand": Record<never, never>;
+  "account.break.working": Record<never, never>;
   "account.delete.body": { "days": number };
   "account.delete.button": Record<never, never>;
   "account.delete.cancel": Record<never, never>;
@@ -129,6 +140,7 @@ export type MessageParams = {
   "home.settings.open": Record<never, never>;
   "home.tech.open": Record<never, never>;
   "home.title": Record<never, never>;
+  "home.welcomeBack": Record<never, never>;
   "legal.privacy.summary": Record<never, never>;
   "legal.privacy.title": Record<never, never>;
   "legal.research.summary": Record<never, never>;
@@ -641,6 +653,9 @@ export type MessageParams = {
   "settings.about.title": Record<never, never>;
   "settings.back": Record<never, never>;
   "settings.close": Record<never, never>;
+  "settings.consents.label": Record<never, never>;
+  "settings.group.account": Record<never, never>;
+  "settings.group.app": Record<never, never>;
   "settings.highContrast": Record<never, never>;
   "settings.language.label": Record<never, never>;
   "settings.language.system": Record<never, never>;
@@ -671,6 +686,8 @@ export type MessageParams = {
   "signIn.exchanging": Record<never, never>;
   "signIn.explain": Record<never, never>;
   "signIn.opening": Record<never, never>;
+  "signIn.paused.body": Record<never, never>;
+  "signIn.paused.title": Record<never, never>;
   "signIn.title": Record<never, never>;
   "signIn.tryAgain": Record<never, never>;
   "signIn.unavailable": Record<never, never>;

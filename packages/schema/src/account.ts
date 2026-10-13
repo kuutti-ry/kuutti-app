@@ -42,6 +42,17 @@ export const AccountDeletionRequest = z
   .meta({ id: "AccountDeletionRequest" });
 export type AccountDeletionRequest = z.infer<typeof AccountDeletionRequest>;
 
+/** A body, so a stray call cannot pause an account; the screen asks the person to say they understand first (#170, ADR-022). */
+export const AccountPauseRequest = z
+  .object({
+    confirm: z
+      .literal(true)
+      .meta({ description: "Must be true: the person said they understand what a break means." }),
+  })
+  .strict()
+  .meta({ id: "AccountPauseRequest" });
+export type AccountPauseRequest = z.infer<typeof AccountPauseRequest>;
+
 const SignedVariantUrls = z
   .object({
     thumb: z.url(),
