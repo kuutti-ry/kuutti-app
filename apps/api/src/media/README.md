@@ -1,6 +1,6 @@
 # media
 
-Photo upload, variants, signed URL issuance (#48, TD-2, TD-8, ADR-005); moderation and the review queue (#49, ADR-006). The exposure budget arrives with #52.
+Photo upload, variants, signed URL issuance (#48, TD-2, TD-8, ADR-005); moderation and the review queue (#49, ADR-006). The exposure budget and the shown record (#52, ADR-008) are `budget.ts` and the statements of `repo.ts`.
 
 - `pipeline.ts`: `inspectImage` reads format and size from the file header (the pixel cap applies before any decoder); `processPhoto` re-encodes with sharp into the three WebP variants, computes the content address and the blurhash. Nothing of the input survives it.
 - `store.ts`: the object store behind `MediaStore` (S3 or the compose stand-in through `lib/s3.ts`; a Map in tests). Only variants reach `put`.

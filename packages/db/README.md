@@ -1,6 +1,6 @@
 # @kuutti/db
 
-Drizzle ORM schema in `src/schema`, migrations generated into `drizzle/` by drizzle-kit and committed as SQL, a migrate runner the API entrypoint calls under an advisory lock, the seed, and the hetu format helper. Rules: `.claude/rules/db.md`.
+Drizzle ORM schema in `src/schema`, migrations generated into `drizzle/` by drizzle-kit and committed as SQL, a migrate runner the API entrypoint calls under an advisory lock, the seed, and the demo tools (`@kuutti/db/demo`, for command lines and tests only). The hetu format itself is `@kuutti/tunnistus-oidc/hetu`. Rules: `.claude/rules/db.md`.
 
 - `pnpm --filter @kuutti/db generate --name <what>` after changing `src/schema`; commit the SQL and `drizzle/meta`. Never edit a generated file. CI regenerates and fails on a diff.
 - `pnpm --filter @kuutti/db migrate` applies committed migrations (the API does this at boot).

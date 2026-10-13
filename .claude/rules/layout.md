@@ -47,7 +47,7 @@ The seam between apps is shared vocabulary and one shared contract, never shared
 apps/api/src/
   <slice>/      routes.ts  service.ts  repo.ts  index.ts  *.test.ts
   lib/          db.ts  config.ts  logger.ts  s3.ts  ssm.ts  auth-middleware.ts
-  jobs/         nightly round builder, research export
+  jobs/         the nightly runner and its jobs (waitlist snapshot, pond gate, the slices' sweeps)
   app.ts
 
 apps/mobile/
@@ -63,10 +63,10 @@ apps/mobile/
 - A slice may not reach into another slice's internals. Anything a neighbour needs is exported from the neighbour's `index.ts`, which is its public surface, or it moves down into `lib/`.
 - Two slices that keep needing each other mean the boundary is in the wrong place, not that the rule is wrong. Raise it; do not work around it.
 - What stays horizontal: `lib/` in each app, `components/ui/` on the clients, and `packages/*`. The test is whether every slice uses it and none owns it. Do not force real infrastructure into a slice for symmetry.
-- The boundary is enforced by the linter once the scaffold lands (#2); until then, the reviewer greps for `from "../<other-slice>/` and rejects it.
+- The boundary is enforced by Biome (`noRestrictedImports` in `biome.json`, part of `pnpm lint`; #2).
 
 ## Specs and tests
 
-- Rules-layer slices (`identity`, `matching`, `pond`, `safety`, erasure) have `features/<slice>/*.feature`. The rest have ordinary tests.
+- Rules-layer slices (`identity`, `matching`, `media`'s photo check, `pond`, `safety`, erasure) have `features/<slice>/*.feature`. The rest have ordinary tests.
 - Scenario name = test name, verbatim. `Scenario Outline` = `describe(<name>)` around `it.each(rows)`. `@pending` for spec-before-code.
 - `pnpm check:scenarios` runs in CI. Renaming a scenario without renaming its test fails the build; that is the point.

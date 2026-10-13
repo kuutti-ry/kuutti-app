@@ -7,17 +7,17 @@ How the app gets onto a physical Android phone and an iPhone, for day-to-day wor
 | `preview` | the app as a tester runs it: no developer menu, starts straight into the app, fetches the latest JavaScript from the `staging` channel at launch | demos, showing the team, checking a merge on a phone |
 | `development` | the dev client: a launcher that connects to Metro on your Mac (or opens a published update) | writing code against a phone |
 
-Build links land as comments on the pinned issue #17. `main` builds `development` for Android automatically when native code changes; everything else is started by hand:
+Build links are on the project's builds page on expo.dev (`apps/mobile/README.md`, Installing the dev client). `main` builds `development` for Android automatically when native code changes; everything else is started by hand:
 
 ```sh
 gh workflow run eas-build.yml -f profile=preview -f platform=android
 ```
 
-Each build counts against Expo's free tier (30 a month, at most 15 iOS). Until Sentry is set up, the `preview` profile skips Sentry's source-map upload (`SENTRY_DISABLE_AUTO_UPLOAD` in `eas.json`); `production` does not, on purpose: a release without readable stack traces should fail, not ship.
+Each build counts against Expo's free tier (30 a month, at most 15 iOS). Every profile uploads its source maps to Sentry during the build (`docs/runbooks/sentry-setup.md`): a build without readable stack traces fails, it does not ship.
 
 ## Android (any phone, no cable needed)
 
-1. On the phone, open the build page from #17 in the browser and download the APK.
+1. On the phone, open the build's page on expo.dev in the browser and download the APK.
 2. Android asks whether the browser may install apps: allow it for this once. On Xiaomi (MIUI or HyperOS) the install dialog has a ten-second countdown and may ask to scan the app; both are normal.
 3. Open Kuutti. A `preview` build shows the sign-in screen; the wrench on the home screen after sign-in, or the tech config screen, shows the staging API's version and commit: that is the check of #10's first box and #5's last.
 
@@ -45,7 +45,7 @@ Needs the paid Apple Developer membership (done 2026-09-20). Apple allows ad hoc
    ```
    A new device later means `eas device:create` again and one more build: the profile lists devices at build time.
 
-Push notification credentials (`eas credentials`: FCM service account, APNs key) can wait for M4; uploading them now saves a native rebuild then.
+Push notification credentials (`eas credentials`: FCM service account, APNs key) can wait for push (#102); uploading them now saves a native rebuild then.
 
 ## The dev client against your Mac
 
@@ -57,7 +57,7 @@ Phone and Mac on the same network. `pnpm env:up` on the Mac; open the `developme
 
 ## Verified links (App Links and Universal Links, #36)
 
-The bank login returns to the app by deep link. Today that link is the custom scheme `kuutti://auth?code=…`, which both platforms open in the app without a dialog (iOS through the scheme, Android through the intent filter Expo derives from `scheme`). The https form `https://api.<env>.kuutti.app/auth/return?code=…` needs verified links, which are a native change (`ios.associatedDomains` and `android.intentFilters` with `autoVerify` in `app.json`): batch it with the next fingerprint move. The API already serves the two files from configuration:
+The bank login returns to the app by deep link. Today that link is the custom scheme `kuutti://auth?code=…`, which both platforms open in the app without a dialog (iOS through the scheme, Android through the intent filter Expo derives from `scheme`). The https form `https://api.<env>.kuutti.app/auth/return?code=…` needs verified links, which are a native change (`ios.associatedDomains` and `android.intentFilters` with `autoVerify` in `app.json`): batch it with the next fingerprint move (#184). The API already serves the two files from configuration:
 
 - `https://api.<env>.kuutti.app/.well-known/assetlinks.json` from `ANDROID_CERT_FINGERPRINTS`. The fingerprint is the release keystore's SHA-256: `eas credentials --platform android` prints it under the keystore. List the `development` and the `preview` build's fingerprints while they differ, comma separated.
 - `https://api.<env>.kuutti.app/.well-known/apple-app-site-association` from `IOS_TEAM_ID` (`HM4J7X495K`).
