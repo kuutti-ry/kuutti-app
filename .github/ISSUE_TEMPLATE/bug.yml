@@ -8,6 +8,13 @@ body:
         Security problems do not belong here: use the private form linked from the issue chooser.
         Never paste personal data, tokens, or anything from a real account or conversation.
   - type: textarea
+    id: summary
+    attributes:
+      label: In short
+      description: One or two sentences for a person, in plain words, saying what is wrong and for whom. No file names; the detail goes below.
+    validations:
+      required: true
+  - type: textarea
     id: what
     attributes:
       label: What happens

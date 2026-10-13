@@ -86,6 +86,10 @@ git push origin v0.1.0
 
 The tag retags the image `main` already built for that commit, so production runs the bytes staging ran; applies the production infrastructure and deploys behind the `prod` environment's approval, then publishes the EAS Update to the `production` channel; starts the production builds on EAS, whose links are on the project's builds page (https://expo.dev/accounts/kuutti/projects/kuutti/builds); and drafts the release notes from the commits since the previous tag. Hotfix: branch from the last tag, pull request, tag, merge back (TD-2).
 
+## Issues
+
+Open an issue from one of the templates. Its first field, and the first paragraph of any issue, is one or two sentences for a person: what it is about and for whom, in plain words, with no file or table names. Everything technical comes after it, however long.
+
 ## Branch and history rules
 
 - `main` is the only long-lived branch. It cannot be deleted or force-pushed, and nothing reaches it except a squash-merged pull request whose checks are green.
