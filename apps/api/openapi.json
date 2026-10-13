@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.12.0",
+    "version": "0.13.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -378,6 +378,11 @@
                   "deleted"
                 ]
               },
+              "stateChangedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
               "registeredAt": {
                 "type": "string",
                 "format": "date-time"
@@ -415,6 +420,7 @@
             "required": [
               "id",
               "state",
+              "stateChangedAt",
               "registeredAt",
               "birthYear",
               "birthMonth",
@@ -458,16 +464,37 @@
                 "type": "string",
                 "nullable": true
               },
+              "standing": {
+                "$ref": "#/components/schemas/IdentityStanding"
+              },
+              "standingChangedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              },
               "deletionCount": {
                 "type": "integer",
                 "minimum": 0
+              },
+              "refusedAttempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reregisterAfter": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
               }
             },
             "required": [
               "firstSeenAt",
               "lastBankLoginAt",
               "loginLevel",
-              "deletionCount"
+              "standing",
+              "standingChangedAt",
+              "deletionCount",
+              "refusedAttempts",
+              "reregisterAfter"
             ]
           },
           "sessions": {
@@ -481,6 +508,11 @@
                 },
                 "platform": {
                   "$ref": "#/components/schemas/AuthPlatform"
+                },
+                "userAgent": {
+                  "type": "string",
+                  "nullable": true,
+                  "maxLength": 200
                 },
                 "createdAt": {
                   "type": "string",
@@ -498,6 +530,7 @@
               "required": [
                 "sessionId",
                 "platform",
+                "userAgent",
                 "createdAt",
                 "lastUsedAt",
                 "expiresAt"
@@ -539,6 +572,27 @@
             },
             "maxItems": 1000
           },
+          "cardsShown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "photoId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "photoId",
+                "at"
+              ]
+            },
+            "maxItems": 1000
+          },
           "photoCheck": {
             "$ref": "#/components/schemas/ExportedPhotoCheck"
           },
@@ -560,6 +614,7 @@
           "profile",
           "photos",
           "photoAccessLog",
+          "cardsShown",
           "photoCheck",
           "research",
           "gate"
@@ -737,6 +792,14 @@
           "privacy",
           "research",
           "special_category"
+        ]
+      },
+      "IdentityStanding": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "suspended",
+          "banned"
         ]
       },
       "ProfileDocument": {

@@ -1,5 +1,5 @@
-import { accountState } from "@kuutti/db";
-import { AccountExport, AccountState, Photo } from "@kuutti/schema";
+import { accountState, identityStanding } from "@kuutti/db";
+import { AccountExport, AccountState, IdentityStanding, Photo } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { prunePhotoCheckNotes } from "../safety/index.ts";
@@ -325,6 +325,8 @@ describe("account erasure", () => {
     expect(body.identity.deletionCount).toBe(0);
     expect(body.identity.firstSeenAt).toBeTruthy();
     expect(body.sessions.map((s) => s.sessionId)).toEqual([a.sessionId]);
+    expect(body.sessions[0]?.userAgent).toBeNull();
+    expect(body.cardsShown).toEqual([]);
     expect(body.photos).toHaveLength(1);
     expect(body.photos[0]).toMatchObject({
       id: photo.id,
@@ -497,5 +499,130 @@ describe("the photo check's notes in erasure and export (#253)", () => {
     );
     expect(theirs.photoCheck.photosNotShown).toEqual([]);
     expect(theirs.photoCheck.carefulCheckUntil).toBeNull();
+  });
+});
+
+describe("account erasure and export: what the verification of 08/10 found (#51)", () => {
+  it("IdentityStanding mirrors the database enum", () => {
+    expect([...IdentityStanding.options]).toEqual([...identityStanding.enumValues]);
+  });
+
+  test("The consent rows go with the account", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    for (const who of [a, b]) {
+      await ctx.client.query(
+        `INSERT INTO consent (account_id, kind, version, locale_shown, given_at, withdrawn_at) VALUES
+           ($1, 'terms', 'v1', 'fi', now() - interval '2 days', NULL),
+           ($1, 'privacy', 'v1', 'fi', now() - interval '2 days', NULL),
+           ($1, 'research', 'v1', 'fi', now() - interval '2 days', $2)`,
+        [who.accountId, who === a ? new Date() : null],
+      );
+    }
+    const consents = (id: string) =>
+      count(ctx, "SELECT count(*) AS n FROM consent WHERE account_id = $1", [id]);
+    expect(await consents(a.accountId)).toBe(3);
+    expect((await del(app, a.headers)).status).toBe(204);
+    expect(await consents(a.accountId)).toBe(0);
+    expect(await consents(b.accountId)).toBe(3);
+    expect(logs().find((l) => l.msg === "account erased")).toMatchObject({ consents: 3 });
+  });
+
+  test("The cards shown to the person are in the export and go with the account", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const mine = await upload(app, a.headers, await fixturePng(130, 130));
+    const theirs = await upload(app, b.headers, await fixturePng(140, 140));
+    await ctx.client.query(
+      `INSERT INTO card_shown (account_id, photo_id, at)
+       VALUES ($1, $2, now() - interval '1 day'), ($3, $4, now())`,
+      [a.accountId, theirs.id, b.accountId, mine.id],
+    );
+    const res = await app.request("/account/export", { headers: a.headers });
+    expect(res.status).toBe(200);
+    const body = AccountExport.parse(await res.json());
+    expect(body.cardsShown.map((c) => c.photoId)).toEqual([theirs.id]);
+    expect(JSON.stringify(body)).not.toContain(b.accountId);
+
+    const shown = (id: string) =>
+      count(ctx, "SELECT count(*) AS n FROM card_shown WHERE account_id = $1", [id]);
+    expect((await del(app, a.headers)).status).toBe(204);
+    expect(await shown(a.accountId)).toBe(0);
+    // "B" was shown "A"'s card: that row went with the photo, not with "B".
+    expect(await shown(b.accountId)).toBe(0);
+    expect(await count(ctx, "SELECT count(*) AS n FROM photo WHERE id = $1", [theirs.id])).toBe(1);
+    expect(logs().find((l) => l.msg === "account erased")).toMatchObject({ shownRows: 1 });
+  });
+
+  test("A moderator's role and panel session survive the erasure of their own account", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client, "a");
+    const { rows } = await ctx.client.query<{ identity_id: string }>(
+      "SELECT identity_id FROM account WHERE id = $1",
+      [a.accountId],
+    );
+    const identityId = rows[0]?.identity_id ?? "";
+    await ctx.client.query(
+      "INSERT INTO moderator_roles (identity_id, role, granted_by) VALUES ($1, 'moderator', 'test')",
+      [identityId],
+    );
+    await ctx.client.query(
+      `INSERT INTO admin_session (identity_id, role, access_hash, expires_at)
+       VALUES ($1, 'moderator', 'mod-a', now() + interval '8 hours')`,
+      [identityId],
+    );
+    expect((await del(app, a.headers)).status).toBe(204);
+    for (const table of ["moderator_roles", "admin_session"]) {
+      expect(
+        await count(ctx, `SELECT count(*) AS n FROM ${table} WHERE identity_id = $1`, [identityId]),
+        table,
+      ).toBe(1);
+    }
+    // The identity itself stays, with the deletion counted (TD-7).
+    expect(
+      await count(ctx, "SELECT count(*) AS n FROM identity WHERE id = $1 AND deletion_count = 1", [
+        identityId,
+      ]),
+    ).toBe(1);
+  });
+
+  test("The export carries the identity's standing, the refused attempts, the cooldown, the state change and each device's user agent", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client, "a");
+    const until = new Date("2026-09-20T10:00:00Z");
+    const changed = new Date("2026-10-01T08:30:00Z");
+    await ctx.client.query(
+      `UPDATE identity SET deletion_count = 1, refused_attempts = 2, reregister_after = $2
+       WHERE id = (SELECT identity_id FROM account WHERE id = $1)`,
+      [a.accountId, until],
+    );
+    await ctx.client.query("UPDATE account SET state_changed_at = $2 WHERE id = $1", [
+      a.accountId,
+      changed,
+    ]);
+    await ctx.client.query("UPDATE session SET user_agent = $2 WHERE id = $1", [
+      a.sessionId,
+      "Kuutti/0.12 (iPhone; iOS 19)",
+    ]);
+    const res = await app.request("/account/export", { headers: a.headers });
+    expect(res.status).toBe(200);
+    const body = AccountExport.parse(await res.json());
+    expect(body.identity).toMatchObject({
+      standing: "ok",
+      standingChangedAt: null,
+      deletionCount: 1,
+      refusedAttempts: 2,
+      reregisterAfter: until.toISOString(),
+    });
+    expect(body.account.stateChangedAt).toBe(changed.toISOString());
+    expect(body.sessions.map((s) => s.userAgent)).toEqual(["Kuutti/0.12 (iPhone; iOS 19)"]);
   });
 });

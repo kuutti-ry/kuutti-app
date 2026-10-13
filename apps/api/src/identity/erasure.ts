@@ -36,6 +36,8 @@ import * as repo from "./repo.ts";
 // slices land; the research_id mapping goes (#50), the events keyed by it stay.
 // The place at the pond gate (#94) goes, and is in the export as it is held.
 // The photo check's notes (#253) go too, and are in the export in plain words.
+// The consent rows go (ADR-010 §14): what they proved goes in the same
+// transaction, and the research events carry their own consent_version.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -51,6 +53,8 @@ export type ErasureSummary = {
   profileRows: number;
   /** The hard preference rows (#46). */
   preferences: number;
+  /** The consent rows (ADR-010 §14). */
+  consents: number;
   /** 0 or 1: the research_id mapping (#50); the events stay, unlinkable. */
   researchSubjects: number;
   photos: number;
@@ -82,9 +86,12 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // Not in the summary: the line that logs it carries the account id.
     await deletePhotoCheckNotesOfAccount(tx, accountId);
     const profileRows = await eraseProfileOfAccount(tx, accountId);
-    // The two hard rows go (TD-7); the consent rows stay as proof (ADR-010),
-    // and the tombstone keeps neither gender nor pond.
+    // The two hard rows go (TD-7), and the tombstone keeps neither gender nor pond.
     const preferences = await deletePreferencesOfAccount(tx, accountId);
+    // The consent rows go (ADR-010 §14): the terms were the condition of use,
+    // the sensitive answers they covered went just above, and the events keep
+    // the version they were written under; nothing is left to prove.
+    const consents = await repo.deleteConsentsOfAccount(tx, accountId);
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
     await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
@@ -101,6 +108,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       photos,
       profileRows,
       preferences,
+      consents,
       researchSubjects,
       reregisterAfter: deletion.reregisterAfter,
     };
@@ -117,6 +125,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     authRequests: result.authRequests,
     profileRows: result.profileRows,
     preferences: result.preferences,
+    consents: result.consents,
     researchSubjects: result.researchSubjects,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
@@ -188,6 +197,7 @@ export async function exportAccount(
     account: {
       id: account.id,
       state: account.state,
+      stateChangedAt: account.stateChangedAt?.toISOString() ?? null,
       registeredAt: account.registeredAt.toISOString(),
       birthYear: account.birthYear,
       birthMonth: account.birthMonth,
@@ -204,11 +214,16 @@ export async function exportAccount(
       firstSeenAt: identity.createdAt.toISOString(),
       lastBankLoginAt: identity.authenticatedAt?.toISOString() ?? null,
       loginLevel: identity.acr,
+      standing: identity.standing,
+      standingChangedAt: identity.standingChangedAt?.toISOString() ?? null,
       deletionCount: identity.deletionCount,
+      refusedAttempts: identity.refusedAttempts,
+      reregisterAfter: identity.reregisterAfter?.toISOString() ?? null,
     },
     sessions: sessions.map((s) => ({
       sessionId: s.id,
       platform: s.platform === "android" ? "android" : "ios",
+      userAgent: s.userAgent,
       createdAt: s.createdAt.toISOString(),
       lastUsedAt: s.lastUsedAt.toISOString(),
       expiresAt: s.expiresAt.toISOString(),
@@ -216,6 +231,7 @@ export async function exportAccount(
     profile,
     photos: photos.photos,
     photoAccessLog: photos.accessLog,
+    cardsShown: photos.cardsShown,
     photoCheck,
     research,
     gate,

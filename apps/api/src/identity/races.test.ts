@@ -202,8 +202,9 @@ describe("an erasure that commits between the session guard and the handler", ()
         "SELECT withdrawn_at IS NOT NULL AS withdrawn FROM consent WHERE account_id = $1 AND kind = 'research'",
         [me.accountId],
       );
-      // No consent recorded for the tombstone, and the one given before is not withdrawn by the loser.
-      expect(consents.rows, label).toEqual(call.given ? [{ withdrawn: false }] : []);
+      // No consent recorded for the tombstone; the one given before went with the
+      // account (ADR-010 §14), so the losing withdrawal had nothing to touch either.
+      expect(consents.rows, label).toEqual([]);
       expect(
         logs().filter((l) =>
           ["gender declared", "consent given", "consent withdrawn", "pond assigned"].includes(

@@ -52,10 +52,10 @@ Feature: Onboarding and consents
     Given a registered account with every required answer and no research consent
     Then the account is active and the status shows no research opt-in
 
-  Scenario: Erasure removes the preferences, keeps the consents and blanks gender and pond
+  Scenario: Erasure removes the preferences and the consents and blanks gender and pond
     Given an onboarded account
     When the account is deleted
-    Then its preference rows are gone, its consent rows remain and the tombstone has neither gender nor pond
+    Then its preference rows and its consent rows are gone and the tombstone has neither gender nor pond
 
   Scenario: The export lists gender, pond, preferences and every consent
     Given an onboarded account with a withdrawn research consent

@@ -70,7 +70,8 @@ export const EXPORT_ACCESS_LOG_LIMIT = 1000;
  * The person's photos for the export: what the list shows, the moderation
  * outcome (never the labels), and fifteen-minute URLs for the variants, each
  * issued through the same path as any other fetch, so the export itself
- * appears in the fetch log it returns.
+ * appears in the fetch log it returns. With them, the cards served to the
+ * person (ADR-008): the trail that erasure deletes is theirs to read first.
  */
 export async function exportPhotos(
   deps:
@@ -80,6 +81,7 @@ export async function exportPhotos(
 ): Promise<{
   photos: ExportedPhoto[];
   accessLog: Array<{ photoId: string; variant: (typeof PHOTO_VARIANTS)[number]; at: string }>;
+  cardsShown: Array<{ photoId: string; at: string }>;
 }> {
   const rows = await repo.listPhotos(deps.db, accountId);
   const reviews = await repo.listReviewsForAccount(deps.db, accountId);
@@ -127,5 +129,8 @@ export async function exportPhotos(
     variant: entry.variant,
     at: entry.at.toISOString(),
   }));
-  return { photos, accessLog };
+  const cardsShown = (
+    await repo.listCardShownOfAccount(deps.db, accountId, EXPORT_ACCESS_LOG_LIMIT)
+  ).map((entry) => ({ photoId: entry.photoId, at: entry.at.toISOString() }));
+  return { photos, accessLog, cardsShown };
 }

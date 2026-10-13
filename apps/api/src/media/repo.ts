@@ -553,6 +553,19 @@ export async function listPhotoAccessOfAccount(
   }));
 }
 
+/** The export (#51): the cards served to the person, each with the last day it came round, newest first. */
+export async function listCardShownOfAccount(
+  db: Queryable,
+  accountId: string,
+  limit: number,
+): Promise<Array<{ photoId: string; at: Date }>> {
+  const { rows } = await db.query<Row>(
+    "SELECT photo_id, at FROM card_shown WHERE account_id = $1 ORDER BY at DESC, photo_id LIMIT $2",
+    [accountId, limit],
+  );
+  return rows.map((r) => ({ photoId: r.photo_id as string, at: r.at as Date }));
+}
+
 /** The moderation outcome per photo of the account, for the export; never the labels. */
 export async function listReviewsForAccount(
   db: Queryable,
