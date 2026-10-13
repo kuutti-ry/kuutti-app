@@ -233,10 +233,10 @@ profile.section.hobbies.title:
   machine: { fi: true, sv: true }
 
 profile.section.hobbies.summary:
-  en: "Up to five things you like doing"
-  description: "Second line of the hobbies section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint."
-  fi: "Enintään viisi asiaa, joita teet mielelläsi"
-  sv: "Upp till fem saker du gärna gör"
+  en: "Things you like doing, as many as you like"
+  description: "Second line of the hobbies section's row on the profile list (#227): what the section holds; a screen reader hears it as the row's hint. No cap since #239."
+  fi: "Asioita, joita teet mielelläsi, niin monta kuin haluat"
+  sv: "Saker du gärna gör, så många du vill"
   machine: { fi: true, sv: true }
 
 profile.section.beliefs.title:
@@ -324,10 +324,10 @@ profile.bio.label:
   machine: { fi: true, sv: true }
 
 profile.bio.hint:
-  en: "{min, number} characters or more count as a bio; or answer two prompts instead."
-  description: "Hint under the bio field; {min} is the completeness threshold."
-  fi: "Vähintään {min, number} merkkiä lasketaan esittelyksi; tai vastaa kahteen kysymykseen."
-  sv: "{min, number} tecken eller fler räknas som en presentation; eller svara på två frågor i stället."
+  en: "{min, number} characters or more count as a bio; or pick a ready line below, or answer two prompts instead."
+  description: "Hint under the bio field; {min} is the length that counts for completeness. A ready line counts too (#239)."
+  fi: "Vähintään {min, number} merkkiä lasketaan esittelyksi; tai valitse valmis rivi alta tai vastaa kahteen kysymykseen."
+  sv: "{min, number} tecken eller fler räknas som en presentation; eller välj en färdig rad nedan eller svara på två frågor i stället."
   machine: { fi: true, sv: true }
 
 profile.bio.orPreset:
@@ -2438,10 +2438,10 @@ profile.completeness.photos:
   machine: { fi: true, sv: true }
 
 profile.completeness.bio_or_prompts:
-  en: "A bio of {min, number} characters, or two answered prompts"
-  description: "Missing item; {min} is the bio threshold."
-  fi: "Vähintään {min, number} merkin esittely tai kaksi vastattua kysymystä"
-  sv: "En presentation på {min, number} tecken eller två besvarade frågor"
+  en: "A bio of {min, number} characters, a ready line, or two answered prompts"
+  description: "Checklist line for the bio-or-prompts rule; {min} is the bio length. A ready line counts too (#239)."
+  fi: "Vähintään {min, number} merkin esittely, valmis rivi tai kaksi vastattua kysymystä"
+  sv: "En presentation på {min, number} tecken, en färdig rad eller två besvarade frågor"
   machine: { fi: true, sv: true }
 
 profile.completeness.seeks:
@@ -3614,10 +3614,10 @@ onboarding.prompts.title:
   machine: { fi: true, sv: true }
 
 onboarding.prompts.explain:
-  en: "Answer two prompts, or write a bio of at least {min, number} characters. Your card leads with a photo and one answer."
-  description: "Explanation under the prompts step's heading (#146, ADR-009 §4)."
-  fi: "Vastaa kahteen kysymykseen tai kirjoita vähintään {min, number} merkin esittely. Korttisi alkaa kuvalla ja yhdellä vastauksella."
-  sv: "Svara på två frågor, eller skriv en presentation på minst {min, number} tecken. Ditt kort inleds med en bild och ett svar."
+  en: "Answer two prompts, write a bio of at least {min, number} characters, or pick a ready line. Your card leads with a photo and one answer."
+  description: "Explanation under the prompts step's heading (#146, ADR-009 §4); a ready line finishes the step too (#239)."
+  fi: "Vastaa kahteen kysymykseen, kirjoita vähintään {min, number} merkin esittely tai valitse valmis rivi. Korttisi alkaa kuvalla ja yhdellä vastauksella."
+  sv: "Svara på två frågor, skriv en presentation på minst {min, number} tecken eller välj en färdig rad. Ditt kort inleds med en bild och ett svar."
   machine: { fi: true, sv: true }
 
 onboarding.prompts.save:

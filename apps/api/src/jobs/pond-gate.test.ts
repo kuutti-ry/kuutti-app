@@ -281,6 +281,20 @@ describe("the gate", () => {
     }
   });
 
+  test("a ready line in place of a bio counts as a finished profile, and neither does not (#239)", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-ready-line");
+    const [line] = await people(ctx.client, pond, 1, { ...ALIKE, bio: "ready_line" });
+    const [neither] = await people(ctx.client, pond, 1, { ...ALIKE, bio: "none" });
+
+    const { result } = await counted(ctx, NIGHT_1);
+    expect(result).toMatchObject({ ponds: 1, counted: 1 });
+    expect(await rowOf(ctx, line)).toMatchObject({ admitted_at: NIGHT_1 });
+    expect(await rowOf(ctx, neither)).toBeUndefined();
+    expect((await askedBy(ctx, neither)).gate.state).toBe("incomplete");
+  });
+
   test("Counting twice changes nothing", async ({ ctx }) => {
     const pond = await setUp(ctx, "test-gate-twice");
     await people(ctx.client, pond, 4, MEN);

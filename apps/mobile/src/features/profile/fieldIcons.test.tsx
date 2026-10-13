@@ -1,7 +1,7 @@
-import { PROFILE_FIELD_KEYS } from "@kuutti/schema";
+import { HOBBY_GROUP_KEYS, PROFILE_FIELD_KEYS } from "@kuutti/schema";
 import { screen } from "@testing-library/react-native";
 import { renderWithTheme } from "@/test/render";
-import { FIELD_ICONS, FieldLabel } from "./fieldIcons";
+import { FIELD_ICONS, FieldLabel, HOBBY_GROUP_ICONS, HobbyGroupLabel } from "./fieldIcons";
 
 // An icon before every field's label (#239): placeholders until the designer draws the set.
 
@@ -70,4 +70,18 @@ describe("the icons drawn here", () => {
       expect(JSON.stringify(screen.toJSON())).toContain('"strokeWidth":3');
     },
   );
+});
+
+describe("HOBBY_GROUP_ICONS", () => {
+  it("gives every hobby group an icon of its own (#239)", () => {
+    expect(Object.keys(HOBBY_GROUP_ICONS)).toEqual([...HOBBY_GROUP_KEYS]);
+    expect(new Set(Object.values(HOBBY_GROUP_ICONS)).size).toBe(HOBBY_GROUP_KEYS.length);
+  });
+
+  it("names the group in words, with its icon hidden from screen readers", async () => {
+    await renderWithTheme(<HobbyGroupLabel group="food" />);
+    expect(screen.getByText("Food and drink")).toBeTruthy();
+    expect(screen.getByTestId("hobby-group-icon-food", hidden)).toBeTruthy();
+    expect(screen.queryByTestId("hobby-group-icon-food")).toBeNull();
+  });
 });

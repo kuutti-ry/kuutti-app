@@ -97,7 +97,8 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       ...(server.ageWindow ? [] : ["age_window"]),
       ...(server.pond ? [] : ["pond"]),
       ...(server.photos >= 3 ? [] : ["photos"]),
-      ...(bio.length >= 50 || prompts >= 2 ? [] : ["prompts_or_bio"]),
+      // A ready line counts like a bio (#239), as the API's completeness has it.
+      ...(bio.length >= 50 || server.profile?.bioPreset || prompts >= 2 ? [] : ["prompts_or_bio"]),
     ];
     const research = server.consents.find((c) => c.kind === "research");
     return {
@@ -634,6 +635,27 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await flush();
     expect(server.profile?.bio).toBeNull();
+  });
+
+  it("finishes the step for words of one's own with a ready line alone (#239)", async () => {
+    const { server } = fakeApi();
+    atResearch(server);
+    server.profile = {
+      displayName: "Aino",
+      bio: null,
+      bioPreset: null,
+      fields: { intent: "casual" },
+      prompts: [],
+    };
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    expect(screen.getByText(/characters, or pick a ready line\. Your card/)).toBeTruthy();
+    checkA11y();
+    await press(screen.getByRole("button", { name: "The photos say it. The rest over coffee." }));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await flush();
+    expect(server.profile).toMatchObject({ bio: null, bioPreset: "photos_speak", prompts: [] });
+    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
   });
 
   it("asks for an app update instead of recording the sensitive-answers consent for a newer wording", async () => {

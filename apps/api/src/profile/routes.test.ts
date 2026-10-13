@@ -118,7 +118,17 @@ describe("profile routes", () => {
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
     expect(body.tips).toEqual([]);
     const again = await put(app, a.headers, { ...update, displayName: "Aino V.", prompts: [] });
-    expect(ProfileResponse.parse(await again.json()).profile?.displayName).toBe("Aino V.");
+    const answered = ProfileResponse.parse(await again.json());
+    expect(answered.profile?.displayName).toBe("Aino V.");
+    // No prompt left, but the ready line stands in for the bio (#239).
+    expect(answered.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
+    const bare = await put(app, a.headers, { ...update, bioPreset: null, prompts: [] });
+    expect(ProfileResponse.parse(await bare.json()).completeness.missing).toEqual([
+      "photos",
+      "bio_or_prompts",
+      "seeks",
+      "age_window",
+    ]);
     const { rows } = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM profile WHERE account_id = $1",
       [a.accountId],
@@ -127,15 +137,35 @@ describe("profile routes", () => {
     expect(logs().find((l) => l.msg === "profile saved")).toMatchObject({ accountId: a.accountId });
   });
 
+  test("PUT /profile takes as many hobbies and languages as one likes (#239)", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const many = {
+      ...update,
+      fields: {
+        ...update.fields,
+        hobbies: HOBBIES.slice(0, 12),
+        languages: ["fi", "sv", "en", "ru", "et", "uk", "de"],
+      },
+    };
+    const saved = await put(app, a.headers, many);
+    expect(saved.status).toBe(200);
+    expect(ProfileResponse.parse(await saved.json()).profile?.fields).toMatchObject({
+      hobbies: HOBBIES.slice(0, 12),
+      languages: ["fi", "sv", "en", "ru", "et", "uk", "de"],
+    });
+  });
+
   test("PUT /profile refuses what the registry does not know", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     const refused = [
       { ...update, fields: { ...update.fields, smoking: "cigars" } },
       { ...update, fields: { ...update.fields, religion: "x" } },
-      { ...update, fields: { ...update.fields, languages: ["fi", "sv", "en", "ru", "et", "uk"] } },
+      { ...update, fields: { ...update.fields, languages: ["fi", "xx"] } },
       { ...update, fields: { ...update.fields, height: 139 } },
-      { ...update, fields: { ...update.fields, hobbies: HOBBIES.slice(0, 6) } },
+      // As many hobbies as one likes (#239), but each once.
+      { ...update, fields: { ...update.fields, hobbies: [HOBBIES[0], HOBBIES[0]] } },
       { ...update, fields: { ...update.fields, campus: "Otaniemi" } },
       // The coffee party left the list, and "none of them" stands alone (#239).
       { ...update, fields: { ...update.fields, politics: ["kahvipuolue"] } },

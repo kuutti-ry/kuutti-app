@@ -26,7 +26,7 @@ executionOrder:
     - A phone number in the bio is refused on leaving with the reason, and the stored bio stays
     - A photo opens full size and back, and removing one asks first
     - Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
-    - Field and work take up to three choices each, a fourth tap does nothing, and long lists can be searched
+    - Field and work take as many choices as apply, Ask me later keeps what was stored, and long lists can be searched
     - A party and a star sign saved on their screens show on the card, and clearing them takes them off
     - The parties screen lists the parties and none of them, which stands alone, with no note and no search
     - At most two deal-breakers, each with an accepted answer; a third is refused in words

@@ -1,4 +1,5 @@
-import type { ProfileFieldKey } from "@kuutti/schema";
+import type { PlainMessageKey } from "@kuutti/i18n";
+import type { HobbyGroup, ProfileFieldKey } from "@kuutti/schema";
 import type { LucideIcon, LucideProps } from "lucide-react-native";
 import Baby from "lucide-react-native/icons/baby";
 import Beer from "lucide-react-native/icons/beer";
@@ -6,19 +7,31 @@ import BookOpen from "lucide-react-native/icons/book-open";
 import Briefcase from "lucide-react-native/icons/briefcase";
 import Cigarette from "lucide-react-native/icons/cigarette";
 import Compass from "lucide-react-native/icons/compass";
+import Cpu from "lucide-react-native/icons/cpu";
+import Dice5 from "lucide-react-native/icons/dice-5";
+import Drama from "lucide-react-native/icons/drama";
 import Dumbbell from "lucide-react-native/icons/dumbbell";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import GraduationCap from "lucide-react-native/icons/graduation-cap";
 import HeartHandshake from "lucide-react-native/icons/heart-handshake";
+import House from "lucide-react-native/icons/house";
 import IdCard from "lucide-react-native/icons/id-card";
 import Languages from "lucide-react-native/icons/languages";
+import Leaf from "lucide-react-native/icons/leaf";
 import MoonStar from "lucide-react-native/icons/moon-star";
+import Palette from "lucide-react-native/icons/palette";
 import PawPrint from "lucide-react-native/icons/paw-print";
 import Pill from "lucide-react-native/icons/pill";
+import Plane from "lucide-react-native/icons/plane";
+import Rabbit from "lucide-react-native/icons/rabbit";
 import Ruler from "lucide-react-native/icons/ruler";
 import Shapes from "lucide-react-native/icons/shapes";
 import Sprout from "lucide-react-native/icons/sprout";
+import Trees from "lucide-react-native/icons/trees";
 import User from "lucide-react-native/icons/user";
+import Users from "lucide-react-native/icons/users";
+import Utensils from "lucide-react-native/icons/utensils";
+import Volleyball from "lucide-react-native/icons/volleyball";
 import Vote from "lucide-react-native/icons/vote";
 import type * as React from "react";
 import { forwardRef } from "react";
@@ -126,6 +139,40 @@ export function FieldLabel({ field, className }: { field: ProfileFieldKey; class
       <Icon as={FIELD_ICONS[field]} size={16} testID={`field-icon-${field}`} />
       <Text variant="small" className="shrink">
         {t(fieldLabelKey(field))}
+      </Text>
+    </View>
+  );
+}
+
+/** One icon for each group of hobbies (#239), before its heading in the picker; placeholders like the fields'. */
+export const HOBBY_GROUP_ICONS: Readonly<Record<HobbyGroup, LucideIcon>> = {
+  outdoors: Trees,
+  sports: Volleyball,
+  creative: Palette,
+  food: Utensils,
+  culture: Drama,
+  games: Dice5,
+  home: House,
+  travel: Plane,
+  animals: Rabbit,
+  tech: Cpu,
+  social: Users,
+  wellbeing: Leaf,
+};
+
+/** A hobby group's heading with its icon before it. */
+export function HobbyGroupLabel({ group }: { group: HobbyGroup }) {
+  const { t } = useT();
+  return (
+    <View className="flex-row items-center gap-2">
+      <Icon
+        as={HOBBY_GROUP_ICONS[group]}
+        size={16}
+        className="text-muted-foreground"
+        testID={`hobby-group-icon-${group}`}
+      />
+      <Text variant="muted" className="shrink">
+        {t(`profile.hobbyGroup.${group}` as PlainMessageKey)}
       </Text>
     </View>
   );

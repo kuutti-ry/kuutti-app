@@ -62,6 +62,15 @@ describe("the figures", () => {
     expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 1, finishing: 0 });
   });
 
+  test("a ready line in place of a bio completes the profile, and neither leaves it finishing (#239)", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-waitlist-ready-line");
+    await people(ctx.client, pond, 1, { gender: "woman", complete: true, bio: "ready_line" });
+    await people(ctx.client, pond, 1, { gender: "woman", complete: true, bio: "none" });
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 1 });
+  });
+
   test("A profile that is not complete counts as finishing", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-waitlist-finishing");
     await people(ctx.client, pond, 10, { gender: "woman", complete: true });

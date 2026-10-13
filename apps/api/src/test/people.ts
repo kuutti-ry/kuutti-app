@@ -15,6 +15,8 @@ export type PeopleOptions = {
   /** With `complete`: whom they seek (default: men) and the ages (default: 25 to 40). */
   seeks?: ("woman" | "man" | "non_binary")[];
   ageWindow?: { min: number; max: number };
+  /** With `complete`: the bio's part of it, a written bio (default), a ready line in its place (#239), or neither, which leaves the profile one short. */
+  bio?: "written" | "ready_line" | "none";
   /** With `complete`: what they are here for (default: open to either, which fits everybody; #147). */
   intent?: "long_term" | "casual" | "open_to_either";
   /** Born in June of this year (default: 1990). */
@@ -87,11 +89,14 @@ export async function people(
   }
   if (options.complete) {
     await db.query(
-      `INSERT INTO profile (account_id, display_name, bio, fields, prompts)
-       SELECT id, 'Aino', $2, $3::jsonb, '[]'::jsonb FROM unnest($1::uuid[]) AS id`,
+      `INSERT INTO profile (account_id, display_name, bio, bio_preset, fields, prompts)
+       SELECT id, 'Aino', $2, $3, $4::jsonb, '[]'::jsonb FROM unnest($1::uuid[]) AS id`,
       [
         ids,
-        "A bio that is long enough to count as one, by the rule of the profile.",
+        (options.bio ?? "written") === "written"
+          ? "A bio that is long enough to count as one, by the rule of the profile."
+          : null,
+        options.bio === "ready_line" ? "photos_speak" : null,
         JSON.stringify({ intent: options.intent ?? "open_to_either" }),
       ],
     );

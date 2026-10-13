@@ -49,7 +49,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `profile-sections` | Sanna | the list of sections; an answer saved by going back, on the card, and off again (#227) |
 | `profile-contact-details` | Sanna | a phone number in the bio refused on leaving the basics, with the reason |
 | `later-fields-ask-later` | Sanna | the unanswered fields in order; Ask me later writes nothing |
-| `later-multi-choice-cap` | Sanna | three each for field and work (#178); the search box |
+| `later-multi-choice-cap` | Sanna | field and work take as many as apply (#178, #239); the search box |
 | `later-answer-on-card` | Sanna | two parties and the corgi on the card, and off again (#213) |
 | `politics-none-alone` | Sanna | ten parties and none of them, which stands alone; no note, no search, no switch |
 | `kids-labels` | Kerttu, Sanna | the future-kids answers follow having kids (#148) |

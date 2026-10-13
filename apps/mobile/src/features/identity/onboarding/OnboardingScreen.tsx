@@ -2,7 +2,6 @@ import { CONSENT_VERSIONS, formatDate, type PlainMessageKey } from "@kuutti/i18n
 import {
   AGE_MAX,
   AGE_MIN,
-  BIO_MAX,
   BIO_MIN_FOR_COMPLETENESS,
   type ConsentKind,
   DISPLAY_NAME_MAX,
@@ -25,7 +24,7 @@ import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { choosePond, fetchPonds, pondName } from "@/features/pond";
-import { optionKey, PromptsEditor, useProfile } from "@/features/profile";
+import { BioEditor, optionKey, PromptsEditor, useProfile } from "@/features/profile";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
@@ -647,20 +646,8 @@ export function OnboardingScreen() {
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.prompts.title")}</Text>
             <Text>{t("onboarding.prompts.explain", { min: BIO_MIN_FOR_COMPLETENESS })}</Text>
-            <View className="gap-2">
-              <Text variant="small">{t("profile.bio.label")}</Text>
-              <Input
-                accessibilityLabel={t("profile.bio.label")}
-                value={draft.bio ?? ""}
-                maxLength={BIO_MAX}
-                multiline
-                // Room for four lines and more as the bio grows (as on the profile screen).
-                className="min-h-28"
-                onChangeText={(text) =>
-                  update({ bio: text.length > 0 ? text : null, bioPreset: null })
-                }
-              />
-            </View>
+            {/* The bio or a ready line, as in the basics: either finishes this step (#239). */}
+            <BioEditor draft={draft} update={update} />
             <Text variant="small">{t("profile.prompts.label")}</Text>
             <PromptsEditor draft={draft} update={update} />
             <Button

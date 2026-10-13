@@ -1,10 +1,10 @@
-# Several fields and lines of work, up to three each (#178, ADR-019 §1): the
-# chips take three, a fourth tap does nothing, and Ask me later keeps what
-# was stored. A list of fourteen or more has a search box (#148, #239), which
+# Several fields and lines of work, as many as apply (#178, ADR-019 §1; no
+# cap since #239): a fourth tap is taken like the first, and Ask me later
+# keeps what was stored. A list of fourteen or more has a search box (#148, #239), which
 # filters the chips as one types; the twelve fields fit a screen and have none. Sanna's field and work are both arts and culture;
 # nothing is saved.
 appId: fi.kuutti.app
-name: Field and work take up to three choices each, a fourth tap does nothing, and long lists can be searched
+name: Field and work take as many choices as apply, Ask me later keeps what was stored, and long lists can be searched
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile/later/field
@@ -28,7 +28,7 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
 - tapOn: "Health care|Terveysala|Vård"
 - assertVisible:
     text: "Health care|Terveysala|Vård"
-    selected: false
+    selected: true
 # Ask me later writes nothing: opened again, only the stored answer.
 - scrollUntilVisible:
     element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
@@ -58,7 +58,7 @@ name: Field and work take up to three choices each, a fourth tap does nothing, a
 - tapOn: "Entrepreneur|Yrittäjä|Företagare"
 - assertVisible:
     text: "Entrepreneur|Yrittäjä|Företagare"
-    selected: false
+    selected: true
 - scrollUntilVisible:
     element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
     direction: DOWN

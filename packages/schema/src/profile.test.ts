@@ -15,7 +15,7 @@ import {
   PromptAnswer,
   TipKind,
 } from "./profile.ts";
-import { HOBBIES_MAX, LANGUAGES_MAX } from "./profile-fields.ts";
+import { PROFILE_FIELDS } from "./profile-fields.ts";
 
 // The profile as written and the card as seen (#47, ADR-009): trimmed text at
 // its bounds, a bio or a placeholder, each prompt once, and a card that says
@@ -249,17 +249,35 @@ describe("the card another person sees", () => {
     ],
     [
       "too many shared hobbies",
-      { shared: { hobbies: Array(HOBBIES_MAX + 1).fill("x"), languages: [] } },
+      {
+        shared: {
+          hobbies: Array(PROFILE_FIELDS.hobbies.options.length + 1).fill("x"),
+          languages: [],
+        },
+      },
       "too_big",
     ],
     [
       "too many shared languages",
-      { shared: { hobbies: [], languages: Array(LANGUAGES_MAX + 1).fill("fi") } },
+      {
+        shared: {
+          hobbies: [],
+          languages: Array(PROFILE_FIELDS.languages.options.length + 1).fill("fi"),
+        },
+      },
       "too_big",
     ],
     ["a gender outside the list", { gender: "female" }, "invalid_value"],
   ])("refuses %s", (_, change, code) => {
     expect(codes(ProfileCard, { ...card, ...change })).toContain(code);
+  });
+
+  it("marks every hobby and language as shared, more than the old five (#239)", () => {
+    const all = {
+      hobbies: [...PROFILE_FIELDS.hobbies.options],
+      languages: [...PROFILE_FIELDS.languages.options],
+    };
+    expect(ProfileCard.parse({ ...card, shared: all }).shared).toEqual(all);
   });
 
   it("previews the owner's own card, or none, with what is missing", () => {

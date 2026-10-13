@@ -55,6 +55,7 @@ type FactsRow = {
   registered_at: Date;
   display_name: string | null;
   bio: string | null;
+  bio_preset: string | null;
   prompts: unknown;
   intent: string | null;
   approved_photos: string;
@@ -83,7 +84,7 @@ type Subject = Applicant & {
 // consents yet), paused, suspended and banned accounts are hidden or gone.
 const FACTS = `
   SELECT a.id, a.gender, a.state, a.birth_year, a.birth_month, a.registered_at,
-         p.display_name, p.bio, p.prompts, p.fields->>'intent' AS intent,
+         p.display_name, p.bio, p.bio_preset, p.prompts, p.fields->>'intent' AS intent,
          (SELECT count(*) FROM photo ph
            WHERE ph.account_id = a.id AND ph.state = 'approved') AS approved_photos,
          (SELECT r.value FROM preferences r
@@ -124,6 +125,7 @@ function subjectFrom(row: FactsRow, pondId: string, at: Date): Subject | null {
   const complete = completeness({
     displayName: row.display_name,
     bio: row.bio,
+    bioPreset: row.bio_preset,
     answeredPrompts: answeredPromptsOf(row.prompts),
     approvedPhotos: Number(row.approved_photos),
     seeks: preferences.seeks,

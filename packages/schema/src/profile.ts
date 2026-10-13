@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { PhotoId } from "./media.ts";
 import { Gender, PondSummary } from "./onboarding.ts";
-import { HOBBIES_MAX, LANGUAGES_MAX, ProfileFields } from "./profile-fields.ts";
+import { PROFILE_FIELDS, ProfileFields } from "./profile-fields.ts";
 
 /**
  * The profile as the person writes it and the card as others see it (#47,
@@ -14,7 +14,7 @@ import { HOBBIES_MAX, LANGUAGES_MAX, ProfileFields } from "./profile-fields.ts";
 
 export const DISPLAY_NAME_MAX = 20;
 export const BIO_MAX = 500;
-/** A bio this long counts for completeness; shorter needs two prompts instead. */
+/** A bio this long counts for completeness; a shorter one needs a ready line (#239) or two answered prompts instead. */
 export const BIO_MIN_FOR_COMPLETENESS = 50;
 export const PROMPT_ANSWER_MAX = 160;
 export const PROMPTS_MAX = 3;
@@ -198,8 +198,8 @@ export const ProfileCard = z
     prompts: z.array(PromptAnswer).max(PROMPTS_MAX),
     /** What both the viewer and the subject answered (#150): marked in words on the card, never a count. Empty on the owner's preview. */
     shared: z.object({
-      hobbies: z.array(z.string().max(40)).max(HOBBIES_MAX),
-      languages: z.array(z.string().max(40)).max(LANGUAGES_MAX),
+      hobbies: z.array(z.string().max(40)).max(PROFILE_FIELDS.hobbies.options.length),
+      languages: z.array(z.string().max(40)).max(PROFILE_FIELDS.languages.options.length),
     }),
   })
   .meta({ id: "ProfileCard" });

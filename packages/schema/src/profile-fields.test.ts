@@ -82,9 +82,7 @@ describe("the profile field registry (ADR-019)", () => {
       { height: 139 },
       { height: 221 },
       { height: 170.5 },
-      { hobbies: HOBBIES.slice(0, 6) },
       { hobbies: [] },
-      { languages: ["fi", "sv", "en", "et", "ru", "uk"] },
       { campus: "Otaniemi" },
       { hideFromField: "yes" },
       { occupationTitle: "x".repeat(41) },
@@ -104,8 +102,7 @@ describe("the profile field registry (ADR-019)", () => {
       expect(politics.safeParse([...PARTY_OPTIONS, "none_of_them"]).success).toBe(false);
     });
 
-    it("lets every party be chosen at once, and no more than the parties", () => {
-      expect(PROFILE_FIELDS.politics.max).toBe(PARTY_OPTIONS.length);
+    it("lets every party be chosen at once", () => {
       expect(PROFILE_FIELDS.politics.schema.safeParse([...PARTY_OPTIONS]).success).toBe(true);
       expect(POLITICS_OPTIONS).toEqual([...PARTY_OPTIONS, "none_of_them"]);
     });
@@ -129,6 +126,23 @@ describe("the profile field registry (ADR-019)", () => {
       ]);
       expect(JSON.stringify(result.error?.issues)).not.toContain("kok");
     });
+  });
+
+  it("takes as many answers of a list as one likes, every one of them, and none twice over the list (#239)", () => {
+    for (const key of PROFILE_FIELD_KEYS) {
+      const spec = PROFILE_FIELDS[key];
+      if (spec.kind !== "multi") continue;
+      // Every option at once, but an option that stands alone.
+      const all = spec.options.filter((o) => !(spec.alone as readonly string[]).includes(o));
+      expect(spec.schema.safeParse(all).success, key).toBe(true);
+      expect(spec.schema.safeParse([...spec.options, spec.options[0]]).success, key).toBe(false);
+      // The cap is the list: no option twice, however short the answer.
+      expect(spec.schema.safeParse([spec.options[0], spec.options[0]]).success, key).toBe(false);
+    }
+    expect(ProfileFields.safeParse({ hobbies: [...HOBBIES] }).success).toBe(true);
+    expect(
+      ProfileFields.safeParse({ languages: ["fi", "sv", "en", "et", "ru", "uk", "de"] }).success,
+    ).toBe(true);
   });
 
   it("takes vaping as a way of smoking, and snus or pouches or neither as other nicotine (#239)", () => {
