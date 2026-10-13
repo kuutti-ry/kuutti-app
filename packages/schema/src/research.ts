@@ -58,16 +58,14 @@ export function ageBandOf(age: number): AgeBand {
 
 /**
  * The profile fields an event may carry (ADR-011 §9): the ones the registry
- * flags `research`, and of those only a single choice, never a multi (a set
- * of fifty-nine hobbies is a fingerprint, not a category), never a text, a
- * number or a setting, and never a field flagged `specialCategory` (ADR-009
- * §2, ADR-019 §4). Computed from the registry, so a field is out until it is
+ * flags `research`. Only the registry's `single()` takes the flag, so a multi
+ * (a set of fifty-nine hobbies is a fingerprint, not a category), a text, a
+ * number or a setting cannot carry it by type; that a flagged field is
+ * neither `specialCategory` (ADR-009 §2, ADR-019 §4) nor hidden is the
+ * registry's test. Computed from the registry, so a field is out until it is
  * flagged, and a flag on a field takes it out the same day.
  */
-export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => {
-  const spec = PROFILE_FIELDS[key];
-  return spec.research && spec.kind === "single" && !spec.specialCategory && spec.role !== "hidden";
-});
+export const RESEARCH_FIELD_KEYS = PROFILE_FIELD_KEYS.filter((key) => PROFILE_FIELDS[key].research);
 
 /**
  * The floor of k for the research block (ADR-011 §9): a cell of pond, age band
