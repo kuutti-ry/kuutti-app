@@ -229,7 +229,7 @@ describe("onboarding and consents", () => {
     expect(done.consents.research).toBeNull();
   });
 
-  test("Erasure removes the preferences, keeps the consents and blanks gender and pond", async ({
+  test("Erasure removes the preferences and the consents and blanks gender and pond", async ({
     ctx,
   }) => {
     const { app } = await appWith(ctx);
@@ -246,7 +246,8 @@ describe("onboarding and consents", () => {
       a.accountId,
     ]);
     expect(preferences.rows).toHaveLength(0);
-    expect(await consentRows(ctx, a.accountId)).toBe(4);
+    // ADR-010 §14: the rows go with the account.
+    expect(await consentRows(ctx, a.accountId)).toBe(0);
     const { rows } = await ctx.client.query<{
       state: string;
       gender: string | null;

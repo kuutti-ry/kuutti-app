@@ -11,6 +11,15 @@ import { z } from "zod";
 export const AuthPlatform = z.enum(["ios", "android"]).meta({ id: "AuthPlatform" });
 export type AuthPlatform = z.infer<typeof AuthPlatform>;
 
+/** The standing staff set on the identity row (TD-7), never on an account. */
+export const IdentityStanding = z
+  .enum(["ok", "suspended", "banned"])
+  .meta({ id: "IdentityStanding" });
+export type IdentityStanding = z.infer<typeof IdentityStanding>;
+
+/** What a device calls itself at login, kept this long: the person's own list of devices, and their export. */
+export const USER_AGENT_MAX = 200;
+
 export const AuthStartQuery = z
   .object({
     platform: AuthPlatform.meta({

@@ -124,6 +124,7 @@ function anExport(): Record<string, unknown> {
         nameInessive: "Helsingissä",
         parentId: null,
       },
+      stateChangedAt: null,
       genderChangedAt: null,
       seeksChangedAt: null,
       email: null,
@@ -135,12 +136,17 @@ function anExport(): Record<string, unknown> {
       firstSeenAt: at,
       lastBankLoginAt: at,
       loginLevel: "http://ftn.ficora.fi/2017/loa2",
+      standing: "ok",
+      standingChangedAt: null,
       deletionCount: 0,
+      refusedAttempts: 0,
+      reregisterAfter: null,
     },
     sessions: [
       {
         sessionId: uuid(3),
         platform: "ios",
+        userAgent: "Kuutti/0.13 (iPhone; iOS 19)",
         createdAt: at,
         lastUsedAt: at,
         expiresAt: at,
@@ -149,6 +155,7 @@ function anExport(): Record<string, unknown> {
     profile: null,
     photos: [photo(0)],
     photoAccessLog: [{ photoId: uuid(100), variant: "thumb", at }],
+    cardsShown: [{ photoId: uuid(101), at }],
     photoCheck: {
       about: "Kuutti checks every photo before anyone else sees it.",
       photosNotShown: [{ at, kind: "nudity", reason: "May show more than Kuutti allows" }],
@@ -224,6 +231,7 @@ describe("the account export", () => {
     ],
     ["photos", 50, () => photo(0)],
     ["photoAccessLog", 1000, () => ({ photoId: uuid(100), variant: "card", at })],
+    ["cardsShown", 1000, () => ({ photoId: uuid(101), at })],
   ])("holds at most so many %s: %i", (key, max, entry) => {
     const full = anExport();
     full[key] = Array.from({ length: max }, entry);
@@ -240,6 +248,21 @@ describe("the account export", () => {
     const over = anExport();
     over.consents = Array.from({ length: 10_001 }, () => consent("research"));
     expect(codes(AccountExport, over)).toEqual(["too_big"]);
+  });
+
+  it("holds a device's user agent only as long as login keeps it, a standing from the closed list, and no negative refusal count", () => {
+    const longer = anExport();
+    longer.sessions = [{ ...(longer.sessions as object[])[0], userAgent: "x".repeat(201) }];
+    expect(codes(AccountExport, longer)).toEqual(["too_big"]);
+    const silent = anExport();
+    silent.sessions = [{ ...(silent.sessions as object[])[0], userAgent: null }];
+    expect(AccountExport.safeParse(silent).success).toBe(true);
+    const frozen = anExport();
+    frozen.identity = { ...(frozen.identity as object), standing: "frozen" };
+    expect(codes(AccountExport, frozen)).toEqual(["invalid_value"]);
+    const negative = anExport();
+    negative.identity = { ...(negative.identity as object), refusedAttempts: -1 };
+    expect(codes(AccountExport, negative)).toEqual(["too_small"]);
   });
 
   it("refuses an unknown session platform and a timestamp that is not ISO 8601", () => {

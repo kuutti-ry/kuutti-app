@@ -73,3 +73,25 @@ Feature: Account deletion per the erasure table
     Given "A" gave the research consent and an event was tracked
     When "A" exports the account
     Then the export says enrolled, lists the event with its coarse snapshot, and contains no research_id
+
+  Scenario: The consent rows go with the account
+    Given "A" and "B" gave their consents and "A" withdrew one
+    When "A" deletes the account
+    Then no consent row of "A" remains and "B"'s are untouched
+
+  Scenario: The cards shown to the person are in the export and go with the account
+    Given "A" was shown "B"'s card and "B" was shown "A"'s
+    When "A" exports the account
+    Then the export lists "B"'s photo as a card shown and nothing of what "B" was shown
+    When "A" deletes the account
+    Then no card shown to "A" remains, "B"'s photo stays, and the rows about "A"'s photo went with it
+
+  Scenario: A moderator's role and panel session survive the erasure of their own account
+    Given "A" is also a moderator with a panel session
+    When "A" deletes the account
+    Then the role and the panel session remain on the identity
+
+  Scenario: The export carries the identity's standing, the refused attempts, the cooldown, the state change and each device's user agent
+    Given "A" deleted once, was refused twice inside the cooldown, and came back on a device that named itself
+    When "A" exports the account
+    Then the export says so, field by field

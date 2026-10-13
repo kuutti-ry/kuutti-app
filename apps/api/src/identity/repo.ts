@@ -5,7 +5,7 @@ import {
   type Queryable,
   transaction,
 } from "@kuutti/db";
-import type { ModeratorRole } from "@kuutti/schema";
+import type { IdentityStanding, ModeratorRole } from "@kuutti/schema";
 
 // Raw parameterised SQL rather than the Drizzle builder (rules/api.md asks for
 // a reason): `Deps.db` is the `Queryable` seam through which the test harness
@@ -225,6 +225,7 @@ export type SessionRow = {
   id: string;
   accountId: string;
   platform: string;
+  userAgent: string | null;
   createdAt: Date;
   expiresAt: Date;
   revokedAt: Date | null;
@@ -234,12 +235,13 @@ const sessionFrom = (r: Row): SessionRow => ({
   id: r.id as string,
   accountId: r.account_id as string,
   platform: r.platform as string,
+  userAgent: (r.user_agent as string | null) ?? null,
   createdAt: r.created_at as Date,
   expiresAt: r.expires_at as Date,
   revokedAt: (r.revoked_at as Date | null) ?? null,
 });
 
-const SESSION_COLUMNS = "id, account_id, platform, created_at, expires_at, revoked_at";
+const SESSION_COLUMNS = "id, account_id, platform, user_agent, created_at, expires_at, revoked_at";
 
 /** Null when the account is no longer live: a login that outlived the erasure gets no session (#51). */
 export async function insertSession(
@@ -539,7 +541,7 @@ export async function findAccountById(db: Queryable, accountId: string): Promise
   return rows[0] ? accountFrom(rows[0]) : null;
 }
 
-/** What the export says about the person's identity row: dates and the login level, never the hash. */
+/** What the export says about the person's identity row: its dates, standing and counters, never the hash. */
 export async function findIdentitySummaryForAccount(
   db: Queryable,
   accountId: string,
@@ -548,10 +550,15 @@ export async function findIdentitySummaryForAccount(
   createdAt: Date;
   authenticatedAt: Date | null;
   acr: string | null;
+  standing: IdentityStanding;
+  standingChangedAt: Date | null;
   deletionCount: number;
+  refusedAttempts: number;
+  reregisterAfter: Date | null;
 } | null> {
   const { rows } = await db.query<Row>(
-    `SELECT i.id, i.created_at, i.authenticated_at, i.acr, i.deletion_count
+    `SELECT i.id, i.created_at, i.authenticated_at, i.acr, i.standing, i.standing_changed_at,
+            i.deletion_count, i.refused_attempts, i.reregister_after
      FROM identity i JOIN account a ON a.identity_id = i.id WHERE a.id = $1`,
     [accountId],
   );
@@ -562,7 +569,11 @@ export async function findIdentitySummaryForAccount(
     createdAt: r.created_at as Date,
     authenticatedAt: (r.authenticated_at as Date | null) ?? null,
     acr: (r.acr as string | null) ?? null,
+    standing: r.standing as IdentityStanding,
+    standingChangedAt: (r.standing_changed_at as Date | null) ?? null,
     deletionCount: r.deletion_count as number,
+    refusedAttempts: r.refused_attempts as number,
+    reregisterAfter: (r.reregister_after as Date | null) ?? null,
   };
 }
 
@@ -744,6 +755,12 @@ export async function listConsents(
           [accountId, limit],
         );
   return rows.map(consentFrom);
+}
+
+/** Erasure (#51, ADR-010 §14): the consent rows go with the account; the events keep their own consent_version. */
+export async function deleteConsentsOfAccount(db: Queryable, accountId: string): Promise<number> {
+  const result = await db.query("DELETE FROM consent WHERE account_id = $1", [accountId]);
+  return result.rowCount ?? 0;
 }
 
 /** The newest active row per kind: what the status and the activation rule look at, however long the history. */

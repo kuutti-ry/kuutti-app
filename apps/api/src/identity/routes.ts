@@ -12,6 +12,7 @@ import {
   ErrorResponse,
   SessionResponse,
   SessionTokens,
+  USER_AGENT_MAX,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
@@ -56,9 +57,6 @@ function untilOf(detail: unknown): string | undefined {
 function isAdminAttempt(detail: unknown): boolean {
   return (detail as { platform?: unknown } | undefined)?.platform === ADMIN_PLATFORM;
 }
-
-/** What the device is called in its own list: the platform plus a bounded user agent. */
-const USER_AGENT_MAX = 200;
 
 const startRoute = createRoute({
   method: "get",
