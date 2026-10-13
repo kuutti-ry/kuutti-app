@@ -181,7 +181,7 @@ export const sv: Readonly<Record<string, string>> = {
   "photos.error.photo_order_invalid": "Fotoordningen var inaktuell, så den laddades om. Försök flytta igen.",
   "photos.error.photo_unsupported": "Den här filen är inte ett foto som Kuutti kan använda. Välj en JPEG-, PNG- eller WebP-bild.",
   "photos.error.tooLarge": "Fotot är för stort. Välj en mindre bild.",
-  "photos.explain": "Högst {max, plural, one {# foto} other {# foton}}. Det första som andra kan se är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det.",
+  "photos.explain": "Högst {max, plural, one {# foto} other {# foton}}. Håll ett foto nedtryckt och dra det för att ändra ordningen. Det första som andra kan se är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det.",
   "photos.imageLabel": "Foto {position, number} / {total, number}",
   "photos.main": "Huvudfoto",
   "photos.makeMain": "Gör till huvudfoto",

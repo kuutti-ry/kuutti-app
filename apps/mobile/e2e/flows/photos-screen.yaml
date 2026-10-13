@@ -1,7 +1,11 @@
 # The photos screen (#48, #138): the count against the limit, the first photo
-# the main one, each photo's state in words, the moves and the removal as
-# labelled buttons; a photo opens full size and back, and removing one asks
-# first. Sanna has five approved photos; the removal is declined.
+# the main one, each photo's state in words, the removal as a labelled button;
+# a photo opens full size and back, and removing one asks first. The order is
+# changed by holding a tile and dragging it (#179), which Maestro has no
+# gesture for (a swipe moves at once, a long press does not drag), and the
+# same moves are the tile's accessibility actions, out of its reach too; the
+# jest suite covers both. Sanna has five approved photos; the removal is
+# declined.
 appId: fi.kuutti.app
 name: A photo opens full size and back, and removing one asks first
 ---
@@ -13,8 +17,6 @@ name: A photo opens full size and back, and removing one asks first
 - waitForAnimationToEnd
 - assertVisible: "Main photo|Pääkuva|Huvudfoto"
 - assertVisible: "Visible to others|Näkyy muille|Syns för andra"
-- assertVisible: "Make main photo|Aseta pääkuvaksi|Gör till huvudfoto"
-- assertVisible: "Move later|Siirrä myöhemmäksi|Flytta bakåt"
 
 - tapOn: "Open photo 1|Avaa kuva 1|Öppna foto 1"
 - extendedWaitUntil:

@@ -85,7 +85,9 @@ jest.mock("@/features/settings", () => {
 const router = jest.requireMock("expo-router") as {
   useLocalSearchParams: () => Record<string, string | string[] | undefined>;
   Redirect?: (props: { href: string }) => React.ReactElement;
-  Stack?: (props: object) => React.ReactElement;
+  Stack?: ((props: object) => React.ReactElement) & {
+    Screen?: (props: object) => React.ReactElement;
+  };
 };
 const params = (value: Record<string, string | string[] | undefined>) => {
   router.useLocalSearchParams = () => value;
@@ -99,6 +101,9 @@ beforeAll(() => {
   const { Text } = require("react-native") as typeof import("react-native");
   router.Redirect = ({ href }) => createElement(Text, { testID: "Redirect" }, href);
   router.Stack = (props) => createElement(Text, { testID: "Stack" }, JSON.stringify(props));
+  // A route's own screen options, beside its screen (the photos route, #179).
+  router.Stack.Screen = (props) =>
+    createElement(Text, { testID: "Stack.Screen" }, JSON.stringify(props));
 });
 beforeEach(() => params({}));
 
@@ -116,6 +121,11 @@ describe("the screens without params", () => {
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);
     expect(propsOf(name)).toEqual({});
+  });
+
+  it("/photos turns the stack's back gesture off, so a drag to the right keeps the tile (#179)", async () => {
+    await render(<PhotosRoute />);
+    expect(propsOf("Stack.Screen")).toEqual({ options: { gestureEnabled: false } });
   });
 
   it("sends a link it has no screen for to the start", async () => {
