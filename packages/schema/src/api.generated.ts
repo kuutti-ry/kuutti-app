@@ -2802,32 +2802,6 @@ export interface components {
         ResearchFields: {
             /** @enum {string} */
             intent?: "long_term" | "casual" | "open_to_either";
-            /** @enum {string} */
-            identityLabel?: "agender" | "genderfluid" | "genderqueer" | "bigender" | "two_spirit" | "questioning" | "non_binary";
-            /** @enum {string} */
-            monogamy?: "monogamous" | "non_monogamous";
-            /** @enum {string} */
-            hasKids?: "no" | "yes_with_me" | "yes_not_with_me";
-            /** @enum {string} */
-            wantsKids?: "want" | "dont_want" | "not_sure";
-            /** @enum {string} */
-            smoking?: "never" | "sometimes" | "regularly" | "quitting" | "vaping";
-            nicotine?: ("snus" | "pouches" | "none")[];
-            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
-            /** @enum {string} */
-            education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
-            /** @enum {string} */
-            drinking?: "never" | "rarely" | "socially" | "often";
-            /** @enum {string} */
-            drugsAttitude?: "not_my_thing" | "dont_mind" | "fine_with_it";
-            hobbies?: ("hiking" | "cycling" | "running" | "skiing" | "swimming" | "sailing" | "foraging" | "fishing" | "climbing" | "gym" | "football" | "floorball" | "ice_hockey" | "yoga" | "dance" | "martial_arts" | "padel" | "photography" | "drawing" | "making_music" | "writing" | "crafts" | "theatre" | "cooking" | "baking" | "coffee" | "wine_and_beer" | "reading" | "cinema" | "museums" | "concerts" | "podcasts" | "board_games" | "video_games" | "chess" | "puzzles" | "gardening" | "sauna" | "cottage" | "diy" | "travelling" | "road_trips" | "learning_languages" | "dogs" | "cats" | "horses" | "birdwatching" | "programming" | "electronics" | "astronomy" | "volunteering" | "karaoke" | "pub_quiz" | "dinner_parties" | "meditation" | "winter_swimming" | "forest_walks" | "slow_mornings" | "other")[];
-            /** @enum {string} */
-            exercise?: "never" | "sometimes" | "weekly" | "daily";
-            pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
-            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
-            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
-            /** @enum {string} */
-            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };
         ExportedGate: {
             /** Format: uuid */
