@@ -2,6 +2,7 @@
 // Other slices import from here only: identity for the mapping row's life
 // (consent given, withdrawn, erased) and the export; any slice for track().
 
+export { anonymityCensus, researchAnonymityJob } from "./anonymity.ts";
 export { exportResearch } from "./export.ts";
 export {
   EVENTS_RETENTION_DAYS,

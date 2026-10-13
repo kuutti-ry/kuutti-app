@@ -7,10 +7,12 @@ import {
   RESEARCH_EVENT_NAMES,
   RESEARCH_EVENTS,
   RESEARCH_FIELD_KEYS,
+  RESEARCH_K_MIN,
   ResearchEventRecord,
   ResearchSnapshot,
   researchFieldsOf,
 } from "./research.ts";
+import { WAITLIST_K_MIN } from "./waitlist.ts";
 
 // The event registry and the coarse snapshot (#50, ADR-011, rules/schema.md).
 
@@ -81,22 +83,36 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
 }
 
 describe("the coarse snapshot", () => {
-  it("takes the closed-list fields only: never a text, a number, a setting or a special-category field", () => {
+  it("takes only the single-choice fields flagged for research: never a multi, a text, a number, a setting or a special-category field", () => {
     for (const key of RESEARCH_FIELD_KEYS) {
-      expect(["single", "multi"]).toContain(PROFILE_FIELDS[key].kind);
-      expect(PROFILE_FIELDS[key].role).not.toBe("hidden");
+      const spec = PROFILE_FIELDS[key];
+      expect(spec.research, key).toBe(true);
+      expect(spec.kind, key).toBe("single");
+      expect(spec.role, key).not.toBe("hidden");
       expect(SPECIAL_CATEGORY_FIELDS).not.toContain(key);
     }
     for (const key of PROFILE_FIELD_KEYS) {
       const spec = PROFILE_FIELDS[key];
-      if (spec.kind === "text" || spec.kind === "number" || spec.kind === "flag") {
-        expect(RESEARCH_FIELD_KEYS).not.toContain(key);
-      }
+      if (spec.kind !== "single" || !spec.research) expect(RESEARCH_FIELD_KEYS).not.toContain(key);
     }
-    for (const key of ["occupationTitle", "height", "hideFromField", "politics", "religion"]) {
+    for (const key of [
+      "hobbies",
+      "languages",
+      "occupationTitle",
+      "height",
+      "hideFromField",
+      "politics",
+      "religion",
+    ]) {
       expect(RESEARCH_FIELD_KEYS).not.toContain(key);
     }
-    expect(RESEARCH_FIELD_KEYS).toContain("hobbies");
+    // The allow-list of ADR-011 §9: intent alone until the census says a second field fits.
+    expect(RESEARCH_FIELD_KEYS).toEqual(["intent"]);
+  });
+
+  it("holds k to the waitlist's floor of ten", () => {
+    expect(RESEARCH_K_MIN).toBe(10);
+    expect(RESEARCH_K_MIN).toBe(WAITLIST_K_MIN);
   });
 
   it("keeps a stored value only while the registry still knows it, and drops the rest", () => {
@@ -110,7 +126,11 @@ describe("the coarse snapshot", () => {
       displayName: "Not a field",
       seeks: ["woman"],
     });
-    expect(fields).toEqual({ intent: "long_term", languages: ["fi", "en"] });
+    // The languages are a closed list too, and still out: not flagged (ADR-011 §9).
+    expect(fields).toEqual({ intent: "long_term" });
+    // A retired option of the flagged field is left out, not copied; a missing one adds nothing.
+    expect(researchFieldsOf({ intent: "retired option" })).toEqual({});
+    expect(researchFieldsOf({ languages: ["fi"] })).toEqual({});
     expect(researchFieldsOf(null)).toEqual({});
     expect(researchFieldsOf("text")).toEqual({});
     expect(ResearchSnapshot.safeParse({ gender: null, fields }).success).toBe(true);

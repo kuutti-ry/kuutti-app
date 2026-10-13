@@ -119,7 +119,7 @@ describe("track", () => {
       consent_version: CURRENT_CONSENT_VERSIONS.research,
       pond: "test-research-pond",
       age_band: "35-39",
-      snapshot: { gender: "woman", fields: { intent: "long_term", languages: ["fi", "en"] } },
+      snapshot: { gender: "woman", fields: { intent: "long_term" } },
       props: { complete: true, approvedPhotos: 3 },
     });
     const text = JSON.stringify(row);

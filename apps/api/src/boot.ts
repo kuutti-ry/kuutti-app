@@ -23,7 +23,11 @@ import type { Logger } from "./lib/logger.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
 import { createMediaDeps, sweepPendingPhotos } from "./media/index.ts";
-import { ensureEventPartitions, researchEventsJob } from "./research/index.ts";
+import {
+  ensureEventPartitions,
+  researchAnonymityJob,
+  researchEventsJob,
+} from "./research/index.ts";
 import { auditBoundary, prunePhotoCheckNotes } from "./safety/index.ts";
 
 export type BootOptions = {
@@ -185,6 +189,8 @@ export async function boot({
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
     // Next month's events partition ready, months past retention dropped (#50).
     researchEventsJob({ db: pool, now }),
+    // The census of the research block: a cell under k is a warning (ADR-011 §9).
+    researchAnonymityJob({ db: pool, logger }),
     // The day's waitlist figures (#54): taken once a day, served all day.
     waitlistJob({ db: pool, logger, now }),
     // Who is let into each pond, and for whom matching opens (#94).
