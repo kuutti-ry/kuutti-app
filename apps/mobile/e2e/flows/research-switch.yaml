@@ -1,5 +1,5 @@
-# The research opt-in stays reachable after onboarding as a switch on the
-# account card (ADR-010 §9, TD-5): on, it records the consent and stays on
+# The research opt-in stays reachable after onboarding as a switch under the
+# app's settings (ADR-010 §9, TD-5; "Your consents" since #170): on, it records the consent and stays on
 # when Settings is opened again; off, it withdraws it. Sanna never took part;
 # the flow ends with the switch off.
 appId: fi.kuutti.app
@@ -7,8 +7,11 @@ name: The research switch in Settings records the opt-in and withdraws it again
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
+# Centred on the line under the switch: centred on the switch's own words, the
+# first swipe left it right under the status bar, where the tap brushed the dev
+# client's floating button and opened its menu instead (CI, 13/10/2026).
 - scrollUntilVisible:
-    element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    element: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     direction: DOWN
     centerElement: true
     timeout: 60000
@@ -25,8 +28,11 @@ name: The research switch in Settings records the opt-in and withdraws it again
 
 - openLink: kuutti://
 - openLink: kuutti://settings
+# Centred on the line under the switch: centred on the switch's own words, the
+# first swipe left it right under the status bar, where the tap brushed the dev
+# client's floating button and opened its menu instead (CI, 13/10/2026).
 - scrollUntilVisible:
-    element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    element: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     direction: DOWN
     centerElement: true
     timeout: 60000
