@@ -91,11 +91,7 @@ const photo = (n: number) => ({
   appealable: false,
   position: n,
   createdAt: at,
-  urls: {
-    thumb: "https://media.example.com/t",
-    card: "https://media.example.com/c",
-    full: "https://media.example.com/f",
-  },
+  file: `photos/${uuid(100 + n)}.webp`,
   review: { decision: "approved", reason: null, decidedByStaff: false, decidedAt: at },
 });
 
@@ -110,6 +106,7 @@ const consent = (kind: string) => ({
 function anExport(): Record<string, unknown> {
   return {
     exportedAt: at,
+    exportedBy: "0.16.0-37a837c",
     account: {
       id: uuid(1),
       state: "active",
@@ -163,6 +160,7 @@ function anExport(): Record<string, unknown> {
     },
     research: { enrolled: false, since: null, consentVersion: null, events: [] },
     gate: null,
+    exports: [{ at }],
   };
 }
 
@@ -170,7 +168,9 @@ describe("the account export", () => {
   it("parses a complete export and keeps what it says", () => {
     const parsed = AccountExport.parse(anExport());
     expect(parsed.account.birthYear).toBe(1990);
-    expect(parsed.photos[0]?.urls?.card).toBe("https://media.example.com/c");
+    expect(parsed.photos[0]?.file).toBe(`photos/${uuid(100)}.webp`);
+    expect(parsed.exportedBy).toBe("0.16.0-37a837c");
+    expect(parsed.exports).toEqual([{ at }]);
     expect(parsed.dealBreakers[0]?.paused).toBe(false);
   });
 
@@ -276,9 +276,9 @@ describe("the account export", () => {
 });
 
 describe("an exported photo", () => {
-  it("has no URLs when the API has no object storage, and no review before the check", () => {
-    const bare = { ...photo(0), urls: null, review: null };
-    expect(ExportedPhoto.parse(bare)).toMatchObject({ urls: null, review: null });
+  it("has no file when the API has no object storage, and no review before the check", () => {
+    const bare = { ...photo(0), file: null, review: null };
+    expect(ExportedPhoto.parse(bare)).toMatchObject({ file: null, review: null });
   });
 
   it("names a rejection's reason and whether a person decided it", () => {
@@ -299,15 +299,11 @@ describe("an exported photo", () => {
   it.each([
     ["a review decision outside the list", { decision: "pending" }, "invalid_value"],
     ["a reason outside the list", { reason: "ugly" }, "invalid_value"],
-    [
-      "a URL that is not one",
-      { urls: { thumb: "nope", card: "nope", full: "nope" } },
-      "invalid_format",
-    ],
+    ["a file path longer than a photo's", { file: `photos/${"a".repeat(60)}.webp` }, "too_big"],
   ])("refuses %s", (_, change, code) => {
     const base = photo(0);
     const changed =
-      "urls" in change
+      "file" in change
         ? { ...base, ...change }
         : { ...base, review: { ...base.review, ...change } };
     expect(codes(ExportedPhoto, changed)).toContain(code);

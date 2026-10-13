@@ -1,6 +1,5 @@
 import { gender } from "@kuutti/db";
 import {
-  AccountExport,
   ConsentsResponse,
   GENDERS,
   ONBOARDING_STEPS,
@@ -12,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { ageInYears } from "../profile/index.ts";
 import { signedInAccount } from "../test/account.ts";
+import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import {
@@ -261,9 +261,7 @@ describe("onboarding and consents", () => {
     const a = await signedInAccount(ctx.client, undefined, { state: "registered" });
     const pondId = await onboard(ctx, app, a.headers, { research: true });
     await app.request("/consents/research", { method: "DELETE", headers: a.headers });
-    const exported = AccountExport.parse(
-      await (await app.request("/account/export", { headers: a.headers })).json(),
-    );
+    const exported = await exportOf(app, a.headers);
     expect(exported.account.gender).toBe("woman");
     expect(exported.account.pond).toMatchObject({
       id: pondId,
@@ -462,9 +460,7 @@ describe("onboarding and consents", () => {
       await (await app.request("/consents", { headers: a.headers })).json(),
     );
     expect(listed.consents).toHaveLength(100);
-    const exported = AccountExport.parse(
-      await (await app.request("/account/export", { headers: a.headers })).json(),
-    );
+    const exported = await exportOf(app, a.headers);
     expect(exported.consents).toHaveLength(122);
   });
 

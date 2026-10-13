@@ -36,6 +36,8 @@ export type MessageParams = {
   "account.export.button": Record<never, never>;
   "account.export.explain": Record<never, never>;
   "account.export.failed": Record<never, never>;
+  "account.export.fileName": Record<never, never>;
+  "account.export.limited": Record<never, never>;
   "account.export.photoCheck.about": Record<never, never>;
   "account.export.photoCheck.reason.disturbing": Record<never, never>;
   "account.export.photoCheck.reason.hate": Record<never, never>;
@@ -109,6 +111,7 @@ export type MessageParams = {
   "errors.auth_under_18": Record<never, never>;
   "errors.card_budget_exceeded": Record<never, never>;
   "errors.change_too_soon": Record<never, never>;
+  "errors.export_budget_exceeded": Record<never, never>;
   "errors.filter_unanswered": Record<never, never>;
   "errors.http_error": Record<never, never>;
   "errors.internal_error": Record<never, never>;

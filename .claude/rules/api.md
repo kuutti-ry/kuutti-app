@@ -34,6 +34,7 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 - Uploads: 10 MB cap, sharp with `limitInputPixels`, `p-limit` at vCPU count, 503 with `Retry-After` above the limit. Strip EXIF. Generate thumb 200x200, card 800x1067, full 1600 long edge, WebP, content-addressed keys. Never persist the original.
 - Rekognition moderation on upload, never auto-delete. What the check is sure of it rejects itself and the owner is told why: a hard label at its group's reject line, no face, several faces; what it is unsure of goes to the human queue (ADR-006 §2, #206, #253). Keep the moderators' load to what the check is unsure of; the groups and their lines live in `media/label-groups.ts` and `matching_config`.
 - Signed CloudFront URLs: 15-minute TTL, issued only inside rate-limited responses, every issuance logged (`account_id`, `photo_id`, variant, time). URL issuance counts against the exposure budget.
+- The data export (`GET /account/export`, #237, ADR-007 §3) is one zip built in memory: the document and every photo's `full` file. At most `matching_config exports_per_day` per Finnish day, counted in the statement that records the export; each photo read is logged as a `full` fetch, counted, never refused.
 
 ## Events and logs
 

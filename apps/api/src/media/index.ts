@@ -7,6 +7,7 @@ export { photoAdminRoutes } from "./admin-routes.ts";
 export { dayWindow, localYearMonth, secondsUntil } from "./budget.ts";
 export {
   deleteOrphanedObjects,
+  type ExportedPhotoFile,
   erasePhotosOfAccount,
   exportPhotos,
   type PhotoErasure,

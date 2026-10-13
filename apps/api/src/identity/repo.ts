@@ -790,6 +790,78 @@ export async function deleteConsentsOfAccount(db: Queryable, accountId: string):
   return result.rowCount ?? 0;
 }
 
+export type ExportRecord = {
+  /** True while the account is live; false means it was erased between the guard and here. */
+  live: boolean;
+  /** Exports answered since the day started, before this one. */
+  used: number;
+  /** True when the request was within the day's cap and its row was written. */
+  recorded: boolean;
+  /** The row's id when recorded, for giving the copy back if the archive never gets built. */
+  id: string | null;
+};
+
+/**
+ * One export answered (#237, ADR-007 §3): the day's count and the row in one
+ * statement under an advisory lock per account, so two requests cannot both
+ * pass a separate count; the shape of the fetch log's budget (media/repo.ts).
+ * Over the cap nothing is written; the caller refuses with the wait.
+ */
+export async function recordExport(
+  db: Queryable,
+  input: {
+    accountId: string;
+    at: Date;
+    /** Start of the cap's day; rows from before it do not count. */
+    since: Date;
+    limit: number;
+  },
+): Promise<ExportRecord> {
+  return transaction(db, async (tx) => {
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `account_export:${input.accountId}`,
+    ]);
+    const { rows } = await tx.query<{ live: boolean; used: number; id: string | null }>(
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+          used AS (SELECT count(*)::int AS n FROM account_export WHERE account_id = $1 AND at >= $3),
+          ins AS (INSERT INTO account_export (account_id, at)
+                  SELECT $1, $2 FROM live, used WHERE used.n < $4
+                  RETURNING id)
+     SELECT EXISTS (SELECT 1 FROM live) AS live,
+            (SELECT n FROM used) AS used,
+            (SELECT id FROM ins) AS id`,
+      [input.accountId, input.at, input.since, input.limit],
+    );
+    const row = rows[0];
+    if (!row) throw new Error("account_export insert returned no row");
+    return { live: row.live, used: row.used, recorded: row.id !== null, id: row.id };
+  });
+}
+
+/** The copy given back (#237): the archive was never built, so the day's cap should not count it. */
+export async function deleteExport(db: Queryable, accountId: string, id: string): Promise<void> {
+  await db.query("DELETE FROM account_export WHERE id = $1 AND account_id = $2", [id, accountId]);
+}
+
+/** The person's requests for a copy, newest first, for the export (#237). */
+export async function listExportsOfAccount(
+  db: Queryable,
+  accountId: string,
+  limit: number,
+): Promise<Array<{ at: Date }>> {
+  const { rows } = await db.query<{ at: Date }>(
+    "SELECT at FROM account_export WHERE account_id = $1 ORDER BY at DESC LIMIT $2",
+    [accountId, limit],
+  );
+  return rows.map((r) => ({ at: r.at }));
+}
+
+/** Erasure (#51): the export requests are the person's trail and go with the account. */
+export async function deleteExportsOfAccount(db: Queryable, accountId: string): Promise<number> {
+  const result = await db.query("DELETE FROM account_export WHERE account_id = $1", [accountId]);
+  return result.rowCount ?? 0;
+}
+
 /** The newest active row per kind: what the status and the activation rule look at, however long the history. */
 export async function activeConsents(db: Queryable, accountId: string): Promise<ConsentRow[]> {
   const { rows } = await db.query<Row>(

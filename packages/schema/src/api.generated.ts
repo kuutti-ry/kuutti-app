@@ -914,7 +914,7 @@ export interface paths {
         };
         /**
          * Everything Kuutti holds about this account
-         * @description One JSON document: the account, the identity's dates and login level, the devices signed in, the photos with fifteen-minute URLs and their moderation outcome, and the person's own fetch log. Nothing about anyone else.
+         * @description One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every photo whose object the store holds. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant.
          */
         get: {
             parameters: {
@@ -925,17 +925,35 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The export. */
+                /** @description The zip; Content-Disposition names the file. */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["AccountExport"];
+                        "application/zip": string;
                     };
                 };
                 /** @description unauthenticated, session_expired or session_revoked. */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account: erased between the session guard and the record (not_found). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description export_budget_exceeded: the day's copies are used up; Retry-After is the wait until the day rolls. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -2501,6 +2519,283 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountExport: {
+            /** Format: date-time */
+            exportedAt: string;
+            exportedBy: string;
+            account: {
+                /** Format: uuid */
+                id: string;
+                /** @enum {string} */
+                state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
+                /** Format: date-time */
+                stateChangedAt: string | null;
+                /** Format: date-time */
+                registeredAt: string;
+                birthYear: number | null;
+                birthMonth: number | null;
+                gender: components["schemas"]["Gender"];
+                pond: components["schemas"]["PondSummary"];
+                /** Format: date-time */
+                genderChangedAt: string | null;
+                /** Format: date-time */
+                seeksChangedAt: string | null;
+                email: string | null;
+            };
+            preferences: components["schemas"]["PreferencesResponse"];
+            dealBreakers: components["schemas"]["StoredDealBreaker"][];
+            consents: components["schemas"]["ConsentRecord"][];
+            identity: {
+                /** Format: date-time */
+                firstSeenAt: string;
+                /** Format: date-time */
+                lastBankLoginAt: string | null;
+                loginLevel: string | null;
+                standing: components["schemas"]["IdentityStanding"];
+                /** Format: date-time */
+                standingChangedAt: string | null;
+                deletionCount: number;
+                refusedAttempts: number;
+                /** Format: date-time */
+                reregisterAfter: string | null;
+            };
+            sessions: {
+                /** Format: uuid */
+                sessionId: string;
+                platform: components["schemas"]["AuthPlatform"];
+                userAgent: string | null;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                lastUsedAt: string;
+                /** Format: date-time */
+                expiresAt: string;
+            }[];
+            profile: components["schemas"]["ProfileDocument"];
+            photos: components["schemas"]["ExportedPhoto"][];
+            photoAccessLog: {
+                /** Format: uuid */
+                photoId: string;
+                variant: components["schemas"]["PhotoVariant"];
+                /** Format: date-time */
+                at: string;
+            }[];
+            cardsShown: {
+                /** Format: uuid */
+                photoId: string;
+                /** Format: date-time */
+                at: string;
+            }[];
+            photoCheck: components["schemas"]["ExportedPhotoCheck"];
+            research: components["schemas"]["ResearchExport"];
+            gate: components["schemas"]["ExportedGate"];
+            exports: {
+                /** Format: date-time */
+                at: string;
+            }[];
+        };
+        /** @enum {string|null} */
+        Gender: "woman" | "man" | "non_binary" | null;
+        PondSummary: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            name: string;
+            nameInessive: string;
+            /** Format: uuid */
+            parentId: string | null;
+        } | null;
+        PreferencesResponse: {
+            seeks: components["schemas"]["Gender"][] | null;
+            ageWindow: components["schemas"]["AgeWindow"];
+        };
+        AgeWindow: {
+            min: number;
+            max: number;
+        } | null;
+        StoredDealBreaker: {
+            field: components["schemas"]["DealBreakerField"];
+            accept: string[];
+            includeUnknown: boolean;
+            paused: boolean;
+        };
+        /** @enum {string} */
+        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages";
+        ConsentRecord: {
+            kind: components["schemas"]["ConsentKind"];
+            version: string;
+            /** @enum {string} */
+            locale: "fi" | "sv" | "en";
+            /** Format: date-time */
+            givenAt: string;
+            /** Format: date-time */
+            withdrawnAt: string | null;
+        };
+        /** @enum {string} */
+        ConsentKind: "terms" | "privacy" | "research" | "special_category";
+        /** @enum {string} */
+        IdentityStanding: "ok" | "suspended" | "banned";
+        /** @enum {string} */
+        AuthPlatform: "ios" | "android";
+        ProfileDocument: {
+            displayName: string;
+            bio: string | null;
+            bioPreset: components["schemas"]["BioPreset"];
+            fields: components["schemas"]["ProfileFields"];
+            prompts: components["schemas"]["PromptAnswer"][];
+            specialCategoryConsent: {
+                version: string;
+                /** Format: date-time */
+                at: string;
+            } | null;
+            /** Format: date-time */
+            updatedAt: string;
+        } | null;
+        /** @enum {string|null} */
+        BioPreset: "lazy_nice_fellow" | "ask_me_instead" | "photos_speak" | null;
+        ProfileFields: {
+            /** @enum {string} */
+            intent?: "long_term" | "casual" | "open_to_either";
+            /** @enum {string} */
+            identityLabel?: "agender" | "genderfluid" | "genderqueer" | "bigender" | "two_spirit" | "questioning" | "non_binary";
+            /** @enum {string} */
+            monogamy?: "monogamous" | "non_monogamous";
+            /** @enum {string} */
+            hasKids?: "no" | "yes_with_me" | "yes_not_with_me";
+            /** @enum {string} */
+            wantsKids?: "want" | "dont_want" | "not_sure";
+            /** @enum {string} */
+            smoking?: "never" | "sometimes" | "regularly" | "quitting" | "vaping";
+            nicotine?: ("snus" | "pouches" | "none")[];
+            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
+            /** @enum {string} */
+            education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
+            /** @enum {string} */
+            drinking?: "never" | "rarely" | "socially" | "often";
+            /** @enum {string} */
+            drugsAttitude?: "not_my_thing" | "dont_mind" | "fine_with_it";
+            hobbies?: ("hiking" | "cycling" | "running" | "skiing" | "swimming" | "sailing" | "foraging" | "fishing" | "climbing" | "gym" | "football" | "floorball" | "ice_hockey" | "yoga" | "dance" | "martial_arts" | "padel" | "photography" | "drawing" | "making_music" | "writing" | "crafts" | "theatre" | "cooking" | "baking" | "coffee" | "wine_and_beer" | "reading" | "cinema" | "museums" | "concerts" | "podcasts" | "board_games" | "video_games" | "chess" | "puzzles" | "gardening" | "sauna" | "cottage" | "diy" | "travelling" | "road_trips" | "learning_languages" | "dogs" | "cats" | "horses" | "birdwatching" | "programming" | "electronics" | "astronomy" | "volunteering" | "karaoke" | "pub_quiz" | "dinner_parties" | "meditation" | "winter_swimming" | "forest_walks" | "slow_mornings" | "other")[];
+            height?: number;
+            /** @enum {string} */
+            exercise?: "never" | "sometimes" | "weekly" | "daily";
+            pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
+            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
+            hideFromField?: boolean;
+            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
+            occupationTitle?: string;
+            politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them")[];
+            /** @enum {string} */
+            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
+            /** @enum {string} */
+            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
+        };
+        PromptAnswer: {
+            key: components["schemas"]["PromptKey"];
+            answer: string;
+        };
+        /** @enum {string} */
+        PromptKey: "sunday" | "proud_of" | "argue_about" | "unpopular_opinion" | "teach_me" | "first_date" | "never_again" | "overrated" | "hidden_talent" | "last_laugh" | "three_things" | "ask_me";
+        ExportedPhoto: {
+            id: components["schemas"]["PhotoId"];
+            /** @description Placeholder the app paints before the thumb arrives (computed from the thumb). */
+            blurhash: string;
+            /** @description Of the full variant. */
+            width: number;
+            /** @description Of the full variant. */
+            height: number;
+            state: components["schemas"]["PhotoState"];
+            /**
+             * @description Set when state is rejected: the reason the owner is told.
+             * @enum {string|null}
+             */
+            rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+            /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
+            appealable: boolean;
+            /** @description 0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4). */
+            position: number;
+            /** Format: date-time */
+            createdAt: string;
+            file: string | null;
+            /** @description The moderation outcome; label names are not part of it. */
+            review: {
+                /** @enum {string} */
+                decision: "approved" | "queued" | "rejected";
+                reason: components["schemas"]["PhotoRejectionReason"];
+                /** @description True when a person decided, false when the automatic check did. */
+                decidedByStaff: boolean;
+                /** Format: date-time */
+                decidedAt: string | null;
+            } | null;
+        };
+        /** Format: uuid */
+        PhotoId: string;
+        /** @enum {string} */
+        PhotoState: "pending" | "approved" | "queued" | "rejected";
+        /** @enum {string|null} */
+        PhotoRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+        /**
+         * @description thumb: 200×200 for lists. card: 800×1067 when a profile is opened. full: 1600 px long edge, requested only from the zoom screen.
+         * @enum {string}
+         */
+        PhotoVariant: "thumb" | "card" | "full";
+        ExportedPhotoCheck: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            /** @description Oldest first; each goes after twelve months. */
+            photosNotShown: {
+                /** Format: date-time */
+                at: string;
+                kind: components["schemas"]["PhotoCheckKind"];
+                /** @description The kind in words, in the request's language. */
+                reason: string;
+            }[];
+            /**
+             * Format: date-time
+             * @description Until when new photos are checked more carefully; null when they are not.
+             */
+            carefulCheckUntil: string | null;
+        };
+        /** @enum {string} */
+        PhotoCheckKind: "nudity" | "violence" | "disturbing" | "hate";
+        ResearchExport: {
+            enrolled: boolean;
+            /** Format: date-time */
+            since: string | null;
+            consentVersion: string | null;
+            events: components["schemas"]["ResearchEventRecord"][];
+        };
+        ResearchEventRecord: {
+            name: string;
+            /** Format: date-time */
+            at: string;
+            consentVersion: string;
+            pond: string | null;
+            ageBand: string;
+            snapshot: components["schemas"]["ResearchSnapshot"];
+            props: {
+                [key: string]: unknown;
+            };
+        };
+        ResearchSnapshot: {
+            gender: components["schemas"]["Gender"];
+            fields: components["schemas"]["ResearchFields"];
+        };
+        ResearchFields: {
+            /** @enum {string} */
+            intent?: "long_term" | "casual" | "open_to_either";
+        };
+        ExportedGate: {
+            /** Format: uuid */
+            pondId: string;
+            /** Format: date-time */
+            admittedAt: string | null;
+            placeSaid: number | null;
+            poolSaid: number;
+            /** Format: date-time */
+            openedAt: string | null;
+            /** Format: date-time */
+            countedAt: string | null;
+        } | null;
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -2598,8 +2893,6 @@ export interface components {
             /** Format: date-time */
             refreshExpiresAt: string;
         };
-        /** @enum {string} */
-        AuthPlatform: "ios" | "android";
         AdminSession: {
             accessToken: string;
             /** Format: date-time */
@@ -2637,285 +2930,6 @@ export interface components {
              */
             confirm: true;
         };
-        AccountExport: {
-            /** Format: date-time */
-            exportedAt: string;
-            account: {
-                /** Format: uuid */
-                id: string;
-                /** @enum {string} */
-                state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
-                /** Format: date-time */
-                stateChangedAt: string | null;
-                /** Format: date-time */
-                registeredAt: string;
-                birthYear: number | null;
-                birthMonth: number | null;
-                gender: components["schemas"]["Gender"];
-                pond: components["schemas"]["PondSummary"];
-                /** Format: date-time */
-                genderChangedAt: string | null;
-                /** Format: date-time */
-                seeksChangedAt: string | null;
-                email: string | null;
-            };
-            preferences: components["schemas"]["PreferencesResponse"];
-            dealBreakers: components["schemas"]["StoredDealBreaker"][];
-            consents: components["schemas"]["ConsentRecord"][];
-            identity: {
-                /** Format: date-time */
-                firstSeenAt: string;
-                /** Format: date-time */
-                lastBankLoginAt: string | null;
-                loginLevel: string | null;
-                standing: components["schemas"]["IdentityStanding"];
-                /** Format: date-time */
-                standingChangedAt: string | null;
-                deletionCount: number;
-                refusedAttempts: number;
-                /** Format: date-time */
-                reregisterAfter: string | null;
-            };
-            sessions: {
-                /** Format: uuid */
-                sessionId: string;
-                platform: components["schemas"]["AuthPlatform"];
-                userAgent: string | null;
-                /** Format: date-time */
-                createdAt: string;
-                /** Format: date-time */
-                lastUsedAt: string;
-                /** Format: date-time */
-                expiresAt: string;
-            }[];
-            profile: components["schemas"]["ProfileDocument"];
-            photos: components["schemas"]["ExportedPhoto"][];
-            photoAccessLog: {
-                /** Format: uuid */
-                photoId: string;
-                variant: components["schemas"]["PhotoVariant"];
-                /** Format: date-time */
-                at: string;
-            }[];
-            cardsShown: {
-                /** Format: uuid */
-                photoId: string;
-                /** Format: date-time */
-                at: string;
-            }[];
-            photoCheck: components["schemas"]["ExportedPhotoCheck"];
-            research: components["schemas"]["ResearchExport"];
-            gate: components["schemas"]["ExportedGate"];
-        };
-        /** @enum {string|null} */
-        Gender: "woman" | "man" | "non_binary" | null;
-        PondSummary: {
-            /** Format: uuid */
-            id: string;
-            slug: string;
-            name: string;
-            nameInessive: string;
-            /** Format: uuid */
-            parentId: string | null;
-        } | null;
-        PreferencesResponse: {
-            seeks: components["schemas"]["Gender"][] | null;
-            ageWindow: components["schemas"]["AgeWindow"];
-        };
-        AgeWindow: {
-            min: number;
-            max: number;
-        } | null;
-        StoredDealBreaker: {
-            field: components["schemas"]["DealBreakerField"];
-            accept: string[];
-            includeUnknown: boolean;
-            paused: boolean;
-        };
-        /** @enum {string} */
-        DealBreakerField: "monogamy" | "hasKids" | "wantsKids" | "smoking" | "languages";
-        ConsentRecord: {
-            kind: components["schemas"]["ConsentKind"];
-            version: string;
-            /** @enum {string} */
-            locale: "fi" | "sv" | "en";
-            /** Format: date-time */
-            givenAt: string;
-            /** Format: date-time */
-            withdrawnAt: string | null;
-        };
-        /** @enum {string} */
-        ConsentKind: "terms" | "privacy" | "research" | "special_category";
-        /** @enum {string} */
-        IdentityStanding: "ok" | "suspended" | "banned";
-        ProfileDocument: {
-            displayName: string;
-            bio: string | null;
-            bioPreset: components["schemas"]["BioPreset"];
-            fields: components["schemas"]["ProfileFields"];
-            prompts: components["schemas"]["PromptAnswer"][];
-            specialCategoryConsent: {
-                version: string;
-                /** Format: date-time */
-                at: string;
-            } | null;
-            /** Format: date-time */
-            updatedAt: string;
-        } | null;
-        /** @enum {string|null} */
-        BioPreset: "lazy_nice_fellow" | "ask_me_instead" | "photos_speak" | null;
-        ProfileFields: {
-            /** @enum {string} */
-            intent?: "long_term" | "casual" | "open_to_either";
-            /** @enum {string} */
-            identityLabel?: "agender" | "genderfluid" | "genderqueer" | "bigender" | "two_spirit" | "questioning" | "non_binary";
-            /** @enum {string} */
-            monogamy?: "monogamous" | "non_monogamous";
-            /** @enum {string} */
-            hasKids?: "no" | "yes_with_me" | "yes_not_with_me";
-            /** @enum {string} */
-            wantsKids?: "want" | "dont_want" | "not_sure";
-            /** @enum {string} */
-            smoking?: "never" | "sometimes" | "regularly" | "quitting" | "vaping";
-            nicotine?: ("snus" | "pouches" | "none")[];
-            languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
-            /** @enum {string} */
-            education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
-            /** @enum {string} */
-            drinking?: "never" | "rarely" | "socially" | "often";
-            /** @enum {string} */
-            drugsAttitude?: "not_my_thing" | "dont_mind" | "fine_with_it";
-            hobbies?: ("hiking" | "cycling" | "running" | "skiing" | "swimming" | "sailing" | "foraging" | "fishing" | "climbing" | "gym" | "football" | "floorball" | "ice_hockey" | "yoga" | "dance" | "martial_arts" | "padel" | "photography" | "drawing" | "making_music" | "writing" | "crafts" | "theatre" | "cooking" | "baking" | "coffee" | "wine_and_beer" | "reading" | "cinema" | "museums" | "concerts" | "podcasts" | "board_games" | "video_games" | "chess" | "puzzles" | "gardening" | "sauna" | "cottage" | "diy" | "travelling" | "road_trips" | "learning_languages" | "dogs" | "cats" | "horses" | "birdwatching" | "programming" | "electronics" | "astronomy" | "volunteering" | "karaoke" | "pub_quiz" | "dinner_parties" | "meditation" | "winter_swimming" | "forest_walks" | "slow_mornings" | "other")[];
-            height?: number;
-            /** @enum {string} */
-            exercise?: "never" | "sometimes" | "weekly" | "daily";
-            pets?: ("dog" | "cat" | "other" | "none" | "allergic")[];
-            field?: ("tech" | "engineering" | "business" | "arts" | "science" | "health" | "education" | "law" | "social" | "trades" | "service" | "other")[];
-            hideFromField?: boolean;
-            occupation?: ("student" | "tech" | "healthcare" | "education" | "business" | "arts_culture" | "science" | "trades_construction" | "service_hospitality" | "public_sector" | "transport" | "agriculture" | "media" | "law_finance" | "sports" | "entrepreneur" | "between_jobs" | "retired" | "other")[];
-            occupationTitle?: string;
-            politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them")[];
-            /** @enum {string} */
-            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
-            /** @enum {string} */
-            zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
-        };
-        PromptAnswer: {
-            key: components["schemas"]["PromptKey"];
-            answer: string;
-        };
-        /** @enum {string} */
-        PromptKey: "sunday" | "proud_of" | "argue_about" | "unpopular_opinion" | "teach_me" | "first_date" | "never_again" | "overrated" | "hidden_talent" | "last_laugh" | "three_things" | "ask_me";
-        ExportedPhoto: {
-            id: components["schemas"]["PhotoId"];
-            /** @description Placeholder the app paints before the thumb arrives (computed from the thumb). */
-            blurhash: string;
-            /** @description Of the full variant. */
-            width: number;
-            /** @description Of the full variant. */
-            height: number;
-            state: components["schemas"]["PhotoState"];
-            /**
-             * @description Set when state is rejected: the reason the owner is told.
-             * @enum {string|null}
-             */
-            rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
-            /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
-            appealable: boolean;
-            /** @description 0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4). */
-            position: number;
-            /** Format: date-time */
-            createdAt: string;
-            urls: components["schemas"]["SignedVariantUrls"];
-            /** @description The moderation outcome; label names are not part of it. */
-            review: {
-                /** @enum {string} */
-                decision: "approved" | "queued" | "rejected";
-                reason: components["schemas"]["PhotoRejectionReason"];
-                /** @description True when a person decided, false when the automatic check did. */
-                decidedByStaff: boolean;
-                /** Format: date-time */
-                decidedAt: string | null;
-            } | null;
-        };
-        /** Format: uuid */
-        PhotoId: string;
-        /** @enum {string} */
-        PhotoState: "pending" | "approved" | "queued" | "rejected";
-        /** @description Fifteen-minute URLs, one per variant. */
-        SignedVariantUrls: {
-            /** Format: uri */
-            thumb: string;
-            /** Format: uri */
-            card: string;
-            /** Format: uri */
-            full: string;
-        } | null;
-        /** @enum {string|null} */
-        PhotoRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
-        /**
-         * @description thumb: 200×200 for lists. card: 800×1067 when a profile is opened. full: 1600 px long edge, requested only from the zoom screen.
-         * @enum {string}
-         */
-        PhotoVariant: "thumb" | "card" | "full";
-        ExportedPhotoCheck: {
-            /** @description What this part is, in the request's language. */
-            about: string;
-            /** @description Oldest first; each goes after twelve months. */
-            photosNotShown: {
-                /** Format: date-time */
-                at: string;
-                kind: components["schemas"]["PhotoCheckKind"];
-                /** @description The kind in words, in the request's language. */
-                reason: string;
-            }[];
-            /**
-             * Format: date-time
-             * @description Until when new photos are checked more carefully; null when they are not.
-             */
-            carefulCheckUntil: string | null;
-        };
-        /** @enum {string} */
-        PhotoCheckKind: "nudity" | "violence" | "disturbing" | "hate";
-        ResearchExport: {
-            enrolled: boolean;
-            /** Format: date-time */
-            since: string | null;
-            consentVersion: string | null;
-            events: components["schemas"]["ResearchEventRecord"][];
-        };
-        ResearchEventRecord: {
-            name: string;
-            /** Format: date-time */
-            at: string;
-            consentVersion: string;
-            pond: string | null;
-            ageBand: string;
-            snapshot: components["schemas"]["ResearchSnapshot"];
-            props: {
-                [key: string]: unknown;
-            };
-        };
-        ResearchSnapshot: {
-            gender: components["schemas"]["Gender"];
-            fields: components["schemas"]["ResearchFields"];
-        };
-        ResearchFields: {
-            /** @enum {string} */
-            intent?: "long_term" | "casual" | "open_to_either";
-        };
-        ExportedGate: {
-            /** Format: uuid */
-            pondId: string;
-            /** Format: date-time */
-            admittedAt: string | null;
-            placeSaid: number | null;
-            poolSaid: number;
-            /** Format: date-time */
-            openedAt: string | null;
-            /** Format: date-time */
-            countedAt: string | null;
-        } | null;
         PhotoList: {
             photos: components["schemas"]["Photo"][];
             /** @description matching_config max_photos. */

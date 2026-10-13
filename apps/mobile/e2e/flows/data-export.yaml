@@ -1,11 +1,12 @@
-# Download my data (#52, ADR-007): a file with everything Kuutti holds about
-# the person is handed to the phone's share sheet, and nothing goes wrong on
-# the way. The sheet is the system's, in the phone's language, so the flow
-# asserts only that the app's own failure line never shows, and closes the
-# sheet by dragging it down. The file's contents are held by erasure.test.ts.
-# Sanna; read only.
+# Download my data (#52, ADR-007, #237): the zip with everything Kuutti holds
+# about the person is handed over, and nothing goes wrong on the way. On iOS
+# that is the share sheet, on Android the system's folder picker; both are
+# the system's, in the phone's language, so the flow asserts only that the
+# app's own failure line never shows, and closes what opened. The file's
+# contents are held by erasure.test.ts. Sanna; read only: the day's three
+# copies are not spent by one run, and the cap is counted per account.
 appId: fi.kuutti.app
-name: Download my data hands the person's file to the share sheet
+name: Download my data hands the person's file over
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
@@ -16,12 +17,12 @@ name: Download my data hands the person's file to the share sheet
     timeout: 60000
 - assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
 - tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-# The sheet covers the app; its file is named after the export's title.
+# The sheet, or the picker, covers the app.
 - extendedWaitUntil:
     notVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 20000
-# iOS's sheet is swiped down by its top; Android's is as tall as its apps
-# make it, so the back key closes it there.
+# iOS's sheet is swiped down by its top; Android's folder picker is closed
+# by the back key, which the app takes as a cancelled download.
 - runFlow:
     when:
       platform: iOS
@@ -34,7 +35,11 @@ name: Download my data hands the person's file to the share sheet
       platform: Android
     commands:
       - back
-- extendedWaitUntil:
-    visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-    timeout: 15000
+# Settings comes back scrolled to its top; the button is under Account again.
+- scrollUntilVisible:
+    element: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."
+- assertNotVisible: "That is enough copies for today\\..*|Tältä päivältä kopioita on jo tarpeeksi\\..*|Det räcker med kopior för i dag\\..*"

@@ -56,7 +56,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `home-and-tech` | Sanna | the area and its numbers, the gate in words; the tech screen's API |
 | `email` | Sanna | malformed refused, valid saved, removed |
 | `research-switch` | Sanna | the opt-in recorded and withdrawn |
-| `data-export` | Sanna | Download my data hands the file to the share sheet |
+| `data-export` | Sanna | Download my data hands the zip over: the share sheet on iOS, the folder picker on Android (#237) |
 | `settings-survive-relaunch` | Sanna | theme, language and session outlast closing the app |
 | `log-out-everywhere` | Sanna | signed out at once, not back on reopening |
 | `language` | Sanna | the language choice changes the app at once (#220) |

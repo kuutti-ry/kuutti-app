@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/mobile",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "main": "expo-router/entry",
   "description": "Expo app. Routes under app/ stay thin; features live under src/features/<slice>/.",
@@ -33,6 +33,7 @@
     "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.21",
     "expo-dev-client": "~57.0.19",
+    "expo-file-system": "~57.0.7",
     "expo-haptics": "~57.0.3",
     "expo-image": "~57.0.5",
     "expo-image-manipulator": "~57.0.21",

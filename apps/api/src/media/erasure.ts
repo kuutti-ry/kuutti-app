@@ -1,8 +1,7 @@
 import type { Queryable } from "@kuutti/db";
 import { type ExportedPhoto, PHOTO_VARIANTS } from "@kuutti/schema";
-import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
-import { issuePhotoUrl, type PhotoServiceDeps, toPhoto } from "./photos.ts";
+import { type PhotoServiceDeps, toPhoto } from "./photos.ts";
 import * as repo from "./repo.ts";
 import { type MediaStore, objectKey } from "./store.ts";
 
@@ -66,12 +65,20 @@ export async function deleteOrphanedObjects(
 
 export const EXPORT_ACCESS_LOG_LIMIT = 1000;
 
+/** One photo's file for the zip (#237): where the document points, and the bytes as stored. */
+export type ExportedPhotoFile = { path: string; bytes: Uint8Array };
+
+/** `photos/<photo id>.webp`: the full variant, 1600 px on the long edge, the best Kuutti holds (rule 4). */
+export const exportedPhotoPath = (photoId: string): string => `photos/${photoId}.webp`;
+
 /**
  * The person's photos for the export: what the list shows, the moderation
- * outcome (never the labels), and fifteen-minute URLs for the variants, each
- * issued through the same path as any other fetch, so the export itself
- * appears in the fetch log it returns. With them, the cards served to the
- * person (ADR-008): the trail that erasure deletes is theirs to read first.
+ * outcome (never the labels), and the full-size file of each photo whose
+ * object the store still holds, rejected and queued ones too (#237: they are
+ * data Kuutti holds). Each read is logged as a fetch of the full variant, so
+ * the export appears in the fetch log it returns, and never refused: the
+ * day's copies are capped by the identity slice. With them, the cards served
+ * to the person (ADR-008): the trail that erasure deletes is theirs to read first.
  */
 export async function exportPhotos(
   deps:
@@ -80,38 +87,34 @@ export async function exportPhotos(
   accountId: string,
 ): Promise<{
   photos: ExportedPhoto[];
+  files: ExportedPhotoFile[];
   accessLog: Array<{ photoId: string; variant: (typeof PHOTO_VARIANTS)[number]; at: string }>;
   cardsShown: Array<{ photoId: string; at: string }>;
 }> {
   const rows = await repo.listPhotos(deps.db, accountId);
   const reviews = await repo.listReviewsForAccount(deps.db, accountId);
-  const withStore = "signer" in deps ? (deps as PhotoServiceDeps) : null;
+  const store = "store" in deps ? deps.store : null;
   const photos: ExportedPhoto[] = [];
+  const files: ExportedPhotoFile[] = [];
   for (const row of rows) {
-    let urls: ExportedPhoto["urls"] = null;
-    if (withStore) {
-      // The export's URLs count against the day's budget like any fetch (#52);
-      // over it, the export still lists the photo, without URLs. One after the
-      // other: each issuance is its own short transaction on the caller's
-      // connection, and the budget lock serialises them anyway.
-      const issued: (string | null)[] = [];
-      for (const variant of PHOTO_VARIANTS) {
-        try {
-          issued.push(
-            (await issuePhotoUrl(withStore, { accountId, photoId: row.id, variant })).url,
-          );
-        } catch (error) {
-          if (!(error instanceof AppError && error.code === "photo_budget_exceeded")) throw error;
-          issued.push(null);
-        }
-      }
-      const [thumb, card, full] = issued;
-      if (thumb && card && full) urls = { thumb, card, full };
+    let file: string | null = null;
+    // Two rows may share one object (the same picture uploaded twice): each
+    // row gets its own file, named by the row's id.
+    const bytes = store ? await store.get(objectKey(row.key, "full")) : null;
+    if (bytes) {
+      file = exportedPhotoPath(row.id);
+      files.push({ path: file, bytes });
+      await repo.logPhotoAccess(deps.db, {
+        accountId,
+        photoId: row.id,
+        variant: "full",
+        at: deps.now(),
+      });
     }
     const review = reviews.get(row.id);
     photos.push({
       ...toPhoto(row),
-      urls,
+      file,
       review: review
         ? {
             decision: review.decision,
@@ -132,5 +135,5 @@ export async function exportPhotos(
   const cardsShown = (
     await repo.listCardShownOfAccount(deps.db, accountId, EXPORT_ACCESS_LOG_LIMIT)
   ).map((entry) => ({ photoId: entry.photoId, at: entry.at.toISOString() }));
-  return { photos, accessLog, cardsShown };
+  return { photos, files, accessLog, cardsShown };
 }

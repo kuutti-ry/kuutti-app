@@ -1,3 +1,4 @@
+export { accountExport } from "./account-export.ts";
 export {
   adminSession,
   moderatorRole,

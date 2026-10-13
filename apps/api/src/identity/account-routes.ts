@@ -1,4 +1,4 @@
-import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import {
   AccountDeletionRequest,
   AccountEmail,
@@ -13,7 +13,8 @@ import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { tOf } from "../lib/i18n.ts";
-import { type ErasureDeps, eraseAccount, exportAccount } from "./erasure.ts";
+import { type ErasureDeps, eraseAccount } from "./erasure.ts";
+import { exportArchive } from "./export.ts";
 import { pauseAccount } from "./pause.ts";
 import * as repo from "./repo.ts";
 
@@ -47,11 +48,27 @@ const exportRoute = createRoute({
   path: "/account/export",
   summary: "Everything Kuutti holds about this account",
   description:
-    "One JSON document: the account, the identity's dates and login level, the devices signed in, the photos with fifteen-minute URLs and their moderation outcome, and the person's own fetch log. Nothing about anyone else.",
+    "One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every photo whose object the store holds. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant.",
   ...bearer,
   responses: {
-    200: { description: "The export.", ...json(AccountExport) },
+    200: {
+      description: "The zip; Content-Disposition names the file.",
+      content: {
+        "application/zip": {
+          schema: z.string().openapi({
+            format: "binary",
+            description: "The zip with the document and the photos.",
+          }),
+        },
+      },
+    },
     401: errorContent("unauthenticated, session_expired or session_revoked."),
+    404: errorContent(
+      "No live account: erased between the session guard and the record (not_found).",
+    ),
+    429: errorContent(
+      "export_budget_exceeded: the day's copies are used up; Retry-After is the wait until the day rolls.",
+    ),
   },
 });
 
@@ -119,10 +136,13 @@ const clearEmailRoute = createRoute({
 
 export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
+  // The document inside the zip is not a response body, so the contract
+  // carries it as a component by name (#237): a reader of openapi.json finds it.
+  app.openAPIRegistry.register("AccountExport", AccountExport);
   const erasureDeps: ErasureDeps = {
     db: deps.db,
     logger: deps.logger,
-    now: () => new Date(),
+    now: deps.now ?? (() => new Date()),
     ...(deps.media ? { media: deps.media } : {}),
   };
   const routes = [deleteRoute, exportRoute, pauseRoute, emailRoute, setEmailRoute, clearEmailRoute];
@@ -173,10 +193,26 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
   });
 
   app.openapi(exportRoute, async (c) => {
-    const body = await exportAccount(erasureDeps, callerOf(c).accountId, tOf(c));
-    c.header("Content-Disposition", 'attachment; filename="kuutti-export.json"');
+    let archive: Awaited<ReturnType<typeof exportArchive>>;
+    try {
+      archive = await exportArchive(
+        { ...erasureDeps, version: deps.config.APP_VERSION },
+        callerOf(c).accountId,
+        tOf(c),
+      );
+    } catch (error) {
+      // The wait until the day rolls, as the photo and card routes say it.
+      if (error instanceof AppError && error.code === "export_budget_exceeded") {
+        const wait = (error.detail as { retryAfterSeconds?: number } | undefined)
+          ?.retryAfterSeconds;
+        c.header("Retry-After", String(wait ?? 1));
+      }
+      throw error;
+    }
+    c.header("Content-Type", "application/zip");
+    c.header("Content-Disposition", `attachment; filename="${archive.name}"`);
     c.header("Cache-Control", "no-store");
-    return c.json(body, 200);
+    return c.body(archive.bytes, 200);
   });
 
   return app;
