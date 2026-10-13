@@ -58,19 +58,27 @@ const single = <T extends Options>(options: T, r: Roles) => ({
  */
 type MultiExtra<T extends Options> = { alone?: readonly T[number][]; shownFirst?: number };
 
-const multi = <T extends Options>(options: T, max: number, r: Roles, extra: MultiExtra<T> = {}) => {
+/**
+ * Several answers of a closed list, as many as the person likes (the
+ * maintainer, #239: "we allow always more data"; what a card shows of them
+ * and what matching reads are decisions of their own). The cap is the list
+ * itself, so the contract still names one.
+ */
+const multi = <T extends Options>(options: T, r: Roles, extra: MultiExtra<T> = {}) => {
   const alone: readonly string[] = extra.alone ?? [];
   return {
     kind: "multi" as const,
     options,
-    max,
     alone,
     shownFirst: extra.shownFirst,
     ...roles(r),
     schema: z
       .array(z.enum(options))
       .min(1)
-      .max(max)
+      .max(options.length)
+      .refine((chosen) => new Set(chosen).size === chosen.length, {
+        message: "an option was chosen twice",
+      })
       .refine((chosen) => chosen.length === 1 || !chosen.some((o) => alone.includes(o)), {
         message: "an option that stands alone was chosen with others",
       }),
@@ -142,7 +150,6 @@ const LANGUAGES = [
   "ko",
   "other",
 ] as const;
-export const LANGUAGES_MAX = 5;
 export const LANGUAGES_SHOWN_FIRST = 10;
 
 /**
@@ -212,7 +219,6 @@ export const HOBBIES = [
   "other",
 ] as const;
 export type Hobby = (typeof HOBBIES)[number];
-export const HOBBIES_MAX = 5;
 
 export const HOBBY_GROUP_KEYS = [
   "outdoors",
@@ -324,13 +330,11 @@ export const PROFILE_FIELDS = {
   /** Nicotine that is not smoked (#239): snus, pouches, either or both, or neither, which stands alone; no frequency. Smoking's companion on the later screens. */
   nicotine: multi(
     ["snus", "pouches", "none"],
-    2,
     { role: "info", preferenceAbout: "none" },
     { alone: ["none"] },
   ),
   languages: multi(
     LANGUAGES,
-    LANGUAGES_MAX,
     { role: "info", preferenceAbout: "deal_breaker" },
     { shownFirst: LANGUAGES_SHOWN_FIRST },
   ),
@@ -348,18 +352,18 @@ export const PROFILE_FIELDS = {
     role: "soft",
     preferenceAbout: "soft",
   }),
-  hobbies: multi(HOBBIES, HOBBIES_MAX, { role: "info", preferenceAbout: "none" }),
+  hobbies: multi(HOBBIES, { role: "info", preferenceAbout: "none" }),
   /** Centimetres; display only, never filterable. */
   height: integer(HEIGHT_MIN_CM, HEIGHT_MAX_CM, { role: "info", preferenceAbout: "none" }),
   exercise: single(["never", "sometimes", "weekly", "daily"], {
     role: "info",
     preferenceAbout: "none",
   }),
-  pets: multi(["dog", "cat", "other", "none", "allergic"], 5, {
+  pets: multi(["dog", "cat", "other", "none", "allergic"], {
     role: "info",
     preferenceAbout: "none",
   }),
-  /** Up to three fields of study or work (#178); a list per university is a configuration of its own, later (ADR-019 §5). */
+  /** Fields of study or work, as many as apply (#178, #239); a list per university is a configuration of its own, later (ADR-019 §5). */
   field: multi(
     [
       "tech",
@@ -375,12 +379,11 @@ export const PROFILE_FIELDS = {
       "service",
       "other",
     ],
-    3,
     { role: "info", preferenceAbout: "none" },
   ),
   /** "Hide me from my field": people of the same field never see this person; the round builder of #95 reads it. */
   hideFromField: flag({ role: "hidden", preferenceAbout: "none" }),
-  /** Up to three lines of work (#178). */
+  /** Lines of work, as many as apply (#178, #239). */
   occupation: multi(
     [
       "student",
@@ -403,7 +406,6 @@ export const PROFILE_FIELDS = {
       "retired",
       "other",
     ],
-    3,
     { role: "info", preferenceAbout: "none" },
   ),
   /** A short title in the person's words and no employer's name: under the plain-text rule like every free text. */
@@ -411,7 +413,6 @@ export const PROFILE_FIELDS = {
   /** Article 9: the parties the person could vote for, or none of them; shown only when filled, never a filter. */
   politics: multi(
     POLITICS_OPTIONS,
-    PARTY_OPTIONS.length,
     { role: "info", preferenceAbout: "none", specialCategory: true },
     { alone: ["none_of_them"] },
   ),

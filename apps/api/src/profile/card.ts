@@ -88,6 +88,7 @@ export async function completenessOf(
   return completeness({
     displayName: profile?.displayName ?? null,
     bio: profile?.bio ?? null,
+    bioPreset: profile?.bioPreset ?? null,
     answeredPrompts: profile?.prompts.length ?? 0,
     approvedPhotos,
     seeks: preferences.seeks,

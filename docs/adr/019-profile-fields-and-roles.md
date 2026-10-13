@@ -21,17 +21,17 @@ Between 1 and 7 October 2026 the team went through what Kuutti asks a person and
    | wantsKids | want / don't want / not sure | info | deal-breaker | the same three answers; the texts adapt to hasKids (want more, no more) on the screens of #148 |
    | smoking | never / sometimes / regularly / quitting / vaping | info | deal-breaker | vaping is a way, not a frequency (#239) |
    | nicotine | snus, pouches (either or both), or neither alone | info | none | other nicotine; smoking's companion on its later screen (#239) |
-   | languages | up to five of a closed list, named in the reader's language | info | deal-breaker | in the order of use, the first ten before a search; no flags |
+   | languages | any number of a closed list, named in the reader's language | info | deal-breaker | in the order of use, the first ten before a search; no flags |
    | education | peruskoulu / toinen aste / AMK / kandi / maisteri or YAMK / tohtori | soft | soft, "similar to mine" | AMK and kandi adjacent; never "at least" |
    | drinking | never / rarely / socially / often | soft | soft | |
    | drugsAttitude | not my thing / don't mind / fine with it | soft | soft | an attitude, never behaviour (§4) |
-   | hobbies | up to five of a fixed list in twelve groups, plus other | info | none | shared ones highlighted on a card (#150), never a score |
+   | hobbies | any number of a fixed list in twelve groups, plus other | info | none | shared ones highlighted on a card (#150), never a score |
    | height | 140 to 220 cm | info | none | display only, never filterable |
    | exercise | never / sometimes / weekly / daily | info | none | |
    | pets | dog / cat / other / none / allergic | info | none | |
-   | field | up to three fields of study or work, closed list (#178) | info | none | §5 |
+   | field | fields of study or work, as many as apply, closed list (#178) | info | none | §5 |
    | hideFromField | on or off | hidden | none | "hide me from people in my field", §5 |
-   | occupation | up to three of a category list (#178) | info | none | §5 |
+   | occupation | lines of work of a category list, as many as apply (#178) | info | none | §5 |
    | occupationTitle | up to 40 characters | info | none | under the plain-text rule; no employer's name |
    | politics | the parliament's parties, several, or none of them alone | info, shown only when filled | none | article 9, §4 |
    | religion | a closed list | info | none; a deal-breaker only after the Ombudsman's answer | article 9, §4 |
@@ -68,6 +68,7 @@ Between 1 and 7 October 2026 the team went through what Kuutti asks a person and
 
 ## History
 
+- 2026-10-13: §1 amended (the maintainer, after #239: "we allow always MORE data"). A multi-choice field takes as many of its options as the person likes: the hobbies (five until now), the languages (five), the fields and lines of work (three). The contract's cap is the list itself. What a card shows of a long answer, and whether matching reads it, are decisions of their own, not settled here: today the card shows every answer.
 - 2026-10-13: §1 and §3 amended (#239, the second part). Smoking takes vaping, and a field of its own, other nicotine, holds snus and nicotine pouches or "no snus or pouches" (no frequency, the maintainer); that answer stands alone through the registry's `alone` option, it is shown on the card and filters nobody, and it is asked on smoking's later screen as its companion, so the later count stays sixteen. Every field has an icon before its label, a placeholder until the designer draws the set: Lucide's, and two drawn here, a snus tin and open palms for religion. The religions' symbols are the Finnish communities' where one exists: the Lutheran one is the Evangelical Lutheran Church of Finland's cross in a ring instead of Luther's rose; the Orthodox Church of Finland calls the three-bar cross the Orthodox cross, so it stays, with its foot no longer cut off; the Islamic, Jewish, Buddhist and Hindu communities of Finland use the world symbols (the interfaith forum USKOT shows the same four), so those stay.
 - 2026-10-12: §1 and §3 amended (#239, the maintainer's review of the profile screens). The coffee party leaves the politics list (the maintainer: no real users yet, so the stored answers go), and "none of them" stands alone: choosing it clears the parties, a party clears it, and `PUT /profile` refuses the mix with `validation_failed` through the registry's `alone` option of a multi-choice field. Migration 0037 cleans what was stored (the coffee party out; next to a party, none of them out; an emptied answer removed), so the tolerant reader does not drop a whole answer. The languages stand in the order of use: Finnish, Swedish, English, then by the people of 20 to 64 who speak each as their registered language (Statistics Finland, StatFin 11rl, 31.12.2025); the picker shows the first ten (`shownFirst`), anything chosen and "another language", the rest by search. A list gets a search box from fourteen options, so the star signs, the politics answers and the fields of study have none. The note on the special-category consent leaves the profile and later screens: Settings names it and takes it back, and the seeks step is where it is given.
 - 2026-10-11: §3 amended (#238). Languages were their own names in every catalogue (suomi, svenska, English, русский); the demo recording showed a card whose reader could not read half of them, and a search for "Russian" that found nothing. They are named in the reader's language now, Finnish and Swedish machine text for the review like the rest. The app's language picker in Settings keeps each language under its own name, as a picker of the interface's language should.

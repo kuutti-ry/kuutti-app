@@ -5,6 +5,7 @@ import { type CompletenessSnapshot, completeness } from "./completeness.ts";
 const ready: CompletenessSnapshot = {
   displayName: "Aino",
   bio: "x".repeat(50),
+  bioPreset: null,
   answeredPrompts: 0,
   approvedPhotos: 3,
   seeks: "women",
@@ -23,10 +24,13 @@ describe("the completeness rule", () => {
       ["bio_or_prompts"],
     ],
     ["no bio but two prompts", { ...ready, bio: null, answeredPrompts: 2 }, []],
+    ["no bio and no prompt", { ...ready, bio: null, answeredPrompts: 0 }, ["bio_or_prompts"]],
+    // The maintainer (#239): "even if empty, but placeholder - show the card".
+    ["a ready line in place of a bio", { ...ready, bio: null, bioPreset: "photos_speak" }, []],
     [
-      "a placeholder bio counts as none",
-      { ...ready, bio: null, answeredPrompts: 0 },
-      ["bio_or_prompts"],
+      "a ready line with a blank bio's whitespace",
+      { ...ready, bio: "   ", bioPreset: "ask_me_instead" },
+      [],
     ],
     ["onboarding not done", { ...ready, seeks: null, ageWindow: null }, ["seeks", "age_window"]],
     [
@@ -34,6 +38,7 @@ describe("the completeness rule", () => {
       {
         displayName: null,
         bio: null,
+        bioPreset: null,
         answeredPrompts: 0,
         approvedPhotos: 0,
         seeks: null,

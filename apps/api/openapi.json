@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.11.0",
+    "version": "0.12.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -875,7 +875,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 2
+            "maxItems": 3
           },
           "languages": {
             "type": "array",
@@ -920,7 +920,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 5
+            "maxItems": 35
           },
           "education": {
             "type": "string",
@@ -1017,7 +1017,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 5
+            "maxItems": 59
           },
           "height": {
             "type": "integer",
@@ -1068,7 +1068,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 3
+            "maxItems": 12
           },
           "hideFromField": {
             "type": "boolean"
@@ -1100,7 +1100,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 3
+            "maxItems": 19
           },
           "occupationTitle": {
             "type": "string",
@@ -1126,7 +1126,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 10
+            "maxItems": 11
           },
           "religion": {
             "type": "string",
@@ -1583,7 +1583,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 2
+            "maxItems": 3
           },
           "languages": {
             "type": "array",
@@ -1628,7 +1628,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 5
+            "maxItems": 35
           },
           "education": {
             "type": "string",
@@ -1725,7 +1725,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 5
+            "maxItems": 59
           },
           "exercise": {
             "type": "string",
@@ -1771,7 +1771,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 3
+            "maxItems": 12
           },
           "occupation": {
             "type": "array",
@@ -1800,7 +1800,7 @@
               ]
             },
             "minItems": 1,
-            "maxItems": 3
+            "maxItems": 19
           },
           "zodiac": {
             "type": "string",
@@ -2396,7 +2396,7 @@
                   "type": "string",
                   "maxLength": 40
                 },
-                "maxItems": 5
+                "maxItems": 59
               },
               "languages": {
                 "type": "array",
@@ -2404,7 +2404,7 @@
                   "type": "string",
                   "maxLength": 40
                 },
-                "maxItems": 5
+                "maxItems": 35
               }
             },
             "required": [

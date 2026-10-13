@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { FieldLabel } from "./fieldIcons";
+import { FieldLabel, HobbyGroupLabel } from "./fieldIcons";
 import { OptionGlyph, optionGlyph } from "./glyphs";
 import { fieldLabelKey, optionKey } from "./keys";
 
@@ -51,17 +51,17 @@ export function visibleOptions(
 /**
  * A multi-choice answer after a tap on one option (#239): a chosen option
  * goes; an option that stands alone ("none of them") replaces the rest; any
- * other joins, clearing an option that stands alone, while the cap allows.
+ * other joins, clearing an option that stands alone. No cap: a list takes as
+ * many as one likes.
  */
 export function toggled(
   current: readonly string[],
   option: string,
-  spec: { max: number; alone: readonly string[] },
+  spec: { alone: readonly string[] },
 ): string[] {
   if (current.includes(option)) return current.filter((o) => o !== option);
   if (spec.alone.includes(option)) return [option];
-  const kept = current.filter((o) => !spec.alone.includes(o));
-  return kept.length < spec.max ? [...kept, option] : [...current];
+  return [...current.filter((o) => !spec.alone.includes(o)), option];
 }
 
 type Draft = Pick<ProfileUpdate, "fields">;
@@ -274,9 +274,7 @@ export function FieldEditor({
                 if (options.length === 0) return null;
                 return (
                   <View key={group} className="gap-1">
-                    <Text variant="muted">
-                      {t(`profile.hobbyGroup.${group}` as PlainMessageKey)}
-                    </Text>
+                    <HobbyGroupLabel group={group} />
                     <View className="flex-row flex-wrap gap-2">{options.map(chip)}</View>
                   </View>
                 );

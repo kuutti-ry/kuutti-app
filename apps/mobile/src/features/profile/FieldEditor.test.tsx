@@ -71,13 +71,20 @@ describe("FieldEditor: several choices", () => {
     expect(fields).toEqual({});
   });
 
-  it("takes no more than the field's limit", async () => {
+  it("takes as many as one likes: a sixth language and a fourth line of work join (#239)", async () => {
     const five = ["fi", "sv", "en", "es", "de"];
     await show("languages", { languages: five } as ProfileFields);
     await fireEvent.changeText(screen.getByLabelText("Search"), "fren");
     await fireEvent.press(screen.getByRole("button", { name: "French" }));
-    expect(fields).toEqual({ languages: five });
-    expect(chosen("French")).toBe(false);
+    expect(fields).toEqual({ languages: [...five, "fr"] });
+    expect(chosen("French")).toBe(true);
+  });
+
+  it("takes every hobby across the groups, with no cap (#239)", async () => {
+    const many = ["hiking", "gym", "cooking", "reading", "board_games", "sauna"];
+    await show("hobbies", { hobbies: many } as ProfileFields);
+    await fireEvent.press(screen.getByRole("button", { name: "Yoga" }));
+    expect(fields).toEqual({ hobbies: [...many, "yoga"] });
   });
 
   it("lets 'None of them' stand alone: it clears the parties, and a party clears it (#239)", async () => {
@@ -222,12 +229,12 @@ describe("visibleOptions", () => {
 });
 
 describe("toggled", () => {
-  const spec = { max: 3, alone: ["none"] };
+  const spec = { alone: ["none"] };
 
-  it("adds an option while the cap allows, and takes a chosen one away", () => {
+  it("adds any option, as many as one likes, and takes a chosen one away", () => {
     expect(toggled([], "a", spec)).toEqual(["a"]);
     expect(toggled(["a"], "b", spec)).toEqual(["a", "b"]);
-    expect(toggled(["a", "b", "c"], "d", spec)).toEqual(["a", "b", "c"]);
+    expect(toggled(["a", "b", "c"], "d", spec)).toEqual(["a", "b", "c", "d"]);
     expect(toggled(["a", "b"], "a", spec)).toEqual(["b"]);
   });
 
@@ -235,7 +242,7 @@ describe("toggled", () => {
     expect(toggled(["a", "b", "c"], "none", spec)).toEqual(["none"]);
     expect(toggled(["none"], "a", spec)).toEqual(["a"]);
     expect(toggled(["none"], "none", spec)).toEqual([]);
-    expect(toggled(["a"], "b", { max: 3, alone: [] })).toEqual(["a", "b"]);
+    expect(toggled(["a"], "b", { alone: [] })).toEqual(["a", "b"]);
   });
 });
 

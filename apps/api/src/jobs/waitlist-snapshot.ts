@@ -39,6 +39,7 @@ type FactsRow = {
   state: string;
   display_name: string | null;
   bio: string | null;
+  bio_preset: string | null;
   prompts: unknown;
   approved_photos: string;
   seeks: unknown;
@@ -64,7 +65,7 @@ const STANDS_AS_ACTIVE = new Set(["active", "shadow_banned"]);
  */
 export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCounts>> {
   const { rows } = await db.query<FactsRow>(
-    `SELECT a.pond_id, a.gender, a.state, p.display_name, p.bio, p.prompts,
+    `SELECT a.pond_id, a.gender, a.state, p.display_name, p.bio, p.bio_preset, p.prompts,
             (SELECT count(*) FROM photo ph
               WHERE ph.account_id = a.id AND ph.state = 'approved') AS approved_photos,
             (SELECT r.value FROM preferences r
@@ -91,6 +92,7 @@ export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCou
       completeness({
         displayName: row.display_name,
         bio: row.bio,
+        bioPreset: row.bio_preset,
         answeredPrompts: answeredPromptsOf(row.prompts),
         approvedPhotos: Number(row.approved_photos),
         seeks: preferences.seeks,

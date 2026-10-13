@@ -6,8 +6,6 @@ import {
   GENDERS,
   type Gender,
   HOBBIES,
-  HOBBIES_MAX,
-  LANGUAGES_MAX,
   POLITICS_OPTIONS,
   PROFILE_FIELDS,
   PROMPT_KEYS,
@@ -220,7 +218,7 @@ function drawFields(random: Random, language: Language, consented: boolean): Pro
   }
   const others = PROFILE_FIELDS.languages.options.filter((l) => l !== language && l !== "other");
   if (random.chance(0.85)) {
-    const more = random.sample(others, random.int(0, Math.min(2, LANGUAGES_MAX - 1)));
+    const more = random.sample(others, random.int(0, 2));
     fields.languages = [language, ...more];
   }
   if (random.chance(0.65)) fields.education = random.pick(PROFILE_FIELDS.education.options);
@@ -228,7 +226,8 @@ function drawFields(random: Random, language: Language, consented: boolean): Pro
     fields.drinking = random.weighted({ never: 15, rarely: 30, socially: 45, often: 10 });
   }
   if (random.chance(0.4)) fields.drugsAttitude = random.pick(PROFILE_FIELDS.drugsAttitude.options);
-  if (random.chance(0.7)) fields.hobbies = random.sample(HOBBIES, random.int(1, HOBBIES_MAX));
+  // One to five, as people tend to: the list takes any number (#239), the demo need not.
+  if (random.chance(0.7)) fields.hobbies = random.sample(HOBBIES, random.int(1, 5));
   if (random.chance(0.55)) fields.height = random.int(152, 198);
   if (random.chance(0.55)) fields.exercise = random.pick(PROFILE_FIELDS.exercise.options);
   if (random.chance(0.5)) {
