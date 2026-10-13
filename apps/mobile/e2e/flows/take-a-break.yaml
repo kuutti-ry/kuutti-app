@@ -1,0 +1,51 @@
+# Taking a break (#170, ADR-022): from Settings, behind the tick, the account is
+# paused and this device signed out with the reason on the sign-in screen;
+# reopening the app does not bring the session back; the next bank login brings
+# the person back where they left off. Helmi has no photos, so where she left
+# off is onboarding's photos step, and the home screen's "Welcome back" line
+# waits for a profile with photos (its test is HomeScreen.test.tsx). She ends
+# as she began: signed in and active, nothing of hers changed.
+appId: fi.kuutti.app
+name: Taking a break signs the person out everywhere, and the next bank login brings them back
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Helmi Mäkelä
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Take a break|Pidä tauko|Ta en paus"
+    centerElement: true
+    timeout: 60000
+- tapOn: "Take a break|Pidä tauko|Ta en paus"
+- extendedWaitUntil:
+    visible: "Take a break from Kuutti|Pidä tauko Kuutista|Ta en paus från Kuutti"
+    timeout: 15000
+- assertVisible: "You are signed out on every device, this one included\\.|Sinut kirjataan ulos kaikilta laitteilta, myös tältä\\.|Du loggas ut på alla enheter, även den här\\."
+# The tick: a switch whose label repeats the words beside it (README).
+- tapOn:
+    text: "0|(I understand what a break means|Ymmärrän, mitä tauko tarkoittaa|Jag förstår vad en paus innebär), off"
+    rightOf: "I understand what a break means|Ymmärrän, mitä tauko tarkoittaa|Jag förstår vad en paus innebär"
+- tapOn: "Start the break|Aloita tauko|Börja pausen"
+# Signed out here, told why; the way back is the same button as always.
+- extendedWaitUntil:
+    visible: "Your account is on a break|Tilisi on tauolla|Ditt konto är på paus"
+    timeout: 20000
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+# Reopening the app does not bring the session back.
+- stopApp
+- runFlow: ../common/open-app.yaml
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+- assertNotVisible: "Your area|Alueesi|Ditt område"
+# The next bank login: everything as it was, which for her is the photos step.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Helmi Mäkelä
+- extendedWaitUntil:
+    visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
+    timeout: 15000
+- assertNotVisible: "Your account is on a break|Tilisi on tauolla|Ditt konto är på paus"

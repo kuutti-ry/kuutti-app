@@ -642,7 +642,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     }
   });
 
-  test("the six histories leave each persona where the mock bank's page says", async ({ ctx }) => {
+  test("the histories leave each persona where the mock bank's page says", async ({ ctx }) => {
     const { bank, context, lines } = await world(ctx);
     const began = Date.now();
     for (const history of PERSONA_HISTORIES) {
@@ -672,6 +672,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(await stateOf("sanna")).toEqual(["active"]);
     expect(await stateOf("noa")).toEqual(["active"]);
     expect(await stateOf("kerttu")).toEqual(["active"]);
+    expect(await stateOf("helmi")).toEqual(["active"]);
     expect(await stateOf("onni")).toEqual(["registered"]);
     expect(await stateOf("tapio")).toEqual(["banned"]);
     expect(await stateOf("ilona")).toEqual(["deleted"]);

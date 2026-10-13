@@ -10,6 +10,11 @@ appId: fi.kuutti.app
       - extendedWaitUntil:
           visible: "Settings|Asetukset|Inställningar"
           timeout: 15000
+      # This device's session is under "Account", after the app's settings (#170): scroll to its heading.
+      - scrollUntilVisible:
+          element: "This device|Tämä laite|Den här enheten"
+          centerElement: true
+          timeout: 60000
       # A session the reset erased is already gone: Settings says so and has no button.
       - runFlow:
           when:
