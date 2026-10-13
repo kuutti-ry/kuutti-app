@@ -3,8 +3,9 @@
 Refs #
 
 <!-- One "Refs #n" per issue this touches: it links the issue and the pull request
-     both ways without closing anything. Never "Closes/Fixes/Resolves #n": the
-     maintainer closes an issue after testing it, not a merge (CI checks this). -->
+     both ways without closing anything. Never "Closes/Fixes/Resolves #n": a merge
+     closes nothing by itself; after it, the issue is closed as completed once
+     nothing is left on it (CLAUDE.md, Git; CI checks the keyword). -->
 
 ## Checklist
 
