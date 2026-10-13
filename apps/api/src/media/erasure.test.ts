@@ -260,6 +260,7 @@ describe("the export of the photos", () => {
     expect(exported).toEqual({
       photos: [expect.objectContaining({ id, urls: null, review: null })],
       accessLog: [],
+      cardsShown: [],
     });
   });
 
@@ -291,6 +292,10 @@ describe("the export of the photos", () => {
       "INSERT INTO photo_access (account_id, photo_id, variant, at) SELECT $1, id, 'thumb', now() FROM photo WHERE account_id = $1",
       [b.accountId],
     );
-    expect(await exportPhotos(deps, a.accountId)).toEqual({ photos: [], accessLog: [] });
+    expect(await exportPhotos(deps, a.accountId)).toEqual({
+      photos: [],
+      accessLog: [],
+      cardsShown: [],
+    });
   });
 });

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AccountState } from "./account-state.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedGate } from "./gate.ts";
-import { AuthPlatform } from "./identity.ts";
+import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
 import { Photo, PhotoCheckKind, PhotoRejectionReason, PhotoVariant } from "./media.ts";
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
@@ -104,6 +104,8 @@ export const AccountExport = z
     account: z.object({
       id: z.uuid(),
       state: AccountState,
+      /** When the state last changed; null while it never has. */
+      stateChangedAt: z.iso.datetime().nullable(),
       registeredAt: z.iso.datetime(),
       birthYear: z.int().nullable(),
       birthMonth: z.int().nullable(),
@@ -127,12 +129,21 @@ export const AccountExport = z
       lastBankLoginAt: z.iso.datetime().nullable(),
       /** The identification level the bank asserted (acr), a URI. */
       loginLevel: z.string().nullable(),
+      /** The standing staff set on the identity (TD-7), and when it last changed. */
+      standing: IdentityStanding,
+      standingChangedAt: z.iso.datetime().nullable(),
       deletionCount: z.int().min(0),
+      /** Bank logins refused while suspended, banned or inside the cooldown (TD-7). */
+      refusedAttempts: z.int().min(0),
+      /** Until when a new account is refused after a deletion; null when no cooldown is set. */
+      reregisterAfter: z.iso.datetime().nullable(),
     }),
     sessions: z.array(
       z.object({
         sessionId: z.uuid(),
         platform: AuthPlatform,
+        /** What the device called itself at login; null when it said nothing. */
+        userAgent: z.string().max(USER_AGENT_MAX).nullable(),
         createdAt: z.iso.datetime(),
         lastUsedAt: z.iso.datetime(),
         expiresAt: z.iso.datetime(),
@@ -145,6 +156,8 @@ export const AccountExport = z
     photoAccessLog: z
       .array(z.object({ photoId: z.uuid(), variant: PhotoVariant, at: z.iso.datetime() }))
       .max(1000),
+    /** The cards served to the person (ADR-008): each card's photo and the last day it came round, newest first, at most 1000. */
+    cardsShown: z.array(z.object({ photoId: z.uuid(), at: z.iso.datetime() })).max(1000),
     /** The photo check's notes and the closer look (#253). */
     photoCheck: ExportedPhotoCheck,
     /** What research holds (#50, ADR-011): the enrolment and the events, never the research_id. */

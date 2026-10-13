@@ -51,3 +51,7 @@ The research opt-in exists as a consent row bound to a wording (#46). Nothing ye
 - `profile → research` and `identity → research` are the only edges into the slice; `research → media` for the Finnish calendar month, and `research` reads `ponds` and `profile.fields` from packages/db read-only, so that `profile` can emit events without the research slice importing it back (rules/layout.md).
 - The seed leaves the research consent to the flow, as it does the other consents.
 - Open, and the maintainer's: the age bands; the two events and their props; the events in the export; a fresh pseudonym on every re-consent; the next field to flag for the snapshot, with the census's answer (§9); the Parquet export and the researcher's read access, and when in M4 the owner role of ADR-006 lands.
+
+## History
+
+- 2026-10-13: the consent rows no longer survive erasure (ADR-010 §14, #51), so the handle §1 names, a consent's `given_at` beside an opt-in event's hour, goes with the account. The tombstone's `registered_at` is the one that remains; the truncation to the hour and to whole days stays.

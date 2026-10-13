@@ -2562,6 +2562,8 @@ export interface components {
                 /** @enum {string} */
                 state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
                 /** Format: date-time */
+                stateChangedAt: string | null;
+                /** Format: date-time */
                 registeredAt: string;
                 birthYear: number | null;
                 birthMonth: number | null;
@@ -2582,12 +2584,19 @@ export interface components {
                 /** Format: date-time */
                 lastBankLoginAt: string | null;
                 loginLevel: string | null;
+                standing: components["schemas"]["IdentityStanding"];
+                /** Format: date-time */
+                standingChangedAt: string | null;
                 deletionCount: number;
+                refusedAttempts: number;
+                /** Format: date-time */
+                reregisterAfter: string | null;
             };
             sessions: {
                 /** Format: uuid */
                 sessionId: string;
                 platform: components["schemas"]["AuthPlatform"];
+                userAgent: string | null;
                 /** Format: date-time */
                 createdAt: string;
                 /** Format: date-time */
@@ -2601,6 +2610,12 @@ export interface components {
                 /** Format: uuid */
                 photoId: string;
                 variant: components["schemas"]["PhotoVariant"];
+                /** Format: date-time */
+                at: string;
+            }[];
+            cardsShown: {
+                /** Format: uuid */
+                photoId: string;
                 /** Format: date-time */
                 at: string;
             }[];
@@ -2647,6 +2662,8 @@ export interface components {
         };
         /** @enum {string} */
         ConsentKind: "terms" | "privacy" | "research" | "special_category";
+        /** @enum {string} */
+        IdentityStanding: "ok" | "suspended" | "banned";
         ProfileDocument: {
             displayName: string;
             bio: string | null;
