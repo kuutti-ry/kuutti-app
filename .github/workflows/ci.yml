@@ -238,8 +238,9 @@ jobs:
     name: issue-link
     # Every pull request names the issue it works on ("Refs #n"), so the issue's
     # timeline links to the pull request and back. A closing keyword is refused:
-    # an issue closes when the maintainer has tested it, not when a merge
-    # happens (CLAUDE.md, Git). Dependabot has no issue and is exempt.
+    # a merge closes nothing by itself; the issue is checked after it and closed
+    # once nothing is left on it (CLAUDE.md, Git). Dependabot has no issue and
+    # is exempt.
     if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     env:
@@ -252,7 +253,7 @@ jobs:
             exit 1
           fi
           if grep -Eiq '\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[[:space:]]*([a-z0-9._-]+/[a-z0-9._-]+)?#[0-9]+' <<< "$PR_BODY"; then
-            echo '::error::A closing keyword would close the issue on merge. Write "Refs #<n>"; the maintainer closes the issue after testing.'
+            echo '::error::A closing keyword would close the issue on merge. Write "Refs #<n>"; the issue is closed after the merge, once nothing is left on it.'
             exit 1
           fi
 
