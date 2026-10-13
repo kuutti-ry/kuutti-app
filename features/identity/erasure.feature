@@ -43,10 +43,10 @@ Feature: Account deletion per the erasure table
     When "A" deletes the account
     Then the audit row about that view remains
 
-  Scenario: The export lists the account, the identity's dates, the devices, the photos with URLs and the fetch log
+  Scenario: The export is a zip with the account, the identity's dates, the devices, the photos as files and the fetch log
     Given "A" has a photo that a moderator approved and has fetched it once
     When "A" exports the account
-    Then the export carries the account, first-seen and last-login dates, the device, the photo with three URLs and its outcome, and the fetch log
+    Then the zip holds the document and the photo's full-size file, and the document carries the account, first-seen and last-login dates, the device, the photo with its file path and outcome, and the fetch log with the export's own read
     And nothing about anyone else
 
   Scenario: The optional e-mail is set, cleared, exported and erased, and reaches no log line
@@ -55,10 +55,21 @@ Feature: Account deletion per the erasure table
     When "A" clears it, or deletes the account
     Then the account holds none
 
-  Scenario: The export works without object storage, with no URLs
+  Scenario: The export works without object storage, with no photo files
     Given the API has no object storage
     When "A" exports the account
-    Then the photos are listed with null URLs
+    Then the photos are listed with no file and the zip holds the document alone
+
+  Scenario: The fourth copy of the day is refused until midnight, and the export lists the day's copies
+    Given "A" took a copy two days ago
+    When "A" exports three times today and once more
+    Then the three are answered, each listing its copies, and the fourth is refused with the wait until midnight
+    And "B"'s day is "B"'s own
+
+  Scenario: The export requests go with the account
+    Given "A" and "B" each took a copy
+    When "A" deletes the account
+    Then no export request of "A" remains and "B"'s does
 
   Scenario: Deletion and export refuse without a session
     When nobody or a staff token calls the account routes

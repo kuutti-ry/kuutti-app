@@ -1,6 +1,7 @@
 import { DealBreakersResponse, type ProfileUpdate } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { exportOf } from "../test/export.ts";
 import { type TestContext, test } from "../test/harness.ts";
 
 // features/matching/preferences.feature (#149): the deal-breakers under the
@@ -142,11 +143,7 @@ describe("deal-breakers", () => {
       { field: "hasKids", mode: "hard" },
       { field: "seeks", mode: "hard" },
     ]);
-    const exported = await ctx.app.request("/account/export", { headers: a.headers });
-    expect(exported.status).toBe(200);
-    expect(((await exported.json()) as { dealBreakers: unknown }).dealBreakers).toEqual([
-      { ...kids, paused: false },
-    ]);
+    expect((await exportOf(ctx.app, a.headers)).dealBreakers).toEqual([{ ...kids, paused: false }]);
 
     // What a person accepts never reaches a log line (rule 5): how many, and nothing else.
     expect(JSON.stringify(ctx.logs())).not.toContain("quitting");

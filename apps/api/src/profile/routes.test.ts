@@ -1,6 +1,5 @@
 import type { Queryable } from "@kuutti/db";
 import {
-  AccountExport,
   CARD_FIELD_KEYS,
   CardPreviewResponse,
   HOBBIES,
@@ -13,6 +12,7 @@ import {
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
+import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import { ageInYears, buildCard } from "./card.ts";
@@ -597,9 +597,7 @@ describe("profile routes", () => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
     await put(app, a.headers, update);
-    const exported = AccountExport.parse(
-      await (await app.request("/account/export", { headers: a.headers })).json(),
-    );
+    const exported = await exportOf(app, a.headers);
     expect(exported.profile?.displayName).toBe("Aino");
     const deleted = await app.request("/account/delete", {
       method: "POST",

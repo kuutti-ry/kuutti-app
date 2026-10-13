@@ -18,7 +18,7 @@ export {
   registerArtificial,
 } from "./artificial.ts";
 export { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
-export { type ErasureSummary, eraseAccount, exportAccount } from "./erasure.ts";
+export { type ErasureSummary, type ExportDeps, eraseAccount, exportAccount } from "./erasure.ts";
 export { hmacKeyFromHex } from "./hetu.ts";
 export { wellKnownRoutes } from "./links.ts";
 export { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.ts";

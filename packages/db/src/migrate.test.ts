@@ -201,6 +201,7 @@ describe("migrate", () => {
         );
         expect(tables.rows.map((r) => r.table_name)).toEqual([
           "account",
+          "account_export",
           "admin_session",
           "audit_log",
           "auth_request",

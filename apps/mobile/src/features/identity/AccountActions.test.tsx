@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { Directory } from "expo-file-system";
 import type * as React from "react";
 import { Platform, Share } from "react-native";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
@@ -9,6 +10,10 @@ import { AccountActions, shareExport } from "./AccountActions";
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock };
 };
+const { __files: cache } = jest.requireMock("expo-file-system") as {
+  __files: Map<string, Uint8Array>;
+};
+const pickDirectory = Directory.pickDirectoryAsync as jest.Mock;
 
 // The account card (#51): export handed to the share sheet, deletion only
 // after the confirmation, the device signed out when the API says 204.
@@ -21,43 +26,20 @@ const session = {
   refreshToken: token("refresh"),
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
-const exported = {
-  exportedAt: "2026-09-26T10:00:00.000Z",
-  account: {
-    id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
-    state: "active",
-    stateChangedAt: null,
-    registeredAt: "2026-09-01T00:00:00.000Z",
-    birthYear: 1990,
-    birthMonth: 6,
-    gender: null,
-    pond: null,
-    genderChangedAt: null,
-    seeksChangedAt: null,
-    email: null,
-  },
-  identity: {
-    firstSeenAt: "2026-09-01T00:00:00.000Z",
-    lastBankLoginAt: null,
-    loginLevel: null,
-    standing: "ok",
-    standingChangedAt: null,
-    deletionCount: 0,
-    refusedAttempts: 0,
-    reregisterAfter: null,
-  },
-  sessions: [],
-  profile: null,
-  preferences: { seeks: null, ageWindow: null },
-  dealBreakers: [],
-  consents: [],
-  photos: [],
-  photoAccessLog: [],
-  cardsShown: [],
-  photoCheck: { about: "About the photo check.", photosNotShown: [], carefulCheckUntil: null },
-  research: { enrolled: false, since: null, consentVersion: null, events: [] },
-  gate: null,
-};
+// The API answers a zip (#237); what is inside is held by the API's tests.
+const ZIP = new Uint8Array([
+  0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+]);
+const ZIP_NAME = "kuutti-data-2026-10-13.zip";
+const zip = () =>
+  new Response(ZIP, {
+    status: 200,
+    headers: {
+      "content-type": "application/zip",
+      "content-disposition": `attachment; filename="${ZIP_NAME}"`,
+    },
+  });
+const bytesOf = (file: Uint8Array | undefined) => (file ? Array.from(file) : undefined);
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -112,18 +94,55 @@ describe("AccountActions", () => {
     expect(currentSession()).not.toBeNull();
   });
 
-  it("hands the export to the share sheet as JSON", async () => {
+  it("hands the export's file to the share sheet by its URL alone, and deletes the cached copy after", async () => {
     const calls = fetchMock([
-      (req) => (new URL(req.url).pathname === "/account/export" ? json(exported) : null),
+      (req) => (new URL(req.url).pathname === "/account/export" ? zip() : null),
     ]);
-    const share = jest.fn(async () => ({ action: "sharedAction" as const }));
+    let whileOpen: number[] | undefined;
+    const share = jest.fn(async () => {
+      whileOpen = bytesOf(cache.get(`file:///cache/${ZIP_NAME}`));
+      return { action: "sharedAction" as const };
+    });
     await show(<AccountActions share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(share).toHaveBeenCalled());
-    const [payload] = share.mock.calls[0] as unknown as [{ title: string; message: string }];
-    expect(payload.title).toBe("Your Kuutti data");
-    expect(JSON.parse(payload.message)).toEqual(exported);
+    expect(share.mock.calls[0]).toEqual([
+      { title: "Your Kuutti data", url: `file:///cache/${ZIP_NAME}` },
+    ]);
+    // The file was there for the sheet, as the API sent it, and is gone once the sheet closed.
+    expect(whileOpen).toEqual(Array.from(ZIP));
+    await waitFor(() => expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false));
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${session.accessToken}`);
+  });
+
+  it("deletes the cached copy even when the sheet fails", async () => {
+    fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
+    const share = jest.fn(async () => {
+      throw new Error("no sheet");
+    });
+    await show(<AccountActions share={share as never} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    expect(await screen.findByText("The download did not work. Try again.")).toBeTruthy();
+    expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
+  });
+
+  it("says the day's copies are used up when the API refuses the fourth, not that it failed", async () => {
+    fetchMock([
+      (req) =>
+        new URL(req.url).pathname === "/account/export"
+          ? json({ error: { code: "export_budget_exceeded", message: "x", requestId: "r" } }, 429)
+          : null,
+    ]);
+    const share = jest.fn();
+    await show(<AccountActions share={share as never} />);
+    await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
+    expect(
+      await screen.findByText(
+        "That is enough copies for today. You can download your data again after midnight.",
+      ),
+    ).toBeTruthy();
+    expect(share).not.toHaveBeenCalled();
+    expect(screen.queryByText("The download did not work. Try again.")).toBeNull();
   });
 
   it("says so when the export fails", async () => {
@@ -189,7 +208,7 @@ describe("AccountActions", () => {
   });
 
   it("hands the export to the phone's own share sheet when no other is given", async () => {
-    fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? json(exported) : null)]);
+    fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
     await show(<AccountActions />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
@@ -231,8 +250,50 @@ describe("AccountActions", () => {
   });
 });
 
+describe("shareExport on Android", () => {
+  afterEach(() => {
+    pickDirectory.mockReset();
+    pickDirectory.mockImplementation(async () => new Directory("content://picked"));
+  });
+
+  it("writes the file into the folder the person picks, and opens no sheet", async () => {
+    const os = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      const share = jest.fn();
+      await shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", share);
+      expect(share).not.toHaveBeenCalled();
+      expect(bytesOf(cache.get(`content://picked/${ZIP_NAME}`))).toEqual(Array.from(ZIP));
+      expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
+    } finally {
+      os.restore();
+      cache.clear();
+    }
+  });
+
+  it("treats a cancelled picker as nothing to do, and any other failure as one", async () => {
+    const os = jest.replaceProperty(Platform, "OS", "android");
+    try {
+      pickDirectory.mockRejectedValueOnce(
+        Object.assign(new Error("The file picker was cancelled by the user"), {
+          code: "ERR_PICKER_CANCELLED",
+        }),
+      );
+      await expect(
+        shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", jest.fn()),
+      ).resolves.toBeUndefined();
+      expect(cache.size).toBe(0);
+      pickDirectory.mockRejectedValueOnce(new Error("no storage"));
+      await expect(
+        shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", jest.fn()),
+      ).rejects.toThrow("no storage");
+    } finally {
+      os.restore();
+    }
+  });
+});
+
 describe("shareExport on the web preview", () => {
-  it("downloads the export as a JSON file instead of sharing it, and lets the URL go later", async () => {
+  it("downloads the zip under the API's name instead of sharing it, and lets the URL go later", async () => {
     jest.useFakeTimers();
     const os = jest.replaceProperty(Platform, "OS", "web");
     const click = jest.fn();
@@ -249,12 +310,13 @@ describe("shareExport on the web preview", () => {
     globals.URL.revokeObjectURL = revoked;
     try {
       const share = jest.fn();
-      await shareExport(exported as never, "Your Kuutti data", share);
+      await shareExport({ name: ZIP_NAME, bytes: ZIP }, "Your Kuutti data", share);
       expect(share).not.toHaveBeenCalled();
-      expect(anchor).toMatchObject({ href: "blob:kuutti/1", download: "kuutti-export.json" });
+      expect(anchor).toMatchObject({ href: "blob:kuutti/1", download: ZIP_NAME });
       expect(click).toHaveBeenCalledTimes(1);
       const [blob] = created.mock.calls[0] as unknown as [Blob];
-      expect(blob.type).toBe("application/json");
+      expect(blob.type).toBe("application/zip");
+      expect(blob.size).toBe(ZIP.byteLength);
       expect(revoked).not.toHaveBeenCalled();
       jest.advanceTimersByTime(60_000);
       expect(revoked).toHaveBeenCalledWith("blob:kuutti/1");

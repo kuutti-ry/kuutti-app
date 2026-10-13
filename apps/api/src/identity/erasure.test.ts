@@ -1,9 +1,11 @@
 import { accountState, identityStanding } from "@kuutti/db";
-import { AccountExport, AccountState, IdentityStanding, Photo } from "@kuutti/schema";
+import { AccountState, IdentityStanding, Photo } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
+import { objectKey } from "../media/index.ts";
 import { prunePhotoCheckNotes } from "../safety/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
+import { exportOf, openExport } from "../test/export.ts";
 import { captureLogger, englishT, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
 import { eraseAccount, exportAccount } from "./erasure.ts";
@@ -15,11 +17,12 @@ import { REREGISTER_COOLDOWN_DAYS } from "./registration.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-async function appWith(ctx: TestContext, options: { media?: false } = {}) {
+async function appWith(ctx: TestContext, options: { media?: false; now?: () => Date } = {}) {
   await withMatchingConfig(ctx.client, {
     max_photos: 6,
     photo_moderation_label_threshold: 60,
     photo_moderation_face_threshold: 90,
+    exports_per_day: 3,
   });
   const { logger, lines } = await captureLogger();
   const media = testMediaDeps();
@@ -28,6 +31,7 @@ async function appWith(ctx: TestContext, options: { media?: false } = {}) {
     logger,
     db: ctx.client,
     ...(options.media === false ? {} : { media: media.deps }),
+    ...(options.now ? { now: options.now } : {}),
   });
   return { app, store: media.store, logs: lines };
 }
@@ -285,10 +289,12 @@ describe("account erasure", () => {
     expect(await count(ctx, "SELECT count(*) AS n FROM admin_session")).toBe(1);
   });
 
-  test("The export lists the account, the identity's dates, the devices, the photos with URLs and the fetch log", async ({
+  test("The export is a zip with the account, the identity's dates, the devices, the photos as files and the fetch log", async ({
     ctx,
   }) => {
-    const { app } = await appWith(ctx);
+    // Fixed at 23:30 in Helsinki: the file is named by the Finnish day, not UTC's.
+    const at = new Date("2026-10-01T20:30:00Z");
+    const { app, store } = await appWith(ctx, { now: () => at });
     const a = await signedInAccount(ctx.client, "a");
     const b = await signedInAccount(ctx.client, "b");
     await upload(app, b.headers, await fixturePng(111, 111));
@@ -313,9 +319,18 @@ describe("account erasure", () => {
     );
 
     const res = await app.request("/account/export", { headers: a.headers });
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-disposition")).toContain("kuutti-export.json");
-    const body = AccountExport.parse(await res.json());
+    expect(res.headers.get("content-disposition")).toBe(
+      'attachment; filename="kuutti-data-2026-10-01.zip"',
+    );
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const { document: body, files } = await openExport(res);
+    // The document beside the photos, both named without anything about the person.
+    expect([...files.keys()].sort()).toEqual(
+      ["kuutti-data-2026-10-01.json", `photos/${photo.id}.webp`].sort(),
+    );
+    expect(body.exportedAt).toBe(at.toISOString());
+    expect(body.exportedBy).toBe("0.0.0-test");
+    expect(body.exports).toEqual([{ at: at.toISOString() }]);
     expect(body.account).toMatchObject({
       id: a.accountId,
       state: "active",
@@ -334,38 +349,93 @@ describe("account erasure", () => {
       review: { decision: "approved", reason: null, decidedByStaff: true },
     });
     expect(body.photos[0]?.review?.decidedAt).toBeTruthy();
-    const urls = body.photos[0]?.urls;
-    expect(urls && new URL(urls.thumb).pathname).toMatch(/\/media\/[0-9a-f]{64}\/thumb\.webp$/);
-    expect(urls && new URL(urls.full).searchParams.get("Signature")).toBeTruthy();
-    // One fetch before the export, plus the three URLs the export itself issued, newest first.
-    expect(body.photoAccessLog).toHaveLength(4);
+    // The file is the full variant as stored, byte for byte.
+    expect(body.photos[0]?.file).toBe(`photos/${photo.id}.webp`);
+    const { rows } = await ctx.client.query<{ key: string }>(
+      "SELECT key FROM photo WHERE id = $1",
+      [photo.id],
+    );
+    const stored = store.objects.get(objectKey(rows[0]?.key ?? "", "full"));
+    expect(
+      stored && Buffer.compare(stored, files.get(`photos/${photo.id}.webp`) ?? Buffer.alloc(0)),
+    ).toBe(0);
+    // One fetch before the export, plus the export's own read of the full variant.
+    expect(body.photoAccessLog.map((e) => e.variant).sort()).toEqual(["full", "thumb"]);
     expect(body.photoAccessLog.every((e) => e.photoId === photo.id)).toBe(true);
-    // The signed URLs' signatures are random base64, and four of their letters
-    // can spell a word (CI, 13/10/2026: "hmac" inside one): the words are
-    // looked for in the document without the URLs, the ids in all of it.
-    const whole = JSON.stringify(body);
-    const words = JSON.stringify({
-      ...body,
-      photos: body.photos.map((photo) => ({ ...photo, urls: null })),
-    });
-    expect(whole).not.toContain(b.accountId);
-    expect(words).not.toMatch(/hetu|hmac|research_id|researchId/i);
-    expect(whole).not.toContain(staff.identityId);
+    // No signed URLs in the document any more (#237), so no random signature
+    // can spell a word by chance (CI, 13/10/2026): the whole document is checked.
+    const text = JSON.stringify(body);
+    expect(text).not.toContain(b.accountId);
+    expect(text).not.toMatch(/hetu|hmac|research_id|researchId/i);
+    expect(text).not.toContain(staff.identityId);
   });
 
-  test("The export works without object storage, with no URLs", async ({ ctx }) => {
+  test("The export works without object storage, with no photo files", async ({ ctx }) => {
     const { app } = await appWith(ctx, { media: false });
     const a = await signedInAccount(ctx.client);
     await ctx.client.query(
       `INSERT INTO photo (account_id, key, blurhash, width, height, position) VALUES ($1, 'k', 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 10, 10, 0)`,
       [a.accountId],
     );
-    const res = await app.request("/account/export", { headers: a.headers });
-    expect(res.status).toBe(200);
-    const body = AccountExport.parse(await res.json());
+    const { document: body, files } = await openExport(
+      await app.request("/account/export", { headers: a.headers }),
+    );
     expect(body.photos).toHaveLength(1);
-    expect(body.photos[0]?.urls).toBeNull();
+    expect(body.photos[0]?.file).toBeNull();
     expect(body.photos[0]?.review).toBeNull();
+    expect(body.photoAccessLog).toEqual([]);
+    expect([...files.keys()]).toHaveLength(1);
+  });
+
+  test("The fourth copy of the day is refused until midnight, and the export lists the day's copies", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    // Yesterday's copy does not count; the day is the Finnish one.
+    await ctx.client.query(
+      "INSERT INTO account_export (account_id, at) VALUES ($1, now() - interval '2 days')",
+      [a.accountId],
+    );
+    for (const n of [1, 2, 3]) {
+      const body = await exportOf(app, a.headers);
+      expect(body.exports, `copy ${n}`).toHaveLength(n + 1);
+    }
+    const refused = await app.request("/account/export", { headers: a.headers });
+    expect(refused.status).toBe(429);
+    const envelope = (await refused.json()) as { error: { code: string; message: string } };
+    expect(envelope.error.code).toBe("export_budget_exceeded");
+    expect(envelope.error.message).toMatch(/after midnight/);
+    expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(Number(refused.headers.get("retry-after"))).toBeLessThanOrEqual(24 * 3600);
+    expect(logs().find((l) => l.msg === "export refused")).toMatchObject({
+      accountId: a.accountId,
+      used: 3,
+      limit: 3,
+      reason: "budget",
+    });
+    // Nothing written over the cap; the other account's day is its own.
+    expect(
+      await count(ctx, "SELECT count(*) AS n FROM account_export WHERE account_id = $1", [
+        a.accountId,
+      ]),
+    ).toBe(4);
+    expect((await exportOf(app, b.headers)).exports).toHaveLength(1);
+  });
+
+  test("The export requests go with the account", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    await exportOf(app, a.headers);
+    await exportOf(app, b.headers);
+    expect((await del(app, a.headers)).status).toBe(204);
+    const of = (id: string) =>
+      count(ctx, "SELECT count(*) AS n FROM account_export WHERE account_id = $1", [id]);
+    expect(await of(a.accountId)).toBe(0);
+    expect(await of(b.accountId)).toBe(1);
+    expect(logs().find((l) => l.msg === "account erased")).toMatchObject({ exports: 1 });
   });
 
   test("Deletion and export refuse without a session", async ({ ctx }) => {
@@ -393,9 +463,7 @@ describe("account erasure and export: the edges", () => {
       [a.accountId],
     );
     const [android, ended] = rows;
-    const res = await app.request("/account/export", { headers: a.headers });
-    expect(res.status).toBe(200);
-    const body = AccountExport.parse(await res.json());
+    const body = await exportOf(app, a.headers);
     expect(
       body.sessions
         .map((s) => ({ id: s.sessionId, platform: s.platform }))
@@ -405,14 +473,18 @@ describe("account erasure and export: the edges", () => {
       { id: a.sessionId, platform: "ios" },
     ]);
     expect(body.sessions.map((s) => s.sessionId)).not.toContain(ended?.id);
-    expect(res.headers.get("cache-control")).toBe("no-store");
   });
 
   test("Erasure and export of an account that does not exist answer 404 and touch nothing", async ({
     ctx,
   }) => {
     const { logger, lines } = await captureLogger();
-    const deps = { db: ctx.client, logger, now: () => new Date("2026-10-01T12:00:00Z") };
+    const deps = {
+      db: ctx.client,
+      logger,
+      now: () => new Date("2026-10-01T12:00:00Z"),
+      version: "test",
+    };
     const nobody = "00000000-0000-4000-8000-00000000dead";
     await expect(eraseAccount(deps, nobody)).rejects.toMatchObject({
       status: 404,
@@ -471,8 +543,12 @@ describe("the photo check's notes in erasure and export (#253)", () => {
     const fi = await app.request("/account/export", {
       headers: { ...a.headers, "accept-language": "fi" },
     });
-    expect(fi.status).toBe(200);
-    const body = AccountExport.parse(await fi.json());
+    // The file is named in the request's language too, ASCII only.
+    expect(fi.headers.get("content-disposition")).toMatch(
+      /^attachment; filename="kuutti-tiedot-\d{4}-\d{2}-\d{2}\.zip"$/,
+    );
+    const { document: body, files } = await openExport(fi);
+    expect([...files.keys()]).toEqual([expect.stringMatching(/^kuutti-tiedot-.*\.json$/)]);
     expect(body.photoCheck.about).toMatch(/^Kuutti tarkistaa jokaisen kuvan/);
     expect(body.photoCheck.photosNotShown).toEqual([
       {
@@ -491,9 +567,7 @@ describe("the photo check's notes in erasure and export (#253)", () => {
     );
 
     // In English too, and in words that accuse nobody.
-    const en = AccountExport.parse(
-      await (await app.request("/account/export", { headers: a.headers })).json(),
-    );
+    const en = await exportOf(app, a.headers);
     expect(en.photoCheck.photosNotShown.map((p) => p.reason)).toEqual([
       "May show more than Kuutti allows",
       "May show a symbol Kuutti does not allow",
@@ -501,9 +575,7 @@ describe("the photo check's notes in erasure and export (#253)", () => {
     expect(JSON.stringify(en.photoCheck)).not.toMatch(/strike|flag|violat|offen[cs]e|suspic|ban/i);
 
     // Another account's export holds none of it.
-    const theirs = AccountExport.parse(
-      await (await app.request("/account/export", { headers: b.headers })).json(),
-    );
+    const theirs = await exportOf(app, b.headers);
     expect(theirs.photoCheck.photosNotShown).toEqual([]);
     expect(theirs.photoCheck.carefulCheckUntil).toBeNull();
   });
@@ -549,9 +621,7 @@ describe("account erasure and export: what the verification of 08/10 found (#51)
        VALUES ($1, $2, now() - interval '1 day'), ($3, $4, now())`,
       [a.accountId, theirs.id, b.accountId, mine.id],
     );
-    const res = await app.request("/account/export", { headers: a.headers });
-    expect(res.status).toBe(200);
-    const body = AccountExport.parse(await res.json());
+    const body = await exportOf(app, a.headers);
     expect(body.cardsShown.map((c) => c.photoId)).toEqual([theirs.id]);
     expect(JSON.stringify(body)).not.toContain(b.accountId);
 
@@ -619,9 +689,7 @@ describe("account erasure and export: what the verification of 08/10 found (#51)
       a.sessionId,
       "Kuutti/0.12 (iPhone; iOS 19)",
     ]);
-    const res = await app.request("/account/export", { headers: a.headers });
-    expect(res.status).toBe(200);
-    const body = AccountExport.parse(await res.json());
+    const body = await exportOf(app, a.headers);
     expect(body.identity).toMatchObject({
       standing: "ok",
       standingChangedAt: null,

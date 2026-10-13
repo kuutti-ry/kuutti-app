@@ -1,4 +1,4 @@
-import { AccountExport, AuthExchangeResponse } from "@kuutti/schema";
+import { AuthExchangeResponse } from "@kuutti/schema";
 import * as React from "react";
 import { ApiError, api } from "@/lib/api";
 import {
@@ -23,12 +23,28 @@ export type SessionState =
   | { status: "signed-out"; notice?: "paused" }
   | { status: "signed-in"; sessionId: string; outcome?: AuthOutcome };
 
+/** The export as the API answers it (#237): a zip, named by the API, nothing about the person in the name. */
+export type ExportFile = { name: string; bytes: Uint8Array };
+
+const DEFAULT_EXPORT_NAME = "kuutti-data.zip";
+
+/**
+ * The name from `Content-Disposition: attachment; filename="..."`, or the
+ * default when the header says nothing. The API's stems are ASCII; the
+ * replacement keeps the name a file name whatever a later catalogue says,
+ * since it becomes a path on the phone.
+ */
+export function exportFileName(disposition: string | null): string {
+  const match = disposition?.match(/filename="([^"]+)"/);
+  return match?.[1]?.replace(/[^\w.-]/g, "_") ?? DEFAULT_EXPORT_NAME;
+}
+
 type SessionApi = SessionState & {
   signIn: (code: string) => Promise<AuthOutcome>;
   signOut: () => Promise<void>;
   signOutEverywhere: () => Promise<void>;
-  /** Everything Kuutti holds about the person (#51), as the API answers it. */
-  exportData: () => Promise<AccountExport>;
+  /** Everything Kuutti holds about the person (#51), as the API answers it: the zip and its name. */
+  exportData: () => Promise<ExportFile>;
   /** Erasure per TD-7 (#51); the device is signed out locally at once. */
   deleteAccount: () => Promise<void>;
   /** Taking a break (#170, ADR-022): the API pauses the account and ends every session; the device is signed out locally with the notice. */
@@ -84,12 +100,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     await clearSession();
   }, []);
 
-  const exportData = React.useCallback(async () => {
-    const { data, error, response } = await api.GET("/account/export");
+  const exportData = React.useCallback(async (): Promise<ExportFile> => {
+    const { data, error, response } = await api.GET("/account/export", {
+      parseAs: "arrayBuffer",
+    });
     if (!data) {
       throw new ApiError(`export answered ${response.status}`, response.status, error?.error.code);
     }
-    return AccountExport.parse(data);
+    return {
+      name: exportFileName(response.headers.get("content-disposition")),
+      bytes: new Uint8Array(data),
+    };
   }, []);
 
   // The API has already ended every token of the account when it answers 204;

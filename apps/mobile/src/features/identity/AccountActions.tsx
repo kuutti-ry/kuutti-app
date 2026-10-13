@@ -1,4 +1,4 @@
-import type { AccountExport } from "@kuutti/schema";
+import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Platform, Share, View } from "react-native";
@@ -13,40 +13,68 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Text } from "@/components/ui/text";
+import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { useSession } from "./session";
+import { type ExportFile, useSession } from "./session";
 
 /** Days before the same person may register again (TD-7); the API's constant, repeated for the text. */
 export const REREGISTER_COOLDOWN_DAYS = 30;
 
 type Busy = { kind: "idle" } | { kind: "exporting" } | { kind: "deleting" };
-type Notice = { kind: "export_failed" } | { kind: "delete_failed" } | null;
+type Notice =
+  | { kind: "export_failed" }
+  | { kind: "export_limited" }
+  | { kind: "delete_failed" }
+  | null;
+
+/** What expo-file-system's picker throws when the person backs out of it; not an error here. */
+const PICKER_CANCELLED = "ERR_PICKER_CANCELLED";
 
 /**
- * Hands the export to the system share sheet on the phone; the web preview
- * has no share sheet and downloads a file instead. Injected so tests can see
- * what was handed over without a native sheet.
+ * Hands the export file to the person (#237): the system share sheet on iOS
+ * with the file's URL (and nothing else: a message beside it would come
+ * along as a text.txt), a folder of their choosing on Android (React
+ * Native's sheet sends text only there), a download on the web preview. The
+ * phone's copy is written to the app's cache and deleted once the sheet
+ * closes: personal data does not wait for the OS to purge it. Injected so
+ * tests can see what was handed over without a native sheet.
  */
 export async function shareExport(
-  data: AccountExport,
+  file: ExportFile,
   title: string,
   share: typeof Share.share = Share.share,
 ): Promise<void> {
-  const json = JSON.stringify(data, null, 2);
   if (Platform.OS === "web") {
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([file.bytes as BlobPart], { type: "application/zip" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "kuutti-export.json";
+    a.download = file.name;
     a.click();
     // The browser queues the download asynchronously; revoking at once can
     // leave it with nothing to save.
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
     return;
   }
-  await share({ title, message: json });
+  if (Platform.OS === "android") {
+    let folder: Directory;
+    try {
+      folder = await Directory.pickDirectoryAsync();
+    } catch (error) {
+      if ((error as { code?: string }).code === PICKER_CANCELLED) return;
+      throw error;
+    }
+    folder.createFile(file.name, "application/zip").write(file.bytes);
+    return;
+  }
+  const cached = new File(Paths.cache, file.name);
+  cached.write(file.bytes);
+  try {
+    await share({ title, url: cached.uri });
+  } finally {
+    cached.delete();
+  }
 }
 
 /**
@@ -72,10 +100,12 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
     setNotice(null);
     setBusy({ kind: "exporting" });
     try {
-      const data = await session.exportData();
-      await shareExport(data, t("account.export.title"), share);
-    } catch {
-      setNotice({ kind: "export_failed" });
+      const file = await session.exportData();
+      await shareExport(file, t("account.export.title"), share);
+    } catch (error) {
+      // The day's copies are used up (#237): said as the API says it, not as a failure.
+      const limited = error instanceof ApiError && error.code === "export_budget_exceeded";
+      setNotice({ kind: limited ? "export_limited" : "export_failed" });
     } finally {
       setBusy({ kind: "idle" });
     }
@@ -106,7 +136,9 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
             <Text accessibilityLiveRegion="assertive">
               {notice.kind === "export_failed"
                 ? t("account.export.failed")
-                : t("account.delete.failed")}
+                : notice.kind === "export_limited"
+                  ? t("account.export.limited")
+                  : t("account.delete.failed")}
             </Text>
           )}
           {busy.kind !== "idle" && (

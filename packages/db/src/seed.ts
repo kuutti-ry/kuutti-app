@@ -85,6 +85,10 @@ export const MATCHING_CONFIG_V1 = {
   // it. The day is the Finnish calendar day.
   exposure_cards_per_day: 60,
   photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
+  // #237 (ADR-007 §3, migration 0040): copies of one's own data per Finnish
+  // day, counted from account_export in the statement that writes it. The
+  // zip carries every full-size photo, so the day's copies bound the exposure.
+  exports_per_day: 3,
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,
