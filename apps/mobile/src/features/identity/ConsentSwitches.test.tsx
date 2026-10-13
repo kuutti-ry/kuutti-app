@@ -176,13 +176,14 @@ describe("ConsentSwitches", () => {
       // Newer than the app's wording: the switch is locked until the app is updated.
       special_category: "2099-01-newer-than-this-app",
     };
-    let consents: Array<{
-      kind: string;
-      version: string;
-      locale: string;
-      givenAt: string;
-      withdrawnAt: string | null;
-    }> = [];
+    const given = {
+      kind: "research",
+      version: CONSENT_VERSIONS.research,
+      locale: "en",
+      givenAt: "2026-09-26T10:00:00.000Z",
+      withdrawnAt: null as string | null,
+    };
+    let consents: Array<typeof given> = [];
     const calls = fetchMock([
       (req) => {
         const path = new URL(req.url).pathname;
@@ -190,15 +191,7 @@ describe("ConsentSwitches", () => {
           return json({ consents, currentVersions: versions });
         }
         if (req.method === "POST" && path === "/consents") {
-          consents = [
-            {
-              kind: "research",
-              version: CONSENT_VERSIONS.research,
-              locale: "en",
-              givenAt: "2026-09-26T10:00:00.000Z",
-              withdrawnAt: null,
-            },
-          ];
+          consents = [given];
           return json({ consents, currentVersions: versions });
         }
         return null;
