@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as ImagePicker from "expo-image-picker";
 import type * as React from "react";
+import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -23,6 +24,39 @@ const press = async (element: ReturnType<typeof screen.getByRole>) => {
   await fireEvent.press(element);
   await act(settle);
 };
+/** A screen reader's choice of one of a tile's actions (#179). */
+const action = async (tile: ReturnType<typeof screen.getByRole>, name: string) => {
+  await fireEvent(tile, "accessibilityAction", { nativeEvent: { actionName: name } });
+  await act(settle);
+};
+const tile = (position: number) => screen.getByRole("button", { name: `Open photo ${position}` });
+const slot = (position: number) => screen.getByTestId(`photo-tile-${position}`);
+/** The grid as the tiles report it: two columns of 100-point squares with a 12-point gap. */
+const layOut = async (...positions: number[]) => {
+  for (const position of positions) {
+    const index = position - 1;
+    await fireEvent(slot(position), "layout", {
+      nativeEvent: {
+        layout: { x: (index % 2) * 112, y: Math.floor(index / 2) * 112, width: 100, height: 100 },
+      },
+    });
+  }
+};
+const touch = (x: number, y: number) => ({ nativeEvent: { pageX: x, pageY: y } });
+/** Whether the slot would take the touch from the tile's pressable now: true only while the tile is lifted. */
+const lifted = (position: number): boolean =>
+  slot(position).props.onMoveShouldSetResponderCapture() === true;
+/** The order of every PUT /photos/order, answered as asked. */
+const ordering = (orders: string[][]) => (req: Request) =>
+  req.method === "PUT" && new URL(req.url).pathname === "/photos/order"
+    ? req.json().then((body: { order: string[] }) => {
+        orders.push(body.order);
+        return json({
+          photos: body.order.map((id, position) => ({ ...photo(1), id, position })),
+          maxPhotos: 3,
+        });
+      })
+    : null;
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
@@ -116,11 +150,19 @@ describe("PhotosScreen", () => {
 
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // Photo 1: open, move later, remove. Photo 2, waiting: open, move earlier, remove. Plus add and done.
-    expect(found).toHaveLength(8);
-    expect(screen.getByRole("button", { name: "Move later" })).toBeTruthy();
-    // A photo in review cannot be made the main one: nobody else sees it yet.
+    // Each photo: open, remove. Plus add and done. The moves are the tiles' actions, not buttons (#179).
+    expect(found).toHaveLength(6);
+    expect(screen.queryByRole("button", { name: "Move later" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Make main photo" })).toBeNull();
+    const tiles = screen.getAllByRole("button", { name: /^Open photo/ });
+    expect(tiles).toHaveLength(2);
+    for (const each of tiles) {
+      expect(each.props.accessibilityActions).toEqual([
+        { name: "moveEarlier", label: "Move earlier" },
+        { name: "moveLater", label: "Move later" },
+        { name: "makeMain", label: "Make main photo" },
+      ]);
+    }
   });
 
   it("calls the first approved photo the main one, the one the card leads with, not one still in review (#239)", async () => {
@@ -142,8 +184,6 @@ describe("PhotosScreen", () => {
         .getAllByText(/^(Main photo|Being reviewed|Visible to others)$/)
         .map((node) => node.props.children),
     ).toEqual(["Being reviewed", "Main photo", "Visible to others", "Visible to others"]);
-    // Only an approved photo that is not the main one can be made main: the third.
-    expect(screen.getAllByRole("button", { name: "Make main photo" })).toHaveLength(1);
   });
 
   it("a rejected photo says why in words, never a label name", async () => {
@@ -177,10 +217,7 @@ describe("PhotosScreen", () => {
           : null,
     ]);
     await show(<PhotosScreen />);
-    // A rejected photo is shown to nobody: no making it the main photo, no moving it (#250).
     expect(await screen.findByText(/A profile photo has to show you/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Make main photo" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Move earlier" })).toBeNull();
     const ask = screen.getByRole("button", { name: "Ask a person to look" });
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
     await press(ask);
@@ -234,7 +271,7 @@ describe("PhotosScreen", () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it("reorders with buttons: move later sends the new order and renumbers", async () => {
+  it("the move-later action sends the new order and renumbers", async () => {
     const { calls } = fetchMock([
       answersList(list(2)),
       answersUrls,
@@ -250,7 +287,8 @@ describe("PhotosScreen", () => {
           : null,
     ]);
     await show(<PhotosScreen />);
-    await press(await screen.findByRole("button", { name: "Move later" }));
+    await screen.findByText("2 photos, at most 3");
+    await action(tile(1), "moveLater");
     await waitFor(() => expect(calls.some((c) => c.method === "PUT")).toBe(true));
     const put = calls.find((c) => c.method === "PUT");
     expect(JSON.parse(await (put as Request).text())).toEqual({
@@ -373,18 +411,23 @@ describe("PhotosScreen", () => {
     expect(await screen.findByText("The photo could not be uploaded. Try again.")).toBeTruthy();
   });
 
-  it("says it is choosing a photo while the picker is open, and holds the buttons", async () => {
-    fetchMock([answersList(approvedList(2)), answersUrls]);
+  it("says it is choosing a photo while the picker is open, and holds the buttons and the moves", async () => {
+    const { calls } = fetchMock([answersList(approvedList(2)), answersUrls]);
     launch.mockReturnValueOnce(new Promise(() => undefined));
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Add a photo" }));
     expect(screen.getByText("Choosing a photo…")).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Make main photo" }).props.accessibilityState?.disabled,
-    ).toBe(true);
+    for (const remove of screen.getAllByRole("button", { name: "Remove" })) {
+      expect(remove.props.accessibilityState?.disabled).toBe(true);
+    }
     expect(
       screen.getByRole("button", { name: "Add a photo" }).props.accessibilityState?.disabled,
     ).toBe(true);
+    await action(tile(2), "makeMain");
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+    // Nor does a tile lift while the screen is busy.
+    await fireEvent(tile(2), "longPress");
+    expect(lifted(2)).toBe(false);
   });
 
   const refusingThumbs = (code: string, status: number) => (req: Request) =>
@@ -439,33 +482,205 @@ describe("PhotosScreen", () => {
     expect(screen.getByText("Not accepted")).toBeTruthy();
   });
 
-  it("makes a photo the main one, and moves the last one a step towards the front", async () => {
+  it("the actions make a photo the main one and move the last one a step towards the front; a name it does not know changes nothing", async () => {
     const orders: string[][] = [];
-    fetchMock([
-      answersList(approvedList(3)),
-      answersUrls,
-      (req) =>
-        req.method === "PUT" && new URL(req.url).pathname === "/photos/order"
-          ? req.json().then((body: { order: string[] }) => {
-              orders.push(body.order);
-              return json({
-                photos: body.order.map((id, position) => ({ ...photo(1), id, position })),
-                maxPhotos: 3,
-              });
-            })
-          : null,
-    ]);
+    fetchMock([answersList(approvedList(3)), answersUrls, ordering(orders)]);
     await show(<PhotosScreen />);
-    const [, makeThirdMain] = await screen.findAllByRole("button", { name: "Make main photo" });
-    await press(makeThirdMain as ReturnType<typeof screen.getByRole>);
+    await screen.findByText("3 photos, at most 3");
+    await action(tile(3), "makeMain");
     await waitFor(() => expect(orders).toHaveLength(1));
-    // The second and the third tile have a "Move earlier"; the third's is pressed.
-    const [, moveLastEarlier] = screen.getAllByRole("button", { name: "Move earlier" });
-    await press(moveLastEarlier as ReturnType<typeof screen.getByRole>);
+    // Photo 1 is the last tile now; its move earlier swaps it with photo 2.
+    await action(tile(3), "moveEarlier");
     await waitFor(() => expect(orders).toHaveLength(2));
+    await action(tile(1), "swapWithTheNeighbour");
     expect(orders).toEqual([
       [photo(3).id, photo(1).id, photo(2).id],
       [photo(3).id, photo(2).id, photo(1).id],
     ]);
+  });
+
+  describe("dragging a tile (#179)", () => {
+    /** A motion-off phone: the lift, the slides and the settling take no time, so a drop saves at once. */
+    let motion: jest.SpyInstance;
+    beforeEach(() => {
+      motion = jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
+    });
+    afterEach(() => motion.mockRestore());
+
+    const grid = () => {
+      const orders: string[][] = [];
+      const { calls } = fetchMock([answersList(approvedList(3)), answersUrls, ordering(orders)]);
+      return { orders, calls };
+    };
+    const shown = async () => {
+      await show(<PhotosScreen />);
+      await screen.findByText("3 photos, at most 3");
+    };
+    /** The whole page tree, for what is not a button: the scroll view. */
+    const scrollEnabled = (): unknown => {
+      const find = (node: HostNode | string): HostNode | null => {
+        if (typeof node === "string") return null;
+        if (node.type === "RCTScrollView") return node;
+        for (const child of node.children ?? []) {
+          const found = find(child);
+          if (found) return found;
+        }
+        return null;
+      };
+      return find(screen.toJSON() as HostNode)?.props.scrollEnabled;
+    };
+
+    it("a tile dragged to the first slot becomes the main photo, and the order is saved once, on drop", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      expect(lifted(3)).toBe(false);
+      expect(scrollEnabled()).toBe(true);
+      await fireEvent(tile(3), "longPress");
+      expect(lifted(3)).toBe(true);
+      expect(lifted(1)).toBe(false);
+      expect(scrollEnabled()).toBe(false);
+      // The slot holds the touch from the first move on, and blocks the scroll view's.
+      expect(await fireEvent(slot(3), "responderGrant", touch(50, 400))).toBe(true);
+      // Up a row: the tile's centre is over the first slot.
+      await fireEvent(slot(3), "responderMove", touch(50, 340));
+      await fireEvent(slot(3), "responderMove", touch(50, 288));
+      await fireEvent(slot(3), "responderRelease", touch(50, 288));
+      await act(settle);
+      expect(orders).toEqual([[photo(3).id, photo(1).id, photo(2).id]]);
+      expect(lifted(3)).toBe(false);
+      expect(scrollEnabled()).toBe(true);
+      expect(screen.getAllByText("Main photo")).toHaveLength(1);
+    });
+
+    it("keeps the last tile crossed when the finger rests in a gap, and saves that", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      await fireEvent(tile(1), "longPress");
+      await fireEvent(slot(1), "responderGrant", touch(50, 50));
+      await fireEvent(slot(1), "responderMove", touch(60, 50)); // still over its own slot
+      await fireEvent(slot(1), "responderMove", touch(162, 50)); // over the second
+      await fireEvent(slot(1), "responderMove", touch(105, 50)); // the gap between the two
+      await fireEvent(slot(1), "responderRelease", touch(105, 50));
+      await act(settle);
+      expect(orders).toEqual([[photo(2).id, photo(1).id, photo(3).id]]);
+    });
+
+    it("a drop on the tile's own slot saves nothing", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      await fireEvent(tile(2), "longPress");
+      await fireEvent(slot(2), "responderGrant", touch(160, 50));
+      await fireEvent(slot(2), "responderMove", touch(170, 60));
+      await fireEvent(slot(2), "responderRelease", touch(170, 60));
+      await act(settle);
+      expect(orders).toEqual([]);
+      expect(lifted(2)).toBe(false);
+    });
+
+    it("a drag the system cuts short saves nothing and puts the tile down", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      await fireEvent(tile(1), "longPress");
+      await fireEvent(slot(1), "responderGrant", touch(50, 50));
+      await fireEvent(slot(1), "responderMove", touch(162, 50));
+      await fireEvent(slot(1), "responderTerminate", touch(162, 50));
+      expect(lifted(1)).toBe(false);
+      expect(scrollEnabled()).toBe(true);
+      await act(settle);
+      expect(orders).toEqual([]);
+    });
+
+    it("a long press without a move puts the tile down again", async () => {
+      grid();
+      await shown();
+      await layOut(1, 2, 3);
+      await fireEvent(tile(1), "longPress");
+      expect(lifted(1)).toBe(true);
+      await act(async () => {
+        await fireEvent(tile(1), "pressOut");
+        await settle();
+      });
+      expect(lifted(1)).toBe(false);
+      expect(scrollEnabled()).toBe(true);
+    });
+
+    it("a touch that was never a long press moves nothing", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      expect(await fireEvent(slot(1), "responderGrant", touch(50, 50))).toBe(false);
+      await fireEvent(slot(1), "responderMove", touch(162, 50));
+      await fireEvent(slot(1), "responderRelease", touch(162, 50));
+      await act(settle);
+      expect(orders).toEqual([]);
+    });
+
+    it("only the lifted tile's slot takes the touch, and a second long press meanwhile is ignored", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      await fireEvent(tile(1), "longPress");
+      await fireEvent(tile(2), "longPress");
+      expect(lifted(2)).toBe(false);
+      // Nor does another view's request for the touch take it from the lifted one.
+      expect(slot(1).props.onResponderTerminationRequest()).toBe(false);
+      expect(await fireEvent(slot(2), "responderGrant", touch(160, 50))).toBe(false);
+      await fireEvent(slot(2), "responderMove", touch(50, 50));
+      await fireEvent(slot(2), "responderRelease", touch(50, 50));
+      await act(settle);
+      expect(orders).toEqual([]);
+      expect(lifted(1)).toBe(true);
+    });
+
+    it("finds no slot before the grid is laid out, and a drop then saves nothing", async () => {
+      const { orders } = grid();
+      await shown();
+      await fireEvent(tile(1), "longPress");
+      await fireEvent(slot(1), "responderGrant", touch(50, 50));
+      await fireEvent(slot(1), "responderMove", touch(162, 50));
+      await fireEvent(slot(1), "responderRelease", touch(162, 50));
+      await act(settle);
+      expect(orders).toEqual([]);
+      expect(lifted(1)).toBe(false);
+    });
+
+    it("slides past a tile that has not been laid out, and still saves the drop", async () => {
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 3);
+      await fireEvent(tile(1), "longPress");
+      await fireEvent(slot(1), "responderGrant", touch(50, 50));
+      // Over the third slot: the second would step aside, but it has no place to go yet.
+      await fireEvent(slot(1), "responderMove", touch(50, 162));
+      await fireEvent(slot(1), "responderRelease", touch(50, 162));
+      await act(settle);
+      expect(orders).toEqual([[photo(2).id, photo(3).id, photo(1).id]]);
+    });
+
+    it("with motion on, the order is saved once the tile has settled into its slot", async () => {
+      motion.mockResolvedValue(false);
+      const { orders } = grid();
+      await shown();
+      await layOut(1, 2, 3);
+      jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+      try {
+        await fireEvent(tile(1), "longPress");
+        await fireEvent(slot(1), "responderGrant", touch(50, 50));
+        await fireEvent(slot(1), "responderMove", touch(162, 50));
+        await fireEvent(slot(1), "responderRelease", touch(162, 50));
+        expect(orders).toEqual([]); // settling takes 150 ms
+        await act(async () => {
+          jest.advanceTimersByTime(300);
+        });
+        expect(orders).toEqual([[photo(2).id, photo(1).id, photo(3).id]]);
+      } finally {
+        jest.useRealTimers();
+      }
+      await act(settle);
+    });
   });
 });

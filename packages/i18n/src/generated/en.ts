@@ -233,7 +233,7 @@ export const en: Readonly<Record<string, string>> = {
   "photos.error.photo_order_invalid": "The photo order was out of date, so it was reloaded. Try the move again.",
   "photos.error.photo_unsupported": "This file is not a photo Kuutti can use. Choose a JPEG, PNG or WebP picture.",
   "photos.error.tooLarge": "The photo is too large. Choose a smaller picture.",
-  "photos.explain": "Up to {max, plural, one {# photo} other {# photos}}. The first one others can see is your main photo. A new photo is checked before anyone else sees it.",
+  "photos.explain": "Up to {max, plural, one {# photo} other {# photos}}. Hold a photo and drag it to change the order. The first one others can see is your main photo. A new photo is checked before anyone else sees it.",
   "photos.imageLabel": "Photo {position, number} / {total, number}",
   "photos.main": "Main photo",
   "photos.makeMain": "Make main photo",

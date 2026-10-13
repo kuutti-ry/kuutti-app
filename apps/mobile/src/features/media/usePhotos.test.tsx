@@ -333,6 +333,21 @@ describe("usePhotos: the order", () => {
     expect(ids(result.current)?.map(([id]) => id)).toEqual([photo(3).id, photo(1).id, photo(2).id]);
   });
 
+  it("places a photo at a position; nothing for a position past either end, a photo it does not have, or its own place", async () => {
+    const seen = serve(
+      listing(() => json(list(1, 2, 3))),
+      ordered,
+    );
+    const { result } = await ready();
+    await act(async () => result.current.moveTo(0, 2));
+    expect(ids(result.current)?.map(([id]) => id)).toEqual([photo(2).id, photo(3).id, photo(1).id]);
+    await act(async () => result.current.moveTo(1, 1));
+    await act(async () => result.current.moveTo(3, 0));
+    await act(async () => result.current.moveTo(0, 3));
+    await act(async () => result.current.moveTo(0, -1));
+    expect(writes(seen)).toHaveLength(1);
+  });
+
   it("takes the order back from the API when it refuses the new one, and says why", async () => {
     const seen = serve(
       listing(() => json(list(1, 2))),

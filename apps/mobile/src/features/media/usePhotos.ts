@@ -2,6 +2,7 @@ import type { Photo, PhotoList } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { appealPhoto, deletePhoto, listPhotos, reorderPhotos, uploadPhoto } from "./client";
+import { placed } from "./drag";
 import { checkPhoto } from "./localCheck";
 import { pickPhoto, prepareForUpload } from "./pick";
 
@@ -155,29 +156,35 @@ export function usePhotos() {
     [state.list, update, reload],
   );
 
-  /** One step towards the front (-1) or the back (+1). */
-  const move = useCallback(
-    (id: string, delta: -1 | 1) => {
+  /**
+   * The photo at `from` placed at `to` (#179: a drop, or one of the tile's
+   * accessibility actions through move and makeMain); nothing for a position
+   * past either end, a photo that is not there, or the place it is in.
+   */
+  const moveTo = useCallback(
+    (from: number, to: number) => {
       const photos = state.list?.photos ?? [];
-      const from = photos.findIndex((p) => p.id === id);
-      const to = from + delta;
-      if (from < 0 || to < 0 || to >= photos.length) return Promise.resolve();
-      const next = [...photos];
-      const [moving] = next.splice(from, 1);
-      if (moving) next.splice(to, 0, moving);
-      return reorder(next);
+      if (from === to || !photos[from] || to < 0 || to >= photos.length) return Promise.resolve();
+      return reorder(placed(photos, from, to));
     },
     [state.list, reorder],
   );
 
+  /** One step towards the front (-1) or the back (+1). */
+  const move = useCallback(
+    (id: string, delta: -1 | 1) => {
+      const from = (state.list?.photos ?? []).findIndex((p) => p.id === id);
+      return moveTo(from, from + delta);
+    },
+    [state.list, moveTo],
+  );
+
   const makeMain = useCallback(
     (id: string) => {
-      const photos = state.list?.photos ?? [];
-      const chosen = photos.find((p) => p.id === id);
-      if (!chosen || photos[0]?.id === id) return Promise.resolve();
-      return reorder([chosen, ...photos.filter((p) => p.id !== id)]);
+      const from = (state.list?.photos ?? []).findIndex((p) => p.id === id);
+      return moveTo(from, 0);
     },
-    [state.list, reorder],
+    [state.list, moveTo],
   );
 
   const dismissNotice = useCallback(() => update({ notice: null }), [update]);
@@ -188,7 +195,18 @@ export function usePhotos() {
     [update],
   );
 
-  return { ...state, reload, add, remove, appeal, move, makeMain, dismissNotice, reportRefusal };
+  return {
+    ...state,
+    reload,
+    add,
+    remove,
+    appeal,
+    moveTo,
+    move,
+    makeMain,
+    dismissNotice,
+    reportRefusal,
+  };
 }
 
 function renumber(list: PhotoList, photos: Photo[]): PhotoList {

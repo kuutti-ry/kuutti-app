@@ -186,7 +186,7 @@ export const fi: Readonly<Record<string, string>> = {
   "photos.error.photo_order_invalid": "Kuvien järjestys oli vanhentunut, joten se ladattiin uudelleen. Kokeile siirtoa uudelleen.",
   "photos.error.photo_unsupported": "Tämä tiedosto ei ole kuva, jota Kuutti voi käyttää. Valitse JPEG-, PNG- tai WebP-kuva.",
   "photos.error.tooLarge": "Kuva on liian suuri. Valitse pienempi kuva.",
-  "photos.explain": "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Ensimmäinen, jonka muut voivat nähdä, on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen.",
+  "photos.explain": "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan. Ensimmäinen, jonka muut voivat nähdä, on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen.",
   "photos.imageLabel": "Kuva {position, number} / {total, number}",
   "photos.main": "Pääkuva",
   "photos.makeMain": "Aseta pääkuvaksi",

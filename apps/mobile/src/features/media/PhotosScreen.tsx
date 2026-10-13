@@ -1,12 +1,9 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { Photo, PhotoRejectionReason, PhotoState } from "@kuutti/schema";
 import { useRouter } from "expo-router";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import ArrowRight from "lucide-react-native/icons/arrow-right";
-import Star from "lucide-react-native/icons/star";
 import Trash from "lucide-react-native/icons/trash";
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Animated, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -23,7 +20,9 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
+import { useMotionDuration } from "@/theme/useReducedMotion";
 import { PhotoImage } from "./PhotoImage";
+import { useDragOrder } from "./useDragOrder";
 import { type PhotosNotice, usePhotos } from "./usePhotos";
 
 const STATE_TEXT: Record<PhotoState, PlainMessageKey> = {
@@ -75,12 +74,25 @@ function noticeText(notice: PhotosNotice, t: ReturnType<typeof useT>["t"]): stri
 }
 
 /**
- * The person's photos (#48, rules/mobile.md Images): a grid of thumbs, each
- * with buttons to make it the main photo, move it a step, or remove it after a
- * confirmation; no drag as the only way to do anything (CLAUDE.md
- * Accessibility). Tapping a photo opens the zoom screen, the one place the
- * full variant is requested. A new photo goes through the on-device check and
- * the pre-resize before the upload, with its progress in words.
+ * The moves a tile offers a screen reader or a switch user (#179): the same
+ * three the drag makes, as named actions on every tile, so a gesture is never
+ * the only way (CLAUDE.md Accessibility). A move that cannot happen, earlier
+ * from the first slot, main for the main one, changes nothing.
+ */
+const TILE_ACTIONS: ReadonlyArray<{ name: string; key: PlainMessageKey }> = [
+  { name: "moveEarlier", key: "photos.moveEarlier" },
+  { name: "moveLater", key: "photos.moveLater" },
+  { name: "makeMain", key: "photos.makeMain" },
+];
+
+/**
+ * The person's photos (#48, rules/mobile.md Images): a grid of thumbs,
+ * reordered by holding a tile and dragging it, the first slot the main photo
+ * (#179), the same moves as accessibility actions on every tile; each has a
+ * button to remove it after a confirmation. Tapping a photo opens the zoom
+ * screen, the one place the full variant is requested. A new photo goes
+ * through the on-device check and the pre-resize before the upload, with its
+ * progress in words.
  */
 export function PhotosScreen() {
   const { t } = useT();
@@ -98,6 +110,19 @@ export function PhotosScreen() {
   const busy = photos.busy.kind !== "idle";
   const atMax = list !== null && total >= list.maxPhotos;
 
+  const drag = useDragOrder({
+    count: total,
+    duration: useMotionDuration(150),
+    onDrop: (from, to) => void photos.moveTo(from, to),
+  });
+  const tileActions = TILE_ACTIONS.map(({ name, key }) => ({ name, label: t(key) }));
+  const act = (photo: Photo, action: string) => {
+    if (busy) return;
+    if (action === "moveEarlier") void photos.move(photo.id, -1);
+    if (action === "moveLater") void photos.move(photo.id, 1);
+    if (action === "makeMain") void photos.makeMain(photo.id);
+  };
+
   const busyText =
     photos.busy.kind === "picking"
       ? t("photos.picking")
@@ -109,7 +134,10 @@ export function PhotosScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
+      <ScrollView
+        contentContainerClassName="flex-grow gap-4 p-6"
+        scrollEnabled={drag.active === null}
+      >
         <Text variant="h1" accessibilityRole="header">
           {t("photos.title")}
         </Text>
@@ -139,121 +167,96 @@ export function PhotosScreen() {
         {list && total === 0 && <Text variant="muted">{t("photos.empty")}</Text>}
 
         <View className="flex-row flex-wrap gap-3">
-          {list?.photos.map((photo, index) => (
-            <View key={photo.id} className="w-[47%] gap-2">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={t("photos.open", { position: index + 1 })}
-                className="overflow-hidden rounded-lg bg-muted"
-                style={{ minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET }}
-                onPress={() => {
-                  tap();
-                  router.push({
-                    pathname: "/photos/[id]",
-                    params: {
-                      id: photo.id,
-                      blurhash: photo.blurhash,
-                      position: String(index + 1),
-                      total: String(total),
-                    },
-                  });
-                }}
+          {list?.photos.map((photo, index) => {
+            const tile = drag.tile(index);
+            return (
+              // The slot: laid out by the grid, measured for the drag, and the
+              // view that holds the touch once the tile is lifted. Nothing for
+              // a screen reader to land on; the tile inside is the control.
+              <View
+                key={photo.id}
+                className="w-[47%]"
+                style={{ zIndex: tile.zIndex }}
+                onLayout={tile.onLayout}
+                accessible={false}
+                testID={`photo-tile-${index + 1}`}
+                {...tile.responder}
               >
-                <PhotoImage
-                  id={photo.id}
-                  variant="thumb"
-                  blurhash={photo.blurhash}
-                  accessibilityLabel={t("photos.imageLabel", { position: index + 1, total })}
-                  style={{ width: "100%", aspectRatio: 1 }}
-                  onRefused={(code) => {
-                    if (code === "photo_budget_exceeded") photos.reportRefusal(code);
-                  }}
-                />
-              </Pressable>
-              <View className="gap-0.5">
-                {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
-                <Text variant="muted">{stateText(photo, t)}</Text>
-              </View>
-              {photo.state === "rejected" && photo.appealable && (
-                <Button
-                  variant="outline"
-                  accessibilityLabel={t("photos.appeal")}
-                  disabled={busy}
-                  onPress={() => {
-                    tap();
-                    void photos.appeal(photo.id);
-                  }}
-                >
-                  {t("photos.appeal")}
-                </Button>
-              )}
-              {/* Two rows on purpose: four 44-point targets never fit one row of a half-width tile, and a wrap that depends on the font size put the remove button on a row of its own. */}
-              <View className="gap-1">
-                <View className="flex-row gap-1">
-                  {/* Only a photo others can see can be the main one: never one in review, never a
-                      rejected one (#250); moving it to the front makes it the first approved (#239). */}
-                  {photo.state === "approved" && photo.id !== mainId && (
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      accessibilityLabel={t("photos.makeMain")}
-                      disabled={busy}
+                <Animated.View style={{ transform: tile.transform }}>
+                  <View className="gap-2">
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("photos.open", { position: index + 1 })}
+                      accessibilityActions={tileActions}
+                      onAccessibilityAction={(event) => act(photo, event.nativeEvent.actionName)}
+                      className="overflow-hidden rounded-lg bg-muted"
+                      style={{ minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET }}
                       onPress={() => {
                         tap();
-                        void photos.makeMain(photo.id);
+                        router.push({
+                          pathname: "/photos/[id]",
+                          params: {
+                            id: photo.id,
+                            blurhash: photo.blurhash,
+                            position: String(index + 1),
+                            total: String(total),
+                          },
+                        });
                       }}
+                      onLongPress={() => {
+                        if (busy) return;
+                        tap();
+                        tile.onLongPress();
+                      }}
+                      onPressOut={tile.onPressOut}
                     >
-                      <Icon as={Star} />
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    accessibilityLabel={t("photos.remove")}
-                    disabled={busy}
-                    onPress={() => {
-                      tap();
-                      setRemoving(photo);
-                    }}
-                  >
-                    <Icon as={Trash} />
-                  </Button>
-                </View>
-                {total > 1 && photo.state !== "rejected" && (
-                  <View className="flex-row gap-1">
-                    {index !== 0 && (
+                      <PhotoImage
+                        id={photo.id}
+                        variant="thumb"
+                        blurhash={photo.blurhash}
+                        accessibilityLabel={t("photos.imageLabel", { position: index + 1, total })}
+                        style={{ width: "100%", aspectRatio: 1 }}
+                        onRefused={(code) => {
+                          if (code === "photo_budget_exceeded") photos.reportRefusal(code);
+                        }}
+                      />
+                    </Pressable>
+                    <View className="gap-0.5">
+                      {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
+                      <Text variant="muted">{stateText(photo, t)}</Text>
+                    </View>
+                    {photo.state === "rejected" && photo.appealable && (
                       <Button
                         variant="outline"
-                        size="icon"
-                        accessibilityLabel={t("photos.moveEarlier")}
+                        accessibilityLabel={t("photos.appeal")}
                         disabled={busy}
                         onPress={() => {
                           tap();
-                          void photos.move(photo.id, -1);
+                          void photos.appeal(photo.id);
                         }}
                       >
-                        <Icon as={ArrowLeft} />
+                        {t("photos.appeal")}
                       </Button>
                     )}
-                    {index !== total - 1 && (
+                    <View className="flex-row gap-1">
                       <Button
                         variant="outline"
                         size="icon"
-                        accessibilityLabel={t("photos.moveLater")}
+                        accessibilityLabel={t("photos.remove")}
                         disabled={busy}
                         onPress={() => {
                           tap();
-                          void photos.move(photo.id, 1);
+                          setRemoving(photo);
                         }}
                       >
-                        <Icon as={ArrowRight} />
+                        <Icon as={Trash} />
                       </Button>
-                    )}
+                    </View>
                   </View>
-                )}
+                </Animated.View>
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {busyText && (

@@ -3670,10 +3670,10 @@ photos.title:
   machine: { fi: true, sv: true }
 
 photos.explain:
-  en: "Up to {max, plural, one {# photo} other {# photos}}. The first one others can see is your main photo. A new photo is checked before anyone else sees it."
-  description: Photos screen, the paragraph under the heading. {max} is max_photos from the API. The main photo is the first approved one, the one the card leads with (ADR-009 §4, #239).
-  fi: "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Ensimmäinen, jonka muut voivat nähdä, on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
-  sv: "Högst {max, plural, one {# foto} other {# foton}}. Det första som andra kan se är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det."
+  en: "Up to {max, plural, one {# photo} other {# photos}}. Hold a photo and drag it to change the order. The first one others can see is your main photo. A new photo is checked before anyone else sees it."
+  description: Photos screen, the paragraph under the heading. {max} is max_photos from the API. The order is changed by holding a tile and dragging it (#179). The main photo is the first approved one, the one the card leads with (ADR-009 §4, #239).
+  fi: "Enintään {max, plural, one {# kuva} other {# kuvaa}}. Vaihda järjestystä pitämällä kuvaa painettuna ja vetämällä se uuteen paikkaan. Ensimmäinen, jonka muut voivat nähdä, on pääkuvasi. Uusi kuva tarkistetaan, ennen kuin kukaan muu näkee sen."
+  sv: "Högst {max, plural, one {# foto} other {# foton}}. Håll ett foto nedtryckt och dra det för att ändra ordningen. Det första som andra kan se är ditt huvudfoto. Ett nytt foto granskas innan någon annan ser det."
   machine: { fi: true, sv: true }
 
 photos.count:
@@ -3769,21 +3769,21 @@ photos.open:
 
 photos.makeMain:
   en: Make main photo
-  description: Photos screen, button that moves a photo to the first position.
+  description: Photos screen, accessibility action on a photo tile (a screen reader's way instead of dragging, #179) that moves the photo to the first position.
   fi: Aseta pääkuvaksi
   sv: Gör till huvudfoto
   machine: { fi: true, sv: true }
 
 photos.moveEarlier:
   en: Move earlier
-  description: Photos screen, button that moves a photo one step towards the front.
+  description: Photos screen, accessibility action on a photo tile (a screen reader's way instead of dragging, #179) that moves the photo one step towards the front.
   fi: Siirrä aiemmaksi
   sv: Flytta framåt
   machine: { fi: true, sv: true }
 
 photos.moveLater:
   en: Move later
-  description: Photos screen, button that moves a photo one step towards the back.
+  description: Photos screen, accessibility action on a photo tile (a screen reader's way instead of dragging, #179) that moves the photo one step towards the back.
   fi: Siirrä myöhemmäksi
   sv: Flytta bakåt
   machine: { fi: true, sv: true }

@@ -233,7 +233,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "photos.error.photo_order_invalid": "［Théé phóótóó óórdéér wááš óóúút óóf dáátéé, šóó íít wááš réélóóáádééd. Trýý théé móóvéé áágááííñ.］",
   "photos.error.photo_unsupported": "［Thííš fííléé ííš ñóót áá phóótóó Kúúúúttíí çááñ úúšéé. Çhóóóóšéé áá JPÉÉG, PÑG óór WéébP pííçtúúréé.］",
   "photos.error.tooLarge": "［Théé phóótóó ííš tóóóó láárgéé. Çhóóóóšéé áá šmáálléér pííçtúúréé.］",
-  "photos.explain": "［ÚÚp tóó {max,plural,one{# phóótóó} other{# phóótóóš}}. Théé fííršt óóñéé óóthéérš çááñ šéééé ííš ýýóóúúr mááííñ phóótóó. ÁÁ ñééw phóótóó ííš çhééçkééd bééfóóréé ááñýýóóñéé éélšéé šééééš íít.］",
+  "photos.explain": "［ÚÚp tóó {max,plural,one{# phóótóó} other{# phóótóóš}}. Hóóld áá phóótóó ááñd dráág íít tóó çhááñgéé théé óórdéér. Théé fííršt óóñéé óóthéérš çááñ šéééé ííš ýýóóúúr mááííñ phóótóó. ÁÁ ñééw phóótóó ííš çhééçkééd bééfóóréé ááñýýóóñéé éélšéé šééééš íít.］",
   "photos.imageLabel": "［Phóótóó {position, number} / {total, number}］",
   "photos.main": "［Mááííñ phóótóó］",
   "photos.makeMain": "［Máákéé mááííñ phóótóó］",
