@@ -1,11 +1,5 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import {
-  BIO_MAX,
-  BIO_MIN_FOR_COMPLETENESS,
-  BIO_PRESETS,
-  DISPLAY_NAME_MAX,
-  type ProfileUpdate,
-} from "@kuutti/schema";
+import { DISPLAY_NAME_MAX, type ProfileUpdate } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
