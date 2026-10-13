@@ -105,12 +105,12 @@ describe("DealBreakersScreen", () => {
     expect(router.push).toHaveBeenCalledWith("/profile/later/hasKids");
   });
 
-  it("leads a field without a later screen to the profile screen", async () => {
+  it("leads a field without a later screen to the section that holds it (#239)", async () => {
     fakeApi({ ...answeredAll, monogamy: undefined });
     await show(<DealBreakersScreen />);
     await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
     await press(screen.getByRole("button", { name: "Answer it" }));
-    expect(router.push).toHaveBeenCalledWith("/profile");
+    expect(router.push).toHaveBeenCalledWith("/profile/section/relationship");
   });
 
   it("switches deal-breakers on, takes what is fine, holds the limit, and saves the set", async () => {
@@ -188,6 +188,25 @@ describe("DealBreakersScreen", () => {
     expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Finnish" })).toBeNull();
     expect(screen.getByLabelText("Search").props.value).toBe(" GERM ");
+  });
+
+  it("leads the accepted languages with the first ten, as their picker does, and keeps an accepted one in view (#239)", async () => {
+    fakeApi(answeredAll, [{ field: "languages", accept: ["fi", "de"], includeUnknown: false }]);
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    expect(screen.getByRole("button", { name: "Somali" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "German" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Another language" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "French" })).toBeNull();
+    // Taken back, an accepted language beyond the ten stays to be accepted again.
+    await press(screen.getByRole("button", { name: "German" }));
+    expect(screen.getByRole("button", { name: "German" }).props.accessibilityState?.selected).toBe(
+      false,
+    );
+    await press(screen.getByRole("button", { name: "German" }));
+    expect(screen.getByRole("button", { name: "German" }).props.accessibilityState?.selected).toBe(
+      true,
+    );
   });
 
   it("takes an accepted answer back, and switches a deal-breaker off again", async () => {

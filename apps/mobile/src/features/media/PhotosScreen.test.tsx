@@ -53,6 +53,11 @@ const list = (n: number, maxPhotos = 3) => ({
   photos: Array.from({ length: n }, (_, i) => photo(i + 1)),
   maxPhotos,
 });
+/** Every photo approved: each one others see, so each but the first can be made the main one. */
+const approvedList = (n: number, maxPhotos = 3) => ({
+  photos: Array.from({ length: n }, (_, i) => ({ ...photo(i + 1), state: "approved" })),
+  maxPhotos,
+});
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -111,10 +116,34 @@ describe("PhotosScreen", () => {
 
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // Photo 1: open, move later, remove. Photo 2: open, make main, move earlier, remove. Plus add and done.
-    expect(found).toHaveLength(9);
+    // Photo 1: open, move later, remove. Photo 2, waiting: open, move earlier, remove. Plus add and done.
+    expect(found).toHaveLength(8);
     expect(screen.getByRole("button", { name: "Move later" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Make main photo" })).toBeTruthy();
+    // A photo in review cannot be made the main one: nobody else sees it yet.
+    expect(screen.queryByRole("button", { name: "Make main photo" })).toBeNull();
+  });
+
+  it("calls the first approved photo the main one, the one the card leads with, not one still in review (#239)", async () => {
+    fetchMock([
+      answersList({
+        photos: [
+          { ...photo(1), state: "queued" },
+          { ...photo(2), state: "approved" },
+          { ...photo(3), state: "approved" },
+        ],
+        maxPhotos: 3,
+      }),
+      answersUrls,
+    ]);
+    await show(<PhotosScreen />);
+    await screen.findByText("Being reviewed");
+    expect(
+      screen
+        .getAllByText(/^(Main photo|Being reviewed|Visible to others)$/)
+        .map((node) => node.props.children),
+    ).toEqual(["Being reviewed", "Main photo", "Visible to others", "Visible to others"]);
+    // Only an approved photo that is not the main one can be made main: the third.
+    expect(screen.getAllByRole("button", { name: "Make main photo" })).toHaveLength(1);
   });
 
   it("a rejected photo says why in words, never a label name", async () => {
@@ -128,6 +157,8 @@ describe("PhotosScreen", () => {
     await show(<PhotosScreen />);
     expect(await screen.findByText(/A profile photo has to show you/)).toBeTruthy();
     expect(screen.queryByText("Not accepted")).toBeNull();
+    // Shown to nobody, so no main photo (#250).
+    expect(screen.queryByText("Main photo")).toBeNull();
   });
 
   it("offers to ask a person to look at the check's rejection, and shows it queued again (#253)", async () => {
@@ -343,7 +374,7 @@ describe("PhotosScreen", () => {
   });
 
   it("says it is choosing a photo while the picker is open, and holds the buttons", async () => {
-    fetchMock([answersList(list(2)), answersUrls]);
+    fetchMock([answersList(approvedList(2)), answersUrls]);
     launch.mockReturnValueOnce(new Promise(() => undefined));
     await show(<PhotosScreen />);
     await press(await screen.findByRole("button", { name: "Add a photo" }));
@@ -411,7 +442,7 @@ describe("PhotosScreen", () => {
   it("makes a photo the main one, and moves the last one a step towards the front", async () => {
     const orders: string[][] = [];
     fetchMock([
-      answersList(list(3)),
+      answersList(approvedList(3)),
       answersUrls,
       (req) =>
         req.method === "PUT" && new URL(req.url).pathname === "/photos/order"

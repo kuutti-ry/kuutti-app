@@ -5,11 +5,10 @@ import {
   BIO_PRESETS,
   DISPLAY_NAME_MAX,
   type ProfileUpdate,
-  SPECIAL_CATEGORY_FIELDS,
 } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
 import ArrowLeft from "lucide-react-native/icons/arrow-left";
-import { Fragment, useEffect, useEffectEvent, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -28,7 +27,7 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { currentSession } from "@/lib/session";
 import { useHapticTap } from "@/theme/haptics";
-import { Chip, FieldEditor, SpecialCategoryNote } from "./FieldEditor";
+import { Chip, FieldEditor } from "./FieldEditor";
 import { presetKey } from "./keys";
 import { PromptsEditor } from "./PromptsEditor";
 import { findSection, type SectionItem, sectionPath, sectionTitleKey } from "./sections";
@@ -176,9 +175,6 @@ export function SectionScreen({ section: id }: { section: string }) {
   useEffect(() => navigation.addListener("beforeRemove", () => onLeave()), [navigation]);
 
   if (!section) return null;
-  const firstSpecial = section.items.find((item) =>
-    (SPECIAL_CATEGORY_FIELDS as readonly string[]).includes(item),
-  );
 
   if (profile.status === "loading") {
     return (
@@ -229,13 +225,10 @@ export function SectionScreen({ section: id }: { section: string }) {
           <Text accessibilityLiveRegion="assertive">{errorText(profile.notice, t)}</Text>
         )}
 
+        {/* No note on the article 9 consent over politics and religion: Settings is the
+            one place that names it and takes it back (ADR-019 §4, #204, #239). */}
         {section.items.map((item) => (
-          <Fragment key={item}>
-            {/* The article 9 fields stand under the note on their consent (ADR-019 §4, #204):
-                anyone active gave it at the seeks step; Settings is where it is withdrawn. */}
-            {item === firstSpecial && <SpecialCategoryNote />}
-            <ItemEditor item={item} draft={draft} update={update} />
-          </Fragment>
+          <ItemEditor key={item} item={item} draft={draft} update={update} />
         ))}
       </ScrollView>
 

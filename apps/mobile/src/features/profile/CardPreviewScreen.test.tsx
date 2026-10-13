@@ -104,11 +104,12 @@ afterEach(() => {
 });
 
 describe("CardPreviewScreen", () => {
-  it("shows the card as others see it: the verified age, the gender with its label, the photos through the photo route, the choices in words", async () => {
+  it("shows the card as others see it: the name with the age, the gender with its label, the photos through the photo route, the choices in words", async () => {
     const calls = serveCard();
     await show();
-    await waitFor(() => expect(screen.getByText("Aino")).toBeTruthy());
-    expect(screen.getByText("36, age verified by your bank")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
+    // Every account is bank-verified, so the card does not say so (#239).
+    expect(screen.queryByText(/verified/)).toBeNull();
     expect(screen.getByText("Non-binary")).toBeTruthy();
     expect(screen.getByText("Genderfluid")).toBeTruthy();
     expect(screen.getByText("Espoo")).toBeTruthy();
@@ -147,7 +148,7 @@ describe("CardPreviewScreen", () => {
     jest.spyOn(PixelRatio, "getFontScale").mockReturnValue(MAX_FONT_SCALE);
     serveCard({ complete: true, missing: [] });
     await show();
-    await waitFor(() => expect(screen.getByText("Aino")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
     expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
     expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     // No fixed-height text container anywhere on the card (CLAUDE.md Accessibility).
@@ -204,7 +205,7 @@ describe("CardPreviewScreen", () => {
   it("shows no checklist for a complete card", async () => {
     serveCard({ complete: true, missing: [] });
     await show();
-    await waitFor(() => expect(screen.getByText("Aino")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
     expect(screen.queryByText("Before your card can be shown")).toBeNull();
   });
 

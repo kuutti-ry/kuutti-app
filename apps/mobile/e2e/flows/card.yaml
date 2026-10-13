@@ -1,11 +1,12 @@
 # The card is what others see (#47, ADR-019 §2): it leads with the main photo,
-# the name and the age the bank verified, then the gender and the area, the
+# the name with the age (every account is bank-verified, so the card does not
+# say so, #239), then the gender and the area, the
 # prompts and the bio, and the information fields with their labels, several
 # answers joined by commas; soft fields (education, drinking) never show, and
 # a finished profile has no list of what is missing. Sanna's history after
 # `pnpm demo:reset` (packages/db/src/seed/histories.ts); read only.
 appId: fi.kuutti.app
-name: The card leads with the photo, the name and the verified age, and shows the information fields but nothing soft
+name: The card leads with the photo, the name and the age, and shows the information fields but nothing soft
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile/card
@@ -15,11 +16,11 @@ name: The card leads with the photo, the name and the verified age, and shows th
 - assertVisible: "This is what others see\\.|Tämän muut näkevät\\.|Det här ser andra\\."
 - assertVisible: "Photo 1 of 5|Kuva 1 / 5|Foto 1 av 5"
 - scrollUntilVisible:
-    element: ".*, age verified by your bank|.*, ikä varmistettu pankistasi|.*, ålder verifierad av din bank"
+    element: "Sanna, \\d+"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible: "Sanna"
+- assertNotVisible: ".*verified.*|.*varmistettu.*|.*verifierad.*"
 - assertVisible: "Woman|Nainen|Kvinna"
 - assertVisible: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
 - scrollUntilVisible:

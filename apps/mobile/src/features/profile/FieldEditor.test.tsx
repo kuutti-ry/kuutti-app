@@ -3,15 +3,11 @@ import { fireEvent, screen } from "@testing-library/react-native";
 import { useState } from "react";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { FieldEditor, optionTextKey, SpecialCategoryNote } from "./FieldEditor";
+import { FieldEditor, optionTextKey, toggled, visibleOptions } from "./FieldEditor";
 
 // One field of the registry as the person answers it (#47, #148, ADR-019):
 // a setting as a switch, choices as chips that say whether they are chosen,
 // a short text, a number as a stepper, and a search over a long list.
-
-const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock };
-};
 
 /** The draft the editor works on, as the screens hold it; `fields` is what it holds now. */
 let fields: ProfileFields = {};
@@ -33,7 +29,6 @@ const chosen = (name: string) =>
 
 beforeEach(() => {
   fields = {};
-  router.push.mockReset();
 });
 
 describe("FieldEditor: a setting", () => {
@@ -79,9 +74,29 @@ describe("FieldEditor: several choices", () => {
   it("takes no more than the field's limit", async () => {
     const five = ["fi", "sv", "en", "es", "de"];
     await show("languages", { languages: five } as ProfileFields);
+    await fireEvent.changeText(screen.getByLabelText("Search"), "fren");
     await fireEvent.press(screen.getByRole("button", { name: "French" }));
     expect(fields).toEqual({ languages: five });
     expect(chosen("French")).toBe(false);
+  });
+
+  it("lets 'None of them' stand alone: it clears the parties, and a party clears it (#239)", async () => {
+    await show("politics", { politics: ["kok", "vihr"] } as ProfileFields);
+    await fireEvent.press(screen.getByRole("button", { name: "None of them" }));
+    expect(fields).toEqual({ politics: ["none_of_them"] });
+    expect(chosen("National Coalition Party")).toBe(false);
+    expect(chosen("None of them")).toBe(true);
+    await fireEvent.press(screen.getByRole("button", { name: "Greens" }));
+    expect(fields).toEqual({ politics: ["vihr"] });
+    expect(chosen("None of them")).toBe(false);
+    await fireEvent.press(screen.getByRole("button", { name: "Greens" }));
+    expect(fields).toEqual({});
+  });
+
+  it("no longer offers the coffee party (#239)", async () => {
+    await show("politics");
+    expect(screen.queryByRole("button", { name: "The Coffee Party" })).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(11);
   });
 
   it("puts a glyph before a party's name and still names the button by the party alone", async () => {
@@ -118,6 +133,92 @@ describe("FieldEditor: a long list", () => {
   it("offers no search over a short list", async () => {
     await show("smoking");
     expect(screen.queryByLabelText("Search")).toBeNull();
+  });
+
+  it.each([
+    ["zodiac", "Corgi"],
+    ["politics", "None of them"],
+    ["field", "Other"],
+  ] as const)(
+    "offers no search over the %s, whose every option fits a screen (#239)",
+    async (field, last) => {
+      await show(field);
+      expect(screen.queryByLabelText("Search")).toBeNull();
+      expect(screen.getByRole("button", { name: last })).toBeTruthy();
+    },
+  );
+
+  it("leads the languages with ten, keeps the chosen and 'other' in view, and finds the rest by search (#239)", async () => {
+    await show("languages", { languages: ["de"] } as ProfileFields);
+    for (const name of [
+      "Finnish",
+      "Swedish",
+      "English",
+      "Russian",
+      "Somali",
+      "German",
+      "Another language",
+    ]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    // Vietnamese is eleventh: found by search only.
+    expect(screen.queryByRole("button", { name: "Vietnamese" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "French" })).toBeNull();
+    await fireEvent.changeText(screen.getByLabelText("Search"), "viet");
+    await fireEvent.press(screen.getByRole("button", { name: "Vietnamese" }));
+    expect(fields).toEqual({ languages: ["de", "vi"] });
+    // Chosen, it stays in view once the search is emptied.
+    await fireEvent.changeText(screen.getByLabelText("Search"), "");
+    expect(chosen("Vietnamese")).toBe(true);
+    expect(screen.queryByRole("button", { name: "French" })).toBeNull();
+  });
+
+  it("keeps a language beyond the first ten in view once taken back, so it can be chosen again (#239)", async () => {
+    await show("languages", { languages: ["fi", "de"] } as ProfileFields);
+    await fireEvent.press(screen.getByRole("button", { name: "German" }));
+    expect(fields).toEqual({ languages: ["fi"] });
+    expect(chosen("German")).toBe(false);
+    await fireEvent.press(screen.getByRole("button", { name: "German" }));
+    expect(fields).toEqual({ languages: ["fi", "de"] });
+  });
+});
+
+describe("visibleOptions", () => {
+  const text = (option: string) => `Text of ${option}`;
+
+  it("shows every option of a list that names no first ones, and filters any list by its texts", () => {
+    expect(visibleOptions(["a", "b", "c"], undefined, [], "", text)).toEqual(["a", "b", "c"]);
+    expect(visibleOptions(["a", "b", "c"], undefined, [], "  OF B ", text)).toEqual(["b"]);
+    expect(visibleOptions(["a", "b", "other"], 1, ["b"], "of a", text)).toEqual(["a"]);
+    expect(visibleOptions(["a", "b"], undefined, [], "nothing", text)).toEqual([]);
+  });
+
+  it("shows the first ones, the chosen and 'other' of a list that names first ones", () => {
+    expect(visibleOptions(["a", "b", "c", "d", "other"], 2, ["d"], "", text)).toEqual([
+      "a",
+      "b",
+      "d",
+      "other",
+    ]);
+    expect(visibleOptions(["a", "b", "c"], 0, [], " ", text)).toEqual([]);
+  });
+});
+
+describe("toggled", () => {
+  const spec = { max: 3, alone: ["none"] };
+
+  it("adds an option while the cap allows, and takes a chosen one away", () => {
+    expect(toggled([], "a", spec)).toEqual(["a"]);
+    expect(toggled(["a"], "b", spec)).toEqual(["a", "b"]);
+    expect(toggled(["a", "b", "c"], "d", spec)).toEqual(["a", "b", "c"]);
+    expect(toggled(["a", "b"], "a", spec)).toEqual(["b"]);
+  });
+
+  it("lets an option that stands alone replace the rest, and gives way to any other", () => {
+    expect(toggled(["a", "b", "c"], "none", spec)).toEqual(["none"]);
+    expect(toggled(["none"], "a", spec)).toEqual(["a"]);
+    expect(toggled(["none"], "none", spec)).toEqual([]);
+    expect(toggled(["a"], "b", { max: 3, alone: [] })).toEqual(["a", "b"]);
   });
 });
 
@@ -182,14 +283,5 @@ describe("optionTextKey", () => {
     expect(optionTextKey("smoking", "never", { hasKids: "yes_with_me" } as ProfileFields)).toBe(
       "profile.option.smoking.never",
     );
-  });
-});
-
-describe("SpecialCategoryNote", () => {
-  it("names the consent the sensitive answers are kept under and leads to where it is withdrawn", async () => {
-    await renderWithTheme(<SpecialCategoryNote />);
-    expect(screen.getByText(/Stored under the sensitive-answers consent/)).toBeTruthy();
-    await fireEvent.press(screen.getByRole("button", { name: "Settings" }));
-    expect(router.push).toHaveBeenCalledWith("/settings");
   });
 });

@@ -9,7 +9,7 @@ name: A phone number in the bio is refused on leaving with the reason, and the s
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://profile/section/basics
 - extendedWaitUntil:
-    visible: "The basics|Perustiedot|Grunderna"
+    visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - waitForAnimationToEnd
 - scrollUntilVisible:
@@ -41,7 +41,7 @@ name: A phone number in the bio is refused on leaving with the reason, and the s
 # Away with the edit unsaved, on the word.
 - tapOn: "Leave without saving|Poistu tallentamatta|Lämna utan att spara"
 - extendedWaitUntil:
-    notVisible: "The basics|Perustiedot|Grunderna"
+    notVisible: "(The basics|Perustiedot|Grunderna)(, .*)?"
     timeout: 15000
 - openLink: kuutti://profile/card
 - extendedWaitUntil:

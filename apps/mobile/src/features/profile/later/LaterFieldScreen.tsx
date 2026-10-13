@@ -1,9 +1,4 @@
-import {
-  LATER_COMPANIONS,
-  LATER_FIELD_ORDER,
-  PROFILE_FIELDS,
-  type ProfileFieldKey,
-} from "@kuutti/schema";
+import { LATER_COMPANIONS, LATER_FIELD_ORDER, type ProfileFieldKey } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
@@ -13,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { FieldEditor, SpecialCategoryNote } from "../FieldEditor";
+import { FieldEditor } from "../FieldEditor";
 import { useProfile } from "../useProfile";
 
-/** The route of a later screen; the first one is where the home screen and the profile send a person. */
+/** The route of a later screen; the first one is where the profile list sends a person. */
 export const laterPath = (field: ProfileFieldKey) => `/profile/later/${field}` as const;
 export const FIRST_LATER_FIELD = LATER_FIELD_ORDER[0] as ProfileFieldKey;
 
@@ -43,9 +38,9 @@ export function laterProgress(fields: Record<string, unknown>): {
  * The optional fields, one per screen, in the field sheet's order (#148,
  * TD-16): asked while the person waits at the gate, each with "Ask me
  * later", which writes nothing, and "Save and continue", which saves the
- * whole document and moves on. The article 9 fields carry their consent on
- * the screen. The last screen leads to the optional e-mail, which is the
- * account's.
+ * whole document and moves on. The article 9 fields carry no note on their
+ * consent: Settings is the one place for it (#239). The last screen leads to
+ * the optional e-mail, which is the account's.
  */
 export function LaterFieldScreen({ field }: { field: string }) {
   const { t } = useT();
@@ -73,7 +68,6 @@ export function LaterFieldScreen({ field }: { field: string }) {
   }, [index, key, loadedFields, router]);
   if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
-  const spec = PROFILE_FIELDS[key];
 
   if (profile.status === "loading") {
     return (
@@ -124,8 +118,6 @@ export function LaterFieldScreen({ field }: { field: string }) {
           <Text>{t("profile.later.explain")}</Text>
         )}
 
-        {/* An article 9 field stands under the note on its consent (ADR-019 §4, #204). */}
-        {spec.specialCategory && <SpecialCategoryNote />}
         <FieldEditor field={key} draft={draft} update={update} />
         {companion && <FieldEditor field={companion} draft={draft} update={update} />}
 

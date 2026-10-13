@@ -57,6 +57,22 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
   });
 
+  it("draws a chosen choice (default) and an unchosen one (outline) the same size: both have a 1 px border (#239)", async () => {
+    await renderWithTheme(
+      <>
+        <Button accessibilityState={{ selected: true }}>Gemini</Button>
+        <Button variant="outline" accessibilityState={{ selected: false }}>
+          Cancer
+        </Button>
+      </>,
+    );
+    const chosen = screen.getByRole("button", { name: "Gemini" }).props.className;
+    const unchosen = screen.getByRole("button", { name: "Cancer" }).props.className;
+    expect(chosen).toMatch(/(^| )border( |$)/);
+    expect(chosen).toMatch(/\bborder-transparent\b/);
+    expect(unchosen).toMatch(/(^| )border( |$)/);
+  });
+
   it.each([
     ["destructive", /text-destructive-foreground/],
     ["outline", /text-foreground/],

@@ -21,7 +21,7 @@ For everyone who writes or reviews `packages/i18n/messages.yaml`, and sent with 
 
 - Dates are d.M.yyyy in every language: 19.9.2026. Never ISO (2026-09-19), never month first (9/19/2026), never a month name on a screen. `formatDate` in `packages/i18n`.
 - Times are 24-hour with the language's own separator (14.14); a date with its time is `formatDateTime`, a time alone `formatTime`.
-- A height is centimetres with the unit, `formatHeight` (171 cm); an age is a number, said with "verified by your bank"; distances will be bands, never metres, when there is a second pond.
+- A height is centimetres with the unit, `formatHeight` (171 cm); an age is a number of whole years and stands beside the name (`{name}, {years}`, #239); every account is bank-verified, so no text says so; distances will be bands, never metres, when there is a second pond.
 - A date or a number is never built from strings in a client; `pnpm lint` refuses `toLocaleDateString` and `Intl.DateTimeFormat` outside `packages/i18n`.
 
 ## Hard rules (checked by `pnpm i18n:check`)

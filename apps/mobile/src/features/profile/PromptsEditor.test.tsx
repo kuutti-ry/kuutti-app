@@ -19,9 +19,10 @@ const show = (initial: PromptAnswer[] = []) => renderWithTheme(<Harness initial=
 describe("PromptsEditor", () => {
   it("offers every prompt while none is taken, and adds the one picked with an empty answer", async () => {
     await show();
-    expect(
-      screen.getByText(`Pick up to ${PROMPTS_MAX} and answer each in a line or two.`),
-    ).toBeTruthy();
+    // How many of three hold an answer, and no heading of its own: the screen's names the prompts (#239).
+    expect(screen.getByLabelText(`0 of ${PROMPTS_MAX} answered`)).toBeTruthy();
+    expect(screen.getByText(`0/${PROMPTS_MAX}`)).toBeTruthy();
+    expect(screen.queryByText("Prompts")).toBeNull();
     expect(screen.getByText("Add a prompt")).toBeTruthy();
     expect(
       screen.getAllByRole("button").filter((b) => b.props.accessibilityState?.selected === false),
@@ -33,11 +34,14 @@ describe("PromptsEditor", () => {
     expect(screen.getByLabelText("Your answer to: My ideal Sunday")).toBeTruthy();
   });
 
-  it("writes the answer to its own prompt only", async () => {
+  it("writes the answer to its own prompt only, and counts it once it holds more than blanks", async () => {
     await show([
       { key: "sunday", answer: "" },
       { key: "hidden_talent", answer: "Whistling." },
     ]);
+    expect(screen.getByText("1/3")).toBeTruthy();
+    await fireEvent.changeText(screen.getByLabelText("Your answer to: My ideal Sunday"), "  ");
+    expect(screen.getByText("1/3")).toBeTruthy();
     await fireEvent.changeText(
       screen.getByLabelText("Your answer to: My ideal Sunday"),
       "A long breakfast.",
@@ -46,6 +50,7 @@ describe("PromptsEditor", () => {
       { key: "sunday", answer: "A long breakfast." },
       { key: "hidden_talent", answer: "Whistling." },
     ]);
+    expect(screen.getByText("2/3")).toBeTruthy();
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 

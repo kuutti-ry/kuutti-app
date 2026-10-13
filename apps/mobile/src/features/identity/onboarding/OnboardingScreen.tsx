@@ -661,6 +661,7 @@ export function OnboardingScreen() {
                 }
               />
             </View>
+            <Text variant="small">{t("profile.prompts.label")}</Text>
             <PromptsEditor draft={draft} update={update} />
             <Button
               disabled={busy || profile.saving}

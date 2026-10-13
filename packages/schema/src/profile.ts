@@ -174,7 +174,8 @@ export type CardPhoto = z.infer<typeof CardPhoto>;
 
 /**
  * What another person sees. The age is whole years from the bank-verified
- * year and month, and the card says so; nothing else about the person is
+ * year and month; the card shows it beside the name and does not say it was
+ * verified, since every account is (#239). Nothing else about the person is
  * verified by anyone.
  */
 export const ProfileCard = z

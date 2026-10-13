@@ -41,7 +41,7 @@ describe("the texts of the profile registry", () => {
     expect(has("fi", "legal.special_category.summary")).toBe(true);
   });
 
-  it("lists the parties in the order of their Finnish names, the two that are no party last", () => {
+  it("lists the parties in the order of their Finnish names, none of them last", () => {
     // People know the parties by name and logo (#213); the order is the Finnish names' (ADR-019 §3).
     const finnish = (option: string) =>
       String(i18n.getResource("fi", "translation", `profile.option.politics.${option}`));
@@ -49,9 +49,6 @@ describe("the texts of the profile registry", () => {
     expect([...PARTY_OPTIONS]).toEqual(
       [...PARTY_OPTIONS].sort((a, b) => collator.compare(finnish(a), finnish(b))),
     );
-    expect(PROFILE_FIELDS.politics.options.slice(PARTY_OPTIONS.length)).toEqual([
-      "none_of_them",
-      "kahvipuolue",
-    ]);
+    expect(PROFILE_FIELDS.politics.options.slice(PARTY_OPTIONS.length)).toEqual(["none_of_them"]);
   });
 });

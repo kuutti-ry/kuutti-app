@@ -6,6 +6,9 @@ import {
   HOBBIES,
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
+  LANGUAGES_SHOWN_FIRST,
+  PARTY_OPTIONS,
+  POLITICS_OPTIONS,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
   ProfileFields,
@@ -83,8 +86,68 @@ describe("the profile field registry (ADR-019)", () => {
       { campus: "Otaniemi" },
       { hideFromField: "yes" },
       { occupationTitle: "x".repeat(41) },
+      { politics: ["kahvipuolue"] },
     ]) {
       expect(ProfileFields.safeParse(bad).success, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  describe("an option that stands alone (#239)", () => {
+    it("takes 'none of them' by itself and refuses it next to a party, in either order", () => {
+      const politics = PROFILE_FIELDS.politics.schema;
+      expect(politics.safeParse(["none_of_them"]).success).toBe(true);
+      expect(politics.safeParse(["vihr", "sdp"]).success).toBe(true);
+      expect(politics.safeParse(["none_of_them", "kok"]).success).toBe(false);
+      expect(politics.safeParse(["kok", "none_of_them"]).success).toBe(false);
+      expect(politics.safeParse([...PARTY_OPTIONS, "none_of_them"]).success).toBe(false);
+    });
+
+    it("lets every party be chosen at once, and no more than the parties", () => {
+      expect(PROFILE_FIELDS.politics.max).toBe(PARTY_OPTIONS.length);
+      expect(PROFILE_FIELDS.politics.schema.safeParse([...PARTY_OPTIONS]).success).toBe(true);
+      expect(POLITICS_OPTIONS).toEqual([...PARTY_OPTIONS, "none_of_them"]);
+    });
+
+    it("names only options of its own list, and none on the other lists", () => {
+      for (const key of PROFILE_FIELD_KEYS) {
+        const spec = PROFILE_FIELDS[key];
+        if (spec.kind !== "multi") continue;
+        for (const option of spec.alone) expect(spec.options, key).toContain(option);
+        if (key !== "politics") expect(spec.alone, key).toEqual([]);
+      }
+    });
+
+    it("says why a mix is refused without repeating what was chosen", () => {
+      const result = ProfileFields.safeParse({ politics: ["none_of_them", "kok"] });
+      expect(result.success).toBe(false);
+      expect(result.error?.issues).toEqual([
+        expect.objectContaining({ code: "custom", path: ["politics"] }),
+      ]);
+      expect(JSON.stringify(result.error?.issues)).not.toContain("kok");
+    });
+  });
+
+  it("leads the languages with the national two and English, ten before the search, other last (#239)", () => {
+    const { options, shownFirst } = PROFILE_FIELDS.languages;
+    expect(shownFirst).toBe(LANGUAGES_SHOWN_FIRST);
+    expect(options.slice(0, LANGUAGES_SHOWN_FIRST)).toEqual([
+      "fi",
+      "sv",
+      "en",
+      "ru",
+      "et",
+      "uk",
+      "ar",
+      "fa",
+      "zh",
+      "so",
+    ]);
+    expect(options.at(-1)).toBe("other");
+    expect(new Set(options).size).toBe(options.length);
+    for (const key of PROFILE_FIELD_KEYS) {
+      const spec = PROFILE_FIELDS[key];
+      if (spec.kind === "multi" && key !== "languages")
+        expect(spec.shownFirst, key).toBeUndefined();
     }
   });
 

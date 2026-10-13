@@ -126,7 +126,6 @@ export type MessageParams = {
   "home.gate.failed": Record<never, never>;
   "home.gate.retry": Record<never, never>;
   "home.loading": Record<never, never>;
-  "home.photos.open": Record<never, never>;
   "home.settings.open": Record<never, never>;
   "home.tech.open": Record<never, never>;
   "home.title": Record<never, never>;
@@ -291,15 +290,14 @@ export type MessageParams = {
   "profile.card.explain": Record<never, never>;
   "profile.card.failed": Record<never, never>;
   "profile.card.loading": Record<never, never>;
+  "profile.card.nameAge": { "name": string; "years": number };
   "profile.card.open": Record<never, never>;
   "profile.card.photoLabel": { "position": number; "total": number };
   "profile.card.sharedOption": { "option": string };
   "profile.card.title": Record<never, never>;
-  "profile.card.verifiedAge": { "years": number };
   "profile.clear": Record<never, never>;
   "profile.completeness.age_window": Record<never, never>;
   "profile.completeness.bio_or_prompts": { "min": number };
-  "profile.completeness.complete": Record<never, never>;
   "profile.completeness.display_name": Record<never, never>;
   "profile.completeness.photos": { "min": number };
   "profile.completeness.seeks": Record<never, never>;
@@ -326,7 +324,6 @@ export type MessageParams = {
   "profile.displayName.label": Record<never, never>;
   "profile.error.generic": Record<never, never>;
   "profile.error.text_contact_details": Record<never, never>;
-  "profile.explain": Record<never, never>;
   "profile.failed": Record<never, never>;
   "profile.field.drinking": Record<never, never>;
   "profile.field.drugsAttitude": Record<never, never>;
@@ -537,7 +534,6 @@ export type MessageParams = {
   "profile.option.pets.dog": Record<never, never>;
   "profile.option.pets.none": Record<never, never>;
   "profile.option.pets.other": Record<never, never>;
-  "profile.option.politics.kahvipuolue": Record<never, never>;
   "profile.option.politics.kd": Record<never, never>;
   "profile.option.politics.kesk": Record<never, never>;
   "profile.option.politics.kok": Record<never, never>;
@@ -583,6 +579,10 @@ export type MessageParams = {
   "profile.optionWithKids.wantsKids.dont_want": Record<never, never>;
   "profile.optionWithKids.wantsKids.not_sure": Record<never, never>;
   "profile.optionWithKids.wantsKids.want": Record<never, never>;
+  "profile.progress.answered": { "answered": number; "total": number };
+  "profile.progress.done": Record<never, never>;
+  "profile.progress.photos": { "answered": number; "total": number };
+  "profile.progress.short": { "answered": number; "total": number };
   "profile.prompt.argue_about": Record<never, never>;
   "profile.prompt.ask_me": Record<never, never>;
   "profile.prompt.first_date": Record<never, never>;
@@ -596,7 +596,6 @@ export type MessageParams = {
   "profile.prompt.three_things": Record<never, never>;
   "profile.prompt.unpopular_opinion": Record<never, never>;
   "profile.prompts.answer": { "prompt": string };
-  "profile.prompts.hint": { "max": number };
   "profile.prompts.label": Record<never, never>;
   "profile.prompts.pick": Record<never, never>;
   "profile.prompts.remove": { "prompt": string };
@@ -612,13 +611,14 @@ export type MessageParams = {
   "profile.section.hobbies.title": Record<never, never>;
   "profile.section.lifestyle.summary": Record<never, never>;
   "profile.section.lifestyle.title": Record<never, never>;
+  "profile.section.photos.summary": Record<never, never>;
+  "profile.section.photos.title": Record<never, never>;
   "profile.section.prompts.summary": Record<never, never>;
   "profile.section.prompts.title": Record<never, never>;
   "profile.section.relationship.summary": Record<never, never>;
   "profile.section.relationship.title": Record<never, never>;
   "profile.section.work.summary": Record<never, never>;
   "profile.section.work.title": Record<never, never>;
-  "profile.specialCategory.note": Record<never, never>;
   "profile.text.hint": { "max": number };
   "profile.tip.blurry": Record<never, never>;
   "profile.tip.dismiss": Record<never, never>;

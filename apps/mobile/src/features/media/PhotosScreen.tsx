@@ -91,6 +91,10 @@ export function PhotosScreen() {
 
   const list = photos.list;
   const total = list?.photos.length ?? 0;
+  // The main photo is the first one others see: the first approved in the
+  // owner's order, as the card and the tips read it (ADR-009 §4). The first
+  // tile while it is still in review is not it (#239).
+  const mainId = list?.photos.find((photo) => photo.state === "approved")?.id;
   const busy = photos.busy.kind !== "idle";
   const atMax = list !== null && total >= list.maxPhotos;
 
@@ -167,7 +171,7 @@ export function PhotosScreen() {
                 />
               </Pressable>
               <View className="gap-0.5">
-                {index === 0 && <Text variant="small">{t("photos.main")}</Text>}
+                {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
                 <Text variant="muted">{stateText(photo, t)}</Text>
               </View>
               {photo.state === "rejected" && photo.appealable && (
@@ -186,8 +190,9 @@ export function PhotosScreen() {
               {/* Two rows on purpose: four 44-point targets never fit one row of a half-width tile, and a wrap that depends on the font size put the remove button on a row of its own. */}
               <View className="gap-1">
                 <View className="flex-row gap-1">
-                  {/* A rejected photo is shown to nobody: no main photo, no place in the order (#250). */}
-                  {index !== 0 && photo.state !== "rejected" && (
+                  {/* Only a photo others can see can be the main one: never one in review, never a
+                      rejected one (#250); moving it to the front makes it the first approved (#239). */}
+                  {photo.state === "approved" && photo.id !== mainId && (
                     <Button
                       variant="outline"
                       size="icon"

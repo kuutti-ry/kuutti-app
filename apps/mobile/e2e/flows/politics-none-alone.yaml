@@ -1,0 +1,44 @@
+# The parties screen (#213, #239): the ten parties with the Pirate Party and
+# "none of them", no coffee party, no search box (eleven fit a screen) and no
+# note on the sensitive-answers consent, which Settings alone names (#204).
+# "None of them" stands alone: chosen, it clears the party chosen before it.
+# Sanna consented at the seek step and has no politics answer; nothing is saved.
+appId: fi.kuutti.app
+name: The parties screen lists the parties and none of them, which stands alone, with no note and no search
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://profile/later/politics
+- extendedWaitUntil:
+    visible: "Parties you could vote for|Puolueet, joita voisit äänestää|Partier du kunde rösta på"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertNotVisible: "Stored under the sensitive-answers consent.*|Tallennetaan arkaluonteisten vastausten suostumuksella.*|Lagras under det samtycke till känsliga svar.*"
+- assertNotVisible: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
+- assertNotVisible: "Search|Hae|Sök"
+- assertVisible: "Centre Party|Keskusta|Centern"
+- assertVisible: "National Coalition Party|Kokoomus|Samlingspartiet"
+- assertVisible: "Christian Democrats|Kristillisdemokraatit|Kristdemokraterna"
+- assertVisible: "Movement Now|Liike Nyt|Rörelse Nu"
+- assertVisible: "Finns Party|Perussuomalaiset|Sannfinländarna"
+- assertVisible: "Pirate Party|Piraattipuolue|Piratpartiet"
+- assertVisible: "Swedish People's Party|RKP|SFP"
+- assertVisible: "Social Democrats|SDP|Socialdemokraterna"
+- assertVisible: "Left Alliance|Vasemmistoliitto|Vänsterförbundet"
+- assertVisible: "Greens|Vihreät|De Gröna"
+- tapOn: "Greens|Vihreät|De Gröna"
+- assertVisible:
+    text: "Greens|Vihreät|De Gröna"
+    selected: true
+- scrollUntilVisible:
+    element: "None of them|Ei mikään näistä|Inget av dem"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertNotVisible: "The Coffee Party|Kahvipuolue|Kaffepartiet"
+- tapOn: "None of them|Ei mikään näistä|Inget av dem"
+- assertVisible:
+    text: "None of them|Ei mikään näistä|Inget av dem"
+    selected: true
+- assertVisible:
+    text: "Greens|Vihreät|De Gröna"
+    selected: false

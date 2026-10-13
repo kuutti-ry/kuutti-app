@@ -60,7 +60,7 @@ beforeEach(async () => {
 });
 
 describe("HomeScreen", () => {
-  it("shows the pond, the gate, the profile and the photos, and the two buttons at the top", async () => {
+  it("shows the pond, the gate and the profile, and the two buttons at the top", async () => {
     await renderWithTheme(<HomeScreen />);
     expect(screen.getByRole("heading", { name: "Kuutti" })).toBeTruthy();
     // Both cards have fetched and painted before anything is pressed.
@@ -70,16 +70,10 @@ describe("HomeScreen", () => {
     ).toBeTruthy();
     const user = userEvent.setup();
     await user.press(screen.getByRole("button", { name: "Your profile" }));
-    await user.press(screen.getByRole("button", { name: "Your photos" }));
     await user.press(screen.getByRole("button", { name: "Settings" }));
     // A dev build: the technical view is one tap away; a store build has no such button.
     await user.press(screen.getByRole("button", { name: "Tech config" }));
-    expect(router.push.mock.calls.map((c) => c[0])).toEqual([
-      "/profile",
-      "/photos",
-      "/settings",
-      "/tech",
-    ]);
+    expect(router.push.mock.calls.map((c) => c[0])).toEqual(["/profile", "/settings", "/tech"]);
     // Nothing of the old smoke screen: no API card, no Retry.
     expect(screen.queryByText(/git commit/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
@@ -98,18 +92,15 @@ describe("HomeScreen", () => {
     expect(screen.queryByText("Otaniemi")).toBeNull();
   });
 
-  it("leads to the questions that can wait and to the deal-breakers", async () => {
+  it("leaves the photos, the later questions and the deal-breakers to the profile, which holds them (#239)", async () => {
     await renderWithTheme(<HomeScreen />);
-    const user = userEvent.setup();
-    await user.press(screen.getByRole("button", { name: "Fill in the rest while you wait" }));
-    await user.press(screen.getByRole("button", { name: "Your deal-breakers" }));
-    expect(router.push.mock.calls.map((c) => c[0])).toEqual([
-      "/profile/later/hasKids",
-      "/profile/deal-breakers",
-    ]);
+    expect(await screen.findByRole("button", { name: "Your profile" })).toBeTruthy();
+    for (const name of ["Your photos", "Fill in the rest while you wait", "Your deal-breakers"]) {
+      expect(screen.queryByRole("button", { name })).toBeNull();
+    }
   });
 
-  it("shows the profile and the photos but no pond before the account has one", async () => {
+  it("shows the profile but no pond before the account has one", async () => {
     mockGate = { status: "complete", pond: null };
     await renderWithTheme(<HomeScreen />);
     expect(screen.getByRole("button", { name: "Your profile" })).toBeTruthy();

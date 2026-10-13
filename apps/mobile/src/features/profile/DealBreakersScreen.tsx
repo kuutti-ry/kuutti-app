@@ -18,9 +18,10 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchDealBreakers, saveDealBreakers } from "./client";
-import { Chip, SEARCHABLE_FROM } from "./FieldEditor";
+import { Chip, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
 import { fieldLabelKey, optionKey } from "./keys";
 import { laterPath } from "./later/LaterFieldScreen";
+import { sectionOf, sectionPath } from "./sections";
 import { useProfile } from "./useProfile";
 
 export const DEAL_BREAKERS_PATH = "/profile/deal-breakers" as const;
@@ -49,6 +50,12 @@ const optionsOf = (field: DealBreakerField): readonly string[] => {
   return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
 };
 
+/** How many options lead the accept list before the search: the languages' first ten, as in their picker (#239). */
+const shownFirstOf = (field: DealBreakerField): number | undefined => {
+  const spec = PROFILE_FIELDS[field];
+  return spec.kind === "multi" ? spec.shownFirst : undefined;
+};
+
 /**
  * The deal-breakers under the disclose-to-filter rule (#149, TD-16): up to
  * `max`, each only on a field the person answered themselves, so the screen
@@ -67,6 +74,8 @@ export function DealBreakersScreen() {
   const [max, setMax] = useState(0);
   const [draft, setDraft] = useState<Draft>({});
   const [search, setSearch] = useState<Partial<Record<DealBreakerField, string>>>({});
+  // An option once pressed stays in view on this visit, accepted or not, as in the field editor (#239).
+  const [seen, setSeen] = useState<Partial<Record<DealBreakerField, readonly string[]>>>({});
   const [notice, setNotice] = useState<"saved" | "failed" | "limit" | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -148,11 +157,13 @@ export function DealBreakersScreen() {
       onPress={() => {
         tap();
         // A field of the later screens opens its own; the rest (monogamy) is
-        // answered on the profile screen, which has every field (10/10/2026:
-        // "Answer it" on relationship structure opened the first unanswered
-        // later field instead).
+        // answered in the section that holds it (10/10/2026: "Answer it" on
+        // relationship structure opened the first unanswered later field
+        // instead; #239: not the list again, on top of the one below).
         router.push(
-          (LATER_FIELD_ORDER as readonly string[]).includes(field) ? laterPath(field) : "/profile",
+          (LATER_FIELD_ORDER as readonly string[]).includes(field)
+            ? laterPath(field)
+            : sectionPath(sectionOf(field)),
         );
       }}
     >
@@ -176,13 +187,13 @@ export function DealBreakersScreen() {
           const row = draft[field] ?? OFF;
           const answered = own[field] !== undefined;
           const options = optionsOf(field);
-          const needle = (search[field] ?? "").trim().toLowerCase();
-          const shown =
-            needle === ""
-              ? options
-              : options.filter((option) =>
-                  t(optionKey(field, option)).toLowerCase().includes(needle),
-                );
+          const shown = visibleOptions(
+            options,
+            shownFirstOf(field),
+            [...row.accept, ...(seen[field] ?? [])],
+            search[field] ?? "",
+            (option) => t(optionKey(field, option)),
+          );
           return (
             <View key={field} className="gap-2">
               <View className="flex-row items-center justify-between gap-3">
@@ -234,6 +245,7 @@ export function DealBreakersScreen() {
                           selected={selected}
                           onPress={() => {
                             tap();
+                            setSeen((s) => ({ ...s, [field]: [...(s[field] ?? []), option] }));
                             set(field, {
                               accept: selected
                                 ? row.accept.filter((o) => o !== option)
