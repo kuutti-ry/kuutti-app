@@ -167,6 +167,66 @@ describe("ConsentSwitches", () => {
     );
   });
 
+  it("toggles from the words too, and a switch locked by an outdated wording ignores them", async () => {
+    const version = "2026-09-draft-1";
+    const versions = {
+      terms: version,
+      privacy: version,
+      research: CONSENT_VERSIONS.research,
+      // Newer than the app's wording: the switch is locked until the app is updated.
+      special_category: "2099-01-newer-than-this-app",
+    };
+    let consents: Array<{
+      kind: string;
+      version: string;
+      locale: string;
+      givenAt: string;
+      withdrawnAt: string | null;
+    }> = [];
+    const calls = fetchMock([
+      (req) => {
+        const path = new URL(req.url).pathname;
+        if (req.method === "GET" && path === "/consents") {
+          return json({ consents, currentVersions: versions });
+        }
+        if (req.method === "POST" && path === "/consents") {
+          consents = [
+            {
+              kind: "research",
+              version: CONSENT_VERSIONS.research,
+              locale: "en",
+              givenAt: "2026-09-26T10:00:00.000Z",
+              withdrawnAt: null,
+            },
+          ];
+          return json({ consents, currentVersions: versions });
+        }
+        return null;
+      },
+    ]);
+    await show(<ConsentSwitches />);
+    await screen.findByLabelText("Take part in research");
+    await act(async () => {
+      fireEvent.press(screen.getByText("Take part in research"));
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("Take part in research").props.accessibilityState?.checked).toBe(
+        true,
+      ),
+    );
+    // The sensitive-answers switch is locked (the app's wording is older): its words do nothing.
+    const before = calls.length;
+    await act(async () => {
+      fireEvent.press(screen.getByText("Store my sensitive answers"));
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    });
+    expect(calls.length).toBe(before);
+    expect(
+      screen.getByLabelText("Store my sensitive answers").props.accessibilityState?.checked,
+    ).toBe(false);
+  });
+
   it("shows nothing for a signed-out device", async () => {
     await clearSession();
     fetchMock([]);
