@@ -80,6 +80,7 @@ describe("seed", () => {
           photo_tip_fish_species_min: 70,
           exposure_cards_per_day: 60,
           photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
+          exports_per_day: 3,
           waitlist_k: 10,
           default_pond: "suomi",
           change_cadence_days: 30,

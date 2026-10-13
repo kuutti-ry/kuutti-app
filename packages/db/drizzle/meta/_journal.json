@@ -274,6 +274,20 @@
       "when": 1791891599381,
       "tag": "0038_account_paused_from",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791895768885,
+      "tag": "0039_account_export",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1791895776088,
+      "tag": "0040_exports_per_day",
+      "breakpoints": true
     }
   ]
 }

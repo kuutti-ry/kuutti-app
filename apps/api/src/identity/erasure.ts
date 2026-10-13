@@ -10,6 +10,7 @@ import {
 } from "../matching/index.ts";
 import {
   deleteOrphanedObjects,
+  type ExportedPhotoFile,
   erasePhotosOfAccount,
   exportPhotos,
   type MediaDeps,
@@ -38,6 +39,7 @@ import * as repo from "./repo.ts";
 // The photo check's notes (#253) go too, and are in the export in plain words.
 // The consent rows go (ADR-010 §14): what they proved goes in the same
 // transaction, and the research events carry their own consent_version.
+// The export requests go (#237): the person's own trail, listed in the export.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -45,6 +47,9 @@ export type ErasureDeps = {
   now: () => Date;
   media?: MediaDeps;
 };
+
+/** The export names the API that wrote it (#237); the version string of lib/version.ts. */
+export type ExportDeps = ErasureDeps & { version: string };
 
 export type ErasureSummary = {
   sessions: number;
@@ -55,6 +60,8 @@ export type ErasureSummary = {
   preferences: number;
   /** The consent rows (ADR-010 §14). */
   consents: number;
+  /** The export requests (#237). */
+  exports: number;
   /** 0 or 1: the research_id mapping (#50); the events stay, unlinkable. */
   researchSubjects: number;
   photos: number;
@@ -92,6 +99,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // the sensitive answers they covered went just above, and the events keep
     // the version they were written under; nothing is left to prove.
     const consents = await repo.deleteConsentsOfAccount(tx, accountId);
+    const exports = await repo.deleteExportsOfAccount(tx, accountId);
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
     await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
@@ -109,6 +117,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       profileRows,
       preferences,
       consents,
+      exports,
       researchSubjects,
       reregisterAfter: deletion.reregisterAfter,
     };
@@ -126,6 +135,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     profileRows: result.profileRows,
     preferences: result.preferences,
     consents: result.consents,
+    exports: result.exports,
     researchSubjects: result.researchSubjects,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
@@ -162,12 +172,18 @@ async function exportPhotoCheck(
   };
 }
 
-/** Everything Kuutti holds about the person, as of now; `t` is the request's language. */
+/** The export's history, newest first, at most this many rows; the day's cap keeps it short. */
+export const EXPORT_HISTORY_LIMIT = 1000;
+
+/**
+ * Everything Kuutti holds about the person, as of now: the document, and the
+ * photo files it points to (#237). `t` is the request's language.
+ */
 export async function exportAccount(
-  deps: ErasureDeps,
+  deps: ExportDeps,
   accountId: string,
   t: TFunction,
-): Promise<AccountExport> {
+): Promise<{ document: AccountExport; files: ExportedPhotoFile[] }> {
   const account = await repo.findAccountById(deps.db, accountId);
   const identity = await repo.findIdentitySummaryForAccount(deps.db, accountId);
   if (!account || !identity) throw new AppError(404, "not_found", "No such account");
@@ -181,8 +197,8 @@ export async function exportAccount(
     accountId,
     await currentConsent(deps.db, accountId, "special_category"),
   );
-  const [pond, preferences, consents, research, gate, dealBreakers, photoCheck] = await Promise.all(
-    [
+  const [pond, preferences, consents, research, gate, dealBreakers, photoCheck, exports] =
+    await Promise.all([
       findPondOfAccount(deps.db, accountId),
       readPreferences(deps.db, accountId),
       exportConsents(deps.db, accountId),
@@ -190,10 +206,11 @@ export async function exportAccount(
       exportGate(deps.db, accountId),
       readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
       exportPhotoCheck(deps, accountId, t),
-    ],
-  );
-  return {
+      repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    ]);
+  const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
+    exportedBy: deps.version,
     account: {
       id: account.id,
       state: account.state,
@@ -235,5 +252,7 @@ export async function exportAccount(
     photoCheck,
     research,
     gate,
+    exports: exports.map((e) => ({ at: e.at.toISOString() })),
   };
+  return { document, files: photos.files };
 }

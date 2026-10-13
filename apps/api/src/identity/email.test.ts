@@ -1,7 +1,7 @@
-import { AccountExport } from "@kuutti/schema";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount } from "../test/account.ts";
+import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 
 // features/identity/erasure.feature (#148, TD-18): the optional e-mail, a way
@@ -34,9 +34,7 @@ describe("the optional e-mail", () => {
     expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(204);
     expect(await readEmail(app, a.headers)).toEqual({ email: ADDRESS });
     // The person's own download carries it; nothing else does.
-    const exported = AccountExport.parse(
-      await (await app.request("/account/export", { headers: a.headers })).json(),
-    );
+    const exported = await exportOf(app, a.headers);
     expect(exported.account.email).toBe(ADDRESS);
     // Validated as an address and nothing else.
     for (const body of [{ email: "aino" }, { email: "" }, { email: "a@b", extra: 1 }, {}]) {

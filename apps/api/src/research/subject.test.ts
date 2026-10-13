@@ -1,6 +1,6 @@
-import { AccountExport } from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { signedInAccount } from "../test/account.ts";
+import { exportOf } from "../test/export.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../test/harness.ts";
 import { ensureEventPartitions } from "./partitions.ts";
 import * as repo from "./repo.ts";
@@ -157,9 +157,7 @@ describe("the research_id mapping", () => {
       complete: false,
       approvedPhotos: 1,
     });
-    const response = await ctx.app.request("/account/export", { headers: a.headers });
-    expect(response.status).toBe(200);
-    const body = AccountExport.parse(await response.json());
+    const body = await exportOf(ctx.app, a.headers);
     expect(body.research.enrolled).toBe(true);
     expect(body.research.consentVersion).toBe(CURRENT_CONSENT_VERSIONS.research);
     expect(body.research.since).toBeTruthy();
@@ -177,9 +175,7 @@ describe("the research_id mapping", () => {
     expect(JSON.stringify(body)).not.toContain(researchId);
 
     await withdraw(ctx, a.headers);
-    const after = AccountExport.parse(
-      await (await ctx.app.request("/account/export", { headers: a.headers })).json(),
-    );
+    const after = await exportOf(ctx.app, a.headers);
     expect(after.research).toEqual({
       enrolled: false,
       since: null,
