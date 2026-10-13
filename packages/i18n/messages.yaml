@@ -2951,6 +2951,13 @@ errors.card_budget_exceeded:
   sv: Du har sett många profiler i dag. Nya kommer efter midnatt.
   machine: { fi: true, sv: true }
 
+errors.export_budget_exceeded:
+  en: That is enough copies of your data for today. You can download it again after midnight.
+  description: Export route (429 with Retry-After), the account has taken the day's copies from matching_config exports_per_day (#237); the day rolls at midnight in Finland. Said plainly, nobody is limited in silence.
+  fi: Tältä päivältä kopioita tiedoistasi on jo tarpeeksi. Voit ladata ne uudelleen keskiyön jälkeen.
+  sv: Det räcker med kopior av dina uppgifter för i dag. Du kan ladda ner dem igen efter midnatt.
+  machine: { fi: true, sv: true }
+
 errors.text_contact_details:
   en: Your profile text cannot contain an e-mail address, a link, a phone number or a social media handle.
   description: Profile save (400), a text field carried a way to reach the person outside Kuutti (#47, the plain-text rule). The API says which field in the envelope's detail, never in the message.
@@ -4210,6 +4217,20 @@ account.export.failed:
   description: Account card, the export request failed.
   fi: Lataus ei onnistunut. Yritä uudelleen.
   sv: Nedladdningen misslyckades. Försök igen.
+  machine: { fi: true, sv: true }
+
+account.export.limited:
+  en: That is enough copies for today. You can download your data again after midnight.
+  description: Account card, the export refused because the day's copies (matching_config exports_per_day, #237) are used up; the day rolls at midnight in Finland. Never a number, the cap is a tunable.
+  fi: Tältä päivältä kopioita on jo tarpeeksi. Voit ladata tietosi uudelleen keskiyön jälkeen.
+  sv: Det räcker med kopior för i dag. Du kan ladda ner dina uppgifter igen efter midnatt.
+  machine: { fi: true, sv: true }
+
+account.export.fileName:
+  en: kuutti-data
+  description: "The stem of the export's file name (#237): the zip is <stem>-<date>.zip and the JSON inside it <stem>-<date>.json. ASCII letters, digits and hyphens only, in every language: the name goes into an HTTP header and the phone's Files app. Nothing about the person in it."
+  fi: kuutti-tiedot
+  sv: kuutti-uppgifter
   machine: { fi: true, sv: true }
 
 account.export.photoCheck.about:

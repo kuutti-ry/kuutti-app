@@ -5,7 +5,7 @@ import { captureLogger, type TestContext, test } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { deleteOrphanedObjects, erasePhotosOfAccount, exportPhotos } from "./erasure.ts";
 import type { PhotoServiceDeps } from "./photos.ts";
-import { insertPhoto, insertPhotoAccess } from "./repo.ts";
+import { insertPhoto, insertPhotoAccess, logPhotoAccess } from "./repo.ts";
 import { type MediaStore, objectKey } from "./store.ts";
 
 // The media half of erasure and export (#51, TD-7): the rows inside the
@@ -40,6 +40,13 @@ describe("media inserts after erasure", () => {
       limit: 100,
     });
     expect(access).toMatchObject({ live: false, recorded: false });
+    // The export's uncounted row (#237) is guarded the same way.
+    await logPhotoAccess(ctx.client, {
+      accountId: a.accountId,
+      photoId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+      variant: "full",
+      at: new Date(),
+    });
     for (const table of ["photo", "photo_access"]) {
       const { rows } = await ctx.client.query<{ n: string }>(
         `SELECT count(*) AS n FROM ${table} WHERE account_id = $1`,
@@ -189,15 +196,16 @@ describe("the export of the photos", () => {
   async function serviceDeps(ctx: TestContext, budget = { thumb: 10, card: 10, full: 10 }) {
     await withMatchingConfig(ctx.client, { photo_fetches_per_day: budget });
     const { logger } = await captureLogger();
-    const { deps } = testMediaDeps();
+    const { deps, store } = testMediaDeps();
     const service: PhotoServiceDeps = { ...deps, db: ctx.client, logger, now: () => new Date() };
-    return service;
+    return { service, store };
   }
+  const bytesOf = (text: string) => new TextEncoder().encode(text);
 
-  test("each photo with its URLs and its moderation outcome, never the labels, and the export's own fetches in the log", async ({
+  test("each photo with its file and its moderation outcome, never the labels, and the export's own reads in the log", async ({
     ctx,
   }) => {
-    const deps = await serviceDeps(ctx);
+    const { service, store } = await serviceDeps(ctx);
     const a = await signedInAccount(ctx.client);
     const staff = await staffSession(ctx.client);
     const byStaff = await photoOf(ctx, a.accountId, "k-staff", "rejected", 0);
@@ -209,8 +217,12 @@ describe("the export of the photos", () => {
               ($3, '[]', 1, '{}', 'approved', NULL, NULL, NULL)`,
       [byStaff, staff.identityId, byMachine],
     );
+    // A rejected photo's object is still held, and so is given; the unchecked one's object is gone.
+    await store.put(objectKey("k-staff", "full"), bytesOf("staff-full"), "image/webp");
+    await store.put(objectKey("k-staff", "thumb"), bytesOf("staff-thumb"), "image/webp");
+    await store.put(objectKey("k-machine", "full"), bytesOf("machine-full"), "image/webp");
 
-    const exported = await exportPhotos(deps, a.accountId);
+    const exported = await exportPhotos(service, a.accountId);
     expect(exported.photos.map((p) => p.id)).toEqual([byStaff, byMachine, unchecked]);
     expect(exported.photos[0]?.review).toEqual({
       decision: "rejected",
@@ -225,29 +237,55 @@ describe("the export of the photos", () => {
       decidedAt: null,
     });
     expect(exported.photos[2]?.review).toBeNull();
-    for (const photo of exported.photos) {
-      expect(Object.keys(photo.urls ?? {}).sort()).toEqual(["card", "full", "thumb"]);
-    }
-    expect(JSON.stringify(exported)).not.toContain("Suggestive");
-    // Nine URLs issued, nine rows in the fetch log the export returns.
-    expect(exported.accessLog).toHaveLength(9);
-    expect(new Set(exported.accessLog.map((e) => e.photoId))).toEqual(
-      new Set([byStaff, byMachine, unchecked]),
+    expect(exported.photos.map((p) => p.file)).toEqual([
+      `photos/${byStaff}.webp`,
+      `photos/${byMachine}.webp`,
+      null,
+    ]);
+    // The full variant as stored, never a smaller one, never re-encoded.
+    expect(exported.files.map((f) => [f.path, new TextDecoder().decode(f.bytes)])).toEqual([
+      [`photos/${byStaff}.webp`, "staff-full"],
+      [`photos/${byMachine}.webp`, "machine-full"],
+    ]);
+    expect(JSON.stringify(exported.photos)).not.toContain("Suggestive");
+    // Two files read, two rows in the fetch log the export returns.
+    expect(exported.accessLog.map((e) => [e.photoId, e.variant]).sort()).toEqual(
+      [
+        [byStaff, "full"],
+        [byMachine, "full"],
+      ].sort(),
     );
   });
 
-  test("over the day's budget the photo is still listed, without URLs", async ({ ctx }) => {
-    const deps = await serviceDeps(ctx, { thumb: 10, card: 0, full: 10 });
+  test("over the day's photo budget the file is still given and the read still logged", async ({
+    ctx,
+  }) => {
+    const { service, store } = await serviceDeps(ctx, { thumb: 10, card: 10, full: 0 });
     const a = await signedInAccount(ctx.client);
     const id = await photoOf(ctx, a.accountId, "k-budget");
-    const exported = await exportPhotos(deps, a.accountId);
-    expect(exported.photos).toHaveLength(1);
-    expect(exported.photos[0]).toMatchObject({ id, urls: null });
-    // The two variants within the budget were fetched and are in the log; the card was not.
-    expect(exported.accessLog.map((e) => e.variant).sort()).toEqual(["full", "thumb"]);
+    await store.put(objectKey("k-budget", "full"), bytesOf("budget-full"), "image/webp");
+    const exported = await exportPhotos(service, a.accountId);
+    expect(exported.photos[0]).toMatchObject({ id, file: `photos/${id}.webp` });
+    expect(exported.files).toHaveLength(1);
+    // Logged, counted against later fetches, never refused: the day's copies are capped elsewhere.
+    expect(exported.accessLog.map((e) => e.variant)).toEqual(["full"]);
   });
 
-  test("without object storage the photos are listed without URLs and nothing is fetched", async ({
+  test("two rows that share one object each get their own file", async ({ ctx }) => {
+    const { service, store } = await serviceDeps(ctx);
+    const a = await signedInAccount(ctx.client);
+    const first = await photoOf(ctx, a.accountId, "k-twice", "approved", 0);
+    const second = await photoOf(ctx, a.accountId, "k-twice", "approved", 1);
+    await store.put(objectKey("k-twice", "full"), bytesOf("twice"), "image/webp");
+    const exported = await exportPhotos(service, a.accountId);
+    expect(exported.files.map((f) => f.path)).toEqual([
+      `photos/${first}.webp`,
+      `photos/${second}.webp`,
+    ]);
+    expect(exported.files.every((f) => new TextDecoder().decode(f.bytes) === "twice")).toBe(true);
+  });
+
+  test("without object storage the photos are listed without files and nothing is read", async ({
     ctx,
   }) => {
     const { logger } = await captureLogger();
@@ -258,33 +296,31 @@ describe("the export of the photos", () => {
       a.accountId,
     );
     expect(exported).toEqual({
-      photos: [expect.objectContaining({ id, urls: null, review: null })],
+      photos: [expect.objectContaining({ id, file: null, review: null })],
+      files: [],
       accessLog: [],
       cardsShown: [],
     });
   });
 
-  test("a failure other than the budget fails the export rather than hiding a photo's URLs", async ({
-    ctx,
-  }) => {
-    const deps = await serviceDeps(ctx);
+  test("a store that fails fails the export rather than hiding a photo's file", async ({ ctx }) => {
+    const { service } = await serviceDeps(ctx);
     const a = await signedInAccount(ctx.client);
-    await photoOf(ctx, a.accountId, "k-signer");
+    await photoOf(ctx, a.accountId, "k-store");
     const broken: PhotoServiceDeps = {
-      ...deps,
-      signer: {
-        sign: async () => {
-          throw new Error("the signing key is unreadable");
+      ...service,
+      store: {
+        ...service.store,
+        get: async () => {
+          throw new Error("the bucket is unreachable");
         },
       },
     };
-    await expect(exportPhotos(broken, a.accountId)).rejects.toThrow(
-      "the signing key is unreadable",
-    );
+    await expect(exportPhotos(broken, a.accountId)).rejects.toThrow("the bucket is unreachable");
   });
 
   test("another account's photos and fetches are never in the export", async ({ ctx }) => {
-    const deps = await serviceDeps(ctx);
+    const { service } = await serviceDeps(ctx);
     const a = await signedInAccount(ctx.client, "a");
     const b = await signedInAccount(ctx.client, "b");
     await photoOf(ctx, b.accountId, "k-theirs");
@@ -292,8 +328,9 @@ describe("the export of the photos", () => {
       "INSERT INTO photo_access (account_id, photo_id, variant, at) SELECT $1, id, 'thumb', now() FROM photo WHERE account_id = $1",
       [b.accountId],
     );
-    expect(await exportPhotos(deps, a.accountId)).toEqual({
+    expect(await exportPhotos(service, a.accountId)).toEqual({
       photos: [],
+      files: [],
       accessLog: [],
       cardsShown: [],
     });

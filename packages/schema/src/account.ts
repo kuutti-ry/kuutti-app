@@ -53,17 +53,12 @@ export const AccountPauseRequest = z
   .meta({ id: "AccountPauseRequest" });
 export type AccountPauseRequest = z.infer<typeof AccountPauseRequest>;
 
-const SignedVariantUrls = z
-  .object({
-    thumb: z.url(),
-    card: z.url(),
-    full: z.url(),
-  })
-  .meta({ id: "SignedVariantUrls", description: "Fifteen-minute URLs, one per variant." });
+/** `photos/<photo id>.webp`: where a photo's file sits inside the export's zip (#237). */
+export const EXPORT_PHOTO_PATH_MAX = 60;
 
 export const ExportedPhoto = Photo.extend({
-  /** Absent when the API has no object storage configured (development without the stand-in). */
-  urls: SignedVariantUrls.nullable(),
+  /** The path of the photo's full-size file inside the zip; null when its object is gone, or the API has no object storage (development without the stand-in). */
+  file: z.string().max(EXPORT_PHOTO_PATH_MAX).nullable(),
   review: z
     .object({
       decision: z.enum(["approved", "queued", "rejected"]),
@@ -109,9 +104,14 @@ export type ExportedPhotoCheck = z.infer<typeof ExportedPhotoCheck>;
  * month, no personal identity code (only its keyed hash, which is omitted
  * because it identifies nothing without the key).
  */
+/** The API's version string: `0.16.0-37a837c`, or the tag of a release (CLAUDE.md Git). */
+export const EXPORTED_BY_MAX = 100;
+
 export const AccountExport = z
   .object({
     exportedAt: z.iso.datetime(),
+    /** Which API wrote the file (#237): the contract this document follows is the one at that version. */
+    exportedBy: z.string().max(EXPORTED_BY_MAX),
     account: z.object({
       id: z.uuid(),
       state: AccountState,
@@ -175,6 +175,8 @@ export const AccountExport = z
     research: ResearchExport,
     /** The place at the pond gate (#94, ADR-015); null before the first count. */
     gate: ExportedGate.nullable(),
+    /** The person's own requests for a copy (#237), this one included, newest first, at most 1000; at most matching_config exports_per_day are answered per Finnish day. */
+    exports: z.array(z.object({ at: z.iso.datetime() })).max(1000),
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

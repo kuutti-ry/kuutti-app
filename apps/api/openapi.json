@@ -14,367 +14,16 @@
       }
     },
     "schemas": {
-      "HealthResponse": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "degraded"
-            ],
-            "description": "ok when the database answers and migrations are current; degraded otherwise."
-          },
-          "version": {
-            "type": "string",
-            "minLength": 1,
-            "description": "APP_VERSION injected at build time."
-          },
-          "commit": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Short git commit the build was made from."
-          },
-          "builtAt": {
-            "type": "string",
-            "minLength": 1,
-            "description": "ISO 8601 build timestamp."
-          },
-          "source": {
-            "type": "string",
-            "format": "uri",
-            "description": "Where the source of the running service is published (AGPL-3.0 section 13), to be read with `commit`. A modified deployment points this at its own source."
-          },
-          "db": {
-            "type": "string",
-            "enum": [
-              "ok",
-              "unreachable"
-            ],
-            "description": "SELECT 1 answered within 500 ms."
-          },
-          "migrations": {
-            "type": "string",
-            "enum": [
-              "current",
-              "pending"
-            ],
-            "description": "Committed migrations compared with the ones applied to this database."
-          }
-        },
-        "required": [
-          "status",
-          "version",
-          "commit",
-          "builtAt",
-          "source",
-          "db",
-          "migrations"
-        ]
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Stable machine-readable code."
-              },
-              "message": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Short, generic, safe to show."
-              },
-              "requestId": {
-                "type": "string",
-                "minLength": 1,
-                "description": "Matches the API log line."
-              }
-            },
-            "required": [
-              "code",
-              "message",
-              "requestId"
-            ]
-          }
-        },
-        "required": [
-          "error"
-        ]
-      },
-      "AuthExchangeResponse": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "This device's session; the app keeps it with the tokens."
-          },
-          "accessToken": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "Bearer token; valid until accessExpiresAt."
-          },
-          "accessExpiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "refreshToken": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "Single use: /auth/refresh answers with a new pair and retires this one."
-          },
-          "refreshExpiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "After this the device logs in through the bank again."
-          },
-          "outcome": {
-            "type": "string",
-            "enum": [
-              "created",
-              "resumed",
-              "unpaused"
-            ],
-            "description": "created: a fresh account (first login or after a cooldown); resumed: the live account; unpaused: the live account, back from a break (#170)."
-          }
-        },
-        "required": [
-          "sessionId",
-          "accessToken",
-          "accessExpiresAt",
-          "refreshToken",
-          "refreshExpiresAt",
-          "outcome"
-        ]
-      },
-      "AuthExchangeRequest": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "The one-time code the deep link carried."
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "additionalProperties": false
-      },
-      "SessionTokens": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "This device's session; the app keeps it with the tokens."
-          },
-          "accessToken": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "Bearer token; valid until accessExpiresAt."
-          },
-          "accessExpiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "refreshToken": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$",
-            "description": "Single use: /auth/refresh answers with a new pair and retires this one."
-          },
-          "refreshExpiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "description": "After this the device logs in through the bank again."
-          }
-        },
-        "required": [
-          "sessionId",
-          "accessToken",
-          "accessExpiresAt",
-          "refreshToken",
-          "refreshExpiresAt"
-        ]
-      },
-      "AuthRefreshRequest": {
-        "type": "object",
-        "properties": {
-          "refreshToken": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$"
-          }
-        },
-        "required": [
-          "refreshToken"
-        ],
-        "additionalProperties": false
-      },
-      "SessionResponse": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "accountId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "platform": {
-            "$ref": "#/components/schemas/AuthPlatform"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "refreshExpiresAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "sessionId",
-          "accountId",
-          "platform",
-          "createdAt",
-          "refreshExpiresAt"
-        ]
-      },
-      "AuthPlatform": {
-        "type": "string",
-        "enum": [
-          "ios",
-          "android"
-        ]
-      },
-      "AdminSession": {
-        "type": "object",
-        "properties": {
-          "accessToken": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "role": {
-            "$ref": "#/components/schemas/ModeratorRole"
-          }
-        },
-        "required": [
-          "accessToken",
-          "expiresAt",
-          "role"
-        ]
-      },
-      "ModeratorRole": {
-        "type": "string",
-        "enum": [
-          "moderator",
-          "admin",
-          "researcher"
-        ]
-      },
-      "AdminAuthExchangeRequest": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9_-]{43}$"
-          }
-        },
-        "required": [
-          "code"
-        ],
-        "additionalProperties": false
-      },
-      "AdminWhoAmI": {
-        "type": "object",
-        "properties": {
-          "role": {
-            "$ref": "#/components/schemas/ModeratorRole"
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "role",
-          "expiresAt"
-        ]
-      },
-      "AccountEmailResponse": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "nullable": true,
-            "maxLength": 254
-          }
-        },
-        "required": [
-          "email"
-        ]
-      },
-      "AccountEmail": {
-        "type": "object",
-        "properties": {
-          "email": {
-            "type": "string",
-            "maxLength": 254,
-            "format": "email"
-          }
-        },
-        "required": [
-          "email"
-        ],
-        "additionalProperties": false
-      },
-      "AccountDeletionRequest": {
-        "type": "object",
-        "properties": {
-          "confirm": {
-            "type": "boolean",
-            "enum": [
-              true
-            ],
-            "description": "Must be true: the person confirmed in the app."
-          }
-        },
-        "required": [
-          "confirm"
-        ],
-        "additionalProperties": false
-      },
-      "AccountPauseRequest": {
-        "type": "object",
-        "properties": {
-          "confirm": {
-            "type": "boolean",
-            "enum": [
-              true
-            ],
-            "description": "Must be true: the person said they understand what a break means."
-          }
-        },
-        "required": [
-          "confirm"
-        ],
-        "additionalProperties": false
-      },
       "AccountExport": {
         "type": "object",
         "properties": {
           "exportedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "exportedBy": {
+            "type": "string",
+            "maxLength": 100
           },
           "account": {
             "type": "object",
@@ -618,10 +267,27 @@
           },
           "gate": {
             "$ref": "#/components/schemas/ExportedGate"
+          },
+          "exports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "at"
+              ]
+            },
+            "maxItems": 1000
           }
         },
         "required": [
           "exportedAt",
+          "exportedBy",
           "account",
           "preferences",
           "dealBreakers",
@@ -634,7 +300,8 @@
           "cardsShown",
           "photoCheck",
           "research",
-          "gate"
+          "gate",
+          "exports"
         ]
       },
       "Gender": {
@@ -817,6 +484,13 @@
           "ok",
           "suspended",
           "banned"
+        ]
+      },
+      "AuthPlatform": {
+        "type": "string",
+        "enum": [
+          "ios",
+          "android"
         ]
       },
       "ProfileDocument": {
@@ -1335,8 +1009,10 @@
             "type": "string",
             "format": "date-time"
           },
-          "urls": {
-            "$ref": "#/components/schemas/SignedVariantUrls"
+          "file": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
           },
           "review": {
             "type": "object",
@@ -1382,7 +1058,7 @@
           "appealable",
           "position",
           "createdAt",
-          "urls",
+          "file",
           "review"
         ]
       },
@@ -1398,30 +1074,6 @@
           "queued",
           "rejected"
         ]
-      },
-      "SignedVariantUrls": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "thumb": {
-            "type": "string",
-            "format": "uri"
-          },
-          "card": {
-            "type": "string",
-            "format": "uri"
-          },
-          "full": {
-            "type": "string",
-            "format": "uri"
-          }
-        },
-        "required": [
-          "thumb",
-          "card",
-          "full"
-        ],
-        "description": "Fifteen-minute URLs, one per variant."
       },
       "PhotoRejectionReason": {
         "type": "string",
@@ -1651,6 +1303,354 @@
           "openedAt",
           "countedAt"
         ]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "description": "ok when the database answers and migrations are current; degraded otherwise."
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "description": "APP_VERSION injected at build time."
+          },
+          "commit": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Short git commit the build was made from."
+          },
+          "builtAt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ISO 8601 build timestamp."
+          },
+          "source": {
+            "type": "string",
+            "format": "uri",
+            "description": "Where the source of the running service is published (AGPL-3.0 section 13), to be read with `commit`. A modified deployment points this at its own source."
+          },
+          "db": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unreachable"
+            ],
+            "description": "SELECT 1 answered within 500 ms."
+          },
+          "migrations": {
+            "type": "string",
+            "enum": [
+              "current",
+              "pending"
+            ],
+            "description": "Committed migrations compared with the ones applied to this database."
+          }
+        },
+        "required": [
+          "status",
+          "version",
+          "commit",
+          "builtAt",
+          "source",
+          "db",
+          "migrations"
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Stable machine-readable code."
+              },
+              "message": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Short, generic, safe to show."
+              },
+              "requestId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Matches the API log line."
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "requestId"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "AuthExchangeResponse": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "This device's session; the app keeps it with the tokens."
+          },
+          "accessToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Bearer token; valid until accessExpiresAt."
+          },
+          "accessExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Single use: /auth/refresh answers with a new pair and retires this one."
+          },
+          "refreshExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "After this the device logs in through the bank again."
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "created",
+              "resumed",
+              "unpaused"
+            ],
+            "description": "created: a fresh account (first login or after a cooldown); resumed: the live account; unpaused: the live account, back from a break (#170)."
+          }
+        },
+        "required": [
+          "sessionId",
+          "accessToken",
+          "accessExpiresAt",
+          "refreshToken",
+          "refreshExpiresAt",
+          "outcome"
+        ]
+      },
+      "AuthExchangeRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "The one-time code the deep link carried."
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "SessionTokens": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "This device's session; the app keeps it with the tokens."
+          },
+          "accessToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Bearer token; valid until accessExpiresAt."
+          },
+          "accessExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Single use: /auth/refresh answers with a new pair and retires this one."
+          },
+          "refreshExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "After this the device logs in through the bank again."
+          }
+        },
+        "required": [
+          "sessionId",
+          "accessToken",
+          "accessExpiresAt",
+          "refreshToken",
+          "refreshExpiresAt"
+        ]
+      },
+      "AuthRefreshRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ],
+        "additionalProperties": false
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/AuthPlatform"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "sessionId",
+          "accountId",
+          "platform",
+          "createdAt",
+          "refreshExpiresAt"
+        ]
+      },
+      "AdminSession": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ModeratorRole"
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresAt",
+          "role"
+        ]
+      },
+      "ModeratorRole": {
+        "type": "string",
+        "enum": [
+          "moderator",
+          "admin",
+          "researcher"
+        ]
+      },
+      "AdminAuthExchangeRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "AdminWhoAmI": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/ModeratorRole"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "role",
+          "expiresAt"
+        ]
+      },
+      "AccountEmailResponse": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 254
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "AccountEmail": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "additionalProperties": false
+      },
+      "AccountDeletionRequest": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Must be true: the person confirmed in the app."
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
+      },
+      "AccountPauseRequest": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Must be true: the person said they understand what a break means."
+          }
+        },
+        "required": [
+          "confirm"
+        ],
+        "additionalProperties": false
       },
       "PhotoList": {
         "type": "object",
@@ -3429,7 +3429,7 @@
     "/account/export": {
       "get": {
         "summary": "Everything Kuutti holds about this account",
-        "description": "One JSON document: the account, the identity's dates and login level, the devices signed in, the photos with fifteen-minute URLs and their moderation outcome, and the person's own fetch log. Nothing about anyone else.",
+        "description": "One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every photo whose object the store holds. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant.",
         "security": [
           {
             "session": []
@@ -3437,17 +3437,39 @@
         ],
         "responses": {
           "200": {
-            "description": "The export.",
+            "description": "The zip; Content-Disposition names the file.",
             "content": {
-              "application/json": {
+              "application/zip": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccountExport"
+                  "type": "string",
+                  "format": "binary",
+                  "description": "The zip with the document and the photos."
                 }
               }
             }
           },
           "401": {
             "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account: erased between the session guard and the record (not_found).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "export_budget_exceeded: the day's copies are used up; Retry-After is the wait until the day rolls.",
             "content": {
               "application/json": {
                 "schema": {

@@ -40,7 +40,7 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 ## Runtimes
 
 - **App**: `src/lib/locale.tsx` resolves the phone's languages (`expo-localization`) to a catalogue, lets a stored in-app choice beat it, and offers `en-XA` in dev builds. Locales fall back to English per key.
-- **API**: `src/lib/i18n.ts` gives each request `c.get("t")` and `c.get("locale")` from `Accept-Language` (the account's stored locale from M2). Error envelopes keep their stable `code`; the `message` follows the request's language.
+- **API**: `src/lib/i18n.ts` gives each request `c.get("t")` and `c.get("locale")` from `Accept-Language`. Error envelopes keep their stable `code`; the `message` follows the request's language.
 - **Admin**: English only by decision; it still reads its text from here.
 
 ## Checks

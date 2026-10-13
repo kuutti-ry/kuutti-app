@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { ApiError } from "@/lib/api";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
-import { SessionProvider, useSession } from "./session";
+import { exportFileName, SessionProvider, useSession } from "./session";
 
 // Whether this device is signed in (#35, #51): read from the store at start,
 // the exchange of the bank login's one-time code, the three ways out, the
@@ -16,43 +16,6 @@ const tokens = (seed = "a", sessionId = SESSION_ID) => ({
   refreshToken: token(`refresh${seed}`),
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 });
-const EXPORTED = {
-  exportedAt: "2026-09-26T10:00:00.000Z",
-  account: {
-    id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
-    state: "active",
-    stateChangedAt: null,
-    registeredAt: "2026-09-01T00:00:00.000Z",
-    birthYear: 1990,
-    birthMonth: 6,
-    gender: null,
-    pond: null,
-    genderChangedAt: null,
-    seeksChangedAt: null,
-    email: null,
-  },
-  identity: {
-    firstSeenAt: "2026-09-01T00:00:00.000Z",
-    lastBankLoginAt: null,
-    loginLevel: null,
-    standing: "ok",
-    standingChangedAt: null,
-    deletionCount: 0,
-    refusedAttempts: 0,
-    reregisterAfter: null,
-  },
-  sessions: [],
-  profile: null,
-  preferences: { seeks: null, ageWindow: null },
-  dealBreakers: [],
-  consents: [],
-  photos: [],
-  photoAccessLog: [],
-  cardsShown: [],
-  photoCheck: { about: "About the photo check.", photosNotShown: [], carefulCheckUntil: null },
-  research: { enrolled: false, since: null, consentVersion: null, events: [] },
-  gate: null,
-};
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -213,15 +176,35 @@ describe("SessionProvider: signing out", () => {
 });
 
 describe("SessionProvider: the account", () => {
-  it("exports everything the API holds, parsed", async () => {
+  it("exports everything the API holds as the zip it sent, under the name it gave", async () => {
     await saveSession(tokens());
-    serve({ "GET /account/export": () => json(EXPORTED) });
+    const bytes = new Uint8Array([0x50, 0x4b, 0x05, 0x06, 1, 2, 3]);
+    serve({
+      "GET /account/export": () =>
+        new Response(bytes, {
+          status: 200,
+          headers: {
+            "content-type": "application/zip",
+            "content-disposition": 'attachment; filename="kuutti-tiedot-2026-10-13.zip"',
+          },
+        }),
+    });
     const { result } = await session();
-    let exported: unknown;
+    let exported: { name: string; bytes: Uint8Array } | undefined;
     await act(async () => {
       exported = await result.current.exportData();
     });
-    expect(exported).toEqual(EXPORTED);
+    expect(exported?.name).toBe("kuutti-tiedot-2026-10-13.zip");
+    expect(Array.from(exported?.bytes ?? [])).toEqual(Array.from(bytes));
+  });
+
+  it.each([
+    [null, "kuutti-data.zip"],
+    ["inline", "kuutti-data.zip"],
+    ['attachment; filename="kuutti-data-2026-10-13.zip"', "kuutti-data-2026-10-13.zip"],
+    ['attachment; filename="../a b/kuutti.zip"', ".._a_b_kuutti.zip"],
+  ])("names the file from the header %s as %s", (header, name) => {
+    expect(exportFileName(header)).toBe(name);
   });
 
   it("throws the refusal of an export with its code", async () => {

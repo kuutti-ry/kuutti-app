@@ -28,6 +28,7 @@ describe("the tables", () => {
   it("are every table the migrations create but events, whose partitions a custom migration writes", () => {
     expect(tables.map((table) => table.name).sort()).toEqual([
       "account",
+      "account_export",
       "admin_session",
       "audit_log",
       "auth_request",
@@ -110,6 +111,7 @@ describe("the foreign keys", () => {
       .filter((reference) => reference.includes(" -> account.id"))
       .map((reference) => reference.split(".")[0]);
     expect(toAccount.sort()).toEqual([
+      "account_export",
       "auth_request",
       "card_shown",
       "consent",
@@ -179,6 +181,7 @@ describe("the indexes", () => {
 
   it.each([
     ["photo_access", "photo_access_account_at_idx", ["account_id", "at"]],
+    ["account_export", "account_export_account_at_idx", ["account_id", "at"]],
     ["card_shown", "card_shown_photo_idx", ["photo_id"]],
     ["session", "session_retired_refresh_hash_idx", ["retired_refresh_hash"]],
     ["auth_request", "auth_request_expires_at_idx", ["expires_at"]],

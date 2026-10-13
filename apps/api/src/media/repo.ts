@@ -316,6 +316,24 @@ export async function insertPhotoAccess(
   });
 }
 
+/**
+ * A fetch-log row outside the budget (#237): the export reads the person's
+ * own full-size photos on the server, and the log it returns says so, as it
+ * did when the export issued URLs. The row counts against later fetches like
+ * any other; the export itself is bounded by its own day's cap. Nothing for
+ * an erased account (#51).
+ */
+export async function logPhotoAccess(
+  db: Queryable,
+  input: { accountId: string; photoId: string; variant: PhotoVariant; at: Date },
+): Promise<void> {
+  await db.query(
+    `INSERT INTO photo_access (account_id, photo_id, variant, at)
+     SELECT $1, $2, $3, $4 FROM account WHERE id = $1 AND state <> 'deleted'`,
+    [input.accountId, input.photoId, input.variant, input.at],
+  );
+}
+
 // Moderation (#49). The automatic check and the staff routes read photos
 // across accounts on purpose: what a moderator sees is every queued photo,
 // behind the admin guard (lib/admin-middleware.ts) and an audit row per view.

@@ -755,11 +755,11 @@ describe("the person's own gate", () => {
     const [waits] = (await people(ctx.client, pond, 3, MEN)).slice(2);
     await people(ctx.client, pond, 1, WOMEN);
     const { logger } = await captureLogger();
-    const deps = { db: ctx.client, logger, now: () => NIGHT_2 };
-    expect((await exportAccount(deps, she as string, englishT)).gate).toBeNull();
+    const deps = { db: ctx.client, logger, now: () => NIGHT_2, version: "test" };
+    expect((await exportAccount(deps, she as string, englishT)).document.gate).toBeNull();
 
     await counted(ctx, NIGHT_1);
-    expect((await exportAccount(deps, she as string, englishT)).gate).toEqual({
+    expect((await exportAccount(deps, she as string, englishT)).document.gate).toEqual({
       pondId: pond,
       admittedAt: NIGHT_1.toISOString(),
       placeSaid: null,
@@ -767,7 +767,7 @@ describe("the person's own gate", () => {
       openedAt: null,
       countedAt: NIGHT_1.toISOString(),
     });
-    expect((await exportAccount(deps, waits as string, englishT)).gate).toMatchObject({
+    expect((await exportAccount(deps, waits as string, englishT)).document.gate).toMatchObject({
       admittedAt: null,
       placeSaid: 10,
       poolSaid: 0,

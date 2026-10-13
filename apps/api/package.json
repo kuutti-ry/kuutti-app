@@ -31,6 +31,7 @@
     "@kuutti/tunnistus-oidc": "workspace:*",
     "@sentry/node": "^11.5.0",
     "blurhash": "^2.0.5",
+    "fflate": "^0.8.3",
     "hono": "^4.13.13",
     "p-limit": "^7.3.3",
     "pg": "^8.23.1",

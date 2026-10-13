@@ -72,6 +72,32 @@ jest.mock("expo-router", () => {
 // picker cancels unless a test says otherwise; the manipulator "resizes" by
 // returning the requested size and a new uri, so a test can see the picture
 // went through the pre-resize before the upload.
+// The export's hand-over (#237): files written to a fake cache, a picker a
+// test can resolve or cancel. What a test needs to see is on __files.
+jest.mock("expo-file-system", () => {
+  const files = new Map();
+  class File {
+    constructor(...parts) {
+      this.uri = parts.map((part) => (typeof part === "string" ? part : part.uri)).join("/");
+    }
+    write(content) {
+      files.set(this.uri, content);
+    }
+    delete() {
+      files.delete(this.uri);
+    }
+  }
+  class Directory {
+    constructor(uri) {
+      this.uri = uri;
+    }
+    createFile(name) {
+      return new File(this, name);
+    }
+  }
+  Directory.pickDirectoryAsync = jest.fn(async () => new Directory("content://picked"));
+  return { Directory, File, Paths: { cache: new Directory("file:///cache") }, __files: files };
+});
 jest.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: jest.fn(async () => ({ canceled: true, assets: null })),
 }));

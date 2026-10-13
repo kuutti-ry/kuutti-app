@@ -92,6 +92,7 @@ export const ERROR_MESSAGE_KEYS = {
   media_unavailable: "errors.media_unavailable",
   photo_budget_exceeded: "errors.photo_budget_exceeded",
   card_budget_exceeded: "errors.card_budget_exceeded",
+  export_budget_exceeded: "errors.export_budget_exceeded",
   text_contact_details: "errors.text_contact_details",
   consent_required: "errors.special_category_locked",
   agreement_outdated: "errors.agreement_outdated",
