@@ -1,6 +1,6 @@
 # Kuutti
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/kuutti-ry/kuutti-app/badge)](https://scorecard.dev/viewer/?uri=github.com/kuutti-ry/kuutti-app)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/kuutti-ry/kuutti-app/badge)](https://scorecard.dev/viewer/?uri=github.com/kuutti-ry/kuutti-app) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15449/badge)](https://www.bestpractices.dev/projects/15449)
 
 A free, open-source dating app for Finland. No ads, no premium tiers, no data sales. Every account is a real adult verified through Finnish bank identification. Run by a non-profit association, built as a hobby by volunteers, with research partners onboard.
 
