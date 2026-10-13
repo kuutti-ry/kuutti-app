@@ -15,6 +15,14 @@ name: A sign-in link not asked for is refused without touching the session, and 
 # Still signed in.
 - openLink: kuutti://settings
 - extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# This device's session is under "Account", after the app's settings (#170).
+- scrollUntilVisible:
+    element: "This device|Tämä laite|Den här enheten"
+    centerElement: true
+    timeout: 60000
+- extendedWaitUntil:
     visible: "Log out|Kirjaudu ulos|Logga ut"
     timeout: 15000
 # No such screen: home.

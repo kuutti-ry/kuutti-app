@@ -14,7 +14,9 @@ name: Log out everywhere ends this device's session, and reopening the app does 
     element: "This device|Tämä laite|Den här enheten"
     centerElement: true
     timeout: 60000
-- assertVisible: "Log out|Kirjaudu ulos|Logga ut"
+- extendedWaitUntil:
+    visible: "Log out|Kirjaudu ulos|Logga ut"
+    timeout: 10000
 - tapOn: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
 - openLink: kuutti://
 - extendedWaitUntil:
