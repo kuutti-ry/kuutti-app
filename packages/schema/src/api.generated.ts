@@ -2675,7 +2675,8 @@ export interface components {
             /** @enum {string} */
             wantsKids?: "want" | "dont_want" | "not_sure";
             /** @enum {string} */
-            smoking?: "never" | "sometimes" | "regularly" | "quitting";
+            smoking?: "never" | "sometimes" | "regularly" | "quitting" | "vaping";
+            nicotine?: ("snus" | "pouches" | "none")[];
             languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
             /** @enum {string} */
             education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";
@@ -2810,7 +2811,8 @@ export interface components {
             /** @enum {string} */
             wantsKids?: "want" | "dont_want" | "not_sure";
             /** @enum {string} */
-            smoking?: "never" | "sometimes" | "regularly" | "quitting";
+            smoking?: "never" | "sometimes" | "regularly" | "quitting" | "vaping";
+            nicotine?: ("snus" | "pouches" | "none")[];
             languages?: ("fi" | "sv" | "en" | "ru" | "et" | "uk" | "ar" | "fa" | "zh" | "so" | "vi" | "sq" | "ku" | "tl" | "th" | "bn" | "tr" | "ne" | "es" | "ur" | "de" | "ro" | "pl" | "fr" | "hi" | "pt" | "it" | "lv" | "hu" | "nl" | "lt" | "ja" | "se" | "ko" | "other")[];
             /** @enum {string} */
             education?: "peruskoulu" | "toinen_aste" | "amk" | "kandi" | "maisteri" | "tohtori";

@@ -140,6 +140,7 @@ describe("profile routes", () => {
       // The coffee party left the list, and "none of them" stands alone (#239).
       { ...update, fields: { ...update.fields, politics: ["kahvipuolue"] } },
       { ...update, fields: { ...update.fields, politics: ["none_of_them", "kok"] } },
+      { ...update, fields: { ...update.fields, nicotine: ["none", "snus"] } },
       { ...update, prompts: [update.prompts[0], update.prompts[0]] },
       { ...update, bio: "Hello there", bioPreset: "photos_speak" },
       { ...update, displayName: "" },

@@ -146,7 +146,7 @@ describe("ProfileScreen", () => {
     ]) {
       expect(screen.getByRole("button", { name: title })).toBeTruthy();
     }
-    expect(screen.getByText("Smoking, drinking, drugs, exercise and pets")).toBeTruthy();
+    expect(screen.getByText("Smoking, nicotine, drinking, drugs, exercise and pets")).toBeTruthy();
     expect(screen.getByText("What others see first on your card")).toBeTruthy();
     // No lead text about the card: a dating app's profile explains itself (#239).
     expect(screen.queryByText(/What others see on your card/)).toBeNull();
@@ -181,7 +181,7 @@ describe("ProfileScreen", () => {
           wantsKids: "want",
           smoking: "never",
           hobbies: ["sauna"],
-          // A setting and a companion: neither counts (the job title is no gap).
+          // A setting and a free text: neither counts (the job title is no gap).
           hideFromField: true,
           occupationTitle: "Nurse",
           field: ["health"],
@@ -197,7 +197,7 @@ describe("ProfileScreen", () => {
     expect(progressValue("Prompts")).toBe("1 of 3 answered");
     expect(progressValue("Relationship and kids")).toBe("Done");
     expect(progressValue("Work and education")).toBe("1 of 3 answered");
-    expect(progressValue("Lifestyle")).toBe("1 of 5 answered");
+    expect(progressValue("Lifestyle")).toBe("1 of 6 answered");
     expect(progressValue("Hobbies")).toBe("Done");
     expect(progressValue("Beliefs")).toBe("0 of 3 answered");
     // The label stays the title alone, so the row is found by its name whatever its state.
@@ -211,9 +211,9 @@ describe("ProfileScreen", () => {
     const hidden = { includeHiddenElements: true };
     expect(screen.getAllByTestId("progress-ring", hidden)).toHaveLength(3);
     expect(screen.queryAllByTestId("progress-ring")).toEqual([]);
-    expect(screen.getByText("1/5", hidden)).toBeTruthy();
+    expect(screen.getByText("1/6", hidden)).toBeTruthy();
     expect(screen.getByText("0/3", hidden)).toBeTruthy();
-    expect(screen.queryByText("1/5")).toBeNull();
+    expect(screen.queryByText("1/6")).toBeNull();
     // No mark on the deal-breakers or the later questions: neither is a part one fills.
     expect(progressValue("Your deal-breakers")).toBeUndefined();
     expect(progressValue("Fill in the rest while you wait")).toBeUndefined();
@@ -232,15 +232,25 @@ describe("ProfileScreen", () => {
   });
 
   it("invites to the later questions only while one is unanswered (#239)", async () => {
+    const all = Object.fromEntries(
+      [...LATER_FIELD_ORDER, "nicotine" as const].map((key) => [key, answerOf(key)]),
+    ) as Record<string, unknown>;
+    fakeApi([[]], [], undefined, { document: { fields: all } });
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
+    expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Your deal-breakers" })).toBeTruthy();
+  });
+
+  it("keeps the invitation while other nicotine alone is unanswered, as the smoking screen asks it (#239)", async () => {
     const all = Object.fromEntries(LATER_FIELD_ORDER.map((key) => [key, answerOf(key)])) as Record<
       string,
       unknown
     >;
     fakeApi([[]], [], undefined, { document: { fields: all } });
     await show(<ProfileScreen />);
-    await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
-    expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Your deal-breakers" })).toBeTruthy();
+    await waitFor(() => expect(progressValue("Lifestyle")).toBe("5 of 6 answered"));
+    expect(screen.getByRole("button", { name: "Fill in the rest while you wait" })).toBeTruthy();
   });
 
   it("shows one tip at a time; a dismissed one gives way to the next and stays dismissed", async () => {

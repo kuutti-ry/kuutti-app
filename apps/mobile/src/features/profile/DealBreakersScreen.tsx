@@ -19,6 +19,7 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchDealBreakers, saveDealBreakers } from "./client";
 import { Chip, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
+import { FieldLabel } from "./fieldIcons";
 import { fieldLabelKey, optionKey } from "./keys";
 import { laterPath } from "./later/LaterFieldScreen";
 import { sectionOf, sectionPath } from "./sections";
@@ -197,9 +198,7 @@ export function DealBreakersScreen() {
           return (
             <View key={field} className="gap-2">
               <View className="flex-row items-center justify-between gap-3">
-                <Text variant="small" className="flex-1">
-                  {label}
-                </Text>
+                <FieldLabel field={field} className="flex-1" />
                 {(answered || row.on) && (
                   <Switch
                     accessibilityLabel={t("profile.dealBreakers.switch", { field: label })}

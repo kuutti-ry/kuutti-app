@@ -1,5 +1,4 @@
 import {
-  LATER_COMPANIONS,
   PHOTOS_FOR_COMPLETENESS,
   PROFILE_FIELDS,
   PROMPTS_MAX,
@@ -13,18 +12,24 @@ export type Progress = { answered: number; total: number };
 
 export const isDone = ({ answered, total }: Progress) => answered >= total;
 
+/**
+ * Whether a field's answer is one a part of the profile waits for: every
+ * choice and number. Not a setting (hide me from my field), which off is a
+ * choice and not a gap, and not a free text (the job title), so a student or
+ * a retired person is not left short forever. The list's marks and the later
+ * screens' walk both read it (#239).
+ */
+export const countsAsAnswer = (field: ProfileFieldKey): boolean =>
+  PROFILE_FIELDS[field].kind !== "flag" && PROFILE_FIELDS[field].kind !== "text";
+
 /** The prompts that hold an answer: what a save keeps (useProfile leaves an empty one out). */
 export const answeredPrompts = (prompts: ProfileUpdate["prompts"]): number =>
   prompts.filter((prompt) => prompt.answer.trim() !== "").length;
 
-const COMPANIONS: ReadonlySet<ProfileFieldKey> = new Set(Object.values(LATER_COMPANIONS));
-
 /**
- * What one item of a section adds to its progress. Not counted: the identity
- * label, which the section shows only once it is given; a setting (hide me
- * from my field), which off is a choice and not a gap; and a companion (the
- * job title), which the later screens do not count either, so a student or a
- * retired person is not left short forever.
+ * What one item of a section adds to its progress: an answer that counts
+ * (countsAsAnswer), other nicotine among them (#239). Not the identity label,
+ * which the section shows only once it is given.
  */
 function itemProgress(item: SectionItem, profile: ProfileUpdate): Progress {
   switch (item) {
@@ -40,9 +45,7 @@ function itemProgress(item: SectionItem, profile: ProfileUpdate): Progress {
     case "identityLabel":
       return { answered: 0, total: 0 };
     default:
-      if (PROFILE_FIELDS[item].kind === "flag" || COMPANIONS.has(item)) {
-        return { answered: 0, total: 0 };
-      }
+      if (!countsAsAnswer(item)) return { answered: 0, total: 0 };
       return { answered: profile.fields[item] === undefined ? 0 : 1, total: 1 };
   }
 }

@@ -316,10 +316,18 @@ export const PROFILE_FIELDS = {
     role: "info",
     preferenceAbout: "deal_breaker",
   }),
-  smoking: single(["never", "sometimes", "regularly", "quitting"], {
+  /** Vaping is a way of smoking of its own, not a frequency (the maintainer, #239). */
+  smoking: single(["never", "sometimes", "regularly", "quitting", "vaping"], {
     role: "info",
     preferenceAbout: "deal_breaker",
   }),
+  /** Nicotine that is not smoked (#239): snus, pouches, either or both, or neither, which stands alone; no frequency. Smoking's companion on the later screens. */
+  nicotine: multi(
+    ["snus", "pouches", "none"],
+    2,
+    { role: "info", preferenceAbout: "none" },
+    { alone: ["none"] },
+  ),
   languages: multi(
     LANGUAGES,
     LANGUAGES_MAX,
@@ -488,6 +496,7 @@ export const LATER_FIELD_ORDER: readonly ProfileFieldKey[] = [
   "zodiac",
 ];
 export const LATER_COMPANIONS: Readonly<Partial<Record<ProfileFieldKey, ProfileFieldKey>>> = {
+  smoking: "nicotine",
   field: "hideFromField",
   occupation: "occupationTitle",
 };
@@ -506,6 +515,7 @@ export const ProfileFields = z
     hasKids: PROFILE_FIELDS.hasKids.schema.optional(),
     wantsKids: PROFILE_FIELDS.wantsKids.schema.optional(),
     smoking: PROFILE_FIELDS.smoking.schema.optional(),
+    nicotine: PROFILE_FIELDS.nicotine.schema.optional(),
     languages: PROFILE_FIELDS.languages.schema.optional(),
     education: PROFILE_FIELDS.education.schema.optional(),
     drinking: PROFILE_FIELDS.drinking.schema.optional(),

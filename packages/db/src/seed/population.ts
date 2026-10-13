@@ -204,7 +204,19 @@ function drawFields(random: Random, language: Language, consented: boolean): Pro
   }
   if (random.chance(0.55)) fields.wantsKids = random.pick(PROFILE_FIELDS.wantsKids.options);
   if (random.chance(0.65)) {
-    fields.smoking = random.weighted({ never: 60, sometimes: 20, regularly: 12, quitting: 8 });
+    fields.smoking = random.weighted({
+      never: 58,
+      sometimes: 18,
+      regularly: 10,
+      quitting: 7,
+      vaping: 7,
+    });
+  }
+  // Other nicotine (#239): neither stands alone, so it is never drawn with the others.
+  if (random.chance(0.5)) {
+    fields.nicotine = random
+      .weighted({ none: 70, snus: 15, pouches: 10, "snus,pouches": 5 })
+      .split(",") as ProfileFields["nicotine"];
   }
   const others = PROFILE_FIELDS.languages.options.filter((l) => l !== language && l !== "other");
   if (random.chance(0.85)) {

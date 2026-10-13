@@ -17,7 +17,10 @@ export const PROFILE_SECTIONS = [
     id: "work",
     items: ["education", "field", "hideFromField", "occupation", "occupationTitle"],
   },
-  { id: "lifestyle", items: ["smoking", "drinking", "drugsAttitude", "exercise", "pets"] },
+  {
+    id: "lifestyle",
+    items: ["smoking", "nicotine", "drinking", "drugsAttitude", "exercise", "pets"],
+  },
   { id: "hobbies", items: ["hobbies"] },
   { id: "beliefs", items: ["politics", "religion", "zodiac"] },
 ] as const satisfies ReadonlyArray<{ id: string; items: readonly SectionItem[] }>;

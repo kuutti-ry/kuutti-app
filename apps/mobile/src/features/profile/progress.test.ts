@@ -22,7 +22,7 @@ describe("sectionProgress", () => {
       prompts: { answered: 0, total: PROMPTS_MAX },
       relationship: { answered: 0, total: 4 },
       work: { answered: 0, total: 3 },
-      lifestyle: { answered: 0, total: 5 },
+      lifestyle: { answered: 0, total: 6 },
       hobbies: { answered: 0, total: 1 },
       beliefs: { answered: 0, total: 3 },
     });
@@ -47,7 +47,7 @@ describe("sectionProgress", () => {
     ).toEqual({ answered: 1, total: 4 });
   });
 
-  it("leaves a setting and a companion out: hiding from one's field and the job title", () => {
+  it("leaves a setting and a free text out: hiding from one's field and the job title", () => {
     expect(
       of(
         "work",
@@ -74,6 +74,12 @@ describe("sectionProgress", () => {
         }),
       ),
     ).toEqual({ answered: 1, total: PROMPTS_MAX });
+  });
+
+  it("counts other nicotine, smoking's companion on the later screens, like any choice (#239)", () => {
+    expect(of("lifestyle", profile({ fields: { smoking: "vaping", nicotine: ["none"] } }))).toEqual(
+      { answered: 2, total: 6 },
+    );
   });
 
   it("counts 'none of them' and a stance as answers like any other", () => {

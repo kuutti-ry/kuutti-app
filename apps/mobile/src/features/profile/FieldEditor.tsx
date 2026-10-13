@@ -17,6 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { FieldLabel } from "./fieldIcons";
 import { OptionGlyph, optionGlyph } from "./glyphs";
 import { fieldLabelKey, optionKey } from "./keys";
 
@@ -157,9 +158,7 @@ export function FieldEditor({
   if (spec.kind === "flag") {
     return (
       <View className="flex-row items-center justify-between gap-3">
-        <Text variant="small" className="flex-1">
-          {label}
-        </Text>
+        <FieldLabel field={field} className="flex-1" />
         <Switch
           accessibilityLabel={label}
           checked={value === true}
@@ -210,7 +209,7 @@ export function FieldEditor({
 
   return (
     <View className="gap-2">
-      <Text variant="small">{label}</Text>
+      <FieldLabel field={field} />
       {spec.kind === "text" && (
         <>
           <Input

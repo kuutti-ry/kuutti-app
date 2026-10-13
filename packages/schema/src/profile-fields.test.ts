@@ -7,6 +7,8 @@ import {
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
   LANGUAGES_SHOWN_FIRST,
+  LATER_COMPANIONS,
+  LATER_FIELD_ORDER,
   PARTY_OPTIONS,
   POLITICS_OPTIONS,
   PROFILE_FIELD_KEYS,
@@ -113,7 +115,9 @@ describe("the profile field registry (ADR-019)", () => {
         const spec = PROFILE_FIELDS[key];
         if (spec.kind !== "multi") continue;
         for (const option of spec.alone) expect(spec.options, key).toContain(option);
-        if (key !== "politics") expect(spec.alone, key).toEqual([]);
+        if (key === "politics") expect(spec.alone).toEqual(["none_of_them"]);
+        else if (key === "nicotine") expect(spec.alone).toEqual(["none"]);
+        else expect(spec.alone, key).toEqual([]);
       }
     });
 
@@ -125,6 +129,20 @@ describe("the profile field registry (ADR-019)", () => {
       ]);
       expect(JSON.stringify(result.error?.issues)).not.toContain("kok");
     });
+  });
+
+  it("takes vaping as a way of smoking, and snus or pouches or neither as other nicotine (#239)", () => {
+    expect(ProfileFields.safeParse({ smoking: "vaping" }).success).toBe(true);
+    for (const nicotine of [["snus"], ["pouches"], ["snus", "pouches"], ["none"]]) {
+      expect(ProfileFields.safeParse({ nicotine }).success, nicotine.join()).toBe(true);
+    }
+    for (const nicotine of [["none", "snus"], ["pouches", "none"], ["cigars"], []]) {
+      expect(ProfileFields.safeParse({ nicotine }).success, nicotine.join()).toBe(false);
+    }
+    // Shown on the card, never a filter, and asked on smoking's later screen.
+    expect(PROFILE_FIELDS.nicotine).toMatchObject({ role: "info", preferenceAbout: "none" });
+    expect(LATER_COMPANIONS.smoking).toBe("nicotine");
+    expect(LATER_FIELD_ORDER).not.toContain("nicotine");
   });
 
   it("leads the languages with the national two and English, ten before the search, other last (#239)", () => {
