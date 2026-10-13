@@ -34,10 +34,10 @@ const persona = (key: string) => {
 };
 
 describe("the personas of the mock bank", () => {
-  it("are twelve, each with a name of its own and an artificial code", () => {
-    expect(DEMO_PERSONAS).toHaveLength(12);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(12);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(12);
+  it("are thirteen, each with a name of its own and an artificial code", () => {
+    expect(DEMO_PERSONAS).toHaveLength(13);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(13);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(13);
     for (const p of DEMO_PERSONAS) {
       expect(p.key).toMatch(/^[a-z]+$/);
       // 900 to 999: never given to a person.
@@ -73,6 +73,8 @@ describe("the personas of the mock bank", () => {
       kerttu: "010280-952L",
       tapio: "070770-905D",
       ilona: "010170-999R",
+      // The Mobiilivarmenne emulator's person, 94: the break flow's own (#170).
+      helmi: "010132-998W",
     };
     for (const [key, code] of Object.entries(bed)) {
       const p = persona(key);

@@ -22,7 +22,7 @@ The only way to disappear for a while was "Delete everything", which costs the p
 
 - Migration 0038, one nullable column. The export never shows `paused_from`: it is non-null only while no session exists that could ask for an export.
 - `AuthExchangeResponse.outcome` gains `unpaused`. An app older than this parses the exchange strictly and would refuse the value, which only a paused account receives, and no installed build can pause before it has the screen.
-- No Maestro flow in this change: the pause changes its persona's state, every persona of the cast is taken, and a flow that fails between the pause and the resume would leave its persona paused for the flows after it. It takes a thirteenth persona or the last place of a stretch; noted on #170.
+- The Maestro flow `take-a-break` has a persona of its own, Helmi (ADR-014 §4 as amended): the pause changes its persona's state, and a shared persona left paused by a run that failed between the pause and the resume would fail every flow after it. The Settings flows that reach the session block scroll to it now that the account group comes after the app's settings.
 - Open, the maintainer's: whether the optional e-mail (#148) hears about a break (TD-18 says no mail without a reason), and the counterpart's view of a paused chat (#101).
 
 ## Alternatives considered

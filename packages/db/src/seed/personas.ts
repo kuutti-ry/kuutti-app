@@ -1,14 +1,14 @@
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, #140, ADR-014): twelve named persons the
+ * The people of the mock bank (#73, #140, ADR-014): thirteen named persons the
  * local identity provider can log in as with one tap, so that a demo or a
  * test of the first ten minutes does not start with typing claims into a
  * form. The whole product path runs for them as for anybody: the OIDC
  * exchange, the parsing of the code, the HMAC, the age rule, the
  * re-registration rule. Nothing in the API or the app knows their names.
  *
- * The eight born on a fixed day carry the codes of the test persons of
+ * The nine born on a fixed day carry the codes of the test persons of
  * Telia's pre-production bed (#140, docs/vendors/telia.md 1.4): the mock bank
  * issues locally the very code a test bank returns on staging, so a persona
  * is one identity in each environment and a story given on staging is the
@@ -155,6 +155,16 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     group: "history",
     note: "Deleted her account: refused until the waiting time is over.",
     bank: { name: "Aktia", user: "prefilled", note: "or 12345678, password 123456, code 1234" },
+  },
+  {
+    key: "helmi",
+    given: "Helmi",
+    family: "Mäkelä",
+    born: { year: 1932, month: 1, day: 1 },
+    individual: 998,
+    group: "history",
+    note: "Onboarded without photos: the persona of the break's flow, who takes a break and comes back (#170).",
+    bank: { name: "Mobiilivarmenne emulator", user: "0401234567", note: "prefilled" },
   },
   {
     key: "eetu",

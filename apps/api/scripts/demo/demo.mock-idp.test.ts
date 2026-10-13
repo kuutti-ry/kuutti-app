@@ -642,7 +642,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     }
   });
 
-  test("the six histories leave each persona where the mock bank's page says", async ({ ctx }) => {
+  test("the histories leave each persona where the mock bank's page says", async ({ ctx }) => {
     const { bank, context, lines } = await world(ctx);
     const began = Date.now();
     for (const history of PERSONA_HISTORIES) {
@@ -672,6 +672,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(await stateOf("sanna")).toEqual(["active"]);
     expect(await stateOf("noa")).toEqual(["active"]);
     expect(await stateOf("kerttu")).toEqual(["active"]);
+    expect(await stateOf("helmi")).toEqual(["active"]);
     expect(await stateOf("onni")).toEqual(["registered"]);
     expect(await stateOf("tapio")).toEqual(["banned"]);
     expect(await stateOf("ilona")).toEqual(["deleted"]);
@@ -761,12 +762,13 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const count = async (sql: string) =>
       Number((await ctx.client.query<{ n: string }>(sql)).rows[0]?.n);
     const personas = `broker_subject = ANY(ARRAY[${DEMO_PERSONAS.map((p) => `'${p.key}'`).join(",")}])`;
-    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(8);
+    // The seven with a history, Aino, and Aino's name at the other bank.
+    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(9);
 
     const result = await resetPersonas({ db: ctx.client, logger, now });
-    // Seven identities of the mock bank; six accounts were live (Ilona's was a tombstone
+    // Eight identities of the mock bank; seven accounts were live (Ilona's was a tombstone
     // already, Tapio's was banned and is taken as it is).
-    expect(result).toEqual({ identities: 7, erased: 6, objects: 0, spared: [] });
+    expect(result).toEqual({ identities: 8, erased: 7, objects: 0, spared: [] });
     expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(1);
     expect(
       await count(

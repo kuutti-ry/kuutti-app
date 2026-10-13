@@ -362,6 +362,8 @@ describe("account erasure", () => {
     // One fetch before the export, plus the export's own read of the full variant.
     expect(body.photoAccessLog.map((e) => e.variant).sort()).toEqual(["full", "thumb"]);
     expect(body.photoAccessLog.every((e) => e.photoId === photo.id)).toBe(true);
+    // No signed URLs in the document any more (#237), so no random signature
+    // can spell a word by chance (CI, 13/10/2026): the whole document is checked.
     const text = JSON.stringify(body);
     expect(text).not.toContain(b.accountId);
     expect(text).not.toMatch(/hetu|hmac|research_id|researchId/i);

@@ -1,5 +1,5 @@
-# The research opt-in stays reachable after onboarding as a switch on the
-# account card (ADR-010 §9, TD-5): on, it records the consent and stays on
+# The research opt-in stays reachable after onboarding as a switch under the
+# app's settings (ADR-010 §9, TD-5; "Your consents" since #170): on, it records the consent and stays on
 # when Settings is opened again; off, it withdraws it. Sanna never took part;
 # the flow ends with the switch off.
 appId: fi.kuutti.app
@@ -7,16 +7,17 @@ name: The research switch in Settings records the opt-in and withdraws it again
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
+# Centred on the line under the switch, and the switch is toggled by its words:
+# after one swipe the switch itself sits at the top right, under the dev client's
+# floating Tools button, and a tap there opened the dev menu (CI, 13/10/2026).
 - scrollUntilVisible:
-    element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    element: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     direction: DOWN
     centerElement: true
     timeout: 60000
 - assertVisible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
 # A switch's text, to Maestro, is its value ("0" off, "1" on), right of its words.
-- tapOn:
-    text: "0|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), off"
-    rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+- tapOn: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - extendedWaitUntil:
     visible:
       text: "1|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), on"
@@ -25,17 +26,18 @@ name: The research switch in Settings records the opt-in and withdraws it again
 
 - openLink: kuutti://
 - openLink: kuutti://settings
+# Centred on the line under the switch, and the switch is toggled by its words:
+# after one swipe the switch itself sits at the top right, under the dev client's
+# floating Tools button, and a tap there opened the dev menu (CI, 13/10/2026).
 - scrollUntilVisible:
-    element: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+    element: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     direction: DOWN
     centerElement: true
     timeout: 60000
 - assertVisible:
     text: "1|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), on"
     rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
-- tapOn:
-    text: "1|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), on"
-    rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+- tapOn: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - extendedWaitUntil:
     visible:
       text: "0|(Take part in research|Osallistu tutkimukseen|Delta i forskningen), off"

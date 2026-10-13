@@ -7,9 +7,20 @@ name: Log out everywhere ends this device's session, and reopening the app does 
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
 - extendedWaitUntil:
-    visible: "This device|Tämä laite|Den här enheten"
+    visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-- assertVisible: "Log out|Kirjaudu ulos|Logga ut"
+# This device's session is under "Account", after the app's settings (#170); the
+# source card above it can arrive after the first scroll (common/sign-out.yaml).
+- retry:
+    maxRetries: 2
+    commands:
+      - scrollUntilVisible:
+          element: "This device|Tämä laite|Den här enheten"
+          centerElement: true
+          timeout: 60000
+      - extendedWaitUntil:
+          visible: "Log out|Kirjaudu ulos|Logga ut"
+          timeout: 5000
 - tapOn: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
 - openLink: kuutti://
 - extendedWaitUntil:
