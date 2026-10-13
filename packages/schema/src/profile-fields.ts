@@ -35,22 +35,19 @@ export type FieldRole = "hard" | "soft" | "info" | "hidden";
  */
 export type PreferenceAbout = "hard" | "deal_breaker" | "soft" | "none";
 
-type Roles = {
-  role: FieldRole;
-  preferenceAbout: PreferenceAbout;
-  specialCategory?: boolean;
-  research?: boolean;
-};
+type Roles = { role: FieldRole; preferenceAbout: PreferenceAbout; specialCategory?: boolean };
+/** Only a single choice may enter the research snapshot (ADR-011 §9): the other helpers do not take the flag. */
+type SingleRoles = Roles & { research?: boolean };
 type Options = readonly [string, ...string[]];
 
-const roles = (r: Roles) => ({
+const roles = (r: SingleRoles) => ({
   role: r.role,
   preferenceAbout: r.preferenceAbout,
   specialCategory: r.specialCategory ?? false,
   research: r.research ?? false,
 });
 
-const single = <T extends Options>(options: T, r: Roles) => ({
+const single = <T extends Options>(options: T, r: SingleRoles) => ({
   kind: "single" as const,
   options,
   ...roles(r),
