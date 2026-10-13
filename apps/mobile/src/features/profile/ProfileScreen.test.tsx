@@ -232,15 +232,25 @@ describe("ProfileScreen", () => {
   });
 
   it("invites to the later questions only while one is unanswered (#239)", async () => {
+    const all = Object.fromEntries(
+      [...LATER_FIELD_ORDER, "nicotine" as const].map((key) => [key, answerOf(key)]),
+    ) as Record<string, unknown>;
+    fakeApi([[]], [], undefined, { document: { fields: all } });
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
+    expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Your deal-breakers" })).toBeTruthy();
+  });
+
+  it("keeps the invitation while other nicotine alone is unanswered, as the smoking screen asks it (#239)", async () => {
     const all = Object.fromEntries(LATER_FIELD_ORDER.map((key) => [key, answerOf(key)])) as Record<
       string,
       unknown
     >;
     fakeApi([[]], [], undefined, { document: { fields: all } });
     await show(<ProfileScreen />);
-    await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
-    expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Your deal-breakers" })).toBeTruthy();
+    await waitFor(() => expect(progressValue("Lifestyle")).toBe("5 of 6 answered"));
+    expect(screen.getByRole("button", { name: "Fill in the rest while you wait" })).toBeTruthy();
   });
 
   it("shows one tip at a time; a dismissed one gives way to the next and stays dismissed", async () => {

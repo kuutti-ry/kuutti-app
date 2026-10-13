@@ -3,7 +3,7 @@ import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { LaterFieldScreen, laterProgress } from "./LaterFieldScreen";
+import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
@@ -93,6 +93,21 @@ beforeEach(async () => {
   });
 });
 
+describe("screenOpen", () => {
+  it("keeps a screen open while its field or a companion that counts is unanswered (#239)", () => {
+    expect(screenOpen({}, "smoking")).toBe(true);
+    expect(screenOpen({ smoking: "never" }, "smoking")).toBe(true);
+    expect(screenOpen({ nicotine: ["snus"] }, "smoking")).toBe(true);
+    expect(screenOpen({ smoking: "never", nicotine: ["none"] }, "smoking")).toBe(false);
+  });
+
+  it("closes a screen whose companion is a setting or a free text once its own field is answered", () => {
+    expect(screenOpen({ field: ["tech"] }, "field")).toBe(false);
+    expect(screenOpen({ occupation: ["tech"] }, "occupation")).toBe(false);
+    expect(screenOpen({ hasKids: "no" }, "hasKids")).toBe(false);
+  });
+});
+
 describe("LaterFieldScreen", () => {
   it("asks the first field with the progress, skips without writing, and saves before moving on", async () => {
     const { puts } = fakeApi(named({}));
@@ -120,12 +135,23 @@ describe("LaterFieldScreen", () => {
   });
 
   it("moves on past answered fields, to the next one without an answer", async () => {
-    fakeApi(named({ wantsKids: "want", smoking: "never" }));
+    fakeApi(named({ wantsKids: "want", smoking: "never", nicotine: ["none"] }));
     await show(<LaterFieldScreen field="hasKids" />);
     await waitFor(() => expect(screen.getByText("2 of 16 answered")).toBeTruthy());
     expect(router.replace).not.toHaveBeenCalled();
     await press(screen.getByRole("button", { name: "Ask me later" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/languages");
+  });
+
+  it("asks other nicotine of someone whose smoking was answered before it existed (#239)", async () => {
+    // Sanna's history: kids and smoking answered, no other nicotine.
+    fakeApi(named({ hasKids: "no", wantsKids: "want", smoking: "never" }));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/profile/later/smoking"));
+    expect(laterProgress({ hasKids: "no", wantsKids: "want", smoking: "never" })).toEqual({
+      answered: 2,
+      total: 16,
+    });
   });
 
   it("keeps the intro line on the first unanswered field while it is being answered", async () => {
@@ -250,6 +276,7 @@ describe("LaterFieldScreen", () => {
     politics: ["kok"],
     religion: "atheist",
     zodiac: "aries",
+    nicotine: ["snus"],
   };
 
   it("stays on the first field when every later field is answered, and leads on to the e-mail", async () => {

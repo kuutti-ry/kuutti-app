@@ -3,7 +3,9 @@
 # sheet's order, one question per screen, each optional; "Ask me later" moves
 # on and writes nothing, so the count of answered fields stays. After the
 # last field comes the way back in (the e-mail) and the deal-breakers. Sanna
-# has answered ten of sixteen; read only.
+# has answered ten of the sixteen fields, but her smoking screen is open
+# while other nicotine is unanswered (#239), so nine screens are done; read
+# only.
 appId: fi.kuutti.app
 name: Fill in the rest walks the unanswered fields in order, and Ask me later writes nothing
 ---
@@ -22,9 +24,19 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
 - extendedWaitUntil:
     visible: "While you wait|Odotellessasi|Medan du väntar"
     timeout: 15000
-- assertVisible: "10 of 16 answered|10 / 16 vastattu|10 av 16 besvarade"
+- assertVisible: "9 of 16 answered|9 / 16 vastattu|9 av 16 besvarade"
 - assertVisible: "One question at a time, each optional\\..*|Yksi kysymys kerrallaan, jokainen vapaaehtoinen\\..*|En fråga i taget, var och en frivillig\\..*"
-- assertVisible: "Drugs, your attitude|Suhtautuminen huumeisiin|Inställning till droger"
+# Her smoking is answered; other nicotine, asked with it, is not.
+- assertVisible: "Other nicotine|Muu nikotiini|Annat nikotin"
+- scrollUntilVisible:
+    element: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
+- extendedWaitUntil:
+    visible: "Drugs, your attitude|Suhtautuminen huumeisiin|Inställning till droger"
+    timeout: 15000
 - tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
 - extendedWaitUntil:
     visible: "Exercise|Liikunta|Motion"
@@ -61,5 +73,5 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
 - assertVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - openLink: kuutti://profile/later/drugsAttitude
 - extendedWaitUntil:
-    visible: "10 of 16 answered|10 / 16 vastattu|10 av 16 besvarade"
+    visible: "9 of 16 answered|9 / 16 vastattu|9 av 16 besvarade"
     timeout: 15000

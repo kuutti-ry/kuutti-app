@@ -9,27 +9,43 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { FieldEditor } from "../FieldEditor";
+import { countsAsAnswer } from "../progress";
 import { useProfile } from "../useProfile";
 
 /** The route of a later screen; the first one is where the profile list sends a person. */
 export const laterPath = (field: ProfileFieldKey) => `/profile/later/${field}` as const;
 export const FIRST_LATER_FIELD = LATER_FIELD_ORDER[0] as ProfileFieldKey;
 
-/** The first later field after the index that the draft does not answer; none when every one is. */
+/**
+ * Whether a later screen still asks something: its field is unanswered, or a
+ * companion whose answer counts is (other nicotine on the smoking screen; not
+ * the job title or hide-me-from-my-field). Without the companion, someone who
+ * had answered smoking before other nicotine existed was never asked it here
+ * (#239).
+ */
+export function screenOpen(fields: Record<string, unknown>, key: ProfileFieldKey): boolean {
+  const companion = LATER_COMPANIONS[key];
+  return (
+    fields[key] === undefined ||
+    (companion !== undefined && countsAsAnswer(companion) && fields[companion] === undefined)
+  );
+}
+
+/** The first later screen after the index that still asks something; none when every one is done. */
 export function nextUnanswered(
   fields: Record<string, unknown>,
   afterIndex: number,
 ): ProfileFieldKey | undefined {
-  return LATER_FIELD_ORDER.find((key, i) => i > afterIndex && fields[key] === undefined);
+  return LATER_FIELD_ORDER.find((key, i) => i > afterIndex && screenOpen(fields, key));
 }
 
-/** How many of the later fields the draft answers, of how many there are. */
+/** How many of the later screens the draft has done, of how many there are. */
 export function laterProgress(fields: Record<string, unknown>): {
   answered: number;
   total: number;
 } {
   return {
-    answered: LATER_FIELD_ORDER.filter((key) => fields[key] !== undefined).length,
+    answered: LATER_FIELD_ORDER.filter((key) => !screenOpen(fields, key)).length,
     total: LATER_FIELD_ORDER.length,
   };
 }
@@ -62,7 +78,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
   useEffect(() => {
     if (index !== 0 || !key || !loadedFields || entered.current) return;
     entered.current = true;
-    if (loadedFields[key] === undefined) return;
+    if (screenOpen(loadedFields, key)) return;
     const next = nextUnanswered(loadedFields, 0);
     if (next) router.replace(laterPath(next));
   }, [index, key, loadedFields, router]);
