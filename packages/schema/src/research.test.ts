@@ -128,6 +128,9 @@ describe("the coarse snapshot", () => {
     });
     // The languages are a closed list too, and still out: not flagged (ADR-011 §9).
     expect(fields).toEqual({ intent: "long_term" });
+    // A retired option of the flagged field is left out, not copied; a missing one adds nothing.
+    expect(researchFieldsOf({ intent: "retired option" })).toEqual({});
+    expect(researchFieldsOf({ languages: ["fi"] })).toEqual({});
     expect(researchFieldsOf(null)).toEqual({});
     expect(researchFieldsOf("text")).toEqual({});
     expect(ResearchSnapshot.safeParse({ gender: null, fields }).success).toBe(true);
