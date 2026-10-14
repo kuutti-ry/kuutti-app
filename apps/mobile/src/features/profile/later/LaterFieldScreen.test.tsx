@@ -309,7 +309,7 @@ describe("LaterFieldScreen", () => {
     expect(screen.getByText("175\u00a0cm")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0]?.fields).toEqual({ height: 180 });
+    expect(puts[0]?.fields).toEqual({ height: 175 });
     await press(screen.getByRole("button", { name: "Clear the answer" }));
     expect(screen.getByText("No answer yet")).toBeTruthy();
   });
