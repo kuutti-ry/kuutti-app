@@ -295,6 +295,20 @@ describe("the gate", () => {
     expect((await askedBy(ctx, neither)).gate.state).toBe("incomplete");
   });
 
+  test("a dance partner is counted in the pools of dance partners only, and counts only them (#175)", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-dance");
+    const dancers = await people(ctx.client, pond, 21, { ...ALIKE, intent: "dance_partner" });
+    const [either] = await people(ctx.client, pond, 10, { ...ALIKE, intent: "open_to_either" });
+
+    await counted(ctx, NIGHT_1);
+    // Twenty other dancers each, said as twenty; across the intents it would be thirty, and open.
+    expect(await rowOf(ctx, dancers[0])).toMatchObject({ pool_said: 20, opened_at: null });
+    // Nine others open to either, said as none: "either" does not reach a dance partner.
+    expect(await rowOf(ctx, either)).toMatchObject({ pool_said: 0, opened_at: null });
+  });
+
   test("Counting twice changes nothing", async ({ ctx }) => {
     const pond = await setUp(ctx, "test-gate-twice");
     await people(ctx.client, pond, 4, MEN);

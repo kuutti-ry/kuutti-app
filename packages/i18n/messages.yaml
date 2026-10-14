@@ -841,6 +841,13 @@ profile.option.intent.open_to_either:
   sv: "Öppen för båda"
   machine: { fi: true, sv: true }
 
+profile.option.intent.dance_partner:
+  en: "A dance partner"
+  description: "Option dance_partner of the intent field (#175): a partner for lavatanssit, the dances of the Finnish dance pavilions; it meets another dance partner only. Also the card's answer after Looking for."
+  fi: "Lavatanssiparia"
+  sv: "En danspartner"
+  machine: { fi: true, sv: true }
+
 profile.option.identityLabel.agender:
   en: "Agender"
   description: "Option agender of the identityLabel field (#145 registry, ADR-019)."
@@ -3586,10 +3593,10 @@ onboarding.intent.title:
   machine: { fi: true, sv: true }
 
 onboarding.intent.explain:
-  en: "You both have to want the same thing, or be open to either. You can change this later."
-  description: "Explanation under the intent step's heading (#146, #147): intent is a hard filter both ways."
-  fi: "Teidän molempien on haluttava samaa tai oltava avoimia kummallekin. Voit muuttaa tätä myöhemmin."
-  sv: "Ni måste båda vilja samma sak, eller vara öppna för båda. Du kan ändra det här senare."
+  en: "You're shown only to people who want the same thing. Open to either covers long-term and casual. You can change this later."
+  description: "Explanation under the intent step's heading (#146, #147, #175): intent is a hard filter both ways; the second sentence names the option Open to either, which does not reach a dance partner."
+  fi: "Sinut näytetään vain niille, jotka haluavat samaa. Avoin kummallekin kattaa pitkäaikaisen ja rennon. Voit muuttaa tätä myöhemmin."
+  sv: "Du visas bara för dem som vill samma sak. Öppen för båda omfattar långvarigt och avslappnat. Du kan ändra det här senare."
   machine: { fi: true, sv: true }
 
 onboarding.age.youngestDown:

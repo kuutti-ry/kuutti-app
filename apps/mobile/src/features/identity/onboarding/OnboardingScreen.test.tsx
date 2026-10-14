@@ -332,6 +332,36 @@ describe("OnboardingScreen", () => {
     ]);
   });
 
+  it("offers a dance partner beside the other three intents, and saves it (#175)", async () => {
+    const { server } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
+    server.profile = { displayName: "Onni", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    server.gender = "man";
+    server.seeks = ["woman"];
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("What are you here for?")).toBeTruthy());
+    expect(
+      screen.getByText(
+        "You're shown only to people who want the same thing. Open to either covers long-term and casual. You can change this later.",
+      ),
+    ).toBeTruthy();
+    for (const name of [
+      "Something long-term",
+      "Something casual",
+      "Open to either",
+      "A dance partner",
+    ]) {
+      expect(screen.getByRole("button", { name, selected: false })).toBeTruthy();
+    }
+    checkA11y();
+    await press(screen.getByRole("button", { name: "A dance partner" }));
+    expect(screen.getByRole("button", { name: "A dance partner", selected: true })).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("What ages?")).toBeTruthy());
+    expect(server.profile?.fields).toEqual({ intent: "dance_partner" });
+  });
+
   it("asks the pond with one button per area, in the person's language, when there is more than one to choose from", async () => {
     const { server, calls } = fakeApi();
     server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));

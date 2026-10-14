@@ -570,7 +570,8 @@
             "enum": [
               "long_term",
               "casual",
-              "open_to_either"
+              "open_to_either",
+              "dance_partner"
             ]
           },
           "identityLabel": {
@@ -1256,7 +1257,8 @@
             "enum": [
               "long_term",
               "casual",
-              "open_to_either"
+              "open_to_either",
+              "dance_partner"
             ]
           }
         },

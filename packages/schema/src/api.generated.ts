@@ -2655,7 +2655,7 @@ export interface components {
         BioPreset: "lazy_nice_fellow" | "ask_me_instead" | "photos_speak" | null;
         ProfileFields: {
             /** @enum {string} */
-            intent?: "long_term" | "casual" | "open_to_either";
+            intent?: "long_term" | "casual" | "open_to_either" | "dance_partner";
             /** @enum {string} */
             identityLabel?: "agender" | "genderfluid" | "genderqueer" | "bigender" | "two_spirit" | "questioning" | "non_binary";
             /** @enum {string} */
@@ -2782,7 +2782,7 @@ export interface components {
         };
         ResearchFields: {
             /** @enum {string} */
-            intent?: "long_term" | "casual" | "open_to_either";
+            intent?: "long_term" | "casual" | "open_to_either" | "dance_partner";
         };
         ExportedGate: {
             /** Format: uuid */
