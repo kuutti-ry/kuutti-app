@@ -65,11 +65,10 @@ export function BreakScreen() {
         </View>
 
         {/* The tick is the person's word; the button below waits for it. The
-            label toggles the switch too, so the target is the whole row. */}
+            label toggles the switch too, so the words are a target as well. */}
         <View className="flex-row items-center justify-between gap-4">
           <Label
             nativeID="break-understand-label"
-            className="flex-1"
             onPress={() => !busy && setUnderstood(!understood)}
           >
             {t("account.break.understand")}

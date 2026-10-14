@@ -36,4 +36,11 @@ describe("Label", () => {
     expect(pressed).not.toHaveBeenCalled();
     expect(rootOf("Name").props.className).toMatch(/\bopacity-50\b/);
   });
+
+  it("shrinks beside a control, its text wrapping, instead of pushing the control off the screen", async () => {
+    const words = "A label long enough to need the room";
+    await renderWithTheme(<Label>{words}</Label>);
+    expect(rootOf(words).props.className).toMatch(/\bshrink\b/);
+    expect(screen.getByText(words).props.className).toMatch(/\bshrink\b/);
+  });
 });
