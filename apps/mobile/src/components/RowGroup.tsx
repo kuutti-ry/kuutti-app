@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 export type Row = {
   key: string;
   title: string;
-  /** What is in it, under the title; a screen reader hears it as the hint. */
+  /** What is in it, or what is chosen, under the title; a screen reader hears it as the hint, unless it is the value. */
   summary?: string;
-  /** Its state in words, heard as the value (the profile's progress). */
+  /** Its state in words, heard as the value (the profile's progress, the theme chosen). */
   value?: string;
   /** A mark of its state, drawn before the chevron. */
   mark?: ReactNode;
@@ -51,7 +51,12 @@ export function RowGroup({ rows }: { rows: readonly Row[] }) {
               key={row.key}
               accessible
               accessibilityLabel={row.title}
-              accessibilityValue={row.detail ? { text: row.detail } : undefined}
+              // The label stands for the children, so the summary is said with the detail.
+              accessibilityValue={
+                row.detail || row.summary
+                  ? { text: [row.detail, row.summary].filter(Boolean).join(", ") }
+                  : undefined
+              }
               className={cn("flex-row items-center", edge)}
             >
               {words}
@@ -64,7 +69,8 @@ export function RowGroup({ rows }: { rows: readonly Row[] }) {
             key={row.key}
             variant="ghost"
             accessibilityLabel={row.title}
-            accessibilityHint={row.summary}
+            // A summary that is the state is heard once, as the value.
+            accessibilityHint={row.summary !== row.value ? row.summary : undefined}
             accessibilityValue={row.value ? { text: row.value } : undefined}
             className={edge}
             onPress={row.onPress}

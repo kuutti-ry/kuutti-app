@@ -1,6 +1,6 @@
 /**
- * The packages this app is made of, with their licences, for the tech config
- * screen (#143): walks the app's dependencies through the hoisted node_modules
+ * The packages this app is made of, with their licences, for the licences
+ * screen in Settings, in every build (#143, #287): walks the app's dependencies through the hoisted node_modules
  * of the workspace, reads each package.json once, and writes
  * src/generated/licenses.json, which is committed. `pnpm licenses` cannot
  * read a hoisted install (it answers "Unknown" for everything), hence this.

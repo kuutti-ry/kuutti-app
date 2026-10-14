@@ -8,17 +8,19 @@ name: The session, the theme and the language survive closing and reopening the 
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
+# Each row says what is chosen, which Maestro reads after its title; the
+# chosen option itself is ticked on the row's screen.
 - extendedWaitUntil:
-    visible: "Theme|Teema|Tema"
+    visible: "(Theme|Teema|Tema)(, .*)?"
     timeout: 15000
-- tapOn: "Theme|Teema|Tema"
+- tapOn: "(Theme|Teema|Tema)(, .*)?"
 - extendedWaitUntil:
     visible: "Dark|Tumma|Mörkt"
     timeout: 15000
 - tapOn: "Dark|Tumma|Mörkt"
 - assertVisible: "✓ Dark|✓ Tumma|✓ Mörkt"
 - tapOn: "Back|Takaisin|Tillbaka"
-- tapOn: "Language|Kieli|Språk"
+- tapOn: "(Language|Kieli|Språk)(, .*)?"
 - extendedWaitUntil:
     visible: ".*Svenska.*"
     timeout: 15000
@@ -34,14 +36,14 @@ name: The session, the theme and the language survive closing and reopening the 
 - extendedWaitUntil:
     visible: "Inställningar"
     timeout: 15000
-- assertVisible: "Mörkt"
-- assertVisible: "Svenska"
 
-# Back as it began.
-- tapOn: "Tema"
+# Kept across the restart, each ticked on its screen; then back as it began.
+- tapOn: "Tema(, .*)?"
+- assertVisible: "✓ Mörkt"
 - tapOn: "System"
 - assertVisible: "✓ System"
 - tapOn: "Tillbaka"
-- tapOn: "Språk"
+- tapOn: "Språk(, .*)?"
+- assertVisible: ".*✓.*Svenska.*"
 - tapOn: "Telefonens språk"
 - assertVisible: "✓ Phone's language|✓ Puhelimen kieli|✓ Telefonens språk"

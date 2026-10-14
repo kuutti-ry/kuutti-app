@@ -15,6 +15,8 @@ export type MessageParams = {
   "account.break.title": Record<never, never>;
   "account.break.understand": Record<never, never>;
   "account.break.working": Record<never, never>;
+  "account.choices.loadFailed": Record<never, never>;
+  "account.choices.loading": Record<never, never>;
   "account.delete.body": { "days": number };
   "account.delete.button": Record<never, never>;
   "account.delete.cancel": Record<never, never>;
@@ -29,6 +31,8 @@ export type MessageParams = {
   "account.email.failed": Record<never, never>;
   "account.email.invalid": Record<never, never>;
   "account.email.label": Record<never, never>;
+  "account.email.loadFailed": Record<never, never>;
+  "account.email.loading": Record<never, never>;
   "account.email.save": Record<never, never>;
   "account.email.saved": Record<never, never>;
   "account.email.set": Record<never, never>;
@@ -672,12 +676,17 @@ export type MessageParams = {
   "settings.logout": Record<never, never>;
   "settings.logoutAll": Record<never, never>;
   "settings.open": Record<never, never>;
+  "settings.research.title": Record<never, never>;
   "settings.section.agreements": Record<never, never>;
   "settings.section.appearance": Record<never, never>;
   "settings.selected": { "option": string };
+  "settings.sensitive.title": Record<never, never>;
   "settings.session.label": Record<never, never>;
   "settings.session.none": Record<never, never>;
   "settings.source.summary": Record<never, never>;
+  "settings.state.off": Record<never, never>;
+  "settings.state.on": Record<never, never>;
+  "settings.state.outdated": Record<never, never>;
   "settings.theme.dark": Record<never, never>;
   "settings.theme.label": Record<never, never>;
   "settings.theme.light": Record<never, never>;

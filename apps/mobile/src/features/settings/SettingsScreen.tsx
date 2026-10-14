@@ -1,17 +1,18 @@
 import { CONSENT_VERSIONS, LOCALE_NAMES } from "@kuutti/i18n";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
-import { useSession } from "@/features/identity";
+import { type ConsentState, useConsentStates, useSession } from "@/features/identity";
 import LICENSES from "@/generated/licenses.json";
+import { buildInfo } from "@/lib/build";
 import { useLocaleSettings, useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { useTheme } from "@/theme/ThemeProvider";
 import { SCHEMES } from "./Choice";
+import { CONSENT_TITLE } from "./ConsentScreen";
 
 /** A heading and its rows. */
 function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
@@ -33,8 +34,9 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
  * #146) and the texts they refer to; about Kuutti, the version, the source
  * offer of AGPL-3.0 section 13 (visible to everybody) and the licences; the
  * account, this device, the e-mail, and the export, the break and the
- * deletion last (#51, #148, #170). What is technical (commits, the API, a
- * test error) is the tech config screen and exists outside production only.
+ * deletion last (#51, #148, #170). The tech config screen keeps what is
+ * technical beyond the version (the API, the native build, a test error) and
+ * exists outside production only.
  */
 export function SettingsScreen() {
   const { t } = useT();
@@ -58,10 +60,28 @@ export function SettingsScreen() {
     locale.preference === "system"
       ? t("settings.language.system")
       : LOCALE_NAMES[locale.preference];
-  // The counted version (#172) rides in extra, which the fingerprint skips; app.json's is the store's.
-  const version: unknown = Constants.expoConfig?.extra?.version ?? Constants.expoConfig?.version;
-  const commit: unknown = Constants.expoConfig?.extra?.commit;
+  const { version, commit } = buildInfo();
   const signedIn = session.status === "signed-in";
+  const consents = useConsentStates();
+  /** A consent's state in words, for its row; nothing while it is unknown. */
+  const consentWords = (state: ConsentState): string | undefined =>
+    state === "on"
+      ? t("settings.state.on")
+      : state === "off"
+        ? t("settings.state.off")
+        : state === "outdated"
+          ? t("settings.state.outdated")
+          : undefined;
+  const consentRow = (kind: "research" | "special_category"): Row => {
+    const words = consentWords(consents[kind]);
+    return {
+      key: kind,
+      title: t(CONSENT_TITLE[kind]),
+      summary: words,
+      value: words,
+      onPress: open(`/settings/consent/${kind}`),
+    };
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -78,12 +98,14 @@ export function SettingsScreen() {
               key: "theme",
               title: t("settings.theme.label"),
               summary: themeSummary,
+              value: themeSummary,
               onPress: open("/settings/theme"),
             },
             {
               key: "language",
               title: t("settings.language.label"),
               summary: languageSummary,
+              value: languageSummary,
               onPress: open("/settings/language"),
             },
           ]}
@@ -91,21 +113,8 @@ export function SettingsScreen() {
         <Section
           title={t("settings.section.agreements")}
           rows={[
-            // The two withdrawable consents: a choice about the app, so with its settings; nothing signed out.
-            ...(signedIn
-              ? [
-                  {
-                    key: "research",
-                    title: t("account.research.label"),
-                    onPress: open("/settings/consent/research"),
-                  },
-                  {
-                    key: "special_category",
-                    title: t("account.specialCategory.label"),
-                    onPress: open("/settings/consent/special_category"),
-                  },
-                ]
-              : []),
+            // The two withdrawable consents, each saying whether it is on; nothing signed out.
+            ...(signedIn ? [consentRow("research"), consentRow("special_category")] : []),
             {
               key: "terms",
               title: t("legal.terms.title"),
@@ -128,11 +137,10 @@ export function SettingsScreen() {
             {
               key: "version",
               title: t("settings.version.label"),
-              summary:
-                typeof commit === "string" && commit.length > 0
-                  ? t("settings.version.commit", { commit: commit.slice(0, 7) })
-                  : undefined,
-              detail: typeof version === "string" && version.length > 0 ? version : "?",
+              summary: commit
+                ? t("settings.version.commit", { commit: commit.slice(0, 7) })
+                : undefined,
+              detail: version ?? "?",
             },
             {
               key: "source",

@@ -10,7 +10,8 @@ name: The language choice in Settings changes the app's language at once
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-- tapOn: "Language|Kieli|Språk"
+# The row says the language chosen, which Maestro reads after its title.
+- tapOn: "(Language|Kieli|Språk)(, .*)?"
 - extendedWaitUntil:
     visible: ".*Suomi.*"
     timeout: 15000

@@ -11,6 +11,12 @@ name: Download my data hands the person's file over
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
 # The export is on the account screen, behind its row (#287).
+# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
+- scrollUntilVisible:
+    element: "Your account|Tilisi|Ditt konto"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - tapOn: "Your account|Tilisi|Ditt konto"
 - extendedWaitUntil:
     visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"

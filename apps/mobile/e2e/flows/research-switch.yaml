@@ -7,9 +7,15 @@ name: The research switch in Settings records the opt-in and withdraws it again
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
-# The consent has a screen of its own, behind its row (#287); there the switch
-# is toggled by its words, the screen's title being the consent's legal name.
-- tapOn: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+# The consent has a screen of its own, behind its row (#287). The row says
+# whether it is on, which Maestro reads after its title; on the screen the
+# switch is toggled by its words.
+- scrollUntilVisible:
+    element: "(Research|Tutkimus|Forskning)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Research|Tutkimus|Forskning)(, .*)?"
 - extendedWaitUntil:
     visible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     timeout: 15000
@@ -23,7 +29,12 @@ name: The research switch in Settings records the opt-in and withdraws it again
 
 - openLink: kuutti://
 - openLink: kuutti://settings
-- tapOn: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
+- scrollUntilVisible:
+    element: "(Research|Tutkimus|Forskning)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Research|Tutkimus|Forskning)(, .*)?"
 - extendedWaitUntil:
     visible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     timeout: 15000

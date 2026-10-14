@@ -133,9 +133,11 @@ describe("the language screen", () => {
 });
 
 describe("the legal screens", () => {
-  it("show the terms with their version, to anybody", async () => {
+  it("show the terms with their version, to anybody, and the way back leads back", async () => {
     await renderWithTheme(<LegalScreen kind="terms" />);
     expectPinnedHeader("Terms of use", "Back");
+    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/^DRAFT: Kuutti is a free dating service/)).toBeTruthy();
     expect(screen.getByText(/^Version \S+$/)).toBeTruthy();
   });
@@ -265,5 +267,19 @@ describe("the e-mail and the account screens", () => {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
     noProblems();
+  });
+
+  it("say there is no session on a signed-out device, the e-mail screen and the account screen alike", async () => {
+    await renderWithTheme(<EmailSettingsScreen />);
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByText("A way back in")).toBeNull();
+  });
+
+  it("say there is no session on the account screen of a signed-out device", async () => {
+    await renderWithTheme(<AccountScreen />);
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Delete my account" })).toBeNull();
   });
 });

@@ -227,6 +227,13 @@ describe("the profile's routes with a param", () => {
       { kind: "special_category" },
       "special_category",
     ],
+    [
+      "a consent's kind, the first of two",
+      ConsentRoute,
+      "ConsentScreen",
+      { kind: ["special_category", "research"] },
+      "special_category",
+    ],
     ["the research consent for a link naming none", ConsentRoute, "ConsentScreen", {}, "research"],
     [
       "a legal text's kind, the first of two",

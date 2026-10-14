@@ -23,6 +23,7 @@ describe("RowGroup", () => {
             onPress: open,
           },
           { key: "b", title: "Prompts", onPress: () => {} },
+          { key: "c", title: "Theme", summary: "Dark", value: "Dark", onPress: () => {} },
         ]}
       />,
     );
@@ -33,6 +34,10 @@ describe("RowGroup", () => {
     const prompts = screen.getByRole("button", { name: "Prompts" });
     expect(prompts.props.accessibilityHint).toBeUndefined();
     expect(prompts.props.accessibilityValue?.text).toBeUndefined();
+    // A summary that is the state is said once, as the value.
+    const theme = screen.getByRole("button", { name: "Theme" });
+    expect(theme.props.accessibilityValue).toEqual({ text: "Dark" });
+    expect(theme.props.accessibilityHint).toBeUndefined();
     await fireEvent.press(basics);
     expect(open).toHaveBeenCalledTimes(1);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
@@ -48,8 +53,21 @@ describe("RowGroup", () => {
     );
     expect(screen.queryByRole("button")).toBeNull();
     const version = screen.getByLabelText("Version");
-    expect(version.props.accessibilityValue).toEqual({ text: "0.19.0" });
+    expect(version.props.accessibilityValue).toEqual({ text: "0.19.0, Build abc1234" });
     expect(screen.getByText("0.19.0")).toBeTruthy();
     expect(screen.getByText("Build abc1234")).toBeTruthy();
+  });
+
+  it("reads a plain row with only a summary, or with nothing beside its title", async () => {
+    await renderWithTheme(
+      <RowGroup
+        rows={[
+          { key: "a", title: "Built", summary: "abc1234" },
+          { key: "b", title: "Bare" },
+        ]}
+      />,
+    );
+    expect(screen.getByLabelText("Built").props.accessibilityValue).toEqual({ text: "abc1234" });
+    expect(screen.getByLabelText("Bare").props.accessibilityValue).toBeUndefined();
   });
 });

@@ -1,3 +1,4 @@
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
@@ -16,6 +17,13 @@ jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
 }));
+
+// The build's version and commit, the test's to choose (lib/build.ts has its own tests).
+const mockBuild = jest.fn((): { version: string | null; commit: string | null } => ({
+  version: "0.19.0",
+  commit: "abc1234def5678",
+}));
+jest.mock("@/lib/build", () => ({ buildInfo: () => mockBuild() }));
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const { __router: router } = jest.requireMock("expo-router") as {
@@ -43,16 +51,37 @@ const press = (element: ReturnType<typeof screen.getByRole>) =>
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+/** Research given for the app's wording; the sensitive answers' wording newer than the app's. */
+const consentsAnswer = {
+  consents: [
+    {
+      kind: "research",
+      version: CONSENT_VERSIONS.research,
+      locale: "en",
+      givenAt: "2026-09-26T10:00:00.000Z",
+      withdrawnAt: null,
+    },
+  ],
+  currentVersions: {
+    terms: CONSENT_VERSIONS.terms,
+    privacy: CONSENT_VERSIONS.privacy,
+    research: CONSENT_VERSIONS.research,
+    special_category: "2099-01-newer-than-this-app",
+  },
+};
 
 beforeEach(async () => {
+  mockBuild.mockReturnValue({ version: "0.19.0", commit: "abc1234def5678" });
   store.clear();
   deviceLanguage("en-US");
   router.back.mockReset();
   router.push.mockReset();
-  // The list reads nothing itself; the session behind it may, and gets an answer.
-  globalThis.fetch = jest.fn(async () =>
-    json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404),
-  ) as unknown as typeof fetch;
+  // The list reads the consents for their rows; the session behind it may read more, and gets a 404.
+  globalThis.fetch = jest.fn(async (input: Request | string) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    if (url.pathname === "/consents") return json(consentsAnswer);
+    return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
+  }) as unknown as typeof fetch;
   await clearSession();
 });
 
@@ -70,7 +99,7 @@ describe("the settings screen", () => {
     for (const name of headings) expect(screen.getByRole("heading", { name })).toBeTruthy();
     // This device's screen says there is no session; the rest of the account needs a person.
     expect(row("This device")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Take part in research" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
     expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Your account" })).toBeNull();
     for (const name of [
@@ -83,8 +112,10 @@ describe("the settings screen", () => {
     ]) {
       expect(row(name)).toBeTruthy();
     }
-    // The version opens nothing: a fact, read with its number.
-    expect(screen.getByLabelText("Version").props.accessibilityValue?.text).toBeTruthy();
+    // The version opens nothing: a fact, read with its number and its build.
+    expect(screen.getByLabelText("Version").props.accessibilityValue).toEqual({
+      text: "0.19.0, Build abc1234",
+    });
     expect(screen.queryByRole("button", { name: "Version" })).toBeNull();
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
@@ -101,8 +132,8 @@ describe("the settings screen", () => {
       "Theme",
       "Language",
       "Legal",
-      "Take part in research",
-      "Store my sensitive answers",
+      "Research",
+      "Sensitive answers",
       "Terms of use",
       "Privacy",
       "About Kuutti",
@@ -141,8 +172,8 @@ describe("the settings screen", () => {
     const expected: Array<[string, string]> = [
       ["Theme", "/settings/theme"],
       ["Language", "/settings/language"],
-      ["Take part in research", "/settings/consent/research"],
-      ["Store my sensitive answers", "/settings/consent/special_category"],
+      ["Research", "/settings/consent/research"],
+      ["Sensitive answers", "/settings/consent/special_category"],
       ["Terms of use", "/settings/legal/terms"],
       ["Privacy", "/settings/legal/privacy"],
       ["Source code", "/settings/source"],
@@ -163,5 +194,29 @@ describe("the settings screen", () => {
     await renderWithTheme(<SettingsScreen />);
     expect(await screen.findByRole("heading", { name: "Asetukset" })).toBeTruthy();
     expect(row("Kieli")).toBeTruthy();
+  });
+
+  it("says whether each consent is on, or that the app needs an update to change it", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    expect(row("Research").props.accessibilityValue).toEqual({ text: "On" });
+    expect(row("Research").props.accessibilityHint).toBeUndefined();
+    expect(row("Sensitive answers").props.accessibilityValue).toEqual({
+      text: "Update the app to change it",
+    });
+  });
+
+  it("names the version without a build, and a question mark when the build names none", async () => {
+    mockBuild.mockReturnValue({ version: null, commit: null });
+    await renderWithTheme(<SettingsScreen />);
+    expect(screen.getByLabelText("Version").props.accessibilityValue).toEqual({ text: "?" });
+    expect(screen.queryByText(/^Build /)).toBeNull();
+  });
+
+  it("says the chosen theme and language as the rows' values", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    expect(row("Theme").props.accessibilityValue).toEqual({ text: "System" });
+    expect(row("Language").props.accessibilityValue).toEqual({ text: "Phone's language" });
   });
 });
