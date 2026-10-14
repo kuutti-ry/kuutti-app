@@ -490,6 +490,7 @@ export type MessageParams = {
   "profile.option.identityLabel.questioning": Record<never, never>;
   "profile.option.identityLabel.two_spirit": Record<never, never>;
   "profile.option.intent.casual": Record<never, never>;
+  "profile.option.intent.dance_partner": Record<never, never>;
   "profile.option.intent.long_term": Record<never, never>;
   "profile.option.intent.open_to_either": Record<never, never>;
   "profile.option.languages.ar": Record<never, never>;

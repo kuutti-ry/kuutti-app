@@ -5,7 +5,8 @@ import type { AgeWindow, Gender, ProfileFields } from "@kuutti/schema";
  * onboarding, in both directions (rule 7). A is in B's pool exactly when B is
  * in A's: each one's gender is among those the other seeks, each one's age
  * is inside the other's window, and the two want the same thing, or one of
- * them is open to either (ADR-015 §4). The pond gate counts a person's pool
+ * them is open to either and the other is no dance partner (ADR-015 §10,
+ * §13). The pond gate counts a person's pool
  * with this (#94) and the round builder draws its candidates through it
  * (#95); blocks and deal-breakers join here with #87, so that no caller can
  * show somebody a filter excludes.
@@ -25,9 +26,15 @@ export type PoolPerson = {
   intent: Intent;
 };
 
-/** The intents fit when they are the same, or one side is open to either. */
+/**
+ * The intents fit when they are the same, or one side is open to either and
+ * the other is no dance partner: "either" is long-term or casual, and a dance
+ * partner meets a dance partner only (#175).
+ */
 export function intentsFit(a: Intent, b: Intent): boolean {
-  return a === b || a === "open_to_either" || b === "open_to_either";
+  if (a === b) return true;
+  if (a === "dance_partner" || b === "dance_partner") return false;
+  return a === "open_to_either" || b === "open_to_either";
 }
 
 /** One direction: whether `candidate` passes what `viewer` asked for. */

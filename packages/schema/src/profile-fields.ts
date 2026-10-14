@@ -296,8 +296,8 @@ export const POLITICS_OPTIONS = [
 export const PARTY_OPTIONS = POLITICS_OPTIONS.filter((option) => option !== "none_of_them");
 
 export const PROFILE_FIELDS = {
-  /** Asked in onboarding (#146); "open to either" matches both others (#147). The one field in the research snapshot (ADR-011 §9). */
-  intent: single(["long_term", "casual", "open_to_either"], {
+  /** Asked in onboarding (#146); "open to either" matches long-term and casual (#147), a dance partner only a dance partner (#175). The one field in the research snapshot (ADR-011 §9). */
+  intent: single(["long_term", "casual", "open_to_either", "dance_partner"], {
     role: "hard",
     preferenceAbout: "hard",
     research: true,

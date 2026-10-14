@@ -84,6 +84,13 @@ describe("ProfileCardView", () => {
     expect(screen.getByText("Finnish (you too), English")).toBeTruthy();
   });
 
+  it("says a dance partner as what the person is looking for (#175)", async () => {
+    await renderWithTheme(
+      <ProfileCardView card={{ ...bare, fields: { intent: "dance_partner" } }} />,
+    );
+    expect(texts(screen.toJSON())).toEqual(["Aino, 36", "Looking for", "A dance partner"]);
+  });
+
   it("names the photos by position and hands a refused one to the screen", async () => {
     globalThis.fetch = jest.fn(async () =>
       json({ error: { code: "photo_budget_exceeded", message: "x", requestId: "r" } }, 429),
