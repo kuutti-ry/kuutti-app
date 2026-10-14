@@ -3,6 +3,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { ProfileScreen } from "./ProfileScreen";
 
@@ -129,6 +130,14 @@ beforeEach(async () => {
 });
 
 describe("ProfileScreen", () => {
+  it("keeps the title, the way back and the card's button pinned above the list", async () => {
+    fakeApi([["display_name", "photos"]]);
+    await show(<ProfileScreen />);
+    await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
+    expectPinnedHeader("Your profile", "Back");
+    expectPinnedHeader("Your profile", "See your card");
+  });
+
   it("lists the photos and the sections with what each holds, after what the card still needs, every row labelled", async () => {
     fakeApi([["display_name", "photos"]]);
     await show(<ProfileScreen />);

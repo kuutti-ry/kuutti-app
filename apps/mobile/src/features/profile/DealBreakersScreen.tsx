@@ -11,12 +11,14 @@ import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { ConfirmLeaveDialog, useConfirmLeave } from "./ConfirmLeave";
 import { fetchDealBreakers, saveDealBreakers } from "./client";
 import { Chip, SEARCHABLE_FROM, visibleOptions } from "./FieldEditor";
 import { FieldLabel } from "./fieldIcons";
@@ -46,6 +48,12 @@ export const updateOf = (draft: Draft): DealBreakersUpdate => ({
   }),
 });
 
+/** What a draft would save, whatever order its accepted answers were pressed in. */
+const canonical = (draft: Draft) =>
+  JSON.stringify(
+    updateOf(draft).dealBreakers.map((row) => ({ ...row, accept: [...row.accept].sort() })),
+  );
+
 const optionsOf = (field: DealBreakerField): readonly string[] => {
   const spec = PROFILE_FIELDS[field];
   return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
@@ -74,6 +82,8 @@ export function DealBreakersScreen() {
   const [failure, setFailure] = useState<unknown>(null);
   const [max, setMax] = useState(0);
   const [draft, setDraft] = useState<Draft>({});
+  // What the API holds, so that leaving with switches changed and not saved asks first.
+  const [stored, setStored] = useState<Draft>({});
   const [search, setSearch] = useState<Partial<Record<DealBreakerField, string>>>({});
   // An option once pressed stays in view on this visit, accepted or not, as in the field editor (#239).
   const [seen, setSeen] = useState<Partial<Record<DealBreakerField, readonly string[]>>>({});
@@ -86,6 +96,7 @@ export function DealBreakersScreen() {
       const response = await fetchDealBreakers();
       setMax(response.max);
       setDraft(draftOf(response.dealBreakers));
+      setStored(draftOf(response.dealBreakers));
       setStatus("ready");
     } catch (error) {
       setFailure(error);
@@ -95,6 +106,10 @@ export function DealBreakersScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+  const leaving = useConfirmLeave(
+    status === "ready" && canonical(draft) !== canonical(stored),
+    () => setDraft(stored),
+  );
 
   if (profile.status === "loading" || status === "loading") {
     return (
@@ -145,6 +160,7 @@ export function DealBreakersScreen() {
       const response = await saveDealBreakers(updateOf(draft));
       setMax(response.max);
       setDraft(draftOf(response.dealBreakers));
+      setStored(draftOf(response.dealBreakers));
       setNotice("saved");
     } catch {
       setNotice("failed");
@@ -174,13 +190,16 @@ export function DealBreakersScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* Back to where it was opened: the profile, or the e-mail at the end of the later screens. */}
+      <ScreenHeader
+        title={t("profile.dealBreakers.title")}
+        backLabel={t("profile.dealBreakers.back")}
+        onBack={() => router.back()}
+      />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.dealBreakers.title")}
-        </Text>
         <Text>{t("profile.dealBreakers.explain", { max })}</Text>
 
         {DEAL_BREAKER_FIELDS.map((field) => {
@@ -297,6 +316,7 @@ export function DealBreakersScreen() {
           {t("profile.dealBreakers.save")}
         </Button>
       </ScrollView>
+      <ConfirmLeaveDialog {...leaving} />
     </SafeAreaView>
   );
 }

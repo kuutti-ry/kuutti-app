@@ -3,6 +3,7 @@ import {
   AGE_MAX,
   AGE_MIN,
   BIO_MIN_FOR_COMPLETENESS,
+  bioOrPromptsComplete,
   type ConsentKind,
   DISPLAY_NAME_MAX,
   GENDERS,
@@ -24,7 +25,13 @@ import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { choosePond, fetchPonds, pondName } from "@/features/pond";
-import { BioEditor, optionKey, PromptsEditor, useProfile } from "@/features/profile";
+import {
+  BioEditor,
+  optionKey,
+  PromptsEditor,
+  profileErrorText,
+  useProfile,
+} from "@/features/profile";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
@@ -272,10 +279,14 @@ export function OnboardingScreen() {
         )}
         {(failed || profileFailed) && (
           <Text accessibilityLiveRegion="assertive">
-            {/* A change refused for its cadence is said as that (#147), the rest as a step that did not go through. */}
+            {/* A change refused for its cadence is said as that (#147), a refused
+                profile save in the profile's own words (#223), the rest as a step
+                that did not go through. */}
             {failedCode === "change_too_soon"
               ? t("errors.change_too_soon")
-              : t("onboarding.failed")}
+              : failed
+                ? t("onboarding.failed")
+                : profileErrorText(profile.notice, t)}
           </Text>
         )}
         {failed && failedCode === "change_too_soon" && changeFrom && (
@@ -650,8 +661,17 @@ export function OnboardingScreen() {
             <BioEditor draft={draft} update={update} />
             <Text variant="small">{t("profile.prompts.label")}</Text>
             <PromptsEditor draft={draft} update={update} />
+            {/* Waits for words that count (#223): a save of fewer would leave the step where it is, saying nothing. */}
             <Button
-              disabled={busy || profile.saving}
+              disabled={
+                busy ||
+                profile.saving ||
+                !bioOrPromptsComplete({
+                  bio: draft.bio,
+                  bioPreset: draft.bioPreset,
+                  answeredPrompts: draft.prompts.filter((p) => p.answer.trim().length > 0).length,
+                })
+              }
               onPress={() => {
                 tap();
                 void saveProfileStep();

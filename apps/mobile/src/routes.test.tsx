@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/react-native";
 import { render, screen } from "@testing-library/react-native";
 import type * as React from "react";
 import RootLayout from "../app/_layout";
+import { redirectSystemPath } from "../app/+native-intent";
 import NotFoundRoute from "../app/+not-found";
 import EmailRoute from "../app/account/email";
 import AuthReturnRoute from "../app/auth";
@@ -68,6 +69,7 @@ jest.mock("@/features/profile", () => {
   return {
     CardPreviewScreen: probe("CardPreviewScreen"),
     DealBreakersScreen: probe("DealBreakersScreen"),
+    holdLinkWhileUnsaved: jest.fn((path: string) => path),
     LaterFieldScreen: probe("LaterFieldScreen"),
     ProfileScreen: probe("ProfileScreen"),
     SectionScreen: probe("SectionScreen"),
@@ -212,5 +214,19 @@ describe("the root layout", () => {
       screenOptions: { headerShown: false, contentStyle: { backgroundColor: "transparent" } },
     });
     expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
+  });
+});
+
+describe("a link from outside the app", () => {
+  it("passes through the hold on unsaved changes, cold start or not (#285)", () => {
+    const { holdLinkWhileUnsaved } = jest.requireMock("@/features/profile") as {
+      holdLinkWhileUnsaved: jest.Mock;
+    };
+    expect(redirectSystemPath({ path: "kuutti://settings", initial: true })).toBe(
+      "kuutti://settings",
+    );
+    expect(holdLinkWhileUnsaved).toHaveBeenLastCalledWith("kuutti://settings", true);
+    expect(redirectSystemPath({ path: "kuutti://", initial: false })).toBe("kuutti://");
+    expect(holdLinkWhileUnsaved).toHaveBeenLastCalledWith("kuutti://", false);
   });
 });

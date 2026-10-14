@@ -21,7 +21,9 @@ function Label({
       // accessibility element of its own and its text is read as text.
       accessible={false}
       className={cn(
-        "flex select-none flex-row items-center gap-2",
+        // Shrinks beside a control, and its text wraps, where a row would
+        // otherwise push the control past the screen's edge (#285).
+        "flex shrink select-none flex-row items-center gap-2",
         Platform.select({ web: "cursor-default" }),
         disabled && "opacity-50",
       )}
@@ -32,7 +34,7 @@ function Label({
       disabled={disabled}
     >
       <LabelPrimitive.Text
-        className={cn("text-sm font-medium text-foreground", className)}
+        className={cn("shrink text-sm font-medium text-foreground", className)}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         {...props}
       />

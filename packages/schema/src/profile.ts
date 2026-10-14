@@ -22,6 +22,23 @@ export const PROMPTS_FOR_COMPLETENESS = 2;
 /** Approved photos a profile needs before it is complete (#47; two since #56). */
 export const PHOTOS_FOR_COMPLETENESS = 2;
 
+/**
+ * The words a profile needs (#239): a bio of BIO_MIN_FOR_COMPLETENESS
+ * characters, a ready line, or PROMPTS_FOR_COMPLETENESS answered prompts.
+ * The API's completeness and onboarding's step read this one rule (#223).
+ */
+export function bioOrPromptsComplete(words: {
+  bio: string | null;
+  bioPreset: string | null;
+  answeredPrompts: number;
+}): boolean {
+  return (
+    (words.bio?.trim().length ?? 0) >= BIO_MIN_FOR_COMPLETENESS ||
+    words.bioPreset !== null ||
+    words.answeredPrompts >= PROMPTS_FOR_COMPLETENESS
+  );
+}
+
 /** The prompts a person may answer; texts are i18n keys profile.prompt.<key>. */
 export const PROMPT_KEYS = [
   "sunday",

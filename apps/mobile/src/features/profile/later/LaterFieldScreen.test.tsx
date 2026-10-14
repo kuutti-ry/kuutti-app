@@ -2,13 +2,28 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
 
-const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
+const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
+  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
+  __navigation: {
+    dispatch: jest.Mock;
+    setOptions: jest.Mock;
+    emit: (name: string, event: unknown) => void;
+  };
 };
 const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** The arrow, Android's back key or a pop of several screens, as the stack reports it. */
+const leave = async () => {
+  const event = { preventDefault: jest.fn(), data: { action: { type: "POP_TO" } } };
+  await act(async () => {
+    navigation.emit("beforeRemove", event);
+    await settle();
+  });
+  return event;
+};
 const show = (ui: React.ReactElement) =>
   act(async () => {
     renderWithTheme(ui);
@@ -126,6 +141,62 @@ describe("LaterFieldScreen", () => {
     expect(puts[0]).toMatchObject({ displayName: "Aino", fields: { hasKids: "yes_with_me" } });
     await waitFor(() => expect(router.push).toHaveBeenCalledTimes(2));
     expect(screen.getByText("1 of 16 answered")).toBeTruthy();
+  });
+
+  it("leaves the questions for the profile in one step from an arrow pinned above them, saving nothing", async () => {
+    const { puts } = fakeApi(named({}));
+    router.back.mockClear();
+    router.dismissTo.mockClear();
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    expectPinnedHeader("While you wait", "Back to your profile");
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(screen.getByRole("button", { name: "Back to your profile" }));
+    expect(router.dismissTo).toHaveBeenCalledWith("/profile");
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(puts).toEqual([]);
+  });
+
+  it("asks before an answer not saved is left, and leaves only on the word", async () => {
+    const { puts } = fakeApi(named({}));
+    navigation.dispatch.mockClear();
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: false });
+
+    expect((await leave()).preventDefault).toHaveBeenCalled();
+    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Keep editing" }));
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+
+    await leave();
+    await press(screen.getByRole("button", { name: "Leave without saving" }));
+    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "POP_TO" });
+    expect(puts).toEqual([]);
+    // Dropped: back to what is saved, so a screen a link left mounted holds nothing.
+    expect(
+      screen.getByRole("button", { name: "Yes, living with me" }).props.accessibilityState
+        ?.selected,
+    ).toBe(false);
+  });
+
+  it("puts an answer back on Ask me later, so a question passed over holds nothing to ask about", async () => {
+    const { puts } = fakeApi(named({}));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(screen.getByRole("button", { name: "Ask me later" }));
+    expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids");
+    expect(
+      screen.getByRole("button", { name: "Yes, living with me" }).props.accessibilityState
+        ?.selected,
+    ).toBe(false);
+    expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: true });
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
+    expect(puts).toEqual([]);
   });
 
   it("lands on the first unanswered field when the first one is answered already", async () => {
@@ -323,13 +394,8 @@ describe("LaterFieldScreen", () => {
   it("stays on a refused save and says a contact detail is not allowed yet", async () => {
     refusingSaves("text_contact_details");
     await show(<LaterFieldScreen field="occupation" />);
-    await waitFor(() =>
-      expect(screen.getByLabelText("Job title, without the employer's name")).toBeTruthy(),
-    );
-    await type(
-      screen.getByLabelText("Job title, without the employer's name"),
-      "aino@example.test",
-    );
+    await waitFor(() => expect(screen.getByLabelText("Job title")).toBeTruthy());
+    await type(screen.getByLabelText("Job title"), "aino@example.test");
     await press(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText(/Your text has an e-mail address, a link/)).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();

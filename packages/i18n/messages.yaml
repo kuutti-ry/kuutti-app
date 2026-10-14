@@ -267,6 +267,13 @@ profile.discard.title:
   sv: Lämna utan att spara?
   machine: { fi: true, sv: true }
 
+profile.discard.unsaved:
+  en: "Your changes are not saved yet."
+  description: "Text of the leave-without-saving dialog on the deal-breakers and the later questions: the person is leaving with changes they have not saved. It may show over another screen than the one that holds them."
+  fi: "Muutoksiasi ei ole vielä tallennettu."
+  sv: "Dina ändringar är inte sparade än."
+  machine: { fi: true, sv: true }
+
 profile.discard.keep:
   en: Keep editing
   description: Button of the leave-without-saving dialog that stays on the profile section to fix what was refused.
@@ -485,10 +492,10 @@ profile.field.occupation:
   machine: { fi: true, sv: true }
 
 profile.field.occupationTitle:
-  en: "Job title, without the employer's name"
-  description: "Label of the occupationTitle field of the profile registry (#145, ADR-019)."
-  fi: "Tehtävänimike ilman työnantajan nimeä"
-  sv: "Yrkestitel utan arbetsgivarens namn"
+  en: "Job title"
+  description: "Label of the occupationTitle field of the profile registry (#145, ADR-019), read on the card and the deal-breakers too; the editor's instruction is profile.text.hint (#223)."
+  fi: "Tehtävänimike"
+  sv: "Yrkestitel"
   machine: { fi: true, sv: true }
 
 profile.field.politics:
@@ -513,10 +520,10 @@ profile.field.zodiac:
   machine: { fi: true, sv: true }
 
 profile.text.hint:
-  en: "In your own words, up to {max, number} characters."
-  description: "Hint under a free-text field of the registry (the job title)."
-  fi: "Omin sanoin, enintään {max, number} merkkiä."
-  sv: "Med egna ord, högst {max, number} tecken."
+  en: "Without the employer's name, and up to {max, number} characters."
+  description: "Hint under the registry's one free-text field, the job title: the editor's instruction, which the label no longer carries (#223), and the length. A second text field would split this per field."
+  fi: "Ilman työnantajan nimeä, enintään {max, number} merkkiä."
+  sv: "Utan arbetsgivarens namn, högst {max, number} tecken."
   machine: { fi: true, sv: true }
 
 profile.number.hint:
@@ -559,6 +566,13 @@ profile.dealBreakers.title:
   description: "Heading of the deal-breakers screen (#149)."
   fi: "Ehdottomat rajat"
   sv: "Absoluta gränser"
+  machine: { fi: true, sv: true }
+
+profile.dealBreakers.back:
+  en: "Back"
+  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, the profile or the e-mail screen; with changes not saved it asks first."
+  fi: "Takaisin"
+  sv: "Tillbaka"
   machine: { fi: true, sv: true }
 
 profile.dealBreakers.explain:
@@ -657,6 +671,13 @@ profile.later.title:
   description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
   fi: "Odotellessasi"
   sv: "Medan du väntar"
+  machine: { fi: true, sv: true }
+
+profile.later.back:
+  en: "Back to your profile"
+  description: "Screen-reader label of the back arrow of the optional fields' screens: it leaves the questions for the profile in one step; with an answer not saved it asks first."
+  fi: "Takaisin profiiliisi"
+  sv: "Tillbaka till din profil"
   machine: { fi: true, sv: true }
 
 profile.later.progress:

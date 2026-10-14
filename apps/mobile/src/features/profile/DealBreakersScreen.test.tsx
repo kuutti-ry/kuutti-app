@@ -2,13 +2,29 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DealBreakersScreen } from "./DealBreakersScreen";
 
-const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock };
+const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
+  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
+  __navigation: {
+    dispatch: jest.Mock;
+    setOptions: jest.Mock;
+    emit: (name: string, event: unknown) => void;
+  };
 };
 const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** The arrow, Android's back key or a pop of several screens, as the stack reports it. */
+const leave = async () => {
+  const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+  await act(async () => {
+    navigation.emit("beforeRemove", event);
+    await settle();
+  });
+  return event;
+};
+const swipe = () => navigation.setOptions.mock.lastCall?.[0];
 const show = (ui: React.ReactElement) =>
   act(async () => {
     renderWithTheme(ui);
@@ -103,6 +119,69 @@ describe("DealBreakersScreen", () => {
     checkA11y();
     await press(screen.getByRole("button", { name: "Answer it" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/hasKids");
+  });
+
+  it("goes back to where it was opened from an arrow pinned above the list, saving nothing", async () => {
+    const { puts } = fakeApi(answeredAll);
+    router.back.mockClear();
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    expectPinnedHeader("Deal-breakers", "Back");
+    await press(screen.getAllByRole("switch")[0] as ReturnType<typeof screen.getByRole>);
+    await press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(puts).toEqual([]);
+  });
+
+  it("asks before switches changed and not saved are left, and leaves only on the word", async () => {
+    const { puts } = fakeApi(answeredAll);
+    navigation.dispatch.mockClear();
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    expect(swipe()).toEqual({ gestureEnabled: true });
+    await press(screen.getByLabelText("Deal-breaker: Smoking"));
+    // The iOS swipe cannot be held without bouncing (#238), so it is off while something is unsaved.
+    expect(swipe()).toEqual({ gestureEnabled: false });
+
+    const first = await leave();
+    expect(first.preventDefault).toHaveBeenCalled();
+    expect(screen.getByText("Leave without saving?")).toBeTruthy();
+    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Keep editing" }));
+    expect(screen.queryByText("Leave without saving?")).toBeNull();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Deal-breaker: Smoking").props.accessibilityState?.checked).toBe(
+      true,
+    );
+
+    await leave();
+    await press(screen.getByRole("button", { name: "Leave without saving" }));
+    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
+    expect(puts).toEqual([]);
+    // Dropped: back to what is stored, so a screen a link left mounted holds nothing.
+    expect(screen.getByLabelText("Deal-breaker: Smoking").props.accessibilityState?.checked).toBe(
+      false,
+    );
+  });
+
+  it("lets go at once when nothing changed, and once the changes are saved", async () => {
+    fakeApi(answeredAll);
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
+
+    await press(screen.getByLabelText("Deal-breaker: Smoking"));
+    await press(screen.getByRole("button", { name: "Never" }));
+    // Switched off again: the same set as stored, so nothing to lose.
+    await press(screen.getByLabelText("Deal-breaker: Smoking"));
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
+
+    await press(screen.getByLabelText("Deal-breaker: Smoking"));
+    await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
+    await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+    expect(swipe()).toEqual({ gestureEnabled: true });
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
+    expect(screen.queryByText("Leave without saving?")).toBeNull();
   });
 
   it("leads a field without a later screen to the section that holds it (#239)", async () => {

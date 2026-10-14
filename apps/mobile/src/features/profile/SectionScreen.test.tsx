@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SectionScreen } from "./SectionScreen";
 import { PROFILE_SECTIONS } from "./sections";
@@ -150,6 +151,13 @@ describe("SectionScreen", () => {
     expect(screen.getByText("Pets")).toBeTruthy();
     expect(screen.queryByText("Languages")).toBeNull();
     expect(screen.queryByLabelText("Name on your card")).toBeNull();
+  });
+
+  it("keeps the section's name and the way back pinned above its fields", async () => {
+    fakeApi();
+    await show(<SectionScreen section="lifestyle" />);
+    await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+    expectPinnedHeader("Lifestyle", "Back to your profile");
   });
 
   it("sends an unknown section to the list", async () => {

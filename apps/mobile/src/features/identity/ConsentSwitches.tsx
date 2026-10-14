@@ -93,13 +93,11 @@ function ConsentSwitch({
   };
   return (
     <View className="gap-2">
-      {/* The words toggle the switch too, as the high-contrast row's do: the
-          whole row is the target, which a thumb or a test reaches without
-          aiming at the thumb-sized switch at the screen's edge. */}
+      {/* The words toggle the switch too, as the high-contrast row's do: a
+          thumb or a test reaches them without aiming at the thumb-sized
+          switch at the screen's edge. */}
       <View className="flex-row items-center justify-between gap-3">
-        <Label className="flex-1" onPress={() => !locked && set(consent.state !== "on")}>
-          {label}
-        </Label>
+        <Label onPress={() => !locked && set(consent.state !== "on")}>{label}</Label>
         <Switch
           accessibilityLabel={label}
           checked={consent.state === "on"}

@@ -33,23 +33,37 @@ jest.mock("@sentry/react-native", () => ({
 // A screen in a test has the focus from the start, and `__focus()` gives it
 // the focus again, as coming back to it does (src/features/pond/GateCard.test.tsx).
 // The navigation object a screen listens on; `__navigation.emit("beforeRemove", event)`
-// is a test leaving the screen (the profile section saves on it, #238).
+// is a test leaving the screen (the profile section saves on it, #238), and
+// `setOptions` records what a screen sets on its route (the swipe, off while unsaved).
+// Several screens may listen at once (one under another, ConfirmLeave.test.tsx),
+// each removing only its own listener.
 const mockNavigationListeners = new Map();
 const mockNavigation = {
   addListener: jest.fn((name, listener) => {
-    mockNavigationListeners.set(name, listener);
-    return () => mockNavigationListeners.delete(name);
+    if (!mockNavigationListeners.has(name)) mockNavigationListeners.set(name, new Set());
+    mockNavigationListeners.get(name).add(listener);
+    return () => mockNavigationListeners.get(name)?.delete(listener);
   }),
   dispatch: jest.fn(),
-  emit: (name, event) => mockNavigationListeners.get(name)?.(event),
+  setOptions: jest.fn(),
+  emit: (name, event) => {
+    for (const listener of mockNavigationListeners.get(name) ?? []) listener(event);
+  },
 };
 jest.mock("expo-router", () => {
   const { useEffect } = require("react");
-  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), setParams: jest.fn() };
+  const router = {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    dismissTo: jest.fn(),
+    setParams: jest.fn(),
+  };
   const focused = new Set();
   return {
     __router: router,
     __navigation: mockNavigation,
+    __navigationListeners: mockNavigationListeners,
     useNavigation: () => mockNavigation,
     __focus: () => {
       for (const effect of focused) effect();

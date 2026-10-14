@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   BIO_MAX,
   BIO_PRESETS,
+  bioOrPromptsComplete,
   CardPreviewResponse,
   Completeness,
   DISPLAY_NAME_MAX,
@@ -284,5 +285,29 @@ describe("the card another person sees", () => {
     const completeness = { complete: true, missing: [] };
     expect(CardPreviewResponse.parse({ card, completeness }).card?.displayName).toBe("Aino");
     expect(CardPreviewResponse.parse({ card: null, completeness }).card).toBeNull();
+  });
+});
+
+describe("the words that count for completeness", () => {
+  const words = (bio: string | null, bioPreset: string | null = null, answeredPrompts = 0) =>
+    bioOrPromptsComplete({ bio, bioPreset, answeredPrompts });
+
+  it("takes a bio of the minimum length, measured after trimming", () => {
+    expect(words("x".repeat(50))).toBe(true);
+    expect(words("x".repeat(49))).toBe(false);
+    expect(words(`  ${"x".repeat(49)}  `)).toBe(false);
+    expect(words(`  ${"x".repeat(50)}  `)).toBe(true);
+  });
+
+  it("takes a ready line alone, or two answered prompts alone", () => {
+    expect(words(null, "lazy_nice_fellow")).toBe(true);
+    expect(words(null, null, 2)).toBe(true);
+    expect(words(null, null, 3)).toBe(true);
+  });
+
+  it("refuses nothing, an empty bio, and a short bio with one prompt", () => {
+    expect(words(null)).toBe(false);
+    expect(words("")).toBe(false);
+    expect(words("x".repeat(49), null, 1)).toBe(false);
   });
 });

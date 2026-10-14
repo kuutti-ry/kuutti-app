@@ -1,10 +1,9 @@
 import { useRouter } from "expo-router";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
@@ -50,24 +49,12 @@ export function BreakScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t("account.break.title")}
+        backLabel={t("account.break.back")}
+        onBack={() => router.back()}
+      />
       <ScrollView contentContainerClassName="gap-6 p-6">
-        <View className="flex-row items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel={t("account.break.back")}
-            onPress={() => {
-              tap();
-              router.back();
-            }}
-          >
-            <Icon as={ArrowLeft} />
-          </Button>
-          <Text variant="h1" accessibilityRole="header">
-            {t("account.break.title")}
-          </Text>
-        </View>
-
         <Text>{t("account.break.intro")}</Text>
         <View className="gap-3" accessibilityRole="list">
           {CONSEQUENCES.map((key) => (
@@ -78,11 +65,10 @@ export function BreakScreen() {
         </View>
 
         {/* The tick is the person's word; the button below waits for it. The
-            label toggles the switch too, so the target is the whole row. */}
+            label toggles the switch too, so the words are a target as well. */}
         <View className="flex-row items-center justify-between gap-4">
           <Label
             nativeID="break-understand-label"
-            className="flex-1"
             onPress={() => !busy && setUnderstood(!understood)}
           >
             {t("account.break.understand")}

@@ -526,13 +526,13 @@ describe("OnboardingScreen", () => {
   }
 
   /** The API answers one path with a refusal until `ok()` is called. */
-  function failingUntilOk(path: string, status = 500) {
+  function failingUntilOk(path: string, status = 500, code = "internal_error") {
     const answers = globalThis.fetch;
     let failing = true;
     globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       if (failing && new URL(request.url).pathname === path) {
-        return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, status);
+        return json({ error: { code, message: "x", requestId: "r" } }, status);
       }
       return answers(input, init);
     }) as unknown as typeof fetch;
@@ -713,5 +713,65 @@ describe("OnboardingScreen", () => {
       screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled,
     ).toBe(true);
     expect(calls.filter((c) => c.method === "POST")).toEqual([]);
+  });
+  /** Everything before the words (#146): the step for them is next. */
+  function atWords(server: ReturnType<typeof fakeApi>["server"]) {
+    server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
+    server.profile = {
+      displayName: "Onni",
+      bio: null,
+      bioPreset: null,
+      fields: { intent: "long_term" },
+      prompts: [],
+    };
+    server.gender = "man";
+    server.seeks = ["woman"];
+    server.ageWindow = { min: 30, max: 42 };
+    server.photos = 3;
+  }
+
+  it("waits at the words for a bio that counts, and takes a ready line as one (#223)", async () => {
+    const { server, calls } = fakeApi();
+    atWords(server);
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    const saveDisabled = () =>
+      screen.getByRole("button", { name: "Save and continue" }).props.accessibilityState?.disabled;
+    expect(saveDisabled()).toBe(true);
+    await type(screen.getByLabelText("About you"), "x".repeat(49));
+    expect(saveDisabled()).toBe(true);
+    await type(screen.getByLabelText("About you"), "x".repeat(50));
+    expect(saveDisabled()).toBe(false);
+    await type(screen.getByLabelText("About you"), "");
+    expect(saveDisabled()).toBe(true);
+    await press(
+      screen.getByRole("button", {
+        name: "I was too lazy to write anything here, so this placeholder says I am a nice fellow.",
+      }),
+    );
+    expect(saveDisabled()).toBe(false);
+    checkA11y();
+    expect(calls.filter((c) => c.method === "PUT" && c.path === "/profile")).toEqual([]);
+  });
+
+  it("says why a bio was refused, in the profile's words, and stays at the step (#223)", async () => {
+    const { server } = fakeApi();
+    atWords(server);
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    // Installed once the profile is read, so only the save meets it.
+    failingUntilOk("/profile", 400, "text_contact_details");
+    await type(screen.getByLabelText("About you"), `Call me on 040 123 4567 ${"x".repeat(40)}`);
+    await press(screen.getByRole("button", { name: "Save and continue" }));
+    await flush();
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "Your text has an e-mail address, a link, a phone number or a social media handle. Those come after a match.",
+        ),
+      ).toBeTruthy(),
+    );
+    expect(screen.queryByText("Something did not load. Try again.")).toBeNull();
+    expect(screen.getByText("A few words")).toBeTruthy();
   });
 });

@@ -49,7 +49,7 @@ name: The card leads with the photo, the name and the age, and shows the informa
 # The unit is joined by a no-break space.
 - assertVisible: "171.cm"
 - scrollUntilVisible:
-    element: "Job title, without the employer's name|Tehtävänimike ilman työnantajan nimeä|Yrkestitel utan arbetsgivarens namn"
+    element: "Job title|Tehtävänimike|Yrkestitel"
     direction: DOWN
     centerElement: true
     timeout: 60000

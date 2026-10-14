@@ -249,9 +249,9 @@ describe("toggled", () => {
 describe("FieldEditor: a short text", () => {
   it("keeps what is typed, says the limit, and drops the field when emptied", async () => {
     await show("occupationTitle");
-    const input = screen.getByLabelText("Job title, without the employer's name");
+    const input = screen.getByLabelText("Job title");
     expect(input.props.value).toBe("");
-    expect(screen.getByText("In your own words, up to 40 characters.")).toBeTruthy();
+    expect(screen.getByText("Without the employer's name, and up to 40 characters.")).toBeTruthy();
     await fireEvent.changeText(input, "Architect");
     expect(fields).toEqual({ occupationTitle: "Architect" });
     await fireEvent.changeText(input, "");
@@ -260,7 +260,7 @@ describe("FieldEditor: a short text", () => {
 
   it("shows an empty box for a stored value that is not text", async () => {
     await show("occupationTitle", { occupationTitle: 7 } as unknown as ProfileFields);
-    expect(screen.getByLabelText("Job title, without the employer's name").props.value).toBe("");
+    expect(screen.getByLabelText("Job title").props.value).toBe("");
   });
 });
 

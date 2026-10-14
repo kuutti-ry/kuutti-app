@@ -4,10 +4,13 @@ import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { ConfirmLeaveDialog, useConfirmLeave } from "../ConfirmLeave";
+import { profileErrorText } from "../errorText";
 import { FieldEditor } from "../FieldEditor";
 import { countsAsAnswer } from "../progress";
 import { useProfile } from "../useProfile";
@@ -82,6 +85,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
     const next = nextUnanswered(loadedFields, 0);
     if (next) router.replace(laterPath(next));
   }, [index, key, loadedFields, router]);
+  const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty, () => update(saved));
   if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
 
@@ -118,13 +122,17 @@ export function LaterFieldScreen({ field }: { field: string }) {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* Out of the questions in one step, wherever they were opened from: each
+          one is pushed on the last, so a plain back would step back one. */}
+      <ScreenHeader
+        title={t("profile.later.title")}
+        backLabel={t("profile.later.back")}
+        onBack={() => router.dismissTo("/profile")}
+      />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.later.title")}
-        </Text>
         <Text variant="muted" accessibilityLiveRegion="polite">
           {t("profile.later.progress", progress)}
         </Text>
@@ -138,11 +146,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
         {companion && <FieldEditor field={companion} draft={draft} update={update} />}
 
         {profile.notice?.kind === "error" && (
-          <Text accessibilityLiveRegion="assertive">
-            {profile.notice.code === "text_contact_details"
-              ? t("profile.error.text_contact_details")
-              : t("profile.error.generic")}
-          </Text>
+          <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
         )}
         {profile.saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
         <Button
@@ -161,12 +165,16 @@ export function LaterFieldScreen({ field }: { field: string }) {
           disabled={profile.saving}
           onPress={() => {
             tap();
+            // Writes nothing and keeps nothing: the answer goes back to what is
+            // saved, so a question passed over has nothing for a later pop to ask about.
+            update(saved);
             moveOn();
           }}
         >
           {t("profile.later.skip")}
         </Button>
       </ScrollView>
+      <ConfirmLeaveDialog {...leaving} />
     </SafeAreaView>
   );
 }
