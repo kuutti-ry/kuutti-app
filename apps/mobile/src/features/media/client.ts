@@ -61,7 +61,7 @@ export async function appealPhoto(id: string): Promise<Photo> {
 export async function reorderPhotos(order: string[]): Promise<PhotoList> {
   const { data, error, response } = await api.PUT("/photos/order", { body: { order } });
   if (!data) throw failed(response, error, "photo order");
-  return PhotoList.parse(data);
+  return readPhotoList(data);
 }
 
 /** A URL good for fifteen minutes; the caller caches by photoId/variant, never by the URL. */

@@ -22,7 +22,12 @@ const photo = (n: number) => ({
   position: n - 1,
   createdAt: "2026-09-25T12:00:00.000Z",
 });
-const list = (...ns: number[]) => ({ photos: ns.map(photo), maxPhotos: 6 });
+const list = (...ns: number[]) => ({
+  photos: ns.map(photo),
+  maxPhotos: 6,
+  tips: [],
+  fishSpecies: null,
+});
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const refusal = (code: string, status: number) =>
@@ -145,8 +150,13 @@ describe("usePhotos: adding", () => {
     expect(result.current.notice).toBeNull();
   });
 
-  it("reports the upload's progress in whole percent, then appends the new photo", async () => {
-    serve(listing(() => json(list(1))));
+  it("reports the upload's progress in whole percent, appends the new photo, then reads the list again for its tips (#287)", async () => {
+    const seen = serve(
+      listing(
+        () => json(list(1)),
+        () => json({ ...list(1, 2), tips: ["fish"], fishSpecies: "pike" }),
+      ),
+    );
     launch.mockResolvedValueOnce({
       canceled: false,
       assets: [{ uri: "file:///a.jpg", width: 1200, height: 900 }],
@@ -171,6 +181,9 @@ describe("usePhotos: adding", () => {
       [photo(1).id, 0],
       [photo(2).id, 1],
     ]);
+    expect(seen.filter(isList)).toHaveLength(2);
+    expect(result.current.list?.tips).toEqual(["fish"]);
+    expect(result.current.list?.fishSpecies).toBe("pike");
   });
 
   it("uploads but leaves the list alone when there was none to add to", async () => {
@@ -209,7 +222,10 @@ describe("usePhotos: appealing (#253)", () => {
   it("puts the photo back as the API answers it, queued, in its place", async () => {
     const queued = { ...photo(2), state: "queued" };
     const seen = serve(
-      listing(() => json(list(1, 2))),
+      listing(
+        () => json(list(1, 2)),
+        () => json({ ...list(1, 2), photos: [photo(1), queued] }),
+      ),
       (r) => (r.method === "POST" && r.url.endsWith("/appeal") ? json(queued) : null),
     );
     const { result } = await ready();
@@ -219,6 +235,8 @@ describe("usePhotos: appealing (#253)", () => {
     ]);
     expect(result.current.list?.photos.map((p) => p.state)).toEqual([photo(1).state, "queued"]);
     expect(result.current.busy).toEqual({ kind: "idle" });
+    // Read again, for the tips a photo in review changes (#287).
+    expect(seen.filter(isList)).toHaveLength(2);
   });
 
   it("keeps the photo and says why when the ask is refused", async () => {
@@ -246,11 +264,22 @@ describe("usePhotos: appealing (#253)", () => {
 
 describe("usePhotos: removing", () => {
   it("removes a photo and renumbers the rest", async () => {
+    const after = {
+      ...list(2, 3),
+      photos: [
+        { ...photo(2), position: 0 },
+        { ...photo(3), position: 1 },
+      ],
+    };
     const seen = serve(
-      listing(() => json(list(1, 2, 3))),
+      listing(
+        () => json({ ...list(1, 2, 3), tips: ["fish"] }),
+        () => json(after),
+      ),
       (r) => (r.method === "DELETE" ? new Response(null, { status: 204 }) : null),
     );
     const { result } = await ready();
+    expect(result.current.list?.tips).toEqual(["fish"]);
     await act(async () => result.current.remove(photo(1).id));
     expect(writes(seen).map((r) => new URL(r.url).pathname)).toEqual([`/photos/${photo(1).id}`]);
     expect(ids(result.current)).toEqual([
@@ -258,6 +287,24 @@ describe("usePhotos: removing", () => {
       [photo(3).id, 1],
     ]);
     expect(result.current.busy).toEqual({ kind: "idle" });
+    // The fish went with its photo: the list read again says so (#287).
+    expect(seen.filter(isList)).toHaveLength(2);
+    expect(result.current.list?.tips).toEqual([]);
+  });
+
+  it("keeps the list as it is when the read after a removal fails", async () => {
+    serve(
+      listing(
+        () => json(list(1, 2)),
+        () => refusal("internal_error", 500),
+      ),
+      (r) => (r.method === "DELETE" ? new Response(null, { status: 204 }) : null),
+    );
+    const { result } = await ready();
+    await act(async () => result.current.remove(photo(1).id));
+    expect(ids(result.current)).toEqual([[photo(2).id, 0]]);
+    expect(result.current.status).toBe("ready");
+    expect(result.current.notice).toBeNull();
   });
 
   it("keeps the photo and says why when the removal is refused", async () => {
@@ -290,6 +337,7 @@ describe("usePhotos: the order", () => {
           json({
             photos: body.order.map((id, position) => ({ ...photo(1), id, position })),
             maxPhotos: 6,
+            tips: [],
           }),
         )
       : null;

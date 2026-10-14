@@ -65,6 +65,20 @@ export function usePhotos() {
     void reload();
   }, [reload]);
 
+  /**
+   * The list again after a change, for the tips that ride on it (#287): what
+   * the check decided, a photo gone or one in review changes them. A read
+   * that fails keeps the list as it is; the change itself went through.
+   */
+  const refresh = useCallback(
+    () =>
+      listPhotos().then(
+        (list) => update({ list }),
+        () => undefined,
+      ),
+    [update],
+  );
+
   const add = useCallback(async () => {
     update({ busy: { kind: "picking" }, notice: null });
     try {
@@ -91,9 +105,10 @@ export function usePhotos() {
           : previous.list,
       }));
     } catch (error) {
-      update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+      return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
     }
-  }, [update]);
+    await refresh();
+  }, [update, refresh]);
 
   const remove = useCallback(
     async (id: string) => {
@@ -111,10 +126,11 @@ export function usePhotos() {
             : null,
         }));
       } catch (error) {
-        update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
       }
+      await refresh();
     },
-    [update],
+    [update, refresh],
   );
 
   // The check's rejection to a person (#253): the photo comes back queued, in its place.
@@ -134,10 +150,11 @@ export function usePhotos() {
             : null,
         }));
       } catch (error) {
-        update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
       }
+      await refresh();
     },
-    [update],
+    [update, refresh],
   );
 
   const reorder = useCallback(

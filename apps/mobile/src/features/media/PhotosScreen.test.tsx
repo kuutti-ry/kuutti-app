@@ -126,6 +126,16 @@ const answersUrls = (req: Request) => {
 };
 const answersList = (body: unknown) => (req: Request) =>
   req.method === "GET" && new URL(req.url).pathname === "/photos" ? json(body) : null;
+/** The list as it stands after each change, the last one again after that: the screen reads it again for its tips (#287). */
+const answersLists = (...bodies: unknown[]) => {
+  let reads = 0;
+  return (req: Request) => {
+    if (req.method !== "GET" || new URL(req.url).pathname !== "/photos") return null;
+    const body = bodies[Math.min(reads, bodies.length - 1)];
+    reads += 1;
+    return json(body);
+  };
+};
 
 beforeEach(async () => {
   FakeXhr.install();
@@ -213,12 +223,16 @@ describe("PhotosScreen", () => {
       rejectionReason: "no_person",
       appealable: true,
     };
+    const queued = { ...rejected, state: "queued", rejectionReason: null, appealable: false };
     const { calls } = fetchMock([
-      answersList({ photos: [photo(1), rejected], maxPhotos: 3, tips: [] }),
+      answersLists(
+        { photos: [photo(1), rejected], maxPhotos: 3, tips: [] },
+        { photos: [photo(1), queued], maxPhotos: 3, tips: [] },
+      ),
       answersUrls,
       (req) =>
         req.method === "POST" && new URL(req.url).pathname === `/photos/${rejected.id}/appeal`
-          ? json({ ...rejected, state: "queued", rejectionReason: null, appealable: false })
+          ? json(queued)
           : null,
     ]);
     await show(<PhotosScreen />);
@@ -304,7 +318,7 @@ describe("PhotosScreen", () => {
 
   it("removes a photo only after the confirmation", async () => {
     const { calls } = fetchMock([
-      answersList(list(1)),
+      answersLists(list(1), list(0)),
       answersUrls,
       (req) => (req.method === "DELETE" ? new Response(null, { status: 204 }) : null),
     ]);
@@ -321,7 +335,7 @@ describe("PhotosScreen", () => {
   });
 
   it("adds a photo: picker, on-device check, pre-resize, upload with progress, then the grid grows", async () => {
-    fetchMock([answersList(list(1)), answersUrls]);
+    fetchMock([answersLists(list(1), list(2)), answersUrls]);
     launch.mockResolvedValueOnce({
       canceled: false,
       assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
