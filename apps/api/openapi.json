@@ -776,8 +776,8 @@
           },
           "height": {
             "type": "integer",
-            "minimum": 140,
-            "maximum": 220
+            "minimum": 90,
+            "maximum": 260
           },
           "exercise": {
             "type": "string",
@@ -1669,11 +1669,21 @@
             "minimum": 0,
             "exclusiveMinimum": true,
             "description": "matching_config max_photos."
+          },
+          "tips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TipKind"
+            }
+          },
+          "fishSpecies": {
+            "$ref": "#/components/schemas/FishSpecies"
           }
         },
         "required": [
           "photos",
-          "maxPhotos"
+          "maxPhotos",
+          "tips"
         ]
       },
       "Photo": {
@@ -1743,6 +1753,37 @@
           "position",
           "createdAt"
         ]
+      },
+      "TipKind": {
+        "type": "string",
+        "enum": [
+          "sunglasses",
+          "mirror_selfie",
+          "tight_crop",
+          "group_photo",
+          "poor_lighting",
+          "blurry",
+          "few_photos",
+          "revealing",
+          "fish"
+        ]
+      },
+      "FishSpecies": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "pike",
+          "perch",
+          "salmon",
+          "trout",
+          "carp",
+          "eel",
+          "cod",
+          "herring",
+          "halibut",
+          null
+        ],
+        "default": null
       },
       "PhotoUploadRequest": {
         "type": "object",
@@ -1984,21 +2025,11 @@
           },
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
-          },
-          "tips": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TipKind"
-            }
-          },
-          "fishSpecies": {
-            "$ref": "#/components/schemas/FishSpecies"
           }
         },
         "required": [
           "profile",
-          "completeness",
-          "tips"
+          "completeness"
         ]
       },
       "Completeness": {
@@ -2029,37 +2060,6 @@
           "seeks",
           "age_window"
         ]
-      },
-      "TipKind": {
-        "type": "string",
-        "enum": [
-          "sunglasses",
-          "mirror_selfie",
-          "tight_crop",
-          "group_photo",
-          "poor_lighting",
-          "blurry",
-          "few_photos",
-          "revealing",
-          "fish"
-        ]
-      },
-      "FishSpecies": {
-        "type": "string",
-        "nullable": true,
-        "enum": [
-          "pike",
-          "perch",
-          "salmon",
-          "trout",
-          "carp",
-          "eel",
-          "cod",
-          "herring",
-          "halibut",
-          null
-        ],
-        "default": null
       },
       "ProfileUpdate": {
         "type": "object",

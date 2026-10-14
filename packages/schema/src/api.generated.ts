@@ -2934,6 +2934,8 @@ export interface components {
             photos: components["schemas"]["Photo"][];
             /** @description matching_config max_photos. */
             maxPhotos: number;
+            tips: components["schemas"]["TipKind"][];
+            fishSpecies?: components["schemas"]["FishSpecies"];
         };
         Photo: {
             id: components["schemas"]["PhotoId"];
@@ -2956,6 +2958,13 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {string} */
+        TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
+        /**
+         * @default null
+         * @enum {string|null}
+         */
+        FishSpecies: "pike" | "perch" | "salmon" | "trout" | "carp" | "eel" | "cod" | "herring" | "halibut" | null;
         PhotoUploadRequest: {
             /**
              * Format: binary
@@ -3016,8 +3025,6 @@ export interface components {
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
-            tips: components["schemas"]["TipKind"][];
-            fishSpecies?: components["schemas"]["FishSpecies"];
         };
         Completeness: {
             complete: boolean;
@@ -3025,13 +3032,6 @@ export interface components {
         };
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
-        /** @enum {string} */
-        TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
-        /**
-         * @default null
-         * @enum {string|null}
-         */
-        FishSpecies: "pike" | "perch" | "salmon" | "trout" | "carp" | "eel" | "cod" | "herring" | "halibut" | null;
         ProfileUpdate: {
             displayName: string;
             bio: string | null;

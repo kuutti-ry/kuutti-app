@@ -1,5 +1,8 @@
+import type { Queryable } from "@kuutti/db";
 import { type FishSpecies, PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
-import { fishSpeciesOf, isRevealing } from "../media/index.ts";
+import { matchingConfigNumbers } from "../lib/matching-config.ts";
+import { fishSpeciesOf, isRevealing } from "./label-groups.ts";
+import { listPhotoTipInputs } from "./repo.ts";
 
 /**
  * Advisory tips for the profile owner (#56). Pure: callers gather photos,
@@ -152,4 +155,39 @@ export function fishSpecies(snapshot: TipSnapshot): FishSpecies | null {
       best = { species, confidence: label.confidence };
   }
   return best?.species ?? null;
+}
+
+/** The tip thresholds from matching_config, in one statement; missing keys fail closed. */
+export async function readTipThresholds(db: Queryable): Promise<TipThresholds> {
+  const fields = Object.keys(TIP_THRESHOLD_KEYS) as (keyof typeof TIP_THRESHOLD_KEYS)[];
+  const values = await matchingConfigNumbers(
+    db,
+    fields.map((field) => TIP_THRESHOLD_KEYS[field]),
+  );
+  return Object.fromEntries(
+    fields.map((field) => [field, values[TIP_THRESHOLD_KEYS[field]]]),
+  ) as TipThresholds;
+}
+
+/** The approved photos carry the signals; the ones in review only count. */
+export async function tipSnapshotOf(db: Queryable, accountId: string): Promise<TipSnapshot> {
+  const [uploaded, thresholds] = await Promise.all([
+    listPhotoTipInputs(db, accountId),
+    readTipThresholds(db),
+  ]);
+  const photos = uploaded.filter((photo) => photo.state === "approved");
+  return { photos, inReview: uploaded.length - photos.length, thresholds };
+}
+
+/**
+ * The tips that apply to an account's photos, highest priority first, with
+ * the fish the fish tip names. On the photo list since #287, where the photos
+ * are; the app shows one at a time.
+ */
+export async function photoTips(
+  db: Queryable,
+  accountId: string,
+): Promise<{ tips: TipKind[]; fishSpecies: FishSpecies | null }> {
+  const snapshot = await tipSnapshotOf(db, accountId);
+  return { tips: tips(snapshot), fishSpecies: fishSpecies(snapshot) };
 }

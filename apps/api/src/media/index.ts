@@ -36,5 +36,6 @@ export {
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";
 export { type MediaStore, memoryMediaStore, objectKey, s3MediaStore } from "./store.ts";
+export { photoTips } from "./tips.ts";
 export { cloudFrontSigner, presignedS3Signer, URL_TTL_MS, type UrlSigner } from "./urls.ts";
 export { createMediaDeps, type MediaSetup } from "./wiring.ts";

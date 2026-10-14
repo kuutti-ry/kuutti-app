@@ -14,7 +14,6 @@ import {
   ProfileResponse,
   ProfileUpdate,
   PromptAnswer,
-  TipKind,
 } from "./profile.ts";
 import { PROFILE_FIELDS } from "./profile-fields.ts";
 
@@ -167,42 +166,15 @@ describe("the profile as its owner reads it back", () => {
     ).toEqual(["invalid_format"]);
   });
 
-  it("is null before the first save, with what is missing and the tips", () => {
+  it("is null before the first save, with what is missing", () => {
     const response = {
       profile: null,
       completeness: { complete: false, missing: ["display_name", "photos"] },
-      tips: ["few_photos"],
-    };
-    // An API older than the fish's species (#253) sends none: read as null.
-    expect(ProfileResponse.parse(response)).toEqual({ ...response, fishSpecies: null });
-  });
-
-  it("names the fish of the fish tip from Finland's and nearby waters only (#253)", () => {
-    const response = {
-      profile: null,
-      completeness: { complete: true, missing: [] },
-      tips: ["fish"],
-      fishSpecies: "pike",
     };
     expect(ProfileResponse.parse(response)).toEqual(response);
-    expect(ProfileResponse.parse({ ...response, fishSpecies: null }).fishSpecies).toBeNull();
-    expect(codes(ProfileResponse, { ...response, fishSpecies: "tuna" })).toEqual(["invalid_value"]);
   });
 
-  it.each([
-    "sunglasses",
-    "mirror_selfie",
-    "tight_crop",
-    "group_photo",
-    "poor_lighting",
-    "blurry",
-    "few_photos",
-  ])("names the tip %s", (tip) => {
-    expect(TipKind.parse(tip)).toBe(tip);
-  });
-
-  it("refuses an unknown tip and an unknown missing item", () => {
-    expect(codes(TipKind, "smile_more")).toEqual(["invalid_value"]);
+  it("refuses an unknown missing item", () => {
     expect(codes(Completeness, { complete: false, missing: ["height"] })).toEqual([
       "invalid_value",
     ]);

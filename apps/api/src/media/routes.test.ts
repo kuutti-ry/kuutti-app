@@ -58,6 +58,24 @@ async function upload(
   return app.request("/photos", { method: "POST", headers, body: multipart(bytes, type) });
 }
 
+/** Uploads n photos and approves them in the database, as the check or a moderator would. */
+async function approvedPhotos(
+  ctx: TestContext,
+  app: ReturnType<typeof createApp>,
+  headers: Record<string, string>,
+  n: number,
+) {
+  const ids: string[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const photo = Photo.parse(
+      await (await upload(app, headers, await fixturePng(48 + i, 48))).json(),
+    );
+    await ctx.client.query("UPDATE photo SET state = 'approved' WHERE id = $1", [photo.id]);
+    ids.push(photo.id);
+  }
+  return ids;
+}
+
 async function errorCode(res: Response): Promise<string> {
   return ErrorResponse.parse(await res.json()).error.code;
 }
@@ -102,6 +120,9 @@ describe("photo routes", () => {
     const body = PhotoList.parse(await list.json());
     expect(body.maxPhotos).toBe(MAX_PHOTOS);
     expect(body.photos.map((p) => p.id)).toEqual([photo.id]);
+    // The tips ride on the list, by the photos they are about (#287); none for one still in review.
+    expect(body.tips).toEqual([]);
+    expect(body.fishSpecies).toBeNull();
     // The key is never in a response or a log line.
     expect(JSON.stringify(body)).not.toContain(contentKey);
     expect(JSON.stringify(logs())).not.toContain(contentKey);
@@ -560,5 +581,52 @@ describe("photo routes, every branch of the guard and the parameters", () => {
       await (await app.request("/photos", { headers: me.headers })).json(),
     );
     expect(list.photos.map((p) => p.id)).toEqual(ids);
+  });
+
+  test("GET /photos answers a label tip from photo_review against matching_config", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const ids = await approvedPhotos(ctx, app, a.headers, 2);
+    for (const id of ids) {
+      await ctx.client.query(
+        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
+         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
+        [id, JSON.stringify([{ name: "Sunglasses", parentName: "Face", confidence: 80 }])],
+      );
+    }
+    const body = PhotoList.parse(
+      await (await app.request("/photos", { headers: a.headers })).json(),
+    );
+    expect(body.tips).toEqual(["sunglasses", "few_photos"]);
+  });
+
+  test("GET /photos names the fish of the fish tip, a local one only, and says null otherwise (#253)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const [main, second] = await approvedPhotos(ctx, app, a.headers, 2);
+    const review = (id: string | undefined, labels: unknown[]) =>
+      ctx.client.query(
+        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
+         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
+        [id, JSON.stringify(labels)],
+      );
+    const read = async () => (await app.request("/photos", { headers: a.headers })).json();
+    // Sent as null, not left out: no fish yet.
+    expect((await read()).fishSpecies).toBeNull();
+    // What Rekognition said of the probe picture of a pike, and a tuna surer than the pike.
+    await review(main, [
+      { name: "Fish", parentName: "Animal", confidence: 94 },
+      { name: "Tuna", parentName: "Animal", confidence: 90 },
+      { name: "Pike", parentName: "Animal", confidence: 76.5 },
+      { name: "Cod", parentName: "Animal", confidence: 55.6 },
+    ]);
+    await review(second, []);
+    const body = PhotoList.parse(await read());
+    expect(body.tips).toContain("fish");
+    expect(body.fishSpecies).toBe("pike");
   });
 });

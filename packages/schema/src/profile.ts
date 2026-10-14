@@ -112,38 +112,6 @@ export const Completeness = z
   .meta({ id: "Completeness" });
 export type Completeness = z.infer<typeof Completeness>;
 
-/**
- * Advisory profile tips for the owner (#56). One tip at a time; never gates
- * completeness, moderation, or matching. A kind names what was noticed; the
- * words for it are the client's. Order of the enum is not priority — the
- * tips rule of apps/api holds that.
- */
-export const TipKind = z
-  .enum([
-    "sunglasses",
-    "mirror_selfie",
-    "tight_crop",
-    "group_photo",
-    "poor_lighting",
-    "blurry",
-    "few_photos",
-    // #253: the main photo shows a lot of skin; the main photo has a fish.
-    "revealing",
-    "fish",
-  ])
-  .meta({ id: "TipKind" });
-export type TipKind = z.infer<typeof TipKind>;
-
-/**
- * The fish the fish tip may name (#253): the species of Finland and nearby
- * waters that Rekognition has a label for. A species it knows from elsewhere
- * (tuna, sturgeon) is never named, however sure it is.
- */
-export const FishSpecies = z
-  .enum(["pike", "perch", "salmon", "trout", "carp", "eel", "cod", "herring", "halibut"])
-  .meta({ id: "FishSpecies" });
-export type FishSpecies = z.infer<typeof FishSpecies>;
-
 /** The stored profile, as the owner reads it back. */
 export const ProfileDocument = z
   .object({
@@ -166,14 +134,6 @@ export const ProfileResponse = z
     /** Null until the first save. */
     profile: ProfileDocument.nullable(),
     completeness: Completeness,
-    /** The tips that apply, highest priority first; the app shows one at a time. */
-    tips: z.array(TipKind),
-    /**
-     * With the fish tip, the species the check is sure enough of on the main
-     * photo; null without the tip or without a sure species. Null when absent,
-     * so an app that is newer than its API still reads the answer.
-     */
-    fishSpecies: FishSpecies.nullable().default(null),
   })
   .meta({ id: "ProfileResponse" });
 export type ProfileResponse = z.infer<typeof ProfileResponse>;

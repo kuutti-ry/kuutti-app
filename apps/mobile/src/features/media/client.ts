@@ -4,6 +4,7 @@ import {
   PhotoList,
   PhotoUrlResponse,
   type PhotoVariant,
+  TipKind,
 } from "@kuutti/schema";
 import { Platform } from "react-native";
 import { ApiError, api, apiBaseUrl } from "@/lib/api";
@@ -24,10 +25,23 @@ function failed(response: Response, error: unknown, what: string): ApiError {
   );
 }
 
+/**
+ * The list as the API sent it, less any tip kind this build has no words
+ * for: a newer API's tip never locks an older app out of its own photos.
+ */
+export function readPhotoList(data: unknown): PhotoList {
+  const tips = (data as { tips?: unknown } | null)?.tips;
+  if (!Array.isArray(tips)) return PhotoList.parse(data);
+  return PhotoList.parse({
+    ...(data as object),
+    tips: tips.filter((kind) => TipKind.safeParse(kind).success),
+  });
+}
+
 export async function listPhotos(): Promise<PhotoList> {
   const { data, error, response } = await api.GET("/photos");
   if (!data) throw failed(response, error, "photos");
-  return PhotoList.parse(data);
+  return readPhotoList(data);
 }
 
 export async function deletePhoto(id: string): Promise<void> {

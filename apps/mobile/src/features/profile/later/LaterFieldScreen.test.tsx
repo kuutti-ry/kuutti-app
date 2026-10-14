@@ -66,7 +66,6 @@ function fakeApi(profile: Profile | null = null) {
         }
       : null,
     completeness: { complete: false, missing: ["photos"] },
-    tips: [],
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);
@@ -303,11 +302,11 @@ describe("LaterFieldScreen", () => {
     await waitFor(() => expect(screen.getByText("No answer yet")).toBeTruthy());
     checkA11y();
     await press(screen.getByRole("button", { name: "One more" }));
-    expect(screen.getByText("180\u00a0cm")).toBeTruthy();
+    expect(screen.getByText("175\u00a0cm")).toBeTruthy();
     await press(screen.getByRole("button", { name: "One more" }));
-    expect(screen.getByText("181\u00a0cm")).toBeTruthy();
+    expect(screen.getByText("176\u00a0cm")).toBeTruthy();
     await press(screen.getByRole("button", { name: "One less" }));
-    expect(screen.getByText("180\u00a0cm")).toBeTruthy();
+    expect(screen.getByText("175\u00a0cm")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await waitFor(() => expect(puts).toHaveLength(1));
     expect(puts[0]?.fields).toEqual({ height: 180 });
@@ -364,7 +363,7 @@ describe("LaterFieldScreen", () => {
     globalThis.fetch = jest.fn(async () =>
       failing
         ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
-        : json({ profile: null, completeness: { complete: false, missing: [] }, tips: [] }),
+        : json({ profile: null, completeness: { complete: false, missing: [] } }),
     ) as unknown as typeof fetch;
     await show(<LaterFieldScreen field="smoking" />);
     expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
@@ -430,7 +429,6 @@ describe("LaterFieldScreen", () => {
             updatedAt: "2026-10-08T10:00:00.000Z",
           },
           completeness: { complete: false, missing: ["photos"] },
-          tips: [],
         }),
       );
       await settle();

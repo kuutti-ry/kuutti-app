@@ -21,8 +21,6 @@ const refusal = (code: string, status: number) =>
 const EMPTY = {
   profile: null,
   completeness: { complete: false, missing: ["photos"] },
-  tips: [],
-  fishSpecies: null,
 };
 const DEAL_BREAKERS = { dealBreakers: [], max: 3 };
 
@@ -111,16 +109,9 @@ describe("the profile client", () => {
 describe("readProfile", () => {
   const answer = { profile: null, completeness: { complete: true, missing: [] } };
 
-  it("leaves out tip kinds this build does not know, and keeps the known ones in order", () => {
-    expect(
-      readProfile({ ...answer, tips: ["a_later_kind", "fish", "another_one", "few_photos"] }).tips,
-    ).toEqual(["fish", "few_photos"]);
-    expect(readProfile({ ...answer, tips: [] }).tips).toEqual([]);
-  });
-
-  it("still refuses an answer that is not the contract, tips or not", () => {
-    expect(() => readProfile({ ...answer, tips: "fish" })).toThrow();
-    expect(() => readProfile({ profile: null, tips: ["fish"] })).toThrow();
+  it("reads the contract and refuses an answer that is not it", () => {
+    expect(readProfile(answer)).toEqual(answer);
+    expect(() => readProfile({ profile: null })).toThrow();
     expect(() => readProfile(null)).toThrow();
   });
 });

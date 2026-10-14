@@ -15,6 +15,7 @@ import {
   PhotoUploadRequest,
   PhotoUrlResponse,
   PhotoVariantParams,
+  TipKind,
 } from "./media.ts";
 
 // Photos (#48, rule 4): the upload's file at its size and type bounds, what
@@ -138,11 +139,46 @@ describe("a photo as its owner reads it", () => {
   });
 
   it("lists at most fifty photos and a positive maximum", () => {
-    expect(PhotoList.parse({ photos: Array(50).fill(photo), maxPhotos: 6 }).photos).toHaveLength(
-      50,
-    );
-    expect(codes(PhotoList, { photos: Array(51).fill(photo), maxPhotos: 6 })).toEqual(["too_big"]);
-    expect(codes(PhotoList, { photos: [], maxPhotos: 0 })).toEqual(["too_small"]);
+    expect(
+      PhotoList.parse({ photos: Array(50).fill(photo), maxPhotos: 6, tips: [] }).photos,
+    ).toHaveLength(50);
+    expect(codes(PhotoList, { photos: Array(51).fill(photo), maxPhotos: 6, tips: [] })).toEqual([
+      "too_big",
+    ]);
+    expect(codes(PhotoList, { photos: [], maxPhotos: 0, tips: [] })).toEqual(["too_small"]);
+  });
+
+  it("carries the tips, and the fish of the fish tip from Finland's and nearby waters only (#253, #287)", () => {
+    const list = { photos: [photo], maxPhotos: 6, tips: ["fish"], fishSpecies: "pike" };
+    expect(PhotoList.parse(list)).toEqual(list);
+    expect(PhotoList.parse({ ...list, fishSpecies: null }).fishSpecies).toBeNull();
+    // An API older than the fish's species (#253) sends none: read as null.
+    expect(PhotoList.parse({ photos: [photo], maxPhotos: 6, tips: ["few_photos"] })).toEqual({
+      photos: [photo],
+      maxPhotos: 6,
+      tips: ["few_photos"],
+      fishSpecies: null,
+    });
+    expect(codes(PhotoList, { ...list, fishSpecies: "tuna" })).toEqual(["invalid_value"]);
+    expect(codes(PhotoList, { photos: [photo], maxPhotos: 6 })).toEqual(["invalid_type"]);
+  });
+
+  it.each([
+    "sunglasses",
+    "mirror_selfie",
+    "tight_crop",
+    "group_photo",
+    "poor_lighting",
+    "blurry",
+    "few_photos",
+    "revealing",
+    "fish",
+  ])("names the tip %s", (tip) => {
+    expect(TipKind.parse(tip)).toBe(tip);
+  });
+
+  it("refuses an unknown tip", () => {
+    expect(codes(TipKind, "smile_more")).toEqual(["invalid_value"]);
   });
 });
 
