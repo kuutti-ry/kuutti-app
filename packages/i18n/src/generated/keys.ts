@@ -336,6 +336,7 @@ export type MessageParams = {
   "profile.discard.keep": Record<never, never>;
   "profile.discard.leave": Record<never, never>;
   "profile.discard.title": Record<never, never>;
+  "profile.discard.unsaved": Record<never, never>;
   "profile.displayName.hint": { "max": number };
   "profile.displayName.label": Record<never, never>;
   "profile.error.generic": Record<never, never>;

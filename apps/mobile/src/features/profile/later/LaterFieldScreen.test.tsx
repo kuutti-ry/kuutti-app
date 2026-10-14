@@ -6,10 +6,24 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
 
-const { __router: router } = jest.requireMock("expo-router") as {
+const { __router: router, __navigation: navigation } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
+  __navigation: {
+    dispatch: jest.Mock;
+    setOptions: jest.Mock;
+    emit: (name: string, event: unknown) => void;
+  };
 };
 const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+/** The arrow, Android's back key or a pop of several screens, as the stack reports it. */
+const leave = async () => {
+  const event = { preventDefault: jest.fn(), data: { action: { type: "POP_TO" } } };
+  await act(async () => {
+    navigation.emit("beforeRemove", event);
+    await settle();
+  });
+  return event;
+};
 const show = (ui: React.ReactElement) =>
   act(async () => {
     renderWithTheme(ui);
@@ -141,6 +155,42 @@ describe("LaterFieldScreen", () => {
     expect(router.dismissTo).toHaveBeenCalledWith("/profile");
     expect(router.back).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
+    expect(puts).toEqual([]);
+  });
+
+  it("asks before an answer not saved is left, and leaves only on the word", async () => {
+    const { puts } = fakeApi(named({}));
+    navigation.dispatch.mockClear();
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: false });
+
+    expect((await leave()).preventDefault).toHaveBeenCalled();
+    expect(screen.getByText("Your changes are not saved yet.")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Keep editing" }));
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+
+    await leave();
+    await press(screen.getByRole("button", { name: "Leave without saving" }));
+    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "POP_TO" });
+    expect(puts).toEqual([]);
+  });
+
+  it("puts an answer back on Ask me later, so a question passed over holds nothing to ask about", async () => {
+    const { puts } = fakeApi(named({}));
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(screen.getByRole("button", { name: "Ask me later" }));
+    expect(router.push).toHaveBeenCalledWith("/profile/later/wantsKids");
+    expect(
+      screen.getByRole("button", { name: "Yes, living with me" }).props.accessibilityState
+        ?.selected,
+    ).toBe(false);
+    expect(navigation.setOptions.mock.lastCall?.[0]).toEqual({ gestureEnabled: true });
+    expect((await leave()).preventDefault).not.toHaveBeenCalled();
     expect(puts).toEqual([]);
   });
 

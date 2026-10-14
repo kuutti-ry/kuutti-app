@@ -33,7 +33,8 @@ jest.mock("@sentry/react-native", () => ({
 // A screen in a test has the focus from the start, and `__focus()` gives it
 // the focus again, as coming back to it does (src/features/pond/GateCard.test.tsx).
 // The navigation object a screen listens on; `__navigation.emit("beforeRemove", event)`
-// is a test leaving the screen (the profile section saves on it, #238).
+// is a test leaving the screen (the profile section saves on it, #238), and
+// `setOptions` records what a screen sets on its route (the swipe, off while unsaved).
 const mockNavigationListeners = new Map();
 const mockNavigation = {
   addListener: jest.fn((name, listener) => {
@@ -41,6 +42,7 @@ const mockNavigation = {
     return () => mockNavigationListeners.delete(name);
   }),
   dispatch: jest.fn(),
+  setOptions: jest.fn(),
   emit: (name, event) => mockNavigationListeners.get(name)?.(event),
 };
 jest.mock("expo-router", () => {

@@ -335,6 +335,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.discard.keep": "Keep editing",
   "profile.discard.leave": "Leave without saving",
   "profile.discard.title": "Leave without saving?",
+  "profile.discard.unsaved": "Your changes are not saved yet.",
   "profile.displayName.hint": "How you want to be called, up to {max, number} characters.",
   "profile.displayName.label": "Name on your card",
   "profile.error.generic": "Saving did not work. Check the fields and try again.",

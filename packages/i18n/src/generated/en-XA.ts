@@ -335,6 +335,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.discard.keep": "［Kéééép éédíítííñg］",
   "profile.discard.leave": "［Lééáávéé wííthóóúút šáávííñg］",
   "profile.discard.title": "［Lééáávéé wííthóóúút šáávííñg?］",
+  "profile.discard.unsaved": "［ÝÝóóúúr çhááñgééš ááréé ñóót šáávééd ýýéét.］",
   "profile.displayName.hint": "［Hóów ýýóóúú wááñt tóó béé çáállééd, úúp tóó {max, number} çháárááçtéérš.］",
   "profile.displayName.label": "［Ñááméé óóñ ýýóóúúr çáárd］",
   "profile.error.generic": "［Šáávííñg dííd ñóót wóórk. Çhééçk théé fííééldš ááñd trýý áágááííñ.］",

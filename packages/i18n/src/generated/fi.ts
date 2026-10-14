@@ -288,6 +288,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.discard.keep": "Jatka muokkaamista",
   "profile.discard.leave": "Poistu tallentamatta",
   "profile.discard.title": "Poistutaanko tallentamatta?",
+  "profile.discard.unsaved": "Muutoksiasi ei ole vielä tallennettu.",
   "profile.displayName.hint": "Millä nimellä haluat tulla kutsutuksi, enintään {max, number} merkkiä.",
   "profile.displayName.label": "Nimi kortillasi",
   "profile.error.generic": "Tallennus ei onnistunut. Tarkista kentät ja yritä uudelleen.",

@@ -280,6 +280,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.discard.keep": "Fortsätt redigera",
   "profile.discard.leave": "Lämna utan att spara",
   "profile.discard.title": "Lämna utan att spara?",
+  "profile.discard.unsaved": "Dina ändringar är inte sparade än.",
   "profile.displayName.hint": "Vad du vill bli kallad, högst {max, number} tecken.",
   "profile.displayName.label": "Namn på ditt kort",
   "profile.error.generic": "Det gick inte att spara. Kontrollera fälten och försök igen.",

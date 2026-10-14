@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { ConfirmLeaveDialog, useConfirmLeave } from "../ConfirmLeave";
 import { FieldEditor } from "../FieldEditor";
 import { countsAsAnswer } from "../progress";
 import { useProfile } from "../useProfile";
@@ -83,6 +84,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
     const next = nextUnanswered(loadedFields, 0);
     if (next) router.replace(laterPath(next));
   }, [index, key, loadedFields, router]);
+  const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty);
   if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
 
@@ -166,12 +168,16 @@ export function LaterFieldScreen({ field }: { field: string }) {
           disabled={profile.saving}
           onPress={() => {
             tap();
+            // Writes nothing and keeps nothing: the answer goes back to what is
+            // saved, so a question passed over has nothing for a later pop to ask about.
+            update(saved);
             moveOn();
           }}
         >
           {t("profile.later.skip")}
         </Button>
       </ScrollView>
+      <ConfirmLeaveDialog {...leaving} />
     </SafeAreaView>
   );
 }
