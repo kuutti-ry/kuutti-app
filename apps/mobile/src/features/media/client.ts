@@ -1,5 +1,6 @@
 import {
   ErrorResponse,
+  FishSpecies,
   Photo,
   PhotoList,
   PhotoUrlResponse,
@@ -26,15 +27,18 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 }
 
 /**
- * The list as the API sent it, less any tip kind this build has no words
- * for: a newer API's tip never locks an older app out of its own photos.
+ * The list as the API sent it, less what this build has no words for: a tip
+ * kind it does not know is left out, and a fish it cannot name is no fish
+ * (the plain fish tip). A newer API's tip never locks an older app out of
+ * its own photos.
  */
 export function readPhotoList(data: unknown): PhotoList {
-  const tips = (data as { tips?: unknown } | null)?.tips;
-  if (!Array.isArray(tips)) return PhotoList.parse(data);
+  const sent = data as { tips?: unknown; fishSpecies?: unknown } | null;
+  if (!sent || !Array.isArray(sent.tips)) return PhotoList.parse(data);
   return PhotoList.parse({
-    ...(data as object),
-    tips: tips.filter((kind) => TipKind.safeParse(kind).success),
+    ...sent,
+    tips: sent.tips.filter((kind) => TipKind.safeParse(kind).success),
+    fishSpecies: FishSpecies.safeParse(sent.fishSpecies).success ? sent.fishSpecies : null,
   });
 }
 

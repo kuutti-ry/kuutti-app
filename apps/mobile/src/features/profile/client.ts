@@ -28,15 +28,11 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 // out of order. Settled either way: a failed save is its screen's to report.
 let lastSave: Promise<unknown> = Promise.resolve();
 
-export function readProfile(data: unknown): ProfileResponse {
-  return ProfileResponse.parse(data);
-}
-
 export async function fetchProfile(): Promise<ProfileResponse> {
   await lastSave;
   const { data, error, response } = await api.GET("/profile");
   if (!data) throw failed(response, error, "profile");
-  return readProfile(data);
+  return ProfileResponse.parse(data);
 }
 
 export function saveProfile(update: ProfileUpdate): Promise<ProfileResponse> {
@@ -47,7 +43,7 @@ export function saveProfile(update: ProfileUpdate): Promise<ProfileResponse> {
       body: update as unknown as ApiComponents["schemas"]["ProfileUpdate"],
     });
     if (!data) throw failed(response, error, "profile save");
-    return readProfile(data);
+    return ProfileResponse.parse(data);
   });
   lastSave = sent.catch(() => undefined);
   return sent;

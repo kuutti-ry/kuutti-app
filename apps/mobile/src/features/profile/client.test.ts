@@ -4,7 +4,6 @@ import {
   fetchCardPreview,
   fetchDealBreakers,
   fetchProfile,
-  readProfile,
   saveDealBreakers,
   saveProfile,
 } from "./client";
@@ -103,16 +102,6 @@ describe("the profile client", () => {
       code: "deal_breakers_limit",
       message: "deal-breakers save answered 422",
     });
-  });
-});
-
-describe("readProfile", () => {
-  const answer = { profile: null, completeness: { complete: true, missing: [] } };
-
-  it("reads the contract and refuses an answer that is not it", () => {
-    expect(readProfile(answer)).toEqual(answer);
-    expect(() => readProfile({ profile: null })).toThrow();
-    expect(() => readProfile(null)).toThrow();
   });
 });
 

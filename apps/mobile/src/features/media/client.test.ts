@@ -321,6 +321,15 @@ describe("readPhotoList", () => {
     expect(readPhotoList({ ...answer, tips: [] }).fishSpecies).toBeNull();
   });
 
+  it("names no fish it cannot name, and keeps the plain fish tip", () => {
+    const read = readPhotoList({ ...answer, tips: ["fish"], fishSpecies: "whitefish" });
+    expect(read.tips).toEqual(["fish"]);
+    expect(read.fishSpecies).toBeNull();
+    expect(readPhotoList({ ...answer, tips: ["fish"], fishSpecies: "pike" }).fishSpecies).toBe(
+      "pike",
+    );
+  });
+
   it("still refuses an answer that is not the contract, tips or not", () => {
     expect(() => readPhotoList({ ...answer, tips: "fish" })).toThrow();
     expect(() => readPhotoList({ photos: [], tips: ["fish"] })).toThrow();
