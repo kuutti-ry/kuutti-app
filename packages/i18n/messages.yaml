@@ -561,6 +561,13 @@ profile.dealBreakers.title:
   sv: "Absoluta gränser"
   machine: { fi: true, sv: true }
 
+profile.dealBreakers.back:
+  en: "Back"
+  description: "Screen-reader label of the back arrow of the deal-breakers screen: back to where it was opened, the profile or the e-mail screen; what is not saved stays unsaved."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
 profile.dealBreakers.explain:
   en: "Up to {max, number}. Only on what you answered yourself, and both ways: yours apply to others, theirs to you."
   description: "Explanation of the deal-breakers (#149, the disclose-to-filter rule)."
@@ -657,6 +664,13 @@ profile.later.title:
   description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
   fi: "Odotellessasi"
   sv: "Medan du väntar"
+  machine: { fi: true, sv: true }
+
+profile.later.back:
+  en: "Back to your profile"
+  description: "Screen-reader label of the back arrow of the optional fields' screens: it leaves the questions for the profile in one step; an answer not saved with Save and continue is left unsaved, as with Ask me later."
+  fi: "Takaisin profiiliisi"
+  sv: "Tillbaka till din profil"
   machine: { fi: true, sv: true }
 
 profile.later.progress:

@@ -3,6 +3,7 @@ import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SettingsScreen } from "./SettingsScreen";
 
@@ -60,6 +61,11 @@ beforeEach(async () => {
 });
 
 describe("the settings screen", () => {
+  it("keeps the title and the way back pinned above the settings", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    expectPinnedHeader("Settings", "Back");
+  });
+
   it("renders in English on an English phone, with a way back and no accessibility problems", async () => {
     await renderWithTheme(<SettingsScreen />);
     expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -174,13 +175,16 @@ export function DealBreakersScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* Back to where it was opened: the profile, or the e-mail at the end of the later screens. */}
+      <ScreenHeader
+        title={t("profile.dealBreakers.title")}
+        backLabel={t("profile.dealBreakers.back")}
+        onBack={() => router.back()}
+      />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.dealBreakers.title")}
-        </Text>
         <Text>{t("profile.dealBreakers.explain", { max })}</Text>
 
         {DEAL_BREAKER_FIELDS.map((field) => {

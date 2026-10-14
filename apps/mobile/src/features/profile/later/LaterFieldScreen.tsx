@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -118,13 +119,17 @@ export function LaterFieldScreen({ field }: { field: string }) {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* Out of the questions in one step, wherever they were opened from: each
+          one is pushed on the last, so a plain back would step back one. */}
+      <ScreenHeader
+        title={t("profile.later.title")}
+        backLabel={t("profile.later.back")}
+        onBack={() => router.dismissTo("/profile")}
+      />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.later.title")}
-        </Text>
         <Text variant="muted" accessibilityLiveRegion="polite">
           {t("profile.later.progress", progress)}
         </Text>

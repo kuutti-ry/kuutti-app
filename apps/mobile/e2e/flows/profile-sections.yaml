@@ -31,12 +31,8 @@ name: A section saves on going back, and the card shows what it saved
     text: "Weekly|Viikoittain|Varje vecka"
     selected: true
 
-# Back to the list: the answer is saved on the way.
-- scrollUntilVisible:
-    element: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
-    direction: UP
-    centerElement: true
-    timeout: 60000
+# Back to the list: the answer is saved on the way. The arrow is pinned above
+# the scroll, so it is in view however far the section was scrolled.
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"
@@ -73,11 +69,6 @@ name: A section saves on going back, and the card shows what it saved
 - assertVisible:
     text: "Weekly|Viikoittain|Varje vecka"
     selected: false
-- scrollUntilVisible:
-    element: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
-    direction: UP
-    centerElement: true
-    timeout: 60000
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
     visible: "(The basics|Perustiedot|Grunderna)(, .*)?"

@@ -2,11 +2,12 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { DealBreakersScreen } from "./DealBreakersScreen";
 
 const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock };
+  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
 };
 const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const show = (ui: React.ReactElement) =>
@@ -103,6 +104,18 @@ describe("DealBreakersScreen", () => {
     checkA11y();
     await press(screen.getByRole("button", { name: "Answer it" }));
     expect(router.push).toHaveBeenCalledWith("/profile/later/hasKids");
+  });
+
+  it("goes back to where it was opened from an arrow pinned above the list, saving nothing", async () => {
+    const { puts } = fakeApi(answeredAll);
+    router.back.mockClear();
+    await show(<DealBreakersScreen />);
+    await waitFor(() => expect(screen.getByText("Deal-breakers")).toBeTruthy());
+    expectPinnedHeader("Deal-breakers", "Back");
+    await press(screen.getAllByRole("switch")[0] as ReturnType<typeof screen.getByRole>);
+    await press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
+    expect(puts).toEqual([]);
   });
 
   it("leads a field without a later screen to the section that holds it (#239)", async () => {

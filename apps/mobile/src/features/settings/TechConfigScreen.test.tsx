@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/react-native";
 import { fireEvent, screen, userEvent, waitFor } from "@testing-library/react-native";
 import { Linking } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { TechConfigScreen } from "./TechConfigScreen";
 
@@ -37,6 +38,12 @@ describe("the tech config screen", () => {
     (Sentry.captureException as jest.Mock).mockClear();
   });
   afterEach(() => jest.restoreAllMocks());
+
+  it("keeps the title and the way back pinned above the details", async () => {
+    await renderWithTheme(<TechConfigScreen />);
+    await waitFor(() => expect(screen.getByText("git commit abc1234")).toBeTruthy());
+    expectPinnedHeader("Tech config", "Back");
+  });
 
   it("names the environment, the API with its commit and database, and the app apart from it", async () => {
     await renderWithTheme(<TechConfigScreen />);

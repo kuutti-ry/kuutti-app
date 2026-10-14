@@ -2,11 +2,12 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { LaterFieldScreen, laterProgress, screenOpen } from "./LaterFieldScreen";
 
 const { __router: router } = jest.requireMock("expo-router") as {
-  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
+  __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock; dismissTo: jest.Mock };
 };
 const settle = (ms = 30) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const show = (ui: React.ReactElement) =>
@@ -126,6 +127,21 @@ describe("LaterFieldScreen", () => {
     expect(puts[0]).toMatchObject({ displayName: "Aino", fields: { hasKids: "yes_with_me" } });
     await waitFor(() => expect(router.push).toHaveBeenCalledTimes(2));
     expect(screen.getByText("1 of 16 answered")).toBeTruthy();
+  });
+
+  it("leaves the questions for the profile in one step from an arrow pinned above them, saving nothing", async () => {
+    const { puts } = fakeApi(named({}));
+    router.back.mockClear();
+    router.dismissTo.mockClear();
+    await show(<LaterFieldScreen field="hasKids" />);
+    await waitFor(() => expect(screen.getByText("While you wait")).toBeTruthy());
+    expectPinnedHeader("While you wait", "Back to your profile");
+    await press(screen.getByRole("button", { name: "Yes, living with me" }));
+    await press(screen.getByRole("button", { name: "Back to your profile" }));
+    expect(router.dismissTo).toHaveBeenCalledWith("/profile");
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(puts).toEqual([]);
   });
 
   it("lands on the first unanswered field when the first one is answered already", async () => {

@@ -27,11 +27,7 @@ name: A phone number in the bio is refused on leaving with the reason, and the s
 - tapOn:
     text: "About you|Sinusta|Om dig"
     above: "Arkkitehti, joka piirtää.*"
-- scrollUntilVisible:
-    element: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
-    direction: UP
-    centerElement: true
-    timeout: 60000
+# The arrow is pinned above the scroll, in view wherever the section stands.
 - tapOn: "Back to your profile|Takaisin profiiliisi|Tillbaka till din profil"
 - extendedWaitUntil:
     visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"

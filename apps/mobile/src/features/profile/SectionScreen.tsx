@@ -1,11 +1,11 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { DISPLAY_NAME_MAX, type ProfileUpdate } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,12 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { currentSession } from "@/lib/session";
-import { useHapticTap } from "@/theme/haptics";
 import { BioEditor } from "./BioEditor";
 import { FieldEditor } from "./FieldEditor";
 import { PromptsEditor } from "./PromptsEditor";
@@ -97,7 +95,6 @@ export function SectionScreen({ section: id }: { section: string }) {
   const { t } = useT();
   const router = useRouter();
   const navigation = useNavigation();
-  const tap = useHapticTap();
   // Read once: a section opened again for a refused draft takes it up.
   const [held] = useState(() => refusedDrafts.get(id));
   useEffect(() => {
@@ -153,26 +150,15 @@ export function SectionScreen({ section: id }: { section: string }) {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t(sectionTitleKey(section.id))}
+        backLabel={t("profile.section.back")}
+        onBack={() => router.back()}
+      />
       <ScrollView
         contentContainerClassName="flex-grow gap-6 p-6"
         keyboardShouldPersistTaps="handled"
       >
-        <View className="flex-row items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel={t("profile.section.back")}
-            onPress={() => {
-              tap();
-              router.back();
-            }}
-          >
-            <Icon as={ArrowLeft} />
-          </Button>
-          <Text variant="h1" accessibilityRole="header" className="flex-1">
-            {t(sectionTitleKey(section.id))}
-          </Text>
-        </View>
         {profile.notice?.kind === "error" && (
           <Text accessibilityLiveRegion="assertive">{errorText(profile.notice, t)}</Text>
         )}

@@ -2,6 +2,7 @@ import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { PixelRatio } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { MAX_FONT_SCALE } from "@/theme/a11y";
 import { CardPreviewScreen } from "./CardPreviewScreen";
@@ -142,6 +143,13 @@ describe("CardPreviewScreen", () => {
       await settle();
     });
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it("keeps the title and the way back pinned above the card", async () => {
+    serveCard();
+    await show();
+    await waitFor(() => expect(screen.getByText("Aino, 36")).toBeTruthy());
+    expectPinnedHeader("Your card", "Back to your profile");
   });
 
   it("holds at the largest font size with a full profile", async () => {

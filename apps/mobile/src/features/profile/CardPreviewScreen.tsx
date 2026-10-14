@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
-import { Button } from "@/components/ui/button";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
-import { useHapticTap } from "@/theme/haptics";
 import { fetchCardPreview } from "./client";
 import { completenessText } from "./keys";
 import { ProfileCardView } from "./ProfileCardView";
@@ -21,7 +20,6 @@ type State =
 export function CardPreviewScreen() {
   const { t } = useT();
   const router = useRouter();
-  const tap = useHapticTap();
   const [state, setState] = useState<State>({ status: "loading" });
   // A photo URL the API refused (the day's budget, #52): said under the card, never a silent gap.
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -40,19 +38,12 @@ export function CardPreviewScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t("profile.card.title")}
+        backLabel={t("profile.card.back")}
+        onBack={() => router.back()}
+      />
       <ScrollView contentContainerClassName="flex-grow gap-4 p-6">
-        <Button
-          variant="ghost"
-          onPress={() => {
-            tap();
-            router.back();
-          }}
-        >
-          {t("profile.card.back")}
-        </Button>
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.card.title")}
-        </Text>
         <Text>{t("profile.card.explain")}</Text>
         {state.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("profile.card.loading")}</Text>

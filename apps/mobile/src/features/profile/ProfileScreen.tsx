@@ -1,12 +1,12 @@
 import type { TipKind } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Eye from "lucide-react-native/icons/eye";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Icon } from "@/components/ui/icon";
@@ -171,32 +171,21 @@ export function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t("profile.title")}
+        backLabel={t("profile.back")}
+        onBack={() => router.back()}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel={t("profile.card.open")}
+          onPress={open("/profile/card")}
+        >
+          <Icon as={Eye} />
+        </Button>
+      </ScreenHeader>
       <ScrollView contentContainerClassName="flex-grow gap-6 p-6">
-        <View className="flex-row items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel={t("profile.back")}
-            onPress={() => {
-              tap();
-              router.back();
-            }}
-          >
-            <Icon as={ArrowLeft} />
-          </Button>
-          <Text variant="h1" accessibilityRole="header" className="flex-1">
-            {t("profile.title")}
-          </Text>
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel={t("profile.card.open")}
-            onPress={open("/profile/card")}
-          >
-            <Icon as={Eye} />
-          </Button>
-        </View>
-
         {/* Said only while the card cannot be shown, with what it lacks (#239). */}
         {missing.length > 0 && (
           <Card>

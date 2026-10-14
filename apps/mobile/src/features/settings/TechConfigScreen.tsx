@@ -4,13 +4,12 @@ import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import * as Updates from "expo-updates";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
 import LICENSES from "@/generated/licenses.json";
@@ -88,24 +87,12 @@ export function TechConfigScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t("tech.title")}
+        backLabel={t("tech.back")}
+        onBack={() => router.back()}
+      />
       <ScrollView contentContainerClassName="items-center gap-4 p-6">
-        <View className="w-full max-w-md flex-row items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel={t("tech.back")}
-            onPress={() => {
-              tap();
-              router.back();
-            }}
-          >
-            <Icon as={ArrowLeft} />
-          </Button>
-          <Text variant="h1" accessibilityRole="header">
-            {t("tech.title")}
-          </Text>
-        </View>
-
         {isProduction() ? (
           <Text className="w-full max-w-md">{t("tech.unavailable")}</Text>
         ) : (

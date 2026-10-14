@@ -2,6 +2,7 @@ import { act, fireEvent, screen } from "@testing-library/react-native";
 import type * as React from "react";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { BreakScreen } from "./BreakScreen";
 
@@ -65,6 +66,11 @@ afterEach(async () => {
 });
 
 describe("BreakScreen", () => {
+  it("keeps the title and the way back pinned above what it says", async () => {
+    await show(<BreakScreen />);
+    expectPinnedHeader("Take a break from Kuutti", "Back");
+  });
+
   it("says the three things that happen, and the button waits for the tick", async () => {
     await show(<BreakScreen />);
     expect(screen.getByRole("heading", { name: "Take a break from Kuutti" })).toBeTruthy();

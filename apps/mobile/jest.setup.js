@@ -45,7 +45,13 @@ const mockNavigation = {
 };
 jest.mock("expo-router", () => {
   const { useEffect } = require("react");
-  const router = { push: jest.fn(), replace: jest.fn(), back: jest.fn(), setParams: jest.fn() };
+  const router = {
+    push: jest.fn(),
+    replace: jest.fn(),
+    back: jest.fn(),
+    dismissTo: jest.fn(),
+    setParams: jest.fn(),
+  };
   const focused = new Set();
   return {
     __router: router,

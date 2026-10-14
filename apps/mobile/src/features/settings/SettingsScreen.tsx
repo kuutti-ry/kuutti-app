@@ -1,11 +1,10 @@
 import { LOCALE_NAMES, type PlainMessageKey } from "@kuutti/i18n";
 import { useRouter } from "expo-router";
-import ArrowLeft from "lucide-react-native/icons/arrow-left";
 import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
@@ -18,7 +17,6 @@ import {
   useLocaleSettings,
   useT,
 } from "@/lib/locale";
-import { useHapticTap } from "@/theme/haptics";
 import { type SchemePreference, useTheme } from "@/theme/ThemeProvider";
 import { SourceOffer } from "./SourceOffer";
 
@@ -65,7 +63,6 @@ function Choice(props: { label: string; flag?: string; chosen: boolean; onPress:
 export function SettingsScreen() {
   const { t } = useT();
   const router = useRouter();
-  const tap = useHapticTap();
   const theme = useTheme();
   const locale = useLocaleSettings();
   const session = useSession();
@@ -92,25 +89,13 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t("settings.title")}
+        backLabel={t("settings.back")}
+        onBack={() => router.back()}
+      />
       {/* The e-mail card's Save must take the first tap while the keyboard is up. */}
       <ScrollView contentContainerClassName="gap-6 p-6" keyboardShouldPersistTaps="handled">
-        <View className="flex-row items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel={t("settings.back")}
-            onPress={() => {
-              tap();
-              router.back();
-            }}
-          >
-            <Icon as={ArrowLeft} />
-          </Button>
-          <Text variant="h1" accessibilityRole="header">
-            {t("settings.title")}
-          </Text>
-        </View>
-
         <Text variant="h3" accessibilityRole="header">
           {t("settings.group.app")}
         </Text>
