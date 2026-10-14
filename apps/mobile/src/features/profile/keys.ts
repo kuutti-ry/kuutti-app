@@ -3,12 +3,10 @@ import {
   BIO_MIN_FOR_COMPLETENESS,
   type BioPreset,
   type CompletenessItem,
-  type FishSpecies,
   type Gender,
   PHOTOS_FOR_COMPLETENESS,
   type ProfileFieldKey,
   type PromptKey,
-  type TipKind,
 } from "@kuutti/schema";
 import type { useT } from "@/lib/locale";
 
@@ -46,38 +44,5 @@ export function completenessText(t: ReturnType<typeof useT>["t"], item: Complete
       return t("profile.completeness.seeks");
     case "age_window":
       return t("profile.completeness.age_window");
-  }
-}
-
-/**
- * One advisory tip for the owner (#56); kinds are the API's, words are the
- * client's. The fish tip names the fish when the API is sure of it (#253).
- */
-export function tipText(
-  t: ReturnType<typeof useT>["t"],
-  kind: TipKind,
-  fishSpecies: FishSpecies | null = null,
-): string {
-  switch (kind) {
-    case "sunglasses":
-      return t("profile.tip.sunglasses");
-    case "mirror_selfie":
-      return t("profile.tip.mirror_selfie");
-    case "tight_crop":
-      return t("profile.tip.tight_crop");
-    case "group_photo":
-      return t("profile.tip.group_photo");
-    case "poor_lighting":
-      return t("profile.tip.poor_lighting");
-    case "blurry":
-      return t("profile.tip.blurry");
-    case "few_photos":
-      return t("profile.tip.few_photos");
-    case "revealing":
-      return t("profile.tip.revealing");
-    case "fish":
-      return fishSpecies
-        ? t("profile.tip.fish_species", { species: fishSpecies })
-        : t("profile.tip.fish");
   }
 }

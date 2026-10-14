@@ -1,7 +1,6 @@
 import { formatDateTime } from "@kuutti/i18n";
 import type { HealthResponse } from "@kuutti/schema";
 import * as Sentry from "@sentry/react-native";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import * as Updates from "expo-updates";
 import { useCallback, useEffect, useState } from "react";
@@ -12,8 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
-import LICENSES from "@/generated/licenses.json";
 import { apiBaseUrl, fetchHealth } from "@/lib/api";
+import { buildInfo } from "@/lib/build";
 import { appEnvironment, isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
@@ -29,8 +28,9 @@ type State =
  * who installs a staging build (#143; the team's notes of 08/10): the
  * environment, the API's address and health, the two commits, the native
  * build and the update it runs, the version, a test error for the error
- * tracker, and the licences of the packages. It exists outside production
- * only; the store's build has the route and shows that. There is no link to
+ * tracker, and the source offer. The licences of the packages are in
+ * Settings, for every build (#287). It exists outside production only; the
+ * store's build has the route and shows that. There is no link to
  * releases: the repository has deployments and packages, no releases (the
  * maintainer, 10/10/2026).
  */
@@ -40,7 +40,6 @@ export function TechConfigScreen() {
   const tap = useHapticTap();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [errorSent, setErrorSent] = useState(false);
-  const [licensesShown, setLicensesShown] = useState(false);
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -54,13 +53,11 @@ export function TechConfigScreen() {
     if (!isProduction()) void load();
   }, [load]);
 
-  // The app's own git commit, as opposed to the API's: app.config.ts stamped
-  // it into the config when this JavaScript was exported or built.
-  const appCommit: unknown = Constants.expoConfig?.extra?.commit;
-  const appCommitLine =
-    typeof appCommit === "string" && appCommit.length > 0
-      ? t("tech.app.commit", { commit: appCommit })
-      : t("tech.app.noCommit");
+  // The app's own git commit and version, as opposed to the API's (lib/build.ts).
+  const build = buildInfo();
+  const appCommitLine = build.commit
+    ? t("tech.app.commit", { commit: build.commit })
+    : t("tech.app.noCommit");
   // The native build's runtime (the fingerprint, ADR-004) and the update it
   // runs, by its publish time: an update only reaches a build with the same
   // runtime, so a commit that stops moving here while the API's moves on
@@ -79,11 +76,7 @@ export function TechConfigScreen() {
             date: formatDateTime(locale, updatedAt),
           })
         : null;
-  // The counted version (#172) rides in extra, which the fingerprint skips; app.json's is the store's.
-  const version: unknown = Constants.expoConfig?.extra?.version ?? Constants.expoConfig?.version;
-  const versionLine = t("tech.app.version", {
-    version: typeof version === "string" && version.length > 0 ? version : "?",
-  });
+  const versionLine = t("tech.app.version", { version: build.version ?? "?" });
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -178,38 +171,14 @@ export function TechConfigScreen() {
               {errorSent && <Text variant="muted">{t("tech.errorTest.sent")}</Text>}
             </View>
 
-            {state.kind === "ok" && <SourceOffer source={state.health.source} />}
-
-            {/* The packages this build is made of, with their licences (scripts/licenses.ts). */}
-            <View className="w-full max-w-md gap-2">
-              <Text variant="small" accessibilityRole="header">
-                {t("tech.licenses.title")}
-              </Text>
-              <Button
-                variant="outline"
-                accessibilityLabel={
-                  licensesShown
-                    ? t("tech.licenses.hide")
-                    : t("tech.licenses.show", { packages: LICENSES.length })
-                }
-                onPress={() => {
-                  tap();
-                  setLicensesShown((shown) => !shown);
-                }}
-              >
-                <Text>
-                  {licensesShown
-                    ? t("tech.licenses.hide")
-                    : t("tech.licenses.show", { packages: LICENSES.length })}
+            {state.kind === "ok" && (
+              <View className="w-full max-w-md items-center gap-2">
+                <Text variant="small" accessibilityRole="header">
+                  {t("about.source.title")}
                 </Text>
-              </Button>
-              {licensesShown &&
-                LICENSES.map((entry) => (
-                  <Text key={`${entry.name}@${entry.version}`} variant="muted">
-                    {`${entry.name} ${entry.version} · ${entry.license}`}
-                  </Text>
-                ))}
-            </View>
+                <SourceOffer source={state.health.source} />
+              </View>
+            )}
           </>
         )}
       </ScrollView>

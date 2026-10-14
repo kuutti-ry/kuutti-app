@@ -65,7 +65,7 @@ describe("the profile field registry (ADR-019)", () => {
     expect(
       ProfileFields.safeParse({
         intent: "open_to_either",
-        height: 140,
+        height: 90,
         hobbies: ["sauna", "hiking"],
         politics: ["none_of_them"],
         religion: "agnostic",
@@ -75,12 +75,14 @@ describe("the profile field registry (ADR-019)", () => {
         occupationTitle: "Nurse",
       }).success,
     ).toBe(true);
+    // The height's two ends are taken, one past either is refused below (#287).
+    expect(ProfileFields.safeParse({ height: 260 }).success).toBe(true);
     for (const bad of [
       { intent: "friends" },
       { smoking: "snus" },
       { education: "master" },
-      { height: 139 },
-      { height: 221 },
+      { height: 89 },
+      { height: 261 },
       { height: 170.5 },
       { hobbies: [] },
       { campus: "Otaniemi" },

@@ -76,7 +76,13 @@ describe("AccountActions", () => {
   it("shows the three labelled buttons and nothing pressable is unlabelled or too small", async () => {
     fetchMock([]);
     await show(<AccountActions />);
-    expect(await screen.findByText("Your account")).toBeTruthy();
+    expect(
+      await screen.findByText(
+        "A file with everything Kuutti holds about you, and nothing about anyone else.",
+      ),
+    ).toBeTruthy();
+    // Its screen carries the title (#287): the card does not repeat it.
+    expect(screen.queryByText("Your account")).toBeNull();
     const found = pressables(screen.toJSON() as HostNode);
     expect(found).toHaveLength(3);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
@@ -190,7 +196,13 @@ describe("AccountActions", () => {
     expect(JSON.parse(await (calls.at(0) as Request).text())).toEqual({ confirm: true });
     await waitFor(() => expect(currentSession()).toBeNull());
     // Signed out: the card is gone with the session.
-    await waitFor(() => expect(screen.queryByText("Your account")).toBeNull());
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          "A file with everything Kuutti holds about you, and nothing about anyone else.",
+        ),
+      ).toBeNull(),
+    );
   });
 
   it("keeps the session when the deletion fails and says so", async () => {
@@ -246,7 +258,11 @@ describe("AccountActions", () => {
     await clearSession();
     fetchMock([]);
     await show(<AccountActions />);
-    expect(screen.queryByText("Your account")).toBeNull();
+    expect(
+      screen.queryByText(
+        "A file with everything Kuutti holds about you, and nothing about anyone else.",
+      ),
+    ).toBeNull();
   });
 });
 

@@ -67,7 +67,6 @@ function fakeApi(fields: Record<string, unknown>, dealBreakers: DealBreaker[] = 
           updatedAt: "2026-10-08T10:00:00.000Z",
         },
         completeness: { complete: false, missing: ["photos"] },
-        tips: [],
       });
     }
     if (path === "/preferences/deal-breakers" && request.method === "GET") return json(stored());

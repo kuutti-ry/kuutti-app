@@ -15,6 +15,7 @@ import { type Moderator, moderatePhoto } from "./moderation.ts";
 import { PipelineError, processPhoto } from "./pipeline.ts";
 import * as repo from "./repo.ts";
 import { type MediaStore, objectKey, WEBP } from "./store.ts";
+import { photoTips } from "./tips.ts";
 import { URL_TTL_MS, type UrlSigner } from "./urls.ts";
 
 /** What the photo routes need beyond the database: injected, so tests hand in a memory store and a test key. */
@@ -37,11 +38,12 @@ const toPhoto = ({ key: _key, ...photo }: repo.PhotoRow): Photo => photo;
 export { toPhoto };
 
 export async function listPhotos(deps: PhotoServiceDeps, accountId: string): Promise<PhotoList> {
-  const [rows, maxPhotos] = await Promise.all([
+  const [rows, maxPhotos, advice] = await Promise.all([
     repo.listPhotos(deps.db, accountId),
     matchingConfigNumber(deps.db, MAX_PHOTOS_KEY),
+    photoTips(deps.db, accountId),
   ]);
-  return { photos: rows.map(toPhoto), maxPhotos };
+  return { photos: rows.map(toPhoto), maxPhotos, ...advice };
 }
 
 /**

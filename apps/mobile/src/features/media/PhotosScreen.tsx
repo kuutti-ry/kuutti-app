@@ -22,6 +22,7 @@ import { TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { useMotionDuration } from "@/theme/useReducedMotion";
 import { PhotoImage } from "./PhotoImage";
+import { PhotoTip } from "./tips";
 import { useDragOrder } from "./useDragOrder";
 import { type PhotosNotice, usePhotos } from "./usePhotos";
 
@@ -163,6 +164,9 @@ export function PhotosScreen() {
             </CardContent>
           </Card>
         )}
+
+        {/* By the photos it is about (#287): one advisory tip, the main photo's first. */}
+        {list && <PhotoTip tips={list.tips} fishSpecies={list.fishSpecies} />}
 
         {list && total === 0 && <Text variant="muted">{t("photos.empty")}</Text>}
 

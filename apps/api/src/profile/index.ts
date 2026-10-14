@@ -1,6 +1,6 @@
 // The profile slice's public surface (rules/layout.md): the routes, the card
-// builder for the round builder of M4, the tip rule of #56, and the erasure
-// and export halves the identity slice calls (#51).
+// builder for the round builder of M4, and the erasure and export halves the
+// identity slice calls (#51).
 
 export {
   ageInYears,
@@ -22,4 +22,3 @@ export {
   saveProfile,
   withdrawSpecialCategoryAnswers,
 } from "./service.ts";
-export { type TipSnapshot, tips } from "./tips.ts";

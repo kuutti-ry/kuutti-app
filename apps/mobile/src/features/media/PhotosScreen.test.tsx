@@ -54,6 +54,7 @@ const ordering = (orders: string[][]) => (req: Request) =>
         return json({
           photos: body.order.map((id, position) => ({ ...photo(1), id, position })),
           maxPhotos: 3,
+          tips: [],
         });
       })
     : null;
@@ -86,11 +87,13 @@ const photo = (n: number) => ({
 const list = (n: number, maxPhotos = 3) => ({
   photos: Array.from({ length: n }, (_, i) => photo(i + 1)),
   maxPhotos,
+  tips: [],
 });
 /** Every photo approved: each one others see, so each but the first can be made the main one. */
 const approvedList = (n: number, maxPhotos = 3) => ({
   photos: Array.from({ length: n }, (_, i) => ({ ...photo(i + 1), state: "approved" })),
   maxPhotos,
+  tips: [],
 });
 
 const json = (body: unknown, status = 200) =>
@@ -123,6 +126,16 @@ const answersUrls = (req: Request) => {
 };
 const answersList = (body: unknown) => (req: Request) =>
   req.method === "GET" && new URL(req.url).pathname === "/photos" ? json(body) : null;
+/** The list as it stands after each change, the last one again after that: the screen reads it again for its tips (#287). */
+const answersLists = (...bodies: unknown[]) => {
+  let reads = 0;
+  return (req: Request) => {
+    if (req.method !== "GET" || new URL(req.url).pathname !== "/photos") return null;
+    const body = bodies[Math.min(reads, bodies.length - 1)];
+    reads += 1;
+    return json(body);
+  };
+};
 
 beforeEach(async () => {
   FakeXhr.install();
@@ -174,6 +187,7 @@ describe("PhotosScreen", () => {
           { ...photo(3), state: "approved" },
         ],
         maxPhotos: 3,
+        tips: [],
       }),
       answersUrls,
     ]);
@@ -191,6 +205,7 @@ describe("PhotosScreen", () => {
       answersList({
         photos: [{ ...photo(1), state: "rejected", rejectionReason: "no_person" }],
         maxPhotos: 3,
+        tips: [],
       }),
       answersUrls,
     ]);
@@ -208,12 +223,16 @@ describe("PhotosScreen", () => {
       rejectionReason: "no_person",
       appealable: true,
     };
+    const queued = { ...rejected, state: "queued", rejectionReason: null, appealable: false };
     const { calls } = fetchMock([
-      answersList({ photos: [photo(1), rejected], maxPhotos: 3 }),
+      answersLists(
+        { photos: [photo(1), rejected], maxPhotos: 3, tips: [] },
+        { photos: [photo(1), queued], maxPhotos: 3, tips: [] },
+      ),
       answersUrls,
       (req) =>
         req.method === "POST" && new URL(req.url).pathname === `/photos/${rejected.id}/appeal`
-          ? json({ ...rejected, state: "queued", rejectionReason: null, appealable: false })
+          ? json(queued)
           : null,
     ]);
     await show(<PhotosScreen />);
@@ -237,7 +256,7 @@ describe("PhotosScreen", () => {
       appealable: true,
     };
     fetchMock([
-      answersList({ photos: [sure, stale], maxPhotos: 3 }),
+      answersList({ photos: [sure, stale], maxPhotos: 3, tips: [] }),
       answersUrls,
       (req) =>
         req.method === "POST" && /\/appeal$/.test(new URL(req.url).pathname)
@@ -283,6 +302,7 @@ describe("PhotosScreen", () => {
                 { ...photo(1), position: 1 },
               ],
               maxPhotos: 3,
+              tips: [],
             })
           : null,
     ]);
@@ -298,7 +318,7 @@ describe("PhotosScreen", () => {
 
   it("removes a photo only after the confirmation", async () => {
     const { calls } = fetchMock([
-      answersList(list(1)),
+      answersLists(list(1), list(0)),
       answersUrls,
       (req) => (req.method === "DELETE" ? new Response(null, { status: 204 }) : null),
     ]);
@@ -315,7 +335,7 @@ describe("PhotosScreen", () => {
   });
 
   it("adds a photo: picker, on-device check, pre-resize, upload with progress, then the grid grows", async () => {
-    fetchMock([answersList(list(1)), answersUrls]);
+    fetchMock([answersLists(list(1), list(2)), answersUrls]);
     launch.mockResolvedValueOnce({
       canceled: false,
       assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
@@ -474,6 +494,7 @@ describe("PhotosScreen", () => {
           { ...photo(2), state: "rejected", rejectionReason: null },
         ],
         maxPhotos: 3,
+        tips: [],
       }),
       answersUrls,
     ]);
@@ -497,6 +518,59 @@ describe("PhotosScreen", () => {
       [photo(3).id, photo(1).id, photo(2).id],
       [photo(3).id, photo(2).id, photo(1).id],
     ]);
+  });
+
+  it("shows one tip at a time by the photos; a dismissed one gives way to the next and stays dismissed (#287)", async () => {
+    const withTips = { ...approvedList(2), tips: ["sunglasses", "few_photos"] };
+    fetchMock([answersList(withTips), answersUrls]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText("A tip for your photos")).toBeTruthy();
+    expect(screen.getByText(/without sunglasses/)).toBeTruthy();
+    expect(screen.queryByText(/fuller picture/)).toBeNull();
+    expect(screen.queryAllByText(/^profile\.tip\./)).toEqual([]);
+    const found = pressables(screen.toJSON() as HostNode);
+    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+    await press(screen.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByText(/without sunglasses/)).toBeNull();
+    expect(screen.getByText(/fuller picture/)).toBeTruthy();
+    // The photos opened again keep the dismissal for this run.
+    fetchMock([answersList(withTips), answersUrls]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText(/fuller picture/)).toBeTruthy();
+    expect(screen.queryByText(/without sunglasses/)).toBeNull();
+    await press(screen.getByRole("button", { name: "Got it" }));
+    expect(screen.queryByText("A tip for your photos")).toBeNull();
+  });
+
+  it("names the fish of the fish tip when the API is sure of it (#253)", async () => {
+    fetchMock([
+      answersList({ ...approvedList(1), tips: ["fish"], fishSpecies: "pike" }),
+      answersUrls,
+    ]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText(/Is that a pike\?/)).toBeTruthy();
+  });
+
+  it("says the plain fish tip when the API names no fish, and nothing with no tip", async () => {
+    fetchMock([answersList({ ...approvedList(1), tips: ["fish"] }), answersUrls]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText(/A fish in the main photo is a classic/)).toBeTruthy();
+    expect(screen.queryByText(/Is that/)).toBeNull();
+    fetchMock([answersList(approvedList(1)), answersUrls]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText("Main photo")).toBeTruthy();
+    expect(screen.queryByText("A tip for your photos")).toBeNull();
+  });
+
+  it("leaves out a tip this build does not know, and loads the rest", async () => {
+    // A newer API names a tip kind this app has no words for yet.
+    // mirror_selfie: a kind no earlier test dismisses for the app's run.
+    fetchMock([
+      answersList({ ...approvedList(1), tips: ["a_kind_from_a_later_api", "mirror_selfie"] }),
+      answersUrls,
+    ]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByText("Try a photo that is not a mirror selfie.")).toBeTruthy();
   });
 
   describe("dragging a tile (#179)", () => {

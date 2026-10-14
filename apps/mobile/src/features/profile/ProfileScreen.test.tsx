@@ -55,16 +55,12 @@ const approved = (n: number) => ({
 
 /**
  * GET /profile answering each read with the next list of what is missing, the
- * last one again after that. `tips` are the advisory kinds of #56 (none by
- * default); `fishSpecies` the fish the fish tip names (#253), absent by default
- * as from an API older than it; `document` the stored profile (none by
+ * last one again after that; `document` the stored profile (none by
  * default); `photos` the photo list's photos (none by default), or "failing"
  * for a list that cannot be read.
  */
 function fakeApi(
   missingByRead: string[][],
-  tips: string[] = [],
-  fishSpecies?: string,
   {
     document,
     photos = [],
@@ -92,8 +88,6 @@ function fakeApi(
             }
           : null,
         completeness: { complete: missing.length === 0, missing },
-        tips,
-        ...(fishSpecies ? { fishSpecies } : {}),
       });
     }
     if (path === "/photos" && request.method === "GET") {
@@ -101,7 +95,7 @@ function fakeApi(
       if (photos === "failing") {
         return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
       }
-      return json({ photos, maxPhotos: 6 });
+      return json({ photos, maxPhotos: 6, tips: [] });
     }
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
@@ -177,7 +171,7 @@ describe("ProfileScreen", () => {
   });
 
   it("marks how far each part is filled: a check mark once done, the words for a screen reader (#239)", async () => {
-    fakeApi([[]], [], undefined, {
+    fakeApi([[]], {
       document: {
         displayName: "Aino",
         bio: "Long walks and short questions.",
@@ -229,10 +223,10 @@ describe("ProfileScreen", () => {
   });
 
   it("marks the photos done at the two a card needs, and leaves the mark out when the list cannot be read", async () => {
-    fakeApi([[]], [], undefined, { photos: [approved(1), approved(2), approved(3)] });
+    fakeApi([[]], { photos: [approved(1), approved(2), approved(3)] });
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Photos")).toBe("Done"));
-    fakeApi([[]], [], undefined, { photos: "failing" });
+    fakeApi([[]], { photos: "failing" });
     await show(<ProfileScreen />);
     await waitFor(() => expect(screen.getAllByText("The basics").length).toBeGreaterThan(0));
     expect(
@@ -244,7 +238,7 @@ describe("ProfileScreen", () => {
     const all = Object.fromEntries(
       [...LATER_FIELD_ORDER, "nicotine" as const].map((key) => [key, answerOf(key)]),
     ) as Record<string, unknown>;
-    fakeApi([[]], [], undefined, { document: { fields: all } });
+    fakeApi([[]], { document: { fields: all } });
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Hobbies")).toBe("Done"));
     expect(screen.queryByRole("button", { name: "Fill in the rest while you wait" })).toBeNull();
@@ -256,47 +250,10 @@ describe("ProfileScreen", () => {
       string,
       unknown
     >;
-    fakeApi([[]], [], undefined, { document: { fields: all } });
+    fakeApi([[]], { document: { fields: all } });
     await show(<ProfileScreen />);
     await waitFor(() => expect(progressValue("Lifestyle")).toBe("5 of 6 answered"));
     expect(screen.getByRole("button", { name: "Fill in the rest while you wait" })).toBeTruthy();
-  });
-
-  it("shows one tip at a time; a dismissed one gives way to the next and stays dismissed", async () => {
-    fakeApi([[]], ["sunglasses", "few_photos"]);
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText("A tip for your photos")).toBeTruthy());
-    expect(screen.getByText(/without sunglasses/)).toBeTruthy();
-    expect(screen.queryByText(/fuller picture/)).toBeNull();
-    expect(screen.queryAllByText(/^profile\.tip\./)).toEqual([]);
-    const found = pressables(screen.toJSON() as HostNode);
-    // The twelve of the list plus the tip's dismiss.
-    expect(found).toHaveLength(13);
-    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    await press(screen.getByRole("button", { name: "Got it" }));
-    expect(screen.queryByText(/without sunglasses/)).toBeNull();
-    expect(screen.getByText(/fuller picture/)).toBeTruthy();
-    // A profile screen opened again keeps the dismissal for this run.
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText(/fuller picture/)).toBeTruthy());
-    expect(screen.queryByText(/without sunglasses/)).toBeNull();
-    await press(screen.getByRole("button", { name: "Got it" }));
-    expect(screen.queryByText("A tip for your photos")).toBeNull();
-  });
-
-  it("names the fish of the fish tip when the API is sure of it (#253)", async () => {
-    fakeApi([[]], ["fish"], "pike");
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText(/Is that a pike\?/)).toBeTruthy());
-  });
-
-  it("says the plain fish tip when the API names no fish", async () => {
-    fakeApi([[]], ["fish"]);
-    await show(<ProfileScreen />);
-    await waitFor(() =>
-      expect(screen.getByText(/A fish in the main photo is a classic/)).toBeTruthy(),
-    );
-    expect(screen.queryByText(/Is that/)).toBeNull();
   });
 
   it("opens the photos, a section, the card from the eye, the deal-breakers and the later questions", async () => {
@@ -343,9 +300,9 @@ describe("ProfileScreen", () => {
         return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
       }
       if (new URL(request.url).pathname === "/photos") {
-        return json({ photos: [approved(1), approved(2)], maxPhotos: 6 });
+        return json({ photos: [approved(1), approved(2)], maxPhotos: 6, tips: [] });
       }
-      return json({ profile: null, completeness: { complete: true, missing: [] }, tips: [] });
+      return json({ profile: null, completeness: { complete: true, missing: [] } });
     }) as unknown as typeof fetch;
     await show(<ProfileScreen />);
     expect(screen.getByText("Your profile could not be loaded.")).toBeTruthy();
@@ -358,22 +315,11 @@ describe("ProfileScreen", () => {
     expect(progressValue("Photos")).toBe("Done");
   });
 
-  it("leaves out a tip this build does not know, and loads the rest", async () => {
-    // A newer API names a tip kind this app has no words for yet.
-    // mirror_selfie: a kind no earlier test dismisses for the app's run.
-    fakeApi([[]], ["a_kind_from_a_later_api", "mirror_selfie"]);
-    await show(<ProfileScreen />);
-    await waitFor(() => expect(screen.getByText("The basics")).toBeTruthy());
-    expect(screen.getByText("Try a photo that is not a mirror selfie.")).toBeTruthy();
-    expect(screen.queryByText("Your profile could not be loaded.")).toBeNull();
-  });
-
   it("offers to update the app when the API answers what this build cannot read", async () => {
     globalThis.fetch = jest.fn(async () =>
       json({
         profile: null,
         completeness: { complete: true, missing: ["a_later_item"] },
-        tips: [],
       }),
     ) as unknown as typeof fetch;
     await show(<ProfileScreen />);

@@ -16,10 +16,17 @@ name: Taking a break signs the person out everywhere, and the next bank login br
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
+# The break is on the account screen, behind its row (#287).
+# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
 - scrollUntilVisible:
-    element: "Take a break|Pidä tauko|Ta en paus"
+    element: "Your account|Tilisi|Ditt konto"
+    direction: DOWN
     centerElement: true
     timeout: 60000
+- tapOn: "Your account|Tilisi|Ditt konto"
+- extendedWaitUntil:
+    visible: "Take a break|Pidä tauko|Ta en paus"
+    timeout: 15000
 - tapOn: "Take a break|Pidä tauko|Ta en paus"
 - extendedWaitUntil:
     visible: "Take a break from Kuutti|Pidä tauko Kuutista|Ta en paus från Kuutti"

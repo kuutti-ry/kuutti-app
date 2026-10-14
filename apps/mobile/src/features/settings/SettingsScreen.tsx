@@ -1,91 +1,87 @@
-import { LOCALE_NAMES, type PlainMessageKey } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, LOCALE_NAMES } from "@kuutti/i18n";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { AccountActions, ConsentSwitches, EmailCard, useSession } from "@/features/identity";
-import { fetchHealth } from "@/lib/api";
-import {
-  LOCALE_FLAGS,
-  type LocalePreference,
-  OFFERED_LOCALES,
-  useLocaleSettings,
-  useT,
-} from "@/lib/locale";
-import { type SchemePreference, useTheme } from "@/theme/ThemeProvider";
-import { SourceOffer } from "./SourceOffer";
+import { type ConsentState, useConsentStates, useSession } from "@/features/identity";
+import LICENSES from "@/generated/licenses.json";
+import { buildInfo } from "@/lib/build";
+import { useLocaleSettings, useT } from "@/lib/locale";
+import { useHapticTap } from "@/theme/haptics";
+import { useTheme } from "@/theme/ThemeProvider";
+import { SCHEMES } from "./Choice";
+import { CONSENT_TITLE } from "./ConsentScreen";
 
-const SCHEMES: ReadonlyArray<{ value: SchemePreference; label: PlainMessageKey }> = [
-  { value: "system", label: "settings.theme.system" },
-  { value: "light", label: "settings.theme.light" },
-  { value: "dark", label: "settings.theme.dark" },
-];
-
-/**
- * One option of a group. The chosen one is marked in text too, never by colour
- * alone. A flag, when given, is decoration in front of the text: the accessible
- * name is the text alone, so a screen reader never announces "flag: Åland".
- */
-function Choice(props: { label: string; flag?: string; chosen: boolean; onPress: () => void }) {
-  const { t } = useT();
-  const name = props.chosen ? t("settings.selected", { option: props.label }) : props.label;
+/** A heading and its rows. */
+function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
   return (
-    <Button
-      variant={props.chosen ? "default" : "outline"}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: props.chosen }}
-      // react-native-web reads the ARIA prop, not accessibilityState.
-      aria-checked={props.chosen}
-      accessibilityLabel={name}
-      className="grow"
-      onPress={props.onPress}
-    >
-      {props.flag ? `${props.flag} ${name}` : name}
-    </Button>
+    <View className="gap-2">
+      <Text variant="h3" accessibilityRole="header">
+        {title}
+      </Text>
+      <RowGroup rows={rows} />
+    </View>
   );
 }
 
 /**
- * The person's own settings, after login, in every build (#143; the team's
- * notes of 08/10), in two groups the way S-Pankki's app has them (#170): "App
- * settings" is theme and high contrast (the OS's by default, kept across
- * restarts), the language (the phone's by default), the two consents and the
- * source offer of AGPL-3.0 section 13, which stays visible to everybody;
- * "Account" is this device's session, the e-mail, the export, the break and
- * the deletion (#51, #148, #170). What is technical (commits, the API, a test
- * error) is the tech config screen and exists outside production only.
+ * The person's own settings, after login, in every build (#143): a list of
+ * sections the way the profile's front page is one (#227, #287), each row a
+ * screen of its own. Appearance and language (the OS's and the phone's by
+ * default, kept across restarts); the legal part, the two consents (#46,
+ * #146) and the texts they refer to; about Kuutti, the version, the source
+ * offer of AGPL-3.0 section 13 (visible to everybody) and the licences; the
+ * account, this device, the e-mail, and the export, the break and the
+ * deletion last (#51, #148, #170). The tech config screen keeps what is
+ * technical beyond the version (the API, the native build, a test error) and
+ * exists outside production only.
  */
 export function SettingsScreen() {
   const { t } = useT();
   const router = useRouter();
+  const tap = useHapticTap();
   const theme = useTheme();
   const locale = useLocaleSettings();
   const session = useSession();
-  // The address of the running service's source, as /health names it (AGPL §13).
-  const [source, setSource] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    fetchHealth()
-      .then((health) => live && setSource(health.source))
-      .catch(() => undefined);
-    return () => {
-      live = false;
+  const open = (path: Parameters<typeof router.push>[0]) => () => {
+    tap();
+    router.push(path);
+  };
+
+  const themeName = t(
+    SCHEMES.find((s) => s.value === theme.preference)?.label ?? "settings.theme.system",
+  );
+  const themeSummary = theme.highContrast
+    ? t("settings.theme.withContrast", { theme: themeName })
+    : themeName;
+  const languageSummary =
+    locale.preference === "system"
+      ? t("settings.language.system")
+      : LOCALE_NAMES[locale.preference];
+  const { version, commit } = buildInfo();
+  const signedIn = session.status === "signed-in";
+  const consents = useConsentStates();
+  /** A consent's state in words, for its row; nothing while it is unknown. */
+  const consentWords = (state: ConsentState): string | undefined =>
+    state === "on"
+      ? t("settings.state.on")
+      : state === "off"
+        ? t("settings.state.off")
+        : state === "outdated"
+          ? t("settings.state.outdated")
+          : undefined;
+  const consentRow = (kind: "research" | "special_category"): Row => {
+    const words = consentWords(consents[kind]);
+    return {
+      key: kind,
+      title: t(CONSENT_TITLE[kind]),
+      summary: words,
+      value: words,
+      onPress: open(`/settings/consent/${kind}`),
     };
-  }, []);
-  const languages: ReadonlyArray<{ value: LocalePreference; label: string; flag?: string }> = [
-    { value: "system", label: t("settings.language.system") },
-    // A language is listed under its own name, whatever the app's language is.
-    ...OFFERED_LOCALES.map((value) => ({
-      value,
-      label: LOCALE_NAMES[value],
-      flag: LOCALE_FLAGS[value],
-    })),
-  ];
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -94,127 +90,101 @@ export function SettingsScreen() {
         backLabel={t("settings.back")}
         onBack={() => router.back()}
       />
-      {/* The e-mail card's Save must take the first tap while the keyboard is up. */}
-      <ScrollView contentContainerClassName="gap-6 p-6" keyboardShouldPersistTaps="handled">
-        <Text variant="h3" accessibilityRole="header">
-          {t("settings.group.app")}
-        </Text>
-
-        <View className="gap-2">
-          <Text variant="small" accessibilityRole="header">
-            {t("settings.theme.label")}
-          </Text>
-          <View
-            accessibilityRole="radiogroup"
-            accessibilityLabel={t("settings.theme.label")}
-            className="flex-row flex-wrap gap-2"
-          >
-            {SCHEMES.map(({ value, label }) => (
-              <Choice
-                key={value}
-                label={t(label)}
-                chosen={theme.preference === value}
-                onPress={() => theme.setPreference(value)}
-              />
-            ))}
-          </View>
-        </View>
-
-        <View className="flex-row items-center justify-between gap-4">
-          <Label
-            nativeID="high-contrast-label"
-            onPress={() => theme.setHighContrast(!theme.highContrast)}
-          >
-            {t("settings.highContrast")}
-          </Label>
-          <Switch
-            accessibilityLabel={t("settings.highContrast")}
-            checked={theme.highContrast}
-            onCheckedChange={theme.setHighContrast}
-          />
-        </View>
-
-        <View className="gap-2">
-          <Text variant="small" accessibilityRole="header">
-            {t("settings.language.label")}
-          </Text>
-          <View
-            accessibilityRole="radiogroup"
-            accessibilityLabel={t("settings.language.label")}
-            className="flex-row flex-wrap gap-2"
-          >
-            {languages.map(({ value, label, flag }) => (
-              <Choice
-                key={value}
-                label={label}
-                flag={flag}
-                chosen={locale.preference === value}
-                onPress={() => locale.setPreference(value)}
-              />
-            ))}
-          </View>
-        </View>
-
-        {/* The two withdrawable consents (#46, #146): a choice about the app, so with its settings. */}
-        {session.status === "signed-in" && (
-          <View className="gap-2">
-            <Text variant="small" accessibilityRole="header">
-              {t("settings.consents.label")}
-            </Text>
-            <ConsentSwitches />
-          </View>
-        )}
-
-        <View className="gap-2">
-          <Text variant="small" accessibilityRole="header">
-            {t("settings.about.title")}
-          </Text>
-          {source ? (
-            <SourceOffer source={source} />
-          ) : (
-            <Text variant="muted">{t("about.source.body")}</Text>
-          )}
-        </View>
-
-        <Text variant="h3" accessibilityRole="header">
-          {t("settings.group.account")}
-        </Text>
-
-        {/* This device's session (#35): log out here, or everywhere, which is
-            the recovery for a lost phone. Errors are swallowed: the local
-            session is cleared either way, and the row expires on its own. */}
-        <View className="gap-2">
-          <Text variant="small" accessibilityRole="header">
-            {t("settings.session.label")}
-          </Text>
-          {session.status === "signed-in" ? (
-            <View className="flex-row flex-wrap gap-2">
-              <Button
-                variant="outline"
-                className="grow"
-                accessibilityLabel={t("settings.logout")}
-                onPress={() => void session.signOut()}
-              >
-                <Text>{t("settings.logout")}</Text>
-              </Button>
-              <Button
-                variant="destructive"
-                className="grow"
-                accessibilityLabel={t("settings.logoutAll")}
-                onPress={() => void session.signOutEverywhere().catch(() => undefined)}
-              >
-                <Text>{t("settings.logoutAll")}</Text>
-              </Button>
-            </View>
-          ) : (
-            <Text variant="muted">{t("settings.session.none")}</Text>
-          )}
-        </View>
-
-        {/* Export, the research opt-in and deletion (#51): nothing when signed out. */}
-        <AccountActions />
-        {/* The optional e-mail (#148): a way back in, never shown, never a login. */}
-        <EmailCard />
+      <ScrollView contentContainerClassName="gap-6 p-6">
+        <Section
+          title={t("settings.section.appearance")}
+          rows={[
+            {
+              key: "theme",
+              title: t("settings.theme.label"),
+              summary: themeSummary,
+              value: themeSummary,
+              onPress: open("/settings/theme"),
+            },
+            {
+              key: "language",
+              title: t("settings.language.label"),
+              summary: languageSummary,
+              value: languageSummary,
+              onPress: open("/settings/language"),
+            },
+          ]}
+        />
+        <Section
+          title={t("settings.section.agreements")}
+          rows={[
+            // The two withdrawable consents, each saying whether it is on; nothing signed out.
+            ...(signedIn ? [consentRow("research"), consentRow("special_category")] : []),
+            {
+              key: "terms",
+              title: t("legal.terms.title"),
+              summary: t("onboarding.consents.version", { version: CONSENT_VERSIONS.terms ?? "" }),
+              onPress: open("/settings/legal/terms"),
+            },
+            {
+              key: "privacy",
+              title: t("legal.privacy.title"),
+              summary: t("onboarding.consents.version", {
+                version: CONSENT_VERSIONS.privacy ?? "",
+              }),
+              onPress: open("/settings/legal/privacy"),
+            },
+          ]}
+        />
+        <Section
+          title={t("settings.about.title")}
+          rows={[
+            {
+              key: "version",
+              title: t("settings.version.label"),
+              summary: commit
+                ? t("settings.version.commit", { commit: commit.slice(0, 7) })
+                : undefined,
+              detail: version ?? "?",
+            },
+            {
+              key: "source",
+              title: t("about.source.title"),
+              summary: t("settings.source.summary"),
+              onPress: open("/settings/source"),
+            },
+            {
+              key: "licenses",
+              title: t("settings.licenses.label"),
+              summary: t("settings.licenses.summary", { packages: LICENSES.length }),
+              onPress: open("/settings/licenses"),
+            },
+          ]}
+        />
+        <Section
+          title={t("settings.group.account")}
+          rows={[
+            // Always there: a device with no session says so on its screen, and
+            // a flow signing out finds the row whatever the session is.
+            {
+              key: "device",
+              title: t("settings.session.label"),
+              summary: t("settings.device.summary"),
+              onPress: open("/settings/device"),
+            },
+            ...(signedIn
+              ? [
+                  {
+                    key: "email",
+                    title: t("settings.email.label"),
+                    summary: t("settings.email.summary"),
+                    onPress: open("/settings/email"),
+                  },
+                  {
+                    key: "account",
+                    title: t("account.title"),
+                    summary: t("settings.account.summary"),
+                    onPress: open("/settings/account"),
+                  },
+                ]
+              : []),
+          ]}
+        />
       </ScrollView>
     </SafeAreaView>
   );

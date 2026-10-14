@@ -107,7 +107,7 @@ const BY_NAME: ReadonlyMap<string, LabelGroup | "allowed"> = new Map([
 /**
  * The allowed labels that show a lot of skin: swimwear and underwear, a
  * shirtless chest, a bare back, partial nudity. Never a reason to hold a photo
- * back; on the main photo, the owner hears a tip (#253, profile/tips.ts).
+ * back; on the main photo, the owner hears a tip (#253, media/tips.ts).
  * Not the top level "...and Kissing", which a kiss alone also carries.
  */
 const REVEALING: ReadonlySet<string> = new Set(

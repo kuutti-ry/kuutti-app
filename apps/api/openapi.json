@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.19.0",
+    "version": "0.20.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -776,8 +776,8 @@
           },
           "height": {
             "type": "integer",
-            "minimum": 140,
-            "maximum": 220
+            "minimum": 90,
+            "maximum": 260
           },
           "exercise": {
             "type": "string",
@@ -1669,11 +1669,21 @@
             "minimum": 0,
             "exclusiveMinimum": true,
             "description": "matching_config max_photos."
+          },
+          "tips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TipKind"
+            }
+          },
+          "fishSpecies": {
+            "$ref": "#/components/schemas/FishSpecies"
           }
         },
         "required": [
           "photos",
-          "maxPhotos"
+          "maxPhotos",
+          "tips"
         ]
       },
       "Photo": {
@@ -1743,6 +1753,37 @@
           "position",
           "createdAt"
         ]
+      },
+      "TipKind": {
+        "type": "string",
+        "enum": [
+          "sunglasses",
+          "mirror_selfie",
+          "tight_crop",
+          "group_photo",
+          "poor_lighting",
+          "blurry",
+          "few_photos",
+          "revealing",
+          "fish"
+        ]
+      },
+      "FishSpecies": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "pike",
+          "perch",
+          "salmon",
+          "trout",
+          "carp",
+          "eel",
+          "cod",
+          "herring",
+          "halibut",
+          null
+        ],
+        "default": null
       },
       "PhotoUploadRequest": {
         "type": "object",
@@ -1984,21 +2025,11 @@
           },
           "completeness": {
             "$ref": "#/components/schemas/Completeness"
-          },
-          "tips": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TipKind"
-            }
-          },
-          "fishSpecies": {
-            "$ref": "#/components/schemas/FishSpecies"
           }
         },
         "required": [
           "profile",
-          "completeness",
-          "tips"
+          "completeness"
         ]
       },
       "Completeness": {
@@ -2029,37 +2060,6 @@
           "seeks",
           "age_window"
         ]
-      },
-      "TipKind": {
-        "type": "string",
-        "enum": [
-          "sunglasses",
-          "mirror_selfie",
-          "tight_crop",
-          "group_photo",
-          "poor_lighting",
-          "blurry",
-          "few_photos",
-          "revealing",
-          "fish"
-        ]
-      },
-      "FishSpecies": {
-        "type": "string",
-        "nullable": true,
-        "enum": [
-          "pike",
-          "perch",
-          "salmon",
-          "trout",
-          "carp",
-          "eel",
-          "cod",
-          "herring",
-          "halibut",
-          null
-        ],
-        "default": null
       },
       "ProfileUpdate": {
         "type": "object",
@@ -3494,7 +3494,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The caller's own photos.",
+            "description": "The caller's own photos, with the advisory tips that apply to them, highest priority first (the app shows one at a time), and the fish the fish tip names, or null.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3766,7 +3766,7 @@
         },
         "responses": {
           "200": {
-            "description": "The photos in the new order.",
+            "description": "The photos in the new order, with the advisory tips that apply to them now that the main photo may have changed, highest priority first (the app shows one at a time), and the fish the fish tip names, or null.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4135,7 +4135,7 @@
     "/profile": {
       "get": {
         "summary": "The caller's profile and what it still needs",
-        "description": "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the advisory tips for the owner that apply, highest priority first.",
+        "description": "The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).",
         "security": [
           {
             "session": []
@@ -4184,7 +4184,7 @@
         },
         "responses": {
           "200": {
-            "description": "Saved; the profile as stored, with its completeness and its advisory tips.",
+            "description": "Saved; the profile as stored, with its completeness.",
             "content": {
               "application/json": {
                 "schema": {

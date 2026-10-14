@@ -1,23 +1,30 @@
+import type { Queryable } from "@kuutti/db";
 import { type FishSpecies, PHOTOS_FOR_COMPLETENESS, type TipKind } from "@kuutti/schema";
-import { fishSpeciesOf, isRevealing } from "../media/index.ts";
+import { matchingConfigNumbers } from "../lib/matching-config.ts";
+import { fishSpeciesOf, isRevealing } from "./label-groups.ts";
+import { listPhotoTipInputs } from "./repo.ts";
 
 /**
- * Advisory tips for the profile owner (#56). Pure: callers gather photos,
- * their photo_review signals, and the matching_config thresholds. Every tip
- * that applies goes on the wire, highest priority first, and the app shows one
- * at a time; never changes completeness, moderation, or matching eligibility.
+ * Advisory tips for the profile owner (#56, #253), answered on the photo list
+ * (GET /photos and PUT /photos/order) since #287, next to the photos they are
+ * about. `tips` and `fishSpecies` are pure over a snapshot; `photoTips`
+ * gathers it: the photos, their photo_review signals, and the matching_config
+ * thresholds. Every tip that applies goes on the wire, highest priority first,
+ * and the app shows one at a time; never changes completeness, moderation, or
+ * matching eligibility.
  *
  * A tip is advice on top of a rule that already holds. What completeness asks
  * for is not said twice: too few photos to be complete is
  * `completeness.missing`, and only a profile with enough of them, and none
- * waiting in review, is told that more would help. Label tips fire only when every approved photo fails
- * that check (collection-wide), so one good photo clears the kind; the two of
- * #253 read the main photo alone, the first one others see (the first approved
- * one by position): a lot of skin there, or a fish.
+ * waiting in review, is told that more would help. Label tips fire only when
+ * every approved photo fails that check (collection-wide), so one good photo
+ * clears the kind; the two of #253 read the main photo alone, the first one
+ * others see (the first approved one by position): a lot of skin there, or a
+ * fish.
  */
 
 /** matching_config keys the tips rule reads; values live in the seed / migrations 0028 and 0029. */
-export const TIP_THRESHOLD_KEYS = {
+const TIP_THRESHOLD_KEYS = {
   mirrorConfidenceMin: "photo_tip_mirror_confidence_min",
   bathroomConfidenceMin: "photo_tip_bathroom_confidence_min",
   sunglassesConfidenceMin: "photo_tip_sunglasses_confidence_min",
@@ -152,4 +159,39 @@ export function fishSpecies(snapshot: TipSnapshot): FishSpecies | null {
       best = { species, confidence: label.confidence };
   }
   return best?.species ?? null;
+}
+
+/** The tip thresholds from matching_config, in one statement; missing keys fail closed. */
+async function readTipThresholds(db: Queryable): Promise<TipThresholds> {
+  const fields = Object.keys(TIP_THRESHOLD_KEYS) as (keyof typeof TIP_THRESHOLD_KEYS)[];
+  const values = await matchingConfigNumbers(
+    db,
+    fields.map((field) => TIP_THRESHOLD_KEYS[field]),
+  );
+  return Object.fromEntries(
+    fields.map((field) => [field, values[TIP_THRESHOLD_KEYS[field]]]),
+  ) as TipThresholds;
+}
+
+/** The approved photos carry the signals; the ones in review only count. */
+async function tipSnapshotOf(db: Queryable, accountId: string): Promise<TipSnapshot> {
+  const [uploaded, thresholds] = await Promise.all([
+    listPhotoTipInputs(db, accountId),
+    readTipThresholds(db),
+  ]);
+  const photos = uploaded.filter((photo) => photo.state === "approved");
+  return { photos, inReview: uploaded.length - photos.length, thresholds };
+}
+
+/**
+ * The tips that apply to an account's photos, highest priority first, with
+ * the fish the fish tip names. On the photo list since #287, where the photos
+ * are; the app shows one at a time.
+ */
+export async function photoTips(
+  db: Queryable,
+  accountId: string,
+): Promise<{ tips: TipKind[]; fishSpecies: FishSpecies | null }> {
+  const snapshot = await tipSnapshotOf(db, accountId);
+  return { tips: tips(snapshot), fishSpecies: fishSpecies(snapshot) };
 }

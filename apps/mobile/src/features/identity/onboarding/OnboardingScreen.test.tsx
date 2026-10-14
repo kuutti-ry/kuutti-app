@@ -129,7 +129,6 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       ? { ...server.profile, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" }
       : null,
     completeness: { complete: false, missing: [] },
-    tips: [],
   });
   globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
     const request = input instanceof Request ? input : new Request(input, init);

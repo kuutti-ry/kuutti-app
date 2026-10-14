@@ -20,12 +20,11 @@ const DOCUMENT: ProfileUpdate = {
   fields: { intent: "long_term", height: 170 },
   prompts: [{ key: "sunday", answer: "A long breakfast." }],
 };
-const stored = (document: ProfileUpdate | null, tips: string[] = []) => ({
+const stored = (document: ProfileUpdate | null) => ({
   profile: document
     ? { ...document, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" }
     : null,
   completeness: { complete: false, missing: ["photos"] },
-  tips,
 });
 
 type Answer = Response | Promise<Response>;
@@ -69,14 +68,13 @@ beforeEach(async () => {
 });
 
 describe("useProfile: reading", () => {
-  it("loads the stored document as the draft, with what is missing and the tips", async () => {
-    serve([() => json(stored(DOCUMENT, ["few_photos"]))]);
+  it("loads the stored document as the draft, with what is missing", async () => {
+    serve([() => json(stored(DOCUMENT))]);
     const { result } = await ready();
     expect(result.current.status).toBe("ready");
     expect(result.current.draft).toEqual(DOCUMENT);
     expect(result.current.saved).toEqual(DOCUMENT);
     expect(result.current.completeness).toEqual({ complete: false, missing: ["photos"] });
-    expect(result.current.tips).toEqual(["few_photos"]);
     expect(result.current.dirty).toBe(false);
   });
 
@@ -97,7 +95,7 @@ describe("useProfile: reading", () => {
     const reads = [
       () => json(stored(DOCUMENT)),
       () => refusal("internal_error", 500),
-      () => json(stored({ ...DOCUMENT, displayName: "Aino K." }, ["blurry"])),
+      () => json(stored({ ...DOCUMENT, displayName: "Aino K." })),
     ];
     serve(reads);
     const { result } = await ready();
@@ -106,7 +104,6 @@ describe("useProfile: reading", () => {
     expect(result.current.draft.displayName).toBe("Aino");
     await act(async () => result.current.reload());
     expect(result.current.draft.displayName).toBe("Aino K.");
-    expect(result.current.tips).toEqual(["blurry"]);
   });
 });
 
@@ -128,10 +125,7 @@ describe("useProfile: editing and saving", () => {
   it("saves the name and bio trimmed, a blank bio as none, and only the answered prompts", async () => {
     const saved = serve(
       [() => json(stored(DOCUMENT))],
-      [
-        () =>
-          json(stored({ ...DOCUMENT, displayName: "Aino", bio: null, prompts: [] }, ["blurry"])),
-      ],
+      [() => json(stored({ ...DOCUMENT, displayName: "Aino", bio: null, prompts: [] }))],
     );
     const { result } = await ready();
     await act(async () =>
@@ -157,7 +151,6 @@ describe("useProfile: editing and saving", () => {
     // The stored document replaces the draft: nothing left to lose.
     expect(result.current.draft).toMatchObject({ bio: null, prompts: [] });
     expect(result.current.dirty).toBe(false);
-    expect(result.current.tips).toEqual(["blurry"]);
     expect(result.current.saving).toBe(false);
   });
 

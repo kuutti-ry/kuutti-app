@@ -4,6 +4,7 @@ import {
   CardPreviewResponse,
   HOBBIES,
   Photo,
+  PhotoList,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
   ProfileResponse,
@@ -94,8 +95,6 @@ describe("profile routes", () => {
       complete: false,
       missing: ["display_name", "photos", "bio_or_prompts", "seeks", "age_window"],
     });
-    // Photos are missing; a tip would say it twice.
-    expect(body.tips).toEqual([]);
   });
 
   test("PUT /profile saves the whole document and answers it back with its completeness", async ({
@@ -116,7 +115,6 @@ describe("profile routes", () => {
     });
     // Two prompts stand in for the bio; photos and onboarding are still missing.
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
-    expect(body.tips).toEqual([]);
     const again = await put(app, a.headers, { ...update, displayName: "Aino V.", prompts: [] });
     const answered = ProfileResponse.parse(await again.json());
     expect(answered.profile?.displayName).toBe("Aino V.");
@@ -163,7 +161,8 @@ describe("profile routes", () => {
       { ...update, fields: { ...update.fields, smoking: "cigars" } },
       { ...update, fields: { ...update.fields, religion: "x" } },
       { ...update, fields: { ...update.fields, languages: ["fi", "xx"] } },
-      { ...update, fields: { ...update.fields, height: 139 } },
+      { ...update, fields: { ...update.fields, height: 89 } },
+      { ...update, fields: { ...update.fields, height: 261 } },
       // As many hobbies as one likes (#239), but each once.
       { ...update, fields: { ...update.fields, hobbies: [HOBBIES[0], HOBBIES[0]] } },
       { ...update, fields: { ...update.fields, campus: "Otaniemi" } },
@@ -180,6 +179,18 @@ describe("profile routes", () => {
       const response = await put(app, a.headers, body);
       expect(response.status, JSON.stringify(body)).toBe(400);
       expect(await errorCode(response)).toBe("validation_failed");
+    }
+  });
+
+  test("PUT /profile takes a height from 90 to 260 cm, both ends included (#287)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    for (const height of [90, 260]) {
+      const saved = await put(app, a.headers, { ...update, fields: { ...update.fields, height } });
+      expect(saved.status, String(height)).toBe(200);
+      expect(ProfileResponse.parse(await saved.json()).profile?.fields.height).toBe(height);
     }
   });
 
@@ -437,7 +448,7 @@ describe("profile routes", () => {
     expect(body.card?.pond).toBeNull();
     expect(body.completeness.missing).toEqual(["photos", "seeks", "age_window"]);
     // The pending upload becomes the second approved photo: enough for
-    // completeness on photos; the tip for one more is on GET /profile.
+    // completeness on photos; the tip for one more is on GET /photos (#287).
     await ctx.client.query("UPDATE photo SET state = 'approved' WHERE account_id = $1", [
       a.accountId,
     ]);
@@ -445,69 +456,22 @@ describe("profile routes", () => {
       CardPreviewResponse.parse(
         await (await app.request("/profile/card", { headers: a.headers })).json(),
       );
-    const profile = async () =>
-      ProfileResponse.parse(await (await app.request("/profile", { headers: a.headers })).json());
+    const photoList = async () =>
+      PhotoList.parse(await (await app.request("/photos", { headers: a.headers })).json());
     const two = await preview();
     expect(two.card?.photos).toHaveLength(2);
     expect(two.completeness.missing).toEqual(["seeks", "age_window"]);
-    expect((await profile()).tips).toEqual(["few_photos"]);
+    expect((await photoList()).tips).toEqual(["few_photos"]);
     // A third clears it.
     await approvedPhotos(ctx, app, a.headers, 1);
     const three = await preview();
     expect(three.card?.photos).toHaveLength(3);
-    expect((await profile()).tips).toEqual([]);
+    expect((await photoList()).tips).toEqual([]);
     // A preview records nothing.
     const { rows } = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = $1", [
       a.accountId,
     ]);
     expect(rows).toHaveLength(0);
-  });
-
-  test("GET /profile answers a label tip from photo_review against matching_config", async ({
-    ctx,
-  }) => {
-    const { app } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
-    const ids = await approvedPhotos(ctx, app, a.headers, 2);
-    for (const id of ids) {
-      await ctx.client.query(
-        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
-         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
-        [id, JSON.stringify([{ name: "Sunglasses", parentName: "Face", confidence: 80 }])],
-      );
-    }
-    const body = ProfileResponse.parse(
-      await (await app.request("/profile", { headers: a.headers })).json(),
-    );
-    expect(body.tips).toEqual(["sunglasses", "few_photos"]);
-  });
-
-  test("GET /profile names the fish of the fish tip, a local one only, and says null otherwise (#253)", async ({
-    ctx,
-  }) => {
-    const { app } = await appWith(ctx);
-    const a = await signedInAccount(ctx.client);
-    const [main, second] = await approvedPhotos(ctx, app, a.headers, 2);
-    const review = (id: string | undefined, labels: unknown[]) =>
-      ctx.client.query(
-        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
-         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
-        [id, JSON.stringify(labels)],
-      );
-    const read = async () => (await app.request("/profile", { headers: a.headers })).json();
-    // Sent as null, not left out: no fish yet.
-    expect((await read()).fishSpecies).toBeNull();
-    // What Rekognition said of the probe picture of a pike, and a tuna surer than the pike.
-    await review(main, [
-      { name: "Fish", parentName: "Animal", confidence: 94 },
-      { name: "Tuna", parentName: "Animal", confidence: 90 },
-      { name: "Pike", parentName: "Animal", confidence: 76.5 },
-      { name: "Cod", parentName: "Animal", confidence: 55.6 },
-    ]);
-    await review(second, []);
-    const body = ProfileResponse.parse(await read());
-    expect(body.tips).toContain("fish");
-    expect(body.fishSpecies).toBe("pike");
   });
 
   test("the card for another viewer: a complete subject is served and recorded, an incomplete or deleted one is not, and the day has a budget", async ({

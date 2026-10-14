@@ -1,10 +1,4 @@
-import type {
-  Completeness,
-  FishSpecies,
-  ProfileDocument,
-  ProfileUpdate,
-  TipKind,
-} from "@kuutti/schema";
+import type { Completeness, ProfileDocument, ProfileUpdate } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
@@ -46,10 +40,8 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
  * The person's profile as a draft they edit and save whole (#47): the API
  * stores the document, answers it back with what is still missing, and the
  * screen shows both. A prompt without an answer yet is kept in the draft and
- * left out of the save. The tips of #56 ride along and refresh with each
- * read (the list of #227 reloads after a section or photos change). Given a
- * held draft, the first read puts it back over the stored document, with the
- * reason it was refused.
+ * left out of the save. Given a held draft, the first read puts it back over
+ * the stored document, with the reason it was refused.
  */
 export function useProfile(held?: HeldDraft) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -59,8 +51,6 @@ export function useProfile(held?: HeldDraft) {
   /** The document as the API last gave it, in the draft's shape. */
   const [saved, setSaved] = useState<ProfileUpdate>(EMPTY_PROFILE);
   const [completeness, setCompleteness] = useState<Completeness | null>(null);
-  const [tips, setTips] = useState<readonly TipKind[]>([]);
-  const [fishSpecies, setFishSpecies] = useState<FishSpecies | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<ProfileNotice>(null);
   const mounted = useRef(true);
@@ -87,8 +77,6 @@ export function useProfile(held?: HeldDraft) {
       setSaved(document);
       if (resumed) setNotice(resumed.notice);
       setCompleteness(response.completeness);
-      setTips(response.tips);
-      setFishSpecies(response.fishSpecies);
       setError(null);
       setStatus("ready");
     } catch (failure) {
@@ -134,8 +122,6 @@ export function useProfile(held?: HeldDraft) {
         setDraft((current) => (current === submitted ? document : current));
       }
       setCompleteness(response.completeness);
-      setTips(response.tips);
-      setFishSpecies(response.fishSpecies);
       return null;
     } catch (error) {
       const refusal = {
@@ -158,8 +144,6 @@ export function useProfile(held?: HeldDraft) {
     draft,
     saved,
     completeness,
-    tips,
-    fishSpecies,
     saving,
     notice,
     dirty,

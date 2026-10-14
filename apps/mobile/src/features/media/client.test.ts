@@ -7,6 +7,7 @@ import {
   deletePhoto,
   fetchPhotoUrl,
   listPhotos,
+  readPhotoList,
   reorderPhotos,
   uploadPhoto,
 } from "./client";
@@ -150,7 +151,7 @@ describe("the photo routes", () => {
   });
 
   it("lists the photos, and fails a refusal with its code", async () => {
-    const list = { photos: [stored], maxPhotos: 6 };
+    const list = { photos: [stored], maxPhotos: 6, tips: [], fishSpecies: null };
     answering(json(list), refusal("internal_error", 500));
     expect(await listPhotos()).toEqual(list);
     await expect(listPhotos()).rejects.toMatchObject({
@@ -183,7 +184,7 @@ describe("the photo routes", () => {
   });
 
   it("sends a new order, answers the renumbered list, and fails a refusal", async () => {
-    const list = { photos: [stored], maxPhotos: 6 };
+    const list = { photos: [stored], maxPhotos: 6, tips: [], fishSpecies: null };
     const seen = answering(json(list), refusal("photo_order_invalid", 422));
     expect(await reorderPhotos([stored.id])).toEqual(list);
     expect(JSON.parse(await (seen[0] as Request).text())).toEqual({ order: [stored.id] });
@@ -305,5 +306,33 @@ describe("uploading a photo, the rest of the way", () => {
     expect(parts).toHaveLength(1);
     expect(parts[0]).toMatchObject({ fieldName: "photo" });
     expect(parts[0]?.uri).not.toBe(picked.uri);
+  });
+});
+
+describe("readPhotoList", () => {
+  const answer = { photos: [], maxPhotos: 3 };
+
+  it("leaves out tip kinds this build does not know, and keeps the known ones in order (#287)", () => {
+    expect(
+      readPhotoList({ ...answer, tips: ["a_later_kind", "fish", "another_one", "few_photos"] })
+        .tips,
+    ).toEqual(["fish", "few_photos"]);
+    expect(readPhotoList({ ...answer, tips: [] }).tips).toEqual([]);
+    expect(readPhotoList({ ...answer, tips: [] }).fishSpecies).toBeNull();
+  });
+
+  it("names no fish it cannot name, and keeps the plain fish tip", () => {
+    const read = readPhotoList({ ...answer, tips: ["fish"], fishSpecies: "whitefish" });
+    expect(read.tips).toEqual(["fish"]);
+    expect(read.fishSpecies).toBeNull();
+    expect(readPhotoList({ ...answer, tips: ["fish"], fishSpecies: "pike" }).fishSpecies).toBe(
+      "pike",
+    );
+  });
+
+  it("still refuses an answer that is not the contract, tips or not", () => {
+    expect(() => readPhotoList({ ...answer, tips: "fish" })).toThrow();
+    expect(() => readPhotoList({ photos: [], tips: ["fish"] })).toThrow();
+    expect(() => readPhotoList(null)).toThrow();
   });
 });

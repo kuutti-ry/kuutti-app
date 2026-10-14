@@ -1,6 +1,7 @@
 # The language choice in Settings changes the app's language at once, and
 # the phone's language takes it back (#164, the first feature flow; the
 # texts are those of packages/i18n/messages.yaml in all three languages).
+# The language has a screen behind its row (#287).
 appId: fi.kuutti.app
 name: The language choice in Settings changes the app's language at once
 ---
@@ -9,15 +10,20 @@ name: The language choice in Settings changes the app's language at once
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
+# The row says the language chosen, which Maestro reads after its title.
+- tapOn: "(Language|Kieli|Språk)(, .*)?"
+- extendedWaitUntil:
+    visible: ".*Suomi.*"
+    timeout: 15000
 - tapOn: ".*Suomi.*"
-- assertVisible: "Asetukset"
 - assertVisible: "Kieli"
+- assertVisible: ".*✓.*Suomi.*"
 - tapOn: ".*Svenska.*"
-- assertVisible: "Inställningar"
 - assertVisible: "Språk"
 - tapOn: ".*English.*"
-- assertVisible: "Settings"
 - assertVisible: "Language"
 # Back to the phone's language, so the next flow finds the app as a person would.
 - tapOn: "Phone's language"
+- assertVisible: "Language|Kieli|Språk"
+- tapOn: "Back|Takaisin|Tillbaka"
 - assertVisible: "Settings|Asetukset|Inställningar"

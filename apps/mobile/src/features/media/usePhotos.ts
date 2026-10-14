@@ -65,7 +65,31 @@ export function usePhotos() {
     void reload();
   }, [reload]);
 
+  /**
+   * Changes started so far: upload, removal, appeal, reorder. A read after a
+   * change applies its answer only when no later change has started since,
+   * so a slow answer never puts back an order or a photo the person has just
+   * moved or removed.
+   */
+  const changes = useRef(0);
+
+  /**
+   * The list again after a change, for the tips that ride on it (#287): what
+   * the check decided, a photo gone or one in review changes them. A read
+   * that fails keeps the list as it is; the change itself went through.
+   */
+  const refresh = useCallback(() => {
+    const seen = changes.current;
+    return listPhotos().then(
+      (list) => {
+        if (changes.current === seen) update({ list });
+      },
+      () => undefined,
+    );
+  }, [update]);
+
   const add = useCallback(async () => {
+    changes.current += 1;
     update({ busy: { kind: "picking" }, notice: null });
     try {
       const picked = await pickPhoto();
@@ -91,12 +115,14 @@ export function usePhotos() {
           : previous.list,
       }));
     } catch (error) {
-      update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+      return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
     }
-  }, [update]);
+    await refresh();
+  }, [update, refresh]);
 
   const remove = useCallback(
     async (id: string) => {
+      changes.current += 1;
       update({ busy: { kind: "removing", id }, notice: null });
       try {
         await deletePhoto(id);
@@ -111,15 +137,17 @@ export function usePhotos() {
             : null,
         }));
       } catch (error) {
-        update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
       }
+      await refresh();
     },
-    [update],
+    [update, refresh],
   );
 
   // The check's rejection to a person (#253): the photo comes back queued, in its place.
   const appeal = useCallback(
     async (id: string) => {
+      changes.current += 1;
       update({ busy: { kind: "appealing", id }, notice: null });
       try {
         const photo = await appealPhoto(id);
@@ -134,16 +162,18 @@ export function usePhotos() {
             : null,
         }));
       } catch (error) {
-        update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
+        return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
       }
+      await refresh();
     },
-    [update],
+    [update, refresh],
   );
 
   const reorder = useCallback(
     async (photos: Photo[]) => {
       const before = state.list;
       if (!before) return;
+      changes.current += 1;
       update({ busy: { kind: "reordering" }, notice: null, list: renumber(before, photos) });
       try {
         const list = await reorderPhotos(photos.map((p) => p.id));

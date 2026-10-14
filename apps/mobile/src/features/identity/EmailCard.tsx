@@ -1,8 +1,9 @@
 import { EMAIL_MAX } from "@kuutti/schema";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,8 +20,10 @@ type Notice = "saved" | "invalid" | "failed" | null;
 /**
  * The optional e-mail (#148, TD-18) as a card: the honest reason first, the
  * address, save and remove. Never shown to anybody else and never a login;
- * the API keeps it out of every log line. On the settings sheet, and as the
- * last of the later screens.
+ * the API keeps it out of every log line. On its own screen in Settings
+ * (#287), and as the last of the later screens. While the address is being
+ * read it says so, and a read that failed says why, with a way to read it
+ * again; nothing for a signed-out device.
  */
 export function EmailCard() {
   const { t } = useT();
@@ -28,28 +31,50 @@ export function EmailCard() {
   const tap = useHapticTap();
   const signedIn = session.status === "signed-in";
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
+  const [error, setError] = useState<unknown>(null);
   const [stored, setStored] = useState<string | null>(null);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
 
+  const mounted = useRef(true);
   useEffect(() => {
-    if (!signedIn) return;
-    let live = true;
-    fetchEmail()
-      .then((email) => {
-        if (!live) return;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const read = useCallback(() => {
+    setState("loading");
+    fetchEmail().then(
+      (email) => {
+        if (!mounted.current) return;
         setStored(email);
         setTyped(email ?? "");
         setState("ready");
-      })
-      .catch(() => live && setState("unavailable"));
-    return () => {
-      live = false;
-    };
-  }, [signedIn]);
+      },
+      (failure: unknown) => {
+        if (!mounted.current) return;
+        setError(failure);
+        setState("unavailable");
+      },
+    );
+  }, []);
+  useEffect(() => {
+    if (signedIn) read();
+  }, [signedIn, read]);
 
-  if (!signedIn || state !== "ready") return null;
+  if (!signedIn) return null;
+  if (state === "loading") {
+    return (
+      <Text variant="muted" accessibilityLiveRegion="polite">
+        {t("account.email.loading")}
+      </Text>
+    );
+  }
+  if (state === "unavailable") {
+    return <LoadFailed headline={t("account.email.loadFailed")} error={error} onRetry={read} />;
+  }
 
   const run = async (call: () => Promise<string | null>) => {
     setBusy(true);

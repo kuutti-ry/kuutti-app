@@ -21,7 +21,16 @@ import ProfileRoute from "../app/profile/index";
 import LaterFieldRoute from "../app/profile/later/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
-import SettingsRoute from "../app/settings";
+import AccountSettingsRoute from "../app/settings/account";
+import ConsentRoute from "../app/settings/consent/[kind]";
+import DeviceRoute from "../app/settings/device";
+import EmailSettingsRoute from "../app/settings/email";
+import SettingsRoute from "../app/settings/index";
+import LanguageRoute from "../app/settings/language";
+import LegalRoute from "../app/settings/legal/[kind]";
+import LicensesRoute from "../app/settings/licenses";
+import SourceRoute from "../app/settings/source";
+import ThemeRoute from "../app/settings/theme";
 import TechRoute from "../app/tech";
 
 // The route files of app/ (rules/layout.md: routes only, thin): each renders
@@ -80,7 +89,21 @@ jest.mock("@/features/settings", () => {
   const { Text } = require("react-native") as typeof import("react-native");
   const probe = (name: string) => (props: object) =>
     createElement(Text, { testID: name }, JSON.stringify(props));
-  return { SettingsScreen: probe("SettingsScreen"), TechConfigScreen: probe("TechConfigScreen") };
+  return {
+    AccountScreen: probe("AccountScreen"),
+    ConsentScreen: probe("ConsentScreen"),
+    consentKindOf: (value: unknown) => (value === "special_category" ? value : "research"),
+    DeviceScreen: probe("DeviceScreen"),
+    EmailSettingsScreen: probe("EmailSettingsScreen"),
+    LanguageScreen: probe("LanguageScreen"),
+    LegalScreen: probe("LegalScreen"),
+    legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
+    LicensesScreen: probe("LicensesScreen"),
+    SettingsScreen: probe("SettingsScreen"),
+    SourceScreen: probe("SourceScreen"),
+    TechConfigScreen: probe("TechConfigScreen"),
+    ThemeScreen: probe("ThemeScreen"),
+  };
 });
 
 /** The jest.setup.js stand-in for Expo Router, with what the route files need beyond it. */
@@ -91,8 +114,8 @@ const router = jest.requireMock("expo-router") as {
     Screen?: (props: object) => React.ReactElement;
   };
 };
-const params = (value: Record<string, string | string[] | undefined>) => {
-  router.useLocalSearchParams = () => value;
+const params = (value: Record<string, string | readonly string[] | undefined>) => {
+  router.useLocalSearchParams = () => value as Record<string, string | string[] | undefined>;
 };
 /** The props a stand-in screen was rendered with. */
 const propsOf = (name: string) =>
@@ -119,6 +142,13 @@ describe("the screens without params", () => {
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
+    ["/settings/account", AccountSettingsRoute, "AccountScreen"],
+    ["/settings/device", DeviceRoute, "DeviceScreen"],
+    ["/settings/email", EmailSettingsRoute, "EmailSettingsScreen"],
+    ["/settings/language", LanguageRoute, "LanguageScreen"],
+    ["/settings/licenses", LicensesRoute, "LicensesScreen"],
+    ["/settings/source", SourceRoute, "SourceScreen"],
+    ["/settings/theme", ThemeRoute, "ThemeScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);
@@ -187,6 +217,36 @@ describe("the profile's routes with a param", () => {
     params({});
     await render(<LaterFieldRoute />);
     expect(propsOf("LaterFieldScreen")).toEqual({ field: "" });
+  });
+
+  it.each([
+    [
+      "a consent's kind",
+      ConsentRoute,
+      "ConsentScreen",
+      { kind: "special_category" },
+      "special_category",
+    ],
+    [
+      "a consent's kind, the first of two",
+      ConsentRoute,
+      "ConsentScreen",
+      { kind: ["special_category", "research"] },
+      "special_category",
+    ],
+    ["the research consent for a link naming none", ConsentRoute, "ConsentScreen", {}, "research"],
+    [
+      "a legal text's kind, the first of two",
+      LegalRoute,
+      "LegalScreen",
+      { kind: ["privacy", "terms"] },
+      "privacy",
+    ],
+    ["the terms for a link naming no text", LegalRoute, "LegalScreen", {}, "terms"],
+  ] as const)("hands %s to its screen (#287)", async (_what, Route, name, given, kind) => {
+    params({ ...given });
+    await render(<Route />);
+    expect(propsOf(name)).toEqual({ kind });
   });
 
   it("hands a section's id to its screen, and an empty one when the link has none", async () => {

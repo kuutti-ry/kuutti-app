@@ -1,11 +1,10 @@
-import type { TipKind } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Eye from "lucide-react-native/icons/eye";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,26 +12,14 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { listPhotos } from "@/features/media";
 import { useT } from "@/lib/locale";
-import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
-import { completenessText, tipText } from "./keys";
+import { completenessText } from "./keys";
 import { FIRST_LATER_FIELD, laterPath, laterProgress } from "./later/LaterFieldScreen";
 import { type MarkStyle, ProgressMark, progressWords } from "./ProgressMark";
 import { isDone, type Progress, photoProgress, sectionProgress } from "./progress";
 import { PROFILE_SECTIONS, sectionPath, sectionSummaryKey, sectionTitleKey } from "./sections";
 import { useProfile } from "./useProfile";
-
-type Row = {
-  key: string;
-  title: string;
-  summary?: string;
-  /** How far the part is filled, when it is one the person fills (#239). */
-  progress?: Progress;
-  /** What a screen reader hears for it, when the section's words do not fit (the photos are approved, not answered). */
-  progressText?: string;
-  onPress: () => void;
-};
 
 /**
  * Both marks side by side until the maintainer picks one (#239): a ring on
@@ -41,44 +28,20 @@ type Row = {
  */
 const markStyle = (index: number): MarkStyle => (index % 2 === 0 ? "ring" : "count");
 
-/**
- * One group of rows, each a button that opens a screen: the title names it,
- * the summary says what is in it (a screen reader hears it as the hint), the
- * mark says how far it is filled (heard as the value, in words), and the
- * chevron says it opens. The label stays the title alone, so a row is found
- * by its name whatever its state.
- */
-function RowGroup({ rows }: { rows: readonly Row[] }) {
-  const { t } = useT();
-  return (
-    <Card className="gap-0 py-0">
-      {rows.map((row, index) => (
-        <Button
-          key={row.key}
-          variant="ghost"
-          accessibilityLabel={row.title}
-          accessibilityHint={row.summary}
-          accessibilityValue={
-            row.progress && { text: row.progressText ?? progressWords(t, row.progress) }
-          }
-          className={cn(
-            "justify-between gap-3 rounded-none px-4 py-3",
-            index < rows.length - 1 && "border-b border-border",
-          )}
-          onPress={row.onPress}
-        >
-          <View className="flex-1 gap-0.5">
-            <Text>{row.title}</Text>
-            {row.summary && (
-              <Text className="text-sm font-normal text-muted-foreground">{row.summary}</Text>
-            )}
-          </View>
-          {row.progress && <ProgressMark progress={row.progress} style={markStyle(index)} />}
-          <Icon as={ChevronRight} className="text-muted-foreground" />
-        </Button>
-      ))}
-    </Card>
-  );
+/** A row of the profile's list with how far its part is filled: the mark drawn, the words heard. */
+function filled(
+  t: ReturnType<typeof useT>["t"],
+  row: Row,
+  index: number,
+  progress: Progress | null | undefined,
+  words?: string,
+): Row {
+  if (!progress) return row;
+  return {
+    ...row,
+    mark: <ProgressMark progress={progress} style={markStyle(index)} />,
+    value: words ?? progressWords(t, progress),
+  };
 }
 
 /**
@@ -98,16 +61,9 @@ function useApprovedPhotos(): [number | null, () => void] {
 }
 
 /**
- * Tips dismissed in this run of the app (#56): kept outside the screen, so
- * leaving the profile and coming back does not bring one back. Nothing is
- * stored; the next start shows them again.
- */
-const dismissedTips = new Set<TipKind>();
-
-/**
  * The profile as a list (#227, ADR-009, ADR-019): the eye at the top that
  * opens the card as others see it, what the card still needs (said only
- * while something is missing, #239), one advisory photo tip (#56), then the
+ * while something is missing, #239), then the
  * profile's parts, each with how far it is filled: the photos, the sections
  * (each its own screen that saves on leaving), the deal-breakers (#149) and,
  * while a later question is unanswered, the later screens (#148). Nothing is
@@ -121,8 +77,6 @@ export function ProfileScreen() {
   const profile = useProfile();
   const { reload } = profile;
   const [approvedPhotos, readPhotos] = useApprovedPhotos();
-  // Renders again after a dismissal; the kinds themselves are in dismissedTips.
-  const [, setDismissals] = useState(0);
   // The first focus is the mount, which the hook reads already.
   const shown = useRef(false);
   useFocusEffect(
@@ -136,9 +90,6 @@ export function ProfileScreen() {
     tap();
     router.push(path);
   };
-  // One at a time (#56): the first that applies and was not dismissed.
-  const tip = profile.tips.find((kind) => !dismissedTips.has(kind)) ?? null;
-
   if (profile.status === "loading") {
     return (
       <SafeAreaView className="flex-1 bg-background">
@@ -200,46 +151,33 @@ export function ProfileScreen() {
           </Card>
         )}
 
-        {tip && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("profile.tip.title")}</CardTitle>
-            </CardHeader>
-            <CardContent className="gap-3">
-              <Text>{tipText(t, tip, profile.fishSpecies)}</Text>
-              <Button
-                variant="outline"
-                onPress={() => {
-                  tap();
-                  dismissedTips.add(tip);
-                  setDismissals((n) => n + 1);
-                }}
-              >
-                {t("profile.tip.dismiss")}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
         <RowGroup
           rows={[
-            {
-              key: "photos",
-              title: t("profile.section.photos.title"),
-              summary: t("profile.section.photos.summary"),
-              progress: photos,
-              progressText:
-                photos && !isDone(photos) ? t("profile.progress.photos", photos) : undefined,
-              onPress: open("/photos"),
-            },
-            ...PROFILE_SECTIONS.map(
-              (section): Row => ({
-                key: section.id,
-                title: t(sectionTitleKey(section.id)),
-                summary: t(sectionSummaryKey(section.id)),
-                progress: sectionProgress(section, profile.saved),
-                onPress: open(sectionPath(section.id)),
-              }),
+            filled(
+              t,
+              {
+                key: "photos",
+                title: t("profile.section.photos.title"),
+                summary: t("profile.section.photos.summary"),
+                onPress: open("/photos"),
+              },
+              0,
+              photos,
+              // The photos are approved, not answered: their own words for a screen reader.
+              photos && !isDone(photos) ? t("profile.progress.photos", photos) : undefined,
+            ),
+            ...PROFILE_SECTIONS.map((section, index) =>
+              filled(
+                t,
+                {
+                  key: section.id,
+                  title: t(sectionTitleKey(section.id)),
+                  summary: t(sectionSummaryKey(section.id)),
+                  onPress: open(sectionPath(section.id)),
+                },
+                index + 1,
+                sectionProgress(section, profile.saved),
+              ),
             ),
           ]}
         />

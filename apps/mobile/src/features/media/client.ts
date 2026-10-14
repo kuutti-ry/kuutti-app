@@ -1,9 +1,11 @@
 import {
   ErrorResponse,
+  FishSpecies,
   Photo,
   PhotoList,
   PhotoUrlResponse,
   type PhotoVariant,
+  TipKind,
 } from "@kuutti/schema";
 import { Platform } from "react-native";
 import { ApiError, api, apiBaseUrl } from "@/lib/api";
@@ -24,10 +26,26 @@ function failed(response: Response, error: unknown, what: string): ApiError {
   );
 }
 
+/**
+ * The list as the API sent it, less what this build has no words for: a tip
+ * kind it does not know is left out, and a fish it cannot name is no fish
+ * (the plain fish tip). A newer API's tip never locks an older app out of
+ * its own photos.
+ */
+export function readPhotoList(data: unknown): PhotoList {
+  const sent = data as { tips?: unknown; fishSpecies?: unknown } | null;
+  if (!sent || !Array.isArray(sent.tips)) return PhotoList.parse(data);
+  return PhotoList.parse({
+    ...sent,
+    tips: sent.tips.filter((kind) => TipKind.safeParse(kind).success),
+    fishSpecies: FishSpecies.safeParse(sent.fishSpecies).success ? sent.fishSpecies : null,
+  });
+}
+
 export async function listPhotos(): Promise<PhotoList> {
   const { data, error, response } = await api.GET("/photos");
   if (!data) throw failed(response, error, "photos");
-  return PhotoList.parse(data);
+  return readPhotoList(data);
 }
 
 export async function deletePhoto(id: string): Promise<void> {
@@ -47,7 +65,7 @@ export async function appealPhoto(id: string): Promise<Photo> {
 export async function reorderPhotos(order: string[]): Promise<PhotoList> {
   const { data, error, response } = await api.PUT("/photos/order", { body: { order } });
   if (!data) throw failed(response, error, "photo order");
-  return PhotoList.parse(data);
+  return readPhotoList(data);
 }
 
 /** A URL good for fifteen minutes; the caller caches by photoId/variant, never by the URL. */

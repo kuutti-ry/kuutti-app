@@ -42,7 +42,11 @@ const listRoute = createRoute({
   description: "In the owner's order, with the blurhash to paint before the bytes arrive.",
   ...bearer,
   responses: {
-    200: { description: "The caller's own photos.", ...json(PhotoList) },
+    200: {
+      description:
+        "The caller's own photos, with the advisory tips that apply to them, highest priority first (the app shows one at a time), and the fish the fish tip names, or null.",
+      ...json(PhotoList),
+    },
     401: unauthenticated,
   },
 });
@@ -111,7 +115,11 @@ const orderRoute = createRoute({
   ...bearer,
   request: { body: { required: true, ...json(PhotoOrderRequest) } },
   responses: {
-    200: { description: "The photos in the new order.", ...json(PhotoList) },
+    200: {
+      description:
+        "The photos in the new order, with the advisory tips that apply to them now that the main photo may have changed, highest priority first (the app shows one at a time), and the fish the fish tip names, or null.",
+      ...json(PhotoList),
+    },
     400: errorContent("Validation failed, or photo_order_invalid."),
     401: unauthenticated,
   },

@@ -991,7 +991,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The caller's own photos. */
+                /** @description The caller's own photos, with the advisory tips that apply to them, highest priority first (the app shows one at a time), and the fish the fish tip names, or null. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1274,7 +1274,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description The photos in the new order. */
+                /** @description The photos in the new order, with the advisory tips that apply to them now that the main photo may have changed, highest priority first (the app shows one at a time), and the fish the fish tip names, or null. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -1651,7 +1651,7 @@ export interface paths {
         };
         /**
          * The caller's profile and what it still needs
-         * @description The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the advisory tips for the owner that apply, highest priority first.
+         * @description The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).
          */
         get: {
             parameters: {
@@ -1699,7 +1699,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Saved; the profile as stored, with its completeness and its advisory tips. */
+                /** @description Saved; the profile as stored, with its completeness. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -2934,6 +2934,8 @@ export interface components {
             photos: components["schemas"]["Photo"][];
             /** @description matching_config max_photos. */
             maxPhotos: number;
+            tips: components["schemas"]["TipKind"][];
+            fishSpecies?: components["schemas"]["FishSpecies"];
         };
         Photo: {
             id: components["schemas"]["PhotoId"];
@@ -2956,6 +2958,13 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
         };
+        /** @enum {string} */
+        TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
+        /**
+         * @default null
+         * @enum {string|null}
+         */
+        FishSpecies: "pike" | "perch" | "salmon" | "trout" | "carp" | "eel" | "cod" | "herring" | "halibut" | null;
         PhotoUploadRequest: {
             /**
              * Format: binary
@@ -3016,8 +3025,6 @@ export interface components {
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];
-            tips: components["schemas"]["TipKind"][];
-            fishSpecies?: components["schemas"]["FishSpecies"];
         };
         Completeness: {
             complete: boolean;
@@ -3025,13 +3032,6 @@ export interface components {
         };
         /** @enum {string} */
         CompletenessItem: "display_name" | "photos" | "bio_or_prompts" | "seeks" | "age_window";
-        /** @enum {string} */
-        TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
-        /**
-         * @default null
-         * @enum {string|null}
-         */
-        FishSpecies: "pike" | "perch" | "salmon" | "trout" | "carp" | "eel" | "cod" | "herring" | "halibut" | null;
         ProfileUpdate: {
             displayName: string;
             bio: string | null;

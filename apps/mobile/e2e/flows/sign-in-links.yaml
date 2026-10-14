@@ -17,18 +17,14 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# This device's session is under "Account", after the app's settings (#170); the
-# source card above it can arrive after the first scroll (common/sign-out.yaml).
-- retry:
-    maxRetries: 2
-    commands:
-      - scrollUntilVisible:
-          element: "This device|Tämä laite|Den här enheten"
-          centerElement: true
-          timeout: 60000
-      - extendedWaitUntil:
-          visible: "Log out|Kirjaudu ulos|Logga ut"
-          timeout: 5000
+# This device's session has a screen of its own, behind its row under "Account"
+# (#287), below the fold on a phone: scrolled to, then tapped.
+- scrollUntilVisible:
+    element: "This device|Tämä laite|Den här enheten"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "This device|Tämä laite|Den här enheten"
 - extendedWaitUntil:
     visible: "Log out|Kirjaudu ulos|Logga ut"
     timeout: 15000

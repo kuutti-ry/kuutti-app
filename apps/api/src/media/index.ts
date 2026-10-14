@@ -12,7 +12,6 @@ export {
   exportPhotos,
   type PhotoErasure,
 } from "./erasure.ts";
-export { fishSpeciesOf, isRevealing } from "./label-groups.ts";
 export {
   decideModeration,
   type Inspection,
@@ -30,8 +29,6 @@ export {
   type CardServed,
   listApprovedPhotos,
   listPhotos,
-  listPhotoTipInputs,
-  type PhotoTipInput,
   recordCardServed,
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";

@@ -526,13 +526,6 @@ profile.text.hint:
   sv: "Utan arbetsgivarens namn, högst {max, number} tecken."
   machine: { fi: true, sv: true }
 
-profile.number.hint:
-  en: "A whole number from {min, number} to {max, number}."
-  description: "Hint under a number field of the registry (the height, in centimetres)."
-  fi: "Kokonaisluku väliltä {min, number}–{max, number}."
-  sv: "Ett heltal från {min, number} till {max, number}."
-  machine: { fi: true, sv: true }
-
 profile.number.unset:
   en: "No answer yet"
   description: "Shown in a number stepper while the field has no value (#148)."
@@ -2488,7 +2481,7 @@ profile.completeness.age_window:
 
 profile.tip.title:
   en: "A tip for your photos"
-  description: "Heading of the advisory tip card on the profile screen (#56)."
+  description: "Heading of the advisory tip card on the photos screen (#56; there since #287)."
   fi: "Vinkki kuviisi"
   sv: "Ett tips för dina foton"
   machine: { fi: true, sv: true }
@@ -2701,7 +2694,7 @@ settings.open:
 
 settings.title:
   en: Settings
-  description: Title of the settings sheet.
+  description: "Title of the settings list."
   fi: Asetukset
   sv: Inställningar
   machine: { fi: true, sv: true }
@@ -2715,7 +2708,7 @@ settings.close:
 
 settings.theme.label:
   en: Theme
-  description: Settings sheet, name of the group of theme choices (system, light, dark).
+  description: "Settings, title of the theme row and of the screen with the theme choices (system, light, dark) and high contrast (#287)."
   fi: Teema
   sv: Tema
   machine: { fi: true, sv: true }
@@ -2750,14 +2743,14 @@ settings.selected:
 
 settings.highContrast:
   en: High contrast
-  description: Settings sheet, label of the switch for the high-contrast colours.
+  description: "Settings, on the theme screen: label of the switch for the high-contrast colours."
   fi: Suuri kontrasti
   sv: Hög kontrast
   machine: { fi: true, sv: true }
 
 settings.language.label:
   en: Language
-  description: Settings sheet, name of the group of language choices. The languages themselves show their own names (English, Suomi, Svenska) and are not messages.
+  description: "Settings, title of the language row and of the screen with the language choices (#287). The languages themselves show their own names (English, Suomi, Svenska) and are not messages."
   fi: Kieli
   sv: Språk
   machine: { fi: true, sv: true }
@@ -2771,14 +2764,14 @@ settings.language.system:
 
 about.source.title:
   en: Source code
-  description: Heading of the source-code offer that AGPL-3.0 section 13 requires, shown to every user of the app.
+  description: "Heading of the source-code offer that AGPL-3.0 section 13 requires, shown to every user: the title of its row and screen in Settings, and its heading on the tech config screen (#287)."
   fi: Lähdekoodi
   sv: Källkod
   machine: { fi: true, sv: true }
 
 about.source.body:
   en: "Kuutti is free software under the AGPL-3.0 licence, published at:"
-  description: Source-code offer (AGPL-3.0 section 13), the footer of the smoke screen. The commits of the API and of the app stand in their cards above; the web address follows on its own line.
+  description: "Source-code offer (AGPL-3.0 section 13), on its screen in Settings and on the tech config screen (#287); the web address follows on its own line."
   fi: "Kuutti on vapaa ohjelmisto, jonka lisenssi on AGPL-3.0, ja se on julkaistu osoitteessa:"
   sv: "Kuutti är fri programvara under licensen AGPL-3.0, publicerad på:"
   machine: { fi: true, sv: true }
@@ -3205,35 +3198,21 @@ signIn.tryAgain:
 
 settings.session.label:
   en: This device
-  description: Settings sheet, heading of the sign-out controls.
+  description: "Settings, title of the row and of the screen with the log-out buttons, under Account (#287)."
   fi: Tämä laite
   sv: Den här enheten
   machine: { fi: true, sv: true }
 
-settings.group.app:
-  en: "App settings"
-  description: "Settings, heading of the first group: theme, contrast, language, the consents and the source offer (#170, the S-Pankki grouping)."
-  fi: "Sovelluksen asetukset"
-  sv: "Appinställningar"
-  machine: { fi: true, sv: true }
-
 settings.group.account:
   en: "Account"
-  description: "Settings, heading of the second group: this device, the e-mail, the export, the break and the deletion (#170)."
+  description: "Settings, heading of the fourth section (#287): this device, the e-mail and the account."
   fi: "Tili"
   sv: "Konto"
   machine: { fi: true, sv: true }
 
-settings.consents.label:
-  en: "Your consents"
-  description: "Settings, heading above the research and sensitive-answers switches (#170)."
-  fi: "Suostumuksesi"
-  sv: "Dina samtycken"
-  machine: { fi: true, sv: true }
-
 settings.session.none:
   en: No session on this device.
-  description: Settings sheet, shown instead of the sign-out controls when the device is not signed in.
+  description: "Settings, shown on a screen whose setting needs a session when the device is not signed in (#287): this device, a consent, the e-mail, the account."
   fi: Tällä laitteella ei ole istuntoa.
   sv: Ingen session på den här enheten.
   machine: { fi: true, sv: true }
@@ -4207,7 +4186,7 @@ admin.forbidden:
 
 account.title:
   en: Your account
-  description: Home (smoke) screen, heading of the card with the data export and the deletion, until the profile gives it a home.
+  description: "Title of the row under Account in Settings and of the screen it opens, with the data export, the break and the deletion (#287)."
   fi: Tilisi
   sv: Ditt konto
   machine: { fi: true, sv: true }
@@ -4433,7 +4412,7 @@ account.break.back:
 
 account.research.label:
   en: "Take part in research"
-  description: "Label of the research opt-in switch on the account card (#46): on when the active research consent names the current wording."
+  description: "Label of the research opt-in switch on its screen in Settings (#46, #287): on when the active research consent names the current wording."
   fi: "Osallistu tutkimukseen"
   sv: "Delta i forskningen"
   machine: { fi: true, sv: true }
@@ -4454,28 +4433,28 @@ account.research.failed:
 
 account.specialCategory.label:
   en: "Store my sensitive answers"
-  description: "Label of the switch on the account card for the special-category consent (#146, ADR-019 §4)."
+  description: "Label of the switch for the special-category consent on its screen in Settings (#146, ADR-019 §4, #287)."
   fi: "Tallenna arkaluonteiset vastaukseni"
   sv: "Spara mina känsliga svar"
   machine: { fi: true, sv: true }
 
 account.specialCategory.explain:
   en: "Whom you seek, the parties you could vote for and your religion. Switching this off removes those answers and pauses matching; your profile stays, and you are asked whom you seek again before matching resumes."
-  description: "Explanation under the special-category switch of the account card (#146, #204): the one place the consent is withdrawn, with its consequence."
+  description: "Explanation under the special-category switch on its screen in Settings (#146, #204, #287): the one place the consent is withdrawn, with its consequence."
   fi: "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset ja keskeyttää yhdistämisen; profiilisi säilyy, ja sinulta kysytään uudelleen, kenen seuraa etsit, ennen kuin yhdistäminen jatkuu."
   sv: "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort och matchningen pausas; din profil finns kvar, och du får frågan om vem du söker igen innan matchningen fortsätter."
   machine: { fi: true, sv: true }
 
 account.email.title:
   en: "A way back in"
-  description: "Heading of the optional e-mail card (#148, TD-18)."
+  description: "Heading of the optional e-mail card (#148, TD-18), on the e-mail screen in Settings and the last of the later screens."
   fi: "Tie takaisin sisään"
   sv: "En väg tillbaka in"
   machine: { fi: true, sv: true }
 
 account.email.explain:
   en: "Optional. If a phone is lost, we can reach you here. Never shown to anyone, never a login, and nothing is sent to it yet."
-  description: "Explanation of the optional e-mail (#148): the honest reason, as the sheet asks."
+  description: "Explanation of the optional e-mail (#148): the honest reason, as the sheet asks; on the card under its heading."
   fi: "Vapaaehtoinen. Jos puhelin katoaa, tavoitamme sinut täältä. Ei näytetä kenellekään, ei koskaan kirjautumista varten, eikä tänne vielä lähetetä mitään."
   sv: "Frivilligt. Om en telefon tappas bort når vi dig här. Visas aldrig för någon, aldrig en inloggning, och inget skickas hit ännu."
   machine: { fi: true, sv: true }
@@ -4757,14 +4736,14 @@ home.welcomeBack:
 
 settings.back:
   en: "Back"
-  description: "Accessible name of the arrow button at the top of the settings screen that returns to the home screen."
+  description: "Accessible name of the arrow at the top of the settings list and of every screen a settings row opens: back to where it was opened (#287)."
   fi: "Takaisin"
   sv: "Tillbaka"
   machine: { fi: true, sv: true }
 
 settings.about.title:
   en: "About Kuutti"
-  description: "Settings screen, heading of the section with the source-code offer (AGPL-3.0 section 13)."
+  description: "Settings, heading of the section with the version, the source-code offer (AGPL-3.0 section 13) and the licences (#287)."
   fi: "Tietoja Kuutista"
   sv: "Om Kuutti"
   machine: { fi: true, sv: true }
@@ -4918,21 +4897,154 @@ tech.errorTest.sent:
 
 tech.licenses.title:
   en: "Licences of the packages"
-  description: "Tech config, heading of the list of the packages this build is made of, each with its licence."
+  description: "Title of the licences screen in Settings, in every build (#287): the packages this build is made of, each with its licence."
   fi: "Pakettien lisenssit"
   sv: "Paketens licenser"
   machine: { fi: true, sv: true }
 
-tech.licenses.show:
-  en: "{packages, plural, one {Show # package} other {Show # packages}}"
-  description: "Tech config button that opens the licence list. {packages} is the number of packages."
-  fi: "{packages, plural, one {Näytä # paketti} other {Näytä # pakettia}}"
-  sv: "{packages, plural, one {Visa # paket} other {Visa # paket}}"
+settings.section.appearance:
+  en: "Appearance and language"
+  description: "Settings, heading of the first section (#287): the theme row and the language row."
+  fi: "Ulkoasu ja kieli"
+  sv: "Utseende och språk"
   machine: { fi: true, sv: true }
 
-tech.licenses.hide:
-  en: "Hide the list"
-  description: "Tech config button that closes the licence list."
-  fi: "Piilota luettelo"
-  sv: "Dölj listan"
+settings.section.agreements:
+  en: "Legal"
+  description: "Settings, heading of the section with the two consents and the terms and privacy texts (#287)."
+  fi: "Oikeudellista"
+  sv: "Juridiskt"
+  machine: { fi: true, sv: true }
+
+settings.theme.withContrast:
+  en: "{theme}, high contrast"
+  description: "Summary of the theme row while high contrast is on (#287); {theme} is the chosen theme's name."
+  fi: "{theme}, suuri kontrasti"
+  sv: "{theme}, hög kontrast"
+  machine: { fi: true, sv: true }
+
+settings.version.label:
+  en: "Version"
+  description: "Title of the version row under About Kuutti (#287); the number stands at its right."
+  fi: "Versio"
+  sv: "Version"
+  machine: { fi: true, sv: true }
+
+settings.version.commit:
+  en: "Build {commit}"
+  description: "Summary of the version row: the app's git commit, seven characters (#287)."
+  fi: "Koontiversio {commit}"
+  sv: "Bygge {commit}"
+  machine: { fi: true, sv: true }
+
+settings.source.summary:
+  en: "Free software under the AGPL-3.0 licence"
+  description: "Summary of the source-code row under About Kuutti (#287); the row opens the offer of AGPL-3.0 section 13."
+  fi: "Vapaa ohjelmisto AGPL-3.0-lisenssillä"
+  sv: "Fri programvara under AGPL-3.0-licensen"
+  machine: { fi: true, sv: true }
+
+settings.licenses.label:
+  en: "Licences"
+  description: "Title of the row that opens the packages' licences (#287)."
+  fi: "Lisenssit"
+  sv: "Licenser"
+  machine: { fi: true, sv: true }
+
+settings.licenses.summary:
+  en: "{packages, plural, one {# package} other {# packages}} this build is made of"
+  description: "Summary of the licences row (#287); {packages} is how many packages the build bundles."
+  fi: "{packages, plural, one {# paketti, josta tämä koontiversio koostuu} other {# pakettia, joista tämä koontiversio koostuu}}"
+  sv: "{packages, plural, one {# paket} other {# paket}} som det här bygget består av"
+  machine: { fi: true, sv: true }
+
+settings.device.summary:
+  en: "Log out here, or everywhere"
+  description: "Summary of the row that opens this device's session (#287)."
+  fi: "Kirjaudu ulos täältä tai kaikkialta"
+  sv: "Logga ut här eller överallt"
+  machine: { fi: true, sv: true }
+
+settings.email.label:
+  en: "E-mail"
+  description: "Title of the row and the screen of the optional e-mail (#287); the card on the screen keeps its own words."
+  fi: "Sähköposti"
+  sv: "E-post"
+  machine: { fi: true, sv: true }
+
+settings.email.summary:
+  en: "A way back in, if a phone is lost"
+  description: "Summary of the row that opens the e-mail screen (#287)."
+  fi: "Paluutie, jos puhelin katoaa"
+  sv: "En väg tillbaka, om en telefon tappas bort"
+  machine: { fi: true, sv: true }
+
+settings.account.summary:
+  en: "Your data, a break, deletion"
+  description: "Summary of the row that opens the export, the break and the deletion (#287); the row and its screen are titled by account.title."
+  fi: "Tietosi, tauko, poisto"
+  sv: "Dina uppgifter, en paus, radering"
+  machine: { fi: true, sv: true }
+
+settings.research.title:
+  en: "Research"
+  description: "Settings, title of the research consent's row and of the screen with its switch (#287)."
+  fi: "Tutkimus"
+  sv: "Forskning"
+  machine: { fi: true, sv: true }
+
+settings.sensitive.title:
+  en: "Sensitive answers"
+  description: "Settings, title of the special-category consent's row and of the screen with its switch (#287)."
+  fi: "Arkaluonteiset vastaukset"
+  sv: "Känsliga svar"
+  machine: { fi: true, sv: true }
+
+settings.state.on:
+  en: "On"
+  description: "Settings, under a consent's row and heard as its value: the consent is given (#287)."
+  fi: "Päällä"
+  sv: "På"
+  machine: { fi: true, sv: true }
+
+settings.state.off:
+  en: "Off"
+  description: "Settings, under a consent's row and heard as its value: the consent is not given (#287)."
+  fi: "Pois"
+  sv: "Av"
+  machine: { fi: true, sv: true }
+
+settings.state.outdated:
+  en: "Update the app to change it"
+  description: "Settings, under a consent's row when the API's wording is newer than this app's: the switch is locked until the app is updated (#287)."
+  fi: "Päivitä sovellus muuttaaksesi tätä"
+  sv: "Uppdatera appen för att ändra det"
+  machine: { fi: true, sv: true }
+
+account.choices.loading:
+  en: "Reading your choice…"
+  description: "On a consent's screen in Settings while the consent is being read (#287)."
+  fi: "Luetaan valintaasi…"
+  sv: "Läser ditt val…"
+  machine: { fi: true, sv: true }
+
+account.choices.loadFailed:
+  en: "Your choice could not be read."
+  description: "Headline on a consent's screen in Settings when the consent could not be read; why, and a button to try again, follow (#287)."
+  fi: "Valintaasi ei voitu lukea."
+  sv: "Ditt val kunde inte läsas."
+  machine: { fi: true, sv: true }
+
+account.email.loading:
+  en: "Reading your e-mail address…"
+  description: "Where the e-mail card goes, while the address is being read (#287)."
+  fi: "Luetaan sähköpostiosoitettasi…"
+  sv: "Läser din e-postadress…"
+  machine: { fi: true, sv: true }
+
+account.email.loadFailed:
+  en: "Your e-mail address could not be read."
+  description: "Headline where the e-mail card goes, when the address could not be read; why, and a button to try again, follow (#287)."
+  fi: "Sähköpostiosoitettasi ei voitu lukea."
+  sv: "Din e-postadress kunde inte läsas."
   machine: { fi: true, sv: true }

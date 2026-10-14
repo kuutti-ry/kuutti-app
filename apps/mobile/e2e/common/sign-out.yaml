@@ -10,20 +10,19 @@ appId: fi.kuutti.app
       - extendedWaitUntil:
           visible: "Settings|Asetukset|Inställningar"
           timeout: 15000
-      # This device's session is under "Account", after the app's settings (#170):
-      # scroll to its heading, and once more if the screen moved meanwhile. The
-      # source card above it arrives when /health answers and pushes the section
-      # below the fold just after the first scroll found it (CI, 13/10/2026).
-      - retry:
-          maxRetries: 2
-          commands:
-            - scrollUntilVisible:
-                element: "This device|Tämä laite|Den här enheten"
-                centerElement: true
-                timeout: 60000
-            - extendedWaitUntil:
-                visible: "Log out|Kirjaudu ulos|Logga ut|No session on this device\\.|Tällä laitteella ei ole istuntoa\\.|Ingen session på den här enheten\\."
-                timeout: 5000
+      # This device's session has a screen of its own, behind its row under
+      # "Account" (#287), below the fold on a phone: scrolled to, then tapped.
+      # The row is there whatever the session is; its screen says when there
+      # is none.
+      - scrollUntilVisible:
+          element: "This device|Tämä laite|Den här enheten"
+          direction: DOWN
+          centerElement: true
+          timeout: 60000
+      - tapOn: "This device|Tämä laite|Den här enheten"
+      - extendedWaitUntil:
+          visible: "Log out|Kirjaudu ulos|Logga ut|No session on this device\\.|Tällä laitteella ei ole istuntoa\\.|Ingen session på den här enheten\\."
+          timeout: 15000
       # A session the reset erased is already gone: Settings says so and has no button.
       - runFlow:
           when:
