@@ -13,13 +13,11 @@ name: Deleting the account asks first, signs the person out, and the next login 
       PERSONA: Aino Virtanen
 # Settings is reachable before onboarding is done.
 - openLink: kuutti://settings
-- scrollUntilVisible:
-    element: "Delete my account|Poista tilini|Ta bort mitt konto"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-# The account card's own buttons, not its heading: on Android the card is
-# taller and centring the button puts the heading off the screen.
+# The deletion is on the account screen, behind its row (#287), last of its buttons.
+- tapOn: "Your account|Tilisi|Ditt konto"
+- extendedWaitUntil:
+    visible: "Delete my account|Poista tilini|Ta bort mitt konto"
+    timeout: 15000
 - assertVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 
 # Asked first; keeping the account deletes nothing.

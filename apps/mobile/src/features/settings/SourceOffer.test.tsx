@@ -12,9 +12,9 @@ const SOURCE = "https://codeberg.org/example/kuutti-fork";
 afterEach(() => jest.restoreAllMocks());
 
 describe("SourceOffer", () => {
-  it("says what the source is and shows its address as text", async () => {
+  it("says what the source is and shows its address as text, its screen carrying the title", async () => {
     await renderWithTheme(<SourceOffer source={SOURCE} />);
-    expect(screen.getByRole("header", { name: "Source code" })).toBeTruthy();
+    expect(screen.queryByRole("header")).toBeNull();
     expect(
       screen.getByText("Kuutti is free software under the AGPL-3.0 licence, published at:"),
     ).toBeTruthy();

@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Text } from "@/components/ui/text";
-import LICENSES from "@/generated/licenses.json";
 import { apiBaseUrl, fetchHealth } from "@/lib/api";
 import { appEnvironment, isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
@@ -40,7 +39,6 @@ export function TechConfigScreen() {
   const tap = useHapticTap();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [errorSent, setErrorSent] = useState(false);
-  const [licensesShown, setLicensesShown] = useState(false);
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -178,38 +176,14 @@ export function TechConfigScreen() {
               {errorSent && <Text variant="muted">{t("tech.errorTest.sent")}</Text>}
             </View>
 
-            {state.kind === "ok" && <SourceOffer source={state.health.source} />}
-
-            {/* The packages this build is made of, with their licences (scripts/licenses.ts). */}
-            <View className="w-full max-w-md gap-2">
-              <Text variant="small" accessibilityRole="header">
-                {t("tech.licenses.title")}
-              </Text>
-              <Button
-                variant="outline"
-                accessibilityLabel={
-                  licensesShown
-                    ? t("tech.licenses.hide")
-                    : t("tech.licenses.show", { packages: LICENSES.length })
-                }
-                onPress={() => {
-                  tap();
-                  setLicensesShown((shown) => !shown);
-                }}
-              >
-                <Text>
-                  {licensesShown
-                    ? t("tech.licenses.hide")
-                    : t("tech.licenses.show", { packages: LICENSES.length })}
+            {state.kind === "ok" && (
+              <View className="w-full max-w-md items-center gap-2">
+                <Text variant="small" accessibilityRole="header">
+                  {t("about.source.title")}
                 </Text>
-              </Button>
-              {licensesShown &&
-                LICENSES.map((entry) => (
-                  <Text key={`${entry.name}@${entry.version}`} variant="muted">
-                    {`${entry.name} ${entry.version} · ${entry.license}`}
-                  </Text>
-                ))}
-            </View>
+                <SourceOffer source={state.health.source} />
+              </View>
+            )}
           </>
         )}
       </ScrollView>

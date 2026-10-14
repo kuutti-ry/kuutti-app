@@ -12,15 +12,12 @@ import { useT } from "@/lib/locale";
  * on the screen and not in the dev settings sheet; it moves to the About
  * screen when product screens arrive (M3). The address is text as well as a
  * link, so the offer stands where no browser opens. The contract only admits
- * https URLs.
+ * https URLs. Its screen carries the title (#287).
  */
 export function SourceOffer({ source }: { source: string }) {
   const { t } = useT();
   return (
     <View className="w-full max-w-md items-center gap-2">
-      <Text variant="small" accessibilityRole="header">
-        {t("about.source.title")}
-      </Text>
       <Text variant="muted" className="text-center">
         {t("about.source.body")}
       </Text>

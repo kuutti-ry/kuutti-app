@@ -13,15 +13,14 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     env:
       PERSONA: Noa Salmi
 - openLink: kuutti://settings
-- scrollUntilVisible:
-    element: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+# The consent has a screen of its own, behind its row (#287).
+- tapOn: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
 # A switch's text, to Maestro, is its value ("1" on, "0" off), right of its words.
-- assertVisible:
-    text: "1|(Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar), on"
-    rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+- extendedWaitUntil:
+    visible:
+      text: "1|(Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar), on"
+      rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+    timeout: 15000
 - tapOn:
     text: "1|(Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar), on"
     rightOf: "Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"

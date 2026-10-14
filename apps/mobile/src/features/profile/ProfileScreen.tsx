@@ -1,10 +1,10 @@
 import { useFocusEffect, useRouter } from "expo-router";
-import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Eye from "lucide-react-native/icons/eye";
 import { useCallback, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
+import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,6 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { listPhotos } from "@/features/media";
 import { useT } from "@/lib/locale";
-import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 import { DEAL_BREAKERS_PATH } from "./DealBreakersScreen";
 import { completenessText } from "./keys";
@@ -22,17 +21,6 @@ import { isDone, type Progress, photoProgress, sectionProgress } from "./progres
 import { PROFILE_SECTIONS, sectionPath, sectionSummaryKey, sectionTitleKey } from "./sections";
 import { useProfile } from "./useProfile";
 
-type Row = {
-  key: string;
-  title: string;
-  summary?: string;
-  /** How far the part is filled, when it is one the person fills (#239). */
-  progress?: Progress;
-  /** What a screen reader hears for it, when the section's words do not fit (the photos are approved, not answered). */
-  progressText?: string;
-  onPress: () => void;
-};
-
 /**
  * Both marks side by side until the maintainer picks one (#239): a ring on
  * every other row, the count on the rest. The one he keeps stays, and this
@@ -40,44 +28,20 @@ type Row = {
  */
 const markStyle = (index: number): MarkStyle => (index % 2 === 0 ? "ring" : "count");
 
-/**
- * One group of rows, each a button that opens a screen: the title names it,
- * the summary says what is in it (a screen reader hears it as the hint), the
- * mark says how far it is filled (heard as the value, in words), and the
- * chevron says it opens. The label stays the title alone, so a row is found
- * by its name whatever its state.
- */
-function RowGroup({ rows }: { rows: readonly Row[] }) {
-  const { t } = useT();
-  return (
-    <Card className="gap-0 py-0">
-      {rows.map((row, index) => (
-        <Button
-          key={row.key}
-          variant="ghost"
-          accessibilityLabel={row.title}
-          accessibilityHint={row.summary}
-          accessibilityValue={
-            row.progress && { text: row.progressText ?? progressWords(t, row.progress) }
-          }
-          className={cn(
-            "justify-between gap-3 rounded-none px-4 py-3",
-            index < rows.length - 1 && "border-b border-border",
-          )}
-          onPress={row.onPress}
-        >
-          <View className="flex-1 gap-0.5">
-            <Text>{row.title}</Text>
-            {row.summary && (
-              <Text className="text-sm font-normal text-muted-foreground">{row.summary}</Text>
-            )}
-          </View>
-          {row.progress && <ProgressMark progress={row.progress} style={markStyle(index)} />}
-          <Icon as={ChevronRight} className="text-muted-foreground" />
-        </Button>
-      ))}
-    </Card>
-  );
+/** A row of the profile's list with how far its part is filled: the mark drawn, the words heard. */
+function filled(
+  t: ReturnType<typeof useT>["t"],
+  row: Row,
+  index: number,
+  progress: Progress | null | undefined,
+  words?: string,
+): Row {
+  if (!progress) return row;
+  return {
+    ...row,
+    mark: <ProgressMark progress={progress} style={markStyle(index)} />,
+    value: words ?? progressWords(t, progress),
+  };
 }
 
 /**
@@ -189,23 +153,31 @@ export function ProfileScreen() {
 
         <RowGroup
           rows={[
-            {
-              key: "photos",
-              title: t("profile.section.photos.title"),
-              summary: t("profile.section.photos.summary"),
-              progress: photos,
-              progressText:
-                photos && !isDone(photos) ? t("profile.progress.photos", photos) : undefined,
-              onPress: open("/photos"),
-            },
-            ...PROFILE_SECTIONS.map(
-              (section): Row => ({
-                key: section.id,
-                title: t(sectionTitleKey(section.id)),
-                summary: t(sectionSummaryKey(section.id)),
-                progress: sectionProgress(section, profile.saved),
-                onPress: open(sectionPath(section.id)),
-              }),
+            filled(
+              t,
+              {
+                key: "photos",
+                title: t("profile.section.photos.title"),
+                summary: t("profile.section.photos.summary"),
+                onPress: open("/photos"),
+              },
+              0,
+              photos,
+              // The photos are approved, not answered: their own words for a screen reader.
+              photos && !isDone(photos) ? t("profile.progress.photos", photos) : undefined,
+            ),
+            ...PROFILE_SECTIONS.map((section, index) =>
+              filled(
+                t,
+                {
+                  key: section.id,
+                  title: t(sectionTitleKey(section.id)),
+                  summary: t(sectionSummaryKey(section.id)),
+                  onPress: open(sectionPath(section.id)),
+                },
+                index + 1,
+                sectionProgress(section, profile.saved),
+              ),
             ),
           ]}
         />

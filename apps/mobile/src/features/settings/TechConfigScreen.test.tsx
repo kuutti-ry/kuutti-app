@@ -66,6 +66,7 @@ describe("the tech config screen", () => {
     await waitFor(() => expect(screen.getByText("git commit abc1234")).toBeTruthy());
     expect(screen.getByText("version 0.1.0")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Releases on GitHub" })).toBeNull();
+    expect(screen.getByRole("header", { name: "Source code" })).toBeTruthy();
     const user = userEvent.setup();
     await user.press(screen.getByRole("link", { name: "Open the source code in the browser" }));
     expect(open.mock.calls.map((c) => c[0])).toEqual(["https://github.com/kuutti-ry/kuutti-app"]);
@@ -90,16 +91,5 @@ describe("the tech config screen", () => {
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     expect((Sentry.captureException as jest.Mock).mock.calls[0]?.[0]).toBeInstanceOf(Error);
     expect(screen.getByText(/^Test error sent\./)).toBeTruthy();
-  });
-
-  it("lists the packages with their licences on request", async () => {
-    await renderWithTheme(<TechConfigScreen />);
-    await screen.findByText("git commit abc1234");
-    const user = userEvent.setup();
-    expect(screen.queryByText(/^expo \d/)).toBeNull();
-    await user.press(screen.getByRole("button", { name: /^Show \d+ packages$/ }));
-    expect(screen.getByText(/^expo \d.* · MIT$/)).toBeTruthy();
-    await user.press(screen.getByRole("button", { name: "Hide the list" }));
-    expect(screen.queryByText(/^expo \d/)).toBeNull();
   });
 });

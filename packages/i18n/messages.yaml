@@ -3203,25 +3203,11 @@ settings.session.label:
   sv: Den här enheten
   machine: { fi: true, sv: true }
 
-settings.group.app:
-  en: "App settings"
-  description: "Settings, heading of the first group: theme, contrast, language, the consents and the source offer (#170, the S-Pankki grouping)."
-  fi: "Sovelluksen asetukset"
-  sv: "Appinställningar"
-  machine: { fi: true, sv: true }
-
 settings.group.account:
   en: "Account"
   description: "Settings, heading of the second group: this device, the e-mail, the export, the break and the deletion (#170)."
   fi: "Tili"
   sv: "Konto"
-  machine: { fi: true, sv: true }
-
-settings.consents.label:
-  en: "Your consents"
-  description: "Settings, heading above the research and sensitive-answers switches (#170)."
-  fi: "Suostumuksesi"
-  sv: "Dina samtycken"
   machine: { fi: true, sv: true }
 
 settings.session.none:
@@ -4916,16 +4902,86 @@ tech.licenses.title:
   sv: "Paketens licenser"
   machine: { fi: true, sv: true }
 
-tech.licenses.show:
-  en: "{packages, plural, one {Show # package} other {Show # packages}}"
-  description: "Tech config button that opens the licence list. {packages} is the number of packages."
-  fi: "{packages, plural, one {Näytä # paketti} other {Näytä # pakettia}}"
-  sv: "{packages, plural, one {Visa # paket} other {Visa # paket}}"
+settings.section.appearance:
+  en: "Appearance and language"
+  description: "Settings, heading of the first section (#287): the theme row and the language row."
+  fi: "Ulkoasu ja kieli"
+  sv: "Utseende och språk"
   machine: { fi: true, sv: true }
 
-tech.licenses.hide:
-  en: "Hide the list"
-  description: "Tech config button that closes the licence list."
-  fi: "Piilota luettelo"
-  sv: "Dölj listan"
+settings.section.agreements:
+  en: "Legal"
+  description: "Settings, heading of the section with the two consents and the terms and privacy texts (#287)."
+  fi: "Oikeudellista"
+  sv: "Juridiskt"
+  machine: { fi: true, sv: true }
+
+settings.theme.withContrast:
+  en: "{theme}, high contrast"
+  description: "Summary of the theme row while high contrast is on (#287); {theme} is the chosen theme's name."
+  fi: "{theme}, suuri kontrasti"
+  sv: "{theme}, hög kontrast"
+  machine: { fi: true, sv: true }
+
+settings.version.label:
+  en: "Version"
+  description: "Title of the version row under About Kuutti (#287); the number stands at its right."
+  fi: "Versio"
+  sv: "Version"
+  machine: { fi: true, sv: true }
+
+settings.version.commit:
+  en: "Build {commit}"
+  description: "Summary of the version row: the app's git commit, seven characters (#287)."
+  fi: "Koontiversio {commit}"
+  sv: "Bygge {commit}"
+  machine: { fi: true, sv: true }
+
+settings.source.summary:
+  en: "Free software under the AGPL-3.0 licence"
+  description: "Summary of the source-code row under About Kuutti (#287); the row opens the offer of AGPL-3.0 section 13."
+  fi: "Vapaa ohjelmisto AGPL-3.0-lisenssillä"
+  sv: "Fri programvara under AGPL-3.0-licensen"
+  machine: { fi: true, sv: true }
+
+settings.licenses.label:
+  en: "Licences"
+  description: "Title of the row that opens the packages' licences (#287)."
+  fi: "Lisenssit"
+  sv: "Licenser"
+  machine: { fi: true, sv: true }
+
+settings.licenses.summary:
+  en: "{packages, plural, one {# package} other {# packages}} this build is made of"
+  description: "Summary of the licences row (#287); {packages} is how many packages the build bundles."
+  fi: "{packages, plural, one {# paketti} other {# pakettia}}, joista tämä versio koostuu"
+  sv: "{packages, plural, one {# paket} other {# paket}} som det här bygget består av"
+  machine: { fi: true, sv: true }
+
+settings.device.summary:
+  en: "Log out here, or everywhere"
+  description: "Summary of the row that opens this device's session (#287)."
+  fi: "Kirjaudu ulos täältä tai kaikkialta"
+  sv: "Logga ut här eller överallt"
+  machine: { fi: true, sv: true }
+
+settings.email.label:
+  en: "E-mail"
+  description: "Title of the row and the screen of the optional e-mail (#287); the card on the screen keeps its own words."
+  fi: "Sähköposti"
+  sv: "E-post"
+  machine: { fi: true, sv: true }
+
+settings.email.summary:
+  en: "A way back in, if a phone is lost"
+  description: "Summary of the row that opens the e-mail screen (#287)."
+  fi: "Paluutie, jos puhelin katoaa"
+  sv: "En väg tillbaka, om en telefon tappas bort"
+  machine: { fi: true, sv: true }
+
+settings.account.summary:
+  en: "Your data, a break, deletion"
+  description: "Summary of the row that opens the export, the break and the deletion (#287); the row and its screen are titled by account.title."
+  fi: "Tietosi, tauko, poisto"
+  sv: "Dina uppgifter, en paus, radering"
   machine: { fi: true, sv: true }

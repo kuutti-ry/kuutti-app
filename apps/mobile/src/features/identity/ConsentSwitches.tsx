@@ -116,11 +116,11 @@ function ConsentSwitch({
 }
 
 /**
- * The two withdrawable consents as switches, under "App settings" (#170, the
- * S-Pankki grouping): a choice about the app, not an action on the account.
- * Nothing for a signed-out device.
+ * The two withdrawable consents as switches, or one of them on its own screen
+ * (#170, #287): a choice about the app, not an action on the account. Nothing
+ * for a signed-out device.
  */
-export function ConsentSwitches() {
+export function ConsentSwitches({ only }: { only?: WithdrawableConsentKind } = {}) {
   const { t, locale } = useT();
   const session = useSession();
   const research = useConsentSwitch("research", session.status === "signed-in", locale);
@@ -128,16 +128,20 @@ export function ConsentSwitches() {
   if (session.status !== "signed-in") return null;
   return (
     <View className="gap-4">
-      <ConsentSwitch
-        consent={research}
-        label={t("account.research.label")}
-        explain={t("account.research.explain")}
-      />
-      <ConsentSwitch
-        consent={special}
-        label={t("account.specialCategory.label")}
-        explain={t("account.specialCategory.explain")}
-      />
+      {only !== "special_category" && (
+        <ConsentSwitch
+          consent={research}
+          label={t("account.research.label")}
+          explain={t("account.research.explain")}
+        />
+      )}
+      {only !== "research" && (
+        <ConsentSwitch
+          consent={special}
+          label={t("account.specialCategory.label")}
+          explain={t("account.specialCategory.explain")}
+        />
+      )}
     </View>
   );
 }

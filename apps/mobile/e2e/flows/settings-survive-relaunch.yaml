@@ -1,6 +1,8 @@
 # What the person chose in Settings stays across closing the app (#12, #55):
 # the session (no bank login again), the theme and the language. Sanna; the
-# flow ends on the system theme and the phone's language, as it began.
+# flow ends on the system theme and the phone's language, as it began. The
+# theme and the language each have a screen behind their row (#287), and the
+# row's summary says what is chosen.
 appId: fi.kuutti.app
 name: The session, the theme and the language survive closing and reopening the app
 ---
@@ -9,9 +11,20 @@ name: The session, the theme and the language survive closing and reopening the 
 - extendedWaitUntil:
     visible: "Theme|Teema|Tema"
     timeout: 15000
+- tapOn: "Theme|Teema|Tema"
+- extendedWaitUntil:
+    visible: "Dark|Tumma|Mörkt"
+    timeout: 15000
 - tapOn: "Dark|Tumma|Mörkt"
 - assertVisible: "✓ Dark|✓ Tumma|✓ Mörkt"
+- tapOn: "Back|Takaisin|Tillbaka"
+- tapOn: "Language|Kieli|Språk"
+- extendedWaitUntil:
+    visible: ".*Svenska.*"
+    timeout: 15000
 - tapOn: ".*Svenska.*"
+- assertVisible: "Språk"
+- tapOn: "Tillbaka"
 - assertVisible: "Inställningar"
 
 - stopApp
@@ -21,11 +34,14 @@ name: The session, the theme and the language survive closing and reopening the 
 - extendedWaitUntil:
     visible: "Inställningar"
     timeout: 15000
-- assertVisible: "✓ Mörkt"
-- assertVisible: ".*✓.*Svenska.*"
+- assertVisible: "Mörkt"
+- assertVisible: "Svenska"
 
 # Back as it began.
+- tapOn: "Tema"
 - tapOn: "System"
+- assertVisible: "✓ System"
+- tapOn: "Tillbaka"
+- tapOn: "Språk"
 - tapOn: "Telefonens språk"
-- assertVisible: "✓ System|✓ Järjestelmä"
 - assertVisible: "✓ Phone's language|✓ Puhelimen kieli|✓ Telefonens språk"

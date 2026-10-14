@@ -10,11 +10,11 @@ name: Download my data hands the person's file over
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
-- scrollUntilVisible:
-    element: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+# The export is on the account screen, behind its row (#287).
+- tapOn: "Your account|Tilisi|Ditt konto"
+- extendedWaitUntil:
+    visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    timeout: 15000
 - assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
 - tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 # The sheet, or the picker, covers the app.
@@ -35,11 +35,9 @@ name: Download my data hands the person's file over
       platform: Android
     commands:
       - back
-# Settings comes back scrolled to its top; the button is under Account again.
-- scrollUntilVisible:
-    element: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+# The account screen comes back, the button still on it.
+- extendedWaitUntil:
+    visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    timeout: 15000
 - assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."
 - assertNotVisible: "That is enough copies for today\\..*|Tältä päivältä kopioita on jo tarpeeksi\\..*|Det räcker med kopior för i dag\\..*"

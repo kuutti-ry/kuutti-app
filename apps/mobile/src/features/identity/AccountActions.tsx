@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Platform, Share, View } from "react-native";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -78,8 +78,9 @@ export async function shareExport(
 }
 
 /**
- * The account card (#51, ADR-007; #170, ADR-022), under "Account" in
- * Settings: the data export, the break and the deletion. The break has a
+ * The account card (#51, ADR-007; #170, ADR-022), on its own screen behind
+ * the "Your account" row of Settings (#287): the data export, the break and
+ * the deletion. The break has a
  * screen of its own with its consequences; deletion is a button behind a
  * confirmation that names the cooldown; never a swipe, never colour alone
  * (CLAUDE.md Accessibility).
@@ -126,9 +127,9 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
 
   return (
     <Card className="w-full max-w-md">
-      <View accessibilityLabel={t("account.title")} className="gap-6">
+      <View className="gap-6">
+        {/* The screen carries the title (#287); the card says what the export is. */}
         <CardHeader>
-          <CardTitle>{t("account.title")}</CardTitle>
           <CardDescription>{t("account.export.explain")}</CardDescription>
         </CardHeader>
         <CardContent className="gap-3">

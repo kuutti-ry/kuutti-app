@@ -1,5 +1,14 @@
 // Public surface of the settings slice in apps/mobile. Other slices import from here only.
 
+export { AccountScreen } from "./AccountScreen";
+export { ConsentScreen, consentKindOf } from "./ConsentScreen";
+export { DeviceScreen } from "./DeviceScreen";
+export { EmailSettingsScreen } from "./EmailSettingsScreen";
+export { LanguageScreen } from "./LanguageScreen";
+export { LegalScreen, legalKindOf } from "./LegalScreen";
+export { LicensesScreen } from "./LicensesScreen";
 export { SettingsScreen } from "./SettingsScreen";
 export { SourceOffer } from "./SourceOffer";
+export { SourceScreen } from "./SourceScreen";
 export { TechConfigScreen } from "./TechConfigScreen";
+export { ThemeScreen } from "./ThemeScreen";

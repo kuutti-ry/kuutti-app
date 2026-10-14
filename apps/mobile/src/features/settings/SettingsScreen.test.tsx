@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { clearSession, saveSession } from "@/lib/session";
@@ -7,27 +7,20 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SettingsScreen } from "./SettingsScreen";
 
+// The settings as a list of sections (#287): each row names a screen, says
+// what is chosen in it, and opens it; the account's rows need a person.
+
 // NativeWind's colour-scheme setter needs its compiled stylesheet, which the
 // test runner has none of: the provider's call is seen, not applied.
-const mockSetColorScheme = jest.fn();
 jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
-  useColorScheme: () => ({ colorScheme: "light", setColorScheme: mockSetColorScheme }),
+  useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
 }));
 
-const ok = {
-  status: "ok",
-  version: "0.0.0-test",
-  commit: "abc1234",
-  builtAt: "2026-09-13T00:00:00.000Z",
-  source: "https://github.com/kuutti-ry/kuutti-app",
-  db: "ok",
-  migrations: "current",
-};
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
-const { __router: router } = jest.requireMock("expo-router") as { __router: { back: jest.Mock } };
+const { __router: router } = jest.requireMock("expo-router") as {
+  __router: { back: jest.Mock; push: jest.Mock };
+};
 
 function deviceLanguage(...tags: string[]) {
   (useLocales as jest.Mock).mockReturnValue(tags.map((languageTag) => ({ languageTag })));
@@ -40,173 +33,135 @@ const tokens = {
   refreshToken: token("refresh"),
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
-const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+const row = (name: string) => screen.getByRole("button", { name });
+/** A press, and the screen settled after it, as the other screens' tests press. */
+const press = (element: ReturnType<typeof screen.getByRole>) =>
+  act(async () => {
+    fireEvent.press(element);
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+  });
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 beforeEach(async () => {
   store.clear();
   deviceLanguage("en-US");
   router.back.mockReset();
-  globalThis.fetch = jest.fn(async (input: Request | string) => {
-    const url = new URL(input instanceof Request ? input.url : input);
-    if (url.pathname === "/health") return json(ok);
-    if (url.pathname === "/consents") {
-      return json({
-        consents: [],
-        currentVersions: { terms: "t", privacy: "p", research: "r", special_category: "s" },
-      });
-    }
-    return json({ error: { code: "not_found" } }, 404);
-  }) as unknown as typeof fetch;
+  router.push.mockReset();
+  // The list reads nothing itself; the session behind it may, and gets an answer.
+  globalThis.fetch = jest.fn(async () =>
+    json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404),
+  ) as unknown as typeof fetch;
   await clearSession();
 });
 
 describe("the settings screen", () => {
-  it("keeps the title and the way back pinned above the settings", async () => {
+  it("keeps the title and the way back pinned above the list", async () => {
     await renderWithTheme(<SettingsScreen />);
     expectPinnedHeader("Settings", "Back");
+    await press(screen.getByRole("button", { name: "Back" }));
+    expect(router.back).toHaveBeenCalledTimes(1);
   });
 
-  it("renders in English on an English phone, with a way back and no accessibility problems", async () => {
+  it("lists the sections for a signed-out device, this device's row among them, with no accessibility problems", async () => {
     await renderWithTheme(<SettingsScreen />);
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
-    fireEvent.press(screen.getByRole("button", { name: "Back" }));
-    expect(router.back).toHaveBeenCalledTimes(1);
+    const headings = ["Appearance and language", "Legal", "About Kuutti", "Account"];
+    for (const name of headings) expect(screen.getByRole("heading", { name })).toBeTruthy();
+    // This device's screen says there is no session; the rest of the account needs a person.
+    expect(row("This device")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Take part in research" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Your account" })).toBeNull();
+    for (const name of [
+      "Theme",
+      "Language",
+      "Terms of use",
+      "Privacy",
+      "Source code",
+      "Licences",
+    ]) {
+      expect(row(name)).toBeTruthy();
+    }
+    // The version opens nothing: a fact, read with its number.
+    expect(screen.getByLabelText("Version").props.accessibilityValue?.text).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Version" })).toBeNull();
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
     );
   });
 
-  it("follows the phone's language, and the in-app choice beats it and is stored", async () => {
-    deviceLanguage("fi-FI", "en-US");
-    await renderWithTheme(<SettingsScreen />);
-    expect(screen.getByRole("heading", { name: "Asetukset" })).toBeTruthy();
-    // Languages are listed under their own names, whatever the app's language is.
-    fireEvent.press(screen.getByRole("radio", { name: "Svenska" }));
-    expect(await screen.findByRole("heading", { name: "Inställningar" })).toBeTruthy();
-    await waitFor(() => expect(store.get("kuutti.preference.locale")).toBe("sv"));
-    // Back to the phone's language clears the choice.
-    fireEvent.press(screen.getByRole("radio", { name: "Telefonens språk" }));
-    expect(await screen.findByRole("heading", { name: "Asetukset" })).toBeTruthy();
-    await waitFor(() => expect(store.get("kuutti.preference.locale")).toBeUndefined());
-  });
-
-  it("shows a flag in front of each language, but not in its accessible name", async () => {
-    await renderWithTheme(<SettingsScreen />);
-    const swedish = screen.getByRole("radio", { name: "Svenska" });
-    expect(swedish.props.accessibilityLabel).toBe("Svenska");
-    expect(screen.getByText("🇦🇽 Svenska")).toBeTruthy();
-  });
-
-  it("keeps the theme and the contrast across restarts, the OS being the default", async () => {
-    await renderWithTheme(<SettingsScreen />);
-    expect(screen.getByRole("radio", { name: "✓ System" })).toBeTruthy();
-    fireEvent.press(screen.getByRole("radio", { name: "Dark" }));
-    await waitFor(() => expect(store.get("kuutti.preference.scheme")).toBe("dark"));
-    expect(mockSetColorScheme).toHaveBeenLastCalledWith("dark");
-    fireEvent.press(screen.getByRole("switch", { name: "High contrast" }));
-    await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("true"));
-  });
-
-  it("applies a stored theme at the next start", async () => {
-    store.set("kuutti.preference.scheme", "light");
-    await renderWithTheme(<SettingsScreen />);
-    expect(await screen.findByRole("radio", { name: "✓ Light" })).toBeTruthy();
-  });
-
-  it("offers this device's session and the account only when signed in, and the source offer always", async () => {
-    const signedOut = await renderWithTheme(<SettingsScreen />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Log out everywhere" })).toBeNull();
-    expect(screen.getByText("About Kuutti")).toBeTruthy();
-    expect(screen.getByText("https://github.com/kuutti-ry/kuutti-app")).toBeTruthy();
-    // The two groups stand whoever looks (#170); the consents need a person.
-    expect(screen.getByRole("heading", { name: "App settings" })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Account" })).toBeTruthy();
-    expect(screen.queryByText("Your consents")).toBeNull();
-    signedOut.unmount();
-
+  it("lists the account's rows for a person, in order after the rest", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
-    await settle();
-    expect(await screen.findByRole("button", { name: "Log out" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Log out everywhere" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Download my data" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Take a break" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Delete my account" })).toBeTruthy();
-    expect(screen.getByText("Your consents")).toBeTruthy();
-    expect(await screen.findByLabelText("Take part in research")).toBeTruthy();
-  });
-
-  it("puts the app's settings before the account, the S-Pankki way (#170)", async () => {
-    await saveSession(tokens);
-    await renderWithTheme(<SettingsScreen />);
-    await settle();
-    const texts = (screen.toJSON() as HostNode[] | HostNode | null) ?? [];
-    const flat = JSON.stringify(texts);
+    expect(await screen.findByRole("button", { name: "Your account" })).toBeTruthy();
+    const flat = JSON.stringify(screen.toJSON());
     const order = [
-      "App settings",
+      "Appearance and language",
       "Theme",
       "Language",
-      "Your consents",
+      "Legal",
+      "Take part in research",
+      "Store my sensitive answers",
+      "Terms of use",
+      "Privacy",
       "About Kuutti",
+      "Version",
+      "Source code",
+      "Licences",
       "Account",
       "This device",
+      "E-mail",
       "Your account",
     ].map((label) => flat.indexOf(`"${label}"`));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it("turns high contrast on and off from its label too", async () => {
+  it("says the defaults under the theme and the language rows", async () => {
     await renderWithTheme(<SettingsScreen />);
-    await fireEvent.press(screen.getByText("High contrast"));
-    await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("true"));
-    expect(
-      screen.getByRole("switch", { name: "High contrast" }).props.accessibilityState,
-    ).toMatchObject({
-      checked: true,
-    });
-    await fireEvent.press(screen.getByText("High contrast"));
-    await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("false"));
+    expect(screen.getByText("System")).toBeTruthy();
+    expect(screen.getByText("Phone's language")).toBeTruthy();
   });
 
-  it("logs this device out", async () => {
+  it("says what is chosen under the theme and the language rows", async () => {
+    store.set("kuutti.preference.scheme", "light");
+    store.set("kuutti.preference.highContrast", "true");
+    store.set("kuutti.preference.locale", "sv");
+    await renderWithTheme(<SettingsScreen />);
+    expect(await screen.findByText("Ljust, hög kontrast")).toBeTruthy();
+    expect(screen.getByText("Svenska")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Inställningar" })).toBeTruthy();
+  });
+
+  it("opens each row's screen", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
-    await fireEvent.press(await screen.findByRole("button", { name: "Log out" }));
-    expect(await screen.findByText("No session on this device.")).toBeTruthy();
+    await screen.findByRole("button", { name: "Your account" });
+    const expected: Array<[string, string]> = [
+      ["Theme", "/settings/theme"],
+      ["Language", "/settings/language"],
+      ["Take part in research", "/settings/consent/research"],
+      ["Store my sensitive answers", "/settings/consent/special_category"],
+      ["Terms of use", "/settings/legal/terms"],
+      ["Privacy", "/settings/legal/privacy"],
+      ["Source code", "/settings/source"],
+      ["Licences", "/settings/licenses"],
+      ["This device", "/settings/device"],
+      ["E-mail", "/settings/email"],
+      ["Your account", "/settings/account"],
+    ];
+    for (const [name, path] of expected) {
+      await press(row(name));
+      expect(router.push).toHaveBeenLastCalledWith(path);
+    }
+    expect(router.push).toHaveBeenCalledTimes(expected.length);
   });
 
-  it("logs out everywhere, and keeps the device signed in without a word when that fails", async () => {
-    await saveSession(tokens);
-    const answers = globalThis.fetch;
-    let failing = true;
-    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
-      const url = new URL(input instanceof Request ? input.url : input);
-      if (url.pathname === "/auth/logout-all") {
-        return failing
-          ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
-          : new Response(null, { status: 204 });
-      }
-      return answers(input, init);
-    }) as unknown as typeof fetch;
+  it("follows the phone's language", async () => {
+    deviceLanguage("fi-FI", "en-US");
     await renderWithTheme(<SettingsScreen />);
-    await fireEvent.press(await screen.findByRole("button", { name: "Log out everywhere" }));
-    await settle();
-    expect(screen.getByRole("button", { name: "Log out everywhere" })).toBeTruthy();
-    failing = false;
-    await fireEvent.press(screen.getByRole("button", { name: "Log out everywhere" }));
-    expect(await screen.findByText("No session on this device.")).toBeTruthy();
-  });
-
-  it("leaves the source offer out while the API cannot say where the source is", async () => {
-    globalThis.fetch = jest.fn(async () => {
-      throw new TypeError("Network request failed");
-    }) as unknown as typeof fetch;
-    await renderWithTheme(<SettingsScreen />);
-    await settle();
-    expect(screen.getByRole("heading", { name: "Settings" })).toBeTruthy();
-    expect(screen.queryByText("Source code")).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Asetukset" })).toBeTruthy();
+    expect(row("Kieli")).toBeTruthy();
   });
 });

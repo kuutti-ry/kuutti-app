@@ -300,7 +300,7 @@ describe("ProfileScreen", () => {
         return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
       }
       if (new URL(request.url).pathname === "/photos") {
-        return json({ photos: [approved(1), approved(2)], maxPhotos: 6 });
+        return json({ photos: [approved(1), approved(2)], maxPhotos: 6, tips: [] });
       }
       return json({ profile: null, completeness: { complete: true, missing: [] } });
     }) as unknown as typeof fetch;
