@@ -85,7 +85,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
     const next = nextUnanswered(loadedFields, 0);
     if (next) router.replace(laterPath(next));
   }, [index, key, loadedFields, router]);
-  const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty);
+  const leaving = useConfirmLeave(profile.status === "ready" && profile.dirty, () => update(saved));
   if (index < 0 || !key) return null;
   const companion = LATER_COMPANIONS[key];
 

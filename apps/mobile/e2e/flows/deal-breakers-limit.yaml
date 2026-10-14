@@ -47,20 +47,23 @@ name: At most two deal-breakers, each with an accepted answer; a third is refuse
     rightOf: "Languages|Kielet|Språk"
 
 # Left unsaved: opened again, nothing is on.
-# Leaving by the arrow with the two unsaved asks first: kept on the word, let
-# go on the word, and then nothing of them is stored (14/10/2026). The arrow,
-# not a link: a link from outside the app is not asked about (ConfirmLeave.tsx).
+# Leaving with the two unsaved asks first (14/10/2026): the arrow, kept on the
+# word; then a link from outside the app, which waits for the word the same way
+# (app/+native-intent.ts) and is followed on it. Nothing of them is stored.
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
     visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
     timeout: 15000
 - tapOn: "Keep editing|Jatka muokkaamista|Fortsätt redigera"
 - assertVisible: "Fine with me|Sopii minulle|Okej för mig"
-- tapOn: "Back|Takaisin|Tillbaka"
+- openLink: kuutti://
 - extendedWaitUntil:
     visible: "Leave without saving\\?|Poistutaanko tallentamatta\\?|Lämna utan att spara\\?"
     timeout: 15000
 - tapOn: "Leave without saving|Poistu tallentamatta|Lämna utan att spara"
+- extendedWaitUntil:
+    visible: "Your profile|Profiilisi|Din profil"
+    timeout: 15000
 - openLink: kuutti://profile/deal-breakers
 - extendedWaitUntil:
     visible: "Deal-breakers|Ehdottomat rajat|Absoluta gränser"

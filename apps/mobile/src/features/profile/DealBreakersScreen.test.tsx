@@ -158,6 +158,10 @@ describe("DealBreakersScreen", () => {
     await press(screen.getByRole("button", { name: "Leave without saving" }));
     expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
     expect(puts).toEqual([]);
+    // Dropped: back to what is stored, so a screen a link left mounted holds nothing.
+    expect(screen.getByLabelText("Deal-breaker: Smoking").props.accessibilityState?.checked).toBe(
+      false,
+    );
   });
 
   it("lets go at once when nothing changed, and once the changes are saved", async () => {

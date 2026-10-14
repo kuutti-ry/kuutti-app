@@ -176,6 +176,11 @@ describe("LaterFieldScreen", () => {
     await press(screen.getByRole("button", { name: "Leave without saving" }));
     expect(navigation.dispatch).toHaveBeenCalledWith({ type: "POP_TO" });
     expect(puts).toEqual([]);
+    // Dropped: back to what is saved, so a screen a link left mounted holds nothing.
+    expect(
+      screen.getByRole("button", { name: "Yes, living with me" }).props.accessibilityState
+        ?.selected,
+    ).toBe(false);
   });
 
   it("puts an answer back on Ask me later, so a question passed over holds nothing to ask about", async () => {

@@ -106,7 +106,10 @@ export function DealBreakersScreen() {
   useEffect(() => {
     void load();
   }, [load]);
-  const leaving = useConfirmLeave(status === "ready" && canonical(draft) !== canonical(stored));
+  const leaving = useConfirmLeave(
+    status === "ready" && canonical(draft) !== canonical(stored),
+    () => setDraft(stored),
+  );
 
   if (profile.status === "loading" || status === "loading") {
     return (
