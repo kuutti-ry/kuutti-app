@@ -1,4 +1,3 @@
-import type { PlainMessageKey } from "@kuutti/i18n";
 import { DISPLAY_NAME_MAX, type ProfileUpdate } from "@kuutti/schema";
 import { useNavigation, useRouter } from "expo-router";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
@@ -20,23 +19,13 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { currentSession } from "@/lib/session";
 import { BioEditor } from "./BioEditor";
+import { profileErrorText } from "./errorText";
 import { FieldEditor } from "./FieldEditor";
 import { PromptsEditor } from "./PromptsEditor";
 import { findSection, type SectionItem, sectionPath, sectionTitleKey } from "./sections";
-import { type HeldDraft, type ProfileNotice, useProfile } from "./useProfile";
+import { type HeldDraft, useProfile } from "./useProfile";
 
 type Update = (patch: Partial<ProfileUpdate>) => void;
-
-/** The API's refusals the screen has its own words for; anything else is the generic line. */
-const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
-  ["text_contact_details", "profile.error.text_contact_details"],
-  ["consent_required", "errors.special_category_locked"],
-]);
-
-function errorText(notice: ProfileNotice, t: ReturnType<typeof useT>["t"]): string {
-  const code = notice?.kind === "error" ? notice.code : undefined;
-  return t(ERROR_TEXT.get(code ?? "") ?? "profile.error.generic");
-}
 
 function NameEditor({ draft, update }: { draft: ProfileUpdate; update: Update }) {
   const { t } = useT();
@@ -160,7 +149,7 @@ export function SectionScreen({ section: id }: { section: string }) {
         keyboardShouldPersistTaps="handled"
       >
         {profile.notice?.kind === "error" && (
-          <Text accessibilityLiveRegion="assertive">{errorText(profile.notice, t)}</Text>
+          <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
         )}
 
         {/* No note on the article 9 consent over politics and religion: Settings is the
@@ -174,7 +163,7 @@ export function SectionScreen({ section: id }: { section: string }) {
         <DialogContent closeLabel={t("profile.discard.close")}>
           <DialogHeader>
             <DialogTitle>{t("profile.discard.title")}</DialogTitle>
-            <DialogDescription>{errorText(profile.notice, t)}</DialogDescription>
+            <DialogDescription>{profileErrorText(profile.notice, t)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onPress={() => setAsking(false)}>

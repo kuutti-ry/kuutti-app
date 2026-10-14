@@ -389,13 +389,8 @@ describe("LaterFieldScreen", () => {
   it("stays on a refused save and says a contact detail is not allowed yet", async () => {
     refusingSaves("text_contact_details");
     await show(<LaterFieldScreen field="occupation" />);
-    await waitFor(() =>
-      expect(screen.getByLabelText("Job title, without the employer's name")).toBeTruthy(),
-    );
-    await type(
-      screen.getByLabelText("Job title, without the employer's name"),
-      "aino@example.test",
-    );
+    await waitFor(() => expect(screen.getByLabelText("Job title")).toBeTruthy());
+    await type(screen.getByLabelText("Job title"), "aino@example.test");
     await press(screen.getByRole("button", { name: "Save and continue" }));
     expect(screen.getByText(/Your text has an e-mail address, a link/)).toBeTruthy();
     expect(router.push).not.toHaveBeenCalled();

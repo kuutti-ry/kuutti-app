@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { ConfirmLeaveDialog, useConfirmLeave } from "../ConfirmLeave";
+import { profileErrorText } from "../errorText";
 import { FieldEditor } from "../FieldEditor";
 import { countsAsAnswer } from "../progress";
 import { useProfile } from "../useProfile";
@@ -145,11 +146,7 @@ export function LaterFieldScreen({ field }: { field: string }) {
         {companion && <FieldEditor field={companion} draft={draft} update={update} />}
 
         {profile.notice?.kind === "error" && (
-          <Text accessibilityLiveRegion="assertive">
-            {profile.notice.code === "text_contact_details"
-              ? t("profile.error.text_contact_details")
-              : t("profile.error.generic")}
-          </Text>
+          <Text accessibilityLiveRegion="assertive">{profileErrorText(profile.notice, t)}</Text>
         )}
         {profile.saving && <Text accessibilityLiveRegion="polite">{t("profile.saving")}</Text>}
         <Button

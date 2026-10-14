@@ -1,9 +1,8 @@
 import {
-  BIO_MIN_FOR_COMPLETENESS,
+  bioOrPromptsComplete,
   type Completeness,
   type CompletenessItem,
   PHOTOS_FOR_COMPLETENESS,
-  PROMPTS_FOR_COMPLETENESS,
 } from "@kuutti/schema";
 
 /**
@@ -32,11 +31,7 @@ export function completeness(snapshot: CompletenessSnapshot): Completeness {
   const missing: CompletenessItem[] = [];
   if (!snapshot.displayName) missing.push("display_name");
   if (snapshot.approvedPhotos < PHOTOS_FOR_COMPLETENESS) missing.push("photos");
-  const bioCounts =
-    (snapshot.bio?.trim().length ?? 0) >= BIO_MIN_FOR_COMPLETENESS || snapshot.bioPreset !== null;
-  if (!bioCounts && snapshot.answeredPrompts < PROMPTS_FOR_COMPLETENESS) {
-    missing.push("bio_or_prompts");
-  }
+  if (!bioOrPromptsComplete(snapshot)) missing.push("bio_or_prompts");
   if (snapshot.seeks === null) missing.push("seeks");
   if (snapshot.ageWindow === null) missing.push("age_window");
   return { complete: missing.length === 0, missing };
