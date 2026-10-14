@@ -162,6 +162,7 @@ describe("profile routes", () => {
       { ...update, fields: { ...update.fields, religion: "x" } },
       { ...update, fields: { ...update.fields, languages: ["fi", "xx"] } },
       { ...update, fields: { ...update.fields, height: 89 } },
+      { ...update, fields: { ...update.fields, height: 261 } },
       // As many hobbies as one likes (#239), but each once.
       { ...update, fields: { ...update.fields, hobbies: [HOBBIES[0], HOBBIES[0]] } },
       { ...update, fields: { ...update.fields, campus: "Otaniemi" } },
@@ -178,6 +179,18 @@ describe("profile routes", () => {
       const response = await put(app, a.headers, body);
       expect(response.status, JSON.stringify(body)).toBe(400);
       expect(await errorCode(response)).toBe("validation_failed");
+    }
+  });
+
+  test("PUT /profile takes a height from 90 to 260 cm, both ends included (#287)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    for (const height of [90, 260]) {
+      const saved = await put(app, a.headers, { ...update, fields: { ...update.fields, height } });
+      expect(saved.status, String(height)).toBe(200);
+      expect(ProfileResponse.parse(await saved.json()).profile?.fields.height).toBe(height);
     }
   });
 

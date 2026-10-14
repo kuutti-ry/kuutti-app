@@ -629,4 +629,45 @@ describe("photo routes, every branch of the guard and the parameters", () => {
     expect(body.tips).toContain("fish");
     expect(body.fishSpecies).toBe("pike");
   });
+
+  test("PUT /photos/order answers the tips of the new main photo (#287)", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const [main, second] = await approvedPhotos(ctx, app, a.headers, 2);
+    const review = (id: string | undefined, labels: unknown[]) =>
+      ctx.client.query(
+        `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision)
+         VALUES ($1, $2::jsonb, 1, '{}', 'approved')`,
+        [id, JSON.stringify(labels)],
+      );
+    await review(main, []);
+    // The fish is on the second photo only, which others do not see first.
+    await review(second, [
+      { name: "Fish", parentName: "Animal", confidence: 94 },
+      { name: "Pike", parentName: "Animal", confidence: 76.5 },
+    ]);
+    const before = PhotoList.parse(
+      await (await app.request("/photos", { headers: a.headers })).json(),
+    );
+    expect(before.tips).not.toContain("fish");
+    expect(before.fishSpecies).toBeNull();
+    const reorder = async (order: (string | undefined)[]) => {
+      const res = await app.request("/photos/order", {
+        method: "PUT",
+        headers: { ...a.headers, "content-type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+      expect(res.status).toBe(200);
+      return PhotoList.parse(await res.json());
+    };
+    // The answer is read after the move, so the card speaks of the new main photo at once.
+    const fishFirst = await reorder([second, main]);
+    expect(fishFirst.photos.map((p) => p.id)).toEqual([second, main]);
+    expect(fishFirst.tips).toContain("fish");
+    expect(fishFirst.fishSpecies).toBe("pike");
+    const back = await reorder([main, second]);
+    expect(back.photos.map((p) => p.id)).toEqual([main, second]);
+    expect(back.tips).not.toContain("fish");
+    expect(back.fishSpecies).toBeNull();
+  });
 });

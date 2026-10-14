@@ -22,7 +22,7 @@ const readRoute = createRoute({
   path: "/profile",
   summary: "The caller's profile and what it still needs",
   description:
-    "The profile as saved (null before the first save), the completeness rule's verdict (what is missing before the profile can enter a round), and the advisory tips for the owner that apply, highest priority first.",
+    "The profile as saved (null before the first save) and the completeness rule's verdict (what is missing before the profile can enter a round).",
   ...bearer,
   responses: {
     200: { description: "The profile.", ...json(ProfileResponse) },
@@ -40,7 +40,7 @@ const saveRoute = createRoute({
   request: { body: { required: true, ...json(ProfileUpdate) } },
   responses: {
     200: {
-      description: "Saved; the profile as stored, with its completeness and its advisory tips.",
+      description: "Saved; the profile as stored, with its completeness.",
       ...json(ProfileResponse),
     },
     400: errorContent(

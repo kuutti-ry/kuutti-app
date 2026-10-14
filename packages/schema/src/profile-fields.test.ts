@@ -75,6 +75,8 @@ describe("the profile field registry (ADR-019)", () => {
         occupationTitle: "Nurse",
       }).success,
     ).toBe(true);
+    // The height's two ends are taken, one past either is refused below (#287).
+    expect(ProfileFields.safeParse({ height: 260 }).success).toBe(true);
     for (const bad of [
       { intent: "friends" },
       { smoking: "snus" },
