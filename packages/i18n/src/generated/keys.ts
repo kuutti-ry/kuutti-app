@@ -388,7 +388,6 @@ export type MessageParams = {
   "profile.later.title": Record<never, never>;
   "profile.loading": Record<never, never>;
   "profile.number.down": Record<never, never>;
-  "profile.number.hint": { "min": number; "max": number };
   "profile.number.unset": Record<never, never>;
   "profile.number.up": Record<never, never>;
   "profile.option.drinking.never": Record<never, never>;

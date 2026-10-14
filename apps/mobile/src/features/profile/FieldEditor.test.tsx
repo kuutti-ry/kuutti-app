@@ -268,27 +268,28 @@ describe("FieldEditor: a number", () => {
   it("starts unanswered, takes the middle of the range on the first press, then moves by one", async () => {
     await show("height");
     expect(screen.getByText("No answer yet")).toBeTruthy();
-    expect(screen.getByText("A whole number from 140 to 220.")).toBeTruthy();
+    // No line under the stepper about the range (#287): its ends say where it stops.
+    expect(screen.queryByText(/whole number/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Clear the answer" })).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "One less" }));
-    expect(fields).toEqual({ height: 180 });
+    expect(fields).toEqual({ height: 175 });
     await fireEvent.press(screen.getByRole("button", { name: "One more" }));
-    expect(fields).toEqual({ height: 181 });
-    expect(screen.getByText("181 cm")).toBeTruthy();
+    expect(fields).toEqual({ height: 176 });
+    expect(screen.getByText("176 cm")).toBeTruthy();
     await fireEvent.press(screen.getByRole("button", { name: "Clear the answer" }));
     expect(fields).toEqual({});
   });
 
   it("stops at either end of the range", async () => {
-    await show("height", { height: 220 } as ProfileFields);
+    await show("height", { height: 260 } as ProfileFields);
     const up = screen.getByRole("button", { name: "One more" });
     expect(up.props.accessibilityState?.disabled).toBe(true);
     await fireEvent.press(screen.getByRole("button", { name: "One less" }));
-    expect(fields).toEqual({ height: 219 });
+    expect(fields).toEqual({ height: 259 });
   });
 
   it("cannot go below the lower end", async () => {
-    await show("height", { height: 140 } as ProfileFields);
+    await show("height", { height: 90 } as ProfileFields);
     expect(
       screen.getByRole("button", { name: "One less" }).props.accessibilityState?.disabled,
     ).toBe(true);

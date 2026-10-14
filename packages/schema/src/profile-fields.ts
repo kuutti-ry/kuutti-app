@@ -267,8 +267,10 @@ export const HOBBY_GROUPS: Readonly<Record<HobbyGroup, readonly Hobby[]>> = {
   wellbeing: ["meditation", "winter_swimming", "forest_walks", "slow_mornings"],
 };
 
-const HEIGHT_MIN_CM = 140;
-const HEIGHT_MAX_CM = 220;
+// Room for every adult (#287): the tallest person on record in Finland stood
+// 251 cm, and adults of short stature are commonly between 90 and 140 cm.
+const HEIGHT_MIN_CM = 90;
+const HEIGHT_MAX_CM = 260;
 
 /**
  * The parties by their usual abbreviation: the nine of the parliament and the

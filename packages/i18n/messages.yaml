@@ -526,13 +526,6 @@ profile.text.hint:
   sv: "Utan arbetsgivarens namn, högst {max, number} tecken."
   machine: { fi: true, sv: true }
 
-profile.number.hint:
-  en: "A whole number from {min, number} to {max, number}."
-  description: "Hint under a number field of the registry (the height, in centimetres)."
-  fi: "Kokonaisluku väliltä {min, number}–{max, number}."
-  sv: "Ett heltal från {min, number} till {max, number}."
-  machine: { fi: true, sv: true }
-
 profile.number.unset:
   en: "No answer yet"
   description: "Shown in a number stepper while the field has no value (#148)."

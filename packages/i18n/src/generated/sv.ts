@@ -332,7 +332,6 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.later.title": "Medan du väntar",
   "profile.loading": "Läser in din profil…",
   "profile.number.down": "En mindre",
-  "profile.number.hint": "Ett heltal från {min, number} till {max, number}.",
   "profile.number.unset": "Inget svar ännu",
   "profile.number.up": "En mer",
   "profile.option.drinking.never": "Aldrig",

@@ -387,7 +387,6 @@ export const en: Readonly<Record<string, string>> = {
   "profile.later.title": "While you wait",
   "profile.loading": "Loading your profile…",
   "profile.number.down": "One less",
-  "profile.number.hint": "A whole number from {min, number} to {max, number}.",
   "profile.number.unset": "No answer yet",
   "profile.number.up": "One more",
   "profile.option.drinking.never": "Never",

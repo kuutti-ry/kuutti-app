@@ -340,7 +340,6 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.later.title": "Odotellessasi",
   "profile.loading": "Ladataan profiiliasi…",
   "profile.number.down": "Yksi vähemmän",
-  "profile.number.hint": "Kokonaisluku väliltä {min, number}–{max, number}.",
   "profile.number.unset": "Ei vielä vastausta",
   "profile.number.up": "Yksi enemmän",
   "profile.option.drinking.never": "En koskaan",

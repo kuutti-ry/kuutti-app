@@ -242,7 +242,6 @@ export function FieldEditor({
               )
             }
           />
-          <Text variant="muted">{t("profile.number.hint", { min: spec.min, max: spec.max })}</Text>
           {typeof value === "number" && (
             <Button
               variant="ghost"

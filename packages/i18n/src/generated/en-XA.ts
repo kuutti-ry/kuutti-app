@@ -387,7 +387,6 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.later.title": "［Whííléé ýýóóúú wááíít］",
   "profile.loading": "［Lóóáádííñg ýýóóúúr próófííléé…］",
   "profile.number.down": "［ÓÓñéé lééšš］",
-  "profile.number.hint": "［ÁÁ whóóléé ñúúmbéér fróóm {min, number} tóó {max, number}.］",
   "profile.number.unset": "［Ñóó ááñšwéér ýýéét］",
   "profile.number.up": "［ÓÓñéé móóréé］",
   "profile.option.drinking.never": "［Ñéévéér］",
