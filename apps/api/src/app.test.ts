@@ -161,4 +161,31 @@ describe("no web surface", () => {
         .status,
     ).toBe(200);
   });
+
+  it("the Swagger UI is served in development and nowhere deployed", async () => {
+    const { logger } = await captureLogger();
+    const page = await createApp({
+      config: testConfig({ APP_ENV: "development" }),
+      logger,
+      db: testPool(),
+    }).request("/docs");
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toMatch(/^text\/html/);
+    const body = await page.text();
+    expect(body).toContain("url: '/openapi.json'");
+    expect(body).toContain("https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.1/");
+
+    for (const deployed of [
+      testConfig({ APP_ENV: "preview", PR_NUMBER: "125" }),
+      testConfig({ APP_ENV: "staging" }),
+      testConfig({
+        APP_ENV: "production",
+        ADMIN_APP_URL: "https://admin.kuutti.app",
+        CORS_ALLOWED_ORIGINS: "https://admin.kuutti.app",
+      }),
+    ]) {
+      const app = createApp({ config: deployed, logger, db: testPool() });
+      expect((await app.request("/docs")).status, deployed.APP_ENV).toBe(404);
+    }
+  });
 });
