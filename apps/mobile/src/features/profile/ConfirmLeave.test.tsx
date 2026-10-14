@@ -116,6 +116,15 @@ describe("useConfirmLeave", () => {
     expect(screen.getByText("A holds a change")).toBeTruthy();
   });
 
+  it("keeps the change and drops a held link when the dialog is closed", async () => {
+    await renderWithTheme(<Holder name="A" unsaved />);
+    const held = (await link("kuutti://")).outcome;
+    await press("Close");
+    await expect(held).resolves.toBeNull();
+    expect(screen.getByText("A is quiet")).toBeTruthy();
+    expect(screen.getByText("A holds a change")).toBeTruthy();
+  });
+
   it("asks on the screen in front when both hold something", async () => {
     await renderWithTheme(
       <>
