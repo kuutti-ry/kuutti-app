@@ -1,5 +1,6 @@
 import type { Queryable } from "@kuutti/db";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
+import type { ProfileFields } from "@kuutti/schema";
 
 /**
  * Many verified people at once, for figures that only mean something in
@@ -17,8 +18,8 @@ export type PeopleOptions = {
   ageWindow?: { min: number; max: number };
   /** With `complete`: the bio's part of it, a written bio (default), a ready line in its place (#239), or neither, which leaves the profile one short. */
   bio?: "written" | "ready_line" | "none";
-  /** With `complete`: what they are here for (default: open to either, which fits everybody; #147). */
-  intent?: "long_term" | "casual" | "open_to_either";
+  /** With `complete`: what they are here for (default: open to either, which fits everybody but dance partners; #147, #175). */
+  intent?: NonNullable<ProfileFields["intent"]>;
   /** Born in June of this year (default: 1990). */
   birthYear?: number;
   /** Terms, privacy and the special-category consent in their current wording, as onboarding leaves them (#46, #146): what the pond gate asks for (#94). */

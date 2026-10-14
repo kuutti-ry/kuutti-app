@@ -7,7 +7,8 @@ Feature: The pond gate
   can bear, its newcomers wait in the order they registered, whatever label
   they chose for themselves. And the gate: matching opens for a person when
   enough people are there who match what they seek, whose wishes they match,
-  and who want the same thing or are open to either. The rules name no
+  and who want the same thing or are open to either; "either" is long-term or
+  casual, and a dance partner meets a dance partner only (#175). The rules name no
   gender, no hard filter is ever crossed (rule 7), and nobody is let out
   again when the pond drifts. What a person is told of it is said in tens, never exactly,
   and only the night moves it: a figure that answered every question put to
@@ -33,20 +34,31 @@ Feature: The pond gate
       | woman      | 30    | man              | 25    | 40    | long_term      | man        | 35    | woman      | 25    | 40    | open_to_either | in     |
       | woman      | 30    | man              | 25    | 40    | open_to_either | man        | 35    | woman      | 25    | 40    | casual         | in     |
       | woman      | 30    | man              | 25    | 40    | casual         | man        | 35    | woman      | 25    | 40    | casual         | in     |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | dance_partner  | in     |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | long_term      | not in |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | casual         | not in |
+      | woman      | 30    | man              | 25    | 40    | dance_partner  | man        | 35    | woman      | 25    | 40    | open_to_either | not in |
 
   Scenario Outline: The sheet's examples of who is shown to whom, by gender and seek
-    Given a <a_gender> seeking <a_seeks> and a <b_gender> seeking <b_seeks>, both of thirty, open to either and to any age
+    Given a <a_gender> seeking <a_seeks> and a <b_gender> seeking <b_seeks>, both of thirty, both here for <intent> and open to any age
     Then they are shown to each other: <shown>
 
     Examples:
-      | a_gender   | a_seeks              | b_gender   | b_seeks              | shown |
-      | man        | man                  | man        | man                  | yes   |
-      | woman      | woman,man            | man        | woman                | yes   |
-      | woman      | non_binary           | non_binary | woman                | yes   |
-      | woman      | non_binary           | non_binary | man                  | no    |
-      | non_binary | woman                | woman      | man                  | no    |
-      | man        | woman                | woman      | woman,man,non_binary | yes   |
-      | non_binary | woman,man,non_binary | man        | woman                | no    |
+      | a_gender   | a_seeks              | b_gender   | b_seeks              | intent         | shown |
+      | man        | man                  | man        | man                  | open_to_either | yes   |
+      | man        | man                  | man        | man                  | dance_partner  | yes   |
+      | woman      | woman,man            | man        | woman                | open_to_either | yes   |
+      | woman      | woman,man            | man        | woman                | dance_partner  | yes   |
+      | woman      | non_binary           | non_binary | woman                | open_to_either | yes   |
+      | woman      | non_binary           | non_binary | woman                | dance_partner  | yes   |
+      | woman      | non_binary           | non_binary | man                  | open_to_either | no    |
+      | woman      | non_binary           | non_binary | man                  | dance_partner  | no    |
+      | non_binary | woman                | woman      | man                  | open_to_either | no    |
+      | non_binary | woman                | woman      | man                  | dance_partner  | no    |
+      | man        | woman                | woman      | woman,man,non_binary | open_to_either | yes   |
+      | man        | woman                | woman      | woman,man,non_binary | dance_partner  | yes   |
+      | non_binary | woman,man,non_binary | man        | woman                | open_to_either | no    |
+      | non_binary | woman,man,non_binary | man        | woman                | dance_partner  | no    |
 
   Scenario: The smaller group is always let in, the larger while it is at most its share
     Given a pond where six of one group and four of the other are let in, all seeking the other
