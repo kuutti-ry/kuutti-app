@@ -1,3 +1,4 @@
+import { swaggerUI } from "@hono/swagger-ui";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Queryable } from "@kuutti/db";
 import { bodyLimit } from "hono/body-limit";
@@ -58,6 +59,7 @@ const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
 export const PUBLIC_ROUTES = new Set([
   "GET /health",
   "GET /openapi.json",
+  "GET /docs",
   // Aggregates per pond, once a day, nothing below k (#54, ADR-013).
   "GET /waitlist",
   "GET /auth/start",
@@ -161,6 +163,12 @@ export function createApp(deps: Deps) {
   });
   if (deps.config.APP_ENV !== "production") {
     app.doc("/openapi.json", openApiDocument(deps.config.APP_VERSION));
+  }
+  // Swagger UI over the same document, on a developer's machine only: the page
+  // pulls swagger-ui-dist from jsDelivr, and no deployed environment of this
+  // API is a web surface (rule 8). Staging and previews keep /openapi.json alone.
+  if (deps.config.APP_ENV === "development" || deps.config.APP_ENV === "test") {
+    app.get("/docs", swaggerUI({ url: "/openapi.json", version: "5.33.1", title: "Kuutti API" }));
   }
 
   return app;
