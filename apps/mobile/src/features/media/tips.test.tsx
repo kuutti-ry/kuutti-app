@@ -85,6 +85,19 @@ describe("PhotoTip", () => {
     expect(screen.queryByText("A tip for your photos")).toBeNull();
     await view.rerender(underProviders(nothing));
 
+    // Another photo made the main one starts afresh even with no tip of its own,
+    // so the fish photo chosen again earns its tip again (the maintainer, 15/10/2026).
+    await view.rerender(underProviders(<PhotoTip tips={[]} fishSpecies={null} mainId="photo-c" />));
+    await settle();
+    expect(screen.queryByText("A tip for your photos")).toBeNull();
+    expect(seen()).toEqual({ mainId: "photo-c", kinds: [] });
+    await view.rerender(underProviders(fish));
+    await settle();
+    expect(screen.getByText(/A fish in the main photo is a classic/)).toBeTruthy();
+    await view.rerender(underProviders(nothing));
+    await settle();
+    expect(seen()).toEqual({ mainId: "photo-a", kinds: ["fish"] });
+
     // Another photo is the main one: what applies to it is said, and the record starts afresh.
     await view.rerender(
       underProviders(
@@ -102,7 +115,7 @@ describe("PhotoTip", () => {
     await settle();
     expect(seen()).toEqual({ mainId: "photo-b", kinds: ["blurry", "few_photos"] });
 
-    // The fish photo chosen again earns its tip again (the maintainer, 15/10/2026).
+    // The fish photo chosen again, named this time.
     await view.rerender(
       underProviders(<PhotoTip tips={["fish"]} fishSpecies="pike" mainId="photo-a" />),
     );

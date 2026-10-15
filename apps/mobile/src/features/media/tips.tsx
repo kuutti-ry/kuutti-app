@@ -53,7 +53,18 @@ export type SeenTips = { mainId: string; kinds: TipKind[] };
 const SEEN_KEY = "photoTipsSeen";
 const NOTHING_SEEN: SeenTips = { mainId: "", kinds: [] };
 
+// Writes queue behind one another, and a read waits for them, so a dismissal
+// and the screen's closing moments later never read the same old value and
+// lose one.
+let pendingWrite: Promise<void> = Promise.resolve();
+
+function writeSeenTips(next: SeenTips): Promise<void> {
+  pendingWrite = pendingWrite.then(() => writePreference(SEEN_KEY, JSON.stringify(next)));
+  return pendingWrite;
+}
+
 async function readSeenTips(): Promise<SeenTips> {
+  await pendingWrite;
   const raw = await readPreference(SEEN_KEY);
   if (raw === null) return NOTHING_SEEN;
   let parsed: unknown;
@@ -72,18 +83,10 @@ async function readSeenTips(): Promise<SeenTips> {
   };
 }
 
-// Writes queue behind one another, so a dismissal and the screen's closing
-// moments later never read the same old value and lose one.
-let pendingWrite: Promise<void> = Promise.resolve();
-
-function markTipSeen(kind: TipKind, mainId: string): Promise<void> {
-  pendingWrite = pendingWrite.then(async () => {
-    const seen = await readSeenTips();
-    const kinds = seen.mainId === mainId ? seen.kinds : [];
-    const next: SeenTips = { mainId, kinds: kinds.includes(kind) ? kinds : [...kinds, kind] };
-    await writePreference(SEEN_KEY, JSON.stringify(next));
-  });
-  return pendingWrite;
+async function markTipSeen(kind: TipKind, mainId: string): Promise<void> {
+  const seen = await readSeenTips();
+  const kinds = seen.mainId === mainId ? seen.kinds : [];
+  await writeSeenTips({ mainId, kinds: kinds.includes(kind) ? kinds : [...kinds, kind] });
 }
 
 /**
@@ -104,18 +107,24 @@ export function PhotoTip({
 }) {
   const { t } = useT();
   const tap = useHapticTap();
-  // Null until the device has answered what was said already: nothing is said before that.
+  const key = mainId ?? "";
+  // Null until the device has answered what was said already: nothing is said
+  // before that. A record of another main photo is over, whether or not this
+  // one has a tip: choosing a photo again starts afresh.
   const [seen, setSeen] = useState<SeenTips | null>(null);
   useEffect(() => {
     let live = true;
     void readSeenTips().then((read) => {
-      if (live) setSeen(read);
+      if (!live) return;
+      if (read.mainId === key) return setSeen(read);
+      const fresh: SeenTips = { mainId: key, kinds: [] };
+      setSeen(fresh);
+      void writeSeenTips(fresh);
     });
     return () => {
       live = false;
     };
-  }, []);
-  const key = mainId ?? "";
+  }, [key]);
   const said = seen && seen.mainId === key ? seen.kinds : [];
   const tip = seen ? (tips.find((kind) => !said.includes(kind)) ?? null) : null;
   // Whatever was on the screen is remembered as said when it gives way: to a
