@@ -10,10 +10,10 @@ import * as repo from "./repo.ts";
 // refresh rotates both tokens and retires the old refresh token on the row, so
 // a second presentation of it is recognised as reuse and ends the device.
 
-export const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
-export const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
+const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 /** Ended sessions stay this long for the person's device list and for support, then the sweep removes them. */
-export const ENDED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const ENDED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type SessionDeps = { db: Queryable; now: () => Date };
 

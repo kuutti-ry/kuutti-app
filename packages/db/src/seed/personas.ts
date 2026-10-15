@@ -35,10 +35,10 @@ export type FixedBirth = { year: number; month: number; day: number };
  * the same age whenever the demo runs, and a different identity as the months
  * pass, which is why none of these carries a history.
  */
-export type RelativeBirth = { yearsAgo: number; monthsAgo: number };
+type RelativeBirth = { yearsAgo: number; monthsAgo: number };
 
 /** The test bank of Telia's pre-production bed that returns the persona's code, and how to log in there. */
-export type TestBank = {
+type TestBank = {
   name: string;
   /** What is typed at the bank: a user name, or "prefilled" where the bank's test page needs nothing. */
   user: string;

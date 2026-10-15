@@ -19,7 +19,7 @@ import { useHapticTap } from "@/theme/haptics";
 import { type ExportFile, useSession } from "./session";
 
 /** Days before the same person may register again (TD-7); the API's constant, repeated for the text. */
-export const REREGISTER_COOLDOWN_DAYS = 30;
+const REREGISTER_COOLDOWN_DAYS = 30;
 
 type Busy = { kind: "idle" } | { kind: "exporting" } | { kind: "deleting" };
 type Notice =

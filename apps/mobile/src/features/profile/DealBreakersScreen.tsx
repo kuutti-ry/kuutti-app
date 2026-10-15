@@ -41,7 +41,7 @@ const draftOf = (stored: StoredDealBreaker[]): Draft => {
 };
 
 /** What is sent: the deal-breakers that are on, in the registry's order. */
-export const updateOf = (draft: Draft): DealBreakersUpdate => ({
+const updateOf = (draft: Draft): DealBreakersUpdate => ({
   dealBreakers: DEAL_BREAKER_FIELDS.flatMap((field) => {
     const row = draft[field];
     return row?.on ? [{ field, accept: row.accept, includeUnknown: row.includeUnknown }] : [];

@@ -67,11 +67,11 @@ export type Thresholds = {
   noAppealNudity: number;
 };
 
-export const LABEL_THRESHOLD_KEY = "photo_moderation_label_threshold";
-export const FACE_THRESHOLD_KEY = "photo_moderation_face_threshold";
-export const NO_APPEAL_NUDITY_KEY = "photo_moderation_nudity_no_appeal";
+const LABEL_THRESHOLD_KEY = "photo_moderation_label_threshold";
+const FACE_THRESHOLD_KEY = "photo_moderation_face_threshold";
+const NO_APPEAL_NUDITY_KEY = "photo_moderation_nudity_no_appeal";
 /** Labels stored per photo, at most; Rekognition returns a few, never dozens. */
-export const MAX_LABELS = 50;
+const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
 const REKOGNITION_MIN_CONFIDENCE = 30;
 /**
@@ -99,7 +99,7 @@ const TIP_SIGNALS: ReadonlySet<string> = new Set([...SCENE_TIP_LABELS, ...FACE_T
 export const isTipSignal = (name: string): boolean => TIP_SIGNALS.has(name);
 export const NOT_CHECKED = "not_checked";
 export const NO_FACE = "no_face";
-export const SEVERAL_FACES = "several_faces";
+const SEVERAL_FACES = "several_faces";
 
 export type Decision = {
   decision: "approved" | "queued" | "rejected";

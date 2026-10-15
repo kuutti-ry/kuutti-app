@@ -31,7 +31,7 @@ export type MediaDeps = {
 export type PhotoServiceDeps = MediaDeps & { db: Queryable; logger: Logger; now: () => Date };
 
 export const RETRY_AFTER_SECONDS = 5;
-export const MAX_PHOTOS_KEY = "max_photos";
+const MAX_PHOTOS_KEY = "max_photos";
 
 const toPhoto = ({ key: _key, ...photo }: repo.PhotoRow): Photo => photo;
 

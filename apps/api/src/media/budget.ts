@@ -8,10 +8,10 @@ import { readMatchingConfig } from "../lib/matching-config.ts";
 // two requests cannot both pass a separate count; what lives here is the day
 // the count is over and the wait a refusal announces.
 
-export const PHOTO_FETCHES_KEY = "photo_fetches_per_day";
+const PHOTO_FETCHES_KEY = "photo_fetches_per_day";
 
 /** Kuutti is for Finland: the day rolls at midnight in Helsinki, DST included. */
-export const DAY_TIME_ZONE = "Europe/Helsinki";
+const DAY_TIME_ZONE = "Europe/Helsinki";
 
 export type DayWindow = { start: Date; end: Date };
 

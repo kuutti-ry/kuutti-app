@@ -67,7 +67,7 @@ const STEPS: Step[] = [
 ];
 
 /** What the screen keeps between two status reads: what the API's status does not say. */
-export type LocalAnswers = {
+type LocalAnswers = {
   researchOffered: boolean;
   /** A non-binary gender was just declared: the label is offered once, before the next step. */
   labelPending: boolean;
@@ -81,7 +81,7 @@ export type LocalAnswers = {
  * the age window, the photos, the prompts; research once, never required.
  * A step the screen cannot ask (a pond without a default) is "stuck".
  */
-export function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
+function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   const missing = new Set(status.missing);
   if (missing.has("terms") || missing.has("privacy")) return "welcome";
   if (missing.has("name")) return "name";
@@ -105,7 +105,7 @@ export function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
  * newer wording, the app asks for an update instead of recording a consent
  * for a text it never showed.
  */
-export function bundledVersion(kind: ConsentKind): string {
+function bundledVersion(kind: ConsentKind): string {
   return CONSENT_VERSIONS[kind] ?? "";
 }
 

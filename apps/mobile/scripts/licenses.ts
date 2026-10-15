@@ -8,14 +8,21 @@
  *   pnpm --filter mobile licenses
  *
  * A test holds the file to a fresh run, so a dependency change that forgets
- * the command fails in CI.
+ * the command fails in CI. For that the list must come out the same on every
+ * machine, so the walk skips optional dependencies: they are what the
+ * installing machine chose (fsevents on a Mac, one of @sentry/cli's platform
+ * packages, lightningcss's binaries), build tooling that is never in the app.
+ * What else the list should leave out is #177's.
  */
 import { existsSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
 
 export type LicenseEntry = { name: string; version: string; license: string };
 
-const APP = resolve(import.meta.dirname, "..");
+// Jest loads this file as CommonJS for scripts/licenses.test.ts, where Babel leaves
+// import.meta empty and __dirname stands in; Node runs it as a module.
+const HERE = typeof __dirname === "string" ? __dirname : import.meta.dirname;
+const APP = resolve(HERE, "..");
 const ROOT = resolve(APP, "../..");
 export const OUTPUT = join(APP, "src", "generated", "licenses.json");
 
@@ -25,7 +32,6 @@ type Manifest = {
   license?: unknown;
   licenses?: unknown;
   dependencies?: Record<string, string>;
-  optionalDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   peerDependenciesMeta?: Record<string, { optional?: boolean }>;
 };
@@ -68,7 +74,7 @@ export function collectLicenses(app: string = APP): LicenseEntry[] {
     const next = queue.shift();
     if (!next) break;
     const found = manifestOf(next.name, next.from);
-    if (!found) continue; // an optional dependency that is not installed on this platform
+    if (!found) continue; // not installed here: nothing to read
     const { dir, manifest } = found;
     const key = `${manifest.name ?? next.name}@${manifest.version ?? "?"}`;
     if (seen.has(key)) continue;
@@ -86,10 +92,8 @@ export function collectLicenses(app: string = APP): LicenseEntry[] {
         .filter(([, meta]) => meta.optional)
         .map(([name]) => name),
     );
+    // Not optionalDependencies: the machine's, never the app's (the header).
     for (const name of Object.keys(manifest.dependencies ?? {})) queue.push({ name, from: dir });
-    for (const name of Object.keys(manifest.optionalDependencies ?? {})) {
-      queue.push({ name, from: dir });
-    }
     for (const name of Object.keys(manifest.peerDependencies ?? {})) {
       if (!optionalPeers.has(name)) queue.push({ name, from: dir });
     }
@@ -103,7 +107,8 @@ export function renderLicenses(entries: LicenseEntry[]): string {
   return `${JSON.stringify(entries, null, 2)}\n`;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
+const SELF = import.meta.filename;
+if (process.argv[1] && SELF && resolve(process.argv[1]) === resolve(SELF)) {
   const entries = collectLicenses();
   writeFileSync(OUTPUT, renderLicenses(entries));
   console.log(`✔ licenses: ${entries.length} packages to src/generated/licenses.json`);

@@ -6,7 +6,7 @@ import { placed } from "./drag";
 import { checkPhoto } from "./localCheck";
 import { pickPhoto, prepareForUpload } from "./pick";
 
-export type PhotosBusy =
+type PhotosBusy =
   | { kind: "idle" }
   | { kind: "picking" }
   | { kind: "preparing" }

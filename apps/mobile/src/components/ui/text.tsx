@@ -58,5 +58,4 @@ function Text({ className, asChild = false, variant = "default", ...props }: Tex
   );
 }
 
-export type { TextProps };
 export { Text, TextClassContext };

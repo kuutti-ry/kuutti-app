@@ -15,7 +15,7 @@ import { matchingConfigNumbers } from "../lib/matching-config.ts";
 /** Twelve months, like the report snapshots of #84 (rules/db.md); the nightly prune keeps it. */
 export const NOTE_RETENTION_DAYS = 365;
 
-export const CLOSER_LOOK_KEYS = {
+const CLOSER_LOOK_KEYS = {
   attempts: "photo_closer_look_attempts",
   windowDays: "photo_closer_look_window_days",
   days: "photo_closer_look_days",

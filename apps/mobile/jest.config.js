@@ -2,7 +2,12 @@
 module.exports = {
   preset: "jest-expo",
   // jest-expo owns apps/mobile; Vitest owns apps/api and packages/* (CLAUDE.md Testing).
-  testMatch: ["<rootDir>/src/**/*.test.(ts|tsx)", "<rootDir>/app/**/*.test.(ts|tsx)"],
+  // The scripts' tests too: scripts/licenses.test.ts had never run before #276.
+  testMatch: [
+    "<rootDir>/src/**/*.test.(ts|tsx)",
+    "<rootDir>/app/**/*.test.(ts|tsx)",
+    "<rootDir>/scripts/**/*.test.(ts|tsx)",
+  ],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   // `pnpm test:coverage` counts every source file, the ones no test loads too.
   collectCoverageFrom: [

@@ -63,13 +63,13 @@ export async function deleteOrphanedObjects(
   }
 }
 
-export const EXPORT_ACCESS_LOG_LIMIT = 1000;
+const EXPORT_ACCESS_LOG_LIMIT = 1000;
 
 /** One photo's file for the zip (#237): where the document points, and the bytes as stored. */
 export type ExportedPhotoFile = { path: string; bytes: Uint8Array };
 
 /** `photos/<photo id>.webp`: the full variant, 1600 px on the long edge, the best Kuutti holds (rule 4). */
-export const exportedPhotoPath = (photoId: string): string => `photos/${photoId}.webp`;
+const exportedPhotoPath = (photoId: string): string => `photos/${photoId}.webp`;
 
 /**
  * The person's photos for the export: what the list shows, the moderation

@@ -47,5 +47,4 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
   );
 }
 
-export type { SwitchProps };
 export { Switch, TRACK_HEIGHT, TRACK_WIDTH };

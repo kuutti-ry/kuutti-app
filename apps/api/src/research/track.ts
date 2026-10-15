@@ -34,7 +34,7 @@ export type TrackResult =
  * and let a database holder rebuild the deleted mapping by joining on it.
  * The hour is coarse enough for every question in the registry (ADR-011 §1).
  */
-export function hourOf(at: Date): Date {
+function hourOf(at: Date): Date {
   return new Date(Math.floor(at.getTime() / 3_600_000) * 3_600_000);
 }
 

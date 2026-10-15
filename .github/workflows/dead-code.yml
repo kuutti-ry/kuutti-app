@@ -1,0 +1,30 @@
+name: Dead code
+
+# knip lists the files, exports, types, dependencies and binaries nothing uses
+# (#276, ADR-021 §7); Biome sees one file at a time and tsc one workspace, so
+# they miss them. Nightly on weekdays, after the dependency audit, so what a
+# change left behind is noticed within a working day: a finding exits 1 and
+# GitHub mails the failed run, the audit's channel. Not a pull-request check
+# yet (the issue's step 4); run `pnpm knip` before pushing. The reasons for
+# every entry and ignore are in knip.ts.
+
+on:
+  schedule:
+    # Weekdays 06:45 UTC, after audit.yml.
+    - cron: "45 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  knip:
+    name: knip
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm
+      - name: Nothing in the workspaces that nothing uses
+        run: pnpm knip

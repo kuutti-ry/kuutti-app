@@ -17,8 +17,8 @@ export type BrokerIdentity = {
   amr: string[];
 };
 
-export type StartLoginInput = { state: string; nonce: string; locale: string | null };
-export type CompleteLoginInput = { callbackUrl: URL; state: string; nonce: string };
+type StartLoginInput = { state: string; nonce: string; locale: string | null };
+type CompleteLoginInput = { callbackUrl: URL; state: string; nonce: string };
 
 /**
  * The seam between the login and whoever brokers it. Telia's dialect (signed

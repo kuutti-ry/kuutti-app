@@ -9,7 +9,7 @@ import type { Logger } from "../lib/logger.ts";
  */
 export type NightlyJob = { name: string; run: () => Promise<Record<string, number>> };
 
-export const NIGHTLY_HOUR = 4;
+const NIGHTLY_HOUR = 4;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Milliseconds from `now` to the next 04:00 Europe/Helsinki. */
