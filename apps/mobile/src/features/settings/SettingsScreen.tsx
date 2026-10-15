@@ -33,8 +33,8 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
  * default, kept across restarts); the legal part, the two consents (#46,
  * #146) and the texts they refer to; about Kuutti, the version, the source
  * offer of AGPL-3.0 section 13 (visible to everybody) and the licences; the
- * account, this device, the e-mail, and the export, the break and the
- * deletion last (#51, #148, #170). The tech config screen keeps what is
+ * account, this device, the e-mail, the feedback to the moderators (#171),
+ * and the export, the break and the deletion last (#51, #148, #170). The tech config screen keeps what is
  * technical beyond the version (the API, the native build, a test error) and
  * exists outside production only.
  */
@@ -174,6 +174,12 @@ export function SettingsScreen() {
                     title: t("settings.email.label"),
                     summary: t("settings.email.summary"),
                     onPress: open("/settings/email"),
+                  },
+                  {
+                    key: "feedback",
+                    title: t("feedback.title"),
+                    summary: t("settings.feedback.summary"),
+                    onPress: open("/settings/feedback"),
                   },
                   {
                     key: "account",

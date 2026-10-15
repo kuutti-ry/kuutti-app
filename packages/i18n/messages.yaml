@@ -2979,6 +2979,13 @@ errors.export_budget_exceeded:
   sv: Det räcker med kopior av dina uppgifter för i dag. Du kan ladda ner dem igen efter midnatt.
   machine: { fi: true, sv: true }
 
+errors.feedback_budget_exceeded:
+  en: That is enough feedback for today. You can send more after midnight.
+  description: "Feedback route (429 with Retry-After), the account has sent the day's feedback, matching_config feedback_per_day (#171); the day rolls at midnight in Finland. Said plainly, nobody is limited in silence."
+  fi: Tältä päivältä palautetta on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen.
+  sv: Det räcker med respons för i dag. Du kan skicka mer efter midnatt.
+  machine: { fi: true, sv: true }
+
 errors.text_contact_details:
   en: Your profile text cannot contain an e-mail address, a link, a phone number or a social media handle.
   description: Profile save (400), a text field carried a way to reach the person outside Kuutti (#47, the plain-text rule). The API says which field in the envelope's detail, never in the message.
@@ -4068,6 +4075,58 @@ admin.queue.error:
   en: The queue could not be loaded.
   description: Admin panel, the queue request failed.
 
+admin.feedback.title:
+  en: Feedback
+  description: "Admin panel, the heading of the feedback list (#171)."
+
+admin.feedback.refresh:
+  en: Refresh
+  description: "Admin panel, the button that reloads the feedback list (#171)."
+
+admin.feedback.loading:
+  en: Loading the feedback…
+  description: "Admin panel, while the feedback list is fetched (#171)."
+
+admin.feedback.error:
+  en: The feedback could not be loaded.
+  description: "Admin panel, the feedback request failed (#171)."
+
+admin.feedback.total:
+  en: "{total, plural, =0 {Nothing waiting.} one {# waiting.} other {# waiting.}}"
+  description: "Admin panel, how many feedback rows wait for a moderator beyond this page (#171)."
+
+admin.feedback.kind.bug:
+  en: Bug
+  description: "Admin panel, the kind of a feedback row (#171)."
+
+admin.feedback.kind.idea:
+  en: Idea
+  description: "Admin panel, the kind of a feedback row (#171)."
+
+admin.feedback.kind.complaint:
+  en: Complaint
+  description: "Admin panel, the kind of a feedback row (#171)."
+
+admin.feedback.kind.praise:
+  en: Praise
+  description: "Admin panel, the kind of a feedback row (#171)."
+
+admin.feedback.meta:
+  en: "Version {version}, {platform}, {locale} · {time} · account {account}"
+  description: "Admin panel, the line under a feedback row's text (#171): the app's version, the platform and the language the app read, when it was sent, and the sender's account id shortened."
+
+admin.feedback.handle:
+  en: Mark as handled
+  description: "Admin panel, the button on a feedback row (#171); written to the audit log."
+
+admin.feedback.handled:
+  en: Handled.
+  description: "Admin panel, a feedback row after the moderator marked it (#171)."
+
+admin.feedback.handleFailed:
+  en: Marking did not work.
+  description: "Admin panel, the handled request failed (#171)."
+
 admin.queue.refresh:
   en: Refresh
   description: Admin panel, reloads the queue.
@@ -4984,6 +5043,118 @@ settings.account.summary:
   description: "Summary of the row that opens the export, the break and the deletion (#287); the row and its screen are titled by account.title."
   fi: "Tietosi, tauko, poisto"
   sv: "Dina uppgifter, en paus, radering"
+  machine: { fi: true, sv: true }
+
+settings.feedback.summary:
+  en: "A bug, an idea, a complaint or praise"
+  description: "Summary of the row under Account in Settings that opens the feedback screen (#171); the row and its screen are titled by feedback.title."
+  fi: "Vika, idea, valitus tai kehu"
+  sv: "En bugg, en idé, ett klagomål eller beröm"
+  machine: { fi: true, sv: true }
+
+feedback.title:
+  en: "Give feedback"
+  description: "Title of the feedback row in Settings and of the screen it opens (#171)."
+  fi: "Anna palautetta"
+  sv: "Ge respons"
+  machine: { fi: true, sv: true }
+
+feedback.explain:
+  en: "A few lines to the moderators: what went wrong, what you would like, what bothers you, or what works. Sent with the app's version, the platform and your language, nothing else. Nobody is mailed."
+  description: "Feedback screen, the line above the form (#171): what is sent along with the words, and that no mail follows."
+  fi: "Muutama rivi moderaattoreille: mikä meni pieleen, mitä toivoisit, mikä häiritsee tai mikä toimii. Mukana lähtevät sovelluksen versio, alusta ja kielesi, ei muuta. Kenellekään ei lähetetä sähköpostia."
+  sv: "Några rader till moderatorerna: vad som gick fel, vad du önskar, vad som stör eller vad som fungerar. Med följer appens version, plattformen och ditt språk, inget annat. Ingen får e-post."
+  machine: { fi: true, sv: true }
+
+feedback.kind.label:
+  en: "What is it about?"
+  description: "Feedback screen, the label of the group of four kind buttons (#171); heard as the radio group's name."
+  fi: "Mistä on kyse?"
+  sv: "Vad gäller det?"
+  machine: { fi: true, sv: true }
+
+feedback.kind.bug:
+  en: "A bug"
+  description: "Feedback screen, one of the four kinds (#171): something does not work."
+  fi: "Vika"
+  sv: "En bugg"
+  machine: { fi: true, sv: true }
+
+feedback.kind.idea:
+  en: "An idea"
+  description: "Feedback screen, one of the four kinds (#171): something the person would like."
+  fi: "Idea"
+  sv: "En idé"
+  machine: { fi: true, sv: true }
+
+feedback.kind.complaint:
+  en: "A complaint"
+  description: "Feedback screen, one of the four kinds (#171): something that bothers the person."
+  fi: "Valitus"
+  sv: "Ett klagomål"
+  machine: { fi: true, sv: true }
+
+feedback.kind.praise:
+  en: "Praise"
+  description: "Feedback screen, one of the four kinds (#171): something that works. Not the word for thank you, which the thanks line uses."
+  fi: "Kehu"
+  sv: "Beröm"
+  machine: { fi: true, sv: true }
+
+feedback.text.label:
+  en: "Your feedback"
+  description: "Feedback screen, the label of the text field (#171); the field is multiline, up to 2000 characters."
+  fi: "Palautteesi"
+  sv: "Din respons"
+  machine: { fi: true, sv: true }
+
+feedback.send:
+  en: "Send"
+  description: "Feedback screen, the button that sends (#171); disabled until a kind is chosen and something is written."
+  fi: "Lähetä"
+  sv: "Skicka"
+  machine: { fi: true, sv: true }
+
+feedback.sending:
+  en: "Sending…"
+  description: "Feedback screen, the send button while the request is on its way (#171)."
+  fi: "Lähetetään…"
+  sv: "Skickar…"
+  machine: { fi: true, sv: true }
+
+feedback.thanks.title:
+  en: "Thank you"
+  description: "Feedback screen, the heading after a send (#171)."
+  fi: "Kiitos"
+  sv: "Tack"
+  machine: { fi: true, sv: true }
+
+feedback.thanks.body:
+  en: "The moderators will read it. Nobody is mailed."
+  description: "Feedback screen, the line under the thanks (#171): what happens next, and that no mail follows."
+  fi: "Moderaattorit lukevat sen. Kenellekään ei lähetetä sähköpostia."
+  sv: "Moderatorerna läser den. Ingen får e-post."
+  machine: { fi: true, sv: true }
+
+feedback.another:
+  en: "Send more"
+  description: "Feedback screen, the button under the thanks that brings the empty form back (#171)."
+  fi: "Lähetä lisää"
+  sv: "Skicka mer"
+  machine: { fi: true, sv: true }
+
+feedback.failed:
+  en: "Sending did not work. Try again."
+  description: "Feedback screen, the request failed for a reason other than the day's cap (#171)."
+  fi: "Lähetys ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte att skicka. Försök igen."
+  machine: { fi: true, sv: true }
+
+feedback.limited:
+  en: "That is enough feedback for today. You can send more after midnight."
+  description: "Feedback screen, the request refused because the day's feedback is sent (matching_config feedback_per_day, #171); the day rolls at midnight in Finland. Never a number, the cap is a tunable."
+  fi: "Tältä päivältä palautetta on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen."
+  sv: "Det räcker med respons för i dag. Du kan skicka mer efter midnatt."
   machine: { fi: true, sv: true }
 
 settings.research.title:

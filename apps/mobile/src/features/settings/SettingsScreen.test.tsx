@@ -102,6 +102,7 @@ describe("the settings screen", () => {
     expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
     expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Your account" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Give feedback" })).toBeNull();
     for (const name of [
       "Theme",
       "Language",
@@ -143,6 +144,7 @@ describe("the settings screen", () => {
       "Account",
       "This device",
       "E-mail",
+      "Give feedback",
       "Your account",
     ].map((label) => flat.indexOf(`"${label}"`));
     expect(order.every((i) => i >= 0)).toBe(true);
@@ -180,6 +182,7 @@ describe("the settings screen", () => {
       ["Licences", "/settings/licenses"],
       ["This device", "/settings/device"],
       ["E-mail", "/settings/email"],
+      ["Give feedback", "/settings/feedback"],
       ["Your account", "/settings/account"],
     ];
     for (const [name, path] of expected) {

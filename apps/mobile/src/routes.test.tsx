@@ -25,6 +25,7 @@ import AccountSettingsRoute from "../app/settings/account";
 import ConsentRoute from "../app/settings/consent/[kind]";
 import DeviceRoute from "../app/settings/device";
 import EmailSettingsRoute from "../app/settings/email";
+import FeedbackRoute from "../app/settings/feedback";
 import SettingsRoute from "../app/settings/index";
 import LanguageRoute from "../app/settings/language";
 import LegalRoute from "../app/settings/legal/[kind]";
@@ -95,6 +96,7 @@ jest.mock("@/features/settings", () => {
     consentKindOf: (value: unknown) => (value === "special_category" ? value : "research"),
     DeviceScreen: probe("DeviceScreen"),
     EmailSettingsScreen: probe("EmailSettingsScreen"),
+    FeedbackScreen: probe("FeedbackScreen"),
     LanguageScreen: probe("LanguageScreen"),
     LegalScreen: probe("LegalScreen"),
     legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
@@ -145,6 +147,7 @@ describe("the screens without params", () => {
     ["/settings/account", AccountSettingsRoute, "AccountScreen"],
     ["/settings/device", DeviceRoute, "DeviceScreen"],
     ["/settings/email", EmailSettingsRoute, "EmailSettingsScreen"],
+    ["/settings/feedback", FeedbackRoute, "FeedbackScreen"],
     ["/settings/language", LanguageRoute, "LanguageScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
     ["/settings/source", SourceRoute, "SourceScreen"],

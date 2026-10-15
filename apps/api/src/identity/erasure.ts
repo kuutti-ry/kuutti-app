@@ -21,7 +21,9 @@ import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
 import {
   closerLookOf,
+  deleteFeedbackOfAccount,
   deletePhotoCheckNotesOfAccount,
+  listFeedbackOfAccount,
   listPhotoCheckNotes,
 } from "../safety/index.ts";
 import { currentConsent, exportConsents } from "./onboarding.ts";
@@ -40,6 +42,7 @@ import * as repo from "./repo.ts";
 // The consent rows go (ADR-010 §14): what they proved goes in the same
 // transaction, and the research events carry their own consent_version.
 // The export requests go (#237): the person's own trail, listed in the export.
+// The feedback goes (#171, ADR-023): the person's own words, listed in the export.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -62,6 +65,8 @@ export type ErasureSummary = {
   consents: number;
   /** The export requests (#237). */
   exports: number;
+  /** The feedback rows (#171). */
+  feedback: number;
   /** 0 or 1: the research_id mapping (#50); the events stay, unlinkable. */
   researchSubjects: number;
   photos: number;
@@ -100,6 +105,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // the version they were written under; nothing is left to prove.
     const consents = await repo.deleteConsentsOfAccount(tx, accountId);
     const exports = await repo.deleteExportsOfAccount(tx, accountId);
+    const feedback = await deleteFeedbackOfAccount(tx, accountId);
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
     await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
@@ -118,6 +124,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       preferences,
       consents,
       exports,
+      feedback,
       researchSubjects,
       reregisterAfter: deletion.reregisterAfter,
     };
@@ -136,6 +143,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     preferences: result.preferences,
     consents: result.consents,
     exports: result.exports,
+    feedback: result.feedback,
     researchSubjects: result.researchSubjects,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
@@ -197,7 +205,7 @@ export async function exportAccount(
     accountId,
     await currentConsent(deps.db, accountId, "special_category"),
   );
-  const [pond, preferences, consents, research, gate, dealBreakers, photoCheck, exports] =
+  const [pond, preferences, consents, research, gate, dealBreakers, photoCheck, exports, feedback] =
     await Promise.all([
       findPondOfAccount(deps.db, accountId),
       readPreferences(deps.db, accountId),
@@ -207,6 +215,7 @@ export async function exportAccount(
       readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
       exportPhotoCheck(deps, accountId, t),
       repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+      listFeedbackOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -253,6 +262,7 @@ export async function exportAccount(
     research,
     gate,
     exports: exports.map((e) => ({ at: e.at.toISOString() })),
+    feedback,
   };
   return { document, files: photos.files };
 }

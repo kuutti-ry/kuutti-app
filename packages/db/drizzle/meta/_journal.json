@@ -288,6 +288,20 @@
       "when": 1791895776088,
       "tag": "0040_exports_per_day",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1792060843226,
+      "tag": "0041_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792060843776,
+      "tag": "0042_feedback_per_day",
+      "breakpoints": true
     }
   ]
 }

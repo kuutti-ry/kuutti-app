@@ -161,6 +161,17 @@ function anExport(): Record<string, unknown> {
     research: { enrolled: false, since: null, consentVersion: null, events: [] },
     gate: null,
     exports: [{ at }],
+    feedback: [
+      {
+        at,
+        kind: "idea",
+        text: "The map is slow on my phone.",
+        appVersion: "0.22.0",
+        platform: "ios",
+        locale: "fi",
+        handledAt: null,
+      },
+    ],
   };
 }
 
@@ -232,6 +243,19 @@ describe("the account export", () => {
     ["photos", 50, () => photo(0)],
     ["photoAccessLog", 1000, () => ({ photoId: uuid(100), variant: "card", at })],
     ["cardsShown", 1000, () => ({ photoId: uuid(101), at })],
+    [
+      "feedback",
+      1000,
+      () => ({
+        at,
+        kind: "praise",
+        text: "x",
+        appVersion: "0.22.0",
+        platform: "web",
+        locale: "sv",
+        handledAt: at,
+      }),
+    ],
   ])("holds at most so many %s: %i", (key, max, entry) => {
     const full = anExport();
     full[key] = Array.from({ length: max }, entry);

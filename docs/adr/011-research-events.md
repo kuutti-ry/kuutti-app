@@ -58,3 +58,4 @@ The research opt-in exists as a consent row bound to a wording (#46). Nothing ye
 
 - 2026-10-13: the consent rows no longer survive erasure (ADR-010 §14, #51), so the handle §1 names, a consent's `given_at` beside an opt-in event's hour, goes with the account. The tombstone's `registered_at` is the one that remains; the truncation to the hour and to whole days stays.
 - 2026-10-15: the events leave the person's export (§10, #51, the maintainer's decision): the copy shows the enrolment, since when and under which wording, and no event; `ResearchEventRecord` and the events reader are removed. Version 0.21.0.
+- 2026-10-15 (#171, ADR-023): `feedback_sent { kind }` joins the registry, the kind alone; the words of the feedback reach no event.

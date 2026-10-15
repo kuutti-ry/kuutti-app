@@ -2,11 +2,12 @@ import { formatTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
+import { FeedbackList } from "./features/safety/index.ts";
 import mark from "./logo-mark.png";
 import { SourceOffer } from "./source-offer.tsx";
 
 // The moderation panel (#49, rules/admin.md): a staff bank login, then the
-// photo review queue. English only by decision (TD-17); plain React, so the
+// photo review queue and the feedback people sent from the app (#171). English only by decision (TD-17); plain React, so the
 // component-library question of rules/admin.md stays open.
 export function App() {
   const { t, locale } = useT();
@@ -33,7 +34,14 @@ export function App() {
         {session.status === "loading" && <p aria-busy="true">{t("admin.queue.loading")}</p>}
         {session.status === "signed-out" && <SignIn />}
         {session.status === "signed-in" &&
-          (session.session.role === "researcher" ? <p>{t("admin.forbidden")}</p> : <PhotoQueue />)}
+          (session.session.role === "researcher" ? (
+            <p>{t("admin.forbidden")}</p>
+          ) : (
+            <>
+              <PhotoQueue />
+              <FeedbackList />
+            </>
+          ))}
       </main>
       <SourceOffer />
     </>
