@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FeedbackKind } from "./feedback.ts";
 import { Gender } from "./onboarding.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
 
@@ -33,6 +34,11 @@ export const RESEARCH_EVENTS = {
   account_paused: {
     question: "How many people step away for a while rather than delete (#170)?",
     props: props({}),
+  },
+  feedback_sent: {
+    question: "Which kinds of feedback come from inside the app, and how often (#171)?",
+    /** The kind alone: the words reach no event (rule 5, ADR-023). */
+    props: props({ kind: FeedbackKind }),
   },
   account_resumed: {
     question: "How long do breaks last before the person comes back (#170)?",

@@ -1,0 +1,36 @@
+# Give feedback (#171, ADR-023): from Settings, under Account, a kind chosen
+# in words, a few lines, Send, and the thanks; the moderators' side is the
+# API's tests. Sanna: the row she leaves is hers alone, one run is far from
+# her day's cap of five, and `pnpm demo:reset` takes the rows with her account.
+appId: fi.kuutti.app
+name: Feedback sent from Settings is thanked, the kind chosen in words
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# The row sits under Account, below the fold on a phone: scrolled to, then tapped.
+- scrollUntilVisible:
+    element: "Give feedback|Anna palautetta|Ge respons"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Give feedback|Anna palautetta|Ge respons"
+- extendedWaitUntil:
+    visible: "What is it about\\?|Mistä on kyse\\?|Vad gäller det\\?"
+    timeout: 15000
+# The kind is a radio button whose label ticks it in words, never a colour alone.
+- tapOn: "An idea|Idea|En idé"
+- assertVisible: "✓ An idea|✓ Idea|✓ En idé"
+- tapOn: "Your feedback|Palautteesi|Din respons"
+- inputText: "A flow left this line to see that feedback lands"
+# A tap on the question, which is no button, closes the keyboard (README, the keyboard).
+- tapOn: "What is it about\\?|Mistä on kyse\\?|Vad gäller det\\?"
+- tapOn: "Send|Lähetä|Skicka"
+- extendedWaitUntil:
+    visible: "Thank you|Kiitos|Tack"
+    timeout: 15000
+- assertVisible: "The moderators will read it\\. Nobody is mailed\\.|Moderaattorit lukevat sen\\. Kenellekään ei lähetetä sähköpostia\\.|Moderatorerna läser den\\. Ingen får e-post\\."
+- tapOn: "Back|Takaisin|Tillbaka"
+- assertVisible: "Settings|Asetukset|Inställningar"

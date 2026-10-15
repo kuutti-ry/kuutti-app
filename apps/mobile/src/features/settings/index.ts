@@ -4,6 +4,7 @@ export { AccountScreen } from "./AccountScreen";
 export { ConsentScreen, consentKindOf } from "./ConsentScreen";
 export { DeviceScreen } from "./DeviceScreen";
 export { EmailSettingsScreen } from "./EmailSettingsScreen";
+export { FeedbackScreen } from "./FeedbackScreen";
 export { LanguageScreen } from "./LanguageScreen";
 export { LegalScreen, legalKindOf } from "./LegalScreen";
 export { LicensesScreen } from "./LicensesScreen";

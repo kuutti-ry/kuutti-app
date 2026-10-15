@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AccountState } from "./account-state.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
+import { ExportedFeedback } from "./feedback.ts";
 import { ExportedGate } from "./gate.ts";
 import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
 import { Photo, PhotoCheckKind, PhotoRejectionReason, PhotoVariant } from "./media.ts";
@@ -177,6 +178,8 @@ export const AccountExport = z
     gate: ExportedGate.nullable(),
     /** The person's own requests for a copy (#237), this one included, newest first, at most 1000; at most matching_config exports_per_day are answered per Finnish day. */
     exports: z.array(z.object({ at: z.iso.datetime() })).max(1000),
+    /** What the person sent as feedback (#171), newest first, at most 1000, with whether a moderator has read it. */
+    feedback: z.array(ExportedFeedback).max(1000),
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

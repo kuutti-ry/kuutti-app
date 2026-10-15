@@ -2102,6 +2102,237 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send feedback to the moderators
+         * @description A kind (bug, idea, complaint, praise) and a few lines, with the app's version, the platform and the language the app read. Stored for the moderators' panel; the text reaches no log line and no research event. At most matching_config feedback_per_day a day per account, the Finnish calendar day.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FeedbackRequest"];
+                };
+            };
+            responses: {
+                /** @description Stored. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed: an unknown kind, an empty or too long text, an unknown platform. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account: erased between the session guard and the record (not_found). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description feedback_budget_exceeded: the day's feedback is sent; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feedback waiting for a moderator
+         * @description The unhandled rows: a bug first and praise last, the oldest first within a kind, with the app's version, the platform and the language the app read, and the sender's account id.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description What waits. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FeedbackList"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/feedback/{id}/handled": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark feedback as handled
+         * @description A moderator read it. Once; written to audit_log with the kind.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description When it was marked. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FeedbackHandledResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such feedback. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description feedback_handled: already marked. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gate": {
         parameters: {
             query?: never;
@@ -2593,6 +2824,7 @@ export interface components {
                 /** Format: date-time */
                 at: string;
             }[];
+            feedback: components["schemas"]["ExportedFeedback"][];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -2775,6 +3007,21 @@ export interface components {
             /** Format: date-time */
             countedAt: string | null;
         } | null;
+        ExportedFeedback: {
+            /** Format: date-time */
+            at: string;
+            kind: components["schemas"]["FeedbackKind"];
+            text: string;
+            appVersion: string;
+            platform: components["schemas"]["FeedbackPlatform"];
+            locale: string;
+            /** Format: date-time */
+            handledAt: string | null;
+        };
+        /** @enum {string} */
+        FeedbackKind: "bug" | "idea" | "complaint" | "praise";
+        /** @enum {string} */
+        FeedbackPlatform: "ios" | "android" | "web";
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -3100,6 +3347,38 @@ export interface components {
         };
         /** @enum {string} */
         WithdrawableConsentKind: "research" | "special_category";
+        FeedbackRequest: {
+            kind: components["schemas"]["FeedbackKind"];
+            text: string;
+            appVersion: string;
+            platform: components["schemas"]["FeedbackPlatform"];
+            locale: string;
+        };
+        FeedbackList: {
+            items: components["schemas"]["FeedbackItem"][];
+            total: number;
+        };
+        FeedbackItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            accountId: string;
+            kind: components["schemas"]["FeedbackKind"];
+            text: string;
+            appVersion: string;
+            platform: components["schemas"]["FeedbackPlatform"];
+            locale: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            handledAt: string | null;
+        };
+        FeedbackHandledResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            handledAt: string;
+        };
         GateResponse: {
             state: components["schemas"]["GateState"];
             within: number | null;

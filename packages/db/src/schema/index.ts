@@ -6,6 +6,7 @@ export {
 } from "./admin.ts";
 export { type AuthRequest, authRequest } from "./auth-request.ts";
 export { consent, consentKind } from "./consent.ts";
+export { feedback, feedbackKind, feedbackPlatform } from "./feedback.ts";
 export { gate } from "./gate.ts";
 export {
   type Account,

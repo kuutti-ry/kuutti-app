@@ -4,6 +4,7 @@ export * from "./admin.ts";
 export type { components as ApiComponents, paths as ApiPaths } from "./api.generated.ts";
 export * from "./deal-breakers.ts";
 export { ErrorResponse } from "./errors.ts";
+export * from "./feedback.ts";
 export * from "./gate.ts";
 export { HealthResponse } from "./health.ts";
 export * from "./identity.ts";

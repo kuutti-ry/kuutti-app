@@ -34,6 +34,7 @@ describe("the tables", () => {
       "auth_request",
       "card_shown",
       "consent",
+      "feedback",
       "gate",
       "identity",
       "matching_config",
@@ -115,6 +116,7 @@ describe("the foreign keys", () => {
       "auth_request",
       "card_shown",
       "consent",
+      "feedback",
       "gate",
       "photo",
       "photo_access",
@@ -132,6 +134,7 @@ describe("the foreign keys", () => {
       "admin_session.identity_id",
       "audit_log.actor_identity_id",
       "auth_request.identity_id",
+      "feedback.handled_by",
       "moderator_roles.identity_id",
       "photo_review.decided_by",
     ]);
@@ -182,6 +185,8 @@ describe("the indexes", () => {
   it.each([
     ["photo_access", "photo_access_account_at_idx", ["account_id", "at"]],
     ["account_export", "account_export_account_at_idx", ["account_id", "at"]],
+    ["feedback", "feedback_account_created_idx", ["account_id", "created_at"]],
+    ["feedback", "feedback_handled_created_idx", ["handled_at", "created_at"]],
     ["card_shown", "card_shown_photo_idx", ["photo_id"]],
     ["session", "session_retired_refresh_hash_idx", ["retired_refresh_hash"]],
     ["auth_request", "auth_request_expires_at_idx", ["expires_at"]],

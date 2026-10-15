@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.21.1",
+    "version": "0.22.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -283,6 +283,13 @@
               ]
             },
             "maxItems": 1000
+          },
+          "feedback": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedFeedback"
+            },
+            "maxItems": 1000
           }
         },
         "required": [
@@ -301,7 +308,8 @@
           "photoCheck",
           "research",
           "gate",
-          "exports"
+          "exports",
+          "feedback"
         ]
       },
       "Gender": {
@@ -1217,6 +1225,64 @@
           "poolSaid",
           "openedAt",
           "countedAt"
+        ]
+      },
+      "ExportedFeedback": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FeedbackKind"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "appVersion": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "platform": {
+            "$ref": "#/components/schemas/FeedbackPlatform"
+          },
+          "locale": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "handledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "at",
+          "kind",
+          "text",
+          "appVersion",
+          "platform",
+          "locale",
+          "handledAt"
+        ]
+      },
+      "FeedbackKind": {
+        "type": "string",
+        "enum": [
+          "bug",
+          "idea",
+          "complaint",
+          "praise"
+        ]
+      },
+      "FeedbackPlatform": {
+        "type": "string",
+        "enum": [
+          "ios",
+          "android",
+          "web"
         ]
       },
       "HealthResponse": {
@@ -2383,6 +2449,131 @@
         "enum": [
           "research",
           "special_category"
+        ]
+      },
+      "FeedbackRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/FeedbackKind"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "appVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "platform": {
+            "$ref": "#/components/schemas/FeedbackPlatform"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16
+          }
+        },
+        "required": [
+          "kind",
+          "text",
+          "appVersion",
+          "platform",
+          "locale"
+        ],
+        "additionalProperties": false
+      },
+      "FeedbackList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedbackItem"
+            },
+            "maxItems": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ]
+      },
+      "FeedbackItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FeedbackKind"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "appVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "platform": {
+            "$ref": "#/components/schemas/FeedbackPlatform"
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 16
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "handledAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "accountId",
+          "kind",
+          "text",
+          "appVersion",
+          "platform",
+          "locale",
+          "createdAt",
+          "handledAt"
+        ]
+      },
+      "FeedbackHandledResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "handledAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "handledAt"
         ]
       },
       "GateResponse": {
@@ -4436,6 +4627,222 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/feedback": {
+      "post": {
+        "summary": "Send feedback to the moderators",
+        "description": "A kind (bug, idea, complaint, praise) and a few lines, with the app's version, the platform and the language the app read. Stored for the moderators' panel; the text reaches no log line and no research event. At most matching_config feedback_per_day a day per account, the Finnish calendar day.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Stored."
+          },
+          "400": {
+            "description": "Validation failed: an unknown kind, an empty or too long text, an unknown platform.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account: erased between the session guard and the record (not_found).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "feedback_budget_exceeded: the day's feedback is sent; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/feedback": {
+      "get": {
+        "summary": "Feedback waiting for a moderator",
+        "description": "The unhandled rows: a bug first and praise last, the oldest first within a kind, with the app's version, the platform and the language the app read, and the sender's account id.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What waits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/feedback/{id}/handled": {
+      "post": {
+        "summary": "Mark feedback as handled",
+        "description": "A moderator read it. Once; written to audit_log with the kind.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "When it was marked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackHandledResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such feedback.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "feedback_handled: already marked.",
             "content": {
               "application/json": {
                 "schema": {

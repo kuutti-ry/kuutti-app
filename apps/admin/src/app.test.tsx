@@ -46,6 +46,7 @@ function staffApi(role = "moderator", calls: string[] = [], options = { logoutFa
     if (key === "GET /health") return json(health);
     if (key === "GET /admin/whoami") return json({ role, expiresAt: staff.expiresAt });
     if (key === "GET /admin/photos/queue") return json({ items: [], total: 0 });
+    if (key === "GET /admin/feedback") return json({ items: [], total: 0 });
     if (key === "POST /admin/auth/logout") {
       if (options.logoutFails) throw new TypeError("Failed to fetch");
       return new Response(null, { status: 204 });

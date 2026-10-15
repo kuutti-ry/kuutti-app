@@ -438,6 +438,47 @@ describe("account erasure", () => {
     expect(logs().find((l) => l.msg === "account erased")).toMatchObject({ exports: 1 });
   });
 
+  test("The feedback goes with the account, and the export lists it until then", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, { media: false });
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const send = (headers: Record<string, string>, kind: string) =>
+      app.request("/feedback", {
+        method: "POST",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          kind,
+          text: `a few lines about ${kind}`,
+          appVersion: "0.22.0",
+          platform: "android",
+          locale: "sv",
+        }),
+      });
+    expect((await send(a.headers, "idea")).status).toBe(204);
+    expect((await send(b.headers, "praise")).status).toBe(204);
+    const document = await exportOf(app, a.headers);
+    expect(document.feedback).toEqual([
+      {
+        at: expect.any(String),
+        kind: "idea",
+        text: "a few lines about idea",
+        appVersion: "0.22.0",
+        platform: "android",
+        locale: "sv",
+        handledAt: null,
+      },
+    ]);
+    expect(JSON.stringify(document)).not.toContain("praise");
+    expect((await del(app, a.headers)).status).toBe(204);
+    const of = (id: string) =>
+      count(ctx, "SELECT count(*) AS n FROM feedback WHERE account_id = $1", [id]);
+    expect(await of(a.accountId)).toBe(0);
+    expect(await of(b.accountId)).toBe(1);
+    expect(logs().find((l) => l.msg === "account erased")).toMatchObject({ feedback: 1 });
+  });
+
   test("Deletion and export refuse without a session", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const staff = await staffSession(ctx.client);

@@ -35,6 +35,7 @@ import { preferencesRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { pondRoutes } from "./pond/index.ts";
 import { exportProfile, profileRoutes } from "./profile/index.ts";
+import { feedbackAdminRoutes, feedbackRoutes } from "./safety/index.ts";
 
 export type { AppEnv };
 
@@ -137,6 +138,8 @@ export function createApp(deps: Deps) {
   app.route("/", photoAdminRoutes(deps, moderators));
   app.route("/", profileRoutes(deps, guard));
   app.route("/", onboardingRoutes(deps, guard));
+  app.route("/", feedbackRoutes(deps, guard));
+  app.route("/", feedbackAdminRoutes(deps, moderators));
   // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",

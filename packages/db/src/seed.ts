@@ -89,6 +89,10 @@ export const MATCHING_CONFIG_V1 = {
   // day, counted from account_export in the statement that writes it. The
   // zip carries every full-size photo, so the day's copies bound the exposure.
   exports_per_day: 3,
+  // #171 (ADR-023, migration 0042): feedback a person may send per Finnish
+  // day, counted from feedback in the statement that writes the row; the
+  // sixth is refused in words.
+  feedback_per_day: 5,
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,

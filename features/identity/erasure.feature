@@ -71,6 +71,13 @@ Feature: Account deletion per the erasure table
     When "A" deletes the account
     Then no export request of "A" remains and "B"'s does
 
+  Scenario: The feedback goes with the account, and the export lists it until then
+    Given "A" and "B" each sent feedback
+    When "A" exports the account
+    Then the export lists "A"'s feedback with its kind, the build and whether a moderator read it, and nothing of "B"'s
+    When "A" deletes the account
+    Then no feedback of "A" remains and "B"'s does
+
   Scenario: Deletion and export refuse without a session
     When nobody or a staff token calls the account routes
     Then the answer is 401

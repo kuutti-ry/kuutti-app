@@ -208,6 +208,7 @@ describe("migrate", () => {
           "card_shown",
           "consent",
           "events",
+          "feedback",
           "gate",
           "identity",
           "matching_config",
