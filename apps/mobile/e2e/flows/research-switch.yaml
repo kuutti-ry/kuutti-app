@@ -28,6 +28,13 @@ name: The research switch in Settings records the opt-in and withdraws it again
     timeout: 15000
 
 - openLink: kuutti://
+# A link is answered as soon as it is sent, before the screen has changed: with
+# Settings opened straight over the consent's screen, whose header is the row's
+# title, the scroll found the header and tapped it (CI on main, 14/10/2026).
+# So home first, the consent's screen gone, and Settings over that.
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000
 - openLink: kuutti://settings
 - scrollUntilVisible:
     element: "(Research|Tutkimus|Forskning)(, .*)?"
