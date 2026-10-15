@@ -1,3 +1,4 @@
+import { PhotoCaption } from "@kuutti/schema";
 import { useLocalSearchParams } from "expo-router";
 import { PhotoZoomScreen } from "@/features/media";
 
@@ -8,13 +9,17 @@ export default function PhotoZoomRoute() {
     blurhash?: string;
     position?: string;
     total?: string;
+    caption?: string;
   }>();
+  // The grid passes the caption's key (#296); anything else in the link is no caption.
+  const caption = PhotoCaption.safeParse(params.caption);
   return (
     <PhotoZoomScreen
       id={params.id}
       blurhash={params.blurhash ?? ""}
       position={Number(params.position ?? "1")}
       total={Number(params.total ?? "1")}
+      caption={caption.success ? caption.data : null}
     />
   );
 }

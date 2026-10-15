@@ -21,6 +21,8 @@ import { useT } from "@/lib/locale";
 import { TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { useMotionDuration } from "@/theme/useReducedMotion";
+import { CaptionDialog } from "./CaptionDialog";
+import { captionKey } from "./captions";
 import { PhotoImage } from "./PhotoImage";
 import { PhotoTip } from "./tips";
 import { useDragOrder } from "./useDragOrder";
@@ -71,6 +73,7 @@ const ERROR_TEXT: ReadonlyMap<string, PlainMessageKey> = new Map([
 function noticeText(notice: PhotosNotice, t: ReturnType<typeof useT>["t"]): string {
   if (notice.kind === "refused_local") return t("photos.refused.local");
   if (notice.kind === "permission") return t("photos.error.permission");
+  if (notice.kind === "caption_failed") return t("photos.caption.failed");
   return t(ERROR_TEXT.get(notice.code ?? "") ?? "photos.error.generic");
 }
 
@@ -101,8 +104,14 @@ export function PhotosScreen() {
   const tap = useHapticTap();
   const photos = usePhotos();
   const [removing, setRemoving] = useState<Photo | null>(null);
+  // The photo whose caption is being chosen (#296), read from the list so the dialog marks the line as it stands.
+  const [captioningId, setCaptioningId] = useState<string | null>(null);
 
   const list = photos.list;
+  const captioningIndex = list?.photos.findIndex((photo) => photo.id === captioningId) ?? -1;
+  const captioning = captioningIndex >= 0 ? (list?.photos[captioningIndex] ?? null) : null;
+  const captionText = (photo: Photo) =>
+    photo.caption ? t(captionKey(photo.caption)) : t("photos.caption.none");
   const total = list?.photos.length ?? 0;
   // The main photo is the first one others see: the first approved in the
   // owner's order, as the card and the tips read it (ADR-009 §4). The first
@@ -166,7 +175,9 @@ export function PhotosScreen() {
         )}
 
         {/* By the photos it is about (#287): one advisory tip, the main photo's first. */}
-        {list && <PhotoTip tips={list.tips} fishSpecies={list.fishSpecies} />}
+        {list && (
+          <PhotoTip tips={list.tips} fishSpecies={list.fishSpecies} mainId={mainId ?? null} />
+        )}
 
         {list && total === 0 && <Text variant="muted">{t("photos.empty")}</Text>}
 
@@ -204,6 +215,7 @@ export function PhotosScreen() {
                             blurhash: photo.blurhash,
                             position: String(index + 1),
                             total: String(total),
+                            ...(photo.caption ? { caption: photo.caption } : {}),
                           },
                         });
                       }}
@@ -218,7 +230,15 @@ export function PhotosScreen() {
                         id={photo.id}
                         variant="thumb"
                         blurhash={photo.blurhash}
-                        accessibilityLabel={t("photos.imageLabel", { position: index + 1, total })}
+                        accessibilityLabel={
+                          photo.caption
+                            ? t("photos.imageLabelCaption", {
+                                position: index + 1,
+                                total,
+                                caption: t(captionKey(photo.caption)),
+                              })
+                            : t("photos.imageLabel", { position: index + 1, total })
+                        }
                         style={{ width: "100%", aspectRatio: 1 }}
                         onRefused={(code) => {
                           if (code === "photo_budget_exceeded") photos.reportRefusal(code);
@@ -229,6 +249,19 @@ export function PhotosScreen() {
                       {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
                       <Text variant="muted">{stateText(photo, t)}</Text>
                     </View>
+                    {/* The owner's line under the photo (#296): the button says the line, or asks for one. */}
+                    <Button
+                      variant="outline"
+                      accessibilityLabel={t("photos.caption.open", { position: index + 1 })}
+                      accessibilityValue={{ text: captionText(photo) }}
+                      disabled={busy}
+                      onPress={() => {
+                        tap();
+                        setCaptioningId(photo.id);
+                      }}
+                    >
+                      {photo.caption ? t(captionKey(photo.caption)) : t("photos.caption.add")}
+                    </Button>
                     {photo.state === "rejected" && photo.appealable && (
                       <Button
                         variant="outline"
@@ -292,6 +325,17 @@ export function PhotosScreen() {
           {t("photos.done")}
         </Button>
       </ScrollView>
+
+      <CaptionDialog
+        photo={captioning}
+        position={captioningIndex + 1}
+        onChoose={(line) => {
+          const photo = captioning;
+          setCaptioningId(null);
+          if (photo) void photos.caption(photo.id, line);
+        }}
+        onClose={() => setCaptioningId(null)}
+      />
 
       <Dialog open={removing !== null} onOpenChange={(open) => !open && setRemoving(null)}>
         <DialogContent closeLabel={t("photos.dialog.close")}>

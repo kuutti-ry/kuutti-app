@@ -4,12 +4,13 @@ import { Platform } from "react-native";
 
 /**
  * Small, non-secret settings that survive a restart: the language override
- * (#13), the theme and the high-contrast choice (#143). expo-secure-store is
- * already in the binary, so no storage module is added for three strings; the
- * web preview uses localStorage. Session tokens do not go through here
+ * (#13), the theme and the high-contrast choice (#143), and the photo tips
+ * said for the current main photo (#297). expo-secure-store is already in
+ * the binary, so no storage module is added for a few strings; the web
+ * preview uses localStorage. Session tokens do not go through here
  * (rules/mobile.md).
  */
-export type PreferenceKey = "locale" | "scheme" | "highContrast";
+export type PreferenceKey = "locale" | "scheme" | "highContrast" | "photoTipsSeen";
 
 const storageKey = (key: PreferenceKey): string => `kuutti.preference.${key}`;
 

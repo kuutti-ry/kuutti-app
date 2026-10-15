@@ -8,7 +8,7 @@ import {
 import { View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
-import { type OnRefused, PhotoImage } from "@/features/media";
+import { captionKey, type OnRefused, PhotoImage } from "@/features/media";
 import { pondName } from "@/features/pond";
 import { useT } from "@/lib/locale";
 import { FieldLabel } from "./fieldIcons";
@@ -36,6 +36,15 @@ export function ProfileCardView({
   const [main, ...rest] = card.photos;
   const [firstPrompt, ...morePrompts] = card.prompts;
   const total = card.photos.length;
+  // A photo's label says its caption too (#296), so a screen reader hears the owner's line with the picture.
+  const photoLabel = (photo: ProfileCard["photos"][number], position: number) =>
+    photo.caption
+      ? t("profile.card.photoLabelCaption", {
+          position,
+          total,
+          caption: t(captionKey(photo.caption)),
+        })
+      : t("profile.card.photoLabel", { position, total });
   const fields = card.fields as Record<string, unknown>;
   const identityLabel = typeof fields.identityLabel === "string" ? fields.identityLabel : null;
 
@@ -71,12 +80,13 @@ export function ProfileCardView({
           id={main.id}
           variant="card"
           blurhash={main.blurhash}
-          accessibilityLabel={t("profile.card.photoLabel", { position: 1, total })}
+          accessibilityLabel={photoLabel(main, 1)}
           style={{ width: "100%", aspectRatio: 3 / 4 }}
           onRefused={onRefused}
         />
       )}
       <CardHeader>
+        {main?.caption && <Caption text={t(captionKey(main.caption))} />}
         {/* The age in the title, as visible as the name: every account is bank-verified,
             so the card does not say so (#239). */}
         <CardTitle>
@@ -93,15 +103,17 @@ export function ProfileCardView({
         {rest.length > 0 && (
           <View className="flex-row flex-wrap gap-2">
             {rest.map((photo, index) => (
-              <PhotoImage
-                key={photo.id}
-                id={photo.id}
-                variant="thumb"
-                blurhash={photo.blurhash}
-                accessibilityLabel={t("profile.card.photoLabel", { position: index + 2, total })}
-                style={{ width: 96, height: 96, borderRadius: 8 }}
-                onRefused={onRefused}
-              />
+              <View key={photo.id} className="w-24 gap-1">
+                <PhotoImage
+                  id={photo.id}
+                  variant="thumb"
+                  blurhash={photo.blurhash}
+                  accessibilityLabel={photoLabel(photo, index + 2)}
+                  style={{ width: 96, height: 96, borderRadius: 8 }}
+                  onRefused={onRefused}
+                />
+                {photo.caption && <Caption text={t(captionKey(photo.caption))} />}
+              </View>
             ))}
           </View>
         )}
@@ -140,5 +152,23 @@ export function ProfileCardView({
         {morePrompts.map(prompt)}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The owner's line under a photo (#296), for the eye. The photo's own label
+ * already says it to a screen reader, so the text is not an element of its
+ * own there: the line is heard once, with the picture.
+ */
+function Caption({ text }: { text: string }) {
+  return (
+    <Text
+      variant="small"
+      className="text-muted-foreground"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {text}
+    </Text>
   );
 }

@@ -1249,6 +1249,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/photos/{id}/caption": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the caption of a photo
+         * @description A line from a closed list, shown under the photo to others in their own language (#296); null clears it. A key, never the person's text, so nothing is checked.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: components["schemas"]["PhotoId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PhotoCaptionRequest"];
+                };
+            };
+            responses: {
+                /** @description The photo with its caption. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Photo"];
+                    };
+                };
+                /** @description Validation failed: not a line of the list. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description Not a photo of this account. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/photos/order": {
         parameters: {
             query?: never;
@@ -2947,6 +3019,12 @@ export interface components {
             position: number;
             /** Format: date-time */
             createdAt: string;
+            /**
+             * @description The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer.
+             * @default null
+             * @enum {string|null}
+             */
+            caption: "recent" | "old_favourite" | "found_again" | "friends_chose" | "someone_else_took" | "everyday_me" | "in_my_element" | "favourite_place" | "travelling" | "summer_day" | "winter_day" | "four_legged" | "at_work" | "my_hobby" | "proud_of" | "ask_me" | null;
             file: string | null;
             /** @description The moderation outcome; label names are not part of it. */
             review: {
@@ -3183,6 +3261,12 @@ export interface components {
             position: number;
             /** Format: date-time */
             createdAt: string;
+            /**
+             * @description The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer.
+             * @default null
+             * @enum {string|null}
+             */
+            caption: "recent" | "old_favourite" | "found_again" | "friends_chose" | "someone_else_took" | "everyday_me" | "in_my_element" | "favourite_place" | "travelling" | "summer_day" | "winter_day" | "four_legged" | "at_work" | "my_hobby" | "proud_of" | "ask_me" | null;
         };
         /** @enum {string} */
         TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
@@ -3198,6 +3282,11 @@ export interface components {
              */
             photo: string;
         };
+        PhotoCaptionRequest: {
+            caption: components["schemas"]["PhotoCaption"];
+        };
+        /** @enum {string|null} */
+        PhotoCaption: "recent" | "old_favourite" | "found_again" | "friends_chose" | "someone_else_took" | "everyday_me" | "in_my_element" | "favourite_place" | "travelling" | "summer_day" | "winter_day" | "four_legged" | "at_work" | "my_hobby" | "proud_of" | "ask_me" | null;
         PhotoOrderRequest: {
             order: components["schemas"]["PhotoId"][];
         };
@@ -3295,6 +3384,7 @@ export interface components {
             blurhash: string;
             width: number;
             height: number;
+            caption?: components["schemas"]["PhotoCaption"];
         };
         OnboardingStatus: {
             /** @enum {string} */

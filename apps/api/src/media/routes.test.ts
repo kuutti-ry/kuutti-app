@@ -324,6 +324,61 @@ describe("photo routes", () => {
     expect((await reorder([])).status).toBe(400);
   });
 
+  test("a caption is a line from the list (#296): set and on the list, cleared by null; not a line, another account's photo and no session are refused", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    const me = await signedInAccount(ctx.client, "a");
+    const other = await signedInAccount(ctx.client, "b");
+    const photo = Photo.parse(
+      await (await upload(app, me.headers, await fixturePng(400, 300))).json(),
+    );
+    expect(photo.caption).toBeNull();
+    const caption = (headers: Record<string, string>, id: string, body: unknown) =>
+      app.request(`/photos/${id}/caption`, {
+        method: "PUT",
+        headers: { ...headers, "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+    const set = await caption(me.headers, photo.id, { caption: "old_favourite" });
+    expect(set.status).toBe(200);
+    expect(Photo.parse(await set.json())).toMatchObject({ id: photo.id, caption: "old_favourite" });
+    const list = PhotoList.parse(
+      await (await app.request("/photos", { headers: me.headers })).json(),
+    );
+    expect(list.photos.map((p) => p.caption)).toEqual(["old_favourite"]);
+
+    const cleared = await caption(me.headers, photo.id, { caption: null });
+    expect(cleared.status).toBe(200);
+    expect(Photo.parse(await cleared.json()).caption).toBeNull();
+
+    // A key from the list, never the person's words: anything else is a validation failure.
+    expect((await caption(me.headers, photo.id, { caption: "my own words" })).status).toBe(400);
+    expect((await caption(me.headers, photo.id, { caption: "" })).status).toBe(400);
+    expect((await caption(me.headers, photo.id, {})).status).toBe(400);
+    expect((await caption(me.headers, photo.id, { caption: "recent", extra: 1 })).status).toBe(400);
+
+    const theirs = await caption(other.headers, photo.id, { caption: "recent" });
+    expect(theirs.status).toBe(404);
+    expect(await errorCode(theirs)).toBe("not_found");
+    const unknown = await caption(me.headers, "00000000-0000-4000-8000-000000000001", {
+      caption: "recent",
+    });
+    expect(unknown.status).toBe(404);
+    const noSession = await caption({}, photo.id, { caption: "recent" });
+    expect(noSession.status).toBe(401);
+
+    // Nothing of the refused attempts stuck, and the log names the photo, not the line.
+    const after = PhotoList.parse(
+      await (await app.request("/photos", { headers: me.headers })).json(),
+    );
+    expect(after.photos.map((p) => p.caption)).toEqual([null]);
+    const captioned = logs().filter((l) => l.msg === "photo captioned");
+    expect(captioned).toHaveLength(2);
+    expect(JSON.stringify(captioned)).not.toContain("old_favourite");
+  });
+
   test("deleting removes the row and closes the gap; the objects go only when no other row shares them", async ({
     ctx,
   }) => {

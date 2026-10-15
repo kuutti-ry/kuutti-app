@@ -2,6 +2,7 @@ import {
   ErrorResponse,
   FishSpecies,
   Photo,
+  type PhotoCaption,
   PhotoList,
   PhotoUrlResponse,
   type PhotoVariant,
@@ -59,6 +60,16 @@ export async function appealPhoto(id: string): Promise<Photo> {
     params: { path: { id } },
   });
   if (!data) throw failed(response, error, "photo appeal");
+  return Photo.parse(data);
+}
+
+/** The owner's line under a photo (#296): a key from the list, or null to clear it. */
+export async function setPhotoCaption(id: string, caption: PhotoCaption | null): Promise<Photo> {
+  const { data, error, response } = await api.PUT("/photos/{id}/caption", {
+    params: { path: { id } },
+    body: { caption },
+  });
+  if (!data) throw failed(response, error, "photo caption");
   return Photo.parse(data);
 }
 

@@ -12,6 +12,13 @@ const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const PHOTO = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01" as ProfileCard["photos"][number]["id"];
+const photoAt = (n: number, caption: ProfileCard["photos"][number]["caption"] = null) => ({
+  id: `0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a0${n}` as ProfileCard["photos"][number]["id"],
+  blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+  width: 1200,
+  height: 1600,
+  caption,
+});
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
 
 const bare: ProfileCard = {
@@ -101,7 +108,13 @@ describe("ProfileCardView", () => {
         card={{
           ...bare,
           photos: [
-            { id: PHOTO, blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj", width: 1200, height: 1600 },
+            {
+              id: PHOTO,
+              blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+              width: 1200,
+              height: 1600,
+              caption: null,
+            },
           ],
         }}
         onRefused={refused}
@@ -110,5 +123,25 @@ describe("ProfileCardView", () => {
     await settle();
     expect(screen.getByLabelText("Photo 1 of 1")).toBeTruthy();
     expect(refused).toHaveBeenCalledWith("photo_budget_exceeded");
+  });
+
+  it("shows the owner's caption under a photo for the eye, and says it once, with the photo, to a screen reader (#296)", async () => {
+    await renderWithTheme(
+      <ProfileCardView
+        card={{
+          ...bare,
+          photos: [photoAt(1, "summer_day"), photoAt(2), photoAt(3, "four_legged")],
+        }}
+      />,
+    );
+    await settle();
+    expect(screen.getByLabelText("Photo 1 of 3. A summer day")).toBeTruthy();
+    expect(screen.getByLabelText("Photo 2 of 3")).toBeTruthy();
+    expect(screen.getByLabelText("Photo 3 of 3. With a four-legged friend")).toBeTruthy();
+    // Visible under the photo, hidden from the accessibility tree: the label above carries it.
+    for (const line of ["A summer day", "With a four-legged friend"]) {
+      expect(screen.getByText(line, { includeHiddenElements: true })).toBeTruthy();
+      expect(screen.queryByText(line)).toBeNull();
+    }
   });
 });

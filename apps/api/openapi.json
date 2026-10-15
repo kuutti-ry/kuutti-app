@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1018,6 +1018,31 @@
             "type": "string",
             "format": "date-time"
           },
+          "caption": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "recent",
+              "old_favourite",
+              "found_again",
+              "friends_chose",
+              "someone_else_took",
+              "everyday_me",
+              "in_my_element",
+              "favourite_place",
+              "travelling",
+              "summer_day",
+              "winter_day",
+              "four_legged",
+              "at_work",
+              "my_hobby",
+              "proud_of",
+              "ask_me",
+              null
+            ],
+            "default": null,
+            "description": "The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer."
+          },
           "file": {
             "type": "string",
             "nullable": true,
@@ -1719,6 +1744,31 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "caption": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "recent",
+              "old_favourite",
+              "found_again",
+              "friends_chose",
+              "someone_else_took",
+              "everyday_me",
+              "in_my_element",
+              "favourite_place",
+              "travelling",
+              "summer_day",
+              "winter_day",
+              "four_legged",
+              "at_work",
+              "my_hobby",
+              "proud_of",
+              "ask_me",
+              null
+            ],
+            "default": null,
+            "description": "The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer."
           }
         },
         "required": [
@@ -1777,6 +1827,41 @@
           "photo"
         ],
         "additionalProperties": false
+      },
+      "PhotoCaptionRequest": {
+        "type": "object",
+        "properties": {
+          "caption": {
+            "$ref": "#/components/schemas/PhotoCaption"
+          }
+        },
+        "required": [
+          "caption"
+        ],
+        "additionalProperties": false
+      },
+      "PhotoCaption": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "recent",
+          "old_favourite",
+          "found_again",
+          "friends_chose",
+          "someone_else_took",
+          "everyday_me",
+          "in_my_element",
+          "favourite_place",
+          "travelling",
+          "summer_day",
+          "winter_day",
+          "four_legged",
+          "at_work",
+          "my_hobby",
+          "proud_of",
+          "ask_me",
+          null
+        ]
       },
       "PhotoOrderRequest": {
         "type": "object",
@@ -2215,6 +2300,9 @@
             "type": "integer",
             "minimum": 0,
             "exclusiveMinimum": true
+          },
+          "caption": {
+            "$ref": "#/components/schemas/PhotoCaption"
           }
         },
         "required": [
@@ -3838,6 +3926,79 @@
           },
           "409": {
             "description": "photo_not_appealable: not the check's own rejection, or appealed already.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/photos/{id}/caption": {
+      "put": {
+        "summary": "Set the caption of a photo",
+        "description": "A line from a closed list, shown under the photo to others in their own language (#296); null clears it. A key, never the person's text, so nothing is checked.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/PhotoId"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PhotoCaptionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The photo with its caption.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Photo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: not a line of the list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a photo of this account.",
             "content": {
               "application/json": {
                 "schema": {

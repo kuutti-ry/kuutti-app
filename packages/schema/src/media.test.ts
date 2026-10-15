@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
+  PHOTO_CAPTIONS,
   PHOTO_MAX_BYTES,
   PHOTO_VARIANT_SIZES,
   PHOTO_VARIANTS,
   Photo,
+  PhotoCaption,
+  PhotoCaptionRequest,
   PhotoFetchBudget,
   PhotoId,
   PhotoList,
@@ -100,6 +103,7 @@ describe("a photo as its owner reads it", () => {
     appealable: false,
     position: 0,
     createdAt: at,
+    caption: null,
   };
 
   it("parses with its id branded", () => {
@@ -222,5 +226,44 @@ describe("the fetch budget of matching_config", () => {
     ["an unknown variant", { thumb: 1, card: 1, full: 1, original: 1 }, "unrecognized_keys"],
   ])("refuses %s", (_, budget, code) => {
     expect(codes(PhotoFetchBudget, budget)).toEqual([code]);
+  });
+});
+
+describe("a caption (#296)", () => {
+  const photo = {
+    id: uuid(1),
+    blurhash: "LEHV6n",
+    width: 1200,
+    height: 1600,
+    state: "approved",
+    rejectionReason: null,
+    appealable: false,
+    position: 0,
+    createdAt: at,
+  };
+
+  it("is one of sixteen lines, a key and never the person's text", () => {
+    expect(PHOTO_CAPTIONS).toHaveLength(16);
+    expect(new Set(PHOTO_CAPTIONS).size).toBe(16);
+    for (const caption of PHOTO_CAPTIONS) expect(PhotoCaption.parse(caption)).toBe(caption);
+    expect(codes(PhotoCaption, "my own words")).toEqual(["invalid_value"]);
+    expect(codes(PhotoCaption, "")).toEqual(["invalid_value"]);
+  });
+
+  it("rides on the photo, and is null when the API did not say (an older API)", () => {
+    expect(Photo.parse({ ...photo, caption: "ask_me" }).caption).toBe("ask_me");
+    expect(Photo.parse(photo).caption).toBeNull();
+    expect(Photo.parse({ ...photo, caption: null }).caption).toBeNull();
+    expect(codes(Photo, { ...photo, caption: "x" })).toEqual(["invalid_value"]);
+  });
+
+  it("is set by a request with the key or null, and nothing else", () => {
+    expect(PhotoCaptionRequest.parse({ caption: "recent" })).toEqual({ caption: "recent" });
+    expect(PhotoCaptionRequest.parse({ caption: null })).toEqual({ caption: null });
+    expect(codes(PhotoCaptionRequest, {})).toEqual(["invalid_value"]);
+    expect(codes(PhotoCaptionRequest, { caption: "x" })).toEqual(["invalid_value"]);
+    expect(codes(PhotoCaptionRequest, { caption: "recent", more: 1 })).toEqual([
+      "unrecognized_keys",
+    ]);
   });
 });

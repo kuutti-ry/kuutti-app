@@ -3,6 +3,7 @@ import {
   ErrorResponse,
   PHOTO_MAX_BYTES,
   Photo,
+  PhotoCaptionRequest,
   PhotoList,
   PhotoOrderRequest,
   PhotoParams,
@@ -18,6 +19,7 @@ import type { AppEnv } from "../lib/env.ts";
 import { AppError, localisedEnvelope } from "../lib/errors.ts";
 import {
   appealPhoto,
+  captionPhoto,
   deletePhoto,
   issuePhotoUrl,
   listPhotos,
@@ -106,6 +108,22 @@ const appealRoute = createRoute({
   },
 });
 
+const captionRoute = createRoute({
+  method: "put",
+  path: "/photos/{id}/caption",
+  summary: "Set the caption of a photo",
+  description:
+    "A line from a closed list, shown under the photo to others in their own language (#296); null clears it. A key, never the person's text, so nothing is checked.",
+  ...bearer,
+  request: { params: PhotoParams, body: { required: true, ...json(PhotoCaptionRequest) } },
+  responses: {
+    200: { description: "The photo with its caption.", ...json(Photo) },
+    400: errorContent("Validation failed: not a line of the list."),
+    401: unauthenticated,
+    404: errorContent("Not a photo of this account."),
+  },
+});
+
 const orderRoute = createRoute({
   method: "put",
   path: "/photos/order",
@@ -162,8 +180,8 @@ export function photoRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv
   // (app.test.ts reads the order from the route table); then this route's own
   // size cap, which replaces the app-wide one that app.ts skips for it.
   const paths = new Set(
-    [listRoute, uploadRoute, deleteRoute, appealRoute, orderRoute, urlRoute].map((r) =>
-      r.getRoutingPath(),
+    [listRoute, uploadRoute, deleteRoute, appealRoute, captionRoute, orderRoute, urlRoute].map(
+      (r) => r.getRoutingPath(),
     ),
   );
   for (const path of paths) app.use(path, requireSession);
@@ -201,6 +219,16 @@ export function photoRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv
 
   app.openapi(appealRoute, async (c) => {
     const photo = await appealPhoto(serviceDeps(), callerOf(c).accountId, c.req.valid("param").id);
+    return c.json(photo, 200);
+  });
+
+  app.openapi(captionRoute, async (c) => {
+    const photo = await captionPhoto(
+      serviceDeps(),
+      callerOf(c).accountId,
+      c.req.valid("param").id,
+      c.req.valid("json").caption,
+    );
     return c.json(photo, 200);
   });
 

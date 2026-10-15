@@ -2619,6 +2619,13 @@ profile.card.photoLabel:
   sv: "Foto {position, number} av {total, number}"
   machine: { fi: true, sv: true }
 
+profile.card.photoLabelCaption:
+  en: "Photo {position, number} of {total, number}. {caption}"
+  description: "Screen-reader label of a card photo when it has a caption (#296); {caption} is the owner's line, in nominative."
+  fi: "Kuva {position, number} / {total, number}. {caption}"
+  sv: "Foto {position, number} av {total, number}. {caption}"
+  machine: { fi: true, sv: true }
+
 profile.card.sharedOption:
   en: "{option} (you too)"
   description: "An answer on a card that the viewer gave as well (#150): a hobby or a language both answered, marked in words, never a count."
@@ -4017,6 +4024,174 @@ photos.rejected.other:
   description: Photos screen, rejected for a reason outside the list.
   fi: Ei hyväksytty. Tämä kuva ei sovi Kuuttiin; kokeile toista.
   sv: Inte godkänt. Det här fotot passar inte på Kuutti; prova ett annat.
+  machine: { fi: true, sv: true }
+
+photos.caption.recent:
+  en: "Taken recently"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Otettu äskettäin"
+  sv: "Tagen nyligen"
+  machine: { fi: true, sv: true }
+
+photos.caption.old_favourite:
+  en: "An old favourite"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Vanha suosikki"
+  sv: "En gammal favorit"
+  machine: { fi: true, sv: true }
+
+photos.caption.found_again:
+  en: "Found this one again"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Löysin tämän uudestaan"
+  sv: "Hittade den här igen"
+  machine: { fi: true, sv: true }
+
+photos.caption.friends_chose:
+  en: "My friends chose this one"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Kaverit valitsivat tämän"
+  sv: "Mina vänner valde den här"
+  machine: { fi: true, sv: true }
+
+photos.caption.someone_else_took:
+  en: "Someone else took this one"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Joku muu otti tämän"
+  sv: "Någon annan tog den här"
+  machine: { fi: true, sv: true }
+
+photos.caption.everyday_me:
+  en: "Everyday me"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Arkiminä"
+  sv: "Mitt vardagsjag"
+  machine: { fi: true, sv: true }
+
+photos.caption.in_my_element:
+  en: "Me in my element"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Omassa elementissäni"
+  sv: "Jag i mitt element"
+  machine: { fi: true, sv: true }
+
+photos.caption.favourite_place:
+  en: "My favourite place"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Lempipaikkani"
+  sv: "Min favoritplats"
+  machine: { fi: true, sv: true }
+
+photos.caption.travelling:
+  en: "Travelling"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Matkoilla"
+  sv: "På resa"
+  machine: { fi: true, sv: true }
+
+photos.caption.summer_day:
+  en: "A summer day"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Kesäpäivä"
+  sv: "En sommardag"
+  machine: { fi: true, sv: true }
+
+photos.caption.winter_day:
+  en: "A winter day"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Talvipäivä"
+  sv: "En vinterdag"
+  machine: { fi: true, sv: true }
+
+photos.caption.four_legged:
+  en: "With a four-legged friend"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Nelijalkaisen kaverin kanssa"
+  sv: "Med en fyrbent vän"
+  machine: { fi: true, sv: true }
+
+photos.caption.at_work:
+  en: "At work"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Töissä"
+  sv: "På jobbet"
+  machine: { fi: true, sv: true }
+
+photos.caption.my_hobby:
+  en: "My hobby"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Harrastukseni"
+  sv: "Min hobby"
+  machine: { fi: true, sv: true }
+
+photos.caption.proud_of:
+  en: "Something I am proud of"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Jotain, mistä olen ylpeä"
+  sv: "Något jag är stolt över"
+  machine: { fi: true, sv: true }
+
+photos.caption.ask_me:
+  en: "Ask me about this one"
+  description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
+  fi: "Kysy tästä"
+  sv: "Fråga mig om den här"
+  machine: { fi: true, sv: true }
+
+photos.caption.none:
+  en: "No caption"
+  description: "Photos screen, the caption dialog's first choice: the photo gets no line."
+  fi: "Ei kuvatekstiä"
+  sv: "Ingen bildtext"
+  machine: { fi: true, sv: true }
+
+photos.caption.add:
+  en: "Add a caption"
+  description: "Photos screen, the caption button under a photo that has none; tapping opens the list of lines."
+  fi: "Lisää kuvateksti"
+  sv: "Lägg till en bildtext"
+  machine: { fi: true, sv: true }
+
+photos.caption.open:
+  en: "Caption of photo {position, number}"
+  description: "Photos screen, screen-reader label of the caption button under a photo; its value is the line chosen, or that there is none. {position} counts from 1."
+  fi: "Kuvan {position, number} kuvateksti"
+  sv: "Bildtext för foto {position, number}"
+  machine: { fi: true, sv: true }
+
+photos.caption.title:
+  en: "A caption for photo {position, number}"
+  description: "Photos screen, title of the dialog that lists the lines to pick from. {position} counts from 1."
+  fi: "Kuvateksti kuvalle {position, number}"
+  sv: "En bildtext för foto {position, number}"
+  machine: { fi: true, sv: true }
+
+photos.caption.explain:
+  en: "One line under the photo, shown to others in their own language."
+  description: "Photos screen, the caption dialog's one sentence of explanation."
+  fi: "Yksi rivi kuvan alla, näkyy muille heidän omalla kielellään."
+  sv: "En rad under fotot, som andra ser på sitt eget språk."
+  machine: { fi: true, sv: true }
+
+photos.caption.failed:
+  en: "The caption could not be saved. Try again."
+  description: "Photos screen, the notice when the API refused or did not answer a caption change (#296)."
+  fi: "Kuvatekstiä ei voitu tallentaa. Yritä uudelleen."
+  sv: "Bildtexten kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
+photos.imageLabelCaption:
+  en: "Photo {position, number} / {total, number}. {caption}"
+  description: "Screen-reader label of one photo in the grid when it has a caption (#296). {position} counts from 1; {total} is how many photos there are; {caption} is the line, in nominative."
+  fi: "Kuva {position, number} / {total, number}. {caption}"
+  sv: "Foto {position, number} / {total, number}. {caption}"
+  machine: { fi: true, sv: true }
+
+photos.zoom.labelCaption:
+  en: "Photo {position, number} / {total, number}, full size. {caption}"
+  description: "Zoom screen, screen-reader label of the large photo when it has a caption (#296). {position} counts from 1; {total} is how many photos there are; {caption} is the line, in nominative."
+  fi: "Kuva {position, number} / {total, number}, täysikokoinen. {caption}"
+  sv: "Foto {position, number} / {total, number}, full storlek. {caption}"
   machine: { fi: true, sv: true }
 
 admin.signIn.title:

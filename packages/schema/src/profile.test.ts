@@ -191,13 +191,23 @@ describe("the card another person sees", () => {
     age: { years: 34, verifiedByBank: true },
     gender: "woman",
     pond: null,
-    photos: [{ id: uuid(2), blurhash: "LEHV6n", width: 800, height: 1067 }],
+    photos: [{ id: uuid(2), blurhash: "LEHV6n", width: 800, height: 1067, caption: null }],
     fields: {},
     bio: null,
     bioPreset: "photos_speak",
     prompts: [],
     shared: { hobbies: ["sauna"], languages: [] },
   };
+
+  it("carries the owner's caption of a photo (#296), null when the API did not say", () => {
+    const withLine = { ...card, photos: [{ ...card.photos[0], caption: "summer_day" }] };
+    expect(ProfileCard.parse(withLine).photos[0]?.caption).toBe("summer_day");
+    const older = {
+      ...card,
+      photos: [{ id: uuid(2), blurhash: "LEHV6n", width: 800, height: 1067 }],
+    };
+    expect(ProfileCard.parse(older).photos[0]?.caption).toBeNull();
+  });
 
   it("parses with the bank-verified age", () => {
     expect(ProfileCard.parse(card)).toEqual(card);

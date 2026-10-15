@@ -271,6 +271,21 @@ describe("the export of the photos", () => {
     expect(exported.accessLog.map((e) => e.variant)).toEqual(["full"]);
   });
 
+  test("the owner's caption is in the export as the key the words come from (#296)", async ({
+    ctx,
+  }) => {
+    const { service } = await serviceDeps(ctx);
+    const a = await signedInAccount(ctx.client);
+    const plain = await photoOf(ctx, a.accountId, "k-plain", "approved", 0);
+    const captioned = await photoOf(ctx, a.accountId, "k-captioned", "approved", 1);
+    await ctx.client.query("UPDATE photo SET caption = 'ask_me' WHERE id = $1", [captioned]);
+    const exported = await exportPhotos(service, a.accountId);
+    expect(exported.photos.map((p) => [p.id, p.caption])).toEqual([
+      [plain, null],
+      [captioned, "ask_me"],
+    ]);
+  });
+
   test("two rows that share one object each get their own file", async ({ ctx }) => {
     const { service, store } = await serviceDeps(ctx);
     const a = await signedInAccount(ctx.client);
