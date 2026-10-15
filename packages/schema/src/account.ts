@@ -171,7 +171,7 @@ export const AccountExport = z
     cardsShown: z.array(z.object({ photoId: z.uuid(), at: z.iso.datetime() })).max(1000),
     /** The photo check's notes and the closer look (#253). */
     photoCheck: ExportedPhotoCheck,
-    /** What research holds (#50, ADR-011): the enrolment and the events, never the research_id. */
+    /** What research holds (#50, ADR-011 §7 and §10): the enrolment, never the events and never the research_id. */
     research: ResearchExport,
     /** The place at the pond gate (#94, ADR-015); null before the first count. */
     gate: ExportedGate.nullable(),

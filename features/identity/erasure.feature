@@ -80,10 +80,11 @@ Feature: Account deletion per the erasure table
     When "A" deletes the account
     Then the mapping row is gone and the event row remains, joinable to nobody
 
-  Scenario: The export shows the research enrolment and the events but never the research_id
+  Scenario: The export shows the research enrolment but never the events or the research_id
     Given "A" gave the research consent and an event was tracked
     When "A" exports the account
-    Then the export says enrolled, lists the event with its coarse snapshot, and contains no research_id
+    Then the export says enrolled, with the wording's version and the time, lists no event, and contains no research_id
+    And the event stays in the table for the researchers
 
   Scenario: The consent rows go with the account
     Given "A" and "B" gave their consents and "A" withdrew one

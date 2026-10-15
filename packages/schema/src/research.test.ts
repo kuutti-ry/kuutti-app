@@ -8,7 +8,6 @@ import {
   RESEARCH_EVENTS,
   RESEARCH_FIELD_KEYS,
   RESEARCH_K_MIN,
-  ResearchEventRecord,
   ResearchSnapshot,
   researchFieldsOf,
 } from "./research.ts";
@@ -158,26 +157,5 @@ describe("the coarse snapshot", () => {
     expect(ageBandOf(50)).toBe("50+");
     expect(ageBandOf(97)).toBe("50+");
     for (const age of [18, 25, 30, 35, 40, 50]) expect(AGE_BANDS).toContain(ageBandOf(age));
-  });
-
-  it("describes an exported event without any id", () => {
-    const record = ResearchEventRecord.parse({
-      name: "profile_saved",
-      at: "2026-09-26T12:00:00.000Z",
-      consentVersion: "2026-09-draft-1",
-      pond: null,
-      ageBand: "30-34",
-      snapshot: { gender: "woman", fields: {} },
-      props: { complete: true, approvedPhotos: 3 },
-    });
-    expect(Object.keys(record).sort()).toEqual([
-      "ageBand",
-      "at",
-      "consentVersion",
-      "name",
-      "pond",
-      "props",
-      "snapshot",
-    ]);
   });
 });

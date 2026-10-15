@@ -145,42 +145,35 @@ describe("the research_id mapping", () => {
     expect(erased?.researchSubjects).toBe(1);
   });
 
-  test("The export shows the research enrolment and the events but never the research_id", async ({
+  test("The export shows the research enrolment but never the events or the research_id", async ({
     ctx,
   }) => {
     const research = await deps(ctx);
     const a = await signedInAccount(ctx.client);
-    await ctx.client.query("UPDATE account SET gender = 'man' WHERE id = $1", [a.accountId]);
     await consent(ctx, a.headers);
     const researchId = (await repo.findSubject(ctx.client, a.accountId))?.researchId ?? "";
     await track(research, a.accountId, "profile_saved", {
       complete: false,
       approvedPhotos: 1,
     });
+    // The opt-in and the save, kept for the researchers and shown to nobody by name.
+    expect(await eventsKeyedBy(ctx, researchId)).toBe(2);
     const body = await exportOf(ctx.app, a.headers);
-    expect(body.research.enrolled).toBe(true);
-    expect(body.research.consentVersion).toBe(CURRENT_CONSENT_VERSIONS.research);
-    expect(body.research.since).toBeTruthy();
-    // Both events fall in the same hour, so their order is not fixed.
-    expect(body.research.events.map((e) => e.name).sort()).toEqual([
-      "profile_saved",
-      "research_opt_in",
-    ]);
-    expect(body.research.events.find((e) => e.name === "profile_saved")).toMatchObject({
-      pond: null,
-      ageBand: "35-39",
-      snapshot: { gender: "man", fields: {} },
-      props: { complete: false, approvedPhotos: 1 },
+    expect(body.research).toEqual({
+      enrolled: true,
+      consentVersion: CURRENT_CONSENT_VERSIONS.research,
+      since: expect.any(String),
     });
-    expect(JSON.stringify(body)).not.toContain(researchId);
+    const text = JSON.stringify(body);
+    expect(text).not.toContain(researchId);
+    expect(text).not.toContain("profile_saved");
+    expect(text).not.toContain("research_opt_in");
 
     await withdraw(ctx, a.headers);
-    const after = await exportOf(ctx.app, a.headers);
-    expect(after.research).toEqual({
+    expect((await exportOf(ctx.app, a.headers)).research).toEqual({
       enrolled: false,
       since: null,
       consentVersion: null,
-      events: [],
     });
   });
 });

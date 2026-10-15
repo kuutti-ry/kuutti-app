@@ -2762,27 +2762,6 @@ export interface components {
             /** Format: date-time */
             since: string | null;
             consentVersion: string | null;
-            events: components["schemas"]["ResearchEventRecord"][];
-        };
-        ResearchEventRecord: {
-            name: string;
-            /** Format: date-time */
-            at: string;
-            consentVersion: string;
-            pond: string | null;
-            ageBand: string;
-            snapshot: components["schemas"]["ResearchSnapshot"];
-            props: {
-                [key: string]: unknown;
-            };
-        };
-        ResearchSnapshot: {
-            gender: components["schemas"]["Gender"];
-            fields: components["schemas"]["ResearchFields"];
-        };
-        ResearchFields: {
-            /** @enum {string} */
-            intent?: "long_term" | "casual" | "open_to_either" | "dance_partner";
         };
         ExportedGate: {
             /** Format: uuid */
