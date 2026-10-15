@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { AdminSession, ModeratorRole } from "@kuutti/schema";
+import type { AdminSession } from "@kuutti/schema";
 import { type AdminSessionStore, hashToken } from "../lib/admin-middleware.ts";
 import { AppError } from "../lib/errors.ts";
 import {
@@ -42,7 +42,7 @@ export async function startAdminLogin(
 }
 
 /** Back to the panel: the code rides in the fragment, so it reaches the SPA and no log. */
-export function adminReturnUrl(adminAppUrl: string, code: string): URL {
+function adminReturnUrl(adminAppUrl: string, code: string): URL {
   const url = new URL(adminAppUrl);
   url.hash = `code=${encodeURIComponent(code)}`;
   return url;
@@ -150,5 +150,3 @@ export async function sweepAdminSessions(
 ): Promise<{ adminSessions: number }> {
   return { adminSessions: await repo.deleteDeadAdminSessions(deps.db, deps.now()) };
 }
-
-export type { ModeratorRole };

@@ -25,7 +25,7 @@ export type ErrorReporter = (
   context: { requestId: string; route?: string },
 ) => void;
 
-export const noReporter: ErrorReporter = () => {};
+const noReporter: ErrorReporter = () => {};
 
 export function envelope(code: string, message: string, requestId: string): ErrorResponse {
   return { error: { code, message, requestId } };

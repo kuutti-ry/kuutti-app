@@ -19,7 +19,7 @@ import { matchingConfigNumber } from "../lib/matching-config.ts";
 // the profile slice through the route's reader, so this slice reads no
 // table of another.
 
-export const DEAL_BREAKERS_MAX_KEY = "deal_breakers_max";
+const DEAL_BREAKERS_MAX_KEY = "deal_breakers_max";
 
 /** The caller's own answers, by field key; the route hands it in from the profile slice. */
 export type OwnFieldsReader = (accountId: string) => Promise<Record<string, unknown>>;
@@ -38,11 +38,10 @@ const optionsOf = (field: DealBreaker["field"]): readonly string[] => {
 };
 
 /** A filter waits while the person's own answer on its field is missing: read, never stored. */
-export const pausedOf = (field: string, own: Record<string, unknown>): boolean =>
-  own[field] === undefined;
+const pausedOf = (field: string, own: Record<string, unknown>): boolean => own[field] === undefined;
 
 /** The first accepted answer that is no option of the field, or null when every one is. */
-export function invalidAccept(dealBreaker: DealBreaker): string | null {
+function invalidAccept(dealBreaker: DealBreaker): string | null {
   const options = optionsOf(dealBreaker.field);
   return dealBreaker.accept.find((option) => !options.includes(option)) ?? null;
 }

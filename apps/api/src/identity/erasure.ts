@@ -173,7 +173,7 @@ async function exportPhotoCheck(
 }
 
 /** The export's history, newest first, at most this many rows; the day's cap keeps it short. */
-export const EXPORT_HISTORY_LIMIT = 1000;
+const EXPORT_HISTORY_LIMIT = 1000;
 
 /**
  * Everything Kuutti holds about the person, as of now: the document, and the

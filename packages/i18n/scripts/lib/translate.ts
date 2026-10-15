@@ -45,7 +45,7 @@ export type Translator = (
  * - stale: reviewed text whose English or translation changed since its review.
  * English-only (admin.*) and legal keys never go.
  */
-export type SelectionMode = "missing" | "retranslate" | "stale";
+type SelectionMode = "missing" | "retranslate" | "stale";
 
 export type Selection = { mode: SelectionMode; keys?: readonly string[]; prefix?: string };
 

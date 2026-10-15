@@ -4,7 +4,7 @@
  * contrast.test.ts proves that a token below the line fails.
  */
 
-export type TokenSet = Record<string, string>;
+type TokenSet = Record<string, string>;
 export type TokenSets = Record<string, TokenSet>;
 
 export type ContrastFailure = {
@@ -16,7 +16,7 @@ export type ContrastFailure = {
 };
 
 /** Text on its surface: AA body text, 4.5:1; 7:1 (AAA) in the high-contrast sets. */
-export const TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string]> = [
+const TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string]> = [
   ["foreground", "background"],
   ["foreground", "card"],
   ["card-foreground", "card"],
@@ -36,7 +36,7 @@ export const TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background:
 ];
 
 /** Outlines that identify a control (WCAG 1.4.11): 3:1. --border is decorative and exempt. */
-export const NON_TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string]> = [
+const NON_TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string]> = [
   ["input", "background"],
   ["input", "card"],
   ["ring", "background"],

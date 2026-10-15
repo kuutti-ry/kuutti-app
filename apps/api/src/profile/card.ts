@@ -20,15 +20,15 @@ import { findPondOfAccount } from "../pond/index.ts";
 import { completeness } from "./completeness.ts";
 import * as repo from "./repo.ts";
 
-export const CARDS_PER_DAY_KEY = "exposure_cards_per_day";
+const CARDS_PER_DAY_KEY = "exposure_cards_per_day";
 
 /** What onboarding (#46) knows about the subject: the matching slice's readPreferences; without a reader nothing is complete. */
-export type PreferenceReader = (
+type PreferenceReader = (
   db: Queryable,
   accountId: string,
 ) => Promise<{ seeks: unknown | null; ageWindow: unknown | null }>;
 
-export const noPreferencesYet: PreferenceReader = async () => ({ seeks: null, ageWindow: null });
+const noPreferencesYet: PreferenceReader = async () => ({ seeks: null, ageWindow: null });
 
 /** The special-category consent as the identity slice's consent rows hold it (ADR-019 §4, #204); without a reader nothing special is stored and the document echoes none. */
 export type SpecialCategoryConsent = { version: string; givenAt: Date } | null;
@@ -64,7 +64,7 @@ export function sharedAnswers(
 }
 
 /** The card's fields: the info and hard ones (ADR-019 §2), less the field of study when the person hides it (#150). */
-export function fieldsOnCard(fields: ProfileFields): ProfileFields {
+function fieldsOnCard(fields: ProfileFields): ProfileFields {
   const out: Record<string, unknown> = { ...cardFields(fields) };
   if (fields.hideFromField === true) delete out.field;
   return out as ProfileFields;

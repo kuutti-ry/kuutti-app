@@ -41,7 +41,7 @@ export const NOW = new Date("2026-10-11T09:00:00.000Z");
  * key header stands in the source, which CI's "No private key in tracked
  * files" check refuses whatever follows it.
  */
-export const armoured = (label: string, body: string) =>
+const armoured = (label: string, body: string) =>
   `-----BEGIN ${label}-----\n${body}\n-----END ${label}-----`;
 export const NOT_A_KEY_PEM = armoured("PRIVATE KEY", "AAAA");
 export const nowSeconds = () => Math.floor(Date.now() / 1000);
@@ -226,7 +226,7 @@ export function tokenError(status: number, error: string, description = ""): Res
   });
 }
 
-export type ProviderRequest = { method: string; url: string; form: URLSearchParams | null };
+type ProviderRequest = { method: string; url: string; form: URLSearchParams | null };
 
 export type FixtureProvider = {
   fetch: client.CustomFetch;

@@ -31,9 +31,9 @@ import { approveLocally, type PhotoAssets, picturesOf } from "./photos.ts";
  */
 export type HistoryContext = BankContext & { db: Queryable; assets?: PhotoAssets };
 
-export type Locale = PersonaHistory["locale"];
-export type HistoryConsentKind = "terms" | "privacy" | "special_category";
-export type HistoryLogin =
+type Locale = PersonaHistory["locale"];
+type HistoryConsentKind = "terms" | "privacy" | "special_category";
+type HistoryLogin =
   | { accountId: string; outcome: AuthExchangeResponse["outcome"] }
   | { refused: string };
 

@@ -35,7 +35,7 @@ export function screenOpen(fields: Record<string, unknown>, key: ProfileFieldKey
 }
 
 /** The first later screen after the index that still asks something; none when every one is done. */
-export function nextUnanswered(
+function nextUnanswered(
   fields: Record<string, unknown>,
   afterIndex: number,
 ): ProfileFieldKey | undefined {

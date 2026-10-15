@@ -103,7 +103,7 @@ const SEEKS: Readonly<Record<Gender, Readonly<Record<string, number>>>> = {
  * research_id mapping together, synthetic people emit no events, and events
  * of people who never were would muddy the first real numbers (#73, out of scope).
  */
-export type SyntheticConsent = {
+type SyntheticConsent = {
   /** The two of the welcome screen and the special-category consent of the seek screen (#146, ADR-019 §4). */
   kind: "terms" | "privacy" | "special_category";
   localeShown: Language;

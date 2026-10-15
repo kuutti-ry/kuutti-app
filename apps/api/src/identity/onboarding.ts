@@ -49,7 +49,7 @@ import * as repo from "./repo.ts";
 export type OnboardingDeps = { db: Queryable; logger: Logger; now: () => Date };
 
 /** The matching_config key naming the pond every account is put in while there is one (ADR-010 §10). */
-export const DEFAULT_POND_KEY = "default_pond";
+const DEFAULT_POND_KEY = "default_pond";
 
 function currentVersions(): ConsentVersions {
   const out: Partial<Record<ConsentKind, string>> = {};

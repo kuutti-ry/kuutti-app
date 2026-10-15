@@ -74,7 +74,7 @@ export type TipSnapshot = {
  * Fixed priority: main-sensitive kinds first, then lighting / blur, then the
  * count tip. Change here only.
  */
-export const TIP_KIND_ORDER = [
+const TIP_KIND_ORDER = [
   "revealing",
   "sunglasses",
   "mirror_selfie",

@@ -69,7 +69,7 @@ export function rateLimit(options: RateLimitOptions): MiddlewareHandler {
 }
 
 /** The client's address by the trusted proxy's account, or null when it left none. */
-export function clientAddress(c: Context, trusted: TrustedProxy): string | null {
+function clientAddress(c: Context, trusted: TrustedProxy): string | null {
   const hops = (c.req.header("x-forwarded-for") ?? "")
     .split(",")
     .map((hop) => hop.trim())

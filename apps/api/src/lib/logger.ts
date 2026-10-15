@@ -10,7 +10,7 @@ export type { Logger };
  * text, email, credentials (CLAUDE.md security defaults, rule 5). Top level and
  * one level nested; the PII-in-logs test (#11) is the backstop.
  */
-export const REDACTED_PATHS = [
+const REDACTED_PATHS = [
   "hetu",
   "personal_identity_code",
   "email",
@@ -34,7 +34,7 @@ export const REDACTED_PATHS = [
   "*.gender",
 ];
 
-export type LogDestination = { write(line: string): void };
+type LogDestination = { write(line: string): void };
 
 export type LoggerOptions = {
   level: string;

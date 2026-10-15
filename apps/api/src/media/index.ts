@@ -12,26 +12,14 @@ export {
   exportPhotos,
   type PhotoErasure,
 } from "./erasure.ts";
+export { sweepPendingPhotos } from "./moderation.ts";
+export { type MediaDeps, uploadPhoto } from "./photos.ts";
 export {
-  decideModeration,
-  type Inspection,
-  type Moderator,
-  queueAllModerator,
-  sweepPendingPhotos,
-} from "./moderation.ts";
-export {
-  type MediaDeps,
-  type PhotoServiceDeps,
-  RETRY_AFTER_SECONDS,
-  uploadPhoto,
-} from "./photos.ts";
-export {
-  type CardServed,
   listApprovedPhotos,
   listPhotos,
   recordCardServed,
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";
-export { type MediaStore, memoryMediaStore, objectKey, s3MediaStore } from "./store.ts";
-export { cloudFrontSigner, presignedS3Signer, URL_TTL_MS, type UrlSigner } from "./urls.ts";
-export { createMediaDeps, type MediaSetup } from "./wiring.ts";
+export { memoryMediaStore, objectKey } from "./store.ts";
+export { cloudFrontSigner } from "./urls.ts";
+export { createMediaDeps } from "./wiring.ts";

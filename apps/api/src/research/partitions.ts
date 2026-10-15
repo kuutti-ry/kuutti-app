@@ -14,7 +14,7 @@ import type { NightlyJob } from "../jobs/nightly.ts";
 export const EVENTS_RETENTION_DAYS = 90;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Distinct from the migration lock (MIGRATE_LOCK_KEY); two containers booting at once take turns here. */
-export const PARTITIONS_LOCK_KEY = 725_121_150;
+const PARTITIONS_LOCK_KEY = 725_121_150;
 
 export type MonthPartition = { name: string; from: Date; to: Date };
 

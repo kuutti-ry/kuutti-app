@@ -26,5 +26,4 @@ function Input({ className, ...props }: InputProps) {
   );
 }
 
-export type { InputProps };
 export { Input };

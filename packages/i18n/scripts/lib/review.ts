@@ -20,14 +20,10 @@ import { flagMachine, rejectionReason, writeText } from "./translate.ts";
  * and versioned, admin.* is English only: neither passes through here.
  */
 
-export type ReviewState = "reviewed" | "machine" | "stale" | "missing";
+type ReviewState = "reviewed" | "machine" | "stale" | "missing";
 
 /** Where one text stands, or undefined for keys that are never reviewed here. */
-export function stateOf(
-  key: string,
-  message: Message,
-  locale: TranslatedLocale,
-): ReviewState | undefined {
+function stateOf(key: string, message: Message, locale: TranslatedLocale): ReviewState | undefined {
   if (isLegalKey(key) || isAdminKey(key)) return undefined;
   if (message[locale] === undefined) return "missing";
   // A text with neither mark fails the check; here it waits for a reviewer like machine text.

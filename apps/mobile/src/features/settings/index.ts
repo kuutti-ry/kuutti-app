@@ -8,7 +8,6 @@ export { LanguageScreen } from "./LanguageScreen";
 export { LegalScreen, legalKindOf } from "./LegalScreen";
 export { LicensesScreen } from "./LicensesScreen";
 export { SettingsScreen } from "./SettingsScreen";
-export { SourceOffer } from "./SourceOffer";
 export { SourceScreen } from "./SourceScreen";
 export { TechConfigScreen } from "./TechConfigScreen";
 export { ThemeScreen } from "./ThemeScreen";

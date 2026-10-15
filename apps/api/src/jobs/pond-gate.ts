@@ -43,8 +43,8 @@ export type GateDeps = { db: Queryable; logger: Logger; now: () => Date };
 /** One count at a time, across every process that may run one; not the waitlist counter's lock. */
 export const GATE_LOCK_KEY = 725_121_155;
 
-export const GATE_K_KEY = "gate_k";
-export const MAJORITY_SHARE_KEY = "majority_share_max";
+const GATE_K_KEY = "gate_k";
+const MAJORITY_SHARE_KEY = "majority_share_max";
 
 type FactsRow = {
   id: string;

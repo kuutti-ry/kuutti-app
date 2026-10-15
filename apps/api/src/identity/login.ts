@@ -23,7 +23,7 @@ import * as repo from "./repo.ts";
  * both disciplined by NTP and differ by seconds; a reused web session is
  * minutes or hours old.
  */
-export const AUTH_TIME_TOLERANCE_MS = 2 * 60_000;
+const AUTH_TIME_TOLERANCE_MS = 2 * 60_000;
 
 export type LoginDeps = {
   db: Queryable;

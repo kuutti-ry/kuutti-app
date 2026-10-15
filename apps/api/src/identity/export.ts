@@ -14,7 +14,7 @@ import * as repo from "./repo.ts";
 // most matching_config exports_per_day per Finnish calendar day: the zip
 // carries every photo, and the day's copies bound what one session can pull.
 
-export const EXPORTS_PER_DAY_KEY = "exports_per_day";
+const EXPORTS_PER_DAY_KEY = "exports_per_day";
 
 export type ExportArchive = {
   /** `<stem>-<date>.zip`, the stem in the request's language; nothing about the person in it. */

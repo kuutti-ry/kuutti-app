@@ -15,7 +15,10 @@ import { dirname, join, resolve, sep } from "node:path";
 
 export type LicenseEntry = { name: string; version: string; license: string };
 
-const APP = resolve(import.meta.dirname, "..");
+// Jest loads this file as CommonJS for scripts/licenses.test.ts, where Babel leaves
+// import.meta empty and __dirname stands in; Node runs it as a module.
+const HERE = typeof __dirname === "string" ? __dirname : import.meta.dirname;
+const APP = resolve(HERE, "..");
 const ROOT = resolve(APP, "../..");
 export const OUTPUT = join(APP, "src", "generated", "licenses.json");
 
@@ -103,7 +106,8 @@ export function renderLicenses(entries: LicenseEntry[]): string {
   return `${JSON.stringify(entries, null, 2)}\n`;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
+const SELF = import.meta.filename;
+if (process.argv[1] && SELF && resolve(process.argv[1]) === resolve(SELF)) {
   const entries = collectLicenses();
   writeFileSync(OUTPUT, renderLicenses(entries));
   console.log(`✔ licenses: ${entries.length} packages to src/generated/licenses.json`);

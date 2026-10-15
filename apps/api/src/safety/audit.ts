@@ -8,8 +8,8 @@ import type { Queryable } from "@kuutti/db";
 // (rules/db.md). `detail` is a small closed structure, never text a person
 // typed.
 
-export const AUDIT_ACTIONS = ["photo.view", "photo.approve", "photo.reject"] as const;
-export type AuditAction = (typeof AUDIT_ACTIONS)[number];
+const AUDIT_ACTIONS = ["photo.view", "photo.approve", "photo.reject"] as const;
+type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditEntry = {
   actorIdentityId: string;

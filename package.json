@@ -1,7 +1,7 @@
 {
   "name": "kuutti",
   "private": true,
-  "version": "0.21.0",
+  "version": "0.21.1",
   "type": "module",
   "description": "Kuutti monorepo root. Workspace members arrive with the M1 scaffold (#2).",
   "license": "SEE LICENSE IN LICENSE-EXCEPTION",
@@ -21,6 +21,7 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "biome check . && pnpm --filter @kuutti/i18n run check:ui-strings",
     "format": "biome format --write .",
+    "knip": "knip",
     "test": "pnpm -r run test",
     "test:coverage": "pnpm -r run test:coverage",
     "check:scenarios": "node scripts/check-scenarios.ts",
@@ -42,9 +43,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "eas-cli": "24.11.0",
+    "knip": "6.41.0",
     "yaml": "2.9.1"
-  },
-  "dependencies": {
-    "zod": "^4.6.5"
   }
 }
