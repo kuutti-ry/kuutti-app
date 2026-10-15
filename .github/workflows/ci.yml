@@ -86,6 +86,15 @@ jobs:
       # WCAG contrast of every token pair in every theme (#12).
       - name: Token contrast
         run: pnpm --filter @kuutti/mobile check:contrast
+      # The licences list of Settings is what the bundles ship (#177): the same
+      # expo export as the update lane, without Hermes bytecode (hermesc has no
+      # arm64 Linux binary) and without minifying, neither of which changes the
+      # module set. A list committed stale is a diff here.
+      - name: Licences of the shipped packages are current
+        run: |
+          pnpm --filter @kuutti/mobile run licenses
+          git diff --exit-code -- apps/mobile/src/generated/licenses.json \
+            || { echo "::error::apps/mobile/src/generated/licenses.json is stale: pnpm --filter mobile run licenses, then commit it"; exit 1; }
 
   i18n:
     name: i18n

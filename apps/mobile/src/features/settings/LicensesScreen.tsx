@@ -3,7 +3,7 @@ import LICENSES from "@/generated/licenses.json";
 import { useT } from "@/lib/locale";
 import { SettingsPage } from "./SettingsPage";
 
-/** The packages this build is made of, with their licences (scripts/licenses.ts), in every build (#177, #287). */
+/** The packages whose code ships in this build, with their licences (scripts/licenses.ts), in every build (#177, #287). */
 export function LicensesScreen() {
   const { t } = useT();
   return (
