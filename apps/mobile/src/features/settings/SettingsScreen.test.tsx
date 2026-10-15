@@ -106,6 +106,7 @@ describe("the settings screen", () => {
     for (const name of [
       "Theme",
       "Language",
+      "Photo descriptions",
       "Terms of use",
       "Privacy",
       "Source code",
@@ -132,6 +133,7 @@ describe("the settings screen", () => {
       "Appearance and language",
       "Theme",
       "Language",
+      "Photo descriptions",
       "Legal",
       "Research",
       "Sensitive answers",
@@ -174,6 +176,7 @@ describe("the settings screen", () => {
     const expected: Array<[string, string]> = [
       ["Theme", "/settings/theme"],
       ["Language", "/settings/language"],
+      ["Photo descriptions", "/settings/photo-descriptions"],
       ["Research", "/settings/consent/research"],
       ["Sensitive answers", "/settings/consent/special_category"],
       ["Terms of use", "/settings/legal/terms"],
@@ -221,5 +224,16 @@ describe("the settings screen", () => {
     await renderWithTheme(<SettingsScreen />);
     expect(row("Theme").props.accessibilityValue).toEqual({ text: "System" });
     expect(row("Language").props.accessibilityValue).toEqual({ text: "Phone's language" });
+  });
+
+  it("says whether the photo descriptions are shown under the photos as the row's value (#296)", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    expect(row("Photo descriptions").props.accessibilityValue).toEqual({
+      text: "Not shown under the photos",
+    });
+    expect(screen.getByText("Not shown under the photos")).toBeTruthy();
+    store.set("kuutti.preference.photoDescriptions", JSON.stringify({ shown: true }));
+    await renderWithTheme(<SettingsScreen />);
+    expect(await screen.findByText("Shown under the photos")).toBeTruthy();
   });
 });

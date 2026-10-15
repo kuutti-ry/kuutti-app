@@ -71,6 +71,43 @@ describe("the profile client", () => {
     });
   });
 
+  it("reads a card photo's description less a key this build cannot say (#296)", async () => {
+    const description = {
+      people: 1,
+      setting: "indoors",
+      scene: ["sauna"],
+      objects: [],
+      smile: false,
+      glasses: false,
+      sunglasses: false,
+      facialHair: true,
+    };
+    const card = {
+      accountId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+      displayName: "Aino",
+      age: { years: 36, verifiedByBank: true },
+      gender: null,
+      pond: null,
+      photos: [
+        {
+          id: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
+          blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+          width: 1200,
+          height: 1600,
+          caption: null,
+          description: { ...description, scene: ["sauna", "spaceship"] },
+        },
+      ],
+      fields: {},
+      bio: null,
+      bioPreset: null,
+      prompts: [],
+      shared: { hobbies: [], languages: [] },
+    };
+    answering(json({ card, completeness: { complete: true, missing: [] } }));
+    expect((await fetchCardPreview()).card?.photos[0]?.description).toEqual(description);
+  });
+
   it("reads the card preview, and fails a refusal", async () => {
     const preview = { card: null, completeness: { complete: false, missing: ["photos"] } };
     const seen = answering(json(preview), new Response("Bad gateway", { status: 502 }));

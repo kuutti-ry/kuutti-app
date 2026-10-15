@@ -191,7 +191,16 @@ describe("the card another person sees", () => {
     age: { years: 34, verifiedByBank: true },
     gender: "woman",
     pond: null,
-    photos: [{ id: uuid(2), blurhash: "LEHV6n", width: 800, height: 1067, caption: null }],
+    photos: [
+      {
+        id: uuid(2),
+        blurhash: "LEHV6n",
+        width: 800,
+        height: 1067,
+        caption: null,
+        description: null,
+      },
+    ],
     fields: {},
     bio: null,
     bioPreset: "photos_speak",
@@ -207,6 +216,27 @@ describe("the card another person sees", () => {
       photos: [{ id: uuid(2), blurhash: "LEHV6n", width: 800, height: 1067 }],
     };
     expect(ProfileCard.parse(older).photos[0]?.caption).toBeNull();
+  });
+
+  it("carries the check's description of a photo (#296), null when the API did not say", () => {
+    const description = {
+      people: 1,
+      setting: "indoors",
+      scene: ["sauna"],
+      objects: [],
+      smile: true,
+      glasses: false,
+      sunglasses: false,
+      facialHair: true,
+    };
+    const described = { ...card, photos: [{ ...card.photos[0], description }] };
+    expect(ProfileCard.parse(described).photos[0]?.description).toEqual(description);
+    expect(ProfileCard.parse(card).photos[0]?.description).toBeNull();
+    const wrong = {
+      ...card,
+      photos: [{ ...card.photos[0], description: { ...description, scene: ["moon"] } }],
+    };
+    expect(ProfileCard.safeParse(wrong).success).toBe(false);
   });
 
   it("parses with the bank-verified age", () => {

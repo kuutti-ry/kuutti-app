@@ -8,9 +8,10 @@ import {
 import { View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
-import { captionKey, type OnRefused, PhotoImage } from "@/features/media";
+import { captionKey, type OnRefused, PhotoDescriptionText, PhotoImage } from "@/features/media";
 import { pondName } from "@/features/pond";
 import { useT } from "@/lib/locale";
+import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
 import { FieldLabel } from "./fieldIcons";
 import { hasGlyphs, OptionGlyph } from "./glyphs";
 import { genderKey, optionKey, presetKey, promptKey } from "./keys";
@@ -33,18 +34,27 @@ export function ProfileCardView({
   onRefused?: OnRefused;
 }) {
   const { t, locale } = useT();
+  const described = usePhotoDescriptionText();
   const [main, ...rest] = card.photos;
   const [firstPrompt, ...morePrompts] = card.prompts;
   const total = card.photos.length;
-  // A photo's label says its caption too (#296), so a screen reader hears the owner's line with the picture.
+  // A photo's label says its caption too (#296), so a screen reader hears the
+  // owner's line with the picture, and then what the check saw in it.
   const photoLabel = (photo: ProfileCard["photos"][number], position: number) =>
-    photo.caption
-      ? t("profile.card.photoLabelCaption", {
-          position,
-          total,
-          caption: t(captionKey(photo.caption)),
-        })
-      : t("profile.card.photoLabel", { position, total });
+    described.label(
+      photo.caption
+        ? t("profile.card.photoLabelCaption", {
+            position,
+            total,
+            caption: t(captionKey(photo.caption)),
+          })
+        : t("profile.card.photoLabel", { position, total }),
+      photo.description,
+    );
+  /** The description under a photo for the eye, where the setting asks for it. */
+  const wordsUnder = (photo: ProfileCard["photos"][number]) =>
+    described.shown ? described.describe(photo.description) : null;
+  const mainWords = main ? wordsUnder(main) : null;
   const fields = card.fields as Record<string, unknown>;
   const identityLabel = typeof fields.identityLabel === "string" ? fields.identityLabel : null;
 
@@ -87,6 +97,7 @@ export function ProfileCardView({
       )}
       <CardHeader>
         {main?.caption && <Caption text={t(captionKey(main.caption))} />}
+        {mainWords && <PhotoDescriptionText text={mainWords} />}
         {/* The age in the title, as visible as the name: every account is bank-verified,
             so the card does not say so (#239). */}
         <CardTitle>
@@ -102,19 +113,23 @@ export function ProfileCardView({
         {firstPrompt && prompt(firstPrompt)}
         {rest.length > 0 && (
           <View className="flex-row flex-wrap gap-2">
-            {rest.map((photo, index) => (
-              <View key={photo.id} className="w-24 gap-1">
-                <PhotoImage
-                  id={photo.id}
-                  variant="thumb"
-                  blurhash={photo.blurhash}
-                  accessibilityLabel={photoLabel(photo, index + 2)}
-                  style={{ width: 96, height: 96, borderRadius: 8 }}
-                  onRefused={onRefused}
-                />
-                {photo.caption && <Caption text={t(captionKey(photo.caption))} />}
-              </View>
-            ))}
+            {rest.map((photo, index) => {
+              const words = wordsUnder(photo);
+              return (
+                <View key={photo.id} className="w-24 gap-1">
+                  <PhotoImage
+                    id={photo.id}
+                    variant="thumb"
+                    blurhash={photo.blurhash}
+                    accessibilityLabel={photoLabel(photo, index + 2)}
+                    style={{ width: 96, height: 96, borderRadius: 8 }}
+                    onRefused={onRefused}
+                  />
+                  {photo.caption && <Caption text={t(captionKey(photo.caption))} />}
+                  {words && <PhotoDescriptionText text={words} />}
+                </View>
+              );
+            })}
           </View>
         )}
         {card.bio && <Text>{card.bio}</Text>}

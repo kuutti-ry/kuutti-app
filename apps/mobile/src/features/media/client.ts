@@ -6,6 +6,7 @@ import {
   PhotoList,
   PhotoUrlResponse,
   type PhotoVariant,
+  photoWithKnownDescription,
   TipKind,
 } from "@kuutti/schema";
 import { Platform } from "react-native";
@@ -29,19 +30,24 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 
 /**
  * The list as the API sent it, less what this build has no words for: a tip
- * kind it does not know is left out, and a fish it cannot name is no fish
- * (the plain fish tip). A newer API's tip never locks an older app out of
- * its own photos.
+ * kind it does not know is left out, a fish it cannot name is no fish (the
+ * plain fish tip), and a description's scene or object it cannot say is left
+ * out of the description (#296). A newer API's tip or label never locks an
+ * older app out of its own photos.
  */
 export function readPhotoList(data: unknown): PhotoList {
-  const sent = data as { tips?: unknown; fishSpecies?: unknown } | null;
+  const sent = data as { photos?: unknown; tips?: unknown; fishSpecies?: unknown } | null;
   if (!sent || !Array.isArray(sent.tips)) return PhotoList.parse(data);
   return PhotoList.parse({
     ...sent,
+    photos: Array.isArray(sent.photos) ? sent.photos.map(photoWithKnownDescription) : sent.photos,
     tips: sent.tips.filter((kind) => TipKind.safeParse(kind).success),
     fishSpecies: FishSpecies.safeParse(sent.fishSpecies).success ? sent.fishSpecies : null,
   });
 }
+
+/** One photo as the API sent it, its description as this build can say it (#296). */
+const readPhoto = (data: unknown): Photo => Photo.parse(photoWithKnownDescription(data));
 
 export async function listPhotos(): Promise<PhotoList> {
   const { data, error, response } = await api.GET("/photos");
@@ -60,7 +66,7 @@ export async function appealPhoto(id: string): Promise<Photo> {
     params: { path: { id } },
   });
   if (!data) throw failed(response, error, "photo appeal");
-  return Photo.parse(data);
+  return readPhoto(data);
 }
 
 /** The owner's line under a photo (#296): a key from the list, or null to clear it. */
@@ -70,7 +76,7 @@ export async function setPhotoCaption(id: string, caption: PhotoCaption | null):
     body: { caption },
   });
   if (!data) throw failed(response, error, "photo caption");
-  return Photo.parse(data);
+  return readPhoto(data);
 }
 
 export async function reorderPhotos(order: string[]): Promise<PhotoList> {
@@ -153,7 +159,7 @@ export async function uploadPhoto(
   } catch {
     parsed = null;
   }
-  if (sent.status === 201) return Photo.parse(parsed);
+  if (sent.status === 201) return readPhoto(parsed);
   const envelope = ErrorResponse.safeParse(parsed);
   throw new ApiError(
     `photo upload answered ${sent.status}`,

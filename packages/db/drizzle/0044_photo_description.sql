@@ -1,0 +1,1 @@
+ALTER TABLE "photo_review" ADD COLUMN "description" jsonb;

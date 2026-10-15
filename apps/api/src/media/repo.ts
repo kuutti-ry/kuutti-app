@@ -3,6 +3,7 @@ import type {
   ModerationLabel,
   Photo,
   PhotoCaption,
+  PhotoDescription,
   PhotoId,
   PhotoRejectionReason,
   PhotoReviewItem,
@@ -32,10 +33,14 @@ const photoFrom = (r: Row): PhotoRow => ({
   position: r.position as number,
   createdAt: (r.created_at as Date).toISOString(),
   caption: (r.caption as PhotoCaption | null) ?? null,
+  description: (r.description as PhotoDescription | null) ?? null,
 });
 
-const COLUMNS =
-  "id, key, blurhash, width, height, state, rejection_reason, appealable, position, created_at, caption";
+// The description (#296) lives on the review row, which goes with the photo;
+// one lookup by the primary key per photo, in RETURNING too, so every answer
+// that carries a photo carries what the check saw of it.
+const COLUMNS = `id, key, blurhash, width, height, state, rejection_reason, appealable, position, created_at, caption,
+  (SELECT r.description FROM photo_review r WHERE r.photo_id = photo.id) AS description`;
 
 export async function listPhotos(db: Queryable, accountId: string): Promise<PhotoRow[]> {
   const { rows } = await db.query<Row>(
@@ -355,15 +360,18 @@ export async function upsertAutomaticReview(
     decision: "approved" | "queued" | "rejected";
     /** Set when the check itself rejects (#206); decided_by stays null, as for every automatic row. */
     reason: PhotoRejectionReason | null;
+    /** What the check saw, for everyone to hear with the photo (#296); null where no check ran. */
+    description: PhotoDescription | null;
   },
 ): Promise<void> {
   await db.query(
-    `INSERT INTO photo_review (photo_id, labels, faces, flagged, model_version, checked_at, decision, reason)
-     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO photo_review (photo_id, labels, faces, flagged, model_version, checked_at, decision, reason, description)
+     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9::jsonb)
      ON CONFLICT (photo_id) DO UPDATE
        SET labels = EXCLUDED.labels, faces = EXCLUDED.faces, flagged = EXCLUDED.flagged,
            model_version = EXCLUDED.model_version, checked_at = EXCLUDED.checked_at,
-           decision = EXCLUDED.decision, reason = EXCLUDED.reason
+           decision = EXCLUDED.decision, reason = EXCLUDED.reason,
+           description = EXCLUDED.description
        WHERE photo_review.decided_by IS NULL`,
     [
       input.photoId,
@@ -374,6 +382,7 @@ export async function upsertAutomaticReview(
       input.checkedAt,
       input.decision,
       input.reason,
+      input.description === null ? null : JSON.stringify(input.description),
     ],
   );
 }

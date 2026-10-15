@@ -1,4 +1,10 @@
 export {
+  ALL_DESCRIPTION_PARTS,
+  describePhoto,
+  type PhotoDescriptionKeys,
+  type PhotoDescriptionParts,
+} from "./describe.ts";
+export {
   type FormatOptions,
   formatDate,
   formatDateTime,

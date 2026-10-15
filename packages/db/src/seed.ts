@@ -78,6 +78,10 @@ export const MATCHING_CONFIG_V1 = {
   photo_tip_fish_confidence_min: 80,
   // #253 (migration 0036): the fish tip names the species from this confidence.
   photo_tip_fish_species_min: 70,
+  // #296 (ADR-006 §3, migration 0045): the automatic description says a scene,
+  // an object or a face attribute only from this confidence. Up when wrong
+  // descriptions turn out common.
+  photo_description_confidence_min: 80,
   // #52 (TD-6, ADR-008): the exposure budget. Cards an account may be served
   // per day (the card route of #47 counts against it; a round of 12 and up to
   // 10 pending likes fit several times over) and signed photo URLs per

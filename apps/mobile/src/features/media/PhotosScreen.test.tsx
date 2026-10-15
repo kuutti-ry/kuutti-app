@@ -64,6 +64,7 @@ const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock; back: jest.Mock };
 };
 const launch = ImagePicker.launchImageLibraryAsync as jest.Mock;
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const session = {
@@ -146,9 +147,9 @@ beforeEach(async () => {
   router.back.mockReset();
   setLocalCheck(null);
   // Which tips were said for which main photo lives on the device (#297): each test starts with none said.
-  (SecureStore as unknown as { __store: Map<string, string> }).__store.delete(
-    "kuutti.preference.photoTipsSeen",
-  );
+  store.delete("kuutti.preference.photoTipsSeen");
+  // The photo descriptions setting too (#296): each test starts from the defaults.
+  store.delete("kuutti.preference.photoDescriptions");
   await saveSession(session);
 });
 
@@ -287,6 +288,44 @@ describe("PhotosScreen", () => {
       pathname: "/photos/[id]",
       params: { id: photo(2).id, blurhash: photo(2).blurhash, position: "2", total: "2" },
     });
+  });
+
+  it("reads the check's description after the caption in a photo's label, shows it under the photo when the setting asks, and hands it to the zoom screen (#296)", async () => {
+    const description = {
+      people: 1,
+      setting: "outdoors",
+      scene: ["lake"],
+      objects: ["hiking", "dog"],
+      smile: true,
+      glasses: false,
+      sunglasses: true,
+      facialHair: false,
+    };
+    const words =
+      "Automatic description: One person, outdoors, by a lake. Smiling, sunglasses. Hiking, with a dog.";
+    const photos = [{ ...photo(1), caption: "travelling", description }, photo(2)];
+    fetchMock([answersList({ photos, maxPhotos: 3, tips: [] }), answersUrls]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByLabelText(`Photo 1 / 2. Travelling. ${words}`)).toBeTruthy();
+    expect(screen.getByLabelText("Photo 2 / 2")).toBeTruthy();
+    expect(screen.queryByText(words, { includeHiddenElements: true })).toBeNull();
+    await press(screen.getByRole("button", { name: "Open photo 1" }));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/photos/[id]",
+      params: expect.objectContaining({ description: JSON.stringify(description) }),
+    });
+
+    store.set(
+      "kuutti.preference.photoDescriptions",
+      JSON.stringify({ shown: true, objects: false }),
+    );
+    fetchMock([answersList({ photos, maxPhotos: 3, tips: [] }), answersUrls]);
+    await show(<PhotosScreen />);
+    const withoutObjects =
+      "Automatic description: One person, outdoors, by a lake. Smiling, sunglasses.";
+    expect(await screen.findByLabelText(`Photo 1 / 2. Travelling. ${withoutObjects}`)).toBeTruthy();
+    expect(screen.getByText(withoutObjects, { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText(withoutObjects)).toBeNull();
   });
 
   it("Done returns to where the person came from, since no header offers a way back", async () => {

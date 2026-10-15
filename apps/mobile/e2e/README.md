@@ -57,6 +57,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `email` | Sanna | malformed refused, valid saved, removed |
 | `research-switch` | Sanna | the opt-in recorded and withdrawn |
 | `data-export` | Sanna | Download my data hands the zip over: the share sheet on iOS, the folder picker on Android (#237) |
+| `photo-descriptions` | Sanna | the Photo descriptions row and its screen (#296): Show under photos on, Face off, both kept when the screen is opened again, then back as found; the description itself needs Rekognition, which the local stack has none of |
 | `settings-survive-relaunch` | Sanna | theme, language and session outlast closing the app |
 | `log-out-everywhere` | Sanna | signed out at once, not back on reopening |
 | `take-a-break` | Helmi | paused behind the tick, signed out with the reason, not back on reopening; the next bank login brings her back where she left off, the photos step (#170) |

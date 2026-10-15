@@ -9,6 +9,7 @@ import { type ConsentState, useConsentStates, useSession } from "@/features/iden
 import LICENSES from "@/generated/licenses.json";
 import { buildInfo } from "@/lib/build";
 import { useLocaleSettings, useT } from "@/lib/locale";
+import { usePhotoDescriptionSettings } from "@/lib/photo-descriptions";
 import { useHapticTap } from "@/theme/haptics";
 import { useTheme } from "@/theme/ThemeProvider";
 import { SCHEMES } from "./Choice";
@@ -30,7 +31,7 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
  * The person's own settings, after login, in every build (#143): a list of
  * sections the way the profile's front page is one (#227, #287), each row a
  * screen of its own. Appearance and language (the OS's and the phone's by
- * default, kept across restarts); the legal part, the two consents (#46,
+ * default, kept across restarts, and the photo descriptions of #296); the legal part, the two consents (#46,
  * #146) and the texts they refer to; about Kuutti, the version, the source
  * offer of AGPL-3.0 section 13 (visible to everybody) and the licences; the
  * account, this device, the e-mail, the feedback to the moderators (#171),
@@ -60,6 +61,10 @@ export function SettingsScreen() {
     locale.preference === "system"
       ? t("settings.language.system")
       : LOCALE_NAMES[locale.preference];
+  // The automatic descriptions (#296): under the photos or read only; the parts chosen are on the screen.
+  const descriptionsSummary = usePhotoDescriptionSettings().settings.shown
+    ? t("settings.photoDescriptions.shown")
+    : t("settings.photoDescriptions.notShown");
   const { version, commit } = buildInfo();
   const signedIn = session.status === "signed-in";
   const consents = useConsentStates();
@@ -107,6 +112,13 @@ export function SettingsScreen() {
               summary: languageSummary,
               value: languageSummary,
               onPress: open("/settings/language"),
+            },
+            {
+              key: "photoDescriptions",
+              title: t("settings.photoDescriptions.label"),
+              summary: descriptionsSummary,
+              value: descriptionsSummary,
+              onPress: open("/settings/photo-descriptions"),
             },
           ]}
         />

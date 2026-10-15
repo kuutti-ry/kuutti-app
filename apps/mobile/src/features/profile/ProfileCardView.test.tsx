@@ -1,5 +1,6 @@
 import type { ProfileCard } from "@kuutti/schema";
 import { act, screen } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import { saveSession } from "@/lib/session";
 import { renderWithTheme } from "@/test/render";
 import { ProfileCardView } from "./ProfileCardView";
@@ -12,14 +13,20 @@ const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const PHOTO = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01" as ProfileCard["photos"][number]["id"];
-const photoAt = (n: number, caption: ProfileCard["photos"][number]["caption"] = null) => ({
+const photoAt = (
+  n: number,
+  caption: ProfileCard["photos"][number]["caption"] = null,
+  description: ProfileCard["photos"][number]["description"] = null,
+) => ({
   id: `0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a0${n}` as ProfileCard["photos"][number]["id"],
   blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
   width: 1200,
   height: 1600,
   caption,
+  description,
 });
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 
 const bare: ProfileCard = {
   accountId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
@@ -46,6 +53,7 @@ const texts = (node: unknown): string[] => {
 };
 
 beforeEach(async () => {
+  store.delete("kuutti.preference.photoDescriptions");
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -114,6 +122,7 @@ describe("ProfileCardView", () => {
               width: 1200,
               height: 1600,
               caption: null,
+              description: null,
             },
           ],
         }}
@@ -142,6 +151,59 @@ describe("ProfileCardView", () => {
     for (const line of ["A summer day", "With a four-legged friend"]) {
       expect(screen.getByText(line, { includeHiddenElements: true })).toBeTruthy();
       expect(screen.queryByText(line)).toBeNull();
+    }
+  });
+
+  it("reads the check's description after the caption on every photo, and shows it under the photo when the setting asks (#296)", async () => {
+    const lakeside = {
+      people: 1,
+      setting: "outdoors" as const,
+      scene: ["lake" as const],
+      objects: ["hiking" as const, "dog" as const],
+      smile: true,
+      glasses: false,
+      sunglasses: true,
+      facialHair: false,
+    };
+    const sauna = {
+      ...lakeside,
+      setting: "indoors" as const,
+      scene: ["sauna" as const],
+      objects: [],
+    };
+    const card = {
+      ...bare,
+      photos: [photoAt(1, "summer_day", lakeside), photoAt(2, null, sauna), photoAt(3)],
+    };
+    const lakesideWords =
+      "Automatic description: One person, outdoors, by a lake. Smiling, sunglasses. Hiking, with a dog.";
+    const saunaWords =
+      "Automatic description: One person, indoors, in a sauna. Smiling, sunglasses.";
+    await renderWithTheme(<ProfileCardView card={card} />);
+    await settle();
+    // The caption first, then the machine's words, named as such; a photo without a description says nothing more.
+    expect(screen.getByLabelText(`Photo 1 of 3. A summer day. ${lakesideWords}`)).toBeTruthy();
+    expect(screen.getByLabelText(`Photo 2 of 3. ${saunaWords}`)).toBeTruthy();
+    expect(screen.getByLabelText("Photo 3 of 3")).toBeTruthy();
+    expect(screen.queryByText(lakesideWords, { includeHiddenElements: true })).toBeNull();
+
+    // Shown under the photos, hidden from the accessibility tree, with the face left out everywhere.
+    store.set(
+      "kuutti.preference.photoDescriptions",
+      JSON.stringify({ shown: true, people: true, face: false, objects: true }),
+    );
+    await renderWithTheme(<ProfileCardView card={card} />);
+    await settle();
+    const lakesideNoFace =
+      "Automatic description: One person, outdoors, by a lake. Hiking, with a dog.";
+    const saunaNoFace = "Automatic description: One person, indoors, in a sauna.";
+    expect(
+      await screen.findByLabelText(`Photo 1 of 3. A summer day. ${lakesideNoFace}`),
+    ).toBeTruthy();
+    expect(screen.getByLabelText(`Photo 2 of 3. ${saunaNoFace}`)).toBeTruthy();
+    for (const words of [lakesideNoFace, saunaNoFace]) {
+      expect(screen.getByText(words, { includeHiddenElements: true })).toBeTruthy();
+      expect(screen.queryByText(words)).toBeNull();
     }
   });
 });

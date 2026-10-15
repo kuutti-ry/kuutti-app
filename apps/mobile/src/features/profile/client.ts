@@ -6,6 +6,7 @@ import {
   ErrorResponse,
   ProfileResponse,
   type ProfileUpdate,
+  photoWithKnownDescription,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
@@ -53,7 +54,11 @@ export async function fetchCardPreview(): Promise<CardPreviewResponse> {
   await lastSave;
   const { data, error, response } = await api.GET("/profile/card");
   if (!data) throw failed(response, error, "card preview");
-  return CardPreviewResponse.parse(data);
+  // A description key this build has no words for is left out (#296), as the photo list does.
+  const card = data.card
+    ? { ...data.card, photos: data.card.photos.map(photoWithKnownDescription) }
+    : data.card;
+  return CardPreviewResponse.parse({ ...data, card });
 }
 
 // The deal-breakers (#149) live with the preferences on the API and with the

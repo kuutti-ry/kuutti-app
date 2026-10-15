@@ -56,6 +56,8 @@ export type AccountPauseRequest = z.infer<typeof AccountPauseRequest>;
 
 /** `photos/<photo id>.webp`: where a photo's file sits inside the export's zip (#237). */
 export const EXPORT_PHOTO_PATH_MAX = 60;
+/** The description in words is a few short sentences; Finnish runs a third longer than English. */
+export const EXPORT_DESCRIPTION_TEXT_MAX = 600;
 
 export const ExportedPhoto = Photo.extend({
   /** The path of the photo's full-size file inside the zip; null when its object is gone, or the API has no object storage (development without the stand-in). */
@@ -71,6 +73,8 @@ export const ExportedPhoto = Photo.extend({
     })
     .nullable()
     .meta({ description: "The moderation outcome; label names are not part of it." }),
+  /** The automatic description in words, in the request's language (#296); null where there is none. The keys it was made from are `description`. */
+  descriptionText: z.string().max(EXPORT_DESCRIPTION_TEXT_MAX).nullable(),
 }).meta({ id: "ExportedPhoto" });
 export type ExportedPhoto = z.infer<typeof ExportedPhoto>;
 

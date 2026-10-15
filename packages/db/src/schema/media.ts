@@ -154,6 +154,12 @@ export const photoReview = pgTable(
     reason: photoRejectionReason("reason"),
     // When the owner asked a person to look at the check's rejection (#253); once per photo.
     appealedAt: timestamp("appealed_at", { withTimezone: true }),
+    // What the check saw for everyone to hear (#296, ADR-006 §3): a
+    // PhotoDescription of packages/schema, keys of a closed list and never a
+    // sentence, written with the labels by the automatic check and read by the
+    // owner's list, the card and the export. Null before the check ran, or
+    // where none runs. Goes with the row, so with the photo.
+    description: jsonb("description"),
   },
   (table) => [index("photo_review_decision_idx").on(table.decision, table.checkedAt)],
 );

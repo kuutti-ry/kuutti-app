@@ -2,6 +2,7 @@
 
 export { captionKey } from "./captions";
 export { listPhotos } from "./client";
+export { PhotoDescriptionText } from "./PhotoDescriptionText";
 export { type OnRefused, PhotoImage } from "./PhotoImage";
 export { PhotosScreen } from "./PhotosScreen";
 export { PhotoZoomScreen } from "./PhotoZoomScreen";

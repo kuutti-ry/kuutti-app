@@ -29,6 +29,7 @@ const stored = {
   rejectionReason: null,
   appealable: false,
   caption: null,
+  description: null,
   position: 0,
   createdAt: "2026-09-25T12:00:00.000Z",
 };
@@ -149,6 +150,29 @@ class UncountedXhr extends FakeXhr {
 describe("the photo routes", () => {
   beforeEach(async () => {
     await saveSession(session);
+  });
+
+  it("reads a photo's description less a key this build cannot say, on the list and on one photo (#296)", async () => {
+    const description = {
+      people: 1,
+      setting: "outdoors",
+      scene: ["lake"],
+      objects: ["dog"],
+      smile: true,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
+    };
+    const newer = { ...description, scene: ["lake", "volcano"], objects: ["dog", "beer"] };
+    answering(
+      json({ photos: [{ ...stored, description: newer }], maxPhotos: 6, tips: [] }),
+      json({ ...stored, description: newer }),
+    );
+    expect((await listPhotos()).photos[0]?.description).toEqual(description);
+    expect((await appealPhoto(stored.id)).description).toEqual(description);
+    expect(
+      readPhotoList({ photos: [stored], maxPhotos: 6, tips: [] }).photos[0]?.description,
+    ).toBeNull();
   });
 
   it("lists the photos, and fails a refusal with its code", async () => {

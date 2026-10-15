@@ -3,6 +3,7 @@ import type * as React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SessionProvider } from "@/features/identity";
 import { LocaleProvider } from "@/lib/locale";
+import { PhotoDescriptionsProvider } from "@/lib/photo-descriptions";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 const METRICS = {
@@ -10,13 +11,15 @@ const METRICS = {
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
 };
 
-/** The providers the root layout supplies: safe area, language, theme and session. */
+/** The providers the root layout supplies: safe area, language, theme, the photo descriptions setting and session. */
 export function underProviders(ui: React.ReactElement) {
   return (
     <SafeAreaProvider initialMetrics={METRICS}>
       <LocaleProvider>
         <ThemeProvider>
-          <SessionProvider>{ui}</SessionProvider>
+          <PhotoDescriptionsProvider>
+            <SessionProvider>{ui}</SessionProvider>
+          </PhotoDescriptionsProvider>
         </ThemeProvider>
       </LocaleProvider>
     </SafeAreaProvider>

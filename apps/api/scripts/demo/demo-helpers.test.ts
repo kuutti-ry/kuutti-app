@@ -220,6 +220,7 @@ describe("one upload as the persona", () => {
     position: 0,
     createdAt: "2026-10-11T09:00:00.000Z",
     caption: null,
+    description: null,
   };
 
   it("sends the bytes as the app does, in the photo field, and reads the photo back", async () => {

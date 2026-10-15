@@ -86,7 +86,8 @@ export async function exportPhotos(
     | (Omit<PhotoServiceDeps, "store" | "signer" | "limit" | "moderator"> & { media?: undefined }),
   accountId: string,
 ): Promise<{
-  photos: ExportedPhoto[];
+  /** Less the description in words (#296), which the identity slice adds in the request's language. */
+  photos: Array<Omit<ExportedPhoto, "descriptionText">>;
   files: ExportedPhotoFile[];
   accessLog: Array<{ photoId: string; variant: (typeof PHOTO_VARIANTS)[number]; at: string }>;
   cardsShown: Array<{ photoId: string; at: string }>;
@@ -94,7 +95,7 @@ export async function exportPhotos(
   const rows = await repo.listPhotos(deps.db, accountId);
   const reviews = await repo.listReviewsForAccount(deps.db, accountId);
   const store = "store" in deps ? deps.store : null;
-  const photos: ExportedPhoto[] = [];
+  const photos: Array<Omit<ExportedPhoto, "descriptionText">> = [];
   const files: ExportedPhotoFile[] = [];
   for (const row of rows) {
     let file: string | null = null;

@@ -1,0 +1,68 @@
+# The Photo descriptions setting (#296 part 3): a row in Appearance and
+# language whose screen holds the Show under photos switch and the three Tell
+# me about switches, each kept on the device. The description itself comes
+# from the photo check's Rekognition, which the local environment has none of
+# (MODERATION=queue), so what the flow reads is the setting: on, off, and
+# kept when the screen is opened again. Sanna; the flow leaves every switch
+# as it found it.
+appId: fi.kuutti.app
+name: The photo descriptions setting shows them under the photos and chooses what they tell
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# The row says whether the descriptions are shown, which Maestro reads after its title.
+- tapOn: "(Photo descriptions|Kuvien kuvaukset|Bildbeskrivningar)(, .*)?"
+- extendedWaitUntil:
+    visible: "Show under photos|Näytä kuvien alla|Visa under fotona"
+    timeout: 15000
+- assertVisible: "Tell me about|Kerro minulle|Berätta om"
+# A switch's text, to Maestro, is its value ("0" off, "1" on), right of its words.
+- assertVisible:
+    text: "0|(Show under photos|Näytä kuvien alla|Visa under fotona), off"
+    rightOf: "Show under photos|Näytä kuvien alla|Visa under fotona"
+- assertVisible:
+    text: "1|(Face|Kasvot|Ansikte), on"
+    rightOf: "Face|Kasvot|Ansikte"
+- tapOn: "Show under photos|Näytä kuvien alla|Visa under fotona"
+- extendedWaitUntil:
+    visible:
+      text: "1|(Show under photos|Näytä kuvien alla|Visa under fotona), on"
+      rightOf: "Show under photos|Näytä kuvien alla|Visa under fotona"
+    timeout: 15000
+- tapOn: "Face|Kasvot|Ansikte"
+- extendedWaitUntil:
+    visible:
+      text: "0|(Face|Kasvot|Ansikte), off"
+      rightOf: "Face|Kasvot|Ansikte"
+    timeout: 15000
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+
+# Kept when the screen is opened again; then back as it began.
+- tapOn: "(Photo descriptions|Kuvien kuvaukset|Bildbeskrivningar)(, .*)?"
+- extendedWaitUntil:
+    visible: "Show under photos|Näytä kuvien alla|Visa under fotona"
+    timeout: 15000
+- assertVisible:
+    text: "1|(Show under photos|Näytä kuvien alla|Visa under fotona), on"
+    rightOf: "Show under photos|Näytä kuvien alla|Visa under fotona"
+- assertVisible:
+    text: "0|(Face|Kasvot|Ansikte), off"
+    rightOf: "Face|Kasvot|Ansikte"
+- tapOn: "Show under photos|Näytä kuvien alla|Visa under fotona"
+- tapOn: "Face|Kasvot|Ansikte"
+- extendedWaitUntil:
+    visible:
+      text: "1|(Face|Kasvot|Ansikte), on"
+      rightOf: "Face|Kasvot|Ansikte"
+    timeout: 15000
+- assertVisible:
+    text: "0|(Show under photos|Näytä kuvien alla|Visa under fotona), off"
+    rightOf: "Show under photos|Näytä kuvien alla|Visa under fotona"
+- tapOn: "Back|Takaisin|Tillbaka"
+- assertVisible: "Settings|Asetukset|Inställningar"
