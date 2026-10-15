@@ -875,16 +875,6 @@
     "license": "FSL-1.1-MIT"
   },
   {
-    "name": "@sentry/cli-darwin",
-    "version": "2.58.6",
-    "license": "FSL-1.1-MIT"
-  },
-  {
-    "name": "@sentry/cli-darwin",
-    "version": "3.8.0",
-    "license": "FSL-1.1-MIT"
-  },
-  {
     "name": "@sentry/conventions",
     "version": "0.16.0",
     "license": "MIT"
@@ -1830,11 +1820,6 @@
     "license": "MIT"
   },
   {
-    "name": "fsevents",
-    "version": "2.3.3",
-    "license": "MIT"
-  },
-  {
     "name": "function-bind",
     "version": "1.1.2",
     "license": "MIT"
@@ -2106,16 +2091,6 @@
   },
   {
     "name": "lightningcss",
-    "version": "1.33.0",
-    "license": "MPL-2.0"
-  },
-  {
-    "name": "lightningcss-darwin-arm64",
-    "version": "1.27.0",
-    "license": "MPL-2.0"
-  },
-  {
-    "name": "lightningcss-darwin-arm64",
     "version": "1.33.0",
     "license": "MPL-2.0"
   },
