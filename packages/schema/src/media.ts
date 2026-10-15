@@ -80,6 +80,35 @@ export const PhotoCheckKind = z
   .meta({ id: "PhotoCheckKind" });
 export type PhotoCheckKind = z.infer<typeof PhotoCheckKind>;
 
+/**
+ * The line an owner picks for a photo (#296): a key from this closed list,
+ * never the person's text, shown to every viewer in their own language
+ * (photos.caption.<key> in messages.yaml), the way the bio's ready lines
+ * work. No line claims anything about the photo's editing or the person's
+ * looks, and none names a second person: a photo shows its owner alone
+ * (ADR-006 §2).
+ */
+export const PHOTO_CAPTIONS = [
+  "recent",
+  "old_favourite",
+  "found_again",
+  "friends_chose",
+  "someone_else_took",
+  "everyday_me",
+  "in_my_element",
+  "favourite_place",
+  "travelling",
+  "summer_day",
+  "winter_day",
+  "four_legged",
+  "at_work",
+  "my_hobby",
+  "proud_of",
+  "ask_me",
+] as const;
+export const PhotoCaption = z.enum(PHOTO_CAPTIONS).meta({ id: "PhotoCaption" });
+export type PhotoCaption = z.infer<typeof PhotoCaption>;
+
 /** What the owner knows about one of their photos. Never the key, never a URL. */
 export const Photo = z
   .object({
@@ -102,6 +131,10 @@ export const Photo = z
         "0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4).",
     }),
     createdAt: z.iso.datetime(),
+    caption: PhotoCaption.nullable().default(null).meta({
+      description:
+        "The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer.",
+    }),
   })
   .meta({ id: "Photo" });
 export type Photo = z.infer<typeof Photo>;
@@ -161,6 +194,13 @@ export const PhotoOrderRequest = z
   .strict()
   .meta({ id: "PhotoOrderRequest" });
 export type PhotoOrderRequest = z.infer<typeof PhotoOrderRequest>;
+
+/** The owner's line for a photo (#296), or null to clear it. */
+export const PhotoCaptionRequest = z
+  .object({ caption: PhotoCaption.nullable() })
+  .strict()
+  .meta({ id: "PhotoCaptionRequest" });
+export type PhotoCaptionRequest = z.infer<typeof PhotoCaptionRequest>;
 
 export const PhotoParams = z.object({ id: PhotoId }).meta({ id: "PhotoParams" });
 export const PhotoVariantParams = z

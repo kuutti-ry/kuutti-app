@@ -19,6 +19,7 @@ const photo = (n: number) => ({
   state: "approved",
   rejectionReason: null,
   appealable: false,
+  caption: null,
   position: n - 1,
   createdAt: "2026-09-25T12:00:00.000Z",
 });

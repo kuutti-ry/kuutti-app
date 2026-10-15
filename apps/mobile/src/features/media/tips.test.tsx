@@ -1,11 +1,22 @@
 import { createI18n, typedT } from "@kuutti/i18n";
 import { FishSpecies, TipKind } from "@kuutti/schema";
-import { renderHook } from "@testing-library/react-native";
+import { act, fireEvent, renderHook, screen } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
+import { View } from "react-native";
 import { LocaleProvider, useT } from "@/lib/locale";
-import { tipText } from "./tips";
+import { renderWithTheme, underProviders } from "@/test/render";
+import { PhotoTip, tipText } from "./tips";
 
 // The words for what the API names by kind (#56, #287): every tip has its own
-// text, and the fish tip names the fish.
+// text, and the fish tip names the fish. A tip is said once per main photo,
+// remembered on the device (#297).
+
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+const SEEN = "kuutti.preference.photoTipsSeen";
+/** The screen without the tip: leaving it, to the component. */
+const nothing = <View />;
+const seen = () => JSON.parse(store.get(SEEN) ?? "{}") as unknown;
+const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
 
 async function english() {
   const { result } = await renderHook(() => useT(), { wrapper: LocaleProvider });
@@ -53,5 +64,91 @@ describe("tipText", () => {
       expect(tipText(fi, "fish", species)).not.toContain("Onko se kala?");
       expect(tipText(sv, "fish", species)).not.toContain("en fisk?");
     }
+  });
+});
+
+describe("PhotoTip", () => {
+  beforeEach(() => store.delete(SEEN));
+
+  it("says a tip once for the main photo (#297): not again once the screen was left, again when another photo was main meanwhile; a dismissal counts too", async () => {
+    const fish = <PhotoTip tips={["fish"]} fishSpecies={null} mainId="photo-a" />;
+    const view = await renderWithTheme(fish);
+    await settle();
+    expect(screen.getByText(/A fish in the main photo is a classic/)).toBeTruthy();
+    // Leaving the screen with the tip on counts as having heard it.
+    await view.rerender(underProviders(nothing));
+    await settle();
+    expect(seen()).toEqual({ mainId: "photo-a", kinds: ["fish"] });
+
+    await view.rerender(underProviders(fish));
+    await settle();
+    expect(screen.queryByText("A tip for your photos")).toBeNull();
+    await view.rerender(underProviders(nothing));
+
+    // Another photo is the main one: what applies to it is said, and the record starts afresh.
+    await view.rerender(
+      underProviders(
+        <PhotoTip tips={["blurry", "few_photos"]} fishSpecies={null} mainId="photo-b" />,
+      ),
+    );
+    await settle();
+    expect(screen.getByText("Try a sharper photo.")).toBeTruthy();
+    await fireEvent.press(screen.getByRole("button", { name: "Got it" }));
+    await settle();
+    // The next tip takes its place, and the dismissal is on the device.
+    expect(screen.getByText(/fuller picture/)).toBeTruthy();
+    expect(seen()).toEqual({ mainId: "photo-b", kinds: ["blurry"] });
+    await view.rerender(underProviders(nothing));
+    await settle();
+    expect(seen()).toEqual({ mainId: "photo-b", kinds: ["blurry", "few_photos"] });
+
+    // The fish photo chosen again earns its tip again (the maintainer, 15/10/2026).
+    await view.rerender(
+      underProviders(<PhotoTip tips={["fish"]} fishSpecies="pike" mainId="photo-a" />),
+    );
+    await settle();
+    expect(screen.getByText(/Is that a pike\?/)).toBeTruthy();
+    await view.rerender(underProviders(nothing));
+    await settle();
+    expect(seen()).toEqual({ mainId: "photo-a", kinds: ["fish"] });
+  });
+
+  it("reads nothing into a stored value it does not understand, and says nothing without a tip", async () => {
+    store.set(SEEN, "not json");
+    const view = await renderWithTheme(
+      <PhotoTip tips={["blurry"]} fishSpecies={null} mainId="photo-a" />,
+    );
+    await settle();
+    expect(screen.getByText("Try a sharper photo.")).toBeTruthy();
+    await view.rerender(underProviders(nothing));
+    await settle();
+    expect(seen()).toEqual({ mainId: "photo-a", kinds: ["blurry"] });
+    // Only kinds this build knows survive a read; a record of another shape is no record.
+    store.set(SEEN, JSON.stringify({ mainId: "photo-a", kinds: ["blurry", "nonsense", 7] }));
+    await view.rerender(
+      underProviders(<PhotoTip tips={["blurry", "fish"]} fishSpecies={null} mainId="photo-a" />),
+    );
+    await settle();
+    expect(screen.getByText(/A fish in the main photo is a classic/)).toBeTruthy();
+    await view.rerender(underProviders(nothing));
+    await settle();
+    expect(seen()).toEqual({ mainId: "photo-a", kinds: ["blurry", "fish"] });
+    for (const odd of [
+      "[]",
+      JSON.stringify({ fish: "photo-a" }),
+      JSON.stringify({ mainId: 1, kinds: [] }),
+    ]) {
+      store.set(SEEN, odd);
+      await view.rerender(
+        underProviders(<PhotoTip tips={["fish"]} fishSpecies={null} mainId="photo-a" />),
+      );
+      await settle();
+      expect(screen.getByText(/A fish in the main photo is a classic/)).toBeTruthy();
+      await view.rerender(underProviders(nothing));
+      await settle();
+    }
+    await view.rerender(underProviders(<PhotoTip tips={[]} fishSpecies={null} mainId={null} />));
+    await settle();
+    expect(screen.queryByText("A tip for your photos")).toBeNull();
   });
 });

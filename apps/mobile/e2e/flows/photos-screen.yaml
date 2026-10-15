@@ -4,8 +4,9 @@
 # changed by holding a tile and dragging it (#179), which Maestro has no
 # gesture for (a swipe moves at once, a long press does not drag), and the
 # same moves are the tile's accessibility actions, out of its reach too; the
-# jest suite covers both. Sanna has five approved photos; the removal is
-# declined.
+# jest suite covers both. A caption (#296) is a line picked from a list, set on
+# the first photo and taken off again. Sanna has five approved photos; the
+# removal is declined, so she is left as found.
 appId: fi.kuutti.app
 name: A photo opens full size and back, and removing one asks first
 ---
@@ -28,6 +29,28 @@ name: A photo opens full size and back, and removing one asks first
 - extendedWaitUntil:
     visible: "5 photos, at most 6|5 kuvaa, enintään 6|5 foton, högst 6"
     timeout: 15000
+
+# The caption button says its value after its label on Android (the README's
+# rows rule); in the dialog the chosen line is the one marked with a tick.
+- tapOn: "(Caption of photo 1|Kuvan 1 kuvateksti|Bildtext för foto 1)(, .*)?"
+- extendedWaitUntil:
+    visible: "A caption for photo 1|Kuvateksti kuvalle 1|En bildtext för foto 1"
+    timeout: 15000
+- tapOn: "An old favourite|Vanha suosikki|En gammal favorit"
+- extendedWaitUntil:
+    notVisible: "A caption for photo 1|Kuvateksti kuvalle 1|En bildtext för foto 1"
+    timeout: 15000
+- assertVisible: "An old favourite|Vanha suosikki|En gammal favorit"
+- tapOn: "(Caption of photo 1|Kuvan 1 kuvateksti|Bildtext för foto 1)(, .*)?"
+- extendedWaitUntil:
+    visible: "✓ An old favourite|✓ Vanha suosikki|✓ En gammal favorit"
+    timeout: 15000
+- tapOn: "No caption|Ei kuvatekstiä|Ingen bildtext"
+- extendedWaitUntil:
+    visible: "Add a caption|Lisää kuvateksti|Lägg till en bildtext"
+    timeout: 15000
+- assertNotVisible: "An old favourite|Vanha suosikki|En gammal favorit"
+
 - tapOn:
     text: "Remove|Poista|Ta bort"
     index: 0

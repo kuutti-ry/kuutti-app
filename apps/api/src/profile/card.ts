@@ -176,6 +176,7 @@ export async function buildCard(
     blurhash: p.blurhash,
     width: p.width,
     height: p.height,
+    caption: p.caption,
   }));
   return {
     card: {

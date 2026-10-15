@@ -54,6 +54,33 @@ describe("PhotoZoomScreen", () => {
     expect(router.back).toHaveBeenCalled();
   });
 
+  it("reads the owner's caption with the photo when it has one (#296)", async () => {
+    globalThis.fetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            url: "https://media.test/media/k/full.webp?Signature=s",
+            variant: "full",
+            expiresAt: "2030-01-01T00:15:00.000Z",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    ) as unknown as typeof fetch;
+    await act(async () => {
+      renderWithTheme(
+        <PhotoZoomScreen
+          id={ID}
+          blurhash="LEHV6nWB2yk8pyo0adR*.7kCMdnj"
+          position={1}
+          total={2}
+          caption="travelling"
+        />,
+      );
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    });
+    expect(screen.getByLabelText("Photo 1 / 2, full size. Travelling")).toBeTruthy();
+  });
+
   it("says so when the API refused the URL for the day's budget (#52)", async () => {
     globalThis.fetch = jest.fn(
       async () =>

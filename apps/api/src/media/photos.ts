@@ -2,6 +2,7 @@ import { type Queryable, transaction } from "@kuutti/db";
 import {
   PHOTO_VARIANTS,
   type Photo,
+  type PhotoCaption,
   type PhotoList,
   type PhotoUrlResponse,
   type PhotoVariant,
@@ -193,6 +194,22 @@ export async function appealPhoto(
     "photo_not_appealable",
     "Only the check's own rejection is appealed, once",
   );
+}
+
+/**
+ * The owner's line under a photo (#296): a key from the closed list, never
+ * the person's text, so nothing is checked; null clears it.
+ */
+export async function captionPhoto(
+  deps: PhotoServiceDeps,
+  accountId: string,
+  photoId: string,
+  caption: PhotoCaption | null,
+): Promise<Photo> {
+  const row = await repo.setCaption(deps.db, { accountId, photoId, caption });
+  if (!row) throw new AppError(404, "not_found", "No such photo of this account");
+  deps.logger.info({ accountId, photoId }, "photo captioned");
+  return toPhoto(row);
 }
 
 /** The order must name every photo of the account exactly once. */

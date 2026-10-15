@@ -1,7 +1,14 @@
-import type { Photo, PhotoList } from "@kuutti/schema";
+import type { Photo, PhotoCaption, PhotoList } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
-import { appealPhoto, deletePhoto, listPhotos, reorderPhotos, uploadPhoto } from "./client";
+import {
+  appealPhoto,
+  deletePhoto,
+  listPhotos,
+  reorderPhotos,
+  setPhotoCaption,
+  uploadPhoto,
+} from "./client";
 import { placed } from "./drag";
 import { checkPhoto } from "./localCheck";
 import { pickPhoto, prepareForUpload } from "./pick";
@@ -13,12 +20,15 @@ type PhotosBusy =
   | { kind: "uploading"; percent: number }
   | { kind: "removing"; id: string }
   | { kind: "appealing"; id: string }
+  | { kind: "captioning"; id: string }
   | { kind: "reordering" };
 
 /** What the screen tells the person after something did not go as asked; one at a time. */
 export type PhotosNotice =
   | { kind: "refused_local" }
   | { kind: "permission" }
+  // The caption did not save (#296): its own words, since the generic ones speak of an upload.
+  | { kind: "caption_failed" }
   | { kind: "error"; code: string | undefined };
 
 export type PhotosState = {
@@ -154,12 +164,7 @@ export function usePhotos() {
         setState((previous) => ({
           ...previous,
           busy: { kind: "idle" },
-          list: previous.list
-            ? {
-                ...previous.list,
-                photos: previous.list.photos.map((p) => (p.id === id ? photo : p)),
-              }
-            : null,
+          list: withPhoto(previous.list, photo),
         }));
       } catch (error) {
         return update({ busy: { kind: "idle" }, notice: { kind: "error", code: codeOf(error) } });
@@ -167,6 +172,25 @@ export function usePhotos() {
       await refresh();
     },
     [update, refresh],
+  );
+
+  /** The owner's line under a photo (#296), or none: the photo comes back with it, in its place. */
+  const caption = useCallback(
+    async (id: string, line: PhotoCaption | null) => {
+      changes.current += 1;
+      update({ busy: { kind: "captioning", id }, notice: null });
+      try {
+        const photo = await setPhotoCaption(id, line);
+        setState((previous) => ({
+          ...previous,
+          busy: { kind: "idle" },
+          list: withPhoto(previous.list, photo),
+        }));
+      } catch {
+        update({ busy: { kind: "idle" }, notice: { kind: "caption_failed" } });
+      }
+    },
+    [update],
   );
 
   const reorder = useCallback(
@@ -231,12 +255,18 @@ export function usePhotos() {
     add,
     remove,
     appeal,
+    caption,
     moveTo,
     move,
     makeMain,
     dismissNotice,
     reportRefusal,
   };
+}
+
+/** The list with one photo as the API now answers it, in its place. */
+function withPhoto(list: PhotoList | null, photo: Photo): PhotoList | null {
+  return list ? { ...list, photos: list.photos.map((p) => (p.id === photo.id ? photo : p)) } : null;
 }
 
 function renumber(list: PhotoList, photos: Photo[]): PhotoList {

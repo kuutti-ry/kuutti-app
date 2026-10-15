@@ -196,7 +196,17 @@ describe("the zoom screen, /photos/[id]", () => {
       blurhash: "LEHV6n",
       position: 2,
       total: 3,
+      caption: null,
     });
+  });
+
+  it("hands the caption's key through, and anything else in the link is no caption (#296)", async () => {
+    params({ id: "p1", blurhash: "LEHV6n", position: "1", total: "2", caption: "travelling" });
+    await render(<PhotoZoomRoute />);
+    expect(propsOf("PhotoZoomScreen")).toMatchObject({ caption: "travelling" });
+    params({ id: "p1", blurhash: "LEHV6n", position: "1", total: "2", caption: "not a line" });
+    await render(<PhotoZoomRoute />);
+    expect(propsOf("PhotoZoomScreen")).toMatchObject({ caption: null });
   });
 
   it("falls back to no placeholder and one photo of one", async () => {
@@ -207,6 +217,7 @@ describe("the zoom screen, /photos/[id]", () => {
       blurhash: "",
       position: 1,
       total: 1,
+      caption: null,
     });
   });
 });

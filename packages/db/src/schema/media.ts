@@ -58,6 +58,10 @@ export const photo = pgTable(
     // 0 is the main photo. The owner orders; the API renumbers 0..n-1.
     position: smallint("position").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // The owner's line for the photo (#296): a key of PHOTO_CAPTIONS, never
+    // the person's text, so there is nothing to check; the words are the
+    // client's, per language.
+    caption: text("caption"),
   },
   (table) => [
     index("photo_account_position_idx").on(table.accountId, table.position),

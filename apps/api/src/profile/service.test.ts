@@ -128,6 +128,26 @@ describe("the card for a viewer who is not the owner", () => {
     expect(await shownRows(ctx, viewer.accountId)).toBe(2);
   });
 
+  test("the card carries the owner's caption of each photo (#296), null where there is none", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 5 });
+    const { deps } = await depsOf(ctx, { readPreferences: onboarded });
+    const viewer = await signedInAccount(ctx.client);
+    const subject = await signedInAccount(ctx.client);
+    await profileRow(ctx, subject.accountId, {});
+    await approvedPhotos(ctx, subject.accountId, 2);
+    await ctx.client.query(
+      "UPDATE photo SET caption = 'summer_day' WHERE account_id = $1 AND position = 1",
+      [subject.accountId],
+    );
+    const served = await buildCard(deps, {
+      viewerAccountId: viewer.accountId,
+      subjectAccountId: subject.accountId,
+    });
+    expect(served.card?.photos.map((p) => p.caption)).toEqual([null, "summer_day"]);
+  });
+
   test("without a preference reader nothing is complete: the owner's preview says what onboarding still owes", async ({
     ctx,
   }) => {

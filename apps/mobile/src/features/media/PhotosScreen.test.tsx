@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as ImagePicker from "expo-image-picker";
+import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
 import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
@@ -83,6 +84,7 @@ const photo = (n: number) => ({
   appealable: false,
   position: n - 1,
   createdAt: "2026-09-25T12:00:00.000Z",
+  caption: null,
 });
 const list = (n: number, maxPhotos = 3) => ({
   photos: Array.from({ length: n }, (_, i) => photo(i + 1)),
@@ -143,6 +145,10 @@ beforeEach(async () => {
   router.push.mockReset();
   router.back.mockReset();
   setLocalCheck(null);
+  // Which tips were said for which main photo lives on the device (#297): each test starts with none said.
+  (SecureStore as unknown as { __store: Map<string, string> }).__store.delete(
+    "kuutti.preference.photoTipsSeen",
+  );
   await saveSession(session);
 });
 
@@ -163,8 +169,8 @@ describe("PhotosScreen", () => {
 
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // Each photo: open, remove. Plus add and done. The moves are the tiles' actions, not buttons (#179).
-    expect(found).toHaveLength(6);
+    // Each photo: open, caption (#296), remove. Plus add and done. The moves are the tiles' actions, not buttons (#179).
+    expect(found).toHaveLength(8);
     expect(screen.queryByRole("button", { name: "Move later" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Make main photo" })).toBeNull();
     const tiles = screen.getAllByRole("button", { name: /^Open photo/ });
@@ -486,6 +492,80 @@ describe("PhotosScreen", () => {
     expect(screen.getByText("1 photo, at most 3")).toBeTruthy();
   });
 
+  it("gives a photo a caption from the list (#296): the dialog's lines, the choice sent and shown, No caption clears it", async () => {
+    const sent: unknown[] = [];
+    fetchMock([
+      answersList(list(2)),
+      answersUrls,
+      (req) =>
+        req.method === "PUT" && /\/caption$/.test(new URL(req.url).pathname)
+          ? req.json().then((body: { caption: string | null }) => {
+              sent.push(body.caption);
+              const id = new URL(req.url).pathname.split("/")[2];
+              return json({ ...photo(1), id, caption: body.caption });
+            })
+          : null,
+    ]);
+    await show(<PhotosScreen />);
+    expect(await screen.findAllByRole("button", { name: /^Caption of photo/ })).toHaveLength(2);
+    expect(screen.getAllByText("Add a caption")).toHaveLength(2);
+    const button = () => screen.getByRole("button", { name: "Caption of photo 1" });
+    expect(button().props.accessibilityValue).toEqual({ text: "No caption" });
+
+    await press(button());
+    expect(await screen.findByText("A caption for photo 1")).toBeTruthy();
+    // Every line of the list and none, each a radio; none chosen yet but "No caption"; every control labelled.
+    expect(screen.getAllByRole("radio")).toHaveLength(17);
+    expect(
+      screen.getByRole("radio", { name: "✓ No caption" }).props.accessibilityState,
+    ).toMatchObject({ checked: true });
+    const found = pressables(screen.toJSON() as HostNode);
+    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+
+    await press(screen.getByRole("radio", { name: "An old favourite" }));
+    await waitFor(() => expect(sent).toEqual(["old_favourite"]));
+    expect(screen.queryByText("A caption for photo 1")).toBeNull();
+    expect(await screen.findByText("An old favourite")).toBeTruthy();
+    expect(button().props.accessibilityValue).toEqual({ text: "An old favourite" });
+    // The photo's own label says the line; the second photo keeps none.
+    expect(screen.getByLabelText("Photo 1 / 2. An old favourite")).toBeTruthy();
+    expect(screen.getByLabelText("Photo 2 / 2")).toBeTruthy();
+    expect(screen.getAllByText("Add a caption")).toHaveLength(1);
+
+    // Opened again, the chosen line is marked; No caption takes it off.
+    await press(button());
+    expect(await screen.findByRole("radio", { name: "✓ An old favourite" })).toBeTruthy();
+    await press(screen.getByRole("radio", { name: "No caption" }));
+    await waitFor(() => expect(sent).toEqual(["old_favourite", null]));
+    expect(await screen.findAllByText("Add a caption")).toHaveLength(2);
+    expect(screen.getByLabelText("Photo 1 / 2")).toBeTruthy();
+  });
+
+  it("opens the photo full size with its caption, and says so when a caption could not be saved", async () => {
+    fetchMock([
+      answersList({ photos: [{ ...photo(1), caption: "travelling" }], maxPhotos: 3, tips: [] }),
+      answersUrls,
+      (req) =>
+        req.method === "PUT" && /\/caption$/.test(new URL(req.url).pathname)
+          ? json({ error: { code: "not_found", message: "x", requestId: "r" } }, 404)
+          : null,
+    ]);
+    await show(<PhotosScreen />);
+    expect(await screen.findByLabelText("Photo 1 / 1. Travelling")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Open photo 1" }));
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/photos/[id]",
+      params: expect.objectContaining({ id: photo(1).id, caption: "travelling" }),
+    });
+
+    await press(screen.getByRole("button", { name: "Caption of photo 1" }));
+    await press(await screen.findByRole("radio", { name: "No caption" }));
+    expect(await screen.findByText("The caption could not be saved. Try again.")).toBeTruthy();
+    // The photo keeps the line it had.
+    expect(screen.getByText("Travelling")).toBeTruthy();
+    expect(screen.getByLabelText("Photo 1 / 1. Travelling")).toBeTruthy();
+  });
+
   it("says what state each photo is in, a rejection without a reason as not accepted", async () => {
     fetchMock([
       answersList({
@@ -520,7 +600,7 @@ describe("PhotosScreen", () => {
     ]);
   });
 
-  it("shows one tip at a time by the photos; a dismissed one gives way to the next and stays dismissed (#287)", async () => {
+  it("shows one tip at a time by the photos; a dismissed one gives way to the next and is not said again (#287, #297)", async () => {
     const withTips = { ...approvedList(2), tips: ["sunglasses", "few_photos"] };
     fetchMock([answersList(withTips), answersUrls]);
     await show(<PhotosScreen />);
@@ -533,7 +613,7 @@ describe("PhotosScreen", () => {
     await press(screen.getByRole("button", { name: "Got it" }));
     expect(screen.queryByText(/without sunglasses/)).toBeNull();
     expect(screen.getByText(/fuller picture/)).toBeTruthy();
-    // The photos opened again keep the dismissal for this run.
+    // The photos opened again: the dismissal is remembered on the device.
     fetchMock([answersList(withTips), answersUrls]);
     await show(<PhotosScreen />);
     expect(await screen.findByText(/fuller picture/)).toBeTruthy();

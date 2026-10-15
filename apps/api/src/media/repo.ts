@@ -2,6 +2,7 @@ import { type Queryable, transaction } from "@kuutti/db";
 import type {
   ModerationLabel,
   Photo,
+  PhotoCaption,
   PhotoId,
   PhotoRejectionReason,
   PhotoReviewItem,
@@ -30,10 +31,11 @@ const photoFrom = (r: Row): PhotoRow => ({
   appealable: r.appealable === true,
   position: r.position as number,
   createdAt: (r.created_at as Date).toISOString(),
+  caption: (r.caption as PhotoCaption | null) ?? null,
 });
 
 const COLUMNS =
-  "id, key, blurhash, width, height, state, rejection_reason, appealable, position, created_at";
+  "id, key, blurhash, width, height, state, rejection_reason, appealable, position, created_at, caption";
 
 export async function listPhotos(db: Queryable, accountId: string): Promise<PhotoRow[]> {
   const { rows } = await db.query<Row>(
@@ -457,6 +459,23 @@ export async function appealPhoto(
     [input.photoId, input.at],
   );
   return photoFrom(row);
+}
+
+/**
+ * The owner's line for a photo (#296), or null to clear it. Scoped by the
+ * account in the statement (rule 6); null when the photo is not this
+ * account's.
+ */
+export async function setCaption(
+  db: Queryable,
+  input: { accountId: string; photoId: string; caption: PhotoCaption | null },
+): Promise<PhotoRow | null> {
+  const { rows } = await db.query<Row>(
+    `UPDATE photo SET caption = $3 WHERE id = $1 AND account_id = $2 RETURNING ${COLUMNS}`,
+    [input.photoId, input.accountId, input.caption],
+  );
+  const row = rows[0];
+  return row ? photoFrom(row) : null;
 }
 
 const QUEUE_COLUMNS = `p.id, p.account_id, p.state, p.blurhash, p.width, p.height, p.created_at,

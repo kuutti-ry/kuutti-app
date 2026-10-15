@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PhotoId } from "./media.ts";
+import { PhotoCaption, PhotoId } from "./media.ts";
 import { Gender, PondSummary } from "./onboarding.ts";
 import { PROFILE_FIELDS, ProfileFields } from "./profile-fields.ts";
 
@@ -145,6 +145,8 @@ export const CardPhoto = z
     blurhash: z.string().min(6).max(200),
     width: z.int().positive(),
     height: z.int().positive(),
+    /** The owner's line under the photo (#296), shown in the viewer's language; null when absent, as on Photo. */
+    caption: PhotoCaption.nullable().default(null),
   })
   .meta({ id: "CardPhoto" });
 export type CardPhoto = z.infer<typeof CardPhoto>;

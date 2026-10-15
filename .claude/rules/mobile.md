@@ -20,7 +20,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 - Upload only through the API. Pre-resize to 1600 px with `expo-image-manipulator` (which drops EXIF) before upload.
 - Render with `expo-image`; `cacheKey` is `photoId/variant`, never the signed URL. Use the blurhash from the profile JSON as the placeholder.
 - Variants: thumb in lists, card on open, full only on zoom. Never prefetch beyond the current round; prefetch counts as exposure.
-- Photo and chat screens get `FLAG_SECURE` on Android and screenshot detection on iOS (#86).
+- Screenshots are never blocked (the maintainer's decision of 15/10/2026, #296): blind and partially sighted people describe a photo from a screenshot with Be My AI or Seeing AI, and TD-6's premise is that single-user capture cannot be prevented; the controls are the exposure budget and the fetch log (#52, ADR-008). Whether iOS notices a screenshot is #86's open question.
 
 ## UI
 
