@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.20.1",
+    "version": "0.21.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1169,100 +1169,13 @@
             "nullable": true,
             "minLength": 1,
             "maxLength": 80
-          },
-          "events": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ResearchEventRecord"
-            },
-            "maxItems": 1000
           }
         },
         "required": [
           "enrolled",
           "since",
-          "consentVersion",
-          "events"
+          "consentVersion"
         ]
-      },
-      "ResearchEventRecord": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 80
-          },
-          "at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "consentVersion": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 80
-          },
-          "pond": {
-            "type": "string",
-            "nullable": true,
-            "minLength": 1,
-            "maxLength": 60
-          },
-          "ageBand": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 12
-          },
-          "snapshot": {
-            "$ref": "#/components/schemas/ResearchSnapshot"
-          },
-          "props": {
-            "type": "object",
-            "additionalProperties": {
-              "nullable": true
-            }
-          }
-        },
-        "required": [
-          "name",
-          "at",
-          "consentVersion",
-          "pond",
-          "ageBand",
-          "snapshot",
-          "props"
-        ]
-      },
-      "ResearchSnapshot": {
-        "type": "object",
-        "properties": {
-          "gender": {
-            "$ref": "#/components/schemas/Gender"
-          },
-          "fields": {
-            "$ref": "#/components/schemas/ResearchFields"
-          }
-        },
-        "required": [
-          "gender",
-          "fields"
-        ],
-        "additionalProperties": false
-      },
-      "ResearchFields": {
-        "type": "object",
-        "properties": {
-          "intent": {
-            "type": "string",
-            "enum": [
-              "long_term",
-              "casual",
-              "open_to_either",
-              "dance_partner"
-            ]
-          }
-        },
-        "additionalProperties": false
       },
       "ExportedGate": {
         "type": "object",

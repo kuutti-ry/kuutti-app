@@ -4,10 +4,11 @@ import { exportResearch } from "./export.ts";
 import { ensureEventPartitions } from "./partitions.ts";
 import { enrolSubject, findSubject, insertEvent, snapshotRows } from "./repo.ts";
 
-// The research half of the export (#51, ADR-007 §4) and the mapping row
-// beneath it (#50, ADR-011): an old event is read leniently, never a failed
-// export; the research_id stays in this slice; nothing is found for an
-// account that is not enrolled, and nothing is written for one erased.
+// The research half of the export (#51, ADR-007 §4; ADR-011 §7 and §10) and
+// the mapping row beneath it (#50, ADR-011): the enrolment and nothing else,
+// whatever the events table holds; the research_id stays in this slice;
+// nothing is found for an account that is not enrolled, and nothing is
+// written for one erased.
 
 const AT = new Date("2026-09-26T12:00:00Z");
 
@@ -44,49 +45,32 @@ describe("the research export", () => {
       enrolled: false,
       since: null,
       consentVersion: null,
-      events: [],
     });
   });
 
-  test("old events are read leniently: a retired gender, a snapshot or props that are no object, a retired option", async ({
+  test("an enrolled account exports the enrolment and none of its events, whatever they hold", async ({
     ctx,
   }) => {
     const { accountId, researchId } = await enrolled(ctx);
     const hour = (h: number) => new Date(AT.getTime() + h * 3_600_000);
     await event(ctx, researchId, {
       at: hour(0),
-      snapshot: { gender: "robot", fields: { intent: "long_term", smoking: "retired option" } },
+      snapshot: { gender: "woman", fields: { intent: "long_term" } },
       props: { complete: true, approvedPhotos: 2 },
     });
     await event(ctx, researchId, { at: hour(1), snapshot: null, props: null });
     await event(ctx, researchId, { at: hour(2), snapshot: "a string", props: "a string" });
-    await event(ctx, researchId, { at: hour(3), snapshot: { fields: {} }, props: {} });
 
     const exported = await exportResearch(ctx.client, accountId);
-    expect(exported).toMatchObject({
+    expect(exported).toEqual({
       enrolled: true,
       since: AT.toISOString(),
       consentVersion: "research-v1",
     });
-    // Newest first.
-    expect(exported.events.map((e) => [e.snapshot, e.props])).toEqual([
-      [{ gender: null, fields: {} }, {}],
-      [{ gender: null, fields: {} }, {}],
-      [{ gender: null, fields: {} }, {}],
-      [
-        { gender: null, fields: { intent: "long_term" } },
-        { complete: true, approvedPhotos: 2 },
-      ],
-    ]);
-    expect(JSON.stringify(exported)).not.toContain(researchId);
-  });
-
-  test("another account's events are never in the export", async ({ ctx }) => {
-    const mine = await enrolled(ctx);
-    const theirs = await enrolled(ctx);
-    await event(ctx, theirs.researchId, { snapshot: { gender: "woman", fields: {} }, props: {} });
-    expect((await exportResearch(ctx.client, mine.accountId)).events).toEqual([]);
-    expect((await exportResearch(ctx.client, theirs.accountId)).events).toHaveLength(1);
+    const text = JSON.stringify(exported);
+    expect(text).not.toContain(researchId);
+    expect(text).not.toContain("profile_saved");
+    expect(text).not.toContain("long_term");
   });
 });
 

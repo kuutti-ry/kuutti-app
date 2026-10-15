@@ -119,32 +119,18 @@ export const ResearchSnapshot = z
   .meta({ id: "ResearchSnapshot" });
 export type ResearchSnapshot = z.infer<typeof ResearchSnapshot>;
 
-/** One event as the export shows it to the person: everything the row holds except the ids. The name is a string, not the enum, so an event retired from the registry still exports while its partition lives. */
-export const ResearchEventRecord = z
-  .object({
-    name: z.string().min(1).max(80),
-    at: z.iso.datetime(),
-    consentVersion: z.string().min(1).max(80),
-    /** The pond's slug, or null for an event before the person chose one. */
-    pond: z.string().min(1).max(60).nullable(),
-    /** As stored; a string like the name, so a renamed band still exports. */
-    ageBand: z.string().min(1).max(12),
-    snapshot: ResearchSnapshot,
-    props: z.record(z.string(), z.unknown()),
-  })
-  .meta({ id: "ResearchEventRecord" });
-export type ResearchEventRecord = z.infer<typeof ResearchEventRecord>;
-
-export const RESEARCH_EXPORT_EVENTS_MAX = 1000;
-
-/** What research holds about the person, for the export (#51): the enrolment and the events, never the research_id. */
+/**
+ * What research holds about the person, for the export (#51): the enrolment
+ * alone, never the research_id. The events are not in it (ADR-011 §10): they
+ * are the researchers' material, pseudonymised while the mapping row lives and
+ * anonymised in every copy that leaves the database, not a record about the
+ * person.
+ */
 export const ResearchExport = z
   .object({
     enrolled: z.boolean(),
     since: z.iso.datetime().nullable(),
     consentVersion: z.string().min(1).max(80).nullable(),
-    /** Newest first, at most 1000. Empty when not enrolled: the events cannot be found, which is the point. */
-    events: z.array(ResearchEventRecord).max(RESEARCH_EXPORT_EVENTS_MAX),
   })
   .meta({ id: "ResearchExport" });
 export type ResearchExport = z.infer<typeof ResearchExport>;
