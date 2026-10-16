@@ -4194,6 +4194,673 @@ photos.zoom.labelCaption:
   sv: "Foto {position, number} / {total, number}, full storlek. {caption}"
   machine: { fi: true, sv: true }
 
+# --- The automatic photo description (#296, ADR-006 §3): what the photo check sees, ---
+# --- one key per part of the closed list of PhotoDescription (packages/schema).   ---
+# --- describePhoto (src/describe.ts) joins the parts into sentences: people and   ---
+# --- the setting, then the face, then the activity and objects. A phrase stands   ---
+# --- in a comma list after "one person" or alone at the start of a sentence, so   ---
+# --- it is a fragment ("by a lake", "with a dog"), never a sentence of its own.    ---
+
+photos.description.text:
+  en: "Automatic description: {description}"
+  description: "Read with a photo by a screen reader after the owner's caption, and shown under it when the viewer asks (#296). {description} is one to three short sentences made of the keys below, e.g. \"One person, outdoors, by a lake. Smiling, sunglasses. Hiking, with a dog.\" The prefix says it is the machine's words, not the owner's."
+  fi: "Automaattinen kuvaus: {description}"
+  sv: "Automatisk beskrivning: {description}"
+  machine: { fi: true, sv: true }
+
+photos.description.people:
+  en: "{people, plural, one {one person} other {# people}}"
+  description: "First phrase of the automatic description (#296): how many people the photo check counted. Starts the sentence; the setting and the scene follow it in a comma list."
+  fi: "{people, plural, one {yksi henkilö} other {# henkilöä}}"
+  sv: "{people, plural, one {en person} other {# personer}}"
+  machine: { fi: true, sv: true }
+
+photos.description.setting.indoors:
+  en: "indoors"
+  description: "Automatic description (#296), after the people: the photo was taken inside. A fragment in a comma list."
+  fi: "sisällä"
+  sv: "inomhus"
+  machine: { fi: true, sv: true }
+
+photos.description.setting.outdoors:
+  en: "outdoors"
+  description: "Automatic description (#296), after the people: the photo was taken outside. A fragment in a comma list."
+  fi: "ulkona"
+  sv: "utomhus"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.lake:
+  en: "by a lake"
+  description: "Automatic description (#296), the setting: Rekognition's Lake. A fragment in a comma list after \"one person, outdoors\"."
+  fi: "järven rannalla"
+  sv: "vid en sjö"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.sea:
+  en: "by the sea"
+  description: "Automatic description (#296), the setting: Rekognition's Sea. A fragment in a comma list."
+  fi: "meren rannalla"
+  sv: "vid havet"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.beach:
+  en: "on a beach"
+  description: "Automatic description (#296), the setting: Rekognition's Beach. A fragment in a comma list."
+  fi: "uimarannalla"
+  sv: "på en strand"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.river:
+  en: "by a river"
+  description: "Automatic description (#296), the setting: Rekognition's River. A fragment in a comma list."
+  fi: "joen rannalla"
+  sv: "vid en å"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.forest:
+  en: "in a forest"
+  description: "Automatic description (#296), the setting: Rekognition's Woodland (alias Forest). A fragment in a comma list."
+  fi: "metsässä"
+  sv: "i en skog"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.mountain:
+  en: "in the mountains"
+  description: "Automatic description (#296), the setting: Rekognition's Mountain, a fell too. A fragment in a comma list."
+  fi: "vuoristossa"
+  sv: "i bergen"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.snow:
+  en: "in the snow"
+  description: "Automatic description (#296), the setting: Rekognition's Snow. A fragment in a comma list."
+  fi: "lumessa"
+  sv: "i snön"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.ice:
+  en: "on the ice"
+  description: "Automatic description (#296), the setting: Rekognition's Ice. A fragment in a comma list."
+  fi: "jäällä"
+  sv: "på isen"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.field:
+  en: "in an open field"
+  description: "Automatic description (#296), the setting: Rekognition's Field, open land, not a sports field. A fragment in a comma list."
+  fi: "aukealla"
+  sv: "på ett fält"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.park:
+  en: "in a park"
+  description: "Automatic description (#296), the setting: Rekognition's Park. A fragment in a comma list."
+  fi: "puistossa"
+  sv: "i en park"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.garden:
+  en: "in a garden"
+  description: "Automatic description (#296), the setting: Rekognition's Garden. A fragment in a comma list."
+  fi: "puutarhassa"
+  sv: "i en trädgård"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.countryside:
+  en: "in the countryside"
+  description: "Automatic description (#296), the setting: Rekognition's Countryside. A fragment in a comma list."
+  fi: "maaseudulla"
+  sv: "på landet"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.city:
+  en: "in a city"
+  description: "Automatic description (#296), the setting: Rekognition's City. A fragment in a comma list."
+  fi: "kaupungissa"
+  sv: "i en stad"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.street:
+  en: "on a street"
+  description: "Automatic description (#296), the setting: Rekognition's Street. A fragment in a comma list."
+  fi: "kadulla"
+  sv: "på en gata"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.cafe:
+  en: "in a café"
+  description: "Automatic description (#296), the setting: Rekognition's Cafe. A fragment in a comma list."
+  fi: "kahvilassa"
+  sv: "på ett kafé"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.restaurant:
+  en: "in a restaurant"
+  description: "Automatic description (#296), the setting: Rekognition's Restaurant. A fragment in a comma list."
+  fi: "ravintolassa"
+  sv: "på en restaurang"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.kitchen:
+  en: "in a kitchen"
+  description: "Automatic description (#296), the setting: Rekognition's Kitchen. A fragment in a comma list."
+  fi: "keittiössä"
+  sv: "i ett kök"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.living_room:
+  en: "in a living room"
+  description: "Automatic description (#296), the setting: Rekognition's Living Room. A fragment in a comma list."
+  fi: "olohuoneessa"
+  sv: "i ett vardagsrum"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.office:
+  en: "in an office"
+  description: "Automatic description (#296), the setting: Rekognition's Office. A fragment in a comma list."
+  fi: "toimistossa"
+  sv: "på ett kontor"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.gym:
+  en: "in a gym"
+  description: "Automatic description (#296), the setting: Rekognition's Gym. A fragment in a comma list."
+  fi: "kuntosalilla"
+  sv: "på ett gym"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.concert:
+  en: "at a concert"
+  description: "Automatic description (#296), the setting: Rekognition's Concert. A fragment in a comma list."
+  fi: "konsertissa"
+  sv: "på en konsert"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.festival:
+  en: "at a festival"
+  description: "Automatic description (#296), the setting: Rekognition's Festival. A fragment in a comma list."
+  fi: "festivaaleilla"
+  sv: "på en festival"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.bar:
+  en: "in a bar"
+  description: "Automatic description (#296), the setting: Rekognition's Bar. A fragment in a comma list."
+  fi: "baarissa"
+  sv: "på en bar"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.library:
+  en: "in a library"
+  description: "Automatic description (#296), the setting: Rekognition's Library. A fragment in a comma list."
+  fi: "kirjastossa"
+  sv: "i ett bibliotek"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.museum:
+  en: "in a museum"
+  description: "Automatic description (#296), the setting: Rekognition's Museum. A fragment in a comma list."
+  fi: "museossa"
+  sv: "på ett museum"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.church:
+  en: "in a church"
+  description: "Automatic description (#296), the setting: Rekognition's Church. A fragment in a comma list."
+  fi: "kirkossa"
+  sv: "i en kyrka"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.harbour:
+  en: "in a harbour"
+  description: "Automatic description (#296), the setting: Rekognition's Harbor. A fragment in a comma list."
+  fi: "satamassa"
+  sv: "i en hamn"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.sauna:
+  en: "in a sauna"
+  description: "Automatic description (#296), the setting: Rekognition's Sauna. A fragment in a comma list."
+  fi: "saunassa"
+  sv: "i en bastu"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.tent:
+  en: "by a tent"
+  description: "Automatic description (#296), the setting: Rekognition's Tent. A fragment in a comma list."
+  fi: "teltan luona"
+  sv: "vid ett tält"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.sunset:
+  en: "at sunset"
+  description: "Automatic description (#296), the setting: Rekognition's Sunset. A fragment in a comma list."
+  fi: "auringonlaskun aikaan"
+  sv: "i solnedgången"
+  machine: { fi: true, sv: true }
+
+photos.description.scene.aurora:
+  en: "under the northern lights"
+  description: "Automatic description (#296), the setting: Rekognition's Aurora. A fragment in a comma list."
+  fi: "revontulien alla"
+  sv: "under norrskenet"
+  machine: { fi: true, sv: true }
+
+photos.description.object.hiking:
+  en: "hiking"
+  description: "Automatic description (#296), the activity: Rekognition's Hiking. Starts the last sentence or stands in its comma list."
+  fi: "vaeltamassa"
+  sv: "på vandring"
+  machine: { fi: true, sv: true }
+
+photos.description.object.fishing:
+  en: "fishing"
+  description: "Automatic description (#296), the activity: Rekognition's Fishing. Starts the last sentence or stands in its comma list."
+  fi: "kalassa"
+  sv: "på fiske"
+  machine: { fi: true, sv: true }
+
+photos.description.object.skiing:
+  en: "skiing"
+  description: "Automatic description (#296), the activity: Rekognition's Skiing, cross-country or downhill. Starts the last sentence or stands in its comma list."
+  fi: "suksilla"
+  sv: "på skidor"
+  machine: { fi: true, sv: true }
+
+photos.description.object.snowboarding:
+  en: "snowboarding"
+  description: "Automatic description (#296), the activity: Rekognition's Snowboarding. Starts the last sentence or stands in its comma list."
+  fi: "lumilaudalla"
+  sv: "på snowboard"
+  machine: { fi: true, sv: true }
+
+photos.description.object.ice_skating:
+  en: "ice skating"
+  description: "Automatic description (#296), the activity: Rekognition's Ice Skating. Starts the last sentence or stands in its comma list."
+  fi: "luistelemassa"
+  sv: "på skridskor"
+  machine: { fi: true, sv: true }
+
+photos.description.object.hockey:
+  en: "ice hockey"
+  description: "Automatic description (#296), the activity: Rekognition's Hockey. A noun: starts the last sentence or stands in its comma list."
+  fi: "jääkiekko"
+  sv: "ishockey"
+  machine: { fi: true, sv: true }
+
+photos.description.object.football:
+  en: "football"
+  description: "Automatic description (#296), the activity: Rekognition's Soccer. A noun: starts the last sentence or stands in its comma list."
+  fi: "jalkapallo"
+  sv: "fotboll"
+  machine: { fi: true, sv: true }
+
+photos.description.object.basketball:
+  en: "basketball"
+  description: "Automatic description (#296), the activity: Rekognition's Basketball. A noun: starts the last sentence or stands in its comma list."
+  fi: "koripallo"
+  sv: "basket"
+  machine: { fi: true, sv: true }
+
+photos.description.object.tennis:
+  en: "tennis"
+  description: "Automatic description (#296), the activity: Rekognition's Tennis. A noun: starts the last sentence or stands in its comma list."
+  fi: "tennis"
+  sv: "tennis"
+  machine: { fi: true, sv: true }
+
+photos.description.object.golf:
+  en: "golf"
+  description: "Automatic description (#296), the activity: Rekognition's Golf. A noun: starts the last sentence or stands in its comma list."
+  fi: "golf"
+  sv: "golf"
+  machine: { fi: true, sv: true }
+
+photos.description.object.running:
+  en: "running"
+  description: "Automatic description (#296), the activity: Rekognition's Running. Starts the last sentence or stands in its comma list."
+  fi: "juoksemassa"
+  sv: "på löprunda"
+  machine: { fi: true, sv: true }
+
+photos.description.object.cycling:
+  en: "cycling"
+  description: "Automatic description (#296), the activity: Rekognition's Cycling. Starts the last sentence or stands in its comma list."
+  fi: "pyöräilemässä"
+  sv: "på cykeltur"
+  machine: { fi: true, sv: true }
+
+photos.description.object.swimming:
+  en: "swimming"
+  description: "Automatic description (#296), the activity: Rekognition's Swimming. Starts the last sentence or stands in its comma list."
+  fi: "uimassa"
+  sv: "simning"
+  machine: { fi: true, sv: true }
+
+photos.description.object.surfing:
+  en: "surfing"
+  description: "Automatic description (#296), the activity: Rekognition's Surfing. Starts the last sentence or stands in its comma list."
+  fi: "surffaamassa"
+  sv: "surfing"
+  machine: { fi: true, sv: true }
+
+photos.description.object.yoga:
+  en: "yoga"
+  description: "Automatic description (#296), the activity: Rekognition's Yoga. A noun: starts the last sentence or stands in its comma list."
+  fi: "jooga"
+  sv: "yoga"
+  machine: { fi: true, sv: true }
+
+photos.description.object.climbing:
+  en: "climbing"
+  description: "Automatic description (#296), the activity: Rekognition's Climbing. Starts the last sentence or stands in its comma list."
+  fi: "kiipeilemässä"
+  sv: "klättring"
+  machine: { fi: true, sv: true }
+
+photos.description.object.dancing:
+  en: "dancing"
+  description: "Automatic description (#296), the activity: Rekognition's Dancing. Starts the last sentence or stands in its comma list."
+  fi: "tanssimassa"
+  sv: "dans"
+  machine: { fi: true, sv: true }
+
+photos.description.object.cooking:
+  en: "cooking"
+  description: "Automatic description (#296), the activity: Rekognition's Cooking. Starts the last sentence or stands in its comma list."
+  fi: "kokkaamassa"
+  sv: "matlagning"
+  machine: { fi: true, sv: true }
+
+photos.description.object.baking:
+  en: "baking"
+  description: "Automatic description (#296), the activity: Rekognition's Baking. Starts the last sentence or stands in its comma list."
+  fi: "leipomassa"
+  sv: "bakning"
+  machine: { fi: true, sv: true }
+
+photos.description.object.guitar:
+  en: "with a guitar"
+  description: "Automatic description (#296), an object: Rekognition's Guitar. Starts the last sentence or stands in its comma list."
+  fi: "kitaran kanssa"
+  sv: "med en gitarr"
+  machine: { fi: true, sv: true }
+
+photos.description.object.piano:
+  en: "at a piano"
+  description: "Automatic description (#296), an object: Rekognition's Piano. Starts the last sentence or stands in its comma list."
+  fi: "pianon ääressä"
+  sv: "vid ett piano"
+  machine: { fi: true, sv: true }
+
+photos.description.object.reading:
+  en: "reading"
+  description: "Automatic description (#296), the activity: Rekognition's Reading. Starts the last sentence or stands in its comma list."
+  fi: "lukemassa"
+  sv: "läsning"
+  machine: { fi: true, sv: true }
+
+photos.description.object.gardening:
+  en: "gardening"
+  description: "Automatic description (#296), the activity: Rekognition's Gardening. Starts the last sentence or stands in its comma list."
+  fi: "puutarhatöissä"
+  sv: "trädgårdsarbete"
+  machine: { fi: true, sv: true }
+
+photos.description.object.camping:
+  en: "camping"
+  description: "Automatic description (#296), the activity: Rekognition's Camping. Starts the last sentence or stands in its comma list."
+  fi: "telttailemassa"
+  sv: "camping"
+  machine: { fi: true, sv: true }
+
+photos.description.object.picnic:
+  en: "at a picnic"
+  description: "Automatic description (#296), the activity: Rekognition's Picnic. Starts the last sentence or stands in its comma list."
+  fi: "piknikillä"
+  sv: "på picknick"
+  machine: { fi: true, sv: true }
+
+photos.description.object.kayak:
+  en: "in a kayak"
+  description: "Automatic description (#296), an object: Rekognition's Kayak. Starts the last sentence or stands in its comma list."
+  fi: "kajakissa"
+  sv: "i en kajak"
+  machine: { fi: true, sv: true }
+
+photos.description.object.canoe:
+  en: "in a canoe"
+  description: "Automatic description (#296), an object: Rekognition's Canoe. Starts the last sentence or stands in its comma list."
+  fi: "kanootissa"
+  sv: "i en kanot"
+  machine: { fi: true, sv: true }
+
+photos.description.object.sailboat:
+  en: "on a sailing boat"
+  description: "Automatic description (#296), an object: Rekognition's Sailboat. Starts the last sentence or stands in its comma list."
+  fi: "purjeveneessä"
+  sv: "i en segelbåt"
+  machine: { fi: true, sv: true }
+
+photos.description.object.boat:
+  en: "on a boat"
+  description: "Automatic description (#296), an object: Rekognition's Boat. Starts the last sentence or stands in its comma list."
+  fi: "veneessä"
+  sv: "i en båt"
+  machine: { fi: true, sv: true }
+
+photos.description.object.rowing:
+  en: "rowing"
+  description: "Automatic description (#296), the activity: Rekognition's Rowing. Starts the last sentence or stands in its comma list."
+  fi: "soutamassa"
+  sv: "rodd"
+  machine: { fi: true, sv: true }
+
+photos.description.object.bicycle:
+  en: "with a bicycle"
+  description: "Automatic description (#296), an object: Rekognition's Bicycle. Starts the last sentence or stands in its comma list."
+  fi: "pyörän kanssa"
+  sv: "med en cykel"
+  machine: { fi: true, sv: true }
+
+photos.description.object.motorcycle:
+  en: "with a motorcycle"
+  description: "Automatic description (#296), an object: Rekognition's Motorcycle. Starts the last sentence or stands in its comma list."
+  fi: "moottoripyörän kanssa"
+  sv: "med en motorcykel"
+  machine: { fi: true, sv: true }
+
+photos.description.object.car:
+  en: "with a car"
+  description: "Automatic description (#296), an object: Rekognition's Car. Starts the last sentence or stands in its comma list."
+  fi: "auton kanssa"
+  sv: "med en bil"
+  machine: { fi: true, sv: true }
+
+photos.description.object.horse:
+  en: "with a horse"
+  description: "Automatic description (#296), an animal: Rekognition's Horse. Starts the last sentence or stands in its comma list."
+  fi: "hevosen kanssa"
+  sv: "med en häst"
+  machine: { fi: true, sv: true }
+
+photos.description.object.horse_riding:
+  en: "riding a horse"
+  description: "Automatic description (#296), the activity: Rekognition's Horseback Riding. Starts the last sentence or stands in its comma list."
+  fi: "ratsastamassa"
+  sv: "ridning"
+  machine: { fi: true, sv: true }
+
+photos.description.object.dog:
+  en: "with a dog"
+  description: "Automatic description (#296), an animal: Rekognition's Dog. Starts the last sentence or stands in its comma list."
+  fi: "koiran kanssa"
+  sv: "med en hund"
+  machine: { fi: true, sv: true }
+
+photos.description.object.cat:
+  en: "with a cat"
+  description: "Automatic description (#296), an animal: Rekognition's Cat. Starts the last sentence or stands in its comma list."
+  fi: "kissan kanssa"
+  sv: "med en katt"
+  machine: { fi: true, sv: true }
+
+photos.description.object.fish:
+  en: "with a fish"
+  description: "Automatic description (#296), an animal: Rekognition's Fish, the one the fish tip is about (#253). Starts the last sentence or stands in its comma list."
+  fi: "kalan kanssa"
+  sv: "med en fisk"
+  machine: { fi: true, sv: true }
+
+photos.description.object.coffee:
+  en: "with a coffee"
+  description: "Automatic description (#296), an object: Rekognition's Coffee. Starts the last sentence or stands in its comma list."
+  fi: "kahvin kanssa"
+  sv: "med en kaffe"
+  machine: { fi: true, sv: true }
+
+photos.description.object.flowers:
+  en: "with flowers"
+  description: "Automatic description (#296), an object: Rekognition's Flower. Starts the last sentence or stands in its comma list."
+  fi: "kukkien kanssa"
+  sv: "med blommor"
+  machine: { fi: true, sv: true }
+
+photos.description.object.bonfire:
+  en: "by a bonfire"
+  description: "Automatic description (#296), an object: Rekognition's Bonfire. Starts the last sentence or stands in its comma list."
+  fi: "nuotiolla"
+  sv: "vid en brasa"
+  machine: { fi: true, sv: true }
+
+photos.description.face.smile:
+  en: "smiling"
+  description: "Automatic description (#296), the face sentence: the check saw a smile. Starts that sentence or stands in its comma list."
+  fi: "hymyilee"
+  sv: "ler"
+  machine: { fi: true, sv: true }
+
+photos.description.face.glasses:
+  en: "glasses"
+  description: "Automatic description (#296), the face sentence: eyeglasses worn. Starts that sentence or stands in its comma list."
+  fi: "silmälasit"
+  sv: "glasögon"
+  machine: { fi: true, sv: true }
+
+photos.description.face.sunglasses:
+  en: "sunglasses"
+  description: "Automatic description (#296), the face sentence: sunglasses worn. Starts that sentence or stands in its comma list."
+  fi: "aurinkolasit"
+  sv: "solglasögon"
+  machine: { fi: true, sv: true }
+
+photos.description.face.facialHair:
+  en: "facial hair"
+  description: "Automatic description (#296), the face sentence: a beard or a moustache, never which. Starts that sentence or stands in its comma list."
+  fi: "parta tai viikset"
+  sv: "skägg eller mustasch"
+  machine: { fi: true, sv: true }
+
+# --- The Photo descriptions setting and the one-time screen-reader hint (#296 part 3) ---
+
+settings.photoDescriptions.label:
+  en: Photo descriptions
+  description: "Settings, title of the row in Appearance and language and of its screen (#296): the automatic descriptions, shown under the photos or not, and which parts are told. Also the title of the one-time hint for screen-reader users."
+  fi: Kuvien kuvaukset
+  sv: Bildbeskrivningar
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.shown:
+  en: "Shown under the photos"
+  description: "Settings, the Photo descriptions row's state when the descriptions are shown as text under the photos (#296); heard as the row's value."
+  fi: "Näytetään kuvien alla"
+  sv: "Visas under fotona"
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.notShown:
+  en: "Not shown under the photos"
+  description: "Settings, the Photo descriptions row's state when the descriptions are only read by a screen reader, the default (#296); heard as the row's value."
+  fi: "Ei näytetä kuvien alla"
+  sv: "Visas inte under fotona"
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.explain:
+  en: "The photo check describes what a sighted viewer sees in a photo: how many people, indoors or outdoors, the setting, a smile or glasses, an activity or an object. A screen reader reads it with each photo, after the owner's own caption. It is automatic and can be wrong."
+  description: "Settings, the Photo descriptions screen, first text (#296): what the descriptions are and that they can be wrong."
+  fi: "Kuvatarkistus kuvailee, mitä näkevä katsoja näkee kuvassa: kuinka monta ihmistä, sisällä vai ulkona, ympäristön, hymyn tai lasit, tekemisen tai esineen. Ruudunlukija lukee kuvauksen jokaisen kuvan kanssa kuvan omistajan oman kuvatekstin jälkeen. Kuvaus on automaattinen ja voi olla väärässä."
+  sv: "Fotokontrollen beskriver vad en seende betraktare ser i ett foto: hur många personer, inomhus eller utomhus, omgivningen, ett leende eller glasögon, en aktivitet eller ett föremål. En skärmläsare läser upp den med varje foto, efter ägarens egen bildtext. Den är automatisk och kan ha fel."
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.show:
+  en: Show under photos
+  description: "Settings, the Photo descriptions screen: label of the switch that shows the description as text under each photo on the card, in one's own photos and full size (#296). Off by default."
+  fi: Näytä kuvien alla
+  sv: Visa under fotona
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.showHint:
+  en: "As text under each photo on the card, in your photos and full size."
+  description: "Settings, the Photo descriptions screen, under the Show under photos switch: where the text appears (#296)."
+  fi: "Tekstinä jokaisen kuvan alla kortilla, omissa kuvissasi ja täysikokoisena."
+  sv: "Som text under varje foto på kortet, bland dina foton och i full storlek."
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.tell.title:
+  en: Tell me about
+  description: "Settings, the Photo descriptions screen: heading of the three switches that choose which parts of a description are read and shown (#296)."
+  fi: Kerro minulle
+  sv: Berätta om
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.tell.people:
+  en: People and setting
+  description: "Settings, the Photo descriptions screen: label of the switch for the first part of a description, how many people, indoors or outdoors, and where (#296). On by default."
+  fi: Ihmiset ja ympäristö
+  sv: Personer och omgivning
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.tell.face:
+  en: Face
+  description: "Settings, the Photo descriptions screen: label of the switch for the face part of a description, a smile, glasses, sunglasses, facial hair (#296). On by default; a person who finds it unwelcome turns it off."
+  fi: Kasvot
+  sv: Ansikte
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.tell.objects:
+  en: Activity and objects
+  description: "Settings, the Photo descriptions screen: label of the switch for the last part of a description, what the person is doing and what is with them (#296). On by default."
+  fi: Tekeminen ja esineet
+  sv: Aktivitet och föremål
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.hint.body:
+  en: "It seems you use a screen reader. Each photo is read with a description of what the photo check sees in it, after the owner's own caption. In Settings the descriptions can also be shown under the photos, and parts of them left out."
+  description: "The one-time hint on the first launch with a screen reader active (#296): a dialog titled Photo descriptions, with this text and two buttons. Never sent anywhere: the screen-reader state stays on the device."
+  fi: "Näytät käyttävän ruudunlukijaa. Jokaisen kuvan kanssa luetaan kuvaus siitä, mitä kuvatarkistus näkee kuvassa, kuvan omistajan oman kuvatekstin jälkeen. Asetuksissa kuvaukset voi myös näyttää kuvien alla ja jättää osia niistä pois."
+  sv: "Det verkar som att du använder en skärmläsare. Varje foto läses upp med en beskrivning av vad fotokontrollen ser i det, efter ägarens egen bildtext. I inställningarna kan beskrivningarna också visas under fotona, och delar av dem lämnas bort."
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.hint.open:
+  en: Open the setting
+  description: "The screen-reader hint's first button (#296): opens the Photo descriptions screen in Settings and closes the hint for good."
+  fi: Avaa asetus
+  sv: Öppna inställningen
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.hint.dismiss:
+  en: Got it
+  description: "The screen-reader hint's second button (#296): closes the hint for good."
+  fi: Selvä
+  sv: Uppfattat
+  machine: { fi: true, sv: true }
+
+settings.photoDescriptions.hint.close:
+  en: Close
+  description: "Screen-reader label of the screen-reader hint's close control (#296); closes the hint for good, like Got it."
+  fi: Sulje
+  sv: Stäng
+  machine: { fi: true, sv: true }
+
 admin.signIn.title:
   en: Sign in
   description: Admin panel, heading of the sign-in screen. English only (TD-17).

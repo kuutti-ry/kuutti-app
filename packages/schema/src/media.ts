@@ -109,6 +109,163 @@ export const PHOTO_CAPTIONS = [
 export const PhotoCaption = z.enum(PHOTO_CAPTIONS).meta({ id: "PhotoCaption" });
 export type PhotoCaption = z.infer<typeof PhotoCaption>;
 
+/**
+ * The automatic description of a photo (#296, ADR-006 §1 and §3): what the
+ * photo check sees in it, said only where a sighted viewer sees it too and
+ * never what they would infer. Structured, never a sentence: each key names
+ * a messages.yaml entry (`photos.description.<part>.<key>`), so every viewer
+ * reads it in their own language, and the closed list is also the catalogue.
+ * The Rekognition names behind the keys are the API's
+ * (`apps/api/src/media/description.ts`). Nothing here is body shape,
+ * attractiveness, age, gender, emotion, ethnicity or hair: the check is never
+ * asked for those.
+ */
+export const PHOTO_SETTINGS = ["indoors", "outdoors"] as const;
+export const PhotoSetting = z.enum(PHOTO_SETTINGS).meta({ id: "PhotoSetting" });
+export type PhotoSetting = z.infer<typeof PhotoSetting>;
+
+/** Where the photo was taken, as far as the check can see it. */
+export const PHOTO_SCENES = [
+  "lake",
+  "sea",
+  "beach",
+  "river",
+  "forest",
+  "mountain",
+  "snow",
+  "ice",
+  "field",
+  "park",
+  "garden",
+  "countryside",
+  "city",
+  "street",
+  "cafe",
+  "restaurant",
+  "kitchen",
+  "living_room",
+  "office",
+  "gym",
+  "concert",
+  "festival",
+  "bar",
+  "library",
+  "museum",
+  "church",
+  "harbour",
+  "sauna",
+  "tent",
+  "sunset",
+  "aurora",
+] as const;
+export const PhotoScene = z.enum(PHOTO_SCENES).meta({ id: "PhotoScene" });
+export type PhotoScene = z.infer<typeof PhotoScene>;
+
+/** What the person is doing, or what is with them: an activity, an animal, an object. */
+export const PHOTO_OBJECTS = [
+  "hiking",
+  "fishing",
+  "skiing",
+  "snowboarding",
+  "ice_skating",
+  "hockey",
+  "football",
+  "basketball",
+  "tennis",
+  "golf",
+  "running",
+  "cycling",
+  "swimming",
+  "surfing",
+  "yoga",
+  "climbing",
+  "dancing",
+  "cooking",
+  "baking",
+  "guitar",
+  "piano",
+  "reading",
+  "gardening",
+  "camping",
+  "picnic",
+  "kayak",
+  "canoe",
+  "sailboat",
+  "boat",
+  "rowing",
+  "bicycle",
+  "motorcycle",
+  "car",
+  "horse",
+  "horse_riding",
+  "dog",
+  "cat",
+  "fish",
+  "coffee",
+  "flowers",
+  "bonfire",
+] as const;
+export const PhotoObject = z.enum(PHOTO_OBJECTS).meta({ id: "PhotoObject" });
+export type PhotoObject = z.infer<typeof PhotoObject>;
+
+/** How many scene and object keys a description carries at most, the surest first; more is noise read aloud. */
+export const PHOTO_DESCRIPTION_SCENES_MAX = 3;
+export const PHOTO_DESCRIPTION_OBJECTS_MAX = 4;
+
+export const PhotoDescription = z
+  .object({
+    people: z.int().min(0).max(50).meta({
+      description: "Faces the check counted as people present (the face threshold of ADR-006 §2).",
+    }),
+    setting: PhotoSetting.nullable().meta({
+      description: "Indoors or outdoors when the check is sure enough of one; null otherwise.",
+    }),
+    scene: z.array(PhotoScene).max(PHOTO_DESCRIPTION_SCENES_MAX).meta({
+      description: "Where, the surest first; each a key of photos.description.scene.",
+    }),
+    objects: z.array(PhotoObject).max(PHOTO_DESCRIPTION_OBJECTS_MAX).meta({
+      description:
+        "Activities, animals and objects, the surest first; each a key of photos.description.object.",
+    }),
+    smile: z.boolean(),
+    glasses: z.boolean(),
+    sunglasses: z.boolean(),
+    facialHair: z.boolean().meta({ description: "A beard or a moustache." }),
+  })
+  .meta({
+    id: "PhotoDescription",
+    description:
+      "What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks.",
+  });
+export type PhotoDescription = z.infer<typeof PhotoDescription>;
+
+/**
+ * A description as this build can say it: a scene or object key it has no
+ * words for is left out, so a newer API's label never locks an older app out
+ * of its photos (the way readPhotoList treats the tips). Applied by a client
+ * before it parses the photo; anything that is not a description is handed
+ * back as it is, for the parse to refuse.
+ */
+export function knownPhotoDescription(value: unknown): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  const { scene, objects } = value as { scene?: unknown; objects?: unknown };
+  return {
+    ...value,
+    scene: Array.isArray(scene) ? scene.filter((key) => PhotoScene.safeParse(key).success) : scene,
+    objects: Array.isArray(objects)
+      ? objects.filter((key) => PhotoObject.safeParse(key).success)
+      : objects,
+  };
+}
+
+/** A photo, the owner's or a card's, with its description as this build can say it; anything else is handed back as it is. */
+export function photoWithKnownDescription(photo: unknown): unknown {
+  if (photo === null || typeof photo !== "object" || Array.isArray(photo)) return photo;
+  const { description } = photo as { description?: unknown };
+  if (description === undefined) return photo;
+  return { ...photo, description: knownPhotoDescription(description) };
+}
+
 /** What the owner knows about one of their photos. Never the key, never a URL. */
 export const Photo = z
   .object({
@@ -134,6 +291,10 @@ export const Photo = z
     caption: PhotoCaption.nullable().default(null).meta({
       description:
         "The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer.",
+    }),
+    description: PhotoDescription.nullable().default(null).meta({
+      description:
+        "What the photo check saw in the photo (#296), or null before the check ran or where none runs. Null when absent, so an app that is newer than its API still reads the answer.",
     }),
   })
   .meta({ id: "Photo" });

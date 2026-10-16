@@ -78,6 +78,7 @@ describe("seed", () => {
           photo_tip_revealing_confidence_min: 80,
           photo_tip_fish_confidence_min: 80,
           photo_tip_fish_species_min: 70,
+          photo_description_confidence_min: 80,
           exposure_cards_per_day: 60,
           photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
           exports_per_day: 3,

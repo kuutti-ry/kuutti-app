@@ -93,6 +93,7 @@ const photo = (n: number) => ({
   createdAt: at,
   file: `photos/${uuid(100 + n)}.webp`,
   review: { decision: "approved", reason: null, decidedByStaff: false, decidedAt: at },
+  descriptionText: null,
 });
 
 const consent = (kind: string) => ({
@@ -318,6 +319,39 @@ describe("an exported photo", () => {
       decidedByStaff: true,
       decidedAt: at,
     });
+  });
+
+  it("carries the check's description in words as well as its keys (#296), or neither", () => {
+    const description = {
+      people: 1,
+      setting: "outdoors",
+      scene: ["lake"],
+      objects: ["dog"],
+      smile: true,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
+    };
+    const described = {
+      ...photo(2),
+      description,
+      descriptionText:
+        "Automatic description: One person, outdoors, by a lake. Smiling. With a dog.",
+    };
+    expect(ExportedPhoto.parse(described)).toMatchObject({
+      description,
+      descriptionText: described.descriptionText,
+    });
+    expect(ExportedPhoto.parse(photo(0))).toMatchObject({
+      description: null,
+      descriptionText: null,
+    });
+    expect(codes(ExportedPhoto, { ...photo(0), descriptionText: "x".repeat(601) })).toEqual([
+      "too_big",
+    ]);
+    expect(codes(ExportedPhoto, { ...photo(0), descriptionText: undefined })).toEqual([
+      "invalid_type",
+    ]);
   });
 
   it.each([

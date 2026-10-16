@@ -47,6 +47,23 @@ Feature: Photo moderation before anyone else sees a photo
     When the nightly sweep runs after ten minutes
     Then the photo is checked from its stored card variant
 
+  Scenario: The check asks the face for what a sighted viewer sees and never for gender, age or emotion
+    Given the automatic check looks at a photo
+    Then DetectFaces is asked for the box, the quality, a smile, glasses, sunglasses, a beard and a moustache by name, never ALL, GENDER, AGE_RANGE or EMOTIONS
+    And DetectLabels is asked for the closed list of settings, scenes and objects by name, never a category
+    And an answer that carries gender, age or emotion anyway leaves nothing of them in the description
+
+  Scenario: An approved photo carries its automatic description to the owner's list, the card and the export
+    Given the automatic check saw one person outdoors by a lake, smiling in sunglasses, hiking with a dog
+    When the owner uploads the photo
+    Then the description is kept with the review row and answered with the photo, on the list, on the card and in the export as keys and in words
+    And a photo no check has reached, or one the queue-all moderator took, has none
+
+  Scenario: The automatic description goes with the photo and with the account
+    Given a photo with an automatic description
+    When the owner removes the photo, or deletes the account
+    Then no description of it remains
+
   Scenario: A photo without a face is not accepted, and its owner is told why without a moderator
     Given the automatic check finds no face at all
     When the owner uploads the photo

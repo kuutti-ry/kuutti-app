@@ -1,5 +1,5 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import type { TFunction } from "@kuutti/i18n";
+import { describePhoto, type TFunction } from "@kuutti/i18n";
 import type { AccountExport, ExportedPhotoCheck } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
@@ -255,7 +255,12 @@ export async function exportAccount(
       expiresAt: s.expiresAt.toISOString(),
     })),
     profile,
-    photos: photos.photos,
+    // The check's description in words too (#296): what the person's photo is
+    // heard with, readable in the file without the catalogue.
+    photos: photos.photos.map((photo) => ({
+      ...photo,
+      descriptionText: photo.description ? describePhoto(t, photo.description) : null,
+    })),
     photoAccessLog: photos.accessLog,
     cardsShown: photos.cardsShown,
     photoCheck,

@@ -18,11 +18,13 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
+import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
 import { TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { useMotionDuration } from "@/theme/useReducedMotion";
 import { CaptionDialog } from "./CaptionDialog";
 import { captionKey } from "./captions";
+import { PhotoDescriptionText } from "./PhotoDescriptionText";
 import { PhotoImage } from "./PhotoImage";
 import { PhotoTip } from "./tips";
 import { useDragOrder } from "./useDragOrder";
@@ -103,6 +105,8 @@ export function PhotosScreen() {
   const router = useRouter();
   const tap = useHapticTap();
   const photos = usePhotos();
+  // What the check saw in each photo (#296): in its label after the caption, and under it when the setting asks.
+  const described = usePhotoDescriptionText();
   const [removing, setRemoving] = useState<Photo | null>(null);
   // The photo whose caption is being chosen (#296), read from the list so the dialog marks the line as it stands.
   const [captioningId, setCaptioningId] = useState<string | null>(null);
@@ -184,6 +188,7 @@ export function PhotosScreen() {
         <View className="flex-row flex-wrap gap-3">
           {list?.photos.map((photo, index) => {
             const tile = drag.tile(index);
+            const words = described.shown ? described.describe(photo.description) : null;
             return (
               // The slot: laid out by the grid, measured for the drag, and the
               // view that holds the touch once the tile is lifted. Nothing for
@@ -216,6 +221,9 @@ export function PhotosScreen() {
                             position: String(index + 1),
                             total: String(total),
                             ...(photo.caption ? { caption: photo.caption } : {}),
+                            ...(photo.description
+                              ? { description: JSON.stringify(photo.description) }
+                              : {}),
                           },
                         });
                       }}
@@ -230,15 +238,16 @@ export function PhotosScreen() {
                         id={photo.id}
                         variant="thumb"
                         blurhash={photo.blurhash}
-                        accessibilityLabel={
+                        accessibilityLabel={described.label(
                           photo.caption
                             ? t("photos.imageLabelCaption", {
                                 position: index + 1,
                                 total,
                                 caption: t(captionKey(photo.caption)),
                               })
-                            : t("photos.imageLabel", { position: index + 1, total })
-                        }
+                            : t("photos.imageLabel", { position: index + 1, total }),
+                          photo.description,
+                        )}
                         style={{ width: "100%", aspectRatio: 1 }}
                         onRefused={(code) => {
                           if (code === "photo_budget_exceeded") photos.reportRefusal(code);
@@ -248,6 +257,7 @@ export function PhotosScreen() {
                     <View className="gap-0.5">
                       {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
                       <Text variant="muted">{stateText(photo, t)}</Text>
+                      {words && <PhotoDescriptionText text={words} />}
                     </View>
                     {/* The owner's line under the photo (#296): the button says the line, or asks for one. */}
                     <Button

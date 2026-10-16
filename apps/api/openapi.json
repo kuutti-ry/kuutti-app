@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.23.1",
+    "version": "0.24.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1043,6 +1043,69 @@
             "default": null,
             "description": "The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer."
           },
+          "description": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "people": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50,
+                "description": "Faces the check counted as people present (the face threshold of ADR-006 §2)."
+              },
+              "setting": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "indoors",
+                  "outdoors",
+                  null
+                ],
+                "description": "Indoors or outdoors when the check is sure enough of one; null otherwise."
+              },
+              "scene": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PhotoScene"
+                },
+                "maxItems": 3,
+                "description": "Where, the surest first; each a key of photos.description.scene."
+              },
+              "objects": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PhotoObject"
+                },
+                "maxItems": 4,
+                "description": "Activities, animals and objects, the surest first; each a key of photos.description.object."
+              },
+              "smile": {
+                "type": "boolean"
+              },
+              "glasses": {
+                "type": "boolean"
+              },
+              "sunglasses": {
+                "type": "boolean"
+              },
+              "facialHair": {
+                "type": "boolean",
+                "description": "A beard or a moustache."
+              }
+            },
+            "default": null,
+            "required": [
+              "people",
+              "setting",
+              "scene",
+              "objects",
+              "smile",
+              "glasses",
+              "sunglasses",
+              "facialHair"
+            ],
+            "description": "What the photo check saw in the photo (#296), or null before the check ran or where none runs. Null when absent, so an app that is newer than its API still reads the answer."
+          },
           "file": {
             "type": "string",
             "nullable": true,
@@ -1080,6 +1143,11 @@
               "decidedAt"
             ],
             "description": "The moderation outcome; label names are not part of it."
+          },
+          "descriptionText": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 600
           }
         },
         "required": [
@@ -1093,7 +1161,8 @@
           "position",
           "createdAt",
           "file",
-          "review"
+          "review",
+          "descriptionText"
         ]
       },
       "PhotoId": {
@@ -1107,6 +1176,88 @@
           "approved",
           "queued",
           "rejected"
+        ]
+      },
+      "PhotoScene": {
+        "type": "string",
+        "enum": [
+          "lake",
+          "sea",
+          "beach",
+          "river",
+          "forest",
+          "mountain",
+          "snow",
+          "ice",
+          "field",
+          "park",
+          "garden",
+          "countryside",
+          "city",
+          "street",
+          "cafe",
+          "restaurant",
+          "kitchen",
+          "living_room",
+          "office",
+          "gym",
+          "concert",
+          "festival",
+          "bar",
+          "library",
+          "museum",
+          "church",
+          "harbour",
+          "sauna",
+          "tent",
+          "sunset",
+          "aurora"
+        ]
+      },
+      "PhotoObject": {
+        "type": "string",
+        "enum": [
+          "hiking",
+          "fishing",
+          "skiing",
+          "snowboarding",
+          "ice_skating",
+          "hockey",
+          "football",
+          "basketball",
+          "tennis",
+          "golf",
+          "running",
+          "cycling",
+          "swimming",
+          "surfing",
+          "yoga",
+          "climbing",
+          "dancing",
+          "cooking",
+          "baking",
+          "guitar",
+          "piano",
+          "reading",
+          "gardening",
+          "camping",
+          "picnic",
+          "kayak",
+          "canoe",
+          "sailboat",
+          "boat",
+          "rowing",
+          "bicycle",
+          "motorcycle",
+          "car",
+          "horse",
+          "horse_riding",
+          "dog",
+          "cat",
+          "fish",
+          "coffee",
+          "flowers",
+          "bonfire"
         ]
       },
       "PhotoRejectionReason": {
@@ -1769,6 +1920,69 @@
             ],
             "default": null,
             "description": "The line the owner picked for the photo (#296), or null; the words for it are the client's, per language. Null when absent, so an app that is newer than its API still reads the answer."
+          },
+          "description": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "people": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50,
+                "description": "Faces the check counted as people present (the face threshold of ADR-006 §2)."
+              },
+              "setting": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "indoors",
+                  "outdoors",
+                  null
+                ],
+                "description": "Indoors or outdoors when the check is sure enough of one; null otherwise."
+              },
+              "scene": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PhotoScene"
+                },
+                "maxItems": 3,
+                "description": "Where, the surest first; each a key of photos.description.scene."
+              },
+              "objects": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PhotoObject"
+                },
+                "maxItems": 4,
+                "description": "Activities, animals and objects, the surest first; each a key of photos.description.object."
+              },
+              "smile": {
+                "type": "boolean"
+              },
+              "glasses": {
+                "type": "boolean"
+              },
+              "sunglasses": {
+                "type": "boolean"
+              },
+              "facialHair": {
+                "type": "boolean",
+                "description": "A beard or a moustache."
+              }
+            },
+            "default": null,
+            "required": [
+              "people",
+              "setting",
+              "scene",
+              "objects",
+              "smile",
+              "glasses",
+              "sunglasses",
+              "facialHair"
+            ],
+            "description": "What the photo check saw in the photo (#296), or null before the check ran or where none runs. Null when absent, so an app that is newer than its API still reads the answer."
           }
         },
         "required": [
@@ -2303,6 +2517,9 @@
           },
           "caption": {
             "$ref": "#/components/schemas/PhotoCaption"
+          },
+          "description": {
+            "$ref": "#/components/schemas/PhotoDescription"
           }
         },
         "required": [
@@ -2311,6 +2528,69 @@
           "width",
           "height"
         ]
+      },
+      "PhotoDescription": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "people": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "description": "Faces the check counted as people present (the face threshold of ADR-006 §2)."
+          },
+          "setting": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "indoors",
+              "outdoors",
+              null
+            ],
+            "description": "Indoors or outdoors when the check is sure enough of one; null otherwise."
+          },
+          "scene": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoScene"
+            },
+            "maxItems": 3,
+            "description": "Where, the surest first; each a key of photos.description.scene."
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoObject"
+            },
+            "maxItems": 4,
+            "description": "Activities, animals and objects, the surest first; each a key of photos.description.object."
+          },
+          "smile": {
+            "type": "boolean"
+          },
+          "glasses": {
+            "type": "boolean"
+          },
+          "sunglasses": {
+            "type": "boolean"
+          },
+          "facialHair": {
+            "type": "boolean",
+            "description": "A beard or a moustache."
+          }
+        },
+        "default": null,
+        "required": [
+          "people",
+          "setting",
+          "scene",
+          "objects",
+          "smile",
+          "glasses",
+          "sunglasses",
+          "facialHair"
+        ],
+        "description": "What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks."
       },
       "OnboardingStatus": {
         "type": "object",

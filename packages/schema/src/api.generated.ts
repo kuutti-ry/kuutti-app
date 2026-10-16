@@ -3025,6 +3025,28 @@ export interface components {
              * @enum {string|null}
              */
             caption: "recent" | "old_favourite" | "found_again" | "friends_chose" | "someone_else_took" | "everyday_me" | "in_my_element" | "favourite_place" | "travelling" | "summer_day" | "winter_day" | "four_legged" | "at_work" | "my_hobby" | "proud_of" | "ask_me" | null;
+            /**
+             * @description What the photo check saw in the photo (#296), or null before the check ran or where none runs. Null when absent, so an app that is newer than its API still reads the answer.
+             * @default null
+             */
+            description: {
+                /** @description Faces the check counted as people present (the face threshold of ADR-006 §2). */
+                people: number;
+                /**
+                 * @description Indoors or outdoors when the check is sure enough of one; null otherwise.
+                 * @enum {string|null}
+                 */
+                setting: "indoors" | "outdoors" | null;
+                /** @description Where, the surest first; each a key of photos.description.scene. */
+                scene: components["schemas"]["PhotoScene"][];
+                /** @description Activities, animals and objects, the surest first; each a key of photos.description.object. */
+                objects: components["schemas"]["PhotoObject"][];
+                smile: boolean;
+                glasses: boolean;
+                sunglasses: boolean;
+                /** @description A beard or a moustache. */
+                facialHair: boolean;
+            } | null;
             file: string | null;
             /** @description The moderation outcome; label names are not part of it. */
             review: {
@@ -3036,11 +3058,16 @@ export interface components {
                 /** Format: date-time */
                 decidedAt: string | null;
             } | null;
+            descriptionText: string | null;
         };
         /** Format: uuid */
         PhotoId: string;
         /** @enum {string} */
         PhotoState: "pending" | "approved" | "queued" | "rejected";
+        /** @enum {string} */
+        PhotoScene: "lake" | "sea" | "beach" | "river" | "forest" | "mountain" | "snow" | "ice" | "field" | "park" | "garden" | "countryside" | "city" | "street" | "cafe" | "restaurant" | "kitchen" | "living_room" | "office" | "gym" | "concert" | "festival" | "bar" | "library" | "museum" | "church" | "harbour" | "sauna" | "tent" | "sunset" | "aurora";
+        /** @enum {string} */
+        PhotoObject: "hiking" | "fishing" | "skiing" | "snowboarding" | "ice_skating" | "hockey" | "football" | "basketball" | "tennis" | "golf" | "running" | "cycling" | "swimming" | "surfing" | "yoga" | "climbing" | "dancing" | "cooking" | "baking" | "guitar" | "piano" | "reading" | "gardening" | "camping" | "picnic" | "kayak" | "canoe" | "sailboat" | "boat" | "rowing" | "bicycle" | "motorcycle" | "car" | "horse" | "horse_riding" | "dog" | "cat" | "fish" | "coffee" | "flowers" | "bonfire";
         /** @enum {string|null} */
         PhotoRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
         /**
@@ -3267,6 +3294,28 @@ export interface components {
              * @enum {string|null}
              */
             caption: "recent" | "old_favourite" | "found_again" | "friends_chose" | "someone_else_took" | "everyday_me" | "in_my_element" | "favourite_place" | "travelling" | "summer_day" | "winter_day" | "four_legged" | "at_work" | "my_hobby" | "proud_of" | "ask_me" | null;
+            /**
+             * @description What the photo check saw in the photo (#296), or null before the check ran or where none runs. Null when absent, so an app that is newer than its API still reads the answer.
+             * @default null
+             */
+            description: {
+                /** @description Faces the check counted as people present (the face threshold of ADR-006 §2). */
+                people: number;
+                /**
+                 * @description Indoors or outdoors when the check is sure enough of one; null otherwise.
+                 * @enum {string|null}
+                 */
+                setting: "indoors" | "outdoors" | null;
+                /** @description Where, the surest first; each a key of photos.description.scene. */
+                scene: components["schemas"]["PhotoScene"][];
+                /** @description Activities, animals and objects, the surest first; each a key of photos.description.object. */
+                objects: components["schemas"]["PhotoObject"][];
+                smile: boolean;
+                glasses: boolean;
+                sunglasses: boolean;
+                /** @description A beard or a moustache. */
+                facialHair: boolean;
+            } | null;
         };
         /** @enum {string} */
         TipKind: "sunglasses" | "mirror_selfie" | "tight_crop" | "group_photo" | "poor_lighting" | "blurry" | "few_photos" | "revealing" | "fish";
@@ -3385,7 +3434,30 @@ export interface components {
             width: number;
             height: number;
             caption?: components["schemas"]["PhotoCaption"];
+            description?: components["schemas"]["PhotoDescription"];
         };
+        /**
+         * @description What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks.
+         * @default null
+         */
+        PhotoDescription: {
+            /** @description Faces the check counted as people present (the face threshold of ADR-006 §2). */
+            people: number;
+            /**
+             * @description Indoors or outdoors when the check is sure enough of one; null otherwise.
+             * @enum {string|null}
+             */
+            setting: "indoors" | "outdoors" | null;
+            /** @description Where, the surest first; each a key of photos.description.scene. */
+            scene: components["schemas"]["PhotoScene"][];
+            /** @description Activities, animals and objects, the surest first; each a key of photos.description.object. */
+            objects: components["schemas"]["PhotoObject"][];
+            smile: boolean;
+            glasses: boolean;
+            sunglasses: boolean;
+            /** @description A beard or a moustache. */
+            facialHair: boolean;
+        } | null;
         OnboardingStatus: {
             /** @enum {string} */
             state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";

@@ -9,12 +9,22 @@ import { type Queryable, transaction } from "@kuutti/db";
 import {
   type ModerationLabel,
   PHOTO_VARIANT_SIZES,
+  type PhotoDescription,
   type PhotoRejectionReason,
 } from "@kuutti/schema";
 import sharp from "sharp";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import { closerLookOf, recordPhotoCheckNote } from "../safety/index.ts";
+import {
+  DESCRIPTION_LABELS,
+  type DescriptionSignals,
+  descriptionSignalsFrom,
+  FACE_ATTRIBUTES,
+  largestFace,
+  NOTHING_SEEN,
+  photoDescriptionOf,
+} from "./description.ts";
 import {
   FISH_SPECIES_LABELS,
   GROUP_REASON,
@@ -36,6 +46,9 @@ import { type MediaStore, objectKey } from "./store.ts";
 // face, or faces none of them sure: a person decides). Thresholds are matching_config
 // rows, never constants here. Labels kept for the tips of #56 are stored with
 // the moderation ones; only the moderation ones can send a photo to the queue.
+// The same answers also make the automatic description of #296
+// (description.ts): what the check saw, for everyone to hear with the photo,
+// stored beside the labels and never deciding anything.
 
 /** What one look at a photo yields. `checked: false` means no automatic check ran. */
 export type Inspection = {
@@ -46,6 +59,8 @@ export type Inspection = {
   tipLabels: ModerationLabel[];
   /** One confidence per face DetectFaces found, whatever its value. */
   faceConfidences: number[];
+  /** What the description of #296 is made of; nothing where no check ran. */
+  seen: DescriptionSignals;
   modelVersion: string | null;
   /** How many calls this cost, for the metric. */
   calls: number;
@@ -65,11 +80,14 @@ export type Thresholds = {
   groups: Record<LabelGroup, { review: number; reject: number }>;
   /** A nudity label at or above this leaves the owner no appeal: no moderator is sent a picture the check is this sure of (#253). */
   noAppealNudity: number;
+  /** The description says a scene, an object or a face attribute only from this confidence (#296). */
+  descriptionConfidenceMin: number;
 };
 
 const LABEL_THRESHOLD_KEY = "photo_moderation_label_threshold";
 const FACE_THRESHOLD_KEY = "photo_moderation_face_threshold";
 const NO_APPEAL_NUDITY_KEY = "photo_moderation_nudity_no_appeal";
+const DESCRIPTION_CONFIDENCE_KEY = "photo_description_confidence_min";
 /** Labels stored per photo, at most; Rekognition returns a few, never dozens. */
 const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
@@ -87,9 +105,18 @@ const SCENE_TIP_LABELS = [
   "Fishing",
   ...Object.values(FISH_SPECIES_LABELS),
 ];
+const SCENE_TIP_NAMES: ReadonlySet<string> = new Set(
+  SCENE_TIP_LABELS.map((name) => name.toLowerCase()),
+);
 /** The face's tip signals, which tipLabelsFrom stores beside the scene's (#56). */
 const FACE_TIP_SIGNALS = ["Sunglasses", "TightCrop", "Brightness", "Sharpness"];
 const TIP_SIGNALS: ReadonlySet<string> = new Set([...SCENE_TIP_LABELS, ...FACE_TIP_SIGNALS]);
+/**
+ * Every name DetectLabels is asked for: the tips' scene labels and the
+ * description's closed list (#296), once each. Rekognition answers only
+ * these, so nothing it would say about a person's looks ever arrives.
+ */
+const SCENE_FILTER: readonly string[] = [...new Set([...SCENE_TIP_LABELS, ...DESCRIPTION_LABELS])];
 
 /**
  * A tip signal stored with the moderation labels (#56): advice for the owner,
@@ -113,6 +140,9 @@ export type Decision = {
   group?: LabelGroup;
 };
 
+/** The decision with what the check saw for the description (#296), as moderatePhoto records and returns it. */
+export type Moderated = Decision & { description: PhotoDescription | null };
+
 const roundConfidence = (n: number) => Math.round(n * 100) / 100;
 
 const asLabel = (name: string, parentName: string, confidence: number): ModerationLabel => ({
@@ -133,17 +163,12 @@ export function tipLabelsFrom(
   const out: ModerationLabel[] = [];
   for (const label of scene) {
     if (typeof label.Name !== "string" || label.Name.length === 0) continue;
+    // The scene answer carries the description's labels too (#296); those
+    // are the description's (description.ts), and only a tip's name is kept here.
+    if (!SCENE_TIP_NAMES.has(label.Name.toLowerCase())) continue;
     out.push(asLabel(label.Name, label.Parents?.[0]?.Name ?? "", label.Confidence ?? 0));
   }
-  let largest: FaceDetail | undefined;
-  let largestArea = 0;
-  for (const face of faces) {
-    const area = (face.BoundingBox?.Width ?? 0) * (face.BoundingBox?.Height ?? 0);
-    if (area >= largestArea) {
-      largestArea = area;
-      largest = face;
-    }
-  }
+  const largest = largestFace(faces);
   if (largest) {
     if (largest.Sunglasses?.Value) {
       out.push(asLabel("Sunglasses", "Face", largest.Sunglasses.Confidence ?? 0));
@@ -151,6 +176,7 @@ export function tipLabelsFrom(
     // Face area as a fraction × 100 when known; matching_config is the tip threshold (#56).
     // A box can reach past the frame (a face closer than the crop): capped at
     // the whole frame, so the value stays within a label's 0 to 100.
+    const largestArea = (largest.BoundingBox?.Width ?? 0) * (largest.BoundingBox?.Height ?? 0);
     if (largestArea > 0) out.push(asLabel("TightCrop", "Face", Math.min(largestArea, 1) * 100));
     if (largest.Quality?.Brightness != null) {
       out.push(asLabel("Brightness", "Face", largest.Quality.Brightness));
@@ -254,13 +280,13 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
             MinConfidence: REKOGNITION_MIN_CONFIDENCE,
           }),
         ),
-        // BoundingBox and Quality come with DEFAULT; ask for Sunglasses too.
-        // Not ALL: that includes Gender, and we do not store it.
-        client.send(
-          new DetectFacesCommand({ Image: image, Attributes: ["DEFAULT", "SUNGLASSES"] }),
-        ),
-        // Advice only (#56): a failed scene call leaves the tips without the
-        // scene and never holds the moderation decision; the log line then
+        // BoundingBox and Quality come with DEFAULT; the rest by name, each a
+        // sight the description says (#296, description.ts). Never ALL: that
+        // includes Gender, AgeRange and Emotions, which are never asked for.
+        client.send(new DetectFacesCommand({ Image: image, Attributes: [...FACE_ATTRIBUTES] })),
+        // Advice and the description only (#56, #296): a failed scene call
+        // leaves the tips without the scene and the description without a
+        // setting, and never holds the moderation decision; the log line then
         // counts two calls.
         client
           .send(
@@ -269,7 +295,7 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
               MinConfidence: REKOGNITION_MIN_CONFIDENCE,
               Features: ["GENERAL_LABELS"],
               Settings: {
-                GeneralLabels: { LabelInclusionFilters: [...SCENE_TIP_LABELS] },
+                GeneralLabels: { LabelInclusionFilters: [...SCENE_FILTER] },
               },
             }),
           )
@@ -286,6 +312,7 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
         labels,
         tipLabels: tipLabelsFrom(scene?.Labels ?? [], faceDetails),
         faceConfidences: faceDetails.map((face) => face.Confidence ?? 0),
+        seen: descriptionSignalsFrom(scene?.Labels ?? [], faceDetails),
         modelVersion: moderation.ModerationModelVersion ?? null,
         calls: scene ? 3 : 2,
       };
@@ -308,6 +335,7 @@ export function queueAllModerator(): Moderator {
         labels: [],
         tipLabels: [],
         faceConfidences: [],
+        seen: NOTHING_SEEN,
         modelVersion: null,
         calls: 0,
       };
@@ -329,6 +357,7 @@ export async function readThresholds(db: Queryable): Promise<Thresholds> {
     LABEL_THRESHOLD_KEY,
     FACE_THRESHOLD_KEY,
     NO_APPEAL_NUDITY_KEY,
+    DESCRIPTION_CONFIDENCE_KEY,
     ...groupKeys,
   ]);
   const groups = Object.fromEntries(
@@ -342,6 +371,7 @@ export async function readThresholds(db: Queryable): Promise<Thresholds> {
     faceThreshold: n[FACE_THRESHOLD_KEY],
     groups,
     noAppealNudity: n[NO_APPEAL_NUDITY_KEY],
+    descriptionConfidenceMin: n[DESCRIPTION_CONFIDENCE_KEY],
   };
 }
 
@@ -367,14 +397,16 @@ export function closerLines(thresholds: Thresholds, reject: number): Thresholds 
  * and logs why; the nightly sweep tries again. A rejection for a hard label
  * the usual lines are sure of leaves a note (safety/photo-check.ts), and an
  * account with enough recent notes is checked with the closer look's lines
- * (#253). The log line carries counts, never a label name nor the closer look
- * (security checklist: nothing about a person's photo beyond the count reaches
- * a line with their account id).
+ * (#253). The description (#296) is made here from what the check saw, at
+ * the line of matching_config, and kept with the review row; nothing of it
+ * decides. The log line carries counts, never a label name, the closer look
+ * nor the description (security checklist: nothing about a person's photo
+ * beyond the count reaches a line with their account id).
  */
 export async function moderatePhoto(
   deps: ModerationDeps,
   input: { photoId: string; accountId: string; card: Uint8Array },
-): Promise<Decision | null> {
+): Promise<Moderated | null> {
   const thresholds = await readThresholds(deps.db);
   let inspection: Inspection;
   try {
@@ -397,6 +429,11 @@ export async function moderatePhoto(
   // note names the group the owner was told of.
   const noted = usual.group ? decided.group : undefined;
   const labels = storedLabels(inspection);
+  // Where no check ran there is nothing to describe; a check that ran says
+  // what it saw, however it decided, so the owner reads it on a queued photo too.
+  const description = inspection.checked
+    ? photoDescriptionOf(inspection.seen, decided.faces, thresholds.descriptionConfidenceMin)
+    : null;
   // The record and the move are one unit: a photo never ends up pending with
   // a review row that says it was checked (the sweep would skip it forever).
   const moved = await transaction(deps.db, async (tx) => {
@@ -409,6 +446,7 @@ export async function moderatePhoto(
       checkedAt: at,
       decision: decided.decision,
       reason: decided.reason ?? null,
+      description,
     });
     const movedNow = await repo.movePendingPhoto(
       tx,
@@ -441,7 +479,7 @@ export async function moderatePhoto(
     },
     "photo moderated",
   );
-  return decided;
+  return { ...decided, description };
 }
 
 /** A photo pending this long with no check recorded was missed (a crash, a failed call): retry it. */

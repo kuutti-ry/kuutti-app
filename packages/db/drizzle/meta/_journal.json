@@ -309,6 +309,20 @@
       "when": 1792078744337,
       "tag": "0043_photo_caption",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792083711628,
+      "tag": "0044_photo_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1792083718467,
+      "tag": "0045_photo_description_confidence_min",
+      "breakpoints": true
     }
   ]
 }

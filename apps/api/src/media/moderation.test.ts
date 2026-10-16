@@ -4,13 +4,24 @@ import {
   type DetectModerationLabelsCommand,
   type RekognitionClient,
 } from "@aws-sdk/client-rekognition";
+import { CardPreviewResponse, Photo, PhotoDescription, PhotoList } from "@kuutti/schema";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { closerLookOf } from "../safety/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
+import { openExport } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixtureWebp, testMediaDeps } from "../test/media.ts";
+import {
+  DESCRIPTION_LABELS,
+  type DescriptionSignals,
+  descriptionSignalsFrom,
+  FACE_ATTRIBUTES,
+  NEVER_FACE_ATTRIBUTES,
+  NOTHING_SEEN,
+  photoDescriptionOf,
+} from "./description.ts";
 import {
   closerLines,
   decideModeration,
@@ -38,6 +49,7 @@ const inspection = (
   labels: string,
   faces: string,
   tipLabels: Inspection["tipLabels"] = [],
+  seen: DescriptionSignals = NOTHING_SEEN,
 ): Inspection => ({
   checked: labels !== "unchecked",
   labels:
@@ -50,11 +62,12 @@ const inspection = (
         }),
   tipLabels,
   faceConfidences: faces === "none" ? [] : faces.split(",").map(Number),
+  seen,
   modelVersion: "7.0",
   calls: 3,
 });
 
-/** Migration 0030's lines for every hard group, and the given lines for unknown labels and faces. */
+/** Migration 0030's lines for every hard group, the given lines for unknown labels and faces, and 0045's for the description. */
 const lines = (labelThreshold: number, faceThreshold: number): Thresholds => ({
   labelThreshold,
   faceThreshold,
@@ -65,7 +78,36 @@ const lines = (labelThreshold: number, faceThreshold: number): Thresholds => ({
     hate: { review: 60, reject: 90 },
   },
   noAppealNudity: 95,
+  descriptionConfidenceMin: 80,
 });
+
+/** What a lakeside hiker's photo would come back as: the material of a description (#296). */
+const LAKESIDE: DescriptionSignals = {
+  scene: [
+    { name: "Outdoors", confidence: 99 },
+    { name: "Lake", confidence: 95 },
+    { name: "Hiking", confidence: 91 },
+    { name: "Dog", confidence: 88 },
+    { name: "Woodland", confidence: 70 },
+  ],
+  face: {
+    smile: { value: true, confidence: 97 },
+    eyeglasses: { value: false, confidence: 99 },
+    sunglasses: { value: true, confidence: 93 },
+    beard: { value: false, confidence: 90 },
+    mustache: { value: false, confidence: 90 },
+  },
+};
+const LAKESIDE_DESCRIPTION: PhotoDescription = {
+  people: 1,
+  setting: "outdoors",
+  scene: ["lake"],
+  objects: ["hiking", "dog"],
+  smile: true,
+  glasses: false,
+  sunglasses: true,
+  facialHair: false,
+};
 
 describe("Automatic moderation decision", () => {
   it.each([
@@ -296,28 +338,234 @@ describe("The Rekognition adapter", () => {
     const inspection = await rekognitionModerator(client as unknown as RekognitionClient).inspect(
       await fixtureWebp(800, 1067),
     );
-    expect(filters).toEqual([
-      "Mirror",
-      "Bathroom",
-      "Fish",
-      "Fishing",
-      // The species the fish tip may name (#253).
-      "Pike",
-      "Perch",
-      "Salmon",
-      "Trout",
-      "Carp",
-      "Eel",
-      "Cod",
-      "Herring",
-      "Halibut",
-    ]);
+    // The tips' scene labels, the species the fish tip may name (#253), and
+    // the description's closed list (#296), each name once.
+    expect(filters).toEqual(
+      expect.arrayContaining([
+        "Mirror",
+        "Bathroom",
+        "Fish",
+        "Fishing",
+        "Pike",
+        "Perch",
+        "Salmon",
+        "Trout",
+        "Carp",
+        "Eel",
+        "Cod",
+        "Herring",
+        "Halibut",
+        ...DESCRIPTION_LABELS,
+      ]),
+    );
+    expect(new Set(filters).size).toBe(filters?.length);
     expect(inspection).toMatchObject({
       checked: true,
       labels: [],
       tipLabels: [{ name: "Sunglasses", parentName: "Face", confidence: 97 }],
       faceConfidences: [99.5],
+      // The face's sunglasses are the description's too; the scene said nothing.
+      seen: {
+        scene: [],
+        face: expect.objectContaining({ sunglasses: { value: true, confidence: 97 } }),
+      },
       calls: 2,
+    });
+  });
+
+  it("The check asks the face for what a sighted viewer sees and never for gender, age or emotion", async () => {
+    let attributes: string[] | undefined;
+    let settings: Record<string, unknown> | undefined;
+    const client = {
+      async send(
+        command: DetectModerationLabelsCommand | DetectFacesCommand | DetectLabelsCommand,
+      ) {
+        if (command instanceof DetectFacesCommand) {
+          attributes = command.input.Attributes;
+          // An answer that carries what was never asked for: Rekognition's
+          // whole FaceDetail, as ALL would return it.
+          return {
+            FaceDetails: [
+              {
+                Confidence: 99,
+                BoundingBox: { Width: 0.5, Height: 0.5, Left: 0.2, Top: 0.2 },
+                Smile: { Value: true, Confidence: 96 },
+                Eyeglasses: { Value: true, Confidence: 91 },
+                Sunglasses: { Value: false, Confidence: 99 },
+                Beard: { Value: true, Confidence: 85 },
+                Mustache: { Value: false, Confidence: 97 },
+                Gender: { Value: "Female", Confidence: 99 },
+                AgeRange: { Low: 25, High: 35 },
+                Emotions: [{ Type: "HAPPY", Confidence: 98 }],
+                EyesOpen: { Value: true, Confidence: 99 },
+                MouthOpen: { Value: false, Confidence: 95 },
+              },
+            ],
+          };
+        }
+        if (command instanceof DetectLabelsCommand) {
+          settings = command.input.Settings?.GeneralLabels as Record<string, unknown>;
+          return {
+            Labels: [
+              { Name: "Indoors", Confidence: 92 },
+              { Name: "Kitchen", Confidence: 90 },
+              { Name: "Cooking", Confidence: 86 },
+              // Never asked for; dropped on arrival even when it comes.
+              { Name: "Adult", Confidence: 99 },
+              { Name: "Female", Confidence: 99 },
+            ],
+          };
+        }
+        return { ModerationLabels: [], ModerationModelVersion: "7.0" };
+      },
+    };
+    const seen = await rekognitionModerator(client as unknown as RekognitionClient).inspect(
+      await fixtureWebp(800, 1067),
+    );
+    expect(attributes).toEqual([...FACE_ATTRIBUTES]);
+    for (const never of NEVER_FACE_ATTRIBUTES) expect(attributes).not.toContain(never);
+    // The scene is asked by name from the closed list, never by a category
+    // (Person Description least of all), and nothing is excluded by category
+    // because nothing outside the list is asked for.
+    expect(settings?.LabelCategoryInclusionFilters).toBeUndefined();
+    expect(settings?.LabelCategoryExclusionFilters).toBeUndefined();
+    expect(settings?.LabelInclusionFilters).not.toContain("Adult");
+    expect(settings?.LabelInclusionFilters).not.toContain("Female");
+    expect(settings?.LabelInclusionFilters).not.toContain("Person");
+    // What arrived unasked leaves nothing: the signals have the five sights and the listed scene.
+    expect(seen.seen).toEqual({
+      scene: [
+        { name: "Indoors", confidence: 92 },
+        { name: "Kitchen", confidence: 90 },
+        { name: "Cooking", confidence: 86 },
+      ],
+      face: {
+        smile: { value: true, confidence: 96 },
+        eyeglasses: { value: true, confidence: 91 },
+        sunglasses: { value: false, confidence: 99 },
+        beard: { value: true, confidence: 85 },
+        mustache: { value: false, confidence: 97 },
+      },
+    });
+    const description = photoDescriptionOf(seen.seen, 1, 80);
+    expect(description).toEqual({
+      people: 1,
+      setting: "indoors",
+      scene: ["kitchen"],
+      objects: ["cooking"],
+      smile: true,
+      glasses: true,
+      sunglasses: false,
+      facialHair: true,
+    });
+    // Nothing the check must never say is anywhere in it, by key or by value.
+    const text = JSON.stringify(description);
+    for (const never of ["Gender", "Female", "AgeRange", "25", "35", "Emotion", "HAPPY", "Adult"]) {
+      expect(text).not.toContain(never);
+    }
+    expect(Object.keys(description).sort()).toEqual(Object.keys(PhotoDescription.shape).sort());
+  });
+});
+
+describe("the automatic description (#296)", () => {
+  it("keeps only the closed list from the scene, whatever the case, and the largest face's five attributes", () => {
+    const seen = descriptionSignalsFrom(
+      [
+        { Name: "lake", Confidence: 90 },
+        { Name: "Suggestive", Confidence: 80 },
+        { Name: "", Confidence: 80 },
+        { Confidence: 80 },
+        { Name: "Dog" },
+      ],
+      [
+        {
+          Confidence: 90,
+          BoundingBox: { Width: 0.1, Height: 0.1 },
+          Smile: { Value: true, Confidence: 99 },
+        },
+        {
+          Confidence: 99,
+          BoundingBox: { Width: 0.6, Height: 0.6 },
+          Smile: { Value: false, Confidence: 80 },
+          Beard: { Value: true, Confidence: 88 },
+        },
+      ],
+    );
+    expect(seen).toEqual({
+      scene: [
+        { name: "lake", confidence: 90 },
+        { name: "Dog", confidence: 0 },
+      ],
+      face: {
+        smile: { value: false, confidence: 80 },
+        eyeglasses: { value: false, confidence: 0 },
+        sunglasses: { value: false, confidence: 0 },
+        beard: { value: true, confidence: 88 },
+        mustache: { value: false, confidence: 0 },
+      },
+    });
+    expect(descriptionSignalsFrom([], [])).toEqual(NOTHING_SEEN);
+  });
+
+  it("says a setting, the surest scenes and objects at the line, a few at most, and the face where it is sure", () => {
+    expect(photoDescriptionOf(LAKESIDE, 1, 80)).toEqual(LAKESIDE_DESCRIPTION);
+    // The line applies to every part: raised, the woods, the dog and the sunglasses stay unsaid; lowered, Woodland joins.
+    expect(photoDescriptionOf(LAKESIDE, 1, 94)).toEqual({
+      ...LAKESIDE_DESCRIPTION,
+      scene: ["lake"],
+      objects: [],
+      sunglasses: false,
+    });
+    expect(photoDescriptionOf(LAKESIDE, 2, 60).scene).toEqual(["lake", "forest"]);
+    expect(photoDescriptionOf(LAKESIDE, 2, 60).people).toBe(2);
+  });
+
+  it("picks the surer of indoors and outdoors, counts a name once, caps the lists, and reads facial hair from a moustache alone", () => {
+    const seen: DescriptionSignals = {
+      scene: [
+        { name: "Indoors", confidence: 85 },
+        { name: "Outdoors", confidence: 90 },
+        { name: "Beach", confidence: 81 },
+        { name: "beach", confidence: 99 },
+        { name: "Sea", confidence: 97 },
+        { name: "Sunset", confidence: 96 },
+        { name: "Harbor", confidence: 95 },
+        { name: "Swimming", confidence: 99 },
+        { name: "Surfing", confidence: 98 },
+        { name: "Boat", confidence: 97 },
+        { name: "Dog", confidence: 96 },
+        { name: "Coffee", confidence: 95 },
+      ],
+      face: {
+        smile: { value: true, confidence: 79.9 },
+        eyeglasses: { value: false, confidence: 0 },
+        sunglasses: { value: false, confidence: 0 },
+        beard: { value: false, confidence: 99 },
+        mustache: { value: true, confidence: 80 },
+      },
+    };
+    expect(photoDescriptionOf(seen, 1, 80)).toEqual({
+      people: 1,
+      setting: "outdoors",
+      scene: ["beach", "sea", "sunset"],
+      objects: ["swimming", "surfing", "boat", "dog"],
+      smile: false,
+      glasses: false,
+      sunglasses: false,
+      facialHair: true,
+    });
+  });
+
+  it("describes a check that saw nothing as nobody, nowhere, with nothing", () => {
+    expect(photoDescriptionOf(NOTHING_SEEN, 0, 80)).toEqual({
+      people: 0,
+      setting: null,
+      scene: [],
+      objects: [],
+      smile: false,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
     });
   });
 });
@@ -621,6 +869,7 @@ describe("moderation of uploads", () => {
       ],
       tipLabels: [{ name: "Sunglasses", parentName: "Probe Face Kuutti", confidence: 66.6666 }],
       faceConfidences: [99],
+      seen: NOTHING_SEEN,
       modelVersion: "7.0",
       calls: 3,
     };
@@ -645,6 +894,111 @@ describe("moderation of uploads", () => {
     for (const secret of ["Probe Label", "Probe Parent", "Probe Face", "77.77", "66.66"]) {
       expect(seen).not.toContain(secret);
     }
+  });
+
+  test("An approved photo carries its automatic description to the owner's list, the card and the export", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, scripted(inspection("none", "99", [], LAKESIDE)));
+    const me = await signedInAccount(ctx.client);
+    const uploaded = await app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 900, height: 1200, exif: false })),
+    });
+    expect(uploaded.status).toBe(201);
+    const photo = Photo.parse(await uploaded.json());
+    expect(photo.state).toBe("approved");
+    expect(photo.description).toEqual(LAKESIDE_DESCRIPTION);
+    // Kept with the review row, beside the labels, as the check wrote it.
+    const review = await ctx.client.query<{ description: unknown }>(
+      "SELECT description FROM photo_review WHERE photo_id = $1",
+      [photo.id],
+    );
+    expect(review.rows[0]?.description).toEqual(LAKESIDE_DESCRIPTION);
+    // The owner's list, and the photo as every write answers it.
+    const listed = PhotoList.parse(
+      await (await app.request("/photos", { headers: me.headers })).json(),
+    );
+    expect(listed.photos[0]?.description).toEqual(LAKESIDE_DESCRIPTION);
+    const captioned = await app.request(`/photos/${photo.id}/caption`, {
+      method: "PUT",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ caption: "in_my_element" }),
+    });
+    expect(Photo.parse(await captioned.json())).toMatchObject({
+      caption: "in_my_element",
+      description: LAKESIDE_DESCRIPTION,
+    });
+    // The card, as a viewer would get it, from the same rows.
+    await ctx.client.query(
+      `INSERT INTO profile (account_id, display_name, bio, fields, prompts)
+       VALUES ($1, 'Aino', $2, '{}'::jsonb, '[]'::jsonb)`,
+      [me.accountId, "A bio long enough for completeness, words and words and more words."],
+    );
+    const preview = await app.request("/profile/card", { headers: me.headers });
+    const card = CardPreviewResponse.parse(await preview.json()).card;
+    expect(card?.photos[0]).toMatchObject({ id: photo.id, description: LAKESIDE_DESCRIPTION });
+    // The export: the keys, and the words in the request's language.
+    const exported = await openExport(
+      await app.request("/account/export", { headers: me.headers }),
+    );
+    expect(exported.document.photos[0]).toMatchObject({
+      id: photo.id,
+      description: LAKESIDE_DESCRIPTION,
+      descriptionText:
+        "Automatic description: One person, outdoors, by a lake. Smiling, sunglasses. Hiking, with a dog.",
+    });
+    const finnish = await openExport(
+      await app.request("/account/export", { headers: { ...me.headers, "accept-language": "fi" } }),
+    );
+    expect(finnish.document.photos[0]?.descriptionText).toBe(
+      "Automaattinen kuvaus: Yksi henkilö, ulkona, järven rannalla. Hymyilee, aurinkolasit. Vaeltamassa, koiran kanssa.",
+    );
+    // A photo no check has reached says nothing, and so does one checked by the queue-all moderator.
+    const unchecked = await appWith(ctx, queueAllModerator());
+    const pending = await unchecked.app.request("/photos", {
+      method: "POST",
+      headers: me.headers,
+      body: multipart(await fixtureJpeg({ width: 800, height: 800, exif: false })),
+    });
+    expect(Photo.parse(await pending.json()).description).toBeNull();
+  });
+
+  test("The automatic description goes with the photo and with the account", async ({ ctx }) => {
+    const { app } = await appWith(ctx, scripted(inspection("none", "99", [], LAKESIDE)));
+    const me = await signedInAccount(ctx.client);
+    const described = async () => {
+      const res = await app.request("/photos", {
+        method: "POST",
+        headers: me.headers,
+        body: multipart(await fixtureJpeg({ width: 800, height: 1000, exif: false })),
+      });
+      return Photo.parse(await res.json());
+    };
+    const rows = async () =>
+      Number(
+        (
+          await ctx.client.query<{ n: string }>(
+            "SELECT count(*) AS n FROM photo_review WHERE description IS NOT NULL",
+          )
+        ).rows[0]?.n,
+      );
+    const gone = await described();
+    expect(await rows()).toBe(1);
+    expect(
+      (await app.request(`/photos/${gone.id}`, { method: "DELETE", headers: me.headers })).status,
+    ).toBe(204);
+    expect(await rows()).toBe(0);
+    await described();
+    expect(await rows()).toBe(1);
+    const deleted = await app.request("/account/delete", {
+      method: "POST",
+      headers: { ...me.headers, "content-type": "application/json" },
+      body: JSON.stringify({ confirm: true }),
+    });
+    expect(deleted.status).toBe(204);
+    expect(await rows()).toBe(0);
   });
 
   test("Tip signals are recorded with the review and do not queue the photo", async ({ ctx }) => {
@@ -747,6 +1101,7 @@ describe("what the Rekognition adapter makes of sparse answers", () => {
       labels: [],
       tipLabels: [],
       faceConfidences: [],
+      seen: NOTHING_SEEN,
       modelVersion: null,
       calls: 3,
     });

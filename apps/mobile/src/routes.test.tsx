@@ -30,6 +30,7 @@ import SettingsRoute from "../app/settings/index";
 import LanguageRoute from "../app/settings/language";
 import LegalRoute from "../app/settings/legal/[kind]";
 import LicensesRoute from "../app/settings/licenses";
+import PhotoDescriptionsRoute from "../app/settings/photo-descriptions";
 import SourceRoute from "../app/settings/source";
 import ThemeRoute from "../app/settings/theme";
 import TechRoute from "../app/tech";
@@ -101,6 +102,8 @@ jest.mock("@/features/settings", () => {
     LegalScreen: probe("LegalScreen"),
     legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
     LicensesScreen: probe("LicensesScreen"),
+    PhotoDescriptionsScreen: probe("PhotoDescriptionsScreen"),
+    ScreenReaderHint: probe("ScreenReaderHint"),
     SettingsScreen: probe("SettingsScreen"),
     SourceScreen: probe("SourceScreen"),
     TechConfigScreen: probe("TechConfigScreen"),
@@ -152,6 +155,7 @@ describe("the screens without params", () => {
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
     ["/settings/source", SourceRoute, "SourceScreen"],
     ["/settings/theme", ThemeRoute, "ThemeScreen"],
+    ["/settings/photo-descriptions", PhotoDescriptionsRoute, "PhotoDescriptionsScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);
@@ -197,7 +201,36 @@ describe("the zoom screen, /photos/[id]", () => {
       position: 2,
       total: 3,
       caption: null,
+      description: null,
     });
+  });
+
+  it("hands the check's description through as the grid passed it, less a key this build cannot say; anything else is none (#296)", async () => {
+    const description = {
+      people: 1,
+      setting: "outdoors",
+      scene: ["lake"],
+      objects: ["dog"],
+      smile: true,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
+    };
+    const base = { id: "p1", blurhash: "LEHV6n", position: "1", total: "2" };
+    params({ ...base, description: JSON.stringify(description) });
+    await render(<PhotoZoomRoute />);
+    expect(propsOf("PhotoZoomScreen")).toMatchObject({ description });
+    params({
+      ...base,
+      description: JSON.stringify({ ...description, scene: ["lake", "volcano"] }),
+    });
+    await render(<PhotoZoomRoute />);
+    expect(propsOf("PhotoZoomScreen")).toMatchObject({ description });
+    for (const raw of ["not json", JSON.stringify({ people: "one" }), JSON.stringify(null), ""]) {
+      params({ ...base, description: raw });
+      await render(<PhotoZoomRoute />);
+      expect(propsOf("PhotoZoomScreen")).toMatchObject({ description: null });
+    }
   });
 
   it("hands the caption's key through, and anything else in the link is no caption (#296)", async () => {
@@ -218,6 +251,7 @@ describe("the zoom screen, /photos/[id]", () => {
       position: 1,
       total: 1,
       caption: null,
+      description: null,
     });
   });
 });
@@ -282,12 +316,13 @@ describe("the root layout", () => {
     );
   });
 
-  it("puts the stack without headers under the providers, with the signed-out watcher beside it", async () => {
+  it("puts the stack without headers under the providers, with the signed-out watcher and the screen-reader hint beside it", async () => {
     await render(<RootLayout />);
     expect(propsOf("Stack")).toEqual({
       screenOptions: { headerShown: false, contentStyle: { backgroundColor: "transparent" } },
     });
     expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
+    expect(screen.getByTestId("ScreenReaderHint")).toBeTruthy();
   });
 });
 

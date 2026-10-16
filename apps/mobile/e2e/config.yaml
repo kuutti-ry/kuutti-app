@@ -37,6 +37,7 @@ executionOrder:
     - Download my data hands the person's file over
     - Feedback sent from Settings is thanked, the kind chosen in words
     - The language choice in Settings changes the app's language at once
+    - The photo descriptions setting shows them under the photos and chooses what they tell
     - The session, the theme and the language survive closing and reopening the app
     - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
     - Log out everywhere ends this device's session, and reopening the app does not bring it back

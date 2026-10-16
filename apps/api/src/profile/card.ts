@@ -177,6 +177,7 @@ export async function buildCard(
     width: p.width,
     height: p.height,
     caption: p.caption,
+    description: p.description,
   }));
   return {
     card: {

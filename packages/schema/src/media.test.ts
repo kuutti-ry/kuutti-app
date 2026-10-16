@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
+  knownPhotoDescription,
   PHOTO_CAPTIONS,
+  PHOTO_DESCRIPTION_OBJECTS_MAX,
+  PHOTO_DESCRIPTION_SCENES_MAX,
   PHOTO_MAX_BYTES,
+  PHOTO_OBJECTS,
+  PHOTO_SCENES,
   PHOTO_VARIANT_SIZES,
   PHOTO_VARIANTS,
   Photo,
   PhotoCaption,
   PhotoCaptionRequest,
+  PhotoDescription,
   PhotoFetchBudget,
   PhotoId,
   PhotoList,
@@ -18,6 +24,7 @@ import {
   PhotoUploadRequest,
   PhotoUrlResponse,
   PhotoVariantParams,
+  photoWithKnownDescription,
   TipKind,
 } from "./media.ts";
 
@@ -104,6 +111,7 @@ describe("a photo as its owner reads it", () => {
     position: 0,
     createdAt: at,
     caption: null,
+    description: null,
   };
 
   it("parses with its id branded", () => {
@@ -265,5 +273,145 @@ describe("a caption (#296)", () => {
     expect(codes(PhotoCaptionRequest, { caption: "recent", more: 1 })).toEqual([
       "unrecognized_keys",
     ]);
+  });
+});
+
+describe("the automatic description (#296)", () => {
+  const photo = {
+    id: uuid(1),
+    blurhash: "LEHV6n",
+    width: 1200,
+    height: 1600,
+    state: "approved",
+    rejectionReason: null,
+    appealable: false,
+    position: 0,
+    createdAt: at,
+  };
+  const lakeside = {
+    people: 1,
+    setting: "outdoors",
+    scene: ["lake"],
+    objects: ["hiking", "dog"],
+    smile: true,
+    glasses: false,
+    sunglasses: true,
+    facialHair: false,
+  };
+
+  it("is keys of a closed list, never words, and names nothing the check must not say", () => {
+    expect(PhotoDescription.parse(lakeside)).toEqual(lakeside);
+    for (const scene of PHOTO_SCENES) {
+      expect(PhotoDescription.parse({ ...lakeside, scene: [scene] }).scene).toEqual([scene]);
+    }
+    for (const object of PHOTO_OBJECTS) {
+      expect(PhotoDescription.parse({ ...lakeside, objects: [object] }).objects).toEqual([object]);
+    }
+    expect(new Set(PHOTO_SCENES).size).toBe(PHOTO_SCENES.length);
+    expect(new Set(PHOTO_OBJECTS).size).toBe(PHOTO_OBJECTS.length);
+    // Never body shape, attractiveness, age, gender, emotion, ethnicity or hair (the issue's table).
+    const names = JSON.stringify([
+      ...PHOTO_SCENES,
+      ...PHOTO_OBJECTS,
+      Object.keys(PhotoDescription.shape),
+    ]);
+    for (const never of [
+      "body",
+      "gender",
+      "age",
+      "emotion",
+      "hair_",
+      "ethnic",
+      "attractive",
+      "slim",
+      "fat",
+      "young",
+      "old",
+    ]) {
+      expect(names.toLowerCase()).not.toContain(never);
+    }
+    expect(codes(PhotoDescription, { ...lakeside, scene: ["bedroom"] })).toEqual(["invalid_value"]);
+    expect(codes(PhotoDescription, { ...lakeside, objects: ["beer"] })).toEqual(["invalid_value"]);
+    expect(codes(PhotoDescription, { ...lakeside, setting: "underwater" })).toEqual([
+      "invalid_value",
+    ]);
+  });
+
+  it("holds a few scenes and objects at most, a people count, and the four face flags", () => {
+    expect(PHOTO_DESCRIPTION_SCENES_MAX).toBe(3);
+    expect(PHOTO_DESCRIPTION_OBJECTS_MAX).toBe(4);
+    expect(
+      codes(PhotoDescription, { ...lakeside, scene: ["lake", "sea", "beach", "river"] }),
+    ).toEqual(["too_big"]);
+    expect(
+      codes(PhotoDescription, { ...lakeside, objects: ["dog", "cat", "fish", "horse", "coffee"] }),
+    ).toEqual(["too_big"]);
+    expect(codes(PhotoDescription, { ...lakeside, people: -1 })).toEqual(["too_small"]);
+    expect(codes(PhotoDescription, { ...lakeside, people: 1.5 })).toEqual(["invalid_type"]);
+    expect(codes(PhotoDescription, { ...lakeside, smile: "yes" })).toEqual(["invalid_type"]);
+    expect(codes(PhotoDescription, { setting: null, scene: [], objects: [] })).toHaveLength(5);
+    expect(
+      PhotoDescription.parse({
+        people: 0,
+        setting: null,
+        scene: [],
+        objects: [],
+        smile: false,
+        glasses: false,
+        sunglasses: false,
+        facialHair: false,
+      }).setting,
+    ).toBeNull();
+  });
+
+  it("rides on the photo, and is null when the API did not say (an older API)", () => {
+    expect(Photo.parse({ ...photo, description: lakeside }).description).toEqual(lakeside);
+    expect(Photo.parse(photo).description).toBeNull();
+    expect(Photo.parse({ ...photo, description: null }).description).toBeNull();
+    expect(codes(Photo, { ...photo, description: { ...lakeside, scene: ["moon"] } })).toEqual([
+      "invalid_value",
+    ]);
+  });
+
+  it("is read on a photo as this build can say it, and a photo without one, or no photo, is handed back as it is", () => {
+    const newer = { ...lakeside, scene: ["lake", "volcano"], objects: ["hiking", "dog", "beer"] };
+    expect(photoWithKnownDescription({ ...photo, description: newer })).toEqual({
+      ...photo,
+      description: lakeside,
+    });
+    expect(photoWithKnownDescription({ ...photo, description: null })).toEqual({
+      ...photo,
+      description: null,
+    });
+    // An older API's photo, with no description at all: untouched, and the parse reads null.
+    expect(photoWithKnownDescription(photo)).toBe(photo);
+    expect(Photo.parse(photoWithKnownDescription(photo)).description).toBeNull();
+    for (const notAPhoto of [null, undefined, "photo", 42, [photo]]) {
+      expect(photoWithKnownDescription(notAPhoto)).toBe(notAPhoto);
+    }
+  });
+
+  it("is read by an older app without the keys it has no words for, and anything else as it is", () => {
+    expect(
+      knownPhotoDescription({
+        ...lakeside,
+        scene: ["lake", "volcano"],
+        objects: ["hiking", "dog", "beer"],
+      }),
+    ).toEqual(lakeside);
+    expect(knownPhotoDescription(lakeside)).toEqual(lakeside);
+    expect(knownPhotoDescription(null)).toBeNull();
+    expect(knownPhotoDescription(undefined)).toBeUndefined();
+    expect(knownPhotoDescription("lake")).toBe("lake");
+    expect(knownPhotoDescription(["lake"])).toEqual(["lake"]);
+    // Not lists: left for the parse to refuse.
+    expect(knownPhotoDescription({ ...lakeside, scene: "lake", objects: 3 })).toEqual({
+      ...lakeside,
+      scene: "lake",
+      objects: 3,
+    });
+    expect(
+      codes(PhotoDescription, knownPhotoDescription({ ...lakeside, scene: "lake" })),
+    ).toContain("invalid_type");
   });
 });

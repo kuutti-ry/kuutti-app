@@ -4,7 +4,9 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
 import { SessionProvider, SignedOutToStart } from "@/features/identity";
+import { ScreenReaderHint } from "@/features/settings";
 import { LocaleProvider } from "@/lib/locale";
+import { PhotoDescriptionsProvider } from "@/lib/photo-descriptions";
 import { sentryOptions } from "@/lib/sentry";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
@@ -17,13 +19,20 @@ function RootLayout() {
   return (
     <LocaleProvider>
       <ThemeProvider>
-        <SessionProvider>
-          <Stack
-            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: "transparent" } }}
-          />
-          <StatusBar style="auto" />
-          <SignedOutToStart />
-        </SessionProvider>
+        <PhotoDescriptionsProvider>
+          <SessionProvider>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "transparent" },
+              }}
+            />
+            <StatusBar style="auto" />
+            <SignedOutToStart />
+            {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
+            <ScreenReaderHint />
+          </SessionProvider>
+        </PhotoDescriptionsProvider>
       </ThemeProvider>
     </LocaleProvider>
   );

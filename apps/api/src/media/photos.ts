@@ -146,6 +146,7 @@ export async function uploadPhoto(
         state: decided.decision,
         rejectionReason: decided.reason ?? null,
         appealable: decided.appealable === true,
+        description: decided.description,
       });
     }
   }
