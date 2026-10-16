@@ -165,7 +165,7 @@ describe("PhotoQueue", () => {
     expect(calls.some((c) => c.method === "POST")).toBe(false);
   });
 
-  it("says when a decision was not saved and when the queue cannot load", async () => {
+  it("leaves a refused decision to the shell: the item keeps its buttons and says nothing of its own (#302)", async () => {
     fetchMock([
       (req) =>
         req.method === "GET" && path(req) === "/admin/photos/queue"
@@ -175,6 +175,25 @@ describe("PhotoQueue", () => {
       (req) =>
         req.method === "POST"
           ? json({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }, 403)
+          : null,
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("1 photo waiting")).toBeInTheDocument();
+  });
+
+  it("says when a decision was not saved and when the queue cannot load", async () => {
+    fetchMock([
+      (req) =>
+        req.method === "GET" && path(req) === "/admin/photos/queue"
+          ? json({ items: [item(1)], total: 1 })
+          : null,
+      cardUrls,
+      (req) =>
+        req.method === "POST"
+          ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
           : null,
     ]);
     show();

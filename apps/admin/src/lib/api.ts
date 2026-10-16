@@ -36,10 +36,15 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
-/** What a 403 to a request that carried the token calls; the shell says once that the role does not allow it (#302). */
-let onForbidden: () => void = () => undefined;
-export function setForbiddenHandler(handler: () => void): void {
-  onForbidden = handler;
+/**
+ * What an answer to a request that carried the token says about the role
+ * (#302): `false` on a 403, `true` on a success. The shell says once that the
+ * role does not allow it, and takes that back when a request is honoured
+ * again; every admin route is behind the same role check.
+ */
+let onRoleAnswer: (allowed: boolean) => void = () => undefined;
+export function setRoleAnswerHandler(handler: (allowed: boolean) => void): void {
+  onRoleAnswer = handler;
 }
 
 const bearer: Middleware = {
@@ -56,7 +61,8 @@ const bearer: Middleware = {
   async onResponse({ request, response }) {
     if (request.headers.has("authorization")) {
       if (response.status === 401) onUnauthorized();
-      else if (response.status === 403) onForbidden();
+      else if (response.status === 403) onRoleAnswer(false);
+      else if (response.ok) onRoleAnswer(true);
     }
     return response;
   },

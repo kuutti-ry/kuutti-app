@@ -202,6 +202,9 @@ describe("App", () => {
     expect(within(menu).getByRole("link", { name: "Feedback" })).not.toHaveAttribute(
       "aria-current",
     );
+    // The front page's redirect is not the person's move: nothing takes the focus.
+    expect(screen.getByRole("heading", { level: 2, name: "Photo review queue" })).not.toHaveFocus();
+    expect(document.title).toBe("Photo review queue · Kuutti admin");
   });
 
   it("moves between screens by the menu, and the new screen's heading takes the focus (#302)", async () => {
@@ -245,20 +248,83 @@ describe("App", () => {
     expect(window.location.pathname).toBe("/photos");
   });
 
-  it("says once that the role does not allow it when the API answers 403, never as the screen's failure, until the person moves on (#302)", async () => {
+  it("says once that the role does not allow it when the API answers 403, never as the screen's failure, and not again once the role is honoured (#302)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
-    renderApp(staffApi("moderator", [], { answers: { "GET /admin/photos/queue": refused } }));
+    let refuse = true;
+    renderApp(
+      staffApi("moderator", [], {
+        answers: {
+          "GET /admin/photos/queue": () => (refuse ? refused() : json({ items: [], total: 0 })),
+        },
+      }),
+    );
     expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
     expect(screen.queryByText("The queue could not be loaded.")).toBeNull();
-    // A second refusal on the same screen says nothing new.
+    // A second refusal on the same visit says nothing new.
     fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
     await waitFor(() => expect(screen.queryByText("Loading the queue…")).toBeNull());
     expect(screen.getAllByRole("alert")).toHaveLength(1);
     // The session is not ended by a 403: the person is still signed in.
     expect(screen.getByText(/Signed in as moderator/)).toBeInTheDocument();
+    // The role is given back: the next answer takes the notice away.
+    refuse = false;
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("does not bring a refusal back when the person returns to the screen it was said on (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    let refuse = true;
+    renderApp(
+      staffApi("moderator", [], {
+        answers: {
+          "GET /admin/photos/queue": () => (refuse ? refused() : json({ items: [], total: 0 })),
+          // The feedback list is not asked again for the role: it stays quiet either way.
+          "GET /admin/feedback": () => refused(),
+        },
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    refuse = false;
     fireEvent.click(screen.getByRole("link", { name: "Feedback" }));
     expect(await screen.findByRole("heading", { level: 2, name: "Feedback" })).toBeInTheDocument();
-    expect(screen.queryByText("Your role does not allow this.")).toBeNull();
+    // Refused on this visit too: said here, once.
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    fireEvent.click(screen.getByRole("link", { name: "Photos" }));
+    expect(await screen.findByText("Nothing waiting")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says a refused decision once, by the shell, and the item keeps its buttons (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const photo = {
+      photoId: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
+      accountId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+      state: "queued",
+      blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+      width: 800,
+      height: 1067,
+      uploadedAt: "2026-09-25T12:00:00.000Z",
+      checkedAt: "2026-09-25T12:00:02.000Z",
+      labels: [],
+      faces: 1,
+      flagged: [],
+      appealed: false,
+      sensitive: true,
+    };
+    renderApp(
+      staffApi("moderator", [], {
+        answers: {
+          "GET /admin/photos/queue": () => json({ items: [photo], total: 1 }),
+          [`POST /admin/photos/${photo.photoId}/decision`]: refused,
+        },
+      }),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Approve" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled());
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
   });
 
   it("after the bank, brings the person back to the screen the sign-in started on (#302)", async () => {

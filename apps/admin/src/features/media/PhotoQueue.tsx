@@ -99,12 +99,17 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
     body: { decision: "approve" } | { decision: "reject"; reason: PhotoRejectionReason },
   ) => {
     setState({ kind: "saving" });
-    // A network failure is a decision not saved, like a refusal: never a
-    // saving state that nothing will end.
-    const { data } = await api
+    // A network failure is a decision not saved: never a saving state that
+    // nothing will end. A 403 is the shell's to say (#302): the item goes back
+    // to its buttons without a failure of its own.
+    const answer = await api
       .POST("/admin/photos/{id}/decision", { params: { path: { id: item.photoId } }, body })
-      .catch(() => ({ data: undefined }));
-    if (!data) {
+      .catch(() => null);
+    if (answer?.response.status === 403) {
+      setState({ kind: "idle" });
+      return;
+    }
+    if (!answer?.data) {
       setState({ kind: "failed" });
       return;
     }

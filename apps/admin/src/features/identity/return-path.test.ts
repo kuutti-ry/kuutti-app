@@ -61,6 +61,7 @@ describe("restoreReturnPath", () => {
 
   it.each([
     ["another host", "//evil.example/photos"],
+    ["another host behind a backslash", "/\\evil.example/photos"],
     ["a full address", "https://evil.example/photos"],
     ["a script", "javascript:alert(1)"],
     ["a relative path", "photos"],

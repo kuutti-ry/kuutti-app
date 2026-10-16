@@ -1,13 +1,13 @@
 import { formatTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import type { ModeratorRole } from "@kuutti/schema";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
 import { FeedbackList } from "./features/safety/index.ts";
-import { setForbiddenHandler } from "./lib/api.ts";
-import { ScreenTitle } from "./lib/screen-title.tsx";
+import { setRoleAnswerHandler } from "./lib/api.ts";
+import { NavigationFocus, ScreenTitle } from "./lib/screen-title.tsx";
 import mark from "./logo-mark.png";
 import { SourceOffer } from "./source-offer.tsx";
 
@@ -50,7 +50,7 @@ export function App() {
   const [front] = screens;
   return (
     <>
-      <a className="skip" href="#main">
+      <a className="skip target" href="#main">
         {t("admin.skip")}
       </a>
       <header className="masthead">
@@ -98,17 +98,22 @@ export function App() {
 /** The routes a signed-in role opens, the front page as the first of them, and the one notice of a refusal. */
 function Screens({ screens, front }: { screens: readonly Screen[]; front: string }) {
   const { t } = useT();
-  const { pathname } = useLocation();
-  // The path a 403 was answered on: the notice belongs to that screen and is
-  // gone once the person moves on. Several refusals on one screen say it once.
+  const { key } = useLocation();
+  // The visit a 403 was answered on: the notice belongs to it, so it is gone
+  // once the person moves on and does not come back with them, and a request
+  // honoured again takes it back. Several refusals on one visit say it once.
+  const visit = useRef(key);
+  useEffect(() => {
+    visit.current = key;
+  }, [key]);
   const [refusedOn, setRefusedOn] = useState<string | null>(null);
   useEffect(() => {
-    setForbiddenHandler(() => setRefusedOn(window.location.pathname));
-    return () => setForbiddenHandler(() => undefined);
+    setRoleAnswerHandler((allowed) => setRefusedOn(allowed ? null : visit.current));
+    return () => setRoleAnswerHandler(() => undefined);
   }, []);
   return (
-    <>
-      {refusedOn === pathname && <p role="alert">{t("admin.refused")}</p>}
+    <NavigationFocus>
+      {refusedOn === key && <p role="alert">{t("admin.refused")}</p>}
       <Routes>
         <Route path="/" element={<Navigate to={front} replace />} />
         {screens.map((screen) => (
@@ -116,7 +121,7 @@ function Screens({ screens, front }: { screens: readonly Screen[]; front: string
         ))}
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </NavigationFocus>
   );
 }
 
@@ -126,7 +131,9 @@ function NotFound() {
     <section aria-labelledby="not-found-title">
       <ScreenTitle id="not-found-title">{t("admin.notFound.title")}</ScreenTitle>
       <p>
-        <Link to="/">{t("admin.notFound.home")}</Link>
+        <Link className="target" to="/">
+          {t("admin.notFound.home")}
+        </Link>
       </p>
     </section>
   );

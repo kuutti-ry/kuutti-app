@@ -58,10 +58,15 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
 
   const mark = async () => {
     setState("saving");
-    const { data } = await api
+    // A 403 is the shell's to say (#302): the row keeps its button, no failure of its own.
+    const answer = await api
       .POST("/admin/feedback/{id}/handled", { params: { path: { id: item.id } } })
-      .catch(() => ({ data: undefined }));
-    if (!data) {
+      .catch(() => null);
+    if (answer?.response.status === 403) {
+      setState("idle");
+      return;
+    }
+    if (!answer?.data) {
       setState("failed");
       return;
     }

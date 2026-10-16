@@ -132,6 +132,23 @@ describe("the feedback list", () => {
     expect(screen.getByRole("button", { name: "Mark as handled" })).toBeTruthy();
   });
 
+  it("leaves a refused marking to the shell: the row keeps its button and says nothing of its own (#302)", async () => {
+    fetchMock([
+      listOf([item(6)]),
+      (req) =>
+        req.method === "POST"
+          ? json({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }, 403)
+          : null,
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as handled" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Mark as handled" })).toBeEnabled(),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("A few lines, number 6.")).toBeInTheDocument();
+  });
+
   it("says marking did not work when the network fails, and lets the moderator try again", async () => {
     fetchMock([
       listOf([item(5)]),

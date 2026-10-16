@@ -8,8 +8,12 @@ import { readFragment } from "./session.tsx";
 
 const KEY = "kuutti.admin.return";
 
-/** A path of this origin: one slash, then anything but a second one. Never a scheme, never another host. */
-const SAME_ORIGIN_PATH = /^\/(?!\/)/;
+/**
+ * A path of this origin: one slash, then anything but a second one or a
+ * backslash, which the URL parser reads as a slash. Never a scheme, never
+ * another host.
+ */
+const SAME_ORIGIN_PATH = /^\/(?![/\\])/;
 
 /** Before the bank login: the path and query the person is on. */
 export function rememberReturnPath(location: Pick<Location, "pathname" | "search">): void {

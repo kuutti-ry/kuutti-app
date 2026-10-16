@@ -85,6 +85,12 @@ select {
 .skip:focus {
   position: static;
 }
+/* A link that stands alone is a target like a button (CLAUDE.md, 44 pt). */
+.target {
+  display: inline-block;
+  min-height: 2.75rem;
+  line-height: 2.75rem;
+}
 .menu {
   list-style: none;
   padding: 0;
