@@ -2414,7 +2414,7 @@ export interface paths {
         };
         /**
          * A person's sanctions
-         * @description Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id.
+         * @description Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id and their role now (null once the role is gone, or for what no person did).
          */
         get: {
             parameters: {
@@ -4566,7 +4566,34 @@ export interface components {
             handledAt: string;
         };
         SanctionList: {
-            items: components["schemas"]["Sanction"][];
+            items: components["schemas"]["SanctionEntry"][];
+        };
+        SanctionEntry: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            accountId: string;
+            kind: components["schemas"]["SanctionKind"];
+            reason: components["schemas"]["SanctionReason"];
+            note: string;
+            /** Format: date-time */
+            endsAt: string | null;
+            /** Format: uuid */
+            createdBy: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            liftedAt: string | null;
+            /** Format: uuid */
+            liftedBy: string | null;
+            reviewNote: string | null;
+            /** Format: uuid */
+            reviewedBy: string | null;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            createdByRole: components["schemas"]["ModeratorRole"] & unknown;
+            liftedByRole: components["schemas"]["ModeratorRole"] & unknown;
+            reviewedByRole: components["schemas"]["ModeratorRole"] & unknown;
         };
         Sanction: {
             /** Format: uuid */

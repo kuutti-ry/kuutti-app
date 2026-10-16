@@ -4,7 +4,7 @@ import {
   AdminAccount,
   type AdminAccountPhoto,
   PhotoUrlResponse,
-  type Sanction,
+  type SanctionEntry,
   SanctionList,
 } from "@kuutti/schema";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -12,14 +12,16 @@ import { useNavigate, useParams } from "react-router";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { AuditDetail } from "./audit-detail.tsx";
+import { Sanctions } from "./Sanctions.tsx";
 
 // A person's page in the panel (#306): one account by its id, never a
 // search. Every open is an audit row on the API's side (account.view), so
 // the page asks once per id, StrictMode's second effect run included; a
 // photo is fetched only when the moderator asks to see it (#253), one
 // photo.view row per look. An erased account shows its deletion date and
-// nothing else. Read-only here: the actions on the person come with #308.
-// English only (TD-17); plain HTML, keyboard first.
+// nothing else. The sanctions and their actions are #308's (Sanctions.tsx);
+// after one, the page is read again in place, which is another look and
+// another account.view row. English only (TD-17); plain HTML, keyboard first.
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -63,7 +65,7 @@ type State =
   | { kind: "error" }
   | { kind: "missing" }
   | { kind: "forbidden" }
-  | { kind: "ready"; page: AdminAccount; sanctions: Sanction[] | null };
+  | { kind: "ready"; page: AdminAccount; sanctions: SanctionEntry[] | null };
 
 export function AccountPage() {
   const { t, locale } = useT();
@@ -71,30 +73,44 @@ export function AccountPage() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const when = (at: string | null) => (at ? formatDateTime(locale, new Date(at)) : "–");
 
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
+  const read = useCallback(async (): Promise<State> => {
     try {
       const { data, response } = await api.GET("/admin/accounts/{id}", {
         params: { path: { id } },
       });
       // A 403 is the shell's to say (#302).
-      if (response.status === 403) return setState({ kind: "forbidden" });
-      if (response.status === 404 || response.status === 400) return setState({ kind: "missing" });
-      if (!data) return setState({ kind: "error" });
+      if (response.status === 403) return { kind: "forbidden" };
+      if (response.status === 404 || response.status === 400) return { kind: "missing" };
+      if (!data) return { kind: "error" };
       const page = AdminAccount.parse(data);
       // An erased account shows nothing more, so nothing more is asked for.
-      if (page.state === "deleted") return setState({ kind: "ready", page, sanctions: [] });
+      if (page.state === "deleted") return { kind: "ready", page, sanctions: [] };
       // The sanctions come from their own route (#307); a failure there leaves the rest of the page.
       const listed = await api
         .GET("/admin/accounts/{id}/sanctions", { params: { path: { id } } })
         .catch(() => null);
-      const sanctions = listed?.data ? SanctionList.parse(listed.data).items : null;
-      setState({ kind: "ready", page, sanctions });
+      const parsed = SanctionList.safeParse(listed?.data);
+      const sanctions = parsed.success ? parsed.data.items : null;
+      return { kind: "ready", page, sanctions };
     } catch (error) {
       console.error("account page load failed", error);
-      setState({ kind: "error" });
+      return { kind: "error" };
     }
   }, [id]);
+
+  const load = useCallback(async () => {
+    setState({ kind: "loading" });
+    setState(await read());
+  }, [read]);
+
+  // After a sanction (#308): read again without the loading step, so the
+  // page and the focus stay where they are. Only a page read in full
+  // replaces it: a failure keeps what is shown and the line that says what
+  // was done, so nobody applies it twice; a refusal there is the shell's.
+  const refresh = useCallback(async () => {
+    const next = await read();
+    if (next.kind === "ready") setState(next);
+  }, [read]);
 
   // Each open is an account.view row: once per id, though StrictMode runs the effect twice.
   const opened = useRef<string | null>(null);
@@ -203,29 +219,7 @@ export function AccountPage() {
         </ul>
       )}
       <h3>{t("admin.account.sanctionsTitle")}</h3>
-      {sanctions === null ? (
-        <p role="alert">{t("admin.account.sanctionsError")}</p>
-      ) : sanctions.length === 0 ? (
-        <p>{t("admin.account.none")}</p>
-      ) : (
-        <ul>
-          {sanctions.map((s) => (
-            <li key={s.id}>
-              <strong>{s.kind}</strong> · {s.reason} · {when(s.createdAt)}
-              {s.endsAt && ` · ${t("admin.account.until", { time: when(s.endsAt) })}`}
-              {s.liftedAt && ` · ${t("admin.account.lifted", { time: when(s.liftedAt) })}`}
-              <br />
-              {s.note}
-              {s.reviewNote && (
-                <>
-                  <br />
-                  {t("admin.account.reviewed", { note: s.reviewNote })}
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Sanctions accountId={page.id} items={sanctions} onChanged={refresh} />
       <h3>{t("admin.account.feedbackTitle")}</h3>
       {page.feedback.length === 0 ? (
         <p>{t("admin.account.none")}</p>
@@ -278,6 +272,8 @@ export function AccountPage() {
 /**
  * One photo, hidden until asked: the request is the audit row (photo.view),
  * so one press is one look, and the picture takes the focus the button had.
+ * The button stays enabled while it asks, so a failure leaves the focus on it
+ * (a disabled button loses it); a second press is a no-op.
  */
 function PersonPhoto({ photo }: { photo: AdminAccountPhoto }) {
   const { t, locale } = useT();
@@ -324,12 +320,7 @@ function PersonPhoto({ photo }: { photo: AdminAccountPhoto }) {
       ) : (
         <>
           {failed && <p role="alert">{t("admin.account.photoFailed")}</p>}
-          <button
-            type="button"
-            disabled={pending}
-            aria-busy={pending || undefined}
-            onClick={() => void show()}
-          >
+          <button type="button" aria-busy={pending || undefined} onClick={() => void show()}>
             {t("admin.account.showPhoto")}
           </button>
         </>

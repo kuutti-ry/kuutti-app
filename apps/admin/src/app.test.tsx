@@ -524,6 +524,25 @@ describe("App", () => {
     expect(calls).not.toContain("GET /admin/overview");
   });
 
+  it.each([
+    ["an admin", "admin", ["Warn", "Hide from others (shadow ban)", "Suspend until a day", "Ban"]],
+    ["a moderator", "moderator", ["Warn", "Hide from others (shadow ban)", "Suspend until a day"]],
+  ])(
+    "gives the signed-in role to a person's page: %s sees these actions (#308)",
+    async (_who, role, actions) => {
+      window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify({ ...staff, role }));
+      window.history.replaceState(null, "", `/accounts/${accountId}`);
+      renderApp(staffApi(role, [], { answers: accountAnswers }));
+      const group = await screen.findByRole("group", { name: "Actions on this person" });
+      expect(
+        within(group)
+          .getAllByRole("button")
+          .map((button) => button.textContent),
+      ).toEqual(actions);
+      expect(screen.getByText(new RegExp(`Signed in as ${role}`))).toBeInTheDocument();
+    },
+  );
+
   it("says a refused person's page once, by the shell, never as the page's failure (#302, #306)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     window.history.replaceState(null, "", `/accounts/${accountId}`);

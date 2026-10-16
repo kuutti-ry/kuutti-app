@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { type Queryable, transaction } from "@kuutti/db";
 import {
   type Sanction,
+  type SanctionEntry,
   type SanctionKind,
   SanctionNote,
   type SanctionReason,
@@ -390,20 +391,39 @@ export async function endSuspensions(db: Queryable, at: Date): Promise<number> {
  * identity's bans set on any of its accounts. Null for an unknown account.
  * Staff read across accounts here by design (the panel's page of #306).
  */
-export async function listSanctions(db: Queryable, accountId: string): Promise<Sanction[] | null> {
+export async function listSanctions(
+  db: Queryable,
+  accountId: string,
+): Promise<SanctionEntry[] | null> {
   const { rows: found } = await db.query<{ identity_id: string }>(
     "SELECT identity_id FROM account WHERE id = $1",
     [accountId],
   );
   const identityId = found[0]?.identity_id;
   if (!identityId) return null;
-  const { rows } = await db.query<Row>(
-    `SELECT ${COLUMNS} FROM sanction
+  // The staff's roles now (#308), each by its key: moderator_roles has one row per identity.
+  const roleOf = (column: string) =>
+    `(SELECT m.role FROM moderator_roles m WHERE m.identity_id = sanction.${column})`;
+  const { rows } = await db.query<
+    Row & {
+      created_by_role: SanctionEntry["createdByRole"];
+      lifted_by_role: SanctionEntry["liftedByRole"];
+      reviewed_by_role: SanctionEntry["reviewedByRole"];
+    }
+  >(
+    `SELECT ${COLUMNS}, ${roleOf("created_by")} AS created_by_role,
+       ${roleOf("lifted_by")} AS lifted_by_role, ${roleOf("reviewed_by")} AS reviewed_by_role
+     FROM sanction
      WHERE account_id = $1 OR (identity_id = $2 AND kind = 'ban')
      ORDER BY created_at DESC, id DESC LIMIT 1000`,
     [accountId, identityId],
   );
-  return rows.map(toItem);
+  return rows.map((row) => ({
+    ...toItem(row),
+    createdByRole: row.created_by_role,
+    liftedByRole: row.lifted_by_role,
+    reviewedByRole: row.reviewed_by_role,
+  }));
 }
 
 /** One sanction in the person's own export, before its words are added in the request's language. */

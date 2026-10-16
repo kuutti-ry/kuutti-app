@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.30.0",
+    "version": "0.31.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3023,13 +3023,123 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Sanction"
+              "$ref": "#/components/schemas/SanctionEntry"
             },
             "maxItems": 1000
           }
         },
         "required": [
           "items"
+        ]
+      },
+      "SanctionEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SanctionKind"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "endsAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "liftedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "liftedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "reviewedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdByRole": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeratorRole"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "liftedByRole": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeratorRole"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "reviewedByRole": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeratorRole"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "accountId",
+          "kind",
+          "reason",
+          "note",
+          "endsAt",
+          "createdBy",
+          "createdAt",
+          "liftedAt",
+          "liftedBy",
+          "reviewNote",
+          "reviewedBy",
+          "reviewedAt",
+          "createdByRole",
+          "liftedByRole",
+          "reviewedByRole"
         ]
       },
       "Sanction": {
@@ -6191,7 +6301,7 @@
     "/admin/accounts/{id}/sanctions": {
       "get": {
         "summary": "A person's sanctions",
-        "description": "Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id.",
+        "description": "Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id and their role now (null once the role is gone, or for what no person did).",
         "security": [
           {
             "session": []

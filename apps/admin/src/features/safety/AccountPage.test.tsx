@@ -123,6 +123,10 @@ const sanction = (n: number, extra: Record<string, unknown> = {}) => ({
   reviewNote: null,
   reviewedBy: null,
   reviewedAt: null,
+  // The staff member's role now (#308), from moderator_roles.
+  createdByRole: "moderator",
+  liftedByRole: null,
+  reviewedByRole: null,
   ...extra,
 });
 const sanctions = [
@@ -135,8 +139,10 @@ const sanctions = [
     createdAt: REGISTERED,
     liftedAt: LIFTED,
     liftedBy: STAFF,
+    liftedByRole: "moderator",
     reviewNote: "Not what the rule means",
     reviewedBy: STAFF,
+    reviewedByRole: "moderator",
     reviewedAt: LIFTED,
   }),
 ];
@@ -296,16 +302,17 @@ describe("a person's page", () => {
     expect(rejected).toHaveTextContent(`rejected · no_person · ${when(UPLOADED)}`);
     expect(screen.queryByRole("img")).toBeNull();
 
-    // The sanctions from their own route: kind, reason, when, until, lifted, the note, a review's note.
-    const sanctionsList = screen.getByText("suspend").closest("ul") as HTMLElement;
+    // The sanctions from their own route (#308's history): kind and reason in words, when,
+    // until, the note, who applied it, lifted and looked at again by whom, a review's note.
+    const sanctionsList = screen.getByText("Suspension").closest("ul") as HTMLElement;
     const [suspended, warned] = within(sanctionsList).getAllByRole("listitem");
     expect(suspended).toHaveTextContent(
-      `suspend · harassment · ${when(CHANGED)} · until: ${when(UNTIL)}Wrote something unkind in two chats`,
+      `Suspension · Harassment · ${when(CHANGED)} · until: ${when(UNTIL)}Wrote something unkind in two chatsApplied by: a1b2c3d4, moderator`,
     );
-    expect(suspended).not.toHaveTextContent("lifted");
-    expect(suspended).not.toHaveTextContent("Looked at again");
+    expect(suspended).not.toHaveTextContent("Lifted:");
+    expect(suspended).not.toHaveTextContent("Looked at again:");
     expect(warned).toHaveTextContent(
-      `warn · other · ${when(REGISTERED)} · lifted: ${when(LIFTED)}Asked for a phone number in the first messageLooked at again: Not what the rule means`,
+      `Warning · Other · ${when(REGISTERED)}Asked for a phone number in the first messageApplied by: a1b2c3d4, moderatorLifted: ${when(LIFTED)}. Who: a1b2c3d4, moderatorLooked at again: ${when(LIFTED)}. Who: a1b2c3d4, moderator. Note: Not what the rule means`,
     );
     expect(warned).not.toHaveTextContent("until");
 
@@ -355,7 +362,9 @@ describe("a person's page", () => {
     expect(screen.queryByText("Standing", { selector: "dt" })).toBeNull();
     expect(screen.queryByText("Registered", { selector: "dt" })).toBeNull();
     expect(screen.queryByText("No profile yet.")).toBeNull();
-    expect(screen.queryByText("suspend")).toBeNull();
+    expect(screen.queryByText("Suspension")).toBeNull();
+    // Nor the actions: an erased account's page shows nothing more (#306).
+    expect(screen.queryByRole("group", { name: "Actions on this person" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Show the photo" })).toBeNull();
     expect(screen.queryByText("None.")).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
@@ -599,8 +608,8 @@ describe("a photo on a person's page", () => {
     if (!first) throw new Error("no button");
     fireEvent.click(first);
     fireEvent.click(first);
-    await waitFor(() => expect(first).toBeDisabled());
-    expect(first).toHaveAttribute("aria-busy", "true");
+    await waitFor(() => expect(first).toHaveAttribute("aria-busy", "true"));
+    expect(first).toBeEnabled();
     fireEvent.click(first);
     expect(asked(calls).filter((call) => call.endsWith("/card"))).toEqual([
       `GET /admin/photos/${photoId(1)}/card`,

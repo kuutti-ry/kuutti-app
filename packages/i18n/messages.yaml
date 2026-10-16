@@ -5368,14 +5368,6 @@ admin.account.sanctionsError:
   en: "The sanctions could not be loaded."
   description: "Admin panel, a person's page, the sanctions' own request failed (#306)."
 
-admin.account.lifted:
-  en: "lifted: {time}"
-  description: "Admin panel, a person's page, after a sanction: when it was lifted (#306)."
-
-admin.account.reviewed:
-  en: "Looked at again: {note}"
-  description: "Admin panel, a person's page, under a sanction: the second member of staff's note (#306)."
-
 admin.account.feedbackTitle:
   en: "Feedback sent"
   description: "Admin panel, a person's page, the heading of the feedback the person sent (#306)."
@@ -5543,6 +5535,250 @@ admin.staff.col.lastSignIn:
 admin.staff.never:
   en: "Never"
   description: "Admin panel, the staff table: no panel sign-in yet (#310)."
+
+admin.sanction.actions:
+  en: "Actions on this person"
+  description: "Admin panel, a person's page, the sanctions (#308): the label of the group of action buttons."
+
+admin.sanction.action.warn:
+  en: "Warn"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that opens a warning."
+
+admin.sanction.action.shadow_ban:
+  en: "Hide from others (shadow ban)"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that opens a shadow ban."
+
+admin.sanction.action.suspend:
+  en: "Suspend until a day"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that opens a suspension."
+
+admin.sanction.action.ban:
+  en: "Ban"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that opens a ban; admins only."
+
+admin.sanction.title.warn:
+  en: "Warn this person"
+  description: "Admin panel, a person's page, the sanctions (#308): the confirm step's title for a warning."
+
+admin.sanction.title.shadow_ban:
+  en: "Hide this person from others"
+  description: "Admin panel, a person's page, the sanctions (#308): the confirm step's title for a shadow ban."
+
+admin.sanction.title.suspend:
+  en: "Suspend this person"
+  description: "Admin panel, a person's page, the sanctions (#308): the confirm step's title for a suspension."
+
+admin.sanction.title.ban:
+  en: "Ban this person"
+  description: "Admin panel, a person's page, the sanctions (#308): the confirm step's title for a ban."
+
+admin.sanction.effect.warn:
+  en: "Writes a warning on the person's file. Nothing else changes for them."
+  description: "Admin panel, a person's page, the sanctions (#308): what a warning does, in words."
+
+admin.sanction.effect.shadow_ban:
+  en: "Hides the person from everyone else at once, without telling them: they see no change."
+  description: "Admin panel, a person's page, the sanctions (#308): what a shadow ban does, in words."
+
+admin.sanction.effect.suspend:
+  en: "Ends every session now and refuses the bank login until the start of the chosen day in Finland, when the night lifts it."
+  description: "Admin panel, a person's page, the sanctions (#308): what a suspension does, in words."
+
+admin.sanction.effect.ban:
+  en: "Ends every session now and refuses the next bank login and any new account, until an admin lifts it."
+  description: "Admin panel, a person's page, the sanctions (#308): what a ban does, in words."
+
+admin.sanction.kind.warn:
+  en: "Warning"
+  description: "Admin panel, a person's page, the sanctions (#308): the kind of a sanction in the history."
+
+admin.sanction.kind.shadow_ban:
+  en: "Shadow ban"
+  description: "Admin panel, a person's page, the sanctions (#308): the kind of a sanction in the history."
+
+admin.sanction.kind.suspend:
+  en: "Suspension"
+  description: "Admin panel, a person's page, the sanctions (#308): the kind of a sanction in the history."
+
+admin.sanction.kind.ban:
+  en: "Ban"
+  description: "Admin panel, a person's page, the sanctions (#308): the kind of a sanction in the history."
+
+admin.sanction.reason.label:
+  en: "Reason"
+  description: "Admin panel, a person's page, the sanctions (#308): the label of the reason list."
+
+admin.sanction.reason.choose:
+  en: "Choose a reason"
+  description: "Admin panel, a person's page, the sanctions (#308): the reason list's first line; nothing is preset (#250)."
+
+admin.sanction.reason.harassment:
+  en: "Harassment"
+  description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
+
+admin.sanction.reason.misrepresentation:
+  en: "Misrepresentation"
+  description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
+
+admin.sanction.reason.under_age:
+  en: "Under 18"
+  description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
+
+admin.sanction.reason.commercial_use:
+  en: "Commercial use"
+  description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
+
+admin.sanction.reason.scraping:
+  en: "Scraping"
+  description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
+
+admin.sanction.reason.other:
+  en: "Other"
+  description: "Admin panel, a person's page, the sanctions (#308): a reason of the closed list."
+
+admin.sanction.note:
+  en: "Note: what happened, in a few words"
+  description: "Admin panel, a person's page, the sanctions (#308): the label of staff's note."
+
+admin.sanction.noteCount:
+  en: "Characters: {characters}/{max}"
+  description: "Admin panel, a person's page, the sanctions (#308): how long the note is, against its limit."
+
+admin.sanction.endsOn:
+  en: "Suspended until the start of this day"
+  description: "Admin panel, a person's page, the sanctions (#308): the label of a suspension's end day."
+
+admin.sanction.apply:
+  en: "Apply"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that sends the step."
+
+admin.sanction.cancel:
+  en: "Cancel"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that closes the step with nothing sent."
+
+admin.sanction.lift:
+  en: "Lift"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that lifts a sanction."
+
+admin.sanction.review:
+  en: "Look at it again"
+  description: "Admin panel, a person's page, the sanctions (#308): the button that opens a second member of staff's look."
+
+admin.sanction.liftTitle:
+  en: "Lift: {kind}"
+  description: "Admin panel, a person's page, the sanctions (#308): the lift step's title; {kind} is the sanction's kind in words."
+
+admin.sanction.liftEffect.warn:
+  en: "The warning is marked lifted. Nothing else changes for the person."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a warning does, in words (ADR-024 §4)."
+
+admin.sanction.liftEffect.shadow_ban:
+  en: "Others see the person again, unless something else still open hides them. Their sessions are not touched."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a shadow ban does, in words (ADR-024 §4)."
+
+admin.sanction.liftEffect.suspend:
+  en: "The person may sign in again, unless something else still open stops them. No session comes back: they sign in anew."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a suspension does, in words (ADR-024 §4)."
+
+admin.sanction.liftEffect.ban:
+  en: "The person may sign in again, unless something else still open stops them. No session comes back: they sign in anew."
+  description: "Admin panel, a person's page, the sanctions (#308): what lifting a ban does, in words (ADR-024 §4)."
+
+admin.sanction.reviewTitle:
+  en: "Look at it again: {kind}"
+  description: "Admin panel, a person's page, the sanctions (#308): the second look's title; {kind} is the sanction's kind in words."
+
+admin.sanction.reviewExplain:
+  en: "A second member of staff's look: a note, and keep it or lift it. Whoever applied it cannot."
+  description: "Admin panel, a person's page, the sanctions (#308): what the second look is."
+
+admin.sanction.reviewNote:
+  en: "Your note"
+  description: "Admin panel, a person's page, the sanctions (#308): the label of the second look's note."
+
+admin.sanction.outcome:
+  en: "Decision"
+  description: "Admin panel, a person's page, the sanctions (#308): the legend of keep or lift."
+
+admin.sanction.keep:
+  en: "Keep it"
+  description: "Admin panel, a person's page, the sanctions (#308): the second look keeps the sanction."
+
+admin.sanction.liftIt:
+  en: "Lift it"
+  description: "Admin panel, a person's page, the sanctions (#308): the second look lifts the sanction."
+
+admin.sanction.who:
+  en: "{id}, {role}"
+  description: "Admin panel, a person's page, the sanctions (#308): a member of staff by the start of their identity id and their role now."
+
+admin.sanction.noRole:
+  en: "no role now"
+  description: "Admin panel, a person's page, the sanctions (#308): the member of staff holds no role any more."
+
+admin.sanction.nobody:
+  en: "Kuutti itself, by no person"
+  description: "Admin panel, a person's page, the sanctions (#308): a sanction no person applied (automatic)."
+
+admin.sanction.appliedBy:
+  en: "Applied by: {who}"
+  description: "Admin panel, a person's page, the sanctions (#308): who applied a sanction."
+
+admin.sanction.liftedBy:
+  en: "Lifted: {time}. Who: {who}"
+  description: "Admin panel, a person's page, the sanctions (#308): when and by whom a sanction was lifted."
+
+admin.sanction.reviewedBy:
+  en: "Looked at again: {time}. Who: {who}. Note: {note}"
+  description: "Admin panel, a person's page, the sanctions (#308): the second look, its time, who and their note."
+
+admin.sanction.done.apply:
+  en: "Applied: {kind}."
+  description: "Admin panel, a person's page, the sanctions (#308): the status after a sanction was applied."
+
+admin.sanction.done.lift:
+  en: "Lifted: {kind}."
+  description: "Admin panel, a person's page, the sanctions (#308): the status after a sanction was lifted."
+
+admin.sanction.done.review:
+  en: "Looked at again: {kind}."
+  description: "Admin panel, a person's page, the sanctions (#308): the status after a second look."
+
+admin.sanction.error.staff_target:
+  en: "This person is staff: the role is taken away first."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, a member of staff cannot be sanctioned."
+
+admin.sanction.error.account_deleted:
+  en: "The account is erased: only a ban binds it."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, the account is erased."
+
+admin.sanction.error.ends_on_invalid:
+  en: "The end day is after today and at most 366 days ahead."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, the suspension's day is out of range."
+
+admin.sanction.error.own_account:
+  en: "This is about your own account: somebody else decides."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, staff act on their own account."
+
+admin.sanction.error.own_sanction:
+  en: "You applied this one: somebody else looks at it again."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, the second look is by the same person."
+
+admin.sanction.error.sanction_lifted:
+  en: "It is lifted already."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, the sanction is lifted already."
+
+admin.sanction.error.sanction_reviewed:
+  en: "Somebody looked at it again already."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, the sanction was looked at again already."
+
+admin.sanction.error.not_found:
+  en: "It is not there any more."
+  description: "Admin panel, a person's page, the sanctions (#308): refused, the sanction or the account is gone."
+
+admin.sanction.error.failed:
+  en: "It could not be done. Try again."
+  description: "Admin panel, a person's page, the sanctions (#308): the request failed."
 
 admin.refused:
   en: Your role does not allow this.

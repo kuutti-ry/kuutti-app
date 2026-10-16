@@ -6,6 +6,7 @@ import {
   SANCTION_NOTE_MAX,
   Sanction,
   SanctionAccountParams,
+  SanctionEntry,
   SanctionKind,
   SanctionList,
   SanctionParams,
@@ -230,14 +231,35 @@ describe("the panel's sanction", () => {
     expect(codes(Sanction, { ...item, liftedAt: undefined })).toEqual(["invalid_type"]);
   });
 
+  /** A sanction as the person's page lists it (#308): the plain one with the staff's roles now. */
+  const entry = {
+    ...item,
+    createdByRole: "moderator",
+    liftedByRole: null,
+    reviewedByRole: "admin",
+  };
+
   it("lists at most 1000 of them", () => {
     expect(SanctionList.parse({ items: [] })).toEqual({ items: [] });
     expect(
-      SanctionList.safeParse({ items: Array.from({ length: 1000 }, () => item) }).success,
+      SanctionList.safeParse({ items: Array.from({ length: 1000 }, () => entry) }).success,
     ).toBe(true);
-    expect(codes(SanctionList, { items: Array.from({ length: 1001 }, () => item) })).toEqual([
+    expect(codes(SanctionList, { items: Array.from({ length: 1001 }, () => entry) })).toEqual([
       "too_big",
     ]);
+  });
+
+  it("lists each with the staff's roles now, each a role or null, none left out (#308)", () => {
+    expect(SanctionEntry.parse(entry)).toEqual(entry);
+    for (const role of ["moderator", "admin", "researcher", null]) {
+      expect(SanctionEntry.safeParse({ ...entry, liftedByRole: role }).success).toBe(true);
+    }
+    expect(codes(SanctionEntry, { ...entry, createdByRole: "owner" })).toEqual(["invalid_value"]);
+    for (const key of ["createdByRole", "liftedByRole", "reviewedByRole"]) {
+      expect(codes(SanctionEntry, { ...entry, [key]: undefined })).toEqual(["invalid_value"]);
+    }
+    // A plain sanction, as the writes answer it, is not a listed one.
+    expect(SanctionList.safeParse({ items: [item] }).success).toBe(false);
   });
 });
 
