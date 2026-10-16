@@ -290,24 +290,29 @@ describe("sessions", () => {
     expect(left.rows).toEqual([{ id: c.sessionId }]);
   });
 
-  test("the sweep keeps a login attempt still open or holding a live code, and removes one over in both", async ({
+  test("the sweep keeps a login attempt still open, under way or holding a live code, and removes one over in both", async ({
     ctx,
   }) => {
-    // An attempt lives ten minutes and its code one more from the callback,
-    // so a late callback leaves a code that outlives its attempt (codes.ts).
+    // Before #324 a late callback could leave a code that outlived its
+    // attempt; the claim's deadline (ADR-026 §8) now outlasts every code, so
+    // the sweep's code_expires_at clause only guards.
+    // A callback claims its attempt until a deadline ten minutes on, and a
+    // refused or failed one ends it at once (ADR-026 §8).
     await ctx.client.query(
-      `INSERT INTO auth_request (state, nonce, platform, expires_at, code_hash, code_expires_at) VALUES
-         ('open', 'n1', 'ios', now() + interval '5 minutes', NULL, NULL),
-         ('late-callback', 'n2', 'ios', now() - interval '1 second', 'h2', now() + interval '1 minute'),
-         ('code-over', 'n3', 'ios', now() - interval '1 second', 'h3', now() - interval '1 second'),
-         ('never-answered', 'n4', 'ios', now() - interval '1 second', NULL, NULL)`,
+      `INSERT INTO auth_request (state, nonce, platform, expires_at, code_hash, code_expires_at, outcome) VALUES
+         ('open', 'n1', 'ios', now() + interval '5 minutes', NULL, NULL, NULL),
+         ('late-callback', 'n2', 'ios', now() - interval '1 second', 'h2', now() + interval '1 minute', 'created'),
+         ('code-over', 'n3', 'ios', now() - interval '1 second', 'h3', now() - interval '1 second', 'created'),
+         ('never-answered', 'n4', 'ios', now() - interval '1 second', NULL, NULL, NULL),
+         ('under-way', 'n5', 'ios', now() + interval '10 minutes', NULL, NULL, 'answered'),
+         ('spent', 'n6', 'ios', now() - interval '1 second', NULL, NULL, 'answered')`,
     );
     const swept = await sweepSessions({ db: ctx.client, now: () => new Date() });
-    expect(swept.authRequests).toBe(2);
+    expect(swept.authRequests).toBe(3);
     const left = await ctx.client.query<{ state: string }>(
       "SELECT state FROM auth_request ORDER BY state",
     );
-    expect(left.rows.map((r) => r.state)).toEqual(["late-callback", "open"]);
+    expect(left.rows.map((r) => r.state)).toEqual(["late-callback", "open", "under-way"]);
   });
 
   test("the sweep keeps a session ended within its retention and removes every session of a deleted account", async ({

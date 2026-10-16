@@ -89,7 +89,7 @@ const callbackRoute = createRoute({
   path: "/auth/callback",
   summary: "The broker's return",
   description:
-    "The registered redirect URI. Exchanges the code with the broker, derives the identity, applies the re-registration rule and redirects to the app's deep link with a one-time code. Never called by the app itself.",
+    "The registered redirect URI. Exchanges the code with the broker, derives the identity, applies the re-registration rule and redirects to the app's deep link with a one-time code. A state is answered once: its second return, at once or later, is auth_state_mismatch without a call to the broker. Never called by the app itself.",
   request: { query: AuthCallbackQuery },
   responses: {
     302: {

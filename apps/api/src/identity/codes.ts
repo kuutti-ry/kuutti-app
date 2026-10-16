@@ -2,7 +2,10 @@ import { createHash, randomBytes } from "node:crypto";
 
 /** How long the app has to exchange the code the deep link carried. */
 export const ONE_TIME_CODE_TTL_MS = 60_000;
-/** How long the person has from /auth/start to the callback. */
+/**
+ * How long the person has from /auth/start to the callback, and the callback
+ * from its claim of the attempt to the code (ADR-026 §8).
+ */
 export const AUTH_REQUEST_TTL_MS = 10 * 60_000;
 /**
  * The most rows auth_request holds (ADR-026 §6): a guard for the disk, not a

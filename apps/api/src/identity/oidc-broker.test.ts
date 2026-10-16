@@ -1,7 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { ACR_LOATEST2, keyIdOf } from "@kuutti/tunnistus-oidc";
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
-import { type FakeTelia, fakeTelia, TELIA_ISSUER } from "@kuutti/tunnistus-oidc/testing";
+import {
+  type FakeTelia,
+  fakeTelia,
+  TELIA_ISSUER,
+  TELIA_TOKEN_ENDPOINT,
+} from "@kuutti/tunnistus-oidc/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
@@ -14,7 +19,8 @@ import { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.
 
 const random = () => randomBytes(24).toString("base64url");
 
-async function brokerFor(telia: FakeTelia) {
+/** The adapter against the double; `fetch` stands between them when a test watches the wire. */
+async function brokerFor(telia: FakeTelia, fetch = telia.fetch) {
   return OidcBroker.create({
     issuer: TELIA_ISSUER,
     clientId: telia.clientId,
@@ -22,7 +28,7 @@ async function brokerFor(telia: FakeTelia) {
     acrValues: ACR_LOATEST2,
     signingKeyPem: telia.signingKeyPem,
     encryptionKeyPem: telia.encryptionKeyPem,
-    fetch: telia.fetch,
+    fetch,
   });
 }
 
@@ -219,5 +225,45 @@ describe("a bank login through the Telia test double, end to end", () => {
         /hetu|sex|birth_day|birth_date|date_of_birth|dob|given_name|surname/.test(n),
       ),
     ).toEqual(["identity.hetu_hmac"]);
+  });
+
+  test("answers a return once: after Telia refuses a forged code, the real return costs no token call", async ({
+    ctx,
+  }) => {
+    const telia = await fakeTelia();
+    let tokenCalls = 0;
+    const counting: FakeTelia["fetch"] = (url, init) => {
+      if (init.method === "POST" && String(url) === TELIA_TOKEN_ENDPOINT) tokenCalls += 1;
+      return telia.fetch(url, init);
+    };
+    const { logger } = await captureLogger();
+    const app = createApp({
+      config: testConfig({ HETU_HMAC_KEY: KEY_HEX }),
+      logger,
+      db: ctx.client,
+      broker: await brokerFor(telia, counting),
+    });
+    const sentBack = (res: Response) => {
+      expect(res.status).toBe(302);
+      return new URL(res.headers.get("location") ?? "").searchParams.get("error");
+    };
+    const started = await app.request("/auth/start?platform=ios&locale=fi");
+    const back = await telia.authorize(new URL(started.headers.get("location") ?? ""));
+    // Whoever holds the state returns first, with a code Telia never issued.
+    const forged = new URL(back);
+    forged.searchParams.set("code", random());
+    expect(sentBack(await app.request(`/auth/callback${forged.search}`))).toBe(
+      "auth_provider_error",
+    );
+    expect(tokenCalls).toBe(1);
+    expect(telia.seen.tokenForm?.code).toBe(forged.searchParams.get("code"));
+    // The person's own return with the code Telia did issue: the attempt is
+    // spent, so the API refuses it without asking Telia (#324, ADR-026 §8).
+    expect(sentBack(await app.request(`/auth/callback${back.search}`))).toBe("auth_state_mismatch");
+    expect(tokenCalls).toBe(1);
+    const created = await ctx.client.query(
+      "SELECT (SELECT count(*)::int FROM identity) AS identities, (SELECT count(*)::int FROM account) AS accounts",
+    );
+    expect(created.rows[0]).toEqual({ identities: 0, accounts: 0 });
   });
 });

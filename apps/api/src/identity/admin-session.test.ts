@@ -25,19 +25,22 @@ function rngFrom(seed: number) {
 }
 const STAFF_HETU = generateHetu(rngFrom(11), { at: NOW, minAge: 30, maxAge: 50 });
 
-/** Answers like a broker whose person is `hetu`; records the logins it was asked to start. */
-function fakeBroker(hetu: string): IdentityBroker & { started: string[] } {
+/** Answers like a broker whose person is `hetu`; records the logins it was asked to start and to complete. */
+function fakeBroker(hetu: string): IdentityBroker & { started: string[]; completed: string[] } {
   const started: string[] = [];
+  const completed: string[] = [];
   return {
     issuer: "https://broker.test/uas",
     started,
+    completed,
     async startLogin(input) {
       started.push(input.state);
       const url = new URL("https://broker.test/uas/oauth2/authorization");
       url.searchParams.set("state", input.state);
       return url;
     },
-    async completeLogin(): Promise<BrokerIdentity> {
+    async completeLogin(input): Promise<BrokerIdentity> {
+      completed.push(input.state);
       return {
         hetu,
         subject: "STAFFSUBJECT",
@@ -329,7 +332,7 @@ describe("staff sessions: refusals, validation and the sweep", () => {
   }) => {
     const identityId = await allowlisted(ctx, "admin");
     await ctx.client.query("UPDATE identity SET standing = 'banned' WHERE id = $1", [identityId]);
-    const { app, logs } = await appWith(ctx);
+    const { app, broker, logs } = await appWith(ctx);
     const state = await start(app);
     const back = await callback(app, state);
     expect(back.origin).toBe(ADMIN_URL);
@@ -340,10 +343,17 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     expect(logs().find((l) => l.code === "admin_not_allowed")).toMatchObject({
       detail: { known: true, standing: "banned", platform: "admin" },
     });
-    // The attempt is spent: the same state cannot be completed again.
+    // The attempt is spent: the same state cannot be completed again, and
+    // the bank is not asked again (#324, ADR-026 §8).
     const again = await callback(app, state);
     expect(again.href).toContain("error=auth_state_mismatch");
     expect(again.href).not.toContain("code=");
+    expect(broker.completed).toEqual([state]);
+    const attempt = await ctx.client.query(
+      "SELECT outcome, expires_at <= clock_timestamp() AS spent FROM auth_request WHERE state = $1",
+      [state],
+    );
+    expect(attempt.rows).toEqual([{ outcome: "answered", spent: true }]);
     expect(await count(ctx, "SELECT count(*) AS n FROM admin_session")).toBe(0);
   });
 

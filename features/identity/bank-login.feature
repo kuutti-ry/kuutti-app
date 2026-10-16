@@ -32,6 +32,12 @@ Feature: Bank login through the identification broker
     Then the browser is sent to the app with auth_cancelled
     And the attempt cannot be completed later
 
+  Scenario: A return from the bank is answered once, and a failed one is spent too
+    Given a login whose return from the bank the broker could not complete
+    When the same return comes back again
+    Then the browser is sent to the app with auth_state_mismatch
+    And the broker is not asked again and nothing is created
+
   Scenario: An authentication that predates the login attempt is refused
     Given the broker reports an authentication from before the app asked for this login
     Then the browser is sent to the app with auth_provider_error
@@ -83,7 +89,7 @@ Feature: Bank login through the identification broker
     When a login starts
     Then the two oldest attempts are gone, the table is one under its cap and the login reaches the broker
 
-  Scenario: At the table's cap a login is refused only when every attempt holds a code
-    Given the table holds as many login attempts as its cap, each with a code awaiting its exchange
+  Scenario: At the table's cap a login is refused only when every attempt is back from the bank
+    Given the table holds as many login attempts as its cap, each with a code awaiting its exchange or its return under way
     When a login starts
     Then the browser is sent to the app with auth_rate_limited and the wait, and nothing is written
