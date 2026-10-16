@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, api, apiUrl, failed, setTokenSource, setUnauthorizedHandler } from "./api.ts";
+import {
+  ApiError,
+  api,
+  apiUrl,
+  failed,
+  setRoleAnswerHandler,
+  setTokenSource,
+  setUnauthorizedHandler,
+} from "./api.ts";
 
 // The panel's one client (ADR-003): where it points, the bearer it adds from
 // the session's token source, and the error it turns an answer into.
@@ -22,6 +30,7 @@ function recordRequests() {
 afterEach(() => {
   setTokenSource(() => null);
   setUnauthorizedHandler(() => undefined);
+  setRoleAnswerHandler(() => undefined);
   vi.unstubAllGlobals();
 });
 
@@ -91,6 +100,43 @@ describe("the client", () => {
     expect(ended).toHaveBeenCalledTimes(1);
     // The caller still gets the answer it asked for.
     expect(response.status).toBe(401);
+  });
+});
+
+describe("what an answer says about the role", () => {
+  it("reports a 403 as refused and a success as allowed, for a request that carried the token, and nothing else (#302)", async () => {
+    let status = 403;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        status < 400
+          ? json({ role: "moderator", expiresAt: "2030-01-01T08:00:00.000Z" }, status)
+          : json({ error: { code: "x", message: "x", requestId: "r" } }, status),
+      ),
+    );
+    const answers: boolean[] = [];
+    const ended = vi.fn();
+    setRoleAnswerHandler((allowed) => answers.push(allowed));
+    setUnauthorizedHandler(ended);
+    // Nobody signed in: no answer says anything about a role.
+    await api.GET("/admin/whoami");
+    status = 200;
+    await api.GET("/admin/whoami");
+    expect(answers).toEqual([]);
+    setTokenSource(() => "t".repeat(43));
+    status = 403;
+    const { response } = await api.GET("/admin/whoami");
+    // A refusal is not the end of the session, and the caller still gets the answer.
+    expect(ended).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    status = 200;
+    await api.GET("/admin/whoami");
+    for (const other of [401, 404, 429, 500]) {
+      status = other;
+      await api.GET("/admin/whoami");
+    }
+    expect(answers).toEqual([false, true]);
+    expect(ended).toHaveBeenCalledTimes(1);
   });
 });
 

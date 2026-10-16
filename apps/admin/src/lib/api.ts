@@ -36,6 +36,17 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
+/**
+ * What an answer to a request that carried the token says about the role
+ * (#302): `false` on a 403, `true` on a success. The shell says once that the
+ * role does not allow it, and takes that back when a request is honoured
+ * again; every admin route is behind the same role check.
+ */
+let onRoleAnswer: (allowed: boolean) => void = () => undefined;
+export function setRoleAnswerHandler(handler: (allowed: boolean) => void): void {
+  onRoleAnswer = handler;
+}
+
 const bearer: Middleware = {
   async onRequest({ request }) {
     const token = tokenSource();
@@ -45,8 +56,14 @@ const bearer: Middleware = {
   // A session the API no longer honours (revoked, expired) ends wherever it
   // is found out, so every screen goes back to the sign-in instead of saying
   // that its own request failed (#250).
+  // A role the route does not admit is said once, in the shell, rather than
+  // as each screen's own failure (#302); the screen still gets the answer.
   async onResponse({ request, response }) {
-    if (response.status === 401 && request.headers.has("authorization")) onUnauthorized();
+    if (request.headers.has("authorization")) {
+      if (response.status === 401) onUnauthorized();
+      else if (response.status === 403) onRoleAnswer(false);
+      else if (response.ok) onRoleAnswer(true);
+    }
     return response;
   },
 };

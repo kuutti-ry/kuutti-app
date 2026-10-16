@@ -3249,10 +3249,6 @@ admin.title:
   en: Kuutti admin
   description: Moderation panel, page heading. The panel is English only (TD-17), so admin.* keys need no fi or sv.
 
-admin.empty:
-  en: Moderation panel. Nothing to moderate yet.
-  description: Moderation panel, placeholder text until the queues arrive in M4.
-
 admin.source.offer:
   en: "Source code (AGPL-3.0). The API this panel talks to runs commit {commit}:"
   description: Moderation panel footer. The source-code offer of AGPL-3.0 section 13; {commit} is the API's short git hash; the web address follows as a link.
@@ -5082,8 +5078,36 @@ admin.queue.decisionFailed:
   description: Admin panel, a decision request failed.
 
 admin.forbidden:
-  en: Your role does not allow the photo queue.
-  description: Admin panel, a researcher signed in; the queue is for moderators and admins.
+  en: Your role does not open any screen of this panel.
+  description: "Admin panel, a researcher signed in: no screen is theirs yet (#194 decides what they read), so the panel shows this instead of a menu (#302)."
+
+admin.refused:
+  en: Your role does not allow this.
+  description: "Admin panel, shown once above a screen when the API refused a request for the signed-in role (403), instead of the screen's own error (#302)."
+
+admin.skip:
+  en: Skip to content
+  description: "Admin panel, the first link of the page for keyboard users; it moves past the heading and the menu to the screen (#302)."
+
+admin.nav.label:
+  en: Screens
+  description: "Admin panel, the accessible name of the menu of screens (#302)."
+
+admin.nav.photos:
+  en: Photos
+  description: "Admin panel, the menu entry of the photo review queue (#302)."
+
+admin.nav.feedback:
+  en: Feedback
+  description: "Admin panel, the menu entry of the feedback people sent from the app (#302)."
+
+admin.notFound.title:
+  en: Nothing at this address
+  description: "Admin panel, the heading of the screen a path the panel does not have opens (#302)."
+
+admin.notFound.home:
+  en: Back to the start
+  description: "Admin panel, the link from an unknown path to the first screen the role opens (#302)."
 
 account.title:
   en: Your account

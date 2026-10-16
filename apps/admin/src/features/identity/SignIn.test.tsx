@@ -1,5 +1,6 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { SignIn } from "./SignIn.tsx";
@@ -8,11 +9,13 @@ import { StaffSessionProvider } from "./session.tsx";
 // The signed-out panel (#49): the bank login, with the refusal the return URL
 // carried in words a moderator can act on.
 
-function show() {
+function show(path = "/") {
   render(
     <I18nProvider i18n={i18n}>
       <StaffSessionProvider>
-        <SignIn />
+        <MemoryRouter initialEntries={[path]}>
+          <SignIn />
+        </MemoryRouter>
       </StaffSessionProvider>
     </I18nProvider>,
   );
@@ -69,6 +72,15 @@ describe("SignIn", () => {
     show();
     fireEvent.click(await screen.findByRole("button", { name: "Sign in with your bank" }));
     expect(assign).toHaveBeenCalledTimes(1);
+    expect(assign).toHaveBeenCalledWith("http://localhost:3000/admin/auth/start");
+  });
+
+  it("remembers the screen the sign-in started on, for the way back from the bank (#302)", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign, hash: "" });
+    show("/feedback?kind=bug");
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in with your bank" }));
+    expect(window.sessionStorage.getItem("kuutti.admin.return")).toBe("/feedback?kind=bug");
     expect(assign).toHaveBeenCalledWith("http://localhost:3000/admin/auth/start");
   });
 });

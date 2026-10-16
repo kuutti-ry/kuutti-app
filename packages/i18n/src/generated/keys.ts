@@ -55,7 +55,6 @@ export type MessageParams = {
   "account.specialCategory.explain": Record<never, never>;
   "account.specialCategory.label": Record<never, never>;
   "account.title": Record<never, never>;
-  "admin.empty": Record<never, never>;
   "admin.feedback.error": Record<never, never>;
   "admin.feedback.handle": Record<never, never>;
   "admin.feedback.handled": Record<never, never>;
@@ -70,6 +69,11 @@ export type MessageParams = {
   "admin.feedback.title": Record<never, never>;
   "admin.feedback.total": { "total": number };
   "admin.forbidden": Record<never, never>;
+  "admin.nav.feedback": Record<never, never>;
+  "admin.nav.label": Record<never, never>;
+  "admin.nav.photos": Record<never, never>;
+  "admin.notFound.home": Record<never, never>;
+  "admin.notFound.title": Record<never, never>;
   "admin.queue.account": { "account": string };
   "admin.queue.appealed": Record<never, never>;
   "admin.queue.approve": Record<never, never>;
@@ -102,6 +106,7 @@ export type MessageParams = {
   "admin.queue.title": Record<never, never>;
   "admin.queue.total": { "total": number };
   "admin.queue.uploaded": { "time": string };
+  "admin.refused": Record<never, never>;
   "admin.session.expires": { "time": string };
   "admin.session.role": { "role": string };
   "admin.signIn.button": Record<never, never>;
@@ -112,6 +117,7 @@ export type MessageParams = {
   "admin.signIn.explain": Record<never, never>;
   "admin.signIn.title": Record<never, never>;
   "admin.signOut": Record<never, never>;
+  "admin.skip": Record<never, never>;
   "admin.source.offer": { "commit": string };
   "admin.source.unavailable": Record<never, never>;
   "admin.title": Record<never, never>;
