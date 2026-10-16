@@ -101,6 +101,46 @@ describe("seed", () => {
     });
   });
 
+  it("writes no reason, and leaves the panel's later versions and their reasons as they were (#305)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        const withReason = async () =>
+          (
+            await pool.query<{ key: string; version: number; value: unknown; reason: string }>(
+              "SELECT key, version, value, reason FROM matching_config WHERE reason IS NOT NULL ORDER BY key",
+            )
+          ).rows;
+        // The seed's and the migrations' rows were written before reasons were kept.
+        expect(await withReason()).toEqual([]);
+
+        // Two changes from the panel, then a preview's next boot seeds again.
+        await pool.query(
+          `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason) VALUES
+             (3, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Open the country'),
+             (2, 'gate_k', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
+        );
+        await seed(pool);
+        expect(await withReason()).toEqual([
+          { key: "default_pond", version: 3, value: "suomi", reason: "Open the country" },
+          { key: "gate_k", version: 2, value: 25, reason: "Smaller ponds first" },
+        ]);
+        const latest = await pool.query<{ key: string; version: number }>(
+          `SELECT key, max(version) AS version FROM matching_config
+           WHERE key IN ('default_pond', 'gate_k') GROUP BY key ORDER BY key`,
+        );
+        expect(latest.rows).toEqual([
+          { key: "default_pond", version: 3 },
+          { key: "gate_k", version: 2 },
+        ]);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   it("refuses production before opening a connection", async () => {
     const result = await new Promise<{ code: number | null; err: string }>((done) => {
       const child = spawn(

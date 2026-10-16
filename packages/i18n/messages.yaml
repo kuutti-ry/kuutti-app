@@ -5088,6 +5088,106 @@ admin.forbidden:
   en: Your role does not open any screen of this panel.
   description: "Admin panel, a researcher signed in: no screen is theirs yet (#194 decides what they read), so the panel shows this instead of a menu (#302)."
 
+admin.nav.config:
+  en: "Tunables"
+  description: "Admin panel, the menu entry of the tunables, admins only (#304)."
+
+admin.config.title:
+  en: "Tunables"
+  description: "Admin panel, the heading of the tunables screen: every key of matching_config with its value and history (#304)."
+
+admin.config.refresh:
+  en: "Refresh"
+  description: "Admin panel, the button that reloads the tunables (#304)."
+
+admin.config.loading:
+  en: "Loading the tunables…"
+  description: "Admin panel, while the tunables are fetched (#304)."
+
+admin.config.error:
+  en: "The tunables could not be loaded."
+  description: "Admin panel, the tunables request failed (#304)."
+
+admin.config.total:
+  en: "{total, plural, one {# tunable} other {# tunables}}"
+  description: "Admin panel, how many keys the tunables screen lists (#304)."
+
+admin.config.current:
+  en: "version {version}: {value}"
+  description: "Admin panel, one key's line, after its name: the version every reader uses and its value (#304)."
+
+admin.config.history:
+  en: "Versions, newest first"
+  description: "Admin panel, the caption of one key's history table (#304)."
+
+admin.config.col.version:
+  en: "Version"
+  description: "Admin panel, history table column (#304)."
+
+admin.config.col.value:
+  en: "Value"
+  description: "Admin panel, history table column (#304)."
+
+admin.config.col.from:
+  en: "From"
+  description: "Admin panel, history table column: when the version began to apply (#304)."
+
+admin.config.col.by:
+  en: "By"
+  description: "Admin panel, history table column: an admin's identity id, or the seed or a migration (#304)."
+
+admin.config.col.why:
+  en: "Why"
+  description: "Admin panel, history table column: the reason given with the change (#305)."
+
+admin.config.noReason:
+  en: "Before reasons were kept"
+  description: "Admin panel, history table: a version the seed or a migration wrote, with no reason (#305)."
+
+admin.config.newValue:
+  en: "New value"
+  description: "Admin panel, the label of the change form's value field (#305)."
+
+admin.config.reason:
+  en: "Why the change"
+  description: "Admin panel, the label of the change form's reason field, which is required (#305)."
+
+admin.config.save:
+  en: "Review the change"
+  description: "Admin panel, the button that shows the old and the new value before anything is sent (#305)."
+
+admin.config.confirm:
+  en: "Change {key}? Now: {from}. New: {to}"
+  description: "Admin panel, the confirm step of a change (#305)."
+
+admin.config.apply:
+  en: "Change it"
+  description: "Admin panel, the button that sends a confirmed change (#305)."
+
+admin.config.cancel:
+  en: "Cancel"
+  description: "Admin panel, back from the confirm step to the form, nothing sent (#305)."
+
+admin.config.changed:
+  en: "Saved. {key}, version {version}: {value}"
+  description: "Admin panel, said after a change was saved (#305)."
+
+admin.config.invalid:
+  en: "This is not a value of the key's type."
+  description: "Admin panel, the form could not read the input as the current value's type (#305)."
+
+admin.config.shape:
+  en: "The value must keep the current one's type and keys."
+  description: "Admin panel, the API refused a value of another type or with other keys (#305)."
+
+admin.config.conflict:
+  en: "Another admin changed this key meanwhile. Refresh and look again."
+  description: "Admin panel, the API refused a change that raced another (#305)."
+
+admin.config.failed:
+  en: "The change was not saved."
+  description: "Admin panel, the change failed for another reason (#305)."
+
 admin.refused:
   en: Your role does not allow this.
   description: "Admin panel, shown once above a screen when the API refused a request for the signed-in role (403), instead of the screen's own error (#302)."

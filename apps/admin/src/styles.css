@@ -119,3 +119,28 @@ h2:focus:not(:focus-visible) {
     grid-template-columns: 1fr;
   }
 }
+/* The tunables' history (#304): a plain table that scrolls on its own on a narrow screen. */
+.tunable details {
+  grid-column: 1 / -1;
+}
+.tunable table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.tunable th,
+.tunable td {
+  text-align: start;
+  padding: 0.25rem 0.75rem 0.25rem 0;
+  vertical-align: top;
+}
+.tunable summary {
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+.actions textarea,
+.actions input {
+  font: inherit;
+  min-height: 2.75rem;
+}

@@ -1,0 +1,1 @@
+ALTER TABLE "matching_config" ADD COLUMN "reason" text;

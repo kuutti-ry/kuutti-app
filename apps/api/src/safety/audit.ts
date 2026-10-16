@@ -16,13 +16,14 @@ const AUDIT_ACTIONS = [
   "sanction.apply",
   "sanction.lift",
   "sanction.review",
+  "config.change",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditEntry = {
   actorIdentityId: string;
   action: AuditAction;
-  subjectType: "photo" | "feedback" | "account";
+  subjectType: "photo" | "feedback" | "account" | "config";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

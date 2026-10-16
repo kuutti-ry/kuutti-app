@@ -234,6 +234,78 @@ describe("App", () => {
     expect(calls).not.toContain("GET /admin/photos/queue");
   });
 
+  it("offers an admin the tunables in the menu, and the screen loads them (#304)", async () => {
+    window.sessionStorage.setItem(
+      "kuutti.admin.session",
+      JSON.stringify({ ...staff, role: "admin" }),
+    );
+    const calls: string[] = [];
+    renderApp(
+      staffApi("admin", calls, { answers: { "GET /admin/config": () => json({ items: [] }) } }),
+    );
+    const menu = await screen.findByRole("navigation", { name: "Screens" });
+    expect(
+      within(menu)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Photos", "Feedback", "Tunables"]);
+    expect(calls).not.toContain("GET /admin/config");
+    fireEvent.click(within(menu).getByRole("link", { name: "Tunables" }));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Tunables" });
+    expect(window.location.pathname).toBe("/config");
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(within(menu).getByRole("link", { name: "Tunables" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(await screen.findByText("0 tunables")).toBeInTheDocument();
+    expect(calls).toContain("GET /admin/config");
+    expect(document.title).toBe("Tunables · Kuutti admin");
+  });
+
+  it("opens the tunables from their own address for an admin (#304)", async () => {
+    window.sessionStorage.setItem(
+      "kuutti.admin.session",
+      JSON.stringify({ ...staff, role: "admin" }),
+    );
+    window.history.replaceState(null, "", "/config");
+    const calls: string[] = [];
+    renderApp(
+      staffApi("admin", calls, { answers: { "GET /admin/config": () => json({ items: [] }) } }),
+    );
+    expect(await screen.findByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
+    expect(await screen.findByText("0 tunables")).toBeInTheDocument();
+    expect(calls).toContain("GET /admin/config");
+    expect(calls).not.toContain("GET /admin/photos/queue");
+    expect(screen.queryByText("Your role does not allow this.")).toBeNull();
+  });
+
+  it("shows a moderator no tunables in the menu, and at their address says the role does not allow it, asking nothing (#304)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/config");
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Tunables" });
+    expect(heading).not.toHaveFocus();
+    expect(screen.getByText("Your role does not allow this.")).toBeInTheDocument();
+    // Said where it is asked for, not as a refusal the API answered.
+    expect(screen.queryByRole("alert")).toBeNull();
+    const menu = screen.getByRole("navigation", { name: "Screens" });
+    expect(
+      within(menu)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Photos", "Feedback"]);
+    expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
+    expect(screen.queryByText("Loading the tunables…")).toBeNull();
+    expect(document.title).toBe("Tunables · Kuutti admin");
+    // The menu still works from here, and the panel never asked for the tunables.
+    fireEvent.click(within(menu).getByRole("link", { name: "Feedback" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Feedback" })).toBeInTheDocument();
+    expect(calls).toContain("GET /admin/feedback");
+    expect(calls).not.toContain("GET /admin/config");
+  });
+
   it("says there is nothing at an address the panel does not have, and links back to the start (#302)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     window.history.replaceState(null, "", "/no/such/screen");

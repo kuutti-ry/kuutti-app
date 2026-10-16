@@ -68,6 +68,7 @@ The four surfaces that matter most, in order: the OIDC exchange with Telia, the 
 ## Logging and monitoring failures
 
 - [ ] Structured logs carry `account_id` and request id, never hetu, message text, email, or `seeks`.
+- [x] The tunables change only by an admin, as a new version with a reason and the admin's identity, written to the audit table before the row (`config.change`), never a rewrite of an earlier version; a value keeps its current shape, so no reader is handed a type it does not parse (#304, #305: `apps/api/src/safety/config.ts`, admin-only guard in `config-routes.ts`).
 - [x] Moderator actions, disclosure requests, and photo views by staff write to the immutable audit table. (#49: `audit_log`, append-only by the trigger of migration 0006, written before the view or the change; the table and the trigger function are owned by `kuutti_audit` after `infra/scripts/db-audit-owner.sh`, so the application role can neither rewrite rows nor disable the trigger, and the API warns at every boot until that has run; disclosure requests join in M4.)
 - [ ] A test asserts that known PII patterns do not appear in log output.
 - [x] Signed URL issuance is logged per account (photo id, variant, time). (#48: a `photo_access` row and a log line per issuance, `apps/api/src/media/photos.ts`.)
