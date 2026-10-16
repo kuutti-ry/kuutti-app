@@ -134,7 +134,13 @@ const Env = z.object({
   // people are asked to follow.
   SOURCE_URL: z.url({ protocol: /^https$/ }).default("https://github.com/kuutti-ry/kuutti-app"),
   BODY_LIMIT_BYTES: z.coerce.number().int().min(1024).default(1_048_576),
+  // Requests a minute per client address, and per person once a guard has
+  // admitted the request (ADR-026 §5); SSM rate-limit-per-minute.
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).optional(),
+  // Requests a minute per client address across the sign-in doors, the two
+  // starts, with an IPv6 client counted by its /56 (ADR-026 §4-5); SSM
+  // sign-in-rate-limit-per-minute.
+  SIGN_IN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).optional(),
   // Whose word the rate limiter takes for the client address (#52, F19,
   // lib/rate-limit.ts). Unset: the socket in development and test, Traefik on
   // a deployed box. /kuutti/<env>/trusted-proxy says cloudfront the day the
@@ -153,6 +159,12 @@ const Env = z.object({
 
 /** Previews throttle harder than staging: nothing real runs there (#9). */
 const RATE_LIMIT_DEFAULT = { preview: 30, other: 120 } as const;
+/**
+ * Production's doors are tight; elsewhere looser (ADR-026 §5): staging keys on
+ * the CloudFront edge until its ingress switch (ADR-008 History), and the
+ * demo's reset signs many personas in from one address.
+ */
+const SIGN_IN_RATE_LIMIT_DEFAULT = { production: 10, other: 60 } as const;
 
 export type AppEnv = z.infer<typeof AppEnv>;
 
@@ -164,8 +176,12 @@ export type PreviewConfig = {
   adminDatabaseUrl: string;
 };
 
-export type Config = Omit<z.infer<typeof Env>, "RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY"> & {
+export type Config = Omit<
+  z.infer<typeof Env>,
+  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY"
+> & {
   RATE_LIMIT_PER_MINUTE: number;
+  SIGN_IN_RATE_LIMIT_PER_MINUTE: number;
   TRUSTED_PROXY: TrustedProxy;
   databaseUrl: string;
   corsAllowedOrigins: ReadonlySet<string>;
@@ -233,6 +249,11 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   const rateLimit =
     env.RATE_LIMIT_PER_MINUTE ??
     (env.APP_ENV === "preview" ? RATE_LIMIT_DEFAULT.preview : RATE_LIMIT_DEFAULT.other);
+  const signInRateLimit =
+    env.SIGN_IN_RATE_LIMIT_PER_MINUTE ??
+    (env.APP_ENV === "production"
+      ? SIGN_IN_RATE_LIMIT_DEFAULT.production
+      : SIGN_IN_RATE_LIMIT_DEFAULT.other);
   // A preview reads the whole /kuutti/staging/* prefix through the shared
   // instance role; what it must never hold in memory is dropped here, so a
   // preview process cannot reach the environment's own database even by
@@ -264,6 +285,7 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   return {
     ...env,
     RATE_LIMIT_PER_MINUTE: rateLimit,
+    SIGN_IN_RATE_LIMIT_PER_MINUTE: signInRateLimit,
     TRUSTED_PROXY: trustedProxy,
     databaseUrl: preview ? withDatabase(baseUrl, preview.database) : baseUrl,
     corsAllowedOrigins: allowedOrigins(env),

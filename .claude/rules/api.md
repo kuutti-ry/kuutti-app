@@ -13,7 +13,7 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 - RPC style across the boundary is an open decision (lean: generated types via `@hono/zod-openapi`). Do not introduce `hc<typeof app>` or a hand-written client without an ADR.
 - Machine callers (the Telia redirect, SNS bounce notifications) get plain HTTP endpoints with their own validation.
 - Product routes refuse browser origins. There is no CORS except an allowlist for the admin SPA and the waitlist site.
-- Rate limits are in-process and fail closed. No Redis.
+- Rate limits are in-process fixed windows and fail closed: a request with no address shares one bucket. No Redis (TD-3). Keys (ADR-026): the client address the trusted proxy reports (ADR-008 §5), IPv6 by its /64, until a guard admits the request; then its person, the account or the staff identity, and the address gets its count back. A new guard is built with `limit: perPerson` (`app.ts`), so one person has one budget; a new route that ends a session or the account joins `ENDS_SESSION` there, outside the person's budget and kept on the address's. The sign-in doors are the two starts (`/auth/start`, `/admin/auth/start`): their own window per address, IPv6 by its /56, checked before anything is written or signed; the exchanges are not doors. A refused start, by any limit, redirects with `error=auth_rate_limited` (`refuseSignInStart`), never a JSON 429 in the system browser. `auth_request`'s ceiling evicts the oldest attempts without a code rather than refusing (ADR-026 §6). The numbers are config, `RATE_LIMIT_PER_MINUTE` and `SIGN_IN_RATE_LIMIT_PER_MINUTE` (SSM), not `matching_config`.
 
 ## Identity and auth
 
@@ -39,7 +39,7 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 ## Events and logs
 
 - `track(name, props)` server-side only, against the zod registry in `packages/schema`. Keyed by `research_id`; carries `consent_version`, pond, and the coarse snapshot. Never message text, never raw `seeks`, never email.
-- Structured logs with `account_id` and request id; never hetu, message text, or email. Errors: generic response body, detail to logs and Sentry, no empty catch.
+- Structured logs with `account_id` (on the panel's requests the staff identity, `staffIdentityId`) and request id; never hetu, message text, email, or a client address: a refusal's line names which limit refused, never its key (ADR-026 §7). Errors: generic response body, detail to logs and Sentry, no empty catch.
 
 ## Config and jobs
 

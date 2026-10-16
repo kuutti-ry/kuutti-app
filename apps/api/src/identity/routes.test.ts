@@ -1,10 +1,15 @@
+import type { Queryable } from "@kuutti/db";
 import { ErrorResponse } from "@kuutti/schema";
 import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
+import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
-import { captureLogger, test, testConfig } from "../test/harness.ts";
+import { captureLogger, test, testConfig, testPool } from "../test/harness.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
+import { AUTH_REQUEST_CAP, AUTH_REQUEST_TTL_MS } from "./codes.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
+import { type LoginDeps, startLogin } from "./login.ts";
+import * as repo from "./repo.ts";
 
 // The bank login end to end through the routes, with a broker that answers
 // what a bank would (#33). Real Postgres, one rolled-back transaction per test.
@@ -64,16 +69,17 @@ function fakeBroker(
 async function appWith(
   ctx: { client: Parameters<typeof createApp>[0]["db"] },
   hetu: string,
-  authenticatedAt?: Date,
+  options: { authenticatedAt?: Date; config?: Record<string, string> } = {},
 ) {
   const { logger, lines } = await captureLogger();
-  const broker = fakeBroker(hetu, authenticatedAt);
+  const broker = fakeBroker(hetu, options.authenticatedAt);
   const app = createApp({
     config: testConfig({
       HETU_HMAC_KEY: KEY_HEX,
       OIDC_ISSUER: "https://broker.test/uas",
       OIDC_CLIENT_ID: "kuutti-test",
       OIDC_REDIRECT_URI: "https://api.test/auth/callback",
+      ...options.config,
     }),
     logger,
     db: ctx.client,
@@ -145,7 +151,7 @@ describe("bank login", () => {
     // auth_time from before the attempt began is a reused web session, not
     // the login of this person. Nothing is created.
     const anHourAgo = new Date(Date.now() - 60 * 60_000);
-    const { app } = await appWith(ctx, ADULT_HETU, anHourAgo);
+    const { app } = await appWith(ctx, ADULT_HETU, { authenticatedAt: anHourAgo });
     const state = await start(app);
     expect(refusal(await callback(app, state))).toEqual({
       error: "auth_provider_error",
@@ -604,5 +610,470 @@ describe("the exchange", () => {
     const agent = new Map(rows.rows.map((r) => [r.id, r.user_agent]));
     expect(agent.get(long.sessionId)).toBe(`Kuutti/1 ${"x".repeat(191)}`);
     expect(agent.get(none.sessionId)).toBeNull();
+  });
+});
+
+// The sign-in doors (ADR-026 §4): one window per client address across the
+// two starts, ahead of their handlers. Each request's address is the one
+// Traefik reports (ADR-008 §5), from the documentation ranges, so no test's
+// address is anybody's.
+const TWO_A_MINUTE = { SIGN_IN_RATE_LIMIT_PER_MINUTE: "2", TRUSTED_PROXY: "traefik" };
+const HERE = "203.0.113.7";
+const THERE = "198.51.100.23";
+const ANY_ADDRESS = /203\.0\.113|198\.51\.100|2001:db8/;
+
+type Db = { client: Parameters<typeof createApp>[0]["db"] };
+
+const from = (address: string) => ({ "x-forwarded-for": address });
+
+const startFrom = (app: ReturnType<typeof createApp>, address: string, query = "platform=ios") =>
+  app.request(`/auth/start?${query}`, { headers: from(address) });
+
+const exchangeFrom = (app: ReturnType<typeof createApp>, address: string, code: string) =>
+  app.request("/auth/exchange", {
+    method: "POST",
+    headers: { ...from(address), "content-type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+
+/** Where a start sent the browser: the broker's origin, or the app's link whole. */
+const sentTo = (res: Response) => {
+  expect(res.status).toBe(302);
+  const location = res.headers.get("location") ?? "";
+  return location.startsWith("kuutti:") ? location : new URL(location).origin;
+};
+
+const attempts = async (ctx: Db) =>
+  Number(
+    (await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM auth_request")).rows[0]?.n,
+  );
+
+/** The lines a refused sign-in leaves (routes.ts, login.ts), one per refusal or eviction. */
+const refusedLines = (logs: () => Array<Record<string, unknown>>) =>
+  logs().filter((l) => l.msg === "sign-in refused");
+
+describe("the sign-in doors (ADR-026 §4)", () => {
+  test("A flood of logins from one address is refused before anything is written", async ({
+    ctx,
+  }) => {
+    const { app, broker, logs } = await appWith(ctx, ADULT_HETU, { config: TWO_A_MINUTE });
+    expect(sentTo(await startFrom(app, HERE))).toBe("https://broker.test");
+    expect(sentTo(await startFrom(app, HERE))).toBe("https://broker.test");
+    const before = await attempts(ctx);
+
+    const refused = await startFrom(app, HERE);
+    expect(sentTo(refused)).toBe("kuutti://auth?error=auth_rate_limited");
+    const wait = Number(refused.headers.get("retry-after"));
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThanOrEqual(60);
+    expect(await attempts(ctx)).toBe(before);
+    expect(broker.started).toHaveLength(2);
+
+    // Another address has a window of its own.
+    expect(sentTo(await startFrom(app, THERE))).toBe("https://broker.test");
+    expect(broker.started).toHaveLength(3);
+    // One line names the code and the limit that refused it, and no line names an address (§7).
+    expect(refusedLines(logs)).toEqual([
+      expect.objectContaining({
+        level: 40,
+        code: "auth_rate_limited",
+        detail: { limiter: "address" },
+      }),
+    ]);
+    expect(JSON.stringify(logs())).not.toMatch(ANY_ADDRESS);
+  });
+
+  test("a start the validation refuses still spends the window, and past it is sent back like any other", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU, { config: TWO_A_MINUTE });
+    expect((await startFrom(app, HERE, "platform=web")).status).toBe(400);
+    expect((await startFrom(app, HERE, "platform=ios&locale=de")).status).toBe(400);
+    expect(sentTo(await startFrom(app, HERE))).toBe("kuutti://auth?error=auth_rate_limited");
+    // The doors stand before the validation: past the window nothing is read.
+    expect(sentTo(await startFrom(app, HERE, "platform=web"))).toBe(
+      "kuutti://auth?error=auth_rate_limited",
+    );
+    expect(broker.started).toEqual([]);
+    expect(await attempts(ctx)).toBe(0);
+  });
+
+  test("an exchange is no door: past the doors' window it answers for itself, and only the address's limit refuses it", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, ADULT_HETU, {
+      config: { ...TWO_A_MINUTE, RATE_LIMIT_PER_MINUTE: "4" },
+    });
+    const unknown = "A".repeat(43);
+    for (const _ of [1, 2, 3, 4]) {
+      const res = await exchangeFrom(app, HERE, unknown);
+      expect(res.status).toBe(401);
+      expect(await errorCode(res)).toBe("auth_code_used");
+    }
+    // The address's own limit, as on any route: the contract's 429.
+    const refused = await exchangeFrom(app, HERE, unknown);
+    expect(refused.status).toBe(429);
+    expect(await errorCode(refused)).toBe("rate_limited");
+    expect(Number(refused.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(refusedLines(logs)).toEqual([]);
+    expect((await exchangeFrom(app, THERE, unknown)).status).toBe(401);
+  });
+
+  test("a whole login spends one of the window, the two starts share it, and the exchange, the callback and the refresh are not doors", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU, { config: TWO_A_MINUTE });
+    const started = await startFrom(app, HERE);
+    const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
+    const back = await app.request(`/auth/callback?code=good&state=${encodeURIComponent(state)}`, {
+      headers: from(HERE),
+    });
+    expect((await exchangeFrom(app, HERE, await codeFrom(back))).status).toBe(200);
+
+    // The staff start counts in the same window as the app's: it is the second.
+    const staffStart = await app.request("/admin/auth/start", { headers: from(HERE) });
+    expect(new URL(staffStart.headers.get("location") ?? "").origin).toBe("https://broker.test");
+    expect(sentTo(await startFrom(app, HERE))).toBe("kuutti://auth?error=auth_rate_limited");
+    const staffRefused = await app.request("/admin/auth/start", { headers: from(HERE) });
+    expect(staffRefused.status).toBe(302);
+    expect(new URL(staffRefused.headers.get("location") ?? "").hash).toBe(
+      "#error=auth_rate_limited",
+    );
+    expect(broker.started).toHaveLength(2);
+
+    // Past the window the exchanges, the callback and the refresh answer for themselves (ADR-026 §4).
+    const staffExchange = await app.request("/admin/auth/exchange", {
+      method: "POST",
+      headers: { ...from(HERE), "content-type": "application/json" },
+      body: JSON.stringify({ code: "A".repeat(43) }),
+    });
+    expect(staffExchange.status).toBe(401);
+    expect(await errorCode(staffExchange)).toBe("auth_code_used");
+    const appExchange = await exchangeFrom(app, HERE, "A".repeat(43));
+    expect(appExchange.status).toBe(401);
+    expect(await errorCode(appExchange)).toBe("auth_code_used");
+    expect(
+      refusal(await app.request("/auth/callback?code=good&state=gone", { headers: from(HERE) }))
+        .error,
+    ).toBe("auth_state_mismatch");
+    const refresh = await app.request("/auth/refresh", {
+      method: "POST",
+      headers: { ...from(HERE), "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken: "B".repeat(43) }),
+    });
+    expect(refresh.status).toBe(401);
+    expect(await errorCode(refresh)).toBe("session_revoked");
+  });
+
+  test("the doors count an IPv6 client by its /56: the 256 /64s of one share a window, and another /56 has its own", async ({
+    ctx,
+  }) => {
+    const { app, broker, logs } = await appWith(ctx, ADULT_HETU, {
+      config: { SIGN_IN_RATE_LIMIT_PER_MINUTE: "256", TRUSTED_PROXY: "traefik" },
+    });
+    // 2001:db8:4711:ab00::/56 holds the /64s 2001:db8:4711:ab00 to 2001:db8:4711:abff.
+    for (let i = 0; i < 256; i += 1) {
+      const sixtyFour = `2001:db8:4711:ab${i.toString(16).padStart(2, "0")}::1`;
+      expect(sentTo(await startFrom(app, sixtyFour))).toBe("https://broker.test");
+    }
+    expect(sentTo(await startFrom(app, "2001:db8:4711:ab42:1:2:3:4"))).toBe(
+      "kuutti://auth?error=auth_rate_limited",
+    );
+    expect(sentTo(await startFrom(app, "2001:db8:4711:ac00::1"))).toBe("https://broker.test");
+    expect(broker.started).toHaveLength(257);
+    expect(JSON.stringify(logs())).not.toMatch(ANY_ADDRESS);
+  });
+});
+
+/** The attempts' states, oldest first. */
+const states = async (ctx: Db) =>
+  (
+    await ctx.client.query<{ state: string }>("SELECT state FROM auth_request ORDER BY expires_at")
+  ).rows.map((r) => r.state);
+
+/**
+ * Attempts until the table holds `rows`, each a second younger than the one
+ * before, so that `full-1` is the oldest: open unless `expired`, and holding
+ * a code still live when `coded`.
+ */
+async function fillTo(ctx: Db, rows: number, rowsAre: { expired?: boolean; coded?: boolean } = {}) {
+  await ctx.client.query(
+    `INSERT INTO auth_request (state, nonce, platform, expires_at, code_hash, code_expires_at)
+     SELECT 'full-' || n, 'n-' || n, 'ios',
+            now() + CASE WHEN $2 THEN interval '-1 hour' ELSE interval '1 minute' END + n * interval '1 second',
+            CASE WHEN $3 THEN 'h-' || n END,
+            CASE WHEN $3 THEN now() + interval '1 minute' END
+     FROM generate_series(1, $1) AS n`,
+    [rows - (await attempts(ctx)), rowsAre.expired === true, rowsAre.coded === true],
+  );
+  expect(await attempts(ctx)).toBe(rows);
+}
+
+/** A ceiling a test fills in a moment; the routes' own is AUTH_REQUEST_CAP. */
+const SMALL_CAP = 5;
+
+/** startLogin itself, on `db`, against SMALL_CAP. */
+async function starter(db: Queryable) {
+  const { logger, lines } = await captureLogger();
+  const broker = fakeBroker(ADULT_HETU);
+  const deps: LoginDeps = {
+    db,
+    broker,
+    hmacKey: hmacKeyFromHex(KEY_HEX),
+    now: () => new Date(),
+    logger,
+    adminAppUrl: "https://admin.test",
+  };
+  return {
+    broker,
+    logs: lines,
+    start: () => startLogin(deps, { platform: "ios", locale: null }, SMALL_CAP),
+  };
+}
+
+/**
+ * The test's transaction with another request's work slipped in once, just
+ * before (or after) the first statement matching the pattern, as if a
+ * concurrent request had committed at that point (races.test.ts); `ran` says
+ * the moment came.
+ */
+function interleaved(
+  db: Queryable,
+  at: { before?: RegExp; after?: RegExp },
+  other: () => Promise<unknown>,
+) {
+  let ran = false;
+  return {
+    ran: () => ran,
+    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+      if (!ran && at.before?.test(text)) {
+        ran = true;
+        await other();
+      }
+      const result = await db.query<R>(text, values);
+      if (!ran && at.after?.test(text)) {
+        ran = true;
+        await other();
+      }
+      return result;
+    },
+  };
+}
+
+/** `db`, keeping the text of every statement run through it, in order. */
+function recording(db: Queryable) {
+  const texts: string[] = [];
+  return {
+    texts,
+    query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+      texts.push(text);
+      return db.query<R>(text, values);
+    },
+  };
+}
+
+/** The statements that count the whole table. */
+const COUNTS_THE_TABLE = /count\(\*\) FROM auth_request/;
+
+/** The statement that ends unanswered attempts and inserts the start's own (repo.ts). */
+const EVICT_AND_INSERT = /^WITH gone AS \(\s*DELETE FROM auth_request/;
+
+describe("the table's ceiling (ADR-026 §6)", () => {
+  test("At the table's cap a login makes room by ending the oldest unanswered attempts", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP);
+    const db = recording(ctx.client);
+    const { broker, logs, start } = await starter(db);
+    await start();
+    // Two go and one comes, so a table that concurrent starts left past its
+    // cap drains back under it.
+    expect(await states(ctx)).toEqual(["full-3", "full-4", "full-5", ...broker.started]);
+    // The table is counted once: the eviction and the insert are one
+    // statement on the primary key, with no count of its own.
+    expect(db.texts.filter((text) => COUNTS_THE_TABLE.test(text))).toHaveLength(1);
+    expect(db.texts.filter((text) => EVICT_AND_INSERT.test(text))).toHaveLength(1);
+    // The line a runbook counts: this start went on, the attempts it ended did not.
+    expect(refusedLines(logs)).toEqual([
+      expect.objectContaining({ level: 40, detail: { limiter: "evicted", evicted: 2 } }),
+    ]);
+    expect(refusedLines(logs)[0]).not.toHaveProperty("code");
+  });
+
+  test("an attempt that holds a code is never ended to make room, however old", async ({ ctx }) => {
+    await fillTo(ctx, SMALL_CAP);
+    // The two oldest have been to the bank: one code waits for its exchange, one was used.
+    await ctx.client.query(
+      `UPDATE auth_request SET code_hash = 'h-' || state, code_expires_at = now() + interval '1 minute',
+         code_used_at = CASE WHEN state = 'full-2' THEN now() END
+       WHERE state IN ('full-1', 'full-2')`,
+    );
+    const { broker, start } = await starter(ctx.client);
+    await start();
+    expect(broker.started).toHaveLength(1);
+    expect(await states(ctx)).toEqual(["full-1", "full-2", "full-5", ...broker.started]);
+  });
+
+  test("a table past its cap, as concurrent starts may leave it, drains back under the cap, one row a start", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP + 2);
+    const { broker, logs, start } = await starter(ctx.client);
+    const sizes: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      await start();
+      sizes.push(await attempts(ctx));
+    }
+    // At or past the cap a start ends two and adds one; under it, the counted
+    // insert adds one. The overshoot only ever shrinks.
+    expect(sizes).toEqual([SMALL_CAP + 1, SMALL_CAP, SMALL_CAP - 1, SMALL_CAP]);
+    expect(broker.started).toHaveLength(4);
+    expect(refusedLines(logs).map((line) => line.detail)).toEqual([
+      { limiter: "evicted", evicted: 2 },
+      { limiter: "evicted", evicted: 2 },
+      { limiter: "evicted", evicted: 2 },
+    ]);
+  });
+
+  test("expired attempts make room first, and one whose code is still live keeps its place", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP, { expired: true });
+    // One of them has just had its code: the person may still exchange it.
+    await ctx.client.query(
+      "UPDATE auth_request SET code_hash = 'h', code_expires_at = now() + interval '1 minute' WHERE state = 'full-1'",
+    );
+    const { broker, logs, start } = await starter(ctx.client);
+    await start();
+    const [state] = broker.started;
+    expect((await states(ctx)).sort()).toEqual(["full-1", state].sort());
+    // Nothing unanswered and open had to go.
+    expect(refusedLines(logs)).toEqual([]);
+  });
+
+  test("At the table's cap a login is refused only when every attempt holds a code", async ({
+    ctx,
+  }) => {
+    // The routes' own ceiling, every row of it a code waiting for its
+    // exchange: nobody can write one without the bank.
+    await fillTo(ctx, AUTH_REQUEST_CAP, { coded: true });
+    const { app, broker, logs } = await appWith(ctx, ADULT_HETU);
+    const refused = await app.request("/auth/start?platform=ios");
+    expect(sentTo(refused)).toBe("kuutti://auth?error=auth_rate_limited");
+    expect(refused.headers.get("retry-after")).toBe("60");
+    // A staff start goes back to the panel the same way.
+    const staff = await app.request("/admin/auth/start");
+    expect(staff.status).toBe(302);
+    expect(new URL(staff.headers.get("location") ?? "").hash).toBe("#error=auth_rate_limited");
+    expect(staff.headers.get("retry-after")).toBe("60");
+    expect(await attempts(ctx)).toBe(AUTH_REQUEST_CAP);
+    expect(broker.started).toEqual([]);
+    const cap = expect.objectContaining({
+      level: 40,
+      code: "auth_rate_limited",
+      detail: { limiter: "cap" },
+    });
+    expect(refusedLines(logs)).toEqual([cap, cap]);
+  });
+
+  test("a start at the cap while another is under way makes room of its own, and the table stays within its cap", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP - 1);
+    const other = await starter(ctx.client);
+    // The other start commits just before this one's insert counts the table.
+    const db = interleaved(ctx.client, { before: /INSERT INTO auth_request/ }, other.start);
+    const { broker, start } = await starter(db);
+    await start();
+    expect(db.ran()).toBe(true);
+    expect(other.broker.started).toHaveLength(1);
+    expect(broker.started).toHaveLength(1);
+    // The count and the insert are one statement, and so are the eviction
+    // and the insert: on one connection the table never passes its cap.
+    expect(await attempts(ctx)).toBe(SMALL_CAP - 1);
+    const left = await states(ctx);
+    expect(left).not.toContain("full-1");
+    expect(left).not.toContain("full-2");
+  });
+
+  test("a start that runs between another's decision to evict and its eviction makes room of its own, and neither is refused", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP);
+    const other = await starter(ctx.client);
+    // This start has found the table full; the other commits a start of its
+    // own, eviction and all, before this one's eviction runs.
+    const db = interleaved(ctx.client, { before: EVICT_AND_INSERT }, other.start);
+    const { broker, logs, start } = await starter(db);
+    await start();
+    expect(db.ran()).toBe(true);
+    expect(other.broker.started).toHaveLength(1);
+    expect(broker.started).toHaveLength(1);
+    // Each ended two: nothing in between can take the room an eviction makes.
+    expect((await states(ctx)).sort()).toEqual(
+      ["full-5", ...other.broker.started, ...broker.started].sort(),
+    );
+    expect(refusedLines(other.logs)).toEqual([
+      expect.objectContaining({ detail: { limiter: "evicted", evicted: 2 } }),
+    ]);
+    expect(refusedLines(logs)).toEqual([
+      expect.objectContaining({ detail: { limiter: "evicted", evicted: 2 } }),
+    ]);
+  });
+
+  test("a start whose sweep of expired attempts frees a place that another start takes first still gets in, and neither is refused", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP);
+    await ctx.client.query(
+      "UPDATE auth_request SET expires_at = now() - interval '1 hour' WHERE state = 'full-1'",
+    );
+    const other = await starter(ctx.client);
+    // The other start commits just after this one's sweep, into the place it freed.
+    const db = interleaved(
+      ctx.client,
+      { after: /DELETE FROM auth_request WHERE expires_at/ },
+      other.start,
+    );
+    const { broker, logs, start } = await starter(db);
+    await start();
+    expect(db.ran()).toBe(true);
+    expect(other.broker.started).toHaveLength(1);
+    expect(broker.started).toHaveLength(1);
+    // This start's second count found the table full again, so it ended the
+    // two oldest unanswered attempts rather than refuse.
+    expect((await states(ctx)).sort()).toEqual(
+      ["full-4", "full-5", ...other.broker.started, ...broker.started].sort(),
+    );
+    expect(refusedLines(other.logs)).toEqual([]);
+    expect(refusedLines(logs)).toEqual([
+      expect.objectContaining({ detail: { limiter: "evicted", evicted: 2 } }),
+    ]);
+  });
+
+  test("starts whose statements overlap on two connections each find room, so the table passes its cap by one a connection at most", async ({
+    ctx,
+  }) => {
+    const second = await testPool().connect();
+    try {
+      await second.query("BEGIN");
+      const cap = (await attempts(ctx)) + 1;
+      const attempt = (state: string) => ({
+        state,
+        nonce: `n-${state}`,
+        platform: "ios",
+        locale: null,
+        expiresAt: new Date(Date.now() + AUTH_REQUEST_TTL_MS),
+      });
+      // Neither sees the other's row before it commits, so both take the last place.
+      expect(await repo.insertAuthRequest(ctx.client, attempt("overlap-a"), cap)).toBe(true);
+      expect(await repo.insertAuthRequest(second, attempt("overlap-b"), cap)).toBe(true);
+      // Each connection's next start sees its own row and is refused.
+      expect(await repo.insertAuthRequest(ctx.client, attempt("overlap-c"), cap)).toBe(false);
+      expect(await repo.insertAuthRequest(second, attempt("overlap-d"), cap)).toBe(false);
+    } finally {
+      await second.query("ROLLBACK").catch(() => undefined);
+      second.release();
+    }
   });
 });

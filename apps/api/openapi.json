@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.32.0",
+    "version": "0.33.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -4248,7 +4248,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable."
+            "description": "Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable; when this address has sent too many requests or started too many sign-ins, or too many are under way at once (ADR-026), to kuutti://auth?error=auth_rate_limited with Retry-After."
           },
           "400": {
             "description": "Validation failed.",
@@ -4358,6 +4358,16 @@
           },
           "401": {
             "description": "Unknown, used or expired code (auth_code_used).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4522,7 +4532,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Redirect to the broker."
+            "description": "Redirect to the broker; when this address has sent too many requests or started too many sign-ins, or too many are under way at once (ADR-026), to the panel with error=auth_rate_limited in the fragment and Retry-After."
           },
           "400": {
             "description": "Validation failed.",
@@ -4593,6 +4603,16 @@
           },
           "403": {
             "description": "admin_not_allowed: the role was taken away meanwhile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
             "content": {
               "application/json": {
                 "schema": {

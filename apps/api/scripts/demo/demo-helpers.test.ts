@@ -178,6 +178,94 @@ describe("the walk to the bank, when the API does not answer as it should", () =
     expect((await walked).kind).toBe("session");
     expect(starts).toBe(2);
   });
+
+  // The sign-in's window sends a start back to the app as a browser is sent
+  // back, with Retry-After (ADR-026 §4), not with a 429.
+  const sentBack = (error: string, headers: Record<string, string> = {}) =>
+    new Response(null, {
+      status: 302,
+      headers: { location: `kuutti://auth?error=${error}`, ...headers },
+    });
+  const sleeper = () => {
+    const slept: number[] = [];
+    return { slept, sleep: async (ms: number) => void slept.push(ms) };
+  };
+
+  it("a start sent back for the rate waits as long as Retry-After asks and tries once more", async () => {
+    let starts = 0;
+    const api = scripted({
+      "GET /auth/start": () => {
+        starts += 1;
+        return starts === 1
+          ? sentBack("auth_rate_limited", { "retry-after": "42" })
+          : redirect(`${BANK}?state=state-1`);
+      },
+    });
+    const { slept, sleep } = sleeper();
+    expect((await loginAs(persona, { ...api.context, sleep })).kind).toBe("session");
+    expect(slept).toEqual([42_000]);
+    expect(api.calls.map((c) => c.route)).toEqual([
+      "GET /auth/start",
+      "GET /auth/start",
+      "POST /ftn/authorize",
+      "GET /auth/callback",
+      "POST /auth/exchange",
+    ]);
+  });
+
+  it("a start sent back for the rate again is said by its code, and nothing goes to a bank", async () => {
+    const api = scripted({
+      "GET /auth/start": () => sentBack("auth_rate_limited", { "retry-after": "900" }),
+    });
+    const { slept, sleep } = sleeper();
+    await expect(loginAs(persona, { ...api.context, sleep })).rejects.toThrow(
+      "/auth/start: the API refused the login with auth_rate_limited",
+    );
+    // Never longer than a window, whatever the header says; then once more, not twice.
+    expect(slept).toEqual([65_000]);
+    expect(api.calls.map((c) => c.route)).toEqual(["GET /auth/start", "GET /auth/start"]);
+  });
+
+  it.each([
+    [
+      "a refusal for the rate without Retry-After",
+      sentBack("auth_rate_limited"),
+      "auth_rate_limited",
+    ],
+    [
+      "another refusal with Retry-After",
+      sentBack("auth_unavailable", { "retry-after": "42" }),
+      "auth_unavailable",
+    ],
+  ])("%s at the start is said by its code at once, without a wait", async (_, answer, code) => {
+    const api = scripted({ "GET /auth/start": () => answer });
+    const { slept, sleep } = sleeper();
+    await expect(loginAs(persona, { ...api.context, sleep })).rejects.toThrow(
+      `/auth/start: the API refused the login with ${code}`,
+    );
+    expect(slept).toEqual([]);
+    expect(api.calls.map((c) => c.route)).toEqual(["GET /auth/start"]);
+  });
+
+  it("a redirect to the bank that carries a Retry-After is followed, not waited for", async () => {
+    const api = scripted({
+      "GET /auth/start": () =>
+        new Response(null, {
+          status: 302,
+          headers: { location: `${BANK}?state=state-1`, "retry-after": "42" },
+        }),
+    });
+    const { slept, sleep } = sleeper();
+    expect((await loginAs(persona, { ...api.context, sleep })).kind).toBe("session");
+    expect(slept).toEqual([]);
+  });
+
+  it("a deep link with no error is taken for no bank on this computer", async () => {
+    const api = scripted({ "GET /auth/start": () => redirect("kuutti://auth?state=state-1") });
+    await expect(loginAs(persona, api.context)).rejects.toThrow(
+      "the API's bank is auth, not the mock bank on this computer: nothing was sent",
+    );
+  });
 });
 
 describe("one call of the API as the persona", () => {

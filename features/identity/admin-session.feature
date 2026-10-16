@@ -44,3 +44,9 @@ Feature: Staff sessions
     Given an admin session
     When it logs out
     Then its token no longer answers
+
+  Scenario: A flood of staff logins from one address is refused before anything is written
+    Given the sign-in doors take two requests a minute from one address
+    When a third staff login starts from that address within the minute
+    Then the browser is sent to the panel with auth_rate_limited and the wait
+    And no attempt is written and the broker signs nothing

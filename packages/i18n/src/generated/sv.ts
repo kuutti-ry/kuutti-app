@@ -792,6 +792,7 @@ export const sv: Readonly<Record<string, string>> = {
   "signIn.error.auth_code_used": "Den här inloggningslänken har redan använts eller gått ut. Börja om.",
   "signIn.error.auth_cooldown": "Du raderade ditt konto nyligen. Tidigaste dagen för ett nytt konto: {date}",
   "signIn.error.auth_provider_error": "Identifieringstjänsten slutförde inte inloggningen. Försök igen om en stund.",
+  "signIn.error.auth_rate_limited": "Just nu har för många inloggningar påbörjats. Vänta en minut och försök igen.",
   "signIn.error.auth_state_mismatch": "Det här inloggningsförsöket är okänt eller har gått ut. Börja om.",
   "signIn.error.auth_suspended": "Det här kontot är tills vidare avstängt.",
   "signIn.error.auth_suspended_until": "Det här kontot är avstängt. Du kan logga in igen från och med: {date}",

@@ -65,17 +65,36 @@ export function whyNotTheLocalStore(
   return null;
 }
 
-/** The longest the walk waits for the rate limit's window, which is a minute. */
+/** The longest the walk waits for a rate limit's window: the API's and the sign-in's are a minute. */
 const RETRY_AFTER_MAX_SECONDS = 65;
 
 /**
- * One request, and once more after the wait the API asks for when it answers
- * 429: the histories are some seventy requests against a limit of 120 a
- * minute, and a second reset within the minute would otherwise stop half way.
+ * Whether the API refused for the rate: a 429, or a sign-in start sent back to
+ * the app with error=auth_rate_limited and Retry-After, as a browser is sent
+ * back (ADR-026 §4).
+ */
+function rateLimited(response: Response): boolean {
+  if (response.status === 429) return true;
+  const location = response.headers.get("location");
+  return (
+    location !== null &&
+    response.headers.has("retry-after") &&
+    new URL(location).searchParams.get("error") === "auth_rate_limited"
+  );
+}
+
+/**
+ * One request, and once more after the wait the API asks for when it refuses
+ * for the rate, whether as a 429 or as a start sent back with
+ * error=auth_rate_limited. The personas' own calls are counted per person and
+ * leave the address's count (ADR-026 §2); what a reset spends of its address
+ * is its starts, some eight of the sign-in doors' sixty a minute in
+ * development (§4, §5), so about the eighth reset within one minute would
+ * otherwise stop half way.
  */
 async function patient(context: BankContext, input: URL, init?: RequestInit): Promise<Response> {
   const first = await context.fetch(input, init);
-  if (first.status !== 429) return first;
+  if (!rateLimited(first)) return first;
   const asked = Number(first.headers.get("retry-after"));
   const seconds = Number.isFinite(asked) && asked > 0 ? asked : RETRY_AFTER_MAX_SECONDS;
   const sleep = context.sleep ?? ((ms: number) => new Promise((done) => setTimeout(done, ms)));
@@ -117,6 +136,10 @@ async function bankOf(context: BankContext, locale: Locale): Promise<URL> {
     );
   }
   const bank = locationOf(start, "/auth/start");
+  // A start the API refuses goes back to the app, as for a browser: said by
+  // its code, rather than taken for a bank somewhere else.
+  const refused = bank.protocol === "kuutti:" ? bank.searchParams.get("error") : null;
+  if (refused) throw new DemoError(`/auth/start: the API refused the login with ${refused}`);
   // The claims are artificial, and still they go to the mock bank on this
   // computer and nowhere else: an API configured for a real broker would
   // send this walk to somebody who never asked for it.

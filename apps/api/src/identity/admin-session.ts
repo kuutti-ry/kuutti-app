@@ -2,12 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { AdminSession } from "@kuutti/schema";
 import { type AdminSessionStore, hashToken } from "../lib/admin-middleware.ts";
 import { AppError } from "../lib/errors.ts";
-import {
-  AUTH_REQUEST_TTL_MS,
-  hashOneTimeCode,
-  newOneTimeCode,
-  ONE_TIME_CODE_TTL_MS,
-} from "./codes.ts";
+import { hashOneTimeCode, newOneTimeCode, ONE_TIME_CODE_TTL_MS } from "./codes.ts";
 import type { LoginDeps } from "./login.ts";
 import * as repo from "./repo.ts";
 
@@ -23,23 +18,6 @@ export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 export const ADMIN_PLATFORM = "admin";
 
 export type AdminLoginDeps = LoginDeps & { adminAppUrl: string };
-
-/** /admin/auth/start: remember state and nonce as an admin attempt, send the browser to the bank. */
-export async function startAdminLogin(
-  deps: AdminLoginDeps,
-  input: { locale: string | null },
-): Promise<URL> {
-  const state = randomBytes(24).toString("base64url");
-  const nonce = randomBytes(24).toString("base64url");
-  await repo.insertAuthRequest(deps.db, {
-    state,
-    nonce,
-    platform: ADMIN_PLATFORM,
-    locale: input.locale,
-    expiresAt: new Date(deps.now().getTime() + AUTH_REQUEST_TTL_MS),
-  });
-  return deps.broker.startLogin({ state, nonce, locale: input.locale });
-}
 
 /** Back to the panel: the code rides in the fragment, so it reaches the SPA and no log. */
 function adminReturnUrl(adminAppUrl: string, code: string): URL {
@@ -63,12 +41,17 @@ export function adminErrorUrl(adminAppUrl: string, code: string): URL {
 export async function completeAdminLogin(
   deps: AdminLoginDeps,
   input: {
-    request: { id: string };
+    request: { id: string; state: string };
     hetuHmac: string;
     reference: repo.BrokerReference;
     now: Date;
   },
 ): Promise<URL> {
+  // As the app's callback does (ADR-026 §6): an attempt a start at the ceiling
+  // ended while the bank answered writes nothing, not even the reference.
+  if (!(await repo.findAuthRequestByState(deps.db, input.request.state))) {
+    throw new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
+  }
   const identity = await repo.findIdentityByHmac(deps.db, input.hetuHmac);
   const role = identity ? await repo.findModeratorRole(deps.db, identity.id) : null;
   if (!identity || !role || identity.standing !== "ok") {
@@ -80,12 +63,17 @@ export async function completeAdminLogin(
   }
   await repo.updateBrokerReference(deps.db, identity.id, input.reference);
   const { code, hash } = newOneTimeCode();
-  await repo.attachAdminCode(deps.db, {
+  const attached = await repo.attachAdminCode(deps.db, {
     id: input.request.id,
     codeHash: hash,
     codeExpiresAt: new Date(input.now.getTime() + ONE_TIME_CODE_TTL_MS),
     identityId: identity.id,
   });
+  // A start at the ceiling ended the attempt while the bank answered (ADR-026
+  // §6): the code would exist nowhere, so the panel gets the error instead.
+  if (!attached) {
+    throw new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
+  }
   return adminReturnUrl(deps.adminAppUrl, code);
 }
 

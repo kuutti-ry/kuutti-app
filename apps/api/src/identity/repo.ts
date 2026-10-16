@@ -78,14 +78,63 @@ export type BrokerReference = {
   amr: string[];
 };
 
+type NewAuthRequest = {
+  state: string;
+  nonce: string;
+  platform: string;
+  locale: string | null;
+  expiresAt: Date;
+};
+
+/**
+ * Inserts the attempt only while the table holds fewer than `cap` rows, the
+ * count and the insert in one statement (ADR-026 §6); false when it was full.
+ * Concurrent starts can each see room, so the table may overshoot the cap by
+ * at most the connection pool's size; the starts at the ceiling take the
+ * excess back, one row each.
+ */
 export async function insertAuthRequest(
   db: Queryable,
-  input: { state: string; nonce: string; platform: string; locale: string | null; expiresAt: Date },
-): Promise<void> {
-  await db.query(
-    "INSERT INTO auth_request (state, nonce, platform, locale, expires_at) VALUES ($1, $2, $3, $4, $5)",
+  input: NewAuthRequest,
+  cap: number,
+): Promise<boolean> {
+  const result = await db.query(
+    `INSERT INTO auth_request (state, nonce, platform, locale, expires_at)
+     SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz
+     WHERE (SELECT count(*) FROM auth_request) < $6`,
+    [input.state, input.nonce, input.platform, input.locale, input.expiresAt, cap],
+  );
+  return result.rowCount === 1;
+}
+
+/**
+ * The start at the ceiling (ADR-026 §6): deletes the two oldest attempts the
+ * bank has not answered yet and inserts this one, in one statement and with
+ * no count, so no other start can take the room in between and the cost is a
+ * walk of the expiry index and two deletes by primary key. Two rather than
+ * one, so a table that concurrent starts left past the ceiling drains back
+ * under it. An attempt that holds a code is never taken: its person has been
+ * to the bank and is on the way back. Rows another start is deleting are
+ * skipped rather than waited for. Returns how many were deleted; 0 means
+ * there was no unanswered attempt to take, and nothing was inserted.
+ */
+export async function evictAndInsertAuthRequest(
+  db: Queryable,
+  input: NewAuthRequest,
+): Promise<number> {
+  const { rows } = await db.query<{ evicted: number }>(
+    `WITH gone AS (
+       DELETE FROM auth_request WHERE id = ANY(ARRAY(
+         SELECT id FROM auth_request WHERE code_hash IS NULL ORDER BY expires_at
+         LIMIT 2 FOR UPDATE SKIP LOCKED))
+       RETURNING id)
+     INSERT INTO auth_request (state, nonce, platform, locale, expires_at)
+     SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz
+     WHERE EXISTS (SELECT 1 FROM gone)
+     RETURNING (SELECT count(*) FROM gone)::int AS evicted`,
     [input.state, input.nonce, input.platform, input.locale, input.expiresAt],
   );
+  return rows[0]?.evicted ?? 0;
 }
 
 export async function findAuthRequestByState(
@@ -110,7 +159,8 @@ export async function findAuthRequestByCodeHash(
  * Publishes the one-time code for the account the callback resolved. False
  * when the account was erased between the resolution and this statement
  * (#51): no code is attached to a tombstone, and the caller resolves again,
- * which now reads the cooldown.
+ * which now reads the cooldown. False too when the attempt itself is gone,
+ * ended at the ceiling (ADR-026 §6); the caller reads it again to tell.
  */
 export async function attachCode(
   db: Queryable,
@@ -458,16 +508,21 @@ export async function findModeratorRole(
   return rows[0]?.role ?? null;
 }
 
-/** An admin login's one-time code resolves to an identity, never to an account. */
+/**
+ * An admin login's one-time code resolves to an identity, never to an
+ * account. False when the attempt is gone: a start at the ceiling ended it
+ * while the bank answered (ADR-026 §6).
+ */
 export async function attachAdminCode(
   db: Queryable,
   input: { id: string; codeHash: string; codeExpiresAt: Date; identityId: string },
-): Promise<void> {
-  await db.query(
+): Promise<boolean> {
+  const result = await db.query(
     `UPDATE auth_request SET code_hash = $2, code_expires_at = $3, identity_id = $4, outcome = 'admin'
      WHERE id = $1`,
     [input.id, input.codeHash, input.codeExpiresAt, input.identityId],
   );
+  return result.rowCount === 1;
 }
 
 export type AdminSessionRow = {

@@ -39,6 +39,8 @@ export function requireAdmin(deps: {
   /** Roles this route admits; the role check is here, never in the handler. */
   roles: readonly ModeratorRole[];
   now?: () => Date;
+  /** The person's limiter (ADR-026 §1), run once the staff identity is known and before the touch. */
+  limit?: MiddlewareHandler<AppEnv>;
 }): MiddlewareHandler<AppEnv> {
   const now = deps.now ?? (() => new Date());
   // The function's name is what the route-table test looks for, and the roles
@@ -65,8 +67,12 @@ export function requireAdmin(deps: {
     c.set("adminRole", found.currentRole);
     c.set("adminSessionId", found.sessionId);
     c.set("adminExpiresAt", found.expiresAt.toISOString());
-    await deps.store.touch(deps.db, found.sessionId, at);
-    await next();
+    // A request the limiter refuses writes nothing, not even the touch.
+    const admitted = async () => {
+      await deps.store.touch(deps.db, found.sessionId, at);
+      await next();
+    };
+    return deps.limit ? deps.limit(c, admitted) : admitted();
   };
   return Object.assign(guard, { roles: deps.roles });
 }

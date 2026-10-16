@@ -4,6 +4,16 @@ import { createHash, randomBytes } from "node:crypto";
 export const ONE_TIME_CODE_TTL_MS = 60_000;
 /** How long the person has from /auth/start to the callback. */
 export const AUTH_REQUEST_TTL_MS = 10 * 60_000;
+/**
+ * The most rows auth_request holds (ADR-026 §6): a guard for the disk, not a
+ * limit a person meets. Real use opens a couple of hundred attempts in a
+ * launch hour; fifty thousand rows are some twelve megabytes with their
+ * indexes. At the ceiling a start deletes the expired rows and then the oldest
+ * attempts the bank has not answered yet (login.ts), so a flood shortens how
+ * long an unanswered attempt lives instead of refusing everybody's start.
+ * What it bounds is the table; who fills it is the doors' window per address.
+ */
+export const AUTH_REQUEST_CAP = 50_000;
 
 /** 32 random bytes, base64url: the code goes to the app, only its hash is stored. */
 export function newOneTimeCode(): { code: string; hash: string } {

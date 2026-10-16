@@ -12,6 +12,8 @@ export type AppEnv = {
     locale: Locale;
     t: TFunction;
     accountId?: string;
+    /** The person's limiter counted this request (ADR-026 §2): only then does the address give its count back. */
+    personCounted?: boolean;
     sessionId?: string;
     /** After the admin guard (#49): the member of staff, by identity, and their current role. */
     adminIdentityId?: string;

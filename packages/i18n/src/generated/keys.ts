@@ -282,6 +282,7 @@ export type MessageParams = {
   "admin.session.role": { "role": string };
   "admin.signIn.button": Record<never, never>;
   "admin.signIn.error.admin_not_allowed": Record<never, never>;
+  "admin.signIn.error.auth_rate_limited": Record<never, never>;
   "admin.signIn.error.generic": Record<never, never>;
   "admin.signIn.error.no_api": Record<never, never>;
   "admin.signIn.error.session_ended": Record<never, never>;
@@ -1040,6 +1041,7 @@ export type MessageParams = {
   "signIn.error.auth_code_used": Record<never, never>;
   "signIn.error.auth_cooldown": { "date": string };
   "signIn.error.auth_provider_error": Record<never, never>;
+  "signIn.error.auth_rate_limited": Record<never, never>;
   "signIn.error.auth_state_mismatch": Record<never, never>;
   "signIn.error.auth_suspended": Record<never, never>;
   "signIn.error.auth_suspended_until": { "date": string };

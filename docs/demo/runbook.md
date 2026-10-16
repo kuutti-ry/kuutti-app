@@ -38,7 +38,7 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 | the camera roll | the five pictures are there | the same |
 | the clock | the gate was counted after the population was written (the reset and the population both count); the nightly count runs at 04:00 Helsinki | the same |
 
-Anything wrong: run the reset again (locally two seconds; on staging under a minute), then the population. A second reset within a minute waits for the rate limit. A reset that refused after "personas forgotten" (a missing cache, say) has erased the personas and told nobody: fix the cause and run it again, and it tells the stories from nothing.
+Anything wrong: run the reset again (locally two seconds; on staging under a minute), then the population. Locally, resets in quick succession wait for the sign-in window, up to a minute: a reset spends some eight of the sixty sign-in starts a minute development allows (ADR-026), so about the eighth in one minute waits; on staging the reset calls no route and waits for nothing. A reset that refused after "personas forgotten" (a missing cache, say) has erased the personas and told nobody: fix the cause and run it again, and it tells the stories from nothing.
 
 ## After the demo
 

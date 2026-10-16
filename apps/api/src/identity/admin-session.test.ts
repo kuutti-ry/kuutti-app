@@ -25,10 +25,14 @@ function rngFrom(seed: number) {
 }
 const STAFF_HETU = generateHetu(rngFrom(11), { at: NOW, minAge: 30, maxAge: 50 });
 
-function fakeBroker(hetu: string): IdentityBroker {
+/** Answers like a broker whose person is `hetu`; records the logins it was asked to start. */
+function fakeBroker(hetu: string): IdentityBroker & { started: string[] } {
+  const started: string[] = [];
   return {
     issuer: "https://broker.test/uas",
+    started,
     async startLogin(input) {
+      started.push(input.state);
       const url = new URL("https://broker.test/uas/oauth2/authorization");
       url.searchParams.set("state", input.state);
       return url;
@@ -47,8 +51,9 @@ function fakeBroker(hetu: string): IdentityBroker {
   };
 }
 
-async function appWith(ctx: TestContext, hetu = STAFF_HETU) {
+async function appWith(ctx: TestContext, hetu = STAFF_HETU, config: Record<string, string> = {}) {
   const { logger, lines } = await captureLogger();
+  const broker = fakeBroker(hetu);
   const app = createApp({
     config: testConfig({
       HETU_HMAC_KEY: KEY_HEX,
@@ -56,12 +61,13 @@ async function appWith(ctx: TestContext, hetu = STAFF_HETU) {
       OIDC_CLIENT_ID: "kuutti-test",
       OIDC_REDIRECT_URI: "https://api.test/auth/callback",
       ADMIN_APP_URL: ADMIN_URL,
+      ...config,
     }),
     logger,
     db: ctx.client,
-    broker: fakeBroker(hetu),
+    broker,
   });
-  return { app, logs: lines };
+  return { app, broker, logs: lines };
 }
 
 /** The identity row of the staff hetu, with a role. */
@@ -475,5 +481,74 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     expect(rows).toEqual([{ id: member.sessionId }]);
     // Kept, it still opens nothing.
     expect((await app.request("/admin/whoami", { headers: member.headers })).status).toBe(401);
+  });
+});
+
+// The sign-in doors for the panel (ADR-026 §4): a refused staff start goes
+// back to the panel, never to a JSON page; the table's ceiling refuses it the
+// same way (routes.test.ts). The addresses are from the documentation ranges,
+// as Traefik reports them.
+describe("staff sign-in under the doors' window", () => {
+  const TWO_A_MINUTE = { SIGN_IN_RATE_LIMIT_PER_MINUTE: "2", TRUSTED_PROXY: "traefik" };
+  const HERE = { "x-forwarded-for": "203.0.113.7" };
+  const REFUSED = `${ADMIN_URL}/#error=auth_rate_limited`;
+  const attempts = async (ctx: TestContext) =>
+    Number(
+      (await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM auth_request")).rows[0]?.n,
+    );
+  const refusedLines = (logs: () => Array<Record<string, unknown>>) =>
+    logs().filter((l) => l.msg === "sign-in refused");
+
+  test("A flood of staff logins from one address is refused before anything is written", async ({
+    ctx,
+  }) => {
+    const { app, broker, logs } = await appWith(ctx, STAFF_HETU, TWO_A_MINUTE);
+    const startHere = () => app.request("/admin/auth/start?locale=fi", { headers: HERE });
+    for (const _ of [1, 2]) {
+      const res = await startHere();
+      expect(res.status).toBe(302);
+      expect(new URL(res.headers.get("location") ?? "").origin).toBe("https://broker.test");
+    }
+    const before = await attempts(ctx);
+
+    const refused = await startHere();
+    expect(refused.status).toBe(302);
+    expect(refused.headers.get("location")).toBe(REFUSED);
+    const wait = Number(refused.headers.get("retry-after"));
+    expect(wait).toBeGreaterThan(0);
+    expect(wait).toBeLessThanOrEqual(60);
+    expect(await attempts(ctx)).toBe(before);
+    expect(broker.started).toHaveLength(2);
+    expect(refusedLines(logs)).toEqual([
+      expect.objectContaining({
+        level: 40,
+        code: "auth_rate_limited",
+        detail: { limiter: "address" },
+      }),
+    ]);
+    expect(JSON.stringify(logs())).not.toContain("203.0.113");
+  });
+
+  test("a staff exchange is no door: past the doors' window it answers for itself", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, STAFF_HETU, TWO_A_MINUTE);
+    const exchangeHere = () =>
+      app.request("/admin/auth/exchange", {
+        method: "POST",
+        headers: { ...HERE, "content-type": "application/json" },
+        body: JSON.stringify({ code: "A".repeat(43) }),
+      });
+    // Two starts spend the window; the exchanges after them are answered all the same.
+    for (const _ of [1, 2]) {
+      const res = await app.request("/admin/auth/start", { headers: HERE });
+      expect(new URL(res.headers.get("location") ?? "").origin).toBe("https://broker.test");
+    }
+    for (const _ of [1, 2, 3]) {
+      const res = await exchangeHere();
+      expect(res.status).toBe(401);
+      expect(await errorCode(res)).toBe("auth_code_used");
+    }
+    expect(refusedLines(logs)).toEqual([]);
   });
 });

@@ -1,10 +1,13 @@
 /**
  * check-schema-words: the database never gets a column for what the project
  * promised not to store (rules 1 and 3, TD-1, TD-14): the personal identity
- * code, legal sex, a full date of birth, a name from the bank.
+ * code, legal sex, a full date of birth, a name from the bank, a client's
+ * network address (ADR-026 §7).
  *
  * Scans the committed migrations and the Drizzle schema for forbidden
- * identifiers as whole words. Exit 1 with every hit.
+ * identifiers as whole words, and for the address words also as a segment of
+ * a snake_case name (ip_hash, last_ip, client_ip_hash), never as letters
+ * inside a word (zip, tip, relationship). Exit 1 with every hit.
  *
  * Usage: node scripts/check-schema-words.ts
  */
@@ -33,6 +36,21 @@ const FORBIDDEN = [
   "last_name",
   "legal_name",
 ];
+// The limiter keys on the address in memory only (ADR-026 §7). A segment is
+// enough: ip covers ip_address, last_ip and client_ip_hash alike.
+const ADDRESS_WORDS = [
+  "ip",
+  "ipaddress",
+  "ipv4",
+  "ipv6",
+  "inet",
+  "cidr",
+  "client_address",
+  "remote_address",
+  "remote_addr",
+  "viewer_address",
+  "forwarded_for",
+];
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];
@@ -49,20 +67,23 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const pattern = new RegExp(`(?<![A-Za-z0-9_])(${FORBIDDEN.join("|")})(?![A-Za-z0-9_])`, "gi");
+// A whole identifier: no letter, digit or underscore on either side.
+const whole = new RegExp(`(?<![A-Za-z0-9_])(${FORBIDDEN.join("|")})(?![A-Za-z0-9_])`, "gi");
+// A snake_case segment: an underscore may stand on either side.
+const segment = new RegExp(`(?<![A-Za-z0-9])(${ADDRESS_WORDS.join("|")})(?![A-Za-z0-9])`, "gi");
 const hits: string[] = [];
 for (const file of SCAN.flatMap((d) => walk(join(ROOT, d)))) {
   const lines = readFileSync(file, "utf8").split(/\r?\n/);
   lines.forEach((line, i) => {
     if (line.trimStart().startsWith("//") || line.trimStart().startsWith("*")) return;
-    for (const m of line.matchAll(pattern)) {
+    for (const m of [...line.matchAll(whole), ...line.matchAll(segment)]) {
       hits.push(`${relative(ROOT, file)}:${i + 1}: "${m[1]}" in: ${line.trim()}`);
     }
   });
 }
 
 if (hits.length > 0) {
-  console.error("✖ forbidden identifiers in the database schema (rules 1 and 3):");
+  console.error("✖ forbidden identifiers in the database schema (rules 1 and 3, ADR-026 §7):");
   for (const h of hits) console.error(`  ${h}`);
   process.exitCode = 1;
 } else {

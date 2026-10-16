@@ -36,6 +36,8 @@ export function requireSession(deps: {
   db: Queryable;
   store: SessionStore;
   now?: () => Date;
+  /** The person's limiter (ADR-026 §1), run once the account is known and before the touch. */
+  limit?: MiddlewareHandler<AppEnv>;
 }): MiddlewareHandler<AppEnv> {
   const now = deps.now ?? (() => new Date());
   // The function's name is what the route-table test looks for.
@@ -60,8 +62,12 @@ export function requireSession(deps: {
     }
     c.set("accountId", found.accountId);
     c.set("sessionId", found.sessionId);
-    await deps.store.touch(deps.db, found.sessionId, at);
-    await next();
+    // A request the limiter refuses writes nothing, not even the touch.
+    const admitted = async () => {
+      await deps.store.touch(deps.db, found.sessionId, at);
+      await next();
+    };
+    return deps.limit ? deps.limit(c, admitted) : admitted();
   };
 }
 

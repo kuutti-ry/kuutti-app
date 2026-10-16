@@ -70,3 +70,20 @@ Feature: Bank login through the identification broker
     Given a pull-request preview, which never has a broker
     When the app asks for a login
     Then the browser is sent to the app with auth_unavailable
+
+  Scenario: A flood of logins from one address is refused before anything is written
+    Given the sign-in doors take two requests a minute from one address
+    When a third login starts from that address within the minute
+    Then the browser is sent to the app with auth_rate_limited and the wait
+    And no attempt is written and the broker signs nothing
+    And a login from another address still reaches the broker
+
+  Scenario: At the table's cap a login makes room by ending the oldest unanswered attempts
+    Given the table holds as many open login attempts as its cap, none answered by the bank
+    When a login starts
+    Then the two oldest attempts are gone, the table is one under its cap and the login reaches the broker
+
+  Scenario: At the table's cap a login is refused only when every attempt holds a code
+    Given the table holds as many login attempts as its cap, each with a code awaiting its exchange
+    When a login starts
+    Then the browser is sent to the app with auth_rate_limited and the wait, and nothing is written

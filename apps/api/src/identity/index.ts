@@ -28,7 +28,8 @@ export { onboardingRoutes } from "./onboarding-routes.ts";
 export { decideRegistration, REREGISTER_COOLDOWN_DAYS } from "./registration.ts";
 // Read-only: what the callback would find for a hash (the demo's tests ask so).
 export { findIdentityByHmac, findLiveAccount } from "./repo.ts";
-export { authRoutes } from "./routes.ts";
+// The app-wide address limit refuses a start the way the doors do (ADR-026 §4).
+export { authRoutes, isSignInStart, refuseSignInStart } from "./routes.ts";
 export { sessionStore } from "./session-store.ts";
 export { sweepSessions } from "./sessions.ts";
 // A person's page in the panel (#306): the account and the identity's standing, for staff.

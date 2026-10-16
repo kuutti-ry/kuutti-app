@@ -11,6 +11,7 @@ import { deriveArtificialIdentity, registerArtificial } from "./artificial.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
 import { eraseAccount } from "./erasure.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
+import { startLogin } from "./login.ts";
 import { CURRENT_CONSENT_VERSIONS } from "./onboarding.ts";
 
 // What the slice answers when another request commits in the middle of one
@@ -63,7 +64,8 @@ function rngFrom(seed: number) {
 const HETU = generateHetu(rngFrom(23), { at: NOW, minAge: 30, maxAge: 45 });
 const HMAC = deriveIdentity(HETU, hmacKeyFromHex(KEY_HEX), NOW).hetuHmac;
 
-function broker(): IdentityBroker {
+/** The bank's answer for HETU; `whileAnswering` runs while the token call is in flight. */
+function broker(whileAnswering?: () => Promise<unknown>): IdentityBroker {
   return {
     issuer: "https://broker.test/uas",
     async startLogin(input) {
@@ -72,6 +74,7 @@ function broker(): IdentityBroker {
       return url;
     },
     async completeLogin(): Promise<BrokerIdentity> {
+      await whileAnswering?.();
       return {
         hetu: HETU,
         subject: "THIS-DEVICE",
@@ -85,10 +88,18 @@ function broker(): IdentityBroker {
   };
 }
 
-async function appOn(db: Queryable, options: { bank?: boolean } = {}) {
+async function appOn(
+  db: Queryable,
+  options: { bank?: boolean; whileTheBankAnswers?: () => Promise<unknown> } = {},
+) {
   const { logger, lines } = await captureLogger();
   const config = options.bank ? testConfig({ HETU_HMAC_KEY: KEY_HEX }) : testConfig();
-  const app = createApp({ config, logger, db, ...(options.bank ? { broker: broker() } : {}) });
+  const app = createApp({
+    config,
+    logger,
+    db,
+    ...(options.bank ? { broker: broker(options.whileTheBankAnswers) } : {}),
+  });
   return { app, logs: lines };
 }
 
@@ -462,6 +473,177 @@ describe("a bank login racing another request", () => {
     );
     expect(Number(sessions.rows[0]?.n)).toBe(0);
     expect((await accountRow(ctx, accountId))?.state).toBe("deleted");
+  });
+
+  /**
+   * Somebody else's start at the ceiling (ADR-026 §6), committed: the table is
+   * full, so it ends the oldest attempts the bank has not answered, this
+   * login's among them, and takes the room.
+   */
+  async function startAtTheCeiling(ctx: TestContext) {
+    const { logger } = await captureLogger();
+    const { rows } = await ctx.client.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM auth_request",
+    );
+    const deps = {
+      db: ctx.client,
+      broker: broker(),
+      hmacKey: hmacKeyFromHex(KEY_HEX),
+      now: () => new Date(),
+      logger,
+      adminAppUrl: "http://localhost:5173",
+    };
+    await startLogin(deps, { platform: "ios", locale: null }, rows[0]?.n ?? 0);
+  }
+
+  /** Where the callback sent the browser, after checking it is no 500. */
+  async function callbackTo(app: ReturnType<typeof createApp>, state: string) {
+    const back = await app.request(`/auth/callback?code=ok&state=${encodeURIComponent(state)}`);
+    expect(back.status).toBe(302);
+    return new URL(back.headers.get("location") ?? "");
+  }
+
+  const attemptRows = async (ctx: TestContext, state: string) =>
+    (await ctx.client.query("SELECT 1 FROM auth_request WHERE state = $1", [state])).rows.length;
+
+  /** Error lines: a 500 leaves one, a refusal does not. */
+  const errorLines = (logs: () => Array<{ level?: number }>) =>
+    logs().filter((line) => (line.level ?? 0) >= 50);
+
+  test("an attempt ended at the ceiling while the bank answers sends a first login back with auth_state_mismatch, and nothing is created", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appOn(ctx.client, {
+      bank: true,
+      whileTheBankAnswers: () => startAtTheCeiling(ctx),
+    });
+    const state = await start(app);
+    const back = await callbackTo(app, state);
+    expect(back.protocol).toBe("kuutti:");
+    expect(back.searchParams.get("error")).toBe("auth_state_mismatch");
+    expect(back.searchParams.get("code")).toBeNull();
+    expect(await attemptRows(ctx, state)).toBe(0);
+    // No identity and no account for a login whose attempt is gone: the
+    // person's next login is their first.
+    const { rows } = await ctx.client.query("SELECT 1 FROM identity WHERE hetu_hmac = $1", [HMAC]);
+    expect(rows).toEqual([]);
+    expect(logs().filter((line) => line.msg === "bank login")).toEqual([]);
+    expect(errorLines(logs)).toEqual([]);
+  });
+
+  test("an attempt ended at the ceiling while the bank answers leaves a paused account paused", async ({
+    ctx,
+  }) => {
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [HMAC],
+    );
+    const identityId = identity.rows[0]?.id ?? "";
+    const account = await ctx.client.query<{ id: string }>(
+      `INSERT INTO account (identity_id, state, paused_from, birth_year, birth_month)
+       VALUES ($1, 'paused', 'active', 1985, 3) RETURNING id`,
+      [identityId],
+    );
+    const accountId = account.rows[0]?.id ?? "";
+    const { app, logs } = await appOn(ctx.client, {
+      bank: true,
+      whileTheBankAnswers: () => startAtTheCeiling(ctx),
+    });
+    const back = await callbackTo(app, await start(app));
+    expect(back.searchParams.get("error")).toBe("auth_state_mismatch");
+    // The break goes on, and the identity keeps no reference of this login.
+    expect((await accountRow(ctx, accountId))?.state).toBe("paused");
+    const { rows } = await ctx.client.query<{ subject: string | null }>(
+      "SELECT broker_subject AS subject FROM identity WHERE id = $1",
+      [identityId],
+    );
+    expect(rows).toEqual([{ subject: null }]);
+    expect(logs().filter((line) => line.msg === "account resumed")).toEqual([]);
+    expect(errorLines(logs)).toEqual([]);
+  });
+
+  test("an attempt ended at the ceiling between the account's resolution and its code sends the browser back with auth_state_mismatch, not a 500", async ({
+    ctx,
+  }) => {
+    const db = interleaved(
+      ctx.client,
+      { before: /SET code_hash = \$2, code_expires_at = \$3, account_id = \$4/ },
+      () => startAtTheCeiling(ctx),
+    );
+    const { app, logs } = await appOn(db, { bank: true });
+    const state = await start(app);
+    const back = await callbackTo(app, state);
+    expect(db.ran()).toBe(true);
+    expect(back.protocol).toBe("kuutti:");
+    expect(back.searchParams.get("error")).toBe("auth_state_mismatch");
+    expect(await attemptRows(ctx, state)).toBe(0);
+    // No code was published, for this login or anyone.
+    const coded = await ctx.client.query(
+      "SELECT 1 FROM auth_request WHERE code_hash IS NOT NULL OR account_id IS NOT NULL",
+    );
+    expect(coded.rows).toEqual([]);
+    expect(logs().filter((line) => line.msg === "bank login")).toEqual([]);
+    expect(errorLines(logs)).toEqual([]);
+  });
+
+  test("a staff attempt ended at the ceiling while the bank answers lands on the panel with auth_state_mismatch and writes nothing", async ({
+    ctx,
+  }) => {
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [HMAC],
+    );
+    const identityId = identity.rows[0]?.id ?? "";
+    const { app, logs } = await appOn(ctx.client, {
+      bank: true,
+      whileTheBankAnswers: () => startAtTheCeiling(ctx),
+    });
+    const started = await app.request("/admin/auth/start");
+    const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
+    const back = await callbackTo(app, state);
+    // The same answer with or without a role: the attempt is gone, which is all it says.
+    expect(back.origin).toBe("http://localhost:5173");
+    expect(back.hash).toBe("#error=auth_state_mismatch");
+    const { rows } = await ctx.client.query<{ subject: string | null }>(
+      "SELECT broker_subject AS subject FROM identity WHERE id = $1",
+      [identityId],
+    );
+    expect(rows).toEqual([{ subject: null }]);
+    expect(errorLines(logs)).toEqual([]);
+  });
+
+  test("a staff attempt ended at the ceiling between the role check and its code lands on the panel with auth_state_mismatch", async ({
+    ctx,
+  }) => {
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [HMAC],
+    );
+    const identityId = identity.rows[0]?.id ?? "";
+    await ctx.client.query(
+      "INSERT INTO moderator_roles (identity_id, role, granted_by) VALUES ($1, 'moderator', 'test')",
+      [identityId],
+    );
+    const db = interleaved(
+      ctx.client,
+      { before: /SET code_hash = \$2, code_expires_at = \$3, identity_id = \$4/ },
+      () => startAtTheCeiling(ctx),
+    );
+    const { app, logs } = await appOn(db, { bank: true });
+    const started = await app.request("/admin/auth/start");
+    expect(started.status).toBe(302);
+    const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
+    const back = await callbackTo(app, state);
+    expect(db.ran()).toBe(true);
+    // The panel's own error, not a code the exchange would refuse as used.
+    expect(back.origin).toBe("http://localhost:5173");
+    expect(back.hash).toBe("#error=auth_state_mismatch");
+    expect(await attemptRows(ctx, state)).toBe(0);
+    const coded = await ctx.client.query("SELECT 1 FROM auth_request WHERE identity_id = $1", [
+      identityId,
+    ]);
+    expect(coded.rows).toEqual([]);
+    expect(errorLines(logs)).toEqual([]);
   });
 });
 

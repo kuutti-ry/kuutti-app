@@ -75,7 +75,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable. */
+                /** @description Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable; when this address has sent too many requests or started too many sign-ins, or too many are under way at once (ADR-026), to kuutti://auth?error=auth_rate_limited with Retry-After. */
                 302: {
                     headers: {
                         [name: string]: unknown;
@@ -198,6 +198,15 @@ export interface paths {
                 };
                 /** @description Unknown, used or expired code (auth_code_used). */
                 401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -431,7 +440,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Redirect to the broker. */
+                /** @description Redirect to the broker; when this address has sent too many requests or started too many sign-ins, or too many are under way at once (ADR-026), to the panel with error=auth_rate_limited in the fragment and Retry-After. */
                 302: {
                     headers: {
                         [name: string]: unknown;
@@ -521,6 +530,15 @@ export interface paths {
                 };
                 /** @description admin_not_allowed: the role was taken away meanwhile. */
                 403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
