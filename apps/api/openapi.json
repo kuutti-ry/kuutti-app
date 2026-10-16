@@ -3469,6 +3469,7 @@
           },
           "registeredAt": {
             "type": "string",
+            "nullable": true,
             "format": "date-time"
           },
           "deletedAt": {
@@ -3478,10 +3479,12 @@
           },
           "standing": {
             "type": "string",
+            "nullable": true,
             "enum": [
               "ok",
               "suspended",
-              "banned"
+              "banned",
+              null
             ]
           },
           "standingChangedAt": {
@@ -3585,7 +3588,7 @@
             "items": {
               "$ref": "#/components/schemas/AdminAuditRow"
             },
-            "maxItems": 100
+            "maxItems": 50
           }
         },
         "required": [
@@ -6846,7 +6849,7 @@
     "/admin/accounts/{id}": {
       "get": {
         "summary": "A person's page",
-        "description": "One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion and standing. Every look is an audit row.",
+        "description": "One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion date and nothing else. Every look is an audit row.",
         "security": [
           {
             "session": []

@@ -115,9 +115,10 @@ export const AdminAccount = z
       "deleted",
     ]),
     stateChangedAt: z.iso.datetime().nullable(),
-    registeredAt: z.iso.datetime(),
+    /** Null for an erased account, as every field but id, state and deletedAt (#306). */
+    registeredAt: z.iso.datetime().nullable(),
     deletedAt: z.iso.datetime().nullable(),
-    standing: z.enum(["ok", "suspended", "banned"]),
+    standing: z.enum(["ok", "suspended", "banned"]).nullable(),
     standingChangedAt: z.iso.datetime().nullable(),
     suspensionEndsAt: z.iso.datetime().nullable(),
     age: z.int().min(0).max(130).nullable(),
@@ -145,7 +146,7 @@ export const AdminAccount = z
         }),
       )
       .max(100),
-    audit: z.array(AdminAuditRow).max(100),
+    audit: z.array(AdminAuditRow).max(50),
   })
   .meta({ id: "AdminAccount" });
 export type AdminAccount = z.infer<typeof AdminAccount>;

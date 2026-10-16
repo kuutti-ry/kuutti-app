@@ -3211,7 +3211,7 @@ export interface paths {
         };
         /**
          * A person's page
-         * @description One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion and standing. Every look is an audit row.
+         * @description One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion date and nothing else. Every look is an audit row.
          */
         get: {
             parameters: {
@@ -4542,11 +4542,11 @@ export interface components {
             /** Format: date-time */
             stateChangedAt: string | null;
             /** Format: date-time */
-            registeredAt: string;
+            registeredAt: string | null;
             /** Format: date-time */
             deletedAt: string | null;
-            /** @enum {string} */
-            standing: "ok" | "suspended" | "banned";
+            /** @enum {string|null} */
+            standing: "ok" | "suspended" | "banned" | null;
             /** Format: date-time */
             standingChangedAt: string | null;
             /** Format: date-time */

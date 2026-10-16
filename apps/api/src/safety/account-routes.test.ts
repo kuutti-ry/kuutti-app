@@ -514,7 +514,7 @@ describe("GET /admin/accounts/{id}", () => {
     });
   });
 
-  test("lists the newest hundred audit rows, the newest first, account and photo rows together", async ({
+  test("lists the newest fifty audit rows, the newest first, account and photo rows together", async ({
     ctx,
     api,
   }) => {
@@ -525,9 +525,9 @@ describe("GET /admin/accounts/{id}", () => {
       position: 0,
       createdAt: at(-DAY),
     });
-    // A hundred rows a minute apart in 2020, alternating the account and its
+    // Fifty rows a minute apart in 2020, alternating the account and its
     // photo; this open's account.view is now(), newer than all of them, so
-    // the oldest seeded row is the one past the hundred.
+    // the oldest seeded row is the one past the fifty: one page of #309's.
     const start = new Date("2020-01-01T00:00:00Z");
     await ctx.client.query(
       `INSERT INTO audit_log (at, actor_identity_id, action, subject_type, subject_id)
@@ -535,17 +535,17 @@ describe("GET /admin/accounts/{id}", () => {
          CASE WHEN g % 2 = 0 THEN 'sanction.review' ELSE 'photo.view' END,
          CASE WHEN g % 2 = 0 THEN 'account' ELSE 'photo' END,
          CASE WHEN g % 2 = 0 THEN $3::uuid ELSE $4::uuid END
-       FROM generate_series(0, 99) AS g`,
+       FROM generate_series(0, 49) AS g`,
       [start, moderator.identityId, person.accountId, photo.id],
     );
     const { audit } = await pageOf(await open(api, moderator.headers, person.accountId));
-    expect(audit).toHaveLength(100);
+    expect(audit).toHaveLength(50);
     expect(audit[0]).toMatchObject({
       action: "account.view",
       actorIdentityId: moderator.identityId,
       at: await txNow(ctx),
     });
-    const seeded = Array.from({ length: 99 }, (_, i) => 99 - i).map((g) => ({
+    const seeded = Array.from({ length: 49 }, (_, i) => 49 - i).map((g) => ({
       at: new Date(start.getTime() + g * 60_000).toISOString(),
       actorIdentityId: moderator.identityId,
       action: g % 2 === 0 ? "sanction.review" : "photo.view",
@@ -716,7 +716,7 @@ describe("GET /admin/accounts/{id}", () => {
     });
   });
 
-  test("a tombstone answers its deletion and standing, with every section empty", async ({
+  test("a tombstone answers its deletion date and nothing else, though its identity is suspended", async ({
     ctx,
     api,
   }) => {
@@ -741,13 +741,15 @@ describe("GET /admin/accounts/{id}", () => {
     expect(page).toEqual({
       id: person.accountId,
       state: "deleted",
-      stateChangedAt: T.toISOString(),
-      registeredAt: REGISTERED,
+      stateChangedAt: null,
+      registeredAt: null,
       deletedAt: T.toISOString(),
-      // The open suspension outlives the erasure and binds the identity (ADR-024 §8).
-      standing: "suspended",
-      standingChangedAt: iso(-HOUR),
-      suspensionEndsAt: SUSPENSION_ENDS,
+      // The open suspension outlives the erasure and binds the identity
+      // (ADR-024 §8), but the tombstone's page does not say so: the standing
+      // would tie it to the person's next account (#306).
+      standing: null,
+      standingChangedAt: null,
+      suspensionEndsAt: null,
       age: null,
       gender: null,
       pond: null,

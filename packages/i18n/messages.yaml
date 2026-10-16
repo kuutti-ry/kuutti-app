@@ -5352,6 +5352,10 @@ admin.account.showPhoto:
   en: "Show the photo"
   description: "Admin panel, a person's page, the button that fetches one photo; the fetch is an audit row (#306)."
 
+admin.account.image:
+  en: "Photo: {state}. Uploaded: {time}"
+  description: "Admin panel, a person's page, the alt text of a photo a moderator asked to see: its state and upload time (#306)."
+
 admin.account.photoFailed:
   en: "The photo could not be shown."
   description: "Admin panel, a person's page, a photo's signed URL was refused or failed (#306)."
@@ -5385,7 +5389,7 @@ admin.account.auditTitle:
   description: "Admin panel, a person's page, the heading of the audit rows about the person and their photos (#306)."
 
 admin.account.auditCaption:
-  en: "Newest first, at most a hundred"
+  en: "Newest first, at most fifty"
   description: "Admin panel, a person's page, the audit table's caption (#306)."
 
 admin.account.col.when:

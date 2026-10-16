@@ -80,6 +80,7 @@ export type MessageParams = {
   "admin.account.gender": Record<never, never>;
   "admin.account.handled": { "time": string };
   "admin.account.id": Record<never, never>;
+  "admin.account.image": { "state": string; "time": string };
   "admin.account.lifted": { "time": string };
   "admin.account.loading": Record<never, never>;
   "admin.account.lookupExplain": Record<never, never>;

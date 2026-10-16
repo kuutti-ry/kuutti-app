@@ -164,3 +164,19 @@ h2:focus:not(:focus-visible) {
   margin: 0;
   overflow-wrap: anywhere;
 }
+/* The audit rows: the table scrolls on its own on a narrow screen, and its detail wraps. */
+.person table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.person th,
+.person td {
+  text-align: start;
+  padding: 0.25rem 0.75rem 0.25rem 0;
+  vertical-align: top;
+}
+.person td code {
+  overflow-wrap: anywhere;
+}

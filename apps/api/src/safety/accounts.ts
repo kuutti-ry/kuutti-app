@@ -14,7 +14,11 @@ import { listFeedbackOfAccount } from "./feedback.ts";
 
 const iso = (at: Date | null) => (at ? at.toISOString() : null);
 
-/** What staff did or saw about the person or one of their photos, newest first, at most a hundred. */
+/**
+ * What staff did or saw about the person or one of their photos, newest
+ * first, one page of the audit log at most (#309): the rest is the audit
+ * viewer's, filtered by the subject.
+ */
 async function auditAbout(db: Queryable, accountId: string): Promise<AdminAuditRow[]> {
   const { rows } = await db.query<{
     at: Date;
@@ -27,7 +31,7 @@ async function auditAbout(db: Queryable, accountId: string): Promise<AdminAuditR
     `SELECT at, actor_identity_id, action, subject_type, subject_id, detail FROM audit_log
      WHERE (subject_type = 'account' AND subject_id = $1)
         OR (subject_type = 'photo' AND subject_id IN (SELECT id FROM photo WHERE account_id = $1))
-     ORDER BY at DESC, id DESC LIMIT 100`,
+     ORDER BY at DESC, id DESC LIMIT 50`,
     [accountId],
   );
   return rows.map((r) => ({
@@ -40,10 +44,27 @@ async function auditAbout(db: Queryable, accountId: string): Promise<AdminAuditR
   }));
 }
 
+type Sections = Pick<
+  AdminAccount,
+  "age" | "gender" | "pond" | "profile" | "photos" | "feedback" | "audit"
+>;
+
+/** Every section empty: an erased account's page, and the base of every other. */
+const empty = (): Sections => ({
+  age: null,
+  gender: null,
+  pond: null,
+  profile: null,
+  photos: [],
+  feedback: [],
+  audit: [],
+});
+
 /**
  * The page (#306); null for an unknown account. An erased account answers
- * its deletion and its identity's standing, nothing else (ADR-007's
- * tombstone holds nothing more to show).
+ * its deletion date and nothing else, as #306 says of ADR-007's tombstone:
+ * not when it was registered, not its identity's standing, which would tie
+ * it to the person's new account.
  */
 export async function accountPage(
   db: Queryable,
@@ -53,6 +74,19 @@ export async function accountPage(
   const found = await accountForStaff(db, accountId);
   if (!found) return null;
   const { account } = found;
+  if (account.state === "deleted") {
+    return {
+      id: account.id,
+      state: account.state,
+      stateChangedAt: null,
+      registeredAt: null,
+      deletedAt: iso(account.deletedAt),
+      standing: null,
+      standingChangedAt: null,
+      suspensionEndsAt: null,
+      ...empty(),
+    };
+  }
   const page: AdminAccount = {
     id: account.id,
     state: account.state,
@@ -62,15 +96,8 @@ export async function accountPage(
     standing: found.standing,
     standingChangedAt: iso(found.standingChangedAt),
     suspensionEndsAt: iso(found.suspensionEndsAt),
-    age: null,
-    gender: null,
-    pond: null,
-    profile: null,
-    photos: [],
-    feedback: [],
-    audit: [],
+    ...empty(),
   };
-  if (account.state === "deleted") return page;
   // One after another: the caller's transaction is one connection.
   const profile = await exportProfile(db, accountId);
   const photos = await listPhotos(db, accountId);

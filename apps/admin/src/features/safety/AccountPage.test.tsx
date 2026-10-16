@@ -1,6 +1,7 @@
 import { formatDateTime } from "@kuutti/i18n";
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { StrictMode } from "react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
@@ -90,11 +91,13 @@ const page = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-/** An erased account: its deletion and standing, nothing else (accounts.ts). */
+/** An erased account: its deletion date, nothing else (accounts.ts). */
 const tombstone = page({
   state: "deleted",
+  stateChangedAt: null,
+  registeredAt: null,
   deletedAt: CHANGED,
-  standing: "ok",
+  standing: null,
   standingChangedAt: null,
   suspensionEndsAt: null,
   age: null,
@@ -176,8 +179,8 @@ const card = (n: number) => () =>
   json({ url: cardUrl(n), variant: "card", expiresAt: "2030-01-01T00:00:00.000Z" });
 const asked = (calls: Request[]) => calls.map((c) => `${c.method} ${path(c)}`);
 
-function show(at = `/accounts/${ID}`) {
-  render(
+function show(at = `/accounts/${ID}`, { strict = false } = {}) {
+  const screens = (
     <I18nProvider i18n={i18n}>
       <MemoryRouter initialEntries={[at]}>
         <Routes>
@@ -185,9 +188,12 @@ function show(at = `/accounts/${ID}`) {
           <Route path="/accounts/:id" element={<AccountPage />} />
         </Routes>
       </MemoryRouter>
-    </I18nProvider>,
+    </I18nProvider>
   );
+  render(strict ? <StrictMode>{screens}</StrictMode> : screens);
 }
+/** The alt text of a photo a moderator asked to see. */
+const shownPhoto = (state: string) => `Photo: ${state}. Uploaded: ${when(UPLOADED)}`;
 
 /** The value a label of a definition list names; a prompt's or a field's label is its key in code. */
 function termValue(term: string): string | null | undefined {
@@ -311,7 +317,7 @@ describe("a person's page", () => {
     expect(idea).not.toHaveTextContent("handled");
 
     // What staff did and saw: a captioned table, the actor by the start of their id, the detail as JSON.
-    const audit = screen.getByRole("table", { name: "Newest first, at most a hundred" });
+    const audit = screen.getByRole("table", { name: "Newest first, at most fifty" });
     expect(
       within(audit)
         .getAllByRole("columnheader")
@@ -338,21 +344,35 @@ describe("a person's page", () => {
     ]);
   });
 
-  it("shows an erased account's deletion and standing, and no profile, photos, sanctions or feedback", async () => {
-    fetchMock([pageOf(tombstone), sanctionsOf(sanctions)]);
+  it("shows an erased account's deletion date and nothing else, asking for no sanctions", async () => {
+    const calls = fetchMock([pageOf(tombstone), sanctionsOf(sanctions)]);
     show();
     expect(await screen.findByText(ID, { selector: "code" })).toBeInTheDocument();
-    expect(sectionTitles()).toEqual(["State", "What staff did and saw"]);
-    expect(termValue("Account")).toBe(`deleted · ${when(CHANGED)}`);
-    // No date for a standing never changed, and no "until" without a suspension.
-    expect(termValue("Standing")).toBe("ok · –");
+    expect(sectionTitles()).toEqual(["State"]);
+    expect(termValue("Account")).toBe("deleted");
     expect(termValue("Deleted")).toBe(when(CHANGED));
-    expect(termValue("Registered")).toBe(when(REGISTERED));
+    // Nothing that would tie the tombstone to the person's next account (#306).
+    expect(screen.queryByText("Standing", { selector: "dt" })).toBeNull();
+    expect(screen.queryByText("Registered", { selector: "dt" })).toBeNull();
     expect(screen.queryByText("No profile yet.")).toBeNull();
     expect(screen.queryByText("suspend")).toBeNull();
     expect(screen.queryByRole("button", { name: "Show the photo" })).toBeNull();
-    expect(screen.getAllByText("None.")).toHaveLength(1);
+    expect(screen.queryByText("None.")).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
+    expect(asked(calls)).toEqual([`GET /admin/accounts/${ID}`]);
+  });
+
+  it("opens the page once under StrictMode: one look, one account.view row (#306)", async () => {
+    const calls = fetchMock([pageOf(page()), sanctionsOf(sanctions)]);
+    show(`/accounts/${ID}`, { strict: true });
+    expect(await screen.findByText(ID, { selector: "code" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText(/Wrote something unkind in two chats/)).toBeInTheDocument(),
+    );
+    expect(asked(calls)).toEqual([
+      `GET /admin/accounts/${ID}`,
+      `GET /admin/accounts/${ID}/sanctions`,
+    ]);
   });
 
   it("says when there is no profile yet, and None. for every empty section", async () => {
@@ -509,8 +529,10 @@ describe("a photo on a person's page", () => {
     if (!first || !second) throw new Error("no buttons");
     expect(asked(calls).filter((call) => call.endsWith("/card"))).toEqual([]);
     fireEvent.click(first);
-    const image = await screen.findByRole("img", { name: "Photo under review" });
+    const image = await screen.findByRole("img", { name: shownPhoto("approved") });
     expect(image).toHaveAttribute("src", cardUrl(1));
+    // The picture takes the focus the button had, so a keyboard user is not left on the page's body.
+    await waitFor(() => expect(image).toHaveFocus());
     expect(image.closest("li")).toHaveTextContent(`approved · ${when(UPLOADED)}`);
     expect(asked(calls).filter((call) => call.endsWith("/card"))).toEqual([
       `GET /admin/photos/${photoId(1)}/card`,
@@ -520,8 +542,8 @@ describe("a photo on a person's page", () => {
     expect(screen.getAllByRole("img")).toHaveLength(1);
   });
 
-  it("says a refused photo could not be shown, keeps the button, and shows it on the next press", async () => {
-    let answer = (): Response => failure(403, "admin_forbidden");
+  it("says a failed photo could not be shown, keeps the button, and shows it on the next press", async () => {
+    let answer = (): Response => failure(500, "internal_error");
     fetchMock([pageOf(page()), sanctionsOf([]), cardOf(2, () => answer())]);
     show();
     const buttons = await screen.findAllByRole("button", { name: "Show the photo" });
@@ -532,11 +554,72 @@ describe("a photo on a person's page", () => {
 
     answer = card(2);
     fireEvent.click(screen.getAllByRole("button", { name: "Show the photo" })[1] as HTMLElement);
-    expect(await screen.findByRole("img", { name: "Photo under review" })).toHaveAttribute(
+    expect(await screen.findByRole("img", { name: shownPhoto("rejected") })).toHaveAttribute(
       "src",
       cardUrl(2),
     );
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("leaves a refused photo to the shell: no words of its own, both buttons stay (#302)", async () => {
+    const calls = fetchMock([
+      pageOf(page()),
+      sanctionsOf([]),
+      cardOf(1, () => failure(403, "admin_forbidden")),
+    ]);
+    show();
+    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    fireEvent.click(first as HTMLElement);
+    await waitFor(() =>
+      expect(asked(calls).filter((call) => call.endsWith("/card"))).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Show the photo" })[0]).toBeEnabled(),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("img")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Show the photo" })).toHaveLength(2);
+  });
+
+  it("asks once for a photo pressed twice before its answer: one look, one photo.view row", async () => {
+    let release: (res: Response) => void = () => {};
+    const calls = fetchMock([
+      pageOf(page()),
+      sanctionsOf([]),
+      cardOf(
+        1,
+        () =>
+          new Promise<Response>((resolve) => {
+            release = resolve;
+          }),
+      ),
+    ]);
+    show();
+    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    if (!first) throw new Error("no button");
+    fireEvent.click(first);
+    fireEvent.click(first);
+    await waitFor(() => expect(first).toBeDisabled());
+    expect(first).toHaveAttribute("aria-busy", "true");
+    fireEvent.click(first);
+    expect(asked(calls).filter((call) => call.endsWith("/card"))).toEqual([
+      `GET /admin/photos/${photoId(1)}/card`,
+    ]);
+    release(card(1)());
+    expect(await screen.findByRole("img", { name: shownPhoto("approved") })).toHaveAttribute(
+      "src",
+      cardUrl(1),
+    );
+    expect(asked(calls).filter((call) => call.endsWith("/card"))).toHaveLength(1);
+  });
+
+  it("says the photo could not be shown when the answer is outside the contract", async () => {
+    fetchMock([pageOf(page()), sanctionsOf([]), cardOf(1, () => json({ url: "not a url" }))]);
+    show();
+    const [first] = await screen.findAllByRole("button", { name: "Show the photo" });
+    fireEvent.click(first as HTMLElement);
+    expect(await screen.findByRole("alert")).toHaveTextContent("The photo could not be shown.");
+    expect(screen.queryByRole("img")).toBeNull();
   });
 
   it("says the photo could not be shown when its request cannot be reached", async () => {

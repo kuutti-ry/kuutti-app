@@ -24,7 +24,7 @@ const pageRoute = createRoute({
   path: "/admin/accounts/{id}",
   summary: "A person's page",
   description:
-    "One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion and standing. Every look is an audit row.",
+    "One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion date and nothing else. Every look is an audit row.",
   security: [{ session: [] }],
   request: { params: AdminAccountParams },
   responses: {
