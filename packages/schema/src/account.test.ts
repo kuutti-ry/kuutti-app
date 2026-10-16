@@ -173,6 +173,18 @@ function anExport(): Record<string, unknown> {
         handledAt: null,
       },
     ],
+    sanctions: [
+      {
+        kind: "suspend",
+        kindInWords: "Suspended until a set day",
+        reason: "commercial_use",
+        reasonInWords: "Selling or advertising",
+        appliedAt: at,
+        endsAt: at,
+        liftedAt: at,
+        lookedAtAgain: true,
+      },
+    ],
   };
 }
 
@@ -184,6 +196,7 @@ describe("the account export", () => {
     expect(parsed.exportedBy).toBe("0.16.0-37a837c");
     expect(parsed.exports).toEqual([{ at }]);
     expect(parsed.dealBreakers[0]?.paused).toBe(false);
+    expect(parsed.sanctions[0]).toMatchObject({ kind: "suspend", lookedAtAgain: true });
   });
 
   it("drops a key it does not define, so a stray hetu_hmac or research_id never reaches the file", () => {
@@ -255,6 +268,20 @@ describe("the account export", () => {
         platform: "web",
         locale: "sv",
         handledAt: at,
+      }),
+    ],
+    [
+      "sanctions",
+      1000,
+      () => ({
+        kind: "warn",
+        kindInWords: "A warning",
+        reason: "harassment",
+        reasonInWords: "Harassment",
+        appliedAt: at,
+        endsAt: null,
+        liftedAt: null,
+        lookedAtAgain: false,
       }),
     ],
   ])("holds at most so many %s: %i", (key, max, entry) => {

@@ -190,6 +190,108 @@ describe("migrate", () => {
     });
   });
 
+  /**
+   * A migrated temporary database with one identity and account, and an
+   * insert of a sanction row that defaults to a plain warning.
+   */
+  async function withSanctionTable(
+    fn: (
+      insert: (row: Record<string, unknown>) => Promise<unknown>,
+      ids: { identityId: string; pool: ReturnType<typeof createPool> },
+    ) => Promise<void>,
+  ) {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const identity = await pool.query<{ id: string }>(
+          "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+          ["5".repeat(64)],
+        );
+        const identityId = identity.rows[0]?.id ?? "";
+        const account = await pool.query<{ id: string }>(
+          "INSERT INTO account (identity_id) VALUES ($1) RETURNING id",
+          [identityId],
+        );
+        const accountId = account.rows[0]?.id;
+        const insert = (row: Record<string, unknown>) => {
+          const full = {
+            identity_id: identityId,
+            account_id: accountId,
+            kind: "warn",
+            reason: "other",
+            note: "x",
+            ...row,
+          };
+          const columns = Object.keys(full);
+          return pool.query(
+            `INSERT INTO sanction (${columns.join(", ")})
+             VALUES (${columns.map((_, i) => `$${i + 1}`).join(", ")})`,
+            Object.values(full),
+          );
+        };
+        await fn(insert, { identityId, pool });
+      } finally {
+        await pool.end();
+      }
+    });
+  }
+  const refused = (constraint: string) => ({ code: "23514", constraint });
+  const END = "2026-10-21T21:00:00Z";
+  const AT = "2026-10-20T09:00:00Z";
+
+  it("migration 0046 holds a sanction's end, note, lift and review together in the database (#307)", async () => {
+    await withSanctionTable(async (insert, { identityId, pool }) => {
+      // Only a suspension has an end, and a suspension always has one.
+      await expect(insert({ kind: "suspend" })).rejects.toMatchObject(
+        refused("sanction_ends_at_check"),
+      );
+      for (const kind of ["warn", "shadow_ban", "ban"]) {
+        await expect(insert({ kind, ends_at: END })).rejects.toMatchObject(
+          refused("sanction_ends_at_check"),
+        );
+      }
+      await insert({ kind: "suspend", ends_at: END });
+      // The note: one to 500 characters.
+      await expect(insert({ note: "" })).rejects.toMatchObject(refused("sanction_note_check"));
+      await expect(insert({ note: "x".repeat(501) })).rejects.toMatchObject(
+        refused("sanction_note_check"),
+      );
+      await insert({ note: "x".repeat(500) });
+      // A lift by somebody has its time; a lift by nobody (the night) only the time.
+      await expect(insert({ lifted_by: identityId })).rejects.toMatchObject(
+        refused("sanction_lift_check"),
+      );
+      await insert({ lifted_at: AT });
+      await insert({ lifted_at: AT, lifted_by: identityId });
+      // A review is the time, who, and a note of one to 500 characters, all or none.
+      for (const half of [
+        { reviewed_at: AT },
+        { reviewed_by: identityId },
+        { review_note: "kept" },
+        { reviewed_at: AT, reviewed_by: identityId, review_note: "" },
+        { reviewed_at: AT, reviewed_by: identityId, review_note: "x".repeat(501) },
+      ]) {
+        await expect(insert(half)).rejects.toMatchObject(refused("sanction_review_check"));
+      }
+      await insert({ reviewed_at: AT, reviewed_by: identityId, review_note: "kept" });
+      const kept = await pool.query<{ n: string }>("SELECT count(*) AS n FROM sanction");
+      expect(Number(kept.rows[0]?.n)).toBe(5);
+      // The kinds and the reasons are the database's own enums.
+      await expect(insert({ kind: "mute" })).rejects.toMatchObject({ code: "22P02" });
+      await expect(insert({ reason: "spam" })).rejects.toMatchObject({ code: "22P02" });
+    });
+  });
+
+  it("migration 0046 refuses a review with its time and who but without a note (#307)", async () => {
+    // A review's note is one to 500 characters (ADR-024 §1); a missing one is not a review.
+    await withSanctionTable(async (insert, { identityId }) => {
+      await expect(insert({ reviewed_at: AT, reviewed_by: identityId })).rejects.toMatchObject(
+        refused("sanction_review_check"),
+      );
+    });
+  });
+
   it("is a no-op the second time", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
@@ -221,6 +323,7 @@ describe("migrate", () => {
           "preferences",
           "profile",
           "research_subject",
+          "sanction",
           "session",
           "waitlist_snapshot",
         ]);

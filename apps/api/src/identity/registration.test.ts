@@ -22,6 +22,7 @@ function identityRow(overrides: Partial<Identity> = {}): Identity {
     deletionCount: 0,
     reregisterAfter: null,
     refusedAttempts: 0,
+    suspensionEndsAt: null,
     createdAt: new Date("2026-09-01T00:00:00Z"),
     ...overrides,
   };
@@ -34,6 +35,7 @@ function accountRow(identityId: string): Account {
     state: "active",
     stateChangedAt: null,
     pausedFrom: null,
+    sanctionedFrom: null,
     birthYear: 1990,
     birthMonth: 1,
     registeredAt: new Date("2026-09-01T00:00:00Z"),
@@ -57,13 +59,34 @@ describe("Re-registration after deletion or ban", () => {
   });
 
   it("A suspended identity waits", () => {
+    const ends = new Date("2026-10-21T21:00:00Z");
+    expect(
+      decideRegistration({
+        identity: identityRow({ standing: "suspended", suspensionEndsAt: ends }),
+        liveAccount: null,
+        now,
+      }),
+    ).toEqual({ kind: "refuse", reason: "suspended", until: ends });
+  });
+
+  it("refuses a suspension written without its end without a day (#307: the demo's and older rows)", () => {
     expect(
       decideRegistration({
         identity: identityRow({ standing: "suspended" }),
         liveAccount: null,
         now,
       }),
-    ).toEqual({ kind: "refuse", reason: "suspended" });
+    ).toEqual({ kind: "refuse", reason: "suspended", until: null });
+  });
+
+  it("refuses a suspended identity even with a live account to resume", () => {
+    const identity = identityRow({
+      standing: "suspended",
+      suspensionEndsAt: new Date("2026-10-21T21:00:00Z"),
+    });
+    expect(decideRegistration({ identity, liveAccount: accountRow(identity.id), now }).kind).toBe(
+      "refuse",
+    );
   });
 
   describe("Deletion cooldown", () => {

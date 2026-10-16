@@ -264,6 +264,28 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     ).toBe(0);
   });
 
+  test.for(["suspended", "banned"] as const)(
+    "A standing that turns %s between the bank and the exchange opens no panel session (#307)",
+    async (standing, { ctx }) => {
+      const identityId = await allowlisted(ctx);
+      const { app } = await appWith(ctx);
+      const code = codeOf(await callback(app, await start(app)));
+      // A sanction lands in the code's minute: the exchange sees it under the identity's lock.
+      await ctx.client.query("UPDATE identity SET standing = $2 WHERE id = $1", [
+        identityId,
+        standing,
+      ]);
+      const res = await exchange(app, "/admin/auth/exchange", code);
+      expect(res.status).toBe(403);
+      expect(await errorCode(res)).toBe("admin_not_allowed");
+      expect(
+        await count(ctx, "SELECT count(*) AS n FROM admin_session WHERE identity_id = $1", [
+          identityId,
+        ]),
+      ).toBe(0);
+    },
+  );
+
   test("A product code never opens an admin session and stays good for the app", async ({
     ctx,
   }) => {

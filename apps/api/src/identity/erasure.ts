@@ -23,12 +23,15 @@ import {
   closerLookOf,
   deleteFeedbackOfAccount,
   deletePhotoCheckNotesOfAccount,
+  deleteSanctionsOfAccount,
   listFeedbackOfAccount,
   listPhotoCheckNotes,
+  listSanctionsOfAccount,
 } from "../safety/index.ts";
 import { currentConsent, exportConsents } from "./onboarding.ts";
 import { recordDeletion } from "./registration.ts";
 import * as repo from "./repo.ts";
+import { visibleState } from "./standing.ts";
 
 // Erasure and export of the caller's own account (#51, TD-7, ADR-007). The
 // erasure table of rules/db.md, applied to what exists in M3: sessions, login
@@ -43,6 +46,8 @@ import * as repo from "./repo.ts";
 // transaction, and the research events carry their own consent_version.
 // The export requests go (#237): the person's own trail, listed in the export.
 // The feedback goes (#171, ADR-023): the person's own words, listed in the export.
+// The sanctions go (#307, ADR-024 §8), except the open bans and suspensions,
+// which carry the identity's standing; listed in the export without who or why in staff's words.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -67,6 +72,8 @@ export type ErasureSummary = {
   exports: number;
   /** The feedback rows (#171). */
   feedback: number;
+  /** The sanction rows that went; the open bans and suspensions stay on the identity (ADR-024 §8). */
+  sanctions: number;
   /** 0 or 1: the research_id mapping (#50); the events stay, unlinkable. */
   researchSubjects: number;
   photos: number;
@@ -106,6 +113,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const consents = await repo.deleteConsentsOfAccount(tx, accountId);
     const exports = await repo.deleteExportsOfAccount(tx, accountId);
     const feedback = await deleteFeedbackOfAccount(tx, accountId);
+    const sanctions = await deleteSanctionsOfAccount(tx, accountId);
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
     await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
@@ -125,6 +133,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       consents,
       exports,
       feedback,
+      sanctions,
       researchSubjects,
       reregisterAfter: deletion.reregisterAfter,
     };
@@ -144,6 +153,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     consents: result.consents,
     exports: result.exports,
     feedback: result.feedback,
+    sanctions: result.sanctions,
     researchSubjects: result.researchSubjects,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
@@ -205,24 +215,36 @@ export async function exportAccount(
     accountId,
     await currentConsent(deps.db, accountId, "special_category"),
   );
-  const [pond, preferences, consents, research, gate, dealBreakers, photoCheck, exports, feedback] =
-    await Promise.all([
-      findPondOfAccount(deps.db, accountId),
-      readPreferences(deps.db, accountId),
-      exportConsents(deps.db, accountId),
-      exportResearch(deps.db, accountId),
-      exportGate(deps.db, accountId),
-      readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
-      exportPhotoCheck(deps, accountId, t),
-      repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
-      listFeedbackOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
-    ]);
+  const [
+    pond,
+    preferences,
+    consents,
+    research,
+    gate,
+    dealBreakers,
+    photoCheck,
+    exports,
+    feedback,
+    sanctions,
+  ] = await Promise.all([
+    findPondOfAccount(deps.db, accountId),
+    readPreferences(deps.db, accountId),
+    exportConsents(deps.db, accountId),
+    exportResearch(deps.db, accountId),
+    exportGate(deps.db, accountId),
+    readDealBreakers(deps.db, accountId, profile?.fields ?? {}),
+    exportPhotoCheck(deps, accountId, t),
+    repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    listFeedbackOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    listSanctionsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+  ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
     exportedBy: deps.version,
     account: {
       id: account.id,
-      state: account.state,
+      // A shadow ban reads as active, as everywhere the person can look (#105, ADR-024 §7).
+      state: visibleState(account.state),
       stateChangedAt: account.stateChangedAt?.toISOString() ?? null,
       registeredAt: account.registeredAt.toISOString(),
       birthYear: account.birthYear,
@@ -268,6 +290,12 @@ export async function exportAccount(
     gate,
     exports: exports.map((e) => ({ at: e.at.toISOString() })),
     feedback,
+    // In words in the request's language too, as the photo check's notes are.
+    sanctions: sanctions.map((sanction) => ({
+      ...sanction,
+      kindInWords: t(`account.export.sanction.kind.${sanction.kind}`),
+      reasonInWords: t(`account.export.sanction.reason.${sanction.reason}`),
+    })),
   };
   return { document, files: photos.files };
 }

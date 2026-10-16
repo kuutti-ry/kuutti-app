@@ -37,6 +37,7 @@ import {
 import { ageInYears, readProfile, withdrawSpecialCategoryAnswers } from "../profile/index.ts";
 import { enrolResearchSubject, removeResearchSubject, track } from "../research/index.ts";
 import * as repo from "./repo.ts";
+import { visibleState } from "./standing.ts";
 
 // Onboarding and consents (#46, #146, ADR-010). The binding texts live under
 // legal.<kind>.* in messages.yaml with a consent_version; the build emits the
@@ -210,7 +211,8 @@ export async function onboardingStatus(
     }
   }
   return {
-    state,
+    // A shadow ban reads as active here, as everywhere the person can look (#105, ADR-024 §7).
+    state: visibleState(state),
     age: ageInYears(account.birthYear, account.birthMonth, now),
     gender: account.gender,
     pond,

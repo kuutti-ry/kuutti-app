@@ -8,13 +8,21 @@ import type { Queryable } from "@kuutti/db";
 // (rules/db.md). `detail` is a small closed structure, never text a person
 // typed.
 
-const AUDIT_ACTIONS = ["photo.view", "photo.approve", "photo.reject", "feedback.handle"] as const;
+const AUDIT_ACTIONS = [
+  "photo.view",
+  "photo.approve",
+  "photo.reject",
+  "feedback.handle",
+  "sanction.apply",
+  "sanction.lift",
+  "sanction.review",
+] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditEntry = {
   actorIdentityId: string;
   action: AuditAction;
-  subjectType: "photo" | "feedback";
+  subjectType: "photo" | "feedback" | "account";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

@@ -12,7 +12,7 @@ import type { OnboardingStatus } from "@kuutti/schema";
 import { afterAll, afterEach, it, vi } from "vitest";
 import { hmacKeyFromHex } from "../../src/identity/index.ts";
 import { signedInAccount } from "../../src/test/account.ts";
-import { captureLogger, describe, expect, test } from "../../src/test/harness.ts";
+import { captureLogger, describe, expect, type TestContext, test } from "../../src/test/harness.ts";
 import { fixtureJpeg, testMediaDeps } from "../../src/test/media.ts";
 import { pondNamed } from "../../src/test/people.ts";
 import { call, DemoError, type Fetch, loginAs, upload } from "./bank.ts";
@@ -406,6 +406,100 @@ describe("a history given", () => {
     // Onni's story has neither faces nor negatives: the release is not opened for him.
     expect((await giveHistory(historyOf("onni"), withRelease)).photos).toBe(0);
     expect(asked).toEqual([]);
+  });
+});
+
+describe("the ban Tapio's story ends in", () => {
+  /** An account of the test database for the story, and its identity, which `whoIs` names. */
+  async function someone(ctx: TestContext) {
+    const { accountId } = await signedInAccount(ctx.client);
+    const { rows } = await ctx.client.query<{ identity_id: string }>(
+      "SELECT identity_id FROM account WHERE id = $1",
+      [accountId],
+    );
+    const identityId = rows[0]?.identity_id;
+    if (!identityId) throw new Error("no identity for the test account");
+    return { accountId, identityId };
+  }
+  const sanctionsOf = async (ctx: TestContext, identityId: string) =>
+    (
+      await ctx.client.query(
+        `SELECT account_id, kind, reason, note, ends_at, created_by, created_at,
+                lifted_at, lifted_by, reviewed_at
+         FROM sanction WHERE identity_id = $1`,
+        [identityId],
+      )
+    ).rows;
+  const standingOf = async (ctx: TestContext, accountId: string) =>
+    (
+      await ctx.client.query(
+        `SELECT i.standing, i.standing_changed_at, a.state, a.state_changed_at,
+                (SELECT count(*)::int FROM session s WHERE s.account_id = a.id AND s.revoked_at IS NULL) AS sessions
+         FROM account a JOIN identity i ON i.id = a.identity_id WHERE a.id = $1`,
+        [accountId],
+      )
+    ).rows[0];
+
+  test("is one sanction row by nobody at the story's time, with the standing and the state it settles to", async ({
+    ctx,
+  }) => {
+    const tapio = await someone(ctx);
+    const writer = fakeWriter({
+      db: ctx.client,
+      login: async () => ({ accountId: tapio.accountId, outcome: "created" }),
+      whoIs: () => ({ clause: "i.id = $2", params: [tapio.identityId] }),
+    });
+    expect(await giveHistory(historyOf("tapio"), writer)).toMatchObject({
+      key: "tapio",
+      afterwards: "banned",
+      login: "created",
+    });
+    // ADR-024 §10: the panel lists it and an admin can lift it; nobody applied it.
+    expect(await sanctionsOf(ctx, tapio.identityId)).toEqual([
+      {
+        account_id: tapio.accountId,
+        kind: "ban",
+        reason: "harassment",
+        note: "Demo: the story ends in a ban.",
+        ends_at: null,
+        created_by: null,
+        created_at: NOW,
+        lifted_at: null,
+        lifted_by: null,
+        reviewed_at: null,
+      },
+    ]);
+    expect(await standingOf(ctx, tapio.accountId)).toEqual({
+      standing: "banned",
+      standing_changed_at: NOW,
+      state: "banned",
+      state_changed_at: NOW,
+      sessions: 0,
+    });
+  });
+
+  test("meets the persona or nobody: a story that names another identity writes nothing", async ({
+    ctx,
+  }) => {
+    const tapio = await someone(ctx);
+    const other = await someone(ctx);
+    const writer = fakeWriter({
+      db: ctx.client,
+      login: async () => ({ accountId: tapio.accountId, outcome: "created" }),
+      // The account the login said, with somebody else's identity beside it.
+      whoIs: () => ({ clause: "i.id = $2", params: [other.identityId] }),
+    });
+    await expect(giveHistory(historyOf("tapio"), writer)).rejects.toThrow(
+      "tapio: the sanction met 0 rows, not one: does the API serve the database of DATABASE_URL?",
+    );
+    for (const who of [tapio, other]) {
+      expect(await sanctionsOf(ctx, who.identityId)).toEqual([]);
+      expect(await standingOf(ctx, who.accountId)).toMatchObject({
+        standing: "ok",
+        state: "active",
+        sessions: 1,
+      });
+    }
   });
 });
 

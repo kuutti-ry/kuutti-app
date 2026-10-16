@@ -50,6 +50,10 @@ export const identity = pgTable(
     reregisterAfter: timestamp("reregister_after", { withTimezone: true }),
     // Logins refused because of standing or cooldown (rules/api.md).
     refusedAttempts: integer("refused_attempts").notNull().default(0),
+    // While suspended: the latest open suspension's end, which the bank
+    // login's refusal names (#307, ADR-024 §5); null otherwise. Settled with
+    // the standing from the sanction rows, never written alone.
+    suspensionEndsAt: timestamp("suspension_ends_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("identity_standing_idx").on(table.standing)],
@@ -78,6 +82,10 @@ export const account = pgTable(
     // paused, which the next bank login restores; null while not on a break.
     // Kept so that a shadow ban survives a break without showing (ADR-013 §2).
     pausedFrom: accountState("paused_from"),
+    // While suspended or banned (#307, ADR-024 §2): what the account would be
+    // without the sanction, `registered`, `active` or `paused`, which a lift
+    // settles back to; null otherwise. Never exported, nulled at erasure.
+    sanctionedFrom: accountState("sanctioned_from"),
     // Age is year and month only (rule 3), derived from the code at
     // registration; nulled at erasure (#51), when the row stays as the
     // anonymised tombstone of a deleted account.

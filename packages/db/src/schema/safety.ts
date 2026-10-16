@@ -1,4 +1,5 @@
-import { index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { check, index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { account, identity } from "./identity.ts";
 import { photo } from "./media.ts";
 
@@ -61,4 +62,69 @@ export const photoCheckNote = pgTable(
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("photo_check_note_account_at_idx").on(table.accountId, table.at)],
+);
+
+/**
+ * A sanction (#307, ADR-024): a warning, a shadow ban, a suspension until a
+ * day, or a ban, with a reason from a closed list and staff's note. The row is
+ * the record; the account's state and the identity's standing are settled
+ * from the rows still open on every change, never stored here. `created_by`
+ * and `lifted_by` are null for what no person did (the night's end of a
+ * suspension, the demo's story, #105's rules). The note is staff's words:
+ * never in a log line, an error detail, an event or the person's export.
+ * Erasure deletes the account's rows except the open bans and suspensions,
+ * which carry the identity's standing (TD-7's kept side); the audit log keeps
+ * the history.
+ */
+export const sanctionKind = pgEnum("sanction_kind", ["warn", "shadow_ban", "suspend", "ban"]);
+export const sanctionReason = pgEnum("sanction_reason", [
+  "harassment",
+  "misrepresentation",
+  "under_age",
+  "commercial_use",
+  "scraping",
+  "other",
+]);
+
+export const sanction = pgTable(
+  "sanction",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => identity.id),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id),
+    kind: sanctionKind("kind").notNull(),
+    reason: sanctionReason("reason").notNull(),
+    note: text("note").notNull(),
+    // A suspension's end: the start of the chosen day in Finland. Only a suspension has one.
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => identity.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    liftedAt: timestamp("lifted_at", { withTimezone: true }),
+    liftedBy: uuid("lifted_by").references(() => identity.id),
+    reviewNote: text("review_note"),
+    reviewedBy: uuid("reviewed_by").references(() => identity.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  },
+  (table) => [
+    // The person's page lists an account's rows, newest first.
+    index("sanction_account_created_idx").on(table.accountId, table.createdAt),
+    // Settling reads what is still open on an identity, a ban across its accounts.
+    index("sanction_identity_open_idx").on(table.identityId).where(sql`${table.liftedAt} IS NULL`),
+    check(
+      "sanction_ends_at_check",
+      sql`(${table.kind} = 'suspend') = (${table.endsAt} IS NOT NULL)`,
+    ),
+    check("sanction_note_check", sql`char_length(${table.note}) BETWEEN 1 AND 500`),
+    check("sanction_lift_check", sql`${table.liftedBy} IS NULL OR ${table.liftedAt} IS NOT NULL`),
+    check(
+      "sanction_review_check",
+      sql`(${table.reviewedAt} IS NULL AND ${table.reviewedBy} IS NULL AND ${table.reviewNote} IS NULL)
+        OR (${table.reviewedAt} IS NOT NULL AND ${table.reviewedBy} IS NOT NULL
+          AND ${table.reviewNote} IS NOT NULL AND char_length(${table.reviewNote}) BETWEEN 1 AND 500)`,
+    ),
+  ],
 );

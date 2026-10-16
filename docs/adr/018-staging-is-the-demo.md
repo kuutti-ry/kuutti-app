@@ -27,3 +27,7 @@ Locally the personas get their stories by logging in at the mock bank and sendin
 - A persona's first login on the bed overwrites the job's mark with Telia's transient `sub` and the bank's method (ADR-016: every login refreshes the reference). That is right: the row is then a login's, as everybody's is.
 - #142 gave the writer its `photos` step: the job uploads a persona's pictures through `uploadPhoto` from the release in the container's cache (`node dist/demo-assets.js` there first: the public tag's tarball over HTTPS, no login, checked against the manifest), and the container's check decides on them; while staging has no object store (its media off, ADR-005 §7) the job and the reset run without pictures and say so; locally the reset approves the faces of a story by a named statement.
 - For the maintainer: `infra/README.md` says how to reach the container (an SSM session and `docker exec`, or Dokploy's terminal for the `api` application) and the three commands; nothing of this needs a parameter written by hand.
+
+## History
+
+- 2026-10-16 (#307, ADR-024 §10): §5's direct write of a ban is a sanction row by nobody (`created_by` null) beside the standing and the state, so the panel lists it and an admin can lift it on staging; the staging reset deletes it with the persona's identity.

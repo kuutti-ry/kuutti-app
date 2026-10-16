@@ -35,6 +35,13 @@ export {
 } from "./preferences.ts";
 export { profile } from "./profile.ts";
 export { researchSubject } from "./research.ts";
-export { auditLog, photoCheckKind, photoCheckNote } from "./safety.ts";
+export {
+  auditLog,
+  photoCheckKind,
+  photoCheckNote,
+  sanction,
+  sanctionKind,
+  sanctionReason,
+} from "./safety.ts";
 export { session } from "./sessions.ts";
 export { waitlistSnapshot } from "./waitlist.ts";

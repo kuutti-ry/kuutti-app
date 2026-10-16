@@ -171,6 +171,70 @@ describe("SignInScreen", () => {
     expect(await screen.findByText(/The earliest day for a new one: 22.10.2026/)).toBeTruthy();
   });
 
+  it("names the day a suspension ends, the start of that day in Finland", async () => {
+    // Midnight in Finland in summer time (ADR-024 §5), as the API sends it.
+    await renderWithTheme(<SignInScreen error="auth_suspended" until="2026-10-21T21:00:00.000Z" />);
+    expect(
+      await screen.findByText("This account is suspended. You can sign in again from: 22.10.2026"),
+    ).toBeTruthy();
+    expect(screen.queryByText("This account is suspended for now.")).toBeNull();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+  });
+
+  it("reads the suspension's day in Finland's zone, whatever the phone's", async () => {
+    // The test process keeps the machine's zone (UTC on CI). Just after
+    // midnight in Finland is still the day before in UTC and anywhere west;
+    // just before midnight is already the next day anywhere east.
+    const view = await renderWithTheme(
+      <SignInScreen error="auth_suspended" until="2026-10-21T21:30:00.000Z" />,
+    );
+    expect(await screen.findByText(/You can sign in again from: 22\.10\.2026$/)).toBeTruthy();
+    // Winter time: midnight is 22:00 UTC.
+    await view.rerender(
+      underProviders(<SignInScreen error="auth_suspended" until="2026-11-08T22:00:00.000Z" />),
+    );
+    expect(await screen.findByText(/You can sign in again from: 9\.11\.2026$/)).toBeTruthy();
+    await view.rerender(
+      underProviders(<SignInScreen error="auth_suspended" until="2026-11-08T21:59:59.999Z" />),
+    );
+    expect(await screen.findByText(/You can sign in again from: 8\.11\.2026$/)).toBeTruthy();
+  });
+
+  it.each([
+    ["fi-FI", "Tämä tili on jäädytetty. Voit kirjautua taas sisään alkaen: 9.11.2026"],
+    ["sv-FI", "Det här kontot är avstängt. Du kan logga in igen från och med: 9.11.2026"],
+  ])("names the suspension's day on a %s phone in its language", async (languageTag, text) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    try {
+      await renderWithTheme(
+        <SignInScreen error="auth_suspended" until="2026-11-08T22:00:00.000Z" />,
+      );
+      expect(await screen.findByText(text)).toBeTruthy();
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
+
+  it("says the plain sentence for a suspension whose link carries no day, or one that is not a date", async () => {
+    const view = await renderWithTheme(<SignInScreen error="auth_suspended" />);
+    expect(await screen.findByText("This account is suspended for now.")).toBeTruthy();
+    await view.rerender(
+      underProviders(<SignInScreen error="auth_suspended" until="2026-10-21T21:00:00.000Z" />),
+    );
+    expect(await screen.findByText(/You can sign in again from: 22\.10\.2026$/)).toBeTruthy();
+    await view.rerender(underProviders(<SignInScreen error="auth_suspended" until="not a date" />));
+    expect(await screen.findByText("This account is suspended for now.")).toBeTruthy();
+    await view.rerender(underProviders(<SignInScreen error="auth_suspended" until="" />));
+    expect(await screen.findByText("This account is suspended for now.")).toBeTruthy();
+    expect(screen.queryByText(/You can sign in again from/)).toBeNull();
+  });
+
+  it("names no day for a ban, whatever day its link carries", async () => {
+    await renderWithTheme(<SignInScreen error="auth_banned" until="2026-10-21T21:00:00.000Z" />);
+    expect(await screen.findByText("This person may not use Kuutti.")).toBeTruthy();
+    expect(screen.queryByText(/22\.10\.2026/)).toBeNull();
+  });
+
   it("says so when the API has no bank, as a pull-request preview has none", async () => {
     await renderWithTheme(<SignInScreen error="auth_unavailable" />);
     expect(await screen.findByText(/There is no bank sign-in here/)).toBeTruthy();

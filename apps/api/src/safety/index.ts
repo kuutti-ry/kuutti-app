@@ -1,5 +1,5 @@
 // Public surface of the safety slice in apps/api. Other slices import from here only.
-// The audit log (#49) is the first piece; reports, blocks and sanctions arrive with M4.
+// The audit log (#49) is the first piece; sanctions (#307) the next; reports and blocks arrive with M4.
 export { auditBoundary, recordAudit } from "./audit.ts";
 // Feedback from inside the app (#171, ADR-023): the routes, and the halves erasure and the export call.
 export { deleteFeedbackOfAccount, listFeedbackOfAccount } from "./feedback.ts";
@@ -13,3 +13,12 @@ export {
   recordPhotoCheckNote,
   withdrawPhotoCheckNote,
 } from "./photo-check.ts";
+// Sanctions (#307, ADR-024): the panel's routes, the night's end of
+// suspensions, and the halves erasure and the export call.
+export { sanctionAdminRoutes } from "./sanction-routes.ts";
+export {
+  applySanction,
+  deleteSanctionsOfAccount,
+  endSuspensions,
+  listSanctionsOfAccount,
+} from "./sanctions.ts";

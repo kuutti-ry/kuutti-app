@@ -11,10 +11,12 @@ import * as repo from "./repo.ts";
 // account out on their own (ADR-013 §2, ADR-015 §3, profile/card.ts). The
 // next bank login brings the state back (login.ts). Nothing here deletes:
 // erasure.ts is the only delete.
-// shortcut: the login exchange does not take the account row's lock, so a
-// login that commits between the session guard and this transaction leaves
-// one live session on a paused account until the app's next start; the lock
-// in the exchange lifts it, when a paused session matters (the round builder).
+// shortcut: the login exchange takes the account row's share lock
+// (insertSession, ADR-024 §4) but admits `paused`, a live state for the guard
+// (#83), so a login that commits between the session guard and this
+// transaction still leaves one live session on a paused account until the
+// app's next start; refusing `paused` there lifts it, when a paused session
+// matters (the round builder).
 
 export type PauseDeps = { db: Queryable; logger: Logger; now: () => Date };
 

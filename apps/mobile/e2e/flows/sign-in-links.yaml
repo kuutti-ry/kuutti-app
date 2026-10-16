@@ -43,6 +43,13 @@ name: A sign-in link not asked for is refused without touching the session, and 
     timeout: 15000
 - assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
 - assertVisible: "Try again|Yritä uudelleen|Försök igen"
+# A suspension with its day (#307, ADR-024 §5): the start of 9.11.2026 in
+# Finland, winter time, still the 8th in UTC, so the day is Finland's in every
+# zone the phone could be in.
+- openLink: kuutti://auth?error=auth_suspended&until=2026-11-08T22:00:00.000Z
+- extendedWaitUntil:
+    visible: "This account is suspended\\. You can sign in again from: 9\\.11\\.2026|Tämä tili on jäädytetty\\. Voit kirjautua taas sisään alkaen: 9\\.11\\.2026|Det här kontot är avstängt\\. Du kan logga in igen från och med: 9\\.11\\.2026"
+    timeout: 15000
 - openLink: kuutti://auth?error=auth_cancelled
 - extendedWaitUntil:
     visible: "You cancelled the sign-in at your bank\\. Nothing was saved\\.|Peruutit kirjautumisen pankissasi\\. Mitään ei tallennettu\\.|Du avbröt inloggningen hos din bank\\. Inget sparades\\."

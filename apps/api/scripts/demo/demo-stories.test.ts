@@ -14,6 +14,7 @@ import {
   personaHetu,
   personaOf,
 } from "@kuutti/db/demo";
+import { SanctionList } from "@kuutti/schema";
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 import {
   decideRegistration,
@@ -24,6 +25,7 @@ import {
   NotArtificialError,
   REREGISTER_COOLDOWN_DAYS,
 } from "../../src/identity/index.ts";
+import { staffSession } from "../../src/test/account.ts";
 import {
   captureLogger,
   describe,
@@ -68,6 +70,15 @@ async function loginWouldBe(ctx: TestContext, hmacKey: Buffer, key: string) {
   const liveAccount = identity ? await findLiveAccount(ctx.client, identity.id) : null;
   return { decision: decideRegistration({ identity, liveAccount, now }), identity, now };
 }
+
+/** The bans of an identity, as the panel would list them. */
+const bansOf = async (ctx: TestContext, identityId: string | undefined) =>
+  (
+    await ctx.client.query<{ kind: string; created_by: string | null; lifted_at: Date | null }>(
+      "SELECT kind, created_by, lifted_at FROM sanction WHERE identity_id = $1",
+      [identityId],
+    )
+  ).rows;
 
 const markedIdentities = (ctx: TestContext) =>
   ctx.client
@@ -159,10 +170,12 @@ describe("the stories through the services", () => {
     for (const key of ["sanna", "onni", "noa", "kerttu"]) {
       expect((await loginWouldBe(ctx, hmacKey, key)).decision.kind, key).toBe("resume");
     }
-    expect((await loginWouldBe(ctx, hmacKey, "tapio")).decision).toEqual({
-      kind: "refuse",
-      reason: "banned",
-    });
+    const tapio = await loginWouldBe(ctx, hmacKey, "tapio");
+    expect(tapio.decision).toEqual({ kind: "refuse", reason: "banned" });
+    // His ban is a sanction row by nobody (ADR-024 §10): the panel lists it.
+    expect(await bansOf(ctx, tapio.identity?.id)).toEqual([
+      { kind: "ban", created_by: null, lifted_at: null },
+    ]);
     const ilona = await loginWouldBe(ctx, hmacKey, "ilona");
     expect(ilona.decision).toMatchObject({ kind: "refuse", reason: "cooldown" });
     if (ilona.decision.kind === "refuse" && ilona.decision.reason === "cooldown") {
@@ -218,6 +231,45 @@ describe("the stories through the services", () => {
     ]);
     const after = await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM account");
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
+    // Nor a second ban: Tapio was told already.
+    expect(await bansOf(ctx, tapio.identity?.id)).toHaveLength(1);
+  });
+
+  test("Tapio's ban is one an admin can lift, and the bank then lets him back in", async ({
+    ctx,
+  }) => {
+    const { writer, hmacKey } = await world(ctx);
+    await giveStories(writer);
+    const tapio = await loginWouldBe(ctx, hmacKey, "tapio");
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM account WHERE identity_id = $1",
+      [tapio.identity?.id],
+    );
+    const accountId = rows[0]?.id;
+    if (!accountId) throw new Error("no account of tapio");
+    const admin = await staffSession(ctx.client, "admin");
+    const listed = await ctx.app.request(`/admin/accounts/${accountId}/sanctions`, {
+      headers: admin.headers,
+    });
+    expect(listed.status).toBe(200);
+    const { items } = SanctionList.parse(await listed.json());
+    expect(items).toMatchObject([
+      { accountId, kind: "ban", reason: "harassment", createdBy: null, liftedAt: null },
+    ]);
+    const ban = items[0];
+    if (!ban) throw new Error("no ban listed");
+    const lifted = await ctx.app.request(`/admin/bans/${ban.id}/lift`, {
+      method: "POST",
+      headers: admin.headers,
+    });
+    expect(lifted.status).toBe(200);
+    expect((await loginWouldBe(ctx, hmacKey, "tapio")).decision.kind).toBe("resume");
+    // Active again, as he was before the story banned him.
+    const state = await ctx.client.query<{ state: string; sanctioned_from: string | null }>(
+      "SELECT state, sanctioned_from FROM account WHERE id = $1",
+      [accountId],
+    );
+    expect(state.rows).toEqual([{ state: "active", sanctioned_from: null }]);
   });
 
   test("the staging reset forgets the personas by their hash, and the stories are given anew", async ({
@@ -226,6 +278,11 @@ describe("the stories through the services", () => {
     const { writer, hmacKey, logger, now } = await world(ctx);
     await giveStories(writer);
     const personas = personaHashes(hmacKey, now());
+    const sanctions = () =>
+      ctx.client
+        .query<{ n: string }>("SELECT count(*) AS n FROM sanction")
+        .then((r) => Number(r.rows[0]?.n));
+    expect(await sanctions()).toBe(1);
     expect(await resetPersonas({ db: ctx.client, logger, now, personas })).toEqual({
       identities: PERSONA_HISTORIES.length,
       // Ilona's account was erased by her own story; the other five are live.
@@ -234,6 +291,8 @@ describe("the stories through the services", () => {
       spared: [],
     });
     expect(await markedIdentities(ctx)).toBe(0);
+    // Tapio's ban outlived his erasure on the identity (ADR-024 §8) and went with it.
+    expect(await sanctions()).toBe(0);
     for (const history of PERSONA_HISTORIES) {
       expect((await loginWouldBe(ctx, hmacKey, history.key)).identity, history.key).toBeNull();
     }

@@ -28,7 +28,7 @@ import {
   researchAnonymityJob,
   researchEventsJob,
 } from "./research/index.ts";
-import { auditBoundary, prunePhotoCheckNotes } from "./safety/index.ts";
+import { auditBoundary, endSuspensions, prunePhotoCheckNotes } from "./safety/index.ts";
 
 export type BootOptions = {
   config: Config;
@@ -191,6 +191,9 @@ export async function boot({
     researchEventsJob({ db: pool, now }),
     // The census of the research block: a cell under k is a warning (ADR-011 §9).
     researchAnonymityJob({ db: pool, logger }),
+    // Suspensions past their day end (#307, ADR-024 §5), before the counter
+    // and the gate, so a person let back in is counted the same night.
+    { name: "end-suspensions", run: async () => ({ ended: await endSuspensions(pool, now()) }) },
     // The day's waitlist figures (#54): taken once a day, served all day.
     waitlistJob({ db: pool, logger, now }),
     // Who is let into each pond, and for whom matching opens (#94).

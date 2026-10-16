@@ -31,3 +31,12 @@ export { findIdentityByHmac, findLiveAccount } from "./repo.ts";
 export { authRoutes } from "./routes.ts";
 export { sessionStore } from "./session-store.ts";
 export { sweepSessions } from "./sessions.ts";
+// The account's state and the identity's standing, settled from the open
+// sanctions the safety slice counts (#307, ADR-024 §2); the sessions a
+// suspension or a ban ends.
+export {
+  endSessionsForSanction,
+  lockAccountForSanction,
+  type OpenSanctions,
+  settleStanding,
+} from "./standing.ts";

@@ -382,11 +382,12 @@ describe("the callback's refusals and failures", () => {
     expect(JSON.stringify(logs())).not.toContain("Odd");
   });
 
-  test("A suspended identity is refused with auth_suspended and the attempt is counted", async ({
+  test("A suspended identity is refused with auth_suspended, with the instant it ends when it has one, and the attempt is counted", async ({
     ctx,
   }) => {
     const { app, broker } = await appWith(ctx, ADULT_HETU);
     const { hetuHmac } = deriveIdentity(ADULT_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+    // A suspension without an end: a row set by hand, or written before the column existed.
     const identity = await ctx.client.query<{ id: string }>(
       "INSERT INTO identity (hetu_hmac, standing) VALUES ($1, 'suspended') RETURNING id",
       [hetuHmac],
@@ -396,12 +397,21 @@ describe("the callback's refusals and failures", () => {
       error: "auth_suspended",
       until: null,
     });
-    expect(broker.completed).toHaveLength(1);
+    // A sanction's suspension: the start of 22.10.2026 in Finland travels as &until= (ADR-024 §5).
+    await ctx.client.query(
+      "UPDATE identity SET suspension_ends_at = '2026-10-21T21:00:00Z' WHERE id = $1",
+      [id],
+    );
+    expect(refusal(await callback(app, await start(app)))).toEqual({
+      error: "auth_suspended",
+      until: "2026-10-21T21:00:00.000Z",
+    });
+    expect(broker.completed).toHaveLength(2);
     const rows = await ctx.client.query(
       "SELECT refused_attempts, (SELECT count(*) FROM account WHERE identity_id = $1) AS accounts FROM identity WHERE id = $1",
       [id],
     );
-    expect(rows.rows[0]).toMatchObject({ refused_attempts: 1, accounts: "0" });
+    expect(rows.rows[0]).toMatchObject({ refused_attempts: 2, accounts: "0" });
   });
 
   test("The adapter's refusal keeps its reason and anything else it throws is a provider error too", async ({

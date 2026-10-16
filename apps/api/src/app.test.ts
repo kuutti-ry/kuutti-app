@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createApp, PUBLIC_ROUTES } from "./app.ts";
 import { captureLogger, testConfig, testPool } from "./test/harness.ts";
 
-type GuardedRoute = { key: string; path: string; guards: string[] };
+type GuardedRoute = { key: string; path: string; guards: string[]; roles: string[][] };
 
 /**
  * Every handler route with the guards that run before it. Registration order
@@ -12,12 +12,13 @@ type GuardedRoute = { key: string; path: string; guards: string[] };
  * everything else, on any method or pattern, is a route.
  */
 function guardedRoutes(app: ReturnType<typeof createApp>): GuardedRoute[] {
-  const guards: { name: string; path: string; index: number }[] = [];
+  const guards: { name: string; path: string; index: number; roles: string[] }[] = [];
   const routes: { key: string; path: string; index: number }[] = [];
   app.routes.forEach(({ method, path, handler }, index) => {
     // The product guard or the staff guard (#49).
     if (handler.name === "requireSession" || handler.name === "requireAdmin") {
-      guards.push({ name: handler.name, path, index });
+      const { roles } = handler as { roles?: readonly string[] };
+      guards.push({ name: handler.name, path, index, roles: [...(roles ?? [])] });
       return;
     }
     if (handler.length === 2) return;
@@ -27,6 +28,7 @@ function guardedRoutes(app: ReturnType<typeof createApp>): GuardedRoute[] {
     key,
     path,
     guards: guards.filter((g) => g.path === path && g.index < index).map((g) => g.name),
+    roles: guards.filter((g) => g.path === path && g.index < index).map((g) => g.roles),
   }));
 }
 
@@ -67,6 +69,26 @@ describe("route table", () => {
       true,
     );
     expect(adminRoutesWithoutStaffGuard(routes)).toEqual([]);
+  });
+
+  it("holds a ban, its lift and its review to the admin role, and the other sanctions to moderators and admins (#307, ADR-024 §3)", async () => {
+    const routes = guardedRoutes(await bareApp());
+    const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;
+    for (const key of [
+      "POST /admin/accounts/:id/bans",
+      "POST /admin/bans/:id/lift",
+      "POST /admin/bans/:id/review",
+    ]) {
+      expect(rolesOf(key), key).toEqual([["admin"]]);
+    }
+    for (const key of [
+      "GET /admin/accounts/:id/sanctions",
+      "POST /admin/accounts/:id/sanctions",
+      "POST /admin/sanctions/:id/lift",
+      "POST /admin/sanctions/:id/review",
+    ]) {
+      expect(rolesOf(key), key).toEqual([["moderator", "admin"]]);
+    }
   });
 
   it("would catch a staff route behind the product guard alone", async () => {

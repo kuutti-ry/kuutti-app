@@ -1,9 +1,14 @@
+import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, SessionTokens } from "@kuutti/schema";
 import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
+import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { applySanction } from "../safety/index.ts";
+import { staffSession } from "../test/account.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
+import * as repo from "./repo.ts";
 import { describeSession, issueSession, sweepSessions } from "./sessions.ts";
 
 // features/identity/sessions.feature (#35): scenario names verbatim, plus the
@@ -360,4 +365,177 @@ describe("sessions", () => {
       { state: "registered", email: null, gender: null, consents: "0", live: "1" },
     ]);
   });
+});
+
+describe("a session only for an account the guard lets in (ADR-024 §4)", () => {
+  test.for([
+    ["a suspended account", "suspended", "ok", false],
+    ["a banned account", "banned", "ok", false],
+    ["a deleted account", "deleted", "ok", false],
+    ["an identity suspended", "active", "suspended", false],
+    ["an identity banned", "active", "banned", false],
+    ["a registered account", "registered", "ok", true],
+    ["an active account", "active", "ok", true],
+    ["a paused account", "paused", "ok", true],
+    ["a shadow-banned account", "shadow_banned", "ok", true],
+  ] as const)(
+    "insertSession refuses a suspended, banned or deleted account and an identity whose standing is not ok, and serves the live states: %s",
+    async ([, state, standing, issued], { ctx }) => {
+      const account = await accountRow(ctx, "a");
+      await ctx.client.query("UPDATE account SET state = $2 WHERE id = $1", [account, state]);
+      await ctx.client.query(
+        "UPDATE identity SET standing = $2 WHERE id = (SELECT identity_id FROM account WHERE id = $1)",
+        [account, standing],
+      );
+      const at = new Date("2026-10-20T09:00:00Z");
+      const row = await repo.insertSession(ctx.client, {
+        accountId: account,
+        platform: "ios",
+        userAgent: null,
+        accessHash: "access-hash",
+        accessExpiresAt: new Date(at.getTime() + 60_000),
+        refreshHash: "refresh-hash",
+        expiresAt: new Date(at.getTime() + 60_000),
+        at,
+      });
+      const { rows } = await ctx.client.query<{ n: string }>(
+        "SELECT count(*) AS n FROM session WHERE account_id = $1",
+        [account],
+      );
+      if (issued) {
+        expect(row).toMatchObject({ accountId: account, platform: "ios" });
+        expect(Number(rows[0]?.n)).toBe(1);
+      } else {
+        expect(row).toBeNull();
+        expect(Number(rows[0]?.n)).toBe(0);
+      }
+    },
+  );
+});
+
+describe("an exchange racing a ban (ADR-024 §4)", () => {
+  /**
+   * The test's transaction with the ban slipped in once, just before or just
+   * after the exchange's session insert: as if the ban's transaction, which
+   * takes the account row's lock first, had committed at that point. Before:
+   * the insert's share lock waited for it and then found the account banned.
+   * After: the insert went first and the ban ends what it wrote.
+   */
+  function interleaved(db: Queryable, at: "before" | "after", other: () => Promise<unknown>) {
+    let ran = false;
+    const insert = /^\s*INSERT INTO session \(/;
+    const wrapped: Queryable & { ran: () => boolean } = {
+      ran: () => ran,
+      async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+        if (!ran && at === "before" && insert.test(text)) {
+          ran = true;
+          await other();
+        }
+        const result = await db.query<R>(text, values);
+        if (!ran && at === "after" && insert.test(text)) {
+          ran = true;
+          await other();
+        }
+        return result;
+      },
+    };
+    return wrapped;
+  }
+
+  const T = new Date("2026-10-20T09:00:00Z");
+  const hetu = generateHetu(
+    (() => {
+      let x = 29;
+      return () => {
+        x = (x * 1103515245 + 12345) % 2147483648;
+        return x / 2147483648;
+      };
+    })(),
+    { at: T, minAge: 30, maxAge: 40 },
+  );
+  const broker: IdentityBroker = {
+    issuer: "https://broker.test/uas",
+    async startLogin(input) {
+      return new URL(`https://broker.test/uas/authorize?state=${input.state}`);
+    },
+    async completeLogin(): Promise<BrokerIdentity> {
+      return {
+        hetu,
+        subject: "RACE",
+        sessionIndex: null,
+        tokenId: null,
+        authenticatedAt: new Date(),
+        acr: "http://ftn.ficora.fi/2017/loatest2",
+        amr: [],
+      };
+    },
+  };
+
+  test.for(["before", "after"] as const)(
+    "An exchange whose session insert races a ban ends with no live session: the ban commits %s the insert",
+    async (order, { ctx }) => {
+      const admin = await staffSession(ctx.client, "admin", "d");
+      let accountId = "";
+      const db = interleaved(ctx.client, order, () =>
+        applySanction(ctx.client, {
+          accountId,
+          kind: "ban",
+          reason: "harassment",
+          note: "Threats in two chats",
+          actor: admin.identityId,
+          at: T,
+        }),
+      );
+      const { logger } = await captureLogger();
+      const app = createApp({
+        config: testConfig({
+          HETU_HMAC_KEY: "cd".repeat(32),
+          OIDC_ISSUER: "https://broker.test/uas",
+          OIDC_CLIENT_ID: "kuutti-test",
+          OIDC_REDIRECT_URI: "https://api.test/auth/callback",
+        }),
+        logger,
+        db,
+        broker,
+      });
+      const started = await app.request("/auth/start?platform=android");
+      const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
+      const back = await app.request(`/auth/callback?code=ok&state=${encodeURIComponent(state)}`);
+      const code = new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "";
+      const { rows: created } = await ctx.client.query<{ account_id: string }>(
+        "SELECT account_id FROM auth_request WHERE state = $1",
+        [state],
+      );
+      accountId = created[0]?.account_id ?? "";
+      expect(accountId).not.toBe("");
+
+      const exchanged = await app.request("/auth/exchange", {
+        method: "post",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      expect(db.ran()).toBe(true);
+      if (order === "before") {
+        // The insert found the account banned: no session, and the code reads as spent.
+        expect(exchanged.status).toBe(401);
+        expect(await errorCode(exchanged)).toBe("auth_code_used");
+      } else {
+        // The tokens reached the device, and the ban had already ended their session.
+        expect(exchanged.status).toBe(200);
+        const tokens = SessionTokens.parse(await exchanged.json());
+        expect((await whoami(app, tokens.accessToken)).code).toBe("session_revoked");
+        expect((await refresh(app, tokens.refreshToken)).status).toBe(401);
+      }
+      const { rows } = await ctx.client.query<{ n: string }>(
+        "SELECT count(*) AS n FROM session WHERE account_id = $1 AND revoked_at IS NULL",
+        [accountId],
+      );
+      expect(Number(rows[0]?.n)).toBe(0);
+      const standing = await ctx.client.query(
+        "SELECT a.state, i.standing FROM account a JOIN identity i ON i.id = a.identity_id WHERE a.id = $1",
+        [accountId],
+      );
+      expect(standing.rows).toEqual([{ state: "banned", standing: "banned" }]);
+    },
+  );
 });

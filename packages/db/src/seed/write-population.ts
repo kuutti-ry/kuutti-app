@@ -47,6 +47,9 @@ const ACCOUNT_TABLES = [
   "card_shown",
   // The photo check writes these on staging too, where the population's photos go through it (#253).
   "photo_check_note",
+  // Tapio's ban, and any staff put on a synthetic person (ADR-024 §10); an open
+  // ban or suspension outlives the erasure on the tombstone and goes here too.
+  "sanction",
   "photo",
   "research_subject",
   "consent",

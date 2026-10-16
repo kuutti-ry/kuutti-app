@@ -256,7 +256,8 @@ describe("the status read racing another request", () => {
     return signInAs(ctx.client, accountId);
   }
 
-  const ACTIVATE = /UPDATE account SET state = 'active', state_changed_at/;
+  // The activation's own statement (it chooses shadow_banned under an open shadow ban, ADR-024 §2).
+  const ACTIVATE = /UPDATE account SET state_changed_at = \$2,\s+state = CASE/;
 
   test("two status reads at once activate the account once and both answer active", async ({
     ctx,

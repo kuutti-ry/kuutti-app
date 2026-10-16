@@ -54,6 +54,7 @@ The four surfaces that matter most, in order: the OIDC exchange with Telia, the 
 - [ ] The app never holds a client secret; the exchange is backend-driven and the app receives a one-time code by deep link.
 - [x] Sessions expire; a device change re-authenticates through the bank; admin sessions are 8 hours with no refresh token. (#35 for the product sessions; #49: `admin_session`, `ADMIN_SESSION_TTL_MS`, no refresh route, tested.)
 - [ ] Re-registration honours identity standing: banned and suspended are refused, cooldown is enforced, nothing is restored.
+- [x] A sanction ends what it says at once and leaves nothing to come back (#307, ADR-024): a suspension or a ban revokes every product session of the account and every panel session of the identity in the transaction that sets it; `insertSession` takes the account row's share lock and asks for the guard's live states and an `ok` standing, so a login racing a sanction never leaves a session that a lift would revive; a sanctioned or paused owner's photos are refused to others in `findVisiblePhoto`; a ban, its lift and its review are behind an admin-only guard on paths of their own; staff's note reaches no log line, error detail, event or export.
 
 ## Software and data integrity failures
 
