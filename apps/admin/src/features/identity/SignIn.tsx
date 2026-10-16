@@ -1,5 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
+import { useLocation } from "react-router";
+import { rememberReturnPath } from "./return-path.ts";
 import { useStaffSession } from "./session.tsx";
 
 const ERRORS: ReadonlyMap<string, PlainMessageKey> = new Map([
@@ -8,17 +10,29 @@ const ERRORS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["session_ended", "admin.signIn.error.session_ended"],
 ]);
 
-/** The one thing a signed-out panel shows: the bank login, and the refusal if there was one. */
+/**
+ * The one thing a signed-out panel shows, on whatever path it was asked for:
+ * the bank login, and the refusal if there was one. The path is remembered
+ * for the bank's return (#302).
+ */
 export function SignIn() {
   const { t } = useT();
   const session = useStaffSession();
+  const location = useLocation();
   const error = session.status === "signed-out" ? session.error : undefined;
   return (
     <section aria-labelledby="sign-in-title">
       <h2 id="sign-in-title">{t("admin.signIn.title")}</h2>
       <p>{t("admin.signIn.explain")}</p>
       {error && <p role="alert">{t(ERRORS.get(error) ?? "admin.signIn.error.generic")}</p>}
-      <button type="button" onClick={session.signIn} disabled={error === "no_api"}>
+      <button
+        type="button"
+        onClick={() => {
+          rememberReturnPath(location);
+          session.signIn();
+        }}
+        disabled={error === "no_api"}
+      >
         {t("admin.signIn.button")}
       </button>
     </section>

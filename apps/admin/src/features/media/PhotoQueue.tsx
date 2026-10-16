@@ -6,8 +6,10 @@ import {
   PhotoReviewQueue,
   PhotoUrlResponse,
 } from "@kuutti/schema";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../lib/api.ts";
+import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { useList } from "../../lib/use-list.ts";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
 // the photos the automatic check would not approve. Plain HTML, keyboard
@@ -24,49 +26,22 @@ const REASONS: ReadonlyArray<{ value: PhotoRejectionReason; label: PlainMessageK
   { value: "other", label: "admin.queue.reason.other" },
 ];
 
-type QueueState =
-  | { kind: "loading" }
-  | { kind: "error" }
-  | { kind: "ready"; items: PhotoReviewItem[]; total: number };
-
 export function PhotoQueue() {
   const { t } = useT();
-  const [state, setState] = useState<QueueState>({ kind: "loading" });
-
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const { data } = await api.GET("/admin/photos/queue", { params: { query: { limit: 20 } } });
-      if (!data) return setState({ kind: "error" });
-      const queue = PhotoReviewQueue.parse(data);
-      setState({ kind: "ready", items: queue.items, total: queue.total });
-    } catch (error) {
-      // A network failure or an answer that is not the contract: the same
-      // error state, never a loading state that nothing will end.
-      console.error("queue load failed", error);
-      setState({ kind: "error" });
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { state, reload, settle } = useList({
+    fetchPage: () => api.GET("/admin/photos/queue", { params: { query: { limit: 20 } } }),
+    parse: (data) => PhotoReviewQueue.parse(data),
+    what: "queue",
+  });
 
   // A decided item stays where it was, saying what was decided, until the
   // next refresh: the moderator sees the result of the click, and the count
   // of what is still waiting goes down.
-  const decided = () =>
-    setState((previous) =>
-      previous.kind === "ready"
-        ? { ...previous, total: Math.max(0, previous.total - 1) }
-        : previous,
-    );
-
   return (
     <section aria-labelledby="queue-title">
       <header className="row">
-        <h2 id="queue-title">{t("admin.queue.title")}</h2>
-        <button type="button" onClick={() => void load()}>
+        <ScreenTitle id="queue-title">{t("admin.queue.title")}</ScreenTitle>
+        <button type="button" onClick={() => void reload()}>
           {t("admin.queue.refresh")}
         </button>
       </header>
@@ -77,7 +52,7 @@ export function PhotoQueue() {
           <p aria-live="polite">{t("admin.queue.total", { total: state.total })}</p>
           <ul className="queue">
             {state.items.map((item) => (
-              <QueueItem key={item.photoId} item={item} onDecided={decided} />
+              <QueueItem key={item.photoId} item={item} onDecided={settle} />
             ))}
           </ul>
         </>

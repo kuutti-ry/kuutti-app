@@ -1,9 +1,10 @@
 import { formatTime } from "@kuutti/i18n";
 import { I18nProvider } from "@kuutti/i18n/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./app.tsx";
-import { StaffSessionProvider } from "./features/identity/index.ts";
+import { restoreReturnPath, StaffSessionProvider } from "./features/identity/index.ts";
 import { i18n } from "./i18n.ts";
 import { apiUrl } from "./source-offer.tsx";
 
@@ -22,7 +23,9 @@ function renderApp(answer: (input?: Request | string, init?: RequestInit) => Pro
   render(
     <I18nProvider i18n={i18n}>
       <StaffSessionProvider>
-        <App />
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
       </StaffSessionProvider>
     </I18nProvider>,
   );
@@ -37,12 +40,24 @@ const staff = {
   role: "moderator",
 };
 
+const refused = () =>
+  new Response(
+    JSON.stringify({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }),
+    { status: 403, headers: { "content-type": "application/json" } },
+  );
+
 /** The API a signed-in panel talks to, by method and path; records what was asked. */
-function staffApi(role = "moderator", calls: string[] = [], options = { logoutFails: false }) {
+function staffApi(
+  role = "moderator",
+  calls: string[] = [],
+  options: { logoutFails?: boolean; answers?: Record<string, () => Response> } = {},
+) {
   return async (input?: Request | string, init?: RequestInit) => {
     const req = input instanceof Request ? input : new Request(input ?? "", init);
     const key = `${req.method} ${new URL(req.url).pathname}`;
     calls.push(key);
+    const answer = options.answers?.[key];
+    if (answer) return answer();
     if (key === "GET /health") return json(health);
     if (key === "GET /admin/whoami") return json({ role, expiresAt: staff.expiresAt });
     if (key === "GET /admin/photos/queue") return json({ items: [], total: 0 });
@@ -86,7 +101,8 @@ describe("App", () => {
   it("says so when the API cannot be reached, and never links an address that is not https", async () => {
     renderApp(async () => json({ ...health, source: "javascript:alert(1)" }));
     expect(await screen.findByText(/The API cannot be reached/)).toBeInTheDocument();
-    expect(screen.queryByRole("link")).toBeNull();
+    // The skip link is the page's own; the footer links nothing.
+    expect(within(screen.getByRole("contentinfo")).queryByRole("link")).toBeNull();
   });
 
   it("is busy while a sign-in is being completed", () => {
@@ -106,10 +122,10 @@ describe("App", () => {
     expect(
       await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Your role does not allow the photo queue.")).toBeNull();
+    expect(screen.queryByText("Your role does not open any screen of this panel.")).toBeNull();
   });
 
-  it("signed in as a researcher, says the role does not allow the queue and never asks for it", async () => {
+  it("signed in as a researcher, shows no menu, says the role opens no screen and never asks for one", async () => {
     window.sessionStorage.setItem(
       "kuutti.admin.session",
       JSON.stringify({ ...staff, role: "researcher" }),
@@ -117,11 +133,13 @@ describe("App", () => {
     const calls: string[] = [];
     renderApp(staffApi("researcher", calls));
     expect(
-      await screen.findByText("Your role does not allow the photo queue."),
+      await screen.findByText("Your role does not open any screen of this panel."),
     ).toBeInTheDocument();
     expect(screen.getByText(/Signed in as researcher/)).toBeInTheDocument();
+    expect(screen.queryByRole("navigation")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Photo review queue" })).toBeNull();
     expect(calls).not.toContain("GET /admin/photos/queue");
+    expect(calls).not.toContain("GET /admin/feedback");
   });
 
   it("a session revoked while the panel is open goes back to the sign-in, saying so (#250)", async () => {
@@ -165,6 +183,107 @@ describe("App", () => {
       expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeInTheDocument(),
     );
     expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
+  });
+
+  it("opens the first screen the role allows at the front page, the menu marking where the person is (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    renderApp(staffApi());
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/photos");
+    const menu = screen.getByRole("navigation", { name: "Screens" });
+    const links = within(menu).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual(["Photos", "Feedback"]);
+    expect(within(menu).getByRole("link", { name: "Photos" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(menu).getByRole("link", { name: "Feedback" })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("moves between screens by the menu, and the new screen's heading takes the focus (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const calls: string[] = [];
+    renderApp(staffApi("admin", calls));
+    const menu = await screen.findByRole("navigation", { name: "Screens" });
+    fireEvent.click(within(menu).getByRole("link", { name: "Feedback" }));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Feedback" });
+    expect(window.location.pathname).toBe("/feedback");
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(within(menu).getByRole("link", { name: "Feedback" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.queryByRole("heading", { name: "Photo review queue" })).toBeNull();
+    expect(calls).toContain("GET /admin/feedback");
+  });
+
+  it("opens a screen from its own address, without taking the focus on the first load (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/feedback");
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Feedback" });
+    expect(heading).not.toHaveFocus();
+    expect(calls).not.toContain("GET /admin/photos/queue");
+  });
+
+  it("says there is nothing at an address the panel does not have, and links back to the start (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/no/such/screen");
+    renderApp(staffApi());
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Nothing at this address" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Back to the start" }));
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/photos");
+  });
+
+  it("says once that the role does not allow it when the API answers 403, never as the screen's failure, until the person moves on (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    renderApp(staffApi("moderator", [], { answers: { "GET /admin/photos/queue": refused } }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    expect(screen.queryByText("The queue could not be loaded.")).toBeNull();
+    // A second refusal on the same screen says nothing new.
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    await waitFor(() => expect(screen.queryByText("Loading the queue…")).toBeNull());
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    // The session is not ended by a 403: the person is still signed in.
+    expect(screen.getByText(/Signed in as moderator/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Feedback" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Feedback" })).toBeInTheDocument();
+    expect(screen.queryByText("Your role does not allow this.")).toBeNull();
+  });
+
+  it("after the bank, brings the person back to the screen the sign-in started on (#302)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.return", "/feedback");
+    window.history.replaceState(null, "", `/#code=${"c".repeat(43)}`);
+    // What main.tsx does before the router starts.
+    restoreReturnPath();
+    const calls: string[] = [];
+    renderApp(
+      staffApi("moderator", calls, { answers: { "POST /admin/auth/exchange": () => json(staff) } }),
+    );
+    expect(await screen.findByRole("heading", { level: 2, name: "Feedback" })).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/feedback");
+    expect(window.location.hash).toBe("");
+    expect(calls).toContain("POST /admin/auth/exchange");
+    expect(calls).not.toContain("GET /admin/photos/queue");
+  });
+
+  it("offers a skip link to the screen, first on the page (#302)", async () => {
+    renderApp(async () => json(health));
+    const skip = screen.getAllByRole("link")[0];
+    expect(skip).toHaveTextContent("Skip to content");
+    expect(skip).toHaveAttribute("href", "#main");
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main");
+    await screen.findByRole("button", { name: "Sign in with your bank" });
   });
 
   it("falls back to the local API on a development server only, never in a production build", () => {

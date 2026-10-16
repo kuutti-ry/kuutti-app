@@ -1,5 +1,6 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { setTokenSource } from "../../lib/api.ts";
@@ -56,7 +57,9 @@ const handledOk: Handler = (req) =>
 function show() {
   render(
     <I18nProvider i18n={i18n}>
-      <FeedbackList />
+      <MemoryRouter>
+        <FeedbackList />
+      </MemoryRouter>
     </I18nProvider>,
   );
 }
@@ -127,5 +130,19 @@ describe("the feedback list", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Marking did not work.");
     expect(screen.getByText("A few lines, number 4.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Mark as handled" })).toBeTruthy();
+  });
+
+  it("says marking did not work when the network fails, and lets the moderator try again", async () => {
+    fetchMock([
+      listOf([item(5)]),
+      (req) => {
+        if (req.method === "POST") throw new TypeError("Failed to fetch");
+        return null;
+      },
+    ]);
+    show();
+    fireEvent.click(await screen.findByRole("button", { name: "Mark as handled" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Marking did not work.");
+    expect(screen.getByRole("button", { name: "Mark as handled" })).toBeEnabled();
   });
 });

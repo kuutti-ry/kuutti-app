@@ -36,6 +36,12 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
+/** What a 403 to a request that carried the token calls; the shell says once that the role does not allow it (#302). */
+let onForbidden: () => void = () => undefined;
+export function setForbiddenHandler(handler: () => void): void {
+  onForbidden = handler;
+}
+
 const bearer: Middleware = {
   async onRequest({ request }) {
     const token = tokenSource();
@@ -45,8 +51,13 @@ const bearer: Middleware = {
   // A session the API no longer honours (revoked, expired) ends wherever it
   // is found out, so every screen goes back to the sign-in instead of saying
   // that its own request failed (#250).
+  // A role the route does not admit is said once, in the shell, rather than
+  // as each screen's own failure (#302); the screen still gets the answer.
   async onResponse({ request, response }) {
-    if (response.status === 401 && request.headers.has("authorization")) onUnauthorized();
+    if (request.headers.has("authorization")) {
+      if (response.status === 401) onUnauthorized();
+      else if (response.status === 403) onForbidden();
+    }
     return response;
   },
 };

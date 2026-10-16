@@ -77,6 +77,37 @@ select {
   outline: 3px solid Highlight;
   outline-offset: 2px;
 }
+/* Out of sight until a keyboard reaches it (#302). */
+.skip {
+  position: absolute;
+  left: -100vw;
+}
+.skip:focus {
+  position: static;
+}
+.menu {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+.menu a {
+  display: inline-block;
+  min-height: 2.75rem;
+  line-height: 2.75rem;
+}
+/* The current screen by weight and an underline, never by colour alone. */
+.menu a[aria-current="page"] {
+  font-weight: bold;
+  text-decoration-thickness: 3px;
+}
+/* Focus moved by the panel shows where a keyboard put it, and not after a click. */
+main:focus:not(:focus-visible),
+h2:focus:not(:focus-visible) {
+  outline: none;
+}
 @media (max-width: 40rem) {
   .item {
     grid-template-columns: 1fr;

@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, api, apiUrl, failed, setTokenSource, setUnauthorizedHandler } from "./api.ts";
+import {
+  ApiError,
+  api,
+  apiUrl,
+  failed,
+  setForbiddenHandler,
+  setTokenSource,
+  setUnauthorizedHandler,
+} from "./api.ts";
 
 // The panel's one client (ADR-003): where it points, the bearer it adds from
 // the session's token source, and the error it turns an answer into.
@@ -22,6 +30,7 @@ function recordRequests() {
 afterEach(() => {
   setTokenSource(() => null);
   setUnauthorizedHandler(() => undefined);
+  setForbiddenHandler(() => undefined);
   vi.unstubAllGlobals();
 });
 
@@ -91,6 +100,37 @@ describe("the client", () => {
     expect(ended).toHaveBeenCalledTimes(1);
     // The caller still gets the answer it asked for.
     expect(response.status).toBe(401);
+  });
+});
+
+describe("a refusal for the role", () => {
+  it("is reported on a 403 to a request that carried the token, and only then (#302)", async () => {
+    let status = 403;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        json({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }, status),
+      ),
+    );
+    const refused = vi.fn();
+    const ended = vi.fn();
+    setForbiddenHandler(refused);
+    setUnauthorizedHandler(ended);
+    // Nobody signed in: a 403 says nothing about a role.
+    await api.GET("/admin/whoami");
+    expect(refused).not.toHaveBeenCalled();
+    setTokenSource(() => "t".repeat(43));
+    const { response } = await api.GET("/admin/whoami");
+    expect(refused).toHaveBeenCalledTimes(1);
+    // A refusal is not the end of the session, and the caller still gets the answer.
+    expect(ended).not.toHaveBeenCalled();
+    expect(response.status).toBe(403);
+    status = 401;
+    await api.GET("/admin/whoami");
+    expect(refused).toHaveBeenCalledTimes(1);
+    status = 200;
+    await api.GET("/admin/whoami");
+    expect(refused).toHaveBeenCalledTimes(1);
   });
 });
 

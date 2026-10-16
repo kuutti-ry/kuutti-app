@@ -1,5 +1,6 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { BrowserRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./app.tsx";
 import { StaffSessionProvider, useStaffSession } from "./features/identity/index.ts";
@@ -37,7 +38,9 @@ describe("App without an API address", () => {
     render(
       <I18nProvider i18n={i18n}>
         <StaffSessionProvider>
-          <App />
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
         </StaffSessionProvider>
       </I18nProvider>,
     );

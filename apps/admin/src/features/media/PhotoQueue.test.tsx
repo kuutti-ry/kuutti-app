@@ -1,5 +1,6 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { setTokenSource } from "../../lib/api.ts";
@@ -60,7 +61,9 @@ const cardUrls: Handler = (req) =>
 function show() {
   render(
     <I18nProvider i18n={i18n}>
-      <PhotoQueue />
+      <MemoryRouter>
+        <PhotoQueue />
+      </MemoryRouter>
     </I18nProvider>,
   );
 }

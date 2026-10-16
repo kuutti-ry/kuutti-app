@@ -1,8 +1,10 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { type FeedbackItem, type FeedbackKind, FeedbackList as FeedbackPage } from "@kuutti/schema";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../../lib/api.ts";
+import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { useList } from "../../lib/use-list.ts";
 
 // Feedback from inside the app (#171, ADR-023, rules/admin.md): what people
 // sent, a bug first and praise last, each with the build the app read and the
@@ -16,48 +18,21 @@ const KIND_LABEL: Record<FeedbackKind, PlainMessageKey> = {
   praise: "admin.feedback.kind.praise",
 };
 
-type ListState =
-  | { kind: "loading" }
-  | { kind: "error" }
-  | { kind: "ready"; items: FeedbackItem[]; total: number };
-
 export function FeedbackList() {
   const { t } = useT();
-  const [state, setState] = useState<ListState>({ kind: "loading" });
-
-  const load = useCallback(async () => {
-    setState({ kind: "loading" });
-    try {
-      const { data } = await api.GET("/admin/feedback", { params: { query: { limit: 50 } } });
-      if (!data) return setState({ kind: "error" });
-      const page = FeedbackPage.parse(data);
-      setState({ kind: "ready", items: page.items, total: page.total });
-    } catch (error) {
-      // A network failure or an answer that is not the contract: the same
-      // error state, never a loading state that nothing will end.
-      console.error("feedback load failed", error);
-      setState({ kind: "error" });
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { state, reload, settle } = useList({
+    fetchPage: () => api.GET("/admin/feedback", { params: { query: { limit: 50 } } }),
+    parse: (data) => FeedbackPage.parse(data),
+    what: "feedback",
+  });
 
   // A handled row stays where it was, saying so, until the next refresh; the
   // count of what still waits goes down.
-  const handled = () =>
-    setState((previous) =>
-      previous.kind === "ready"
-        ? { ...previous, total: Math.max(0, previous.total - 1) }
-        : previous,
-    );
-
   return (
     <section aria-labelledby="feedback-title">
       <div className="row">
-        <h2 id="feedback-title">{t("admin.feedback.title")}</h2>
-        <button type="button" onClick={() => void load()}>
+        <ScreenTitle id="feedback-title">{t("admin.feedback.title")}</ScreenTitle>
+        <button type="button" onClick={() => void reload()}>
           {t("admin.feedback.refresh")}
         </button>
       </div>
@@ -68,7 +43,7 @@ export function FeedbackList() {
           <p aria-live="polite">{t("admin.feedback.total", { total: state.total })}</p>
           <ul className="queue">
             {state.items.map((item) => (
-              <FeedbackRow key={item.id} item={item} onHandled={handled} />
+              <FeedbackRow key={item.id} item={item} onHandled={settle} />
             ))}
           </ul>
         </>
