@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { JSDOM } from "jsdom";
 import { build } from "vite";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -11,11 +12,13 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // and styles from the host alone and images from the host and the API, so the
 // page carries no inline script or style, nothing is inlined as a data: URL,
 // and every file the page names sits under the preview's own prefix, where
-// the CloudFront Function leaves it alone.
+// the CloudFront Function leaves it alone. The page is read as a document,
+// as a browser reads it (jsdom, no script run), never by matching its text.
 
 const app = fileURLToPath(new URL("..", import.meta.url));
 let outDir = "";
-let html = "";
+/** The built index.html, parsed; jsdom runs none of its scripts. */
+let page: Document;
 /** The emitted scripts and stylesheets, by file name under assets/. */
 let emitted: Map<string, string>;
 
@@ -35,7 +38,7 @@ beforeAll(async () => {
   } finally {
     vi.unstubAllEnvs();
   }
-  html = readFileSync(join(outDir, "index.html"), "utf8");
+  page = new JSDOM(readFileSync(join(outDir, "index.html"), "utf8")).window.document;
   emitted = new Map(
     readdirSync(join(outDir, "assets"))
       .filter((name) => /\.(js|css)$/.test(name))
@@ -49,19 +52,23 @@ afterAll(() => {
 
 describe("a preview's build", () => {
   it("has no inline script, style or event handler on its page", () => {
-    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
+    const scripts = [...page.querySelectorAll("script")];
     expect(scripts.length).toBeGreaterThan(0);
-    for (const [, attributes, body = ""] of scripts) {
-      expect(attributes).toMatch(/\ssrc="[^"]+"/);
-      expect(body.trim()).toBe("");
+    for (const script of scripts) {
+      expect(script.getAttribute("src")).toBeTruthy();
+      expect(script.textContent?.trim()).toBe("");
     }
-    expect(html).not.toMatch(/<style\b/i);
-    expect(html).not.toMatch(/\sstyle=/i);
-    expect(html).not.toMatch(/\son[a-z]+=/i);
+    expect(page.querySelectorAll("style")).toHaveLength(0);
+    const inline = [...page.querySelectorAll("*")]
+      .flatMap((element) => [...element.attributes].map((attribute) => attribute.name))
+      .filter((name) => name === "style" || name.startsWith("on"));
+    expect(inline).toEqual([]);
   });
 
   it("names every file of its page under the preview's assets, and each is there", () => {
-    const references = [...html.matchAll(/\s(?:src|href)="([^"]*)"/g)].map(([, url = ""]) => url);
+    const references = [...page.querySelectorAll("[src], [href]")].map(
+      (element) => element.getAttribute("src") ?? element.getAttribute("href") ?? "",
+    );
     expect(references).toEqual(
       expect.arrayContaining([expect.stringMatching(/\.js$/), expect.stringMatching(/\.css$/)]),
     );
