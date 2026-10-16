@@ -4,6 +4,8 @@
 // A person's page in the panel (#306).
 export { accountAdminRoutes } from "./account-routes.ts";
 export { auditBoundary, recordAudit } from "./audit.ts";
+// The audit log's reader and the staff list (#309, #310), admins only.
+export { auditAdminRoutes } from "./audit-routes.ts";
 // The tunables in the panel (#304, #305).
 export { configAdminRoutes } from "./config-routes.ts";
 // Feedback from inside the app (#171, ADR-023): the routes, and the halves erasure and the export call.
@@ -29,3 +31,4 @@ export {
   endSuspensions,
   listSanctionsOfAccount,
 } from "./sanctions.ts";
+export { staffAdminRoutes } from "./staff-routes.ts";

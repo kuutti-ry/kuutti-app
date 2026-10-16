@@ -8,9 +8,11 @@ import { PhotoQueue } from "./features/media/index.ts";
 import {
   AccountLookup,
   AccountPage,
+  AuditLog,
   ConfigList,
   FeedbackList,
   Overview,
+  StaffList,
 } from "./features/safety/index.ts";
 import { setRoleAnswerHandler } from "./lib/api.ts";
 import { NavigationFocus, ScreenTitle } from "./lib/screen-title.tsx";
@@ -69,6 +71,18 @@ const SCREENS: readonly Screen[] = [
     label: "admin.nav.config",
     roles: ["admin"],
     element: <ConfigList />,
+  },
+  {
+    path: "/audit",
+    label: "admin.nav.audit",
+    roles: ["admin"],
+    element: <AuditLog />,
+  },
+  {
+    path: "/staff",
+    label: "admin.nav.staff",
+    roles: ["admin"],
+    element: <StaffList />,
   },
 ];
 

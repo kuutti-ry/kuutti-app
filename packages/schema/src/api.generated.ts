@@ -3279,6 +3279,137 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The audit log, a page at a time
+         * @description Who did or saw what, newest first, 50 rows a page; narrowed by actor, action, subject type and id, and a time window; `before` is the `next` of the page before. Never more than a page. Admins only; a read narrowed to a subject id writes audit.read about it first, any other read writes nothing.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    actor?: string;
+                    action?: string;
+                    subjectType?: string;
+                    subjectId?: string;
+                    from?: string;
+                    to?: string;
+                    before?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AuditPage"];
+                    };
+                };
+                /** @description Validation failed, or cursor_invalid: a cursor this route did not give. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who holds a role
+         * @description Every member of staff by identity id: the role, when and by whom it was granted, the last sign-in to the panel. Granting and revoking stay the maintainer's tool. Admins only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The staff. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StaffList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gate": {
         parameters: {
             query?: never;
@@ -4594,6 +4725,39 @@ export interface components {
             detail: {
                 [key: string]: string | number | boolean | unknown;
             } | null;
+        };
+        AuditPage: {
+            items: components["schemas"]["AuditEntry"][];
+            next: string | null;
+        };
+        AuditEntry: {
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actorIdentityId: string;
+            action: string;
+            subjectType: string;
+            /** Format: uuid */
+            subjectId: string;
+            detail: {
+                [key: string]: string | number | boolean | unknown;
+            } | null;
+            actorRole: components["schemas"]["ModeratorRole"] & unknown;
+            /** Format: uuid */
+            accountId: string | null;
+        };
+        StaffList: {
+            items: components["schemas"]["StaffMember"][];
+        };
+        StaffMember: {
+            /** Format: uuid */
+            identityId: string;
+            role: components["schemas"]["ModeratorRole"];
+            /** Format: date-time */
+            grantedAt: string;
+            grantedBy: string;
+            /** Format: date-time */
+            lastSignInAt: string | null;
         };
         GateResponse: {
             state: components["schemas"]["GateState"];

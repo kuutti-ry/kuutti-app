@@ -11,6 +11,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate, useParams } from "react-router";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { AuditDetail } from "./audit-detail.tsx";
 
 // A person's page in the panel (#306): one account by its id, never a
 // search. Every open is an audit row on the API's side (account.view), so
@@ -263,7 +264,7 @@ export function AccountPage() {
                 </td>
                 <td>{row.action}</td>
                 <td>
-                  <code>{row.detail ? JSON.stringify(row.detail) : ""}</code>
+                  <AuditDetail detail={row.detail} />
                 </td>
               </tr>
             ))}

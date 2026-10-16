@@ -37,11 +37,13 @@ import { pondRoutes } from "./pond/index.ts";
 import { exportProfile, profileRoutes } from "./profile/index.ts";
 import {
   accountAdminRoutes,
+  auditAdminRoutes,
   configAdminRoutes,
   feedbackAdminRoutes,
   feedbackRoutes,
   overviewAdminRoutes,
   sanctionAdminRoutes,
+  staffAdminRoutes,
 } from "./safety/index.ts";
 
 export type { AppEnv };
@@ -153,6 +155,8 @@ export function createApp(deps: Deps) {
   app.route("/", configAdminRoutes(deps, admins));
   app.route("/", overviewAdminRoutes(deps, moderators));
   app.route("/", accountAdminRoutes(deps, moderators));
+  app.route("/", auditAdminRoutes(deps, admins));
+  app.route("/", staffAdminRoutes(deps, admins));
   // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",

@@ -333,7 +333,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Photos", "Feedback", "A person", "Tunables"]);
+    ).toEqual(["Overview", "Photos", "Feedback", "A person", "Tunables", "Audit log", "Staff"]);
     expect(calls).not.toContain("GET /admin/config");
     fireEvent.click(within(menu).getByRole("link", { name: "Tunables" }));
     const heading = await screen.findByRole("heading", { level: 2, name: "Tunables" });
@@ -390,6 +390,91 @@ describe("App", () => {
     expect(calls).toContain("GET /admin/feedback");
     expect(calls).not.toContain("GET /admin/config");
   });
+
+  it("offers an admin the audit log and the staff in the menu, each screen asking for its own when opened (#309, #310)", async () => {
+    window.sessionStorage.setItem(
+      "kuutti.admin.session",
+      JSON.stringify({ ...staff, role: "admin" }),
+    );
+    const calls: string[] = [];
+    renderApp(
+      staffApi("admin", calls, {
+        answers: {
+          "GET /admin/audit": () => json({ items: [], next: null }),
+          "GET /admin/staff": () => json({ items: [] }),
+        },
+      }),
+    );
+    const menu = await screen.findByRole("navigation", { name: "Screens" });
+    expect(calls).not.toContain("GET /admin/audit");
+    expect(calls).not.toContain("GET /admin/staff");
+
+    fireEvent.click(within(menu).getByRole("link", { name: "Audit log" }));
+    const audit = await screen.findByRole("heading", { level: 2, name: "Audit log" });
+    expect(window.location.pathname).toBe("/audit");
+    await waitFor(() => expect(audit).toHaveFocus());
+    expect(within(menu).getByRole("link", { name: "Audit log" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(await screen.findByText("Nothing matches.")).toBeInTheDocument();
+    expect(calls).toContain("GET /admin/audit");
+    expect(calls).not.toContain("GET /admin/staff");
+    expect(document.title).toBe("Audit log · Kuutti admin");
+
+    fireEvent.click(within(menu).getByRole("link", { name: "Staff" }));
+    const staffHeading = await screen.findByRole("heading", { level: 2, name: "Staff" });
+    expect(window.location.pathname).toBe("/staff");
+    await waitFor(() => expect(staffHeading).toHaveFocus());
+    expect(within(menu).getByRole("link", { name: "Staff" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(menu).getByRole("link", { name: "Audit log" })).not.toHaveAttribute(
+      "aria-current",
+    );
+    expect(await screen.findByText("0 members of staff")).toBeInTheDocument();
+    expect(calls).toContain("GET /admin/staff");
+    expect(document.title).toBe("Staff · Kuutti admin");
+    expect(screen.queryByText("Your role does not allow this.")).toBeNull();
+  });
+
+  it.each([
+    ["/audit", "Audit log"],
+    ["/staff", "Staff"],
+  ])(
+    "shows a moderator no audit log or staff in the menu, and at %s says the role does not allow it, asking nothing (#309, #310)",
+    async (address, title) => {
+      window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+      window.history.replaceState(null, "", address);
+      const calls: string[] = [];
+      renderApp(staffApi("moderator", calls));
+      const heading = await screen.findByRole("heading", { level: 2, name: title });
+      expect(heading).not.toHaveFocus();
+      expect(screen.getByText("Your role does not allow this.")).toBeInTheDocument();
+      // Said where it is asked for, not as a refusal the API answered.
+      expect(screen.queryByRole("alert")).toBeNull();
+      const menu = screen.getByRole("navigation", { name: "Screens" });
+      expect(
+        within(menu)
+          .getAllByRole("link")
+          .map((link) => link.textContent),
+      ).toEqual(["Overview", "Photos", "Feedback", "A person"]);
+      expect(within(menu).queryByRole("link", { name: "Audit log" })).toBeNull();
+      expect(within(menu).queryByRole("link", { name: "Staff" })).toBeNull();
+      expect(screen.queryByRole("form", { name: "Filters" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Refresh" })).toBeNull();
+      expect(document.title).toBe(`${title} · Kuutti admin`);
+      // The menu still works from here, and the panel asked for neither screen.
+      fireEvent.click(within(menu).getByRole("link", { name: "Feedback" }));
+      expect(
+        await screen.findByRole("heading", { level: 2, name: "Feedback" }),
+      ).toBeInTheDocument();
+      expect(calls).toContain("GET /admin/feedback");
+      expect(calls).not.toContain("GET /admin/audit");
+      expect(calls).not.toContain("GET /admin/staff");
+    },
+  );
 
   it("opens the way to a person's page from the menu, and a pasted id opens the page, each heading taking the focus (#306)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));

@@ -333,7 +333,7 @@ describe("a person's page", () => {
       );
     expect(rows).toEqual([
       [when(LOOKED), "a1b2c3d4", "account.view", ""],
-      [when(CHANGED), "a1b2c3d4", "photo.decide", '{"decision":"reject","reason":"no_person"}'],
+      [when(CHANGED), "a1b2c3d4", "photo.decide", "decisionrejectreasonno_person"],
     ]);
     expect(audit).not.toHaveTextContent(STAFF);
 

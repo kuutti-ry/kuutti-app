@@ -65,6 +65,59 @@ export const AdminOverview = z
   .meta({ id: "AdminOverview" });
 export type AdminOverview = z.infer<typeof AdminOverview>;
 
+/**
+ * A moment of the audit log's window: from 1970 on, as no row is older and
+ * the database knows no year 0; at most thirty characters, as the database
+ * refuses a value longer than its field (a fraction of 130 digits, say).
+ */
+const instant = z.iso
+  .datetime()
+  .max(30)
+  .refine((value) => Date.parse(value) >= 0, "From 1970 on");
+
+/** The audit log's reader (#309): filters, and the keyset cursor of the page before. */
+export const AuditQuery = z
+  .object({
+    actor: z.uuid().optional(),
+    action: z
+      .string()
+      .regex(/^[a-z]+\.[a-z]+$/)
+      .max(60)
+      .optional(),
+    subjectType: z
+      .string()
+      .regex(/^[a-z]+$/)
+      .max(40)
+      .optional(),
+    subjectId: z.uuid().optional(),
+    from: instant.optional(),
+    to: instant.optional(),
+    /** The `next` of the page before: older rows than it. */
+    before: z.string().max(200).optional(),
+  })
+  .meta({ id: "AuditQuery" });
+export type AuditQuery = z.infer<typeof AuditQuery>;
+
+/** How many audit rows a page holds; no route answers more at once (rules/admin.md: never a bulk export). */
+export const AUDIT_PAGE_SIZE = 50;
+
+/** A member of staff (#310): the role, who granted it and when, the last sign-in to the panel. */
+export const StaffMember = z
+  .object({
+    identityId: z.uuid(),
+    role: ModeratorRole,
+    grantedAt: z.iso.datetime(),
+    grantedBy: z.string().max(200),
+    lastSignInAt: z.iso.datetime().nullable(),
+  })
+  .meta({ id: "StaffMember" });
+export type StaffMember = z.infer<typeof StaffMember>;
+
+export const StaffList = z
+  .object({ items: z.array(StaffMember).max(500) })
+  .meta({ id: "StaffList" });
+export type StaffList = z.infer<typeof StaffList>;
+
 /** A person's page in the panel (#306): by account id only, never a search. */
 export const AdminAccountParams = z.object({ id: z.uuid() }).meta({ id: "AdminAccountParams" });
 
@@ -94,6 +147,24 @@ export const AdminAuditRow = z
   })
   .meta({ id: "AdminAuditRow" });
 export type AdminAuditRow = z.infer<typeof AdminAuditRow>;
+
+/** A row as the audit log's reader shows it (#309): who by role, and whose page a row is about. */
+export const AuditEntry = AdminAuditRow.extend({
+  /** The actor's role now; null once it was taken away. */
+  actorRole: ModeratorRole.nullable(),
+  /** The account the row is about, or the owner of the photo it is about: the person's page (#306). Null otherwise, or for a photo that is gone. */
+  accountId: z.uuid().nullable(),
+}).meta({ id: "AuditEntry" });
+export type AuditEntry = z.infer<typeof AuditEntry>;
+
+/** One page of the audit log, newest first, and the cursor of the next older page; null at the end. */
+export const AuditPage = z
+  .object({
+    items: z.array(AuditEntry).max(AUDIT_PAGE_SIZE),
+    next: z.string().max(200).nullable(),
+  })
+  .meta({ id: "AuditPage" });
+export type AuditPage = z.infer<typeof AuditPage>;
 
 /**
  * What a moderator may see about one person (#306): the account's raw state
