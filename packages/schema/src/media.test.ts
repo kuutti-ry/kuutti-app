@@ -24,6 +24,7 @@ import {
   PhotoUploadRequest,
   PhotoUrlResponse,
   PhotoVariantParams,
+  photoWithKnownDescription,
   TipKind,
 } from "./media.ts";
 
@@ -370,6 +371,24 @@ describe("the automatic description (#296)", () => {
     expect(codes(Photo, { ...photo, description: { ...lakeside, scene: ["moon"] } })).toEqual([
       "invalid_value",
     ]);
+  });
+
+  it("is read on a photo as this build can say it, and a photo without one, or no photo, is handed back as it is", () => {
+    const newer = { ...lakeside, scene: ["lake", "volcano"], objects: ["hiking", "dog", "beer"] };
+    expect(photoWithKnownDescription({ ...photo, description: newer })).toEqual({
+      ...photo,
+      description: lakeside,
+    });
+    expect(photoWithKnownDescription({ ...photo, description: null })).toEqual({
+      ...photo,
+      description: null,
+    });
+    // An older API's photo, with no description at all: untouched, and the parse reads null.
+    expect(photoWithKnownDescription(photo)).toBe(photo);
+    expect(Photo.parse(photoWithKnownDescription(photo)).description).toBeNull();
+    for (const notAPhoto of [null, undefined, "photo", 42, [photo]]) {
+      expect(photoWithKnownDescription(notAPhoto)).toBe(notAPhoto);
+    }
   });
 
   it("is read by an older app without the keys it has no words for, and anything else as it is", () => {
