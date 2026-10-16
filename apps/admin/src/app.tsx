@@ -2,10 +2,10 @@ import { formatTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import type { ModeratorRole } from "@kuutti/schema";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
-import { ConfigList, FeedbackList } from "./features/safety/index.ts";
+import { ConfigList, FeedbackList, Overview } from "./features/safety/index.ts";
 import { setRoleAnswerHandler } from "./lib/api.ts";
 import { NavigationFocus, ScreenTitle } from "./lib/screen-title.tsx";
 import mark from "./logo-mark.png";
@@ -25,6 +25,12 @@ type Screen = {
 };
 
 const SCREENS: readonly Screen[] = [
+  {
+    path: "/",
+    label: "admin.nav.overview",
+    roles: ["moderator", "admin"],
+    element: <Overview />,
+  },
   {
     path: "/photos",
     label: "admin.nav.photos",
@@ -52,7 +58,7 @@ export function App() {
     session.status === "signed-in"
       ? SCREENS.filter((screen) => screen.roles.includes(session.session.role))
       : [];
-  // The front page, until #303 has one of its own: the first screen the role opens.
+  // A role with no screen (a researcher, until #194) gets the forbidden text and no menu.
   const [front] = screens;
   return (
     <>
@@ -80,7 +86,10 @@ export function App() {
           <ul className="menu">
             {screens.map((screen) => (
               <li key={screen.path}>
-                <NavLink to={screen.path}>{t(screen.label)}</NavLink>
+                {/* `end`: the front page is the current one only at "/" itself. */}
+                <NavLink to={screen.path} end>
+                  {t(screen.label)}
+                </NavLink>
               </li>
             ))}
           </ul>
@@ -90,19 +99,15 @@ export function App() {
         {session.status === "loading" && <p aria-busy="true">{t("admin.queue.loading")}</p>}
         {session.status === "signed-out" && <SignIn />}
         {session.status === "signed-in" &&
-          (front ? (
-            <Screens screens={screens} front={front.path} />
-          ) : (
-            <p>{t("admin.forbidden")}</p>
-          ))}
+          (front ? <Screens screens={screens} /> : <p>{t("admin.forbidden")}</p>)}
       </main>
       <SourceOffer />
     </>
   );
 }
 
-/** The routes a signed-in role opens, the front page as the first of them, and the one notice of a refusal. */
-function Screens({ screens, front }: { screens: readonly Screen[]; front: string }) {
+/** The routes a signed-in role opens, the front page (#303) among them, and the one notice of a refusal. */
+function Screens({ screens }: { screens: readonly Screen[] }) {
   const { t } = useT();
   const { key } = useLocation();
   // The visit a 403 was answered on: the notice belongs to it, so it is gone
@@ -121,7 +126,6 @@ function Screens({ screens, front }: { screens: readonly Screen[]; front: string
     <NavigationFocus>
       {refusedOn === key && <p role="alert">{t("admin.refused")}</p>}
       <Routes>
-        <Route path="/" element={<Navigate to={front} replace />} />
         {SCREENS.map((screen) => (
           <Route
             key={screen.path}

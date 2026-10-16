@@ -5188,6 +5188,62 @@ admin.config.failed:
   en: "The change was not saved."
   description: "Admin panel, the change failed for another reason (#305)."
 
+admin.nav.overview:
+  en: "Overview"
+  description: "Admin panel, the menu entry of the front page (#303)."
+
+admin.overview.title:
+  en: "What waits"
+  description: "Admin panel, the heading of the front page: every queue with its count and the age of its oldest (#303)."
+
+admin.overview.refresh:
+  en: "Refresh"
+  description: "Admin panel, the button that reloads the front page (#303)."
+
+admin.overview.loading:
+  en: "Loading what waits…"
+  description: "Admin panel, while the front page is fetched (#303)."
+
+admin.overview.error:
+  en: "What waits could not be loaded."
+  description: "Admin panel, the front page's request failed (#303)."
+
+admin.overview.empty:
+  en: "Nothing waits in any queue."
+  description: "Admin panel, every queue on the front page is empty (#303)."
+
+admin.overview.queue.photos:
+  en: "Photo review queue"
+  description: "Admin panel, the photo queue's name on the front page, a link to it (#303)."
+
+admin.overview.queue.feedback:
+  en: "Feedback"
+  description: "Admin panel, the feedback's name on the front page, a link to it (#303)."
+
+admin.overview.none:
+  en: "nothing waits."
+  description: "Admin panel, after a queue's name on the front page: that queue is empty (#303)."
+
+admin.overview.waiting:
+  en: "{waiting, plural, one {# waits} other {# wait}}. Oldest: {age}"
+  description: "Admin panel, after a queue's name on the front page: how many wait and how long the oldest has, {age} being one of the admin.overview.age texts (#303)."
+
+admin.overview.age.lessThanHour:
+  en: "less than an hour"
+  description: "Admin panel, the oldest has waited under an hour (#303)."
+
+admin.overview.age.hours:
+  en: "{hours, plural, one {# hour} other {# hours}}"
+  description: "Admin panel, the oldest has waited this many whole hours, under two days (#303)."
+
+admin.overview.age.days:
+  en: "{days, plural, one {# day} other {# days}}"
+  description: "Admin panel, the oldest has waited this many whole days, from two days on (#303)."
+
+admin.overview.late:
+  en: "Late (response time: {hours} h)"
+  description: "Admin panel, after a queue whose oldest has waited longer than matching_config moderation_response_hours, the time the association promises (#299, #303); said in words and bold, never by colour alone."
+
 admin.refused:
   en: Your role does not allow this.
   description: "Admin panel, shown once above a screen when the API refused a request for the signed-in role (403), instead of the screen's own error (#302)."

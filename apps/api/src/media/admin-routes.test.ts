@@ -93,6 +93,24 @@ describe("photo review queue", () => {
     });
   });
 
+  test("The queue puts first what has waited longest, an appealed photo from its appeal (#303)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    // Uploaded first, but back in the queue only by an appeal after the second's upload.
+    const appealed = await photoIn(ctx, owner.accountId, "queued", { labels: [], ago: 600 });
+    await ctx.client.query(
+      "UPDATE photo_review SET appealed_at = now() - interval '10 seconds' WHERE photo_id = $1",
+      [appealed],
+    );
+    const waiting = await photoIn(ctx, owner.accountId, "queued", { labels: [], ago: 60 });
+    const res = await app.request("/admin/photos/queue", { headers: staff.headers });
+    const queue = PhotoReviewQueue.parse(await res.json());
+    expect(queue.items.map((i) => i.photoId)).toEqual([waiting, appealed]);
+  });
+
   test("The queue shows queued photos oldest first with what the check saw", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const staff = await staffSession(ctx.client);

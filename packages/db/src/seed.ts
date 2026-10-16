@@ -97,6 +97,7 @@ export const MATCHING_CONFIG_V1 = {
   // day, counted from feedback in the statement that writes the row; the
   // sixth is refused in words.
   feedback_per_day: 5,
+  moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,

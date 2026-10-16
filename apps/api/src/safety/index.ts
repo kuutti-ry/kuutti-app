@@ -6,6 +6,8 @@ export { configAdminRoutes } from "./config-routes.ts";
 // Feedback from inside the app (#171, ADR-023): the routes, and the halves erasure and the export call.
 export { deleteFeedbackOfAccount, listFeedbackOfAccount } from "./feedback.ts";
 export { feedbackAdminRoutes, feedbackRoutes } from "./feedback-routes.ts";
+// The panel's front page (#303).
+export { overviewAdminRoutes } from "./overview-routes.ts";
 // What the photo check did not show, and the closer look it leads to (#253).
 export {
   closerLookOf,

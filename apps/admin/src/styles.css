@@ -144,3 +144,10 @@ h2:focus:not(:focus-visible) {
   font: inherit;
   min-height: 2.75rem;
 }
+/* The front page (#303): one line per queue. */
+.overview {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}

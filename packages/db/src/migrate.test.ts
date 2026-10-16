@@ -314,6 +314,8 @@ describe("migrate", () => {
 
   it("migration 0047 adds the reason to matching_config, nullable, and keeps every row as it was (#305)", async () => {
     const before0047 = migrationsBefore("0047_config_reason");
+    // 0047 alone: a later migration's rows are not this one's to keep.
+    const through0047 = migrationsBefore("0048_moderation_response_hours");
     try {
       await withTemporaryDatabase(async (url) => {
         const pool = createPool({ connectionString: url, max: 2 });
@@ -332,12 +334,15 @@ describe("migrate", () => {
               `SELECT ${columns} FROM matching_config ${order}`,
             )
           ).rows;
-          // Versions 1 and 2 of the migrations before it, every one of them.
+          // Versions 1 and 2 of the migrations before it, every one of them;
+          // the keys a later migration adds (0048, #303) are not there yet.
+          const later = new Set(["moderation_response_hours"]);
           expect(rows).toHaveLength(
-            Object.keys(MATCHING_CONFIG_V1).length + Object.keys(MATCHING_CONFIG_V2).length,
+            Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
+              Object.keys(MATCHING_CONFIG_V2).length,
           );
 
-          expect(await migrate(pool, MIGRATIONS)).toEqual({ state: "applied", applied: 1 });
+          expect(await migrate(pool, through0047)).toEqual({ state: "applied", applied: 1 });
           expect((await reasonColumn()).rows).toEqual([
             { data_type: "text", is_nullable: "YES", column_default: null },
           ]);
@@ -388,6 +393,7 @@ describe("migrate", () => {
       });
     } finally {
       rmSync(before0047, { recursive: true, force: true });
+      rmSync(through0047, { recursive: true, force: true });
     }
   });
 
