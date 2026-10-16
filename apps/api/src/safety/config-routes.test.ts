@@ -319,6 +319,10 @@ describe("POST /admin/config/{key}", () => {
       ["default_pond", 1, "string"],
       ["photo_fetches_per_day", { thumb: 600, card: 300 }, "object"],
       ["photo_fetches_per_day", 600, "object"],
+      // A count keeps its wholeness and sign: a fraction there answers 500 for everyone.
+      ["feedback_per_day", 5.5, "number"],
+      ["feedback_per_day", -1, "number"],
+      ["photo_fetches_per_day", { thumb: 600.5, card: 300, full: 60 }, "object"],
     ] as const) {
       await refused(
         await change(api, staff.headers, key, { value, reason: REASON }),

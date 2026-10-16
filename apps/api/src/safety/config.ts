@@ -59,21 +59,37 @@ function kindOf(value: unknown): string {
   return typeof value;
 }
 
+/** The largest whole number a count may hold: readers compare it with SQL int4 counts. */
+const INT4_MAX = 2_147_483_647;
+
+/** A number keeps what its key declared: a whole number from 0 stays one within int4, a number from 0 stays from 0. */
+function fitsNumber(declared: number, next: number): boolean {
+  if (Number.isInteger(declared) && declared >= 0) {
+    return Number.isSafeInteger(next) && next >= 0 && next <= INT4_MAX;
+  }
+  return declared < 0 || next >= 0;
+}
+
 /**
- * Whether a new value keeps the current one's shape: the same JSON type, and
- * for an object the same keys with values of the same type (the photo fetch
- * budgets are one). A reader parses the value it expects; a change of shape
- * is a migration's, with the code that reads it.
+ * Whether a new value keeps the shape the key's first version declared (the
+ * migration's value): the same JSON type; for an object the same keys with
+ * values of the same type (the photo fetch budgets); for a number its
+ * wholeness and sign, since a count is compared with SQL integers and parsed
+ * as one (a fraction there answers 500 for everyone). The first version and
+ * not the current one, so a fraction key set to 1 can still go back to 0.6.
+ * A reader parses the value it expects; a change of shape is a migration's,
+ * with the code that reads it.
  */
-export function sameShape(current: unknown, next: unknown): boolean {
-  if (kindOf(current) !== kindOf(next)) return false;
-  if (kindOf(current) !== "object") return true;
-  const a = current as Record<string, unknown>;
+export function sameShape(declared: unknown, next: unknown): boolean {
+  if (kindOf(declared) !== kindOf(next)) return false;
+  if (typeof declared === "number") return fitsNumber(declared, next as number);
+  if (kindOf(declared) !== "object") return true;
+  const a = declared as Record<string, unknown>;
   const b = next as Record<string, unknown>;
   const keys = Object.keys(a).sort();
   const other = Object.keys(b).sort();
   if (keys.length !== other.length || keys.some((k, i) => k !== other[i])) return false;
-  return keys.every((k) => kindOf(a[k]) === kindOf(b[k]));
+  return keys.every((k) => sameShape(a[k], b[k]));
 }
 
 /**
@@ -94,11 +110,21 @@ export async function changeConfig(
   );
   const current = latest[0];
   if (!current) throw new AppError(404, "not_found", "No such key; keys are born in migrations");
-  if (!sameShape(current.value, input.value)) {
-    throw new AppError(400, "config_shape", "The value must keep the current one's type and keys", {
-      key: input.key,
-      expected: kindOf(current.value),
-    });
+  const { rows: first } = await db.query<{ value: unknown }>(
+    "SELECT value FROM matching_config WHERE key = $1 ORDER BY version LIMIT 1",
+    [input.key],
+  );
+  const declared = first[0]?.value ?? current.value;
+  if (!sameShape(declared, input.value)) {
+    throw new AppError(
+      400,
+      "config_shape",
+      "The value must keep the type, keys and kind of number its key declared",
+      {
+        key: input.key,
+        expected: kindOf(declared),
+      },
+    );
   }
   const id = randomUUID();
   const version = current.version + 1;

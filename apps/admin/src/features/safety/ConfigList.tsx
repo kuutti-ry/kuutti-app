@@ -1,51 +1,85 @@
 import { formatDateTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import {
-  type ConfigChange,
+  ConfigChange,
   type ConfigKey,
   ConfigList as ConfigPage,
   type ConfigValue,
 } from "@kuutti/schema";
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 
 // The tunables (#304, #305, admins only): every key of matching_config with
 // its value and history, and a change with a reason, shown old and new before
-// it is sent. The API holds the value to the current one's shape; the form
-// reads the input by the current value's type so a typo is caught here first.
-// English only (TD-17); plain HTML, keyboard first.
+// it is sent. The API holds the value to the shape its key declared (the
+// first version); the form reads the input the same way, so a typo is caught
+// here first. A saved change updates its key in place: nothing else on the
+// screen moves. English only (TD-17); plain HTML, keyboard first.
 
 /** A value as the panel shows it: an object as JSON, the rest as it is. */
 const shown = (value: ConfigValue) =>
   typeof value === "object" ? JSON.stringify(value) : String(value);
 
-/** The input read as a value of the current one's type; null when it is not one. */
-function parseAs(current: ConfigValue, input: string): ConfigValue | null {
-  const text = input.trim();
-  if (typeof current === "number") {
-    const n = text === "" ? Number.NaN : Number(text);
-    return Number.isFinite(n) ? n : null;
+/** The largest whole number a count may hold, as the API holds it (SQL int4). */
+const INT4_MAX = 2_147_483_647;
+
+/** A number that keeps what its key declared: a whole number from 0 stays one, a number from 0 stays from 0. */
+function fits(declared: number, n: number): boolean {
+  if (Number.isInteger(declared) && declared >= 0) {
+    return Number.isSafeInteger(n) && n >= 0 && n <= INT4_MAX;
   }
-  if (typeof current === "boolean") return text === "true" ? true : text === "false" ? false : null;
-  if (typeof current === "string") return text === "" ? null : text;
+  return declared < 0 || n >= 0;
+}
+
+/** The input read as a value of the shape its key declared; null when it is not one. */
+function parseAs(declared: ConfigValue, input: string): ConfigValue | null {
+  const text = input.trim();
+  if (typeof declared === "number") {
+    const n = text === "" ? Number.NaN : Number(text);
+    return Number.isFinite(n) && fits(declared, n) ? n : null;
+  }
+  if (typeof declared === "boolean") {
+    return text === "true" ? true : text === "false" ? false : null;
+  }
+  if (typeof declared === "string") return text === "" ? null : text;
   try {
     const parsed: unknown = JSON.parse(text);
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as ConfigValue)
-      : null;
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const value = parsed as Record<string, unknown>;
+    const keys = Object.keys(declared);
+    const same =
+      keys.length === Object.keys(value).length &&
+      keys.every((k) => {
+        const want = declared[k];
+        const got = value[k];
+        if (typeof want === "number") return typeof got === "number" && fits(want, got);
+        return typeof got === typeof want;
+      });
+    return same ? (value as ConfigValue) : null;
   } catch {
     return null;
   }
 }
 
+/** A key with the version a change wrote put first, as the API now holds it. */
+function withChange(item: ConfigKey, change: ConfigChange): ConfigKey {
+  const { key: _key, ...version } = change;
+  return {
+    ...item,
+    value: change.value,
+    version: change.version,
+    versions: [version, ...item.versions].slice(0, 1000),
+  };
+}
+
 export function ConfigList() {
   const { t } = useT();
-  // What the last change wrote, said above the list: the list reloads behind
-  // it, and a row's own state would go with the reload.
+  // What the last change wrote, said in a live region that is always there,
+  // so the first change is announced too.
   const [saved, setSaved] = useState<ConfigChange | null>(null);
-  const { state, reload } = useList({
+  const { state, reload, update } = useList({
     fetchPage: () => api.GET("/admin/config"),
     parse: (data) => {
       const { items } = ConfigPage.parse(data);
@@ -62,15 +96,15 @@ export function ConfigList() {
           {t("admin.config.refresh")}
         </button>
       </div>
-      {saved && (
-        <p aria-live="polite">
-          {t("admin.config.changed", {
-            key: saved.key,
-            value: shown(saved.value),
-            version: String(saved.version),
-          })}
-        </p>
-      )}
+      <p aria-live="polite">
+        {saved
+          ? t("admin.config.changed", {
+              key: saved.key,
+              value: shown(saved.value),
+              version: String(saved.version),
+            })
+          : ""}
+      </p>
       {state.kind === "loading" && <p aria-busy="true">{t("admin.config.loading")}</p>}
       {state.kind === "error" && <p role="alert">{t("admin.config.error")}</p>}
       {state.kind === "ready" && (
@@ -83,7 +117,9 @@ export function ConfigList() {
                 item={item}
                 onChanged={(change) => {
                   setSaved(change);
-                  void reload();
+                  update((items) =>
+                    items.map((i) => (i.key === change.key ? withChange(i, change) : i)),
+                  );
                 }}
               />
             ))}
@@ -112,10 +148,26 @@ function Tunable({
   const [reason, setReason] = useState("");
   const [step, setStep] = useState<Step>({ kind: "editing" });
   const object = typeof item.value === "object";
+  // The shape the key declared: its first version, the migration's (the history is newest first).
+  const declared = item.versions.at(-1)?.value ?? item.value;
+  const whole = typeof declared === "number" && Number.isInteger(declared);
+
+  // The focus follows the step: to the confirm sentence when it appears, back
+  // to the value when the form returns (a cancel, a refusal, a saved change),
+  // so a keyboard or screen-reader user is never left on the page's body.
+  const prompt = useRef<HTMLParagraphElement>(null);
+  const field = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const shownStep = useRef(step.kind);
+  useEffect(() => {
+    const before = shownStep.current;
+    shownStep.current = step.kind;
+    if (step.kind === "confirming" && before === "editing") prompt.current?.focus();
+    if (step.kind === "editing" && before !== "editing") field.current?.focus();
+  }, [step.kind]);
 
   const review = (event: FormEvent) => {
     event.preventDefault();
-    const value = parseAs(item.value, input);
+    const value = parseAs(declared, input);
     if (value === null) return setStep({ kind: "editing", error: "invalid" });
     setStep({ kind: "confirming", value });
   };
@@ -137,9 +189,12 @@ function Tunable({
         error: code === "config_shape" || code === "config_conflict" ? code : "failed",
       });
     }
+    // The answer held to its contract, as the list is (rules/admin.md).
+    const written = ConfigChange.safeParse(answer.data);
+    if (!written.success) return setStep({ kind: "editing", error: "failed" });
     setStep({ kind: "editing" });
     setReason("");
-    onChanged(answer.data);
+    onChanged(written.data);
   };
 
   const errorText = {
@@ -183,7 +238,7 @@ function Tunable({
         </table>
         {step.kind === "confirming" || step.kind === "saving" ? (
           <div className="actions">
-            <p>
+            <p ref={prompt} tabIndex={-1}>
               {t("admin.config.confirm", {
                 key: item.key,
                 from: shown(item.value),
@@ -212,6 +267,7 @@ function Tunable({
             {object ? (
               <textarea
                 id={`${ids}-value`}
+                ref={field}
                 value={input}
                 rows={3}
                 onChange={(event) => setInput(event.target.value)}
@@ -219,7 +275,8 @@ function Tunable({
             ) : (
               <input
                 id={`${ids}-value`}
-                inputMode={typeof item.value === "number" ? "decimal" : "text"}
+                ref={field}
+                inputMode={whole ? "numeric" : typeof item.value === "number" ? "decimal" : "text"}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
               />

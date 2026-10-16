@@ -125,6 +125,26 @@ describe("useList", () => {
     expect(result.current.state).toEqual({ kind: "error" });
   });
 
+  it("updates the items where they stand, without loading again (#305)", async () => {
+    const fetchPage = vi.fn(async () => answer(page([{ id: 1 }, { id: 2 }], 2)));
+    const { result } = renderHook(() => useList(source(fetchPage)));
+    await waitFor(() => expect(result.current.state).toMatchObject({ kind: "ready" }));
+    act(() => result.current.update((items) => items.map((i) => (i.id === 2 ? { id: 20 } : i))));
+    expect(result.current.state).toEqual({
+      kind: "ready",
+      items: [{ id: 1 }, { id: 20 }],
+      total: 2,
+    });
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("updates nothing while the list is not ready", async () => {
+    const { result } = renderHook(() => useList(source(async () => answer(null, 500))));
+    await waitFor(() => expect(result.current.state).toEqual({ kind: "error" }));
+    act(() => result.current.update(() => [{ id: 9 }]));
+    expect(result.current.state).toEqual({ kind: "error" });
+  });
+
   it("lands only the latest load: an earlier answer arriving last changes nothing", async () => {
     const first = deferred();
     const second = deferred();

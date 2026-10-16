@@ -30,6 +30,9 @@ const tunable = (key: string, ...versions: [Version, ...Version[]]) => ({
   versions,
 });
 
+/** What the API answers a change with: the key and the row it wrote. */
+const wrote = (t: ReturnType<typeof tunable>) => ({ key: t.key, ...t.versions[0] });
+
 const feedback = tunable(
   "feedback_per_day",
   version(2, 5, { createdBy: ADMIN, reason: "Five is enough for now" }),
@@ -38,6 +41,7 @@ const feedback = tunable(
 const pond = tunable("default_pond", version(1, "paakaupunkiseutu"));
 const fetches = tunable("photo_fetches_per_day", version(1, { thumb: 600, card: 300, full: 60 }));
 const tips = tunable("photo_tips_on", version(1, true));
+const share = tunable("majority_share_max", version(1, 0.6));
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -212,15 +216,17 @@ describe("the tunables", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Tunables" })).toBeInTheDocument();
   });
 
-  it("labels every control of a key's form", async () => {
-    fetchMock([listOf(feedback, pond, fetches)]);
+  it("labels every control of a key's form, a count's input asking for whole numbers", async () => {
+    fetchMock([listOf(feedback, pond, fetches, share)]);
     show();
     const number = await item("feedback_per_day");
     expect(number.getByLabelText("New value")).toHaveValue("5");
-    expect(number.getByLabelText("New value")).toHaveAttribute("inputmode", "decimal");
+    expect(number.getByLabelText("New value")).toHaveAttribute("inputmode", "numeric");
     expect(number.getByLabelText("Why the change")).toHaveValue("");
     expect(number.getByLabelText("Why the change")).toHaveAttribute("maxlength", "500");
     expect(number.getByLabelText("Why the change")).toBeRequired();
+    const fraction = await item("majority_share_max");
+    expect(fraction.getByLabelText("New value")).toHaveAttribute("inputmode", "decimal");
     const text = await item("default_pond");
     expect(text.getByLabelText("New value")).toHaveValue("paakaupunkiseutu");
     expect(text.getByLabelText("New value")).toHaveAttribute("inputmode", "text");
@@ -235,12 +241,8 @@ describe("the tunables", () => {
     ...feedback.versions,
   );
 
-  it("changes a number: reviews old and new, sends exactly the number and the trimmed reason, and reloads", async () => {
-    let page = 0;
-    const calls = fetchMock([
-      (req) => (isList(req) ? json({ items: page++ === 0 ? [feedback] : [changed] }) : null),
-      changeAnswers(() => json(changed)),
-    ]);
+  it("changes a number: reviews old and new, sends exactly the number and the trimmed reason, and updates the key in place", async () => {
+    const calls = fetchMock([listOf(feedback), changeAnswers(() => json(wrote(changed)))]);
     show();
     const at = await item("feedback_per_day");
     review(at, " 7 ", "  More room in the pilot  ");
@@ -249,7 +251,11 @@ describe("the tunables", () => {
     expect(at.queryByLabelText("New value")).toBeNull();
 
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
-    await waitFor(() => expect(lists(calls)).toHaveLength(2));
+    await waitFor(() =>
+      expect(
+        screen.getByText("feedback_per_day", { selector: "code" }).closest("summary"),
+      ).toHaveTextContent("feedback_per_day version 3: 7"),
+    );
     expect(posts(calls)).toEqual([
       {
         method: "POST",
@@ -258,38 +264,66 @@ describe("the tunables", () => {
         authorization: `Bearer ${"t".repeat(43)}`,
       },
     ]);
-    const after = await item("feedback_per_day");
-    await waitFor(() =>
-      expect(
-        screen.getByText("feedback_per_day", { selector: "code" }).closest("summary"),
-      ).toHaveTextContent("feedback_per_day version 3: 7"),
-    );
-    expect(after.getAllByRole("row")).toHaveLength(4);
-    expect(after.getByLabelText("Why the change")).toHaveValue("");
+    // In place: no reload, the new version first in the history.
+    expect(lists(calls)).toHaveLength(1);
+    expect(at.getAllByRole("row")).toHaveLength(4);
+    expect(
+      within(at.getAllByRole("row")[1] as HTMLElement).getByText("More room in the pilot"),
+    ).toBeInTheDocument();
+    expect(at.getByLabelText("Why the change")).toHaveValue("");
+    expect(screen.getByText("Saved. feedback_per_day, version 3: 7")).toBeInTheDocument();
   });
 
-  it("says the change was saved once the list has reloaded behind it", async () => {
-    // The reload is answered when the test says, as a network answers after
-    // the panel has drawn its loading state.
-    let page = 0;
-    let reloaded: (res: Response) => void = () => undefined;
-    const calls = fetchMock([
-      (req) => {
-        if (!isList(req)) return null;
-        if (page++ === 0) return json({ items: [feedback] });
-        return new Promise<Response>((resolve) => (reloaded = resolve));
-      },
-      changeAnswers(() => json(changed)),
-    ]);
+  it("keeps every other key open and its draft as it was after a change", async () => {
+    const calls = fetchMock([listOf(feedback, pond), changeAnswers(() => json(wrote(changed)))]);
     show();
+    const other = await item("default_pond");
+    fireEvent.change(other.getByLabelText("New value"), { target: { value: "helsinki" } });
+    fireEvent.change(other.getByLabelText("Why the change"), { target: { value: "A draft" } });
     const at = await item("feedback_per_day");
     review(at, "7", "More room in the pilot");
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
-    await waitFor(() => expect(lists(calls)).toHaveLength(2));
-    await screen.findByText("Loading the tunables…");
-    reloaded(json({ items: [changed] }));
-    expect(await screen.findByText("1 tunable")).toBeInTheDocument();
     expect(await screen.findByText("Saved. feedback_per_day, version 3: 7")).toBeInTheDocument();
+    expect(lists(calls)).toHaveLength(1);
+    expect(other.getByLabelText("New value")).toHaveValue("helsinki");
+    expect(other.getByLabelText("Why the change")).toHaveValue("A draft");
+  });
+
+  it("says the saved change in a live region that was there before it", async () => {
+    fetchMock([listOf(feedback), changeAnswers(() => json(wrote(changed)))]);
+    show();
+    const at = await item("feedback_per_day");
+    const region = screen.getAllByText("", { selector: "p[aria-live='polite']" })[0];
+    expect(region).toBeInTheDocument();
+    review(at, "7", "More room in the pilot");
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    await waitFor(() => expect(region).toHaveTextContent("Saved. feedback_per_day, version 3: 7"));
+  });
+
+  it("moves the focus with each step: the confirm sentence, then back to the value", async () => {
+    fetchMock([listOf(feedback), changeAnswers(() => failure("config_conflict", 409))]);
+    show();
+    const at = await item("feedback_per_day");
+    review(at, "6", "Pilot week two");
+    await waitFor(() =>
+      expect(at.getByText("Change feedback_per_day? Now: 5. New: 6")).toHaveFocus(),
+    );
+    fireEvent.click(at.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(at.getByLabelText("New value")).toHaveFocus());
+    review(at, "6");
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    expect(await at.findByRole("alert")).toHaveTextContent("Another admin changed this key");
+    await waitFor(() => expect(at.getByLabelText("New value")).toHaveFocus());
+  });
+
+  it("says the change was not saved when the answer is not the contract", async () => {
+    fetchMock([listOf(feedback), changeAnswers(() => json({ key: "feedback_per_day" }))]);
+    show();
+    const at = await item("feedback_per_day");
+    review(at, "6", "Pilot week two");
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    expect(await at.findByRole("alert")).toHaveTextContent("The change was not saved.");
+    expect(screen.queryByText(/^Saved\./)).toBeNull();
   });
 
   it("holds the buttons while the change is being sent", async () => {
@@ -310,7 +344,7 @@ describe("the tunables", () => {
   });
 
   it("sends nothing on cancel and goes back to the form as it was", async () => {
-    const calls = fetchMock([listOf(feedback), changeAnswers(() => json(feedback))]);
+    const calls = fetchMock([listOf(feedback), changeAnswers(() => json(wrote(feedback)))]);
     show();
     const at = await item("feedback_per_day");
     review(at, "9", "Trying it out");
@@ -355,34 +389,85 @@ describe("the tunables", () => {
     });
   });
 
-  it("reads a decimal and an exponent as numbers, and the error goes once the input is one", async () => {
+  it("holds a count to whole numbers from 0, and a fraction key to numbers from 0", async () => {
     const calls = fetchMock([
-      listOf(feedback),
+      listOf(feedback, share),
       changeAnswers(() =>
-        json(tunable("feedback_per_day", version(3, 1000), ...feedback.versions)),
+        json(wrote(tunable("feedback_per_day", version(3, 1000), ...feedback.versions))),
       ),
     ]);
     show();
     const at = await item("feedback_per_day");
-    review(at, "seven");
-    expect(at.getByRole("alert")).toBeInTheDocument();
-    review(at, "0.5");
-    expect(at.getByText("Change feedback_per_day? Now: 5. New: 0.5")).toBeInTheDocument();
-    fireEvent.click(at.getByRole("button", { name: "Cancel" }));
-    expect(at.queryByRole("alert")).toBeNull();
+    for (const input of ["seven", "0.5", "-1", "3e9"]) {
+      review(at, input);
+      expect(at.getByRole("alert"), input).toHaveTextContent(
+        "This is not a value of the key's type.",
+      );
+    }
     review(at, "1e3");
+    expect(at.getByText("Change feedback_per_day? Now: 5. New: 1000")).toBeInTheDocument();
     fireEvent.click(at.getByRole("button", { name: "Change it" }));
     await waitFor(() => expect(posts(calls)).toHaveLength(1));
     expect(posts(calls)[0]?.body).toStrictEqual({
       value: 1000,
       reason: "Because the pilot said so",
     });
+    const fraction = await item("majority_share_max");
+    review(fraction, "-0.1");
+    expect(fraction.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
+    review(fraction, "0.55");
+    expect(
+      fraction.getByText("Change majority_share_max? Now: 0.6. New: 0.55"),
+    ).toBeInTheDocument();
+  });
+
+  it("holds an object key's other members to their declared type", async () => {
+    const flags = tunable("photo_flags", version(1, { blur: true, mode: "soft" }));
+    const calls = fetchMock([
+      listOf(flags),
+      changeAnswers(() =>
+        json(
+          wrote(
+            tunable("photo_flags", version(2, { blur: false, mode: "hard" }), ...flags.versions),
+          ),
+        ),
+      ),
+    ]);
+    show();
+    const at = await item("photo_flags");
+    review(at, '{"blur":"false","mode":"hard"}');
+    expect(at.getByRole("alert")).toHaveTextContent("This is not a value of the key's type.");
+    review(at, '{"blur":false,"mode":"hard"}');
+    fireEvent.click(at.getByRole("button", { name: "Change it" }));
+    await waitFor(() => expect(posts(calls)).toHaveLength(1));
+    expect(posts(calls)[0]?.body).toStrictEqual({
+      value: { blur: false, mode: "hard" },
+      reason: "Because the pilot said so",
+    });
+  });
+
+  it("holds an object key to its declared keys and the kind of each number", async () => {
+    const calls = fetchMock([listOf(fetches)]);
+    show();
+    const at = await item("photo_fetches_per_day");
+    for (const input of [
+      '{"thumb":600,"card":300}',
+      '{"thumb":600,"card":300,"full":60.5}',
+      '{"thumb":600,"card":-1,"full":60}',
+      '{"thumb":600,"card":"300","full":60}',
+    ]) {
+      review(at, input);
+      expect(at.getByRole("alert"), input).toHaveTextContent(
+        "This is not a value of the key's type.",
+      );
+    }
+    expect(posts(calls)).toEqual([]);
   });
 
   it("sends a string for a string key, even when it reads as a number", async () => {
     const calls = fetchMock([
       listOf(pond),
-      changeAnswers(() => json(tunable("default_pond", version(2, "12"), ...pond.versions))),
+      changeAnswers(() => json(wrote(tunable("default_pond", version(2, "12"), ...pond.versions)))),
     ]);
     show();
     const at = await item("default_pond");
@@ -412,7 +497,9 @@ describe("the tunables", () => {
     ])("sends %j as a boolean", async (input, value) => {
       const calls = fetchMock([
         listOf(tips),
-        changeAnswers(() => json(tunable("photo_tips_on", version(2, value), ...tips.versions))),
+        changeAnswers(() =>
+          json(wrote(tunable("photo_tips_on", version(2, value), ...tips.versions))),
+        ),
       ]);
       show();
       const at = await item("photo_tips_on");
@@ -440,7 +527,7 @@ describe("the tunables", () => {
     const calls = fetchMock([
       listOf(fetches),
       changeAnswers(() =>
-        json(tunable("photo_fetches_per_day", version(2, next), ...fetches.versions)),
+        json(wrote(tunable("photo_fetches_per_day", version(2, next), ...fetches.versions))),
       ),
     ]);
     show();

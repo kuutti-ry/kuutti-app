@@ -29,6 +29,8 @@ export function useList<T>(source: ListSource<T>): {
   reload: () => Promise<void>;
   /** One item was decided where it stands: what waits goes down by one. */
   settle: () => void;
+  /** The items changed where they stand, without a reload that would unmount them. */
+  update: (change: (items: T[]) => T[]) => void;
 } {
   const [state, setState] = useState<ListState<T>>({ kind: "loading" });
   // The source is read at load time, so a screen may pass a new object on every render.
@@ -70,5 +72,13 @@ export function useList<T>(source: ListSource<T>): {
     [],
   );
 
-  return { state, reload, settle };
+  const update = useCallback(
+    (change: (items: T[]) => T[]) =>
+      setState((previous) =>
+        previous.kind === "ready" ? { ...previous, items: change(previous.items) } : previous,
+      ),
+    [],
+  );
+
+  return { state, reload, settle, update };
 }

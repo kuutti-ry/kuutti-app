@@ -179,7 +179,16 @@ describe("features/safety/config.feature", () => {
 describe("sameShape", () => {
   test.for([
     ["a number for a number", 30, 25, true],
-    ["a fraction for a whole number", 30, 0.5, true],
+    ["a fraction for a whole number", 30, 0.5, false],
+    ["a negative for a whole number from 0", 30, -1, false],
+    ["0 for a whole number from 0", 30, 0, true],
+    ["the largest int4 for a whole number", 30, 2_147_483_647, true],
+    ["one past int4 for a whole number", 30, 2_147_483_648, false],
+    ["3e9 for a whole number", 30, 3e9, false],
+    ["a whole number for a fraction", 0.6, 1, true],
+    ["a fraction for a fraction", 0.6, 0.55, true],
+    ["a negative for a fraction from 0", 0.6, -0.1, false],
+    ["a negative for a negative", -1, -2.5, true],
     ["a string for a number", 30, "30", false],
     ["a string for a string", "suomi", "paakaupunkiseutu", true],
     ["a number for a string", "suomi", 1, false],
@@ -225,14 +234,61 @@ describe("sameShape", () => {
     ["null under a number's key", { thumb: 600 }, { thumb: null }, false],
     ["an array under an object's key", { a: { x: 1 } }, { a: [1] }, false],
     [
-      "a nested object with other keys, compared one level",
+      "a nested object with other keys, held as the declaration is",
       { a: { x: 1 } },
       { a: { y: "z" } },
-      true,
+      false,
+    ],
+    [
+      "a fraction under a whole number's key",
+      { thumb: 600, card: 300, full: 60 },
+      { thumb: 600.5, card: 300, full: 60 },
+      false,
+    ],
+    [
+      "a negative under a whole number's key",
+      { thumb: 600, card: 300, full: 60 },
+      { thumb: 600, card: -1, full: 60 },
+      false,
     ],
     ["an empty object for an empty object", {}, {}, true],
-  ] as const)("%s: %j then %j is %s", ([, current, next, expected]) => {
-    expect(sameShape(current, next)).toBe(expected);
+  ] as const)("%s: %j then %j is %s", ([, declared, next, expected]) => {
+    expect(sameShape(declared, next)).toBe(expected);
+  });
+});
+
+describe("changeConfig against the key's declaration", () => {
+  test("a count refuses a fraction, a negative and more than int4 holds, and writes nothing", async ({
+    ctx,
+  }) => {
+    const admin = await staffSession(ctx.client, "admin");
+    for (const value of [5.5, -1, 3e9]) {
+      await expect(
+        changeConfig(ctx.client, {
+          key: "feedback_per_day",
+          value,
+          reason: "A typo",
+          actor: admin.identityId,
+          at: T,
+        }),
+      ).rejects.toMatchObject({ status: 400, code: "config_shape" });
+    }
+    expect((await versionsOf(ctx, "feedback_per_day")).map((r) => r.version)).toEqual([1]);
+    expect(await configAudit(ctx)).toEqual([]);
+  });
+
+  test("a fraction key set to a whole number can go back to a fraction", async ({ ctx }) => {
+    const admin = await staffSession(ctx.client, "admin");
+    const change = (value: number) =>
+      changeConfig(ctx.client, {
+        key: "majority_share_max",
+        value,
+        reason: "Trying it out",
+        actor: admin.identityId,
+        at: T,
+      });
+    expect((await change(1)).version).toBe(2);
+    expect((await change(0.55)).version).toBe(3);
   });
 });
 
