@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { Sanction, SanctionList } from "@kuutti/schema";
+import { Sanction, type SanctionEntry, SanctionList } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { type SignedIn, type Staff, signedInAccount, staffSession } from "../test/account.ts";
 import {
@@ -11,6 +11,7 @@ import {
   type TestContext,
   testConfig,
 } from "../test/harness.ts";
+import { applySanction, endSuspensions } from "./sanctions.ts";
 
 // The panel's seven sanction routes through the app (#307, ADR-024 §3):
 // each answer's status and shape, every validation rule, each variant of the
@@ -194,6 +195,18 @@ const open = {
   reviewedBy: null,
   reviewedAt: null,
 };
+
+type Roles = Partial<Pick<SanctionEntry, "createdByRole" | "liftedByRole" | "reviewedByRole">>;
+const ROLE_KEYS = ["createdByRole", "liftedByRole", "reviewedByRole"] as const;
+
+/** A write's answer as the list shows it (#308): the same sanction, with each member of staff's role now. */
+const entry = (item: Sanction, roles: Roles = {}): SanctionEntry => ({
+  ...item,
+  createdByRole: null,
+  liftedByRole: null,
+  reviewedByRole: null,
+  ...roles,
+});
 
 describe("POST /admin/accounts/{id}/sanctions", () => {
   test.for([
@@ -499,7 +512,15 @@ describe("GET /admin/accounts/{id}/sanctions", () => {
     const response = await list(api, moderator.headers, person.accountId);
     expect(response.status).toBe(200);
     const page = SanctionList.parse(await response.json());
-    expect(page.items).toEqual([suspended, lookedAt, warned]);
+    expect(page.items).toEqual([
+      entry(suspended, { createdByRole: "moderator" }),
+      entry(lookedAt, {
+        createdByRole: "moderator",
+        liftedByRole: "moderator",
+        reviewedByRole: "moderator",
+      }),
+      entry(warned, { createdByRole: "moderator" }),
+    ]);
     expect(lookedAt).toMatchObject({
       liftedAt: new Date(T.getTime() + 3 * HOUR).toISOString(),
       liftedBy: second.identityId,
@@ -533,7 +554,10 @@ describe("GET /admin/accounts/{id}/sanctions", () => {
     const banned = await sanctionOf(await ban(api, admin.headers, person.accountId), 201);
 
     const ofNewer = SanctionList.parse(await (await list(api, moderator.headers, newer)).json());
-    expect(ofNewer.items).toEqual([banned, warnedNewer]);
+    expect(ofNewer.items).toEqual([
+      entry(banned, { createdByRole: "admin" }),
+      entry(warnedNewer, { createdByRole: "moderator" }),
+    ]);
     const ofErased = SanctionList.parse(
       await (await list(api, moderator.headers, person.accountId)).json(),
     );
@@ -566,15 +590,223 @@ describe("GET /admin/accounts/{id}/sanctions", () => {
         createdBy: null,
         createdAt: T.toISOString(),
         ...open,
+        createdByRole: null,
+        liftedByRole: null,
+        reviewedByRole: null,
       },
     ]);
     const item = await sanctionOf(await review(api, moderator.headers, id, KEEP), 200);
     expect(item.reviewedBy).toBe(moderator.identityId);
+    const again = SanctionList.parse(
+      await (await list(api, moderator.headers, person.accountId)).json(),
+    );
+    expect(again.items).toEqual([entry(item, { reviewedByRole: "moderator" })]);
   });
 
   test("an unknown account is not found", async ({ ctx, api }) => {
     const { moderator } = await cast(ctx);
     await refused(await list(api, moderator.headers, randomUUID()), 404, "not_found");
+  });
+});
+
+describe("GET /admin/accounts/{id}/sanctions: who did what, by their role now (#308)", () => {
+  /**
+   * A shadow ban applied by a moderator, lifted by an admin and looked at
+   * again by a second moderator: three people, one step each, so a role
+   * read through the wrong column shows. The list is read by a fourth.
+   */
+  async function story(ctx: TestContext, api: Api) {
+    const { person, moderator, second, admin } = await cast(ctx);
+    const item = await applied(api, moderator, person, SHADOW);
+    api.setClock(new Date(T.getTime() + HOUR));
+    await sanctionOf(await lift(api, admin.headers, item.id), 200);
+    api.setClock(new Date(T.getTime() + 2 * HOUR));
+    const done = await sanctionOf(await review(api, second.headers, item.id, KEEP), 200);
+    const reader = await staffSession(ctx.client, "admin");
+    const listed = async () => {
+      const response = await list(api, reader.headers, person.accountId);
+      expect(response.status).toBe(200);
+      return SanctionList.parse(await response.json()).items;
+    };
+    return { staff: { moderator, admin, second }, done, listed };
+  }
+
+  test("names the moderator who applied, the admin who lifted and the moderator who looked again", async ({
+    ctx,
+    api,
+  }) => {
+    const { staff, done, listed } = await story(ctx, api);
+    expect(done).toMatchObject({
+      createdBy: staff.moderator.identityId,
+      liftedBy: staff.admin.identityId,
+      reviewedBy: staff.second.identityId,
+    });
+    expect(await listed()).toEqual([
+      entry(done, {
+        createdByRole: "moderator",
+        liftedByRole: "admin",
+        reviewedByRole: "moderator",
+      }),
+    ]);
+  });
+
+  test.for([
+    ["applied it", "moderator", { liftedByRole: "admin", reviewedByRole: "moderator" }],
+    ["lifted it", "admin", { createdByRole: "moderator", reviewedByRole: "moderator" }],
+    ["looked at it again", "second", { createdByRole: "moderator", liftedByRole: "admin" }],
+  ] as const)(
+    "the role of whoever %s, taken away afterwards, lists as null and the identity id stays",
+    async ([, who, roles], { ctx, api }) => {
+      const { staff, done, listed } = await story(ctx, api);
+      await ctx.client.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
+        staff[who].identityId,
+      ]);
+      expect(await listed()).toEqual([entry(done, roles)]);
+    },
+  );
+
+  test("every role taken away lists three nulls beside the three identity ids", async ({
+    ctx,
+    api,
+  }) => {
+    const { staff, done, listed } = await story(ctx, api);
+    await ctx.client.query("DELETE FROM moderator_roles WHERE identity_id = ANY($1::uuid[])", [
+      [staff.moderator.identityId, staff.admin.identityId, staff.second.identityId],
+    ]);
+    const [item] = await listed();
+    expect(item).toEqual(entry(done));
+    expect(item).toMatchObject({
+      createdBy: staff.moderator.identityId,
+      liftedBy: staff.admin.identityId,
+      reviewedBy: staff.second.identityId,
+    });
+  });
+
+  test.for([["admin"], ["researcher"]] as const)(
+    "a moderator whose role is %s now is listed by it: the role now, not then",
+    async ([role], { ctx, api }) => {
+      const { staff, done, listed } = await story(ctx, api);
+      await ctx.client.query("UPDATE moderator_roles SET role = $2 WHERE identity_id = $1", [
+        staff.moderator.identityId,
+        role,
+      ]);
+      expect(await listed()).toEqual([
+        entry(done, { createdByRole: role, liftedByRole: "admin", reviewedByRole: "moderator" }),
+      ]);
+    },
+  );
+
+  test("a ban no person applied, as the demo's story writes it, lists no role until an admin lifts it", async ({
+    ctx,
+    api,
+  }) => {
+    const { person, admin } = await cast(ctx);
+    const banned = await applySanction(ctx.client, {
+      accountId: person.accountId,
+      kind: "ban",
+      reason: "harassment",
+      note: NOTE,
+      actor: null,
+      at: T,
+    });
+    expect(banned.createdBy).toBeNull();
+    const before = SanctionList.parse(
+      await (await list(api, admin.headers, person.accountId)).json(),
+    );
+    expect(before.items).toEqual([entry(banned)]);
+    api.setClock(new Date(T.getTime() + HOUR));
+    const lifted = await sanctionOf(await lift(api, admin.headers, banned.id, "bans"), 200);
+    const after = SanctionList.parse(
+      await (await list(api, admin.headers, person.accountId)).json(),
+    );
+    expect(after.items).toEqual([entry(lifted, { liftedByRole: "admin" })]);
+  });
+
+  test("a suspension the night ended lists the moderator's role and none for the lift", async ({
+    ctx,
+    api,
+  }) => {
+    const { person, moderator } = await cast(ctx);
+    const item = await applied(api, moderator, person, suspend("2026-10-22"));
+    const night = new Date("2026-10-22T01:00:00Z");
+    expect(await endSuspensions(ctx.client, night)).toBe(1);
+    const page = SanctionList.parse(
+      await (await list(api, moderator.headers, person.accountId)).json(),
+    );
+    expect(page.items).toEqual([
+      entry({ ...item, liftedAt: night.toISOString() }, { createdByRole: "moderator" }),
+    ]);
+  });
+});
+
+describe("the four writes answer the plain Sanction, without the list's roles (#308)", () => {
+  /** The answer's keys are the contract's thirteen, and none of them a role. */
+  async function plain(response: Response, status: 200 | 201, what: string): Promise<Sanction> {
+    expect(response.status, what).toBe(status);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(Object.keys(body).sort(), what).toEqual(Object.keys(Sanction.shape).sort());
+    for (const key of ROLE_KEYS) expect(body, `${what}: ${key}`).not.toHaveProperty(key);
+    return Sanction.parse(body);
+  }
+
+  test("apply, ban, lift and review on both scopes, by staff who all have a role", async ({
+    ctx,
+    api,
+  }) => {
+    const { person, moderator, second, admin } = await cast(ctx);
+    const other = await staffSession(ctx.client, "admin");
+    const warned = await plain(
+      await apply(api, moderator.headers, person.accountId, WARN),
+      201,
+      "POST /admin/accounts/{id}/sanctions",
+    );
+    api.setClock(new Date(T.getTime() + HOUR));
+    const hidden = await plain(
+      await apply(api, moderator.headers, person.accountId, SHADOW),
+      201,
+      "POST /admin/accounts/{id}/sanctions",
+    );
+    api.setClock(new Date(T.getTime() + 2 * HOUR));
+    const banned = await plain(
+      await ban(api, admin.headers, person.accountId),
+      201,
+      "POST /admin/accounts/{id}/bans",
+    );
+    const lifted = await plain(
+      await lift(api, second.headers, warned.id),
+      200,
+      "POST /admin/sanctions/{id}/lift",
+    );
+    expect(lifted.liftedBy).toBe(second.identityId);
+    const reviewed = await plain(
+      await review(api, second.headers, hidden.id, LIFT),
+      200,
+      "POST /admin/sanctions/{id}/review",
+    );
+    expect(reviewed.reviewedBy).toBe(second.identityId);
+    const kept = await plain(
+      await review(api, other.headers, banned.id, KEEP, "bans"),
+      200,
+      "POST /admin/bans/{id}/review",
+    );
+    expect(kept.reviewedBy).toBe(other.identityId);
+    const unbanned = await plain(
+      await lift(api, other.headers, banned.id, "bans"),
+      200,
+      "POST /admin/bans/{id}/lift",
+    );
+    expect(unbanned.liftedBy).toBe(other.identityId);
+    // The same rows on the list carry the roles the answers left out.
+    const page = SanctionList.parse(
+      await (await list(api, moderator.headers, person.accountId)).json(),
+    );
+    expect(
+      page.items.map((i) => [i.id, i.createdByRole, i.liftedByRole, i.reviewedByRole]),
+    ).toEqual([
+      [banned.id, "admin", "admin", "admin"],
+      [hidden.id, "moderator", "moderator", "moderator"],
+      [warned.id, "moderator", "moderator", null],
+    ]);
   });
 });
 

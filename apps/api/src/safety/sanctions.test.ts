@@ -1582,7 +1582,13 @@ describe("the lists and the erasure's half", () => {
 
     const listed = await listSanctions(ctx.client, live.accountId);
     expect(listed?.map((s) => s.id)).toEqual([shadow.id, ban.id, warning.id]);
-    expect(listed?.[0]).toEqual(shadow);
+    // Applied by nobody: no role beside it (#308).
+    expect(listed?.[0]).toEqual({
+      ...shadow,
+      createdByRole: null,
+      liftedByRole: null,
+      reviewedByRole: null,
+    });
     expect(listed?.[0]?.note).toBe(NOTE);
     expect((await listSanctions(ctx.client, old))?.map((s) => s.id)).toEqual([ban.id]);
     expect(await listSanctions(ctx.client, UNKNOWN_ID)).toBeNull();

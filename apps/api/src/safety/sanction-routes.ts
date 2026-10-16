@@ -44,7 +44,7 @@ const listRoute = createRoute({
   path: "/admin/accounts/{id}/sanctions",
   summary: "A person's sanctions",
   description:
-    "Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id.",
+    "Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id and their role now (null once the role is gone, or for what no person did).",
   ...bearer,
   request: { params: SanctionAccountParams },
   responses: {

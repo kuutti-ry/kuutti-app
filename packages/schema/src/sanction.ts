@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ModeratorRole } from "./admin.ts";
 
 // Sanctions (#307, ADR-024): what a moderator or an admin may do to a person,
 // why, and the record the panel reads. Mirrors of the database's enums
@@ -84,9 +85,21 @@ export const Sanction = z
   .meta({ id: "Sanction" });
 export type Sanction = z.infer<typeof Sanction>;
 
+/**
+ * A sanction on a person's page (#308): who applied, lifted and looked at it
+ * again by their role now as well, null once the role is gone or for what no
+ * person did.
+ */
+export const SanctionEntry = Sanction.extend({
+  createdByRole: ModeratorRole.nullable(),
+  liftedByRole: ModeratorRole.nullable(),
+  reviewedByRole: ModeratorRole.nullable(),
+}).meta({ id: "SanctionEntry" });
+export type SanctionEntry = z.infer<typeof SanctionEntry>;
+
 /** A person's sanctions, newest first: the account's own and the identity's bans from any account. */
 export const SanctionList = z
-  .object({ items: z.array(Sanction).max(1000) })
+  .object({ items: z.array(SanctionEntry).max(1000) })
   .meta({ id: "SanctionList" });
 export type SanctionList = z.infer<typeof SanctionList>;
 

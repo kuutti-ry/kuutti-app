@@ -15,6 +15,7 @@ import {
   StaffList,
 } from "./features/safety/index.ts";
 import { setRoleAnswerHandler } from "./lib/api.ts";
+import { StaffRole } from "./lib/role.ts";
 import { NavigationFocus, ScreenTitle } from "./lib/screen-title.tsx";
 import mark from "./logo-mark.png";
 import { SourceOffer } from "./source-offer.tsx";
@@ -136,7 +137,14 @@ export function App() {
         {session.status === "loading" && <p aria-busy="true">{t("admin.queue.loading")}</p>}
         {session.status === "signed-out" && <SignIn />}
         {session.status === "signed-in" &&
-          (front ? <Screens screens={screens} /> : <p>{t("admin.forbidden")}</p>)}
+          (front ? (
+            // The role reaches the screens, for an action only some roles see (#308).
+            <StaffRole.Provider value={session.session.role}>
+              <Screens screens={screens} />
+            </StaffRole.Provider>
+          ) : (
+            <p>{t("admin.forbidden")}</p>
+          ))}
       </main>
       <SourceOffer />
     </>

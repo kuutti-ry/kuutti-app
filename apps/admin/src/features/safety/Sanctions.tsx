@@ -1,0 +1,514 @@
+import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
+import { useT } from "@kuutti/i18n/react";
+import {
+  SANCTION_NOTE_MAX,
+  Sanction,
+  type SanctionEntry,
+  type SanctionKind,
+  type SanctionReason,
+  SUSPENSION_DAYS_MAX,
+} from "@kuutti/schema";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { api } from "../../lib/api.ts";
+import { Dialog } from "../../lib/dialog.tsx";
+import { useStaffRole } from "../../lib/role.ts";
+
+// The sanctions on a person's page (#308), the panel's side of #307: warn,
+// hide, suspend until a day, and for admins ban; each through a confirm step
+// that says the effect in words, a reason chosen on purpose (nothing preset,
+// as the photo queue since #250) and a note. The history lists every
+// sanction with who did what, and a lift or a second look where the role
+// allows it; the API refuses the rest and the panel says why in words. A 403
+// is the shell's to say (#302). English only (TD-17); keyboard first.
+
+/** The actions in their fixed order: the gentlest first, the ban last and apart. */
+const ORDER: readonly SanctionKind[] = ["warn", "shadow_ban", "suspend", "ban"];
+
+const STEPS: Record<
+  SanctionKind,
+  { action: PlainMessageKey; title: PlainMessageKey; effect: PlainMessageKey }
+> = {
+  warn: {
+    action: "admin.sanction.action.warn",
+    title: "admin.sanction.title.warn",
+    effect: "admin.sanction.effect.warn",
+  },
+  shadow_ban: {
+    action: "admin.sanction.action.shadow_ban",
+    title: "admin.sanction.title.shadow_ban",
+    effect: "admin.sanction.effect.shadow_ban",
+  },
+  suspend: {
+    action: "admin.sanction.action.suspend",
+    title: "admin.sanction.title.suspend",
+    effect: "admin.sanction.effect.suspend",
+  },
+  ban: {
+    action: "admin.sanction.action.ban",
+    title: "admin.sanction.title.ban",
+    effect: "admin.sanction.effect.ban",
+  },
+};
+
+/** What a lift does, by kind: a warning and a shadow ban never touched a session (ADR-024 §4). */
+const LIFT_EFFECT: Record<SanctionKind, PlainMessageKey> = {
+  warn: "admin.sanction.liftEffect.warn",
+  shadow_ban: "admin.sanction.liftEffect.shadow_ban",
+  suspend: "admin.sanction.liftEffect.suspend",
+  ban: "admin.sanction.liftEffect.ban",
+};
+
+const KIND_WORDS: Record<SanctionKind, PlainMessageKey> = {
+  warn: "admin.sanction.kind.warn",
+  shadow_ban: "admin.sanction.kind.shadow_ban",
+  suspend: "admin.sanction.kind.suspend",
+  ban: "admin.sanction.kind.ban",
+};
+
+const REASONS: ReadonlyArray<{ value: SanctionReason; label: PlainMessageKey }> = [
+  { value: "harassment", label: "admin.sanction.reason.harassment" },
+  { value: "misrepresentation", label: "admin.sanction.reason.misrepresentation" },
+  { value: "under_age", label: "admin.sanction.reason.under_age" },
+  { value: "commercial_use", label: "admin.sanction.reason.commercial_use" },
+  { value: "scraping", label: "admin.sanction.reason.scraping" },
+  { value: "other", label: "admin.sanction.reason.other" },
+];
+const REASON_WORDS = Object.fromEntries(REASONS.map((r) => [r.value, r.label])) as Record<
+  SanctionReason,
+  PlainMessageKey
+>;
+
+/** The refusals the API answers with a code of their own, in words. */
+const REFUSALS: Record<string, PlainMessageKey> = {
+  staff_target: "admin.sanction.error.staff_target",
+  account_deleted: "admin.sanction.error.account_deleted",
+  ends_on_invalid: "admin.sanction.error.ends_on_invalid",
+  own_account: "admin.sanction.error.own_account",
+  own_sanction: "admin.sanction.error.own_sanction",
+  sanction_lifted: "admin.sanction.error.sanction_lifted",
+  sanction_reviewed: "admin.sanction.error.sanction_reviewed",
+  not_found: "admin.sanction.error.not_found",
+};
+
+/** A day in the browser's calendar, offset from today, as a date field takes it (YYYY-MM-DD). */
+function dayFromToday(offset: number): string {
+  const day = new Date();
+  day.setDate(day.getDate() + offset);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${day.getFullYear()}-${two(day.getMonth() + 1)}-${two(day.getDate())}`;
+}
+
+type Step =
+  | { kind: "apply"; sanction: SanctionKind }
+  | { kind: "lift"; item: SanctionEntry }
+  | { kind: "review"; item: SanctionEntry };
+
+/** What a request came to: done, refused in words, or left to the shell (a 403). */
+type Outcome = { kind: "done" } | { kind: "refused"; message: PlainMessageKey } | { kind: "shell" };
+
+async function outcomeOf(
+  request: Promise<{ data?: unknown; error?: unknown; response: Response }>,
+): Promise<Outcome> {
+  const answer = await request.catch(() => null);
+  if (answer?.response.status === 403) return { kind: "shell" };
+  if (answer?.data !== undefined && Sanction.safeParse(answer.data).success)
+    return { kind: "done" };
+  const code = (answer?.error as { error?: { code?: string } } | undefined)?.error?.code;
+  return { kind: "refused", message: (code && REFUSALS[code]) || "admin.sanction.error.failed" };
+}
+
+export function Sanctions({
+  accountId,
+  items,
+  onChanged,
+}: {
+  accountId: string;
+  /** Null when the list could not be loaded: the actions stay. */
+  items: SanctionEntry[] | null;
+  onChanged: () => Promise<void>;
+}) {
+  const { t, locale } = useT();
+  const admin = useStaffRole() === "admin";
+  const [step, setStep] = useState<Step | null>(null);
+  const [done, setDone] = useState<string>("");
+  const status = useRef<HTMLParagraphElement>(null);
+  const ids = useId();
+  const when = (at: string) => formatDateTime(locale, new Date(at));
+  const who = (id: string | null, role: SanctionEntry["createdByRole"]) =>
+    id
+      ? t("admin.sanction.who", {
+          id: id.slice(0, 8),
+          role: role ?? t("admin.sanction.noRole"),
+        })
+      : t("admin.sanction.nobody");
+
+  // A change is said in the status line, and the focus goes there: the button
+  // that opened the step may be gone with the change (a lift, a second look).
+  useEffect(() => {
+    if (done) status.current?.focus();
+  }, [done]);
+
+  const finish = async (message: string) => {
+    setStep(null);
+    setDone(message);
+    await onChanged();
+  };
+
+  return (
+    <>
+      <fieldset className="actions">
+        <legend>{t("admin.sanction.actions")}</legend>
+        {ORDER.filter((kind) => kind !== "ban" || admin).map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            className={kind === "ban" ? "apart" : undefined}
+            onClick={() => {
+              setDone("");
+              setStep({ kind: "apply", sanction: kind });
+            }}
+          >
+            {t(STEPS[kind].action)}
+          </button>
+        ))}
+      </fieldset>
+      <p ref={status} role="status" tabIndex={-1}>
+        {done}
+      </p>
+      {items === null ? (
+        <p role="alert">{t("admin.account.sanctionsError")}</p>
+      ) : items.length === 0 ? (
+        <p>{t("admin.account.none")}</p>
+      ) : (
+        <ul className="sanctions">
+          {items.map((s) => {
+            const line = `${ids}-${s.id}`;
+            const mayAct = s.kind !== "ban" || admin;
+            return (
+              <li key={s.id}>
+                <p id={line}>
+                  <strong>{t(KIND_WORDS[s.kind])}</strong> · {t(REASON_WORDS[s.reason])} ·{" "}
+                  {when(s.createdAt)}
+                  {s.endsAt && ` · ${t("admin.account.until", { time: when(s.endsAt) })}`}
+                </p>
+                <p>{s.note}</p>
+                <p>{t("admin.sanction.appliedBy", { who: who(s.createdBy, s.createdByRole) })}</p>
+                {s.liftedAt && (
+                  <p>
+                    {t("admin.sanction.liftedBy", {
+                      time: when(s.liftedAt),
+                      who: who(s.liftedBy, s.liftedByRole),
+                    })}
+                  </p>
+                )}
+                {s.reviewedAt && (
+                  <p>
+                    {t("admin.sanction.reviewedBy", {
+                      time: when(s.reviewedAt),
+                      who: who(s.reviewedBy, s.reviewedByRole),
+                      note: s.reviewNote ?? "",
+                    })}
+                  </p>
+                )}
+                {mayAct && (!s.liftedAt || !s.reviewedAt) && (
+                  <div className="actions">
+                    {!s.liftedAt && (
+                      <button
+                        type="button"
+                        aria-describedby={line}
+                        onClick={() => {
+                          setDone("");
+                          setStep({ kind: "lift", item: s });
+                        }}
+                      >
+                        {t("admin.sanction.lift")}
+                      </button>
+                    )}
+                    {!s.reviewedAt && (
+                      <button
+                        type="button"
+                        aria-describedby={line}
+                        onClick={() => {
+                          setDone("");
+                          setStep({ kind: "review", item: s });
+                        }}
+                      >
+                        {t("admin.sanction.review")}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {step?.kind === "apply" && (
+        <ApplyStep
+          key={step.sanction}
+          accountId={accountId}
+          sanction={step.sanction}
+          onCancel={() => setStep(null)}
+          onShell={() => setStep(null)}
+          onDone={() =>
+            finish(t("admin.sanction.done.apply", { kind: t(KIND_WORDS[step.sanction]) }))
+          }
+        />
+      )}
+      {step?.kind === "lift" && (
+        <LiftStep
+          item={step.item}
+          onCancel={() => setStep(null)}
+          onShell={() => setStep(null)}
+          onDone={() =>
+            finish(t("admin.sanction.done.lift", { kind: t(KIND_WORDS[step.item.kind]) }))
+          }
+        />
+      )}
+      {step?.kind === "review" && (
+        <ReviewStep
+          item={step.item}
+          onCancel={() => setStep(null)}
+          onShell={() => setStep(null)}
+          onDone={() =>
+            finish(t("admin.sanction.done.review", { kind: t(KIND_WORDS[step.item.kind]) }))
+          }
+        />
+      )}
+    </>
+  );
+}
+
+type StepProps = { onCancel: () => void; onShell: () => void; onDone: () => Promise<void> };
+
+/**
+ * The form's end: the refusal in words, and one request at a time. The
+ * buttons stay enabled while it is out, so the focus never leaves the dialog
+ * for the page's body (a disabled button loses it); a second press is a no-op.
+ */
+function useSend({ onShell, onDone }: Pick<StepProps, "onShell" | "onDone">) {
+  const [sending, setSending] = useState(false);
+  const [refused, setRefused] = useState<PlainMessageKey | null>(null);
+  const out = useRef(false);
+  const send = async (
+    request: () => Promise<{ data?: unknown; error?: unknown; response: Response }>,
+  ) => {
+    if (out.current) return;
+    out.current = true;
+    setSending(true);
+    setRefused(null);
+    const outcome = await outcomeOf(request());
+    out.current = false;
+    setSending(false);
+    if (outcome.kind === "shell") return onShell();
+    if (outcome.kind === "refused") return setRefused(outcome.message);
+    await onDone();
+  };
+  return { sending, refused, send };
+}
+
+function ApplyStep({
+  accountId,
+  sanction,
+  onCancel,
+  onShell,
+  onDone,
+}: StepProps & { accountId: string; sanction: SanctionKind }) {
+  const { t } = useT();
+  const ids = useId();
+  const [reason, setReason] = useState<SanctionReason | "">("");
+  const [note, setNote] = useState("");
+  const [endsOn, setEndsOn] = useState("");
+  const { sending, refused, send } = useSend({ onShell, onDone });
+  const meta = STEPS[sanction];
+  const ready = reason !== "" && note.trim() !== "" && (sanction !== "suspend" || endsOn !== "");
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!ready) return;
+    const path = { params: { path: { id: accountId } } };
+    const text = note.trim();
+    void send(() => {
+      if (sanction === "ban") {
+        return api.POST("/admin/accounts/{id}/bans", { ...path, body: { reason, note: text } });
+      }
+      const body =
+        sanction === "suspend"
+          ? { kind: sanction, reason, note: text, endsOn }
+          : { kind: sanction, reason, note: text };
+      return api.POST("/admin/accounts/{id}/sanctions", { ...path, body });
+    });
+  };
+
+  return (
+    <Dialog title={t(meta.title)} onClose={onCancel}>
+      <form className="actions" onSubmit={submit}>
+        <p>{t(meta.effect)}</p>
+        {refused && <p role="alert">{t(refused)}</p>}
+        <label htmlFor={`${ids}-reason`}>{t("admin.sanction.reason.label")}</label>
+        <select
+          id={`${ids}-reason`}
+          required
+          value={reason}
+          onChange={(event) => setReason(event.target.value as SanctionReason)}
+        >
+          <option value="" disabled>
+            {t("admin.sanction.reason.choose")}
+          </option>
+          {REASONS.map((r) => (
+            <option key={r.value} value={r.value}>
+              {t(r.label)}
+            </option>
+          ))}
+        </select>
+        <label htmlFor={`${ids}-note`}>{t("admin.sanction.note")}</label>
+        <textarea
+          id={`${ids}-note`}
+          required
+          rows={3}
+          maxLength={SANCTION_NOTE_MAX}
+          aria-describedby={`${ids}-count`}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+        <p id={`${ids}-count`}>
+          {t("admin.sanction.noteCount", {
+            characters: String(note.length),
+            max: String(SANCTION_NOTE_MAX),
+          })}
+        </p>
+        {sanction === "suspend" && (
+          <>
+            <label htmlFor={`${ids}-ends`}>{t("admin.sanction.endsOn")}</label>
+            <input
+              id={`${ids}-ends`}
+              type="date"
+              required
+              min={dayFromToday(1)}
+              max={dayFromToday(SUSPENSION_DAYS_MAX)}
+              value={endsOn}
+              onChange={(event) => setEndsOn(event.target.value)}
+            />
+          </>
+        )}
+        <button type="submit" disabled={!ready} aria-busy={sending || undefined}>
+          {t("admin.sanction.apply")}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {t("admin.sanction.cancel")}
+        </button>
+      </form>
+    </Dialog>
+  );
+}
+
+const liftPath = (item: SanctionEntry) => ({ params: { path: { id: item.id } } });
+
+function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
+  const { t } = useT();
+  const { sending, refused, send } = useSend({ onShell, onDone });
+  return (
+    <Dialog
+      title={t("admin.sanction.liftTitle", { kind: t(KIND_WORDS[item.kind]) })}
+      onClose={onCancel}
+    >
+      <div className="actions">
+        <p>{t(LIFT_EFFECT[item.kind])}</p>
+        {refused && <p role="alert">{t(refused)}</p>}
+        <button
+          type="button"
+          aria-busy={sending || undefined}
+          onClick={() =>
+            void send(() =>
+              item.kind === "ban"
+                ? api.POST("/admin/bans/{id}/lift", liftPath(item))
+                : api.POST("/admin/sanctions/{id}/lift", liftPath(item)),
+            )
+          }
+        >
+          {t("admin.sanction.lift")}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {t("admin.sanction.cancel")}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+function ReviewStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
+  const { t } = useT();
+  const ids = useId();
+  const [note, setNote] = useState("");
+  const [outcome, setOutcome] = useState<"keep" | "lift" | "">("");
+  const { sending, refused, send } = useSend({ onShell, onDone });
+  const ready = note.trim() !== "" && outcome !== "";
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!ready) return;
+    const request = { ...liftPath(item), body: { note: note.trim(), outcome } };
+    void send(() =>
+      item.kind === "ban"
+        ? api.POST("/admin/bans/{id}/review", request)
+        : api.POST("/admin/sanctions/{id}/review", request),
+    );
+  };
+  return (
+    <Dialog
+      title={t("admin.sanction.reviewTitle", { kind: t(KIND_WORDS[item.kind]) })}
+      onClose={onCancel}
+    >
+      <form className="actions" onSubmit={submit}>
+        <p>{t("admin.sanction.reviewExplain")}</p>
+        {refused && <p role="alert">{t(refused)}</p>}
+        <label htmlFor={`${ids}-note`}>{t("admin.sanction.reviewNote")}</label>
+        <textarea
+          id={`${ids}-note`}
+          required
+          rows={3}
+          maxLength={SANCTION_NOTE_MAX}
+          aria-describedby={`${ids}-count`}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+        />
+        <p id={`${ids}-count`}>
+          {t("admin.sanction.noteCount", {
+            characters: String(note.length),
+            max: String(SANCTION_NOTE_MAX),
+          })}
+        </p>
+        <fieldset>
+          <legend>{t("admin.sanction.outcome")}</legend>
+          <label>
+            <input
+              type="radio"
+              name={`${ids}-outcome`}
+              value="keep"
+              checked={outcome === "keep"}
+              onChange={() => setOutcome("keep")}
+            />
+            {t("admin.sanction.keep")}
+          </label>
+          {!item.liftedAt && (
+            <label>
+              <input
+                type="radio"
+                name={`${ids}-outcome`}
+                value="lift"
+                checked={outcome === "lift"}
+                onChange={() => setOutcome("lift")}
+              />
+              {t("admin.sanction.liftIt")}
+            </label>
+          )}
+        </fieldset>
+        <button type="submit" disabled={!ready} aria-busy={sending || undefined}>
+          {t("admin.sanction.apply")}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {t("admin.sanction.cancel")}
+        </button>
+      </form>
+    </Dialog>
+  );
+}
