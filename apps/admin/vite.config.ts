@@ -7,6 +7,10 @@ export default defineConfig({
   build: {
     outDir: "dist",
     sourcemap: true,
+    // Every asset a file of its own: Vite would inline one under 4 KB as a
+    // data: URL, which the host's CSP refuses (img-src 'self' and the API's
+    // origin, ADR-025 §3).
+    assetsInlineLimit: 0,
   },
   test: {
     environment: "jsdom",

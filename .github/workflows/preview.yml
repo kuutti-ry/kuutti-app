@@ -1,6 +1,6 @@
 name: Preview
 
-# Three preview lanes per pull request (#9, TD-2, TD-19), one sticky comment.
+# Four preview lanes per pull request (#9, TD-2, TD-19), one sticky comment.
 #   api     the image build.yml pushed for this pull request runs on the
 #           staging box as its own Dokploy application with its own
 #           kuutti_pr_<n> database, at https://pr-<n>.<PREVIEW_API_DOMAIN>
@@ -9,10 +9,18 @@ name: Preview
 #   native  when native code, auth, push, camera or the fingerprint changed
 #           against main: an EAS Update on branch pr-<n> for the dev client
 #           (#10), with a QR code; dormant until expo-updates is configured
-# Everything a lane needs lives in the GitHub environment "preview" and the
+#   admin   the moderation panel of the same commit, built under /pr-<n>/
+#           against the staging API, since a preview API has no bank
+#           (ADR-014 §1), and written to pr-<n>/ of the staging panel's
+#           bucket, at <ADMIN_URL>/pr-<n>/ (#313, ADR-025 §6); dormant until
+#           the panel's host is applied
+# Everything a lane needs lives in the GitHub environment "preview" (the
+# panel's writer holds the plan role, a repository variable) and the
 # repository variable PREVIEWS_ENABLED switches the lanes on (infra/README.md,
 # Previews). Forks and Dependabot get no secrets, so they get no preview.
-# Removal is preview-cleanup.yml.
+# Each lane's comment rewrites the whole sticky comment, so the comments come
+# one after another, api, web, admin, native, each with the rows of the ones
+# before it. Removal is preview-cleanup.yml.
 
 on:
   pull_request:
@@ -273,10 +281,190 @@ jobs:
           WEB_URL: ${{ steps.deploy.outputs.url }}
         run: .github/scripts/preview-comment.sh
 
+  # The panel of this pull request (#313, ADR-025 §6), after the api lane as
+  # the web lane is: the Dokploy application is the sweep's work list, so a
+  # panel preview exists only beside one, and goes with it. Built here without
+  # the OIDC token, since the pull request's own install and Vite config run
+  # here. The job after it writes the build: it installs and builds nothing,
+  # and the scripts it runs come from the pull request's ref, as every job of
+  # this workflow, bounded by what the plan role may do (ADR-025 §7).
+  admin:
+    name: admin preview
+    needs: api
+    if: needs.api.outputs.deployed == 'true'
+    runs-on: ubuntu-24.04-arm
+    environment: preview
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.ready.outputs.ready }}
+      url: ${{ steps.ready.outputs.url }}
+      bucket: ${{ steps.ready.outputs.bucket }}
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      # Until the variables are set from staging's tofu output
+      # (infra/README.md, Admin panel), the lane stops green.
+      - name: Is the panel's host applied?
+        id: ready
+        env:
+          ADMIN_URL: ${{ vars.ADMIN_URL }}
+          ADMIN_BUCKET: ${{ vars.ADMIN_BUCKET }}
+          ADMIN_API_URL: ${{ vars.ADMIN_API_URL }}
+        run: |
+          missing=""
+          for name in ADMIN_URL ADMIN_BUCKET ADMIN_API_URL; do [ -n "${!name}" ] || missing="$missing $name"; done
+          if [ -n "$missing" ]; then
+            echo "::notice::not set in the preview environment:$missing; no panel preview (infra/README.md, Admin panel)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "ready=true"
+            echo "url=${ADMIN_URL%/}/pr-$PR_NUMBER/"
+            echo "bucket=$ADMIN_BUCKET"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm
+        if: steps.ready.outputs.ready == 'true'
+
+      # The staging API, not this pull request's: a preview API cannot sign
+      # anyone in, and a staff session is a staging one (ADR-025 §6). So a
+      # pull request that changes the API too previews its panel against
+      # main's API. The router takes the base as its basename.
+      - name: Build the panel under /pr-<n>/ against the staging API
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          VITE_API_URL: ${{ vars.ADMIN_API_URL }}
+        run: pnpm --filter @kuutti/admin exec vite build --base "/pr-$PR_NUMBER/"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          name: admin-preview
+          path: apps/admin/dist
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+  # Writes the panel's build to pr-<n>/ (ADR-025 §6, §7). No environment:
+  # the plan role trusts the pull request's own subject and may put and
+  # delete pr-* of the staging panel's bucket, nothing else; with no
+  # CloudFront write, nothing is invalidated: index.html goes up with
+  # no-cache and the assets carry their hash. It waits for the web lane only
+  # so that its comment follows the web lane's and carries its row; a web
+  # lane that failed does not stop it.
+  admin-publish:
+    name: admin preview publish
+    needs: [api, web, admin]
+    if: ${{ !cancelled() && needs.admin.result == 'success' && needs.admin.outputs.ready == 'true' }}
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    outputs:
+      url: ${{ steps.served.outputs.url }}
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_PLAN_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: gha-admin-preview-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: admin-preview
+          path: dist
+
+      # Right before writing, as every lane asks (ADR-012 §7): a prefix
+      # written after the merge's sweep would wait for the bucket's 14 days.
+      - name: Is the pull request still open?
+        id: open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          open=$(.github/scripts/pr-open.sh)
+          echo "open=$open" >> "$GITHUB_OUTPUT"
+          [ "$open" = true ] || echo "::notice::#$PR_NUMBER is no longer open; nothing written"
+
+      - if: steps.open.outputs.open == 'true'
+        run: .github/scripts/aws-oidc.sh
+
+      # As main's build is written (build.yml): the assets, then index.html,
+      # then the assets of the push before go. The trailing slash keeps
+      # pr-1/ from reaching pr-12/.
+      - name: Write the build to pr-<n>/
+        if: steps.open.outputs.open == 'true'
+        env:
+          BUCKET: ${{ needs.admin.outputs.bucket }}
+        run: |
+          prefix="s3://$BUCKET/pr-$PR_NUMBER/"
+          immutable='public, max-age=31536000, immutable'
+          aws s3 sync dist "$prefix" --exclude index.html --cache-control "$immutable"
+          aws s3 cp dist/index.html "${prefix}index.html" --cache-control no-cache
+          aws s3 sync dist "$prefix" --exclude index.html --cache-control "$immutable" --delete
+
+      # The preview's root and a page by its path both answer this build's
+      # index.html (the CloudFront Function, ADR-025 §6), and the files it
+      # names are served. A path asked for before this push may answer an
+      # edge's copy for a few seconds, so each is given a minute.
+      - name: The preview is served
+        id: served
+        if: steps.open.outputs.open == 'true'
+        env:
+          URL: ${{ needs.admin.outputs.url }}
+        run: |
+          for path in "" photos; do
+            ok=false
+            for _ in $(seq 1 12); do
+              if curl -fsS --max-time 10 -o "$RUNNER_TEMP/page.html" "$URL$path" && cmp -s "$RUNNER_TEMP/page.html" dist/index.html; then
+                ok=true; break
+              fi
+              sleep 5
+            done
+            [ "$ok" = true ] || { echo "::error::$URL$path does not answer this build's index.html"; exit 1; }
+            echo "$URL$path answers this build's index.html"
+          done
+          origin="${URL%/pr-"$PR_NUMBER"/}"
+          # Byte for byte: a file the bucket lacks answers 200 with the root's
+          # index.html (the fallback, ADR-025 §2), so a status says nothing.
+          files=$(grep -o "/pr-$PR_NUMBER/assets/[^\"]*" dist/index.html | sort -u || true)
+          [ -n "$files" ] || { echo "::error::dist/index.html names nothing under /pr-$PR_NUMBER/assets/"; exit 1; }
+          for file in $files; do
+            curl -fsS --max-time 10 -o "$RUNNER_TEMP/asset" "$origin$file"
+            cmp -s "$RUNNER_TEMP/asset" "dist${file#/pr-"$PR_NUMBER"}" || { echo "::error::$origin$file is not this build's file"; exit 1; }
+            echo "served $file"
+          done
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Comment
+        if: steps.open.outputs.open == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHORT_SHA: ${{ needs.api.outputs.short_sha }}
+          API_URL: ${{ needs.api.outputs.api_url }}
+          DATABASE: ${{ needs.api.outputs.database }}
+          # A web lane that failed its own check after deploying still has an
+          # output: its row says building rather than link it.
+          WEB_URL: ${{ needs.web.result == 'success' && needs.web.outputs.web_url || '' }}
+          ADMIN_URL: ${{ steps.served.outputs.url }}
+        run: .github/scripts/preview-comment.sh
+
   native:
     name: native preview
-    needs: [api, web]
-    if: needs.api.outputs.deployed == 'true'
+    # After the panel's writer as well, so its comment, the last, carries the
+    # panel's row; a panel lane that is dormant, skipped or failed does not
+    # stop it, a web lane that failed still does.
+    needs: [api, web, admin-publish]
+    if: ${{ !cancelled() && needs.api.outputs.deployed == 'true' && needs.web.result == 'success' }}
     # x86-64, unlike the other lanes: expo export compiles Hermes bytecode with
     # hermes-compiler's hermesc, which ships for Linux as linux64-bin only; on
     # an arm64 runner the shell cannot execute it (run 35459415764). deploy.yml
@@ -418,6 +606,7 @@ jobs:
           API_URL: ${{ needs.api.outputs.api_url }}
           DATABASE: ${{ needs.api.outputs.database }}
           WEB_URL: ${{ needs.web.outputs.web_url }}
+          ADMIN_URL: ${{ needs.admin-publish.outputs.url }}
           NATIVE: ${{ steps.configured.outputs.configured != 'true' && steps.configured.outputs.configured || (steps.decide.outputs.needed == 'true' && 'published' || 'not-needed') }}
           NATIVE_QR: ${{ steps.update.outputs.qr }}
           NATIVE_LINK: ${{ steps.update.outputs.link }}

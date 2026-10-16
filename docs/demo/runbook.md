@@ -23,7 +23,7 @@ Staging holds no real person (ADR-018). The three commands run inside the API's 
 3. `node dist/demo-population.js --env staging --photos`.
 4. The phone: the `preview` build on channel `staging` (`apps/mobile/README.md`); the tech config screen shows `api.staging.kuutti.app` and the commit. A JS-only merge to `main` reaches it on the next launch; a native change needs the build reinstalled.
 5. Aino's five pictures on the phone's camera roll (AirDrop).
-6. The admin panel against staging (`ADMIN_APP_URL`, `infra/README.md`), the moderator granted as above, on the bed's identity.
+6. The admin panel at `https://admin.staging.kuutti.app` (`infra/README.md`, Admin panel), the moderator granted as above, on the bed's identity. A panel on the laptop cannot finish a staging login: the bank sends it back to the hosted panel.
 
 ## The morning of
 

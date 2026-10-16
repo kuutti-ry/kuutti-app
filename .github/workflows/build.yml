@@ -6,7 +6,9 @@ name: Build
 # staging ran. Deploys and the release draft are the reusable workflows this
 # one calls. A pull request from this repository also gets its image pushed
 # as :pr-<n>-<sha7>, which preview.yml deploys to the staging box (#9); forks
-# and Dependabot have no token that can push, so they get none.
+# and Dependabot have no token that can push, so they get none. After the
+# staging deploy, main's moderation panel goes to its own host on
+# admin.staging.<domain> (#313, ADR-025 §5).
 
 on:
   push:
@@ -257,6 +259,170 @@ jobs:
     # through inherit; an explicit pass would resolve at the caller, which
     # has no environment.
     secrets: inherit # zizmor: ignore[secrets-inherit]
+
+  # The moderation panel follows the staging API it talks to (#313, ADR-025
+  # §5). It is built without credentials, since pnpm install runs the
+  # dependencies' own scripts, and written by the next job, which holds the
+  # staging role and installs nothing; "staging" is here for its variables.
+  # Until those are set from tofu output (infra/README.md, Admin panel), this
+  # job stops green and the next one is skipped.
+  admin:
+    name: admin panel
+    needs: deploy-staging
+    runs-on: ubuntu-24.04-arm
+    environment: staging
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.ready.outputs.ready }}
+    steps:
+      - name: Is the panel's host applied?
+        id: ready
+        env:
+          ADMIN_URL: ${{ vars.ADMIN_URL }}
+          ADMIN_BUCKET: ${{ vars.ADMIN_BUCKET }}
+          ADMIN_DISTRIBUTION_ID: ${{ vars.ADMIN_DISTRIBUTION_ID }}
+        run: |
+          missing=""
+          for name in ADMIN_URL ADMIN_BUCKET ADMIN_DISTRIBUTION_ID; do [ -n "${!name}" ] || missing="$missing $name"; done
+          if [ -n "$missing" ]; then
+            echo "::notice::not set in the staging environment:$missing; the panel is not deployed (infra/README.md, Admin panel)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm
+        if: steps.ready.outputs.ready == 'true'
+
+      # VITE_* is inlined at build time: this build only ever talks to the
+      # staging API, the one origin its CSP names (ADR-025 §3).
+      - name: Build the panel against the staging API
+        if: steps.ready.outputs.ready == 'true'
+        env:
+          VITE_API_URL: ${{ vars.API_URL }}
+        run: |
+          : "${VITE_API_URL:?API_URL must be set in the GitHub environment}"
+          pnpm --filter @kuutti/admin exec vite build
+
+      # overwrite: a re-run of this job, once the variables are set, uploads
+      # under the same name in the same run.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          name: admin-dist
+          path: apps/admin/dist
+          retention-days: 1
+          if-no-files-found: error
+          overwrite: true
+
+  admin-staging:
+    name: admin staging
+    needs: admin
+    if: needs.admin.outputs.ready == 'true'
+    runs-on: ubuntu-24.04-arm
+    environment:
+      name: staging
+      url: ${{ vars.ADMIN_URL }}
+    permissions:
+      contents: read
+      id-token: write
+    # The staging role (kuutti-ci-apply), as the infrastructure apply has it:
+    # the bucket's root and the invalidation are staging's to write, and the
+    # plan role may write pr-* alone (ADR-025 §7).
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_APPLY_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: gha-admin-${{ github.run_id }}
+    # bash -eo pipefail: a failed curl behind a pipe must fail the step.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: admin-dist
+          path: dist
+      - run: .github/scripts/aws-oidc.sh
+
+      # The hashed assets first, then index.html, which names them, and only
+      # then the assets of the build before: a page loaded in between finds
+      # every file it asks for. index.html is revalidated on every load, the
+      # assets never change under their names (ADR-025 §4). pr-* holds the
+      # previews of open pull requests (§6): --delete must never reach it.
+      - name: Write the build to the bucket's root, never under pr-
+        env:
+          ADMIN_BUCKET: ${{ vars.ADMIN_BUCKET }}
+        run: |
+          immutable='public, max-age=31536000, immutable'
+          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude 'pr-*' --cache-control "$immutable"
+          aws s3 cp dist/index.html "s3://$ADMIN_BUCKET/index.html" --cache-control no-cache
+          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude 'pr-*' --cache-control "$immutable" --delete
+
+      # /* is one path of the thousand free each month. Waited for, so the
+      # checks below read this build and not an edge's copy of the last one.
+      - name: Invalidate the distribution
+        env:
+          ADMIN_DISTRIBUTION_ID: ${{ vars.ADMIN_DISTRIBUTION_ID }}
+        run: |
+          id=$(aws cloudfront create-invalidation --distribution-id "$ADMIN_DISTRIBUTION_ID" --paths '/*' \
+            --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$ADMIN_DISTRIBUTION_ID" --id "$id"
+          echo "invalidated /* ($id)"
+
+      # What #313 asks of the host, read from outside: every header of the
+      # panel's policy, exactly as ADR-025 §3 has it, on the root and on a
+      # page's own path (the fallback, §2); that path answers this build's
+      # panel (#302); and the API answers the panel's origin and no other
+      # (§10). The API reads its parameters at boot: a refused origin right
+      # after the parameter changed wants the API restarted once.
+      - name: The panel is served with its headers, and the API lets it in
+        env:
+          ADMIN_URL: ${{ vars.ADMIN_URL }}
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          csp="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' $API_URL; connect-src $API_URL; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+          for path in / /photos; do
+            headers=$(curl -fsS -o /dev/null -D - "$ADMIN_URL$path" | tr -d '\r')
+            while IFS='|' read -r name want; do
+              got=$(grep -i "^$name:" <<< "$headers" | cut -d' ' -f2- || true)
+              lower() { tr '[:upper:]' '[:lower:]' <<< "$1"; }
+              [ "$(lower "$got")" = "$(lower "$want")" ] || { echo "::error::$ADMIN_URL$path answered $name '$got', not '$want'"; exit 1; }
+            done <<EOF
+          content-security-policy|$csp
+          strict-transport-security|max-age=63072000; includeSubDomains; preload
+          x-content-type-options|nosniff
+          referrer-policy|no-referrer
+          x-frame-options|DENY
+          permissions-policy|camera=(), microphone=(), geolocation=()
+          cross-origin-opener-policy|same-origin
+          cross-origin-resource-policy|same-origin
+          x-robots-tag|noindex, nofollow
+          EOF
+            echo "$ADMIN_URL$path carries every header of the panel's policy"
+          done
+          code=$(curl -sS -o "$RUNNER_TEMP/photos.html" -w '%{http_code}' "$ADMIN_URL/photos")
+          if [ "$code" != 200 ] || ! cmp -s "$RUNNER_TEMP/photos.html" dist/index.html; then
+            echo "::error::$ADMIN_URL/photos answered $code, not this build's index.html"; exit 1
+          fi
+          echo "$ADMIN_URL/photos answers 200 with this build's index.html"
+          allowed() {
+            curl -fsS -o /dev/null -D - -X OPTIONS -H "Origin: $1" -H 'Access-Control-Request-Method: GET' "$API_URL/health" \
+              | tr -d '\r' | grep -i '^access-control-allow-origin:' | cut -d' ' -f2-
+          }
+          own=$(allowed "$ADMIN_URL" || true)
+          [ "$own" = "$ADMIN_URL" ] || { echo "::error::$API_URL refused $ADMIN_URL (got '$own'); restarted since its parameters changed?"; exit 1; }
+          got=$(allowed https://example.com || true)
+          [ -z "$got" ] || { echo "::error::$API_URL allowed https://example.com"; exit 1; }
+          echo "$API_URL allows $own and refused https://example.com"
 
   deploy-prod:
     name: deploy prod

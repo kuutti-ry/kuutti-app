@@ -348,6 +348,24 @@ data "aws_iam_policy_document" "ci_plan_preview_cleanup" {
   }
 }
 
+# The moderation panel's previews (#313, ADR-025 §6-§8): preview.yml writes a
+# pull request's build under pr-<n>/ of staging's panel bucket (modules/admin),
+# and preview-cleanup.yml removes it, both from jobs without an environment and
+# so as this role; the bucket's root is kuutti-ci-apply's, from the staging
+# environment. Listing comes with ReadOnlyAccess and reading objects stays
+# denied (ci_plan_deny_data), so the most a pull request can do is replace or
+# remove another pull request's panel preview, which runs on the staging
+# panel's origin just as its own preview does. The bucket is named by the
+# module's convention, as the document above is by compute's.
+data "aws_iam_policy_document" "ci_plan_admin_previews" {
+  statement {
+    sid       = "AdminPreviewObjects"
+    effect    = "Allow"
+    actions   = ["s3:PutObject", "s3:DeleteObject"]
+    resources = ["arn:aws:s3:::${var.project}-admin-staging-${local.account_id}/pr-*"]
+  }
+}
+
 # The weekly export of what exists only on GitHub (#16 D.2, export.yml) has a
 # role of its own. The plan role is assumable from any pull request, and a
 # pull request that could write under github-export/ could replace the bundle
@@ -417,6 +435,12 @@ resource "aws_iam_role_policy" "ci_plan_preview_cleanup" {
   name   = "preview-cleanup"
   role   = aws_iam_role.ci_plan.id
   policy = data.aws_iam_policy_document.ci_plan_preview_cleanup.json
+}
+
+resource "aws_iam_role_policy" "ci_plan_admin_previews" {
+  name   = "admin-previews"
+  role   = aws_iam_role.ci_plan.id
+  policy = data.aws_iam_policy_document.ci_plan_admin_previews.json
 }
 
 resource "aws_iam_role" "ci_apply" {

@@ -70,6 +70,24 @@ module "media" {
   additional_signing_public_keys_pem = [for f in fileset(path.module, "cloudfront-signing-key.*.pub.pem") : file("${path.module}/${f}")]
 }
 
+# The moderation panel's host (#313, ADR-025): a bucket and a distribution of
+# its own on admin.staging, the host admin-app-url and cors-allowed-origins
+# name (variables.tf). build.yml syncs main's build to its root, preview.yml a
+# pull request's to pr-<n>/; both call this environment's API, since only it
+# can sign staff in (ADR-014 §1).
+module "admin" {
+  source = "../../modules/admin"
+  providers = {
+    aws           = aws
+    aws.us_east_1 = aws.us_east_1
+  }
+
+  environment = local.environment
+  zone_id     = data.aws_route53_zone.main.zone_id
+  admin_fqdn  = "admin.staging.${var.domain}"
+  api_origin  = "https://api.staging.${var.domain}"
+}
+
 # Alarms, the alert topic and the saved log queries (#11).
 module "observability" {
   source = "../../modules/observability"
@@ -105,6 +123,7 @@ resource "aws_ssm_parameter" "config" {
     "moderation" = "rekognition"
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.
+    # Both name module admin's host (#313, ADR-025 §10).
     "admin-app-url"        = var.admin_app_url
     "cors-allowed-origins" = var.cors_allowed_origins
     # The rate limiter's idea of the client address (#52, F19): flips to
