@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.28.1",
+    "version": "0.29.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3443,6 +3443,262 @@
           "oldestSince"
         ]
       },
+      "AdminAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "registered",
+              "active",
+              "paused",
+              "shadow_banned",
+              "suspended",
+              "banned",
+              "deleted"
+            ]
+          },
+          "stateChangedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "registeredAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "deletedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "standing": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "ok",
+              "suspended",
+              "banned",
+              null
+            ]
+          },
+          "standingChangedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "suspensionEndsAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "age": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 130
+          },
+          "gender": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "pond": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 80
+          },
+          "profile": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "displayName": {
+                "type": "string"
+              },
+              "bio": {
+                "type": "string",
+                "nullable": true
+              },
+              "bioPreset": {
+                "$ref": "#/components/schemas/BioPreset"
+              },
+              "prompts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/PromptAnswer"
+                },
+                "maxItems": 10
+              },
+              "fields": {
+                "$ref": "#/components/schemas/ProfileFields"
+              }
+            },
+            "required": [
+              "displayName",
+              "bio",
+              "bioPreset",
+              "prompts",
+              "fields"
+            ]
+          },
+          "photos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAccountPhoto"
+            },
+            "maxItems": 50
+          },
+          "feedback": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "handledAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "at",
+                "kind",
+                "text",
+                "handledAt"
+              ]
+            },
+            "maxItems": 100
+          },
+          "audit": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAuditRow"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "stateChangedAt",
+          "registeredAt",
+          "deletedAt",
+          "standing",
+          "standingChangedAt",
+          "suspensionEndsAt",
+          "age",
+          "gender",
+          "pond",
+          "profile",
+          "photos",
+          "feedback",
+          "audit"
+        ]
+      },
+      "AdminAccountPhoto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "queued",
+              "approved",
+              "rejected"
+            ]
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 40
+          },
+          "appealable": {
+            "type": "boolean"
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "rejectionReason",
+          "appealable",
+          "uploadedAt"
+        ]
+      },
+      "AdminAuditRow": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "subjectType": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "detail": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "at",
+          "actorIdentityId",
+          "action",
+          "subjectType",
+          "subjectId",
+          "detail"
+        ]
+      },
       "GateResponse": {
         "type": "object",
         "properties": {
@@ -6579,6 +6835,80 @@
           },
           "403": {
             "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/accounts/{id}": {
+      "get": {
+        "summary": "A person's page",
+        "description": "One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion date and nothing else. Every look is an audit row.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account.",
             "content": {
               "application/json": {
                 "schema": {

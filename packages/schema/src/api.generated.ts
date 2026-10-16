@@ -3202,6 +3202,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A person's page
+         * @description One account by its id: its raw state and the identity's standing, the profile as the card shows it, the photos (the pictures by GET /admin/photos/{id}/card), the feedback the person sent, and the audit rows about them. Never the hash, the broker's ids, the research id or the e-mail. An erased account answers its deletion date and nothing else. Every look is an audit row.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The page. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminAccount"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such account. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gate": {
         parameters: {
             query?: never;
@@ -4456,6 +4533,67 @@ export interface components {
             waiting: number;
             /** Format: date-time */
             oldestSince: string | null;
+        };
+        AdminAccount: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
+            /** Format: date-time */
+            stateChangedAt: string | null;
+            /** Format: date-time */
+            registeredAt: string | null;
+            /** Format: date-time */
+            deletedAt: string | null;
+            /** @enum {string|null} */
+            standing: "ok" | "suspended" | "banned" | null;
+            /** Format: date-time */
+            standingChangedAt: string | null;
+            /** Format: date-time */
+            suspensionEndsAt: string | null;
+            age: number | null;
+            gender: string | null;
+            pond: string | null;
+            profile: {
+                displayName: string;
+                bio: string | null;
+                bioPreset: components["schemas"]["BioPreset"];
+                prompts: components["schemas"]["PromptAnswer"][];
+                fields: components["schemas"]["ProfileFields"];
+            } | null;
+            photos: components["schemas"]["AdminAccountPhoto"][];
+            feedback: {
+                /** Format: date-time */
+                at: string;
+                kind: string;
+                text: string;
+                /** Format: date-time */
+                handledAt: string | null;
+            }[];
+            audit: components["schemas"]["AdminAuditRow"][];
+        };
+        AdminAccountPhoto: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            state: "pending" | "queued" | "approved" | "rejected";
+            rejectionReason: string | null;
+            appealable: boolean;
+            /** Format: date-time */
+            uploadedAt: string;
+        };
+        AdminAuditRow: {
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            actorIdentityId: string;
+            action: string;
+            subjectType: string;
+            /** Format: uuid */
+            subjectId: string;
+            detail: {
+                [key: string]: string | number | boolean | unknown;
+            } | null;
         };
         GateResponse: {
             state: components["schemas"]["GateState"];

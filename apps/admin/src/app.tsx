@@ -5,7 +5,13 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
-import { ConfigList, FeedbackList, Overview } from "./features/safety/index.ts";
+import {
+  AccountLookup,
+  AccountPage,
+  ConfigList,
+  FeedbackList,
+  Overview,
+} from "./features/safety/index.ts";
 import { setRoleAnswerHandler } from "./lib/api.ts";
 import { NavigationFocus, ScreenTitle } from "./lib/screen-title.tsx";
 import mark from "./logo-mark.png";
@@ -22,6 +28,8 @@ type Screen = {
   /** The roles the menu shows it to; the API's own guard is what refuses the rest. */
   roles: readonly ModeratorRole[];
   element: ReactNode;
+  /** False for a screen reached from another, not from the menu (a person's page, #306). */
+  inMenu?: false;
 };
 
 const SCREENS: readonly Screen[] = [
@@ -42,6 +50,19 @@ const SCREENS: readonly Screen[] = [
     label: "admin.nav.feedback",
     roles: ["moderator", "admin"],
     element: <FeedbackList />,
+  },
+  {
+    path: "/accounts",
+    label: "admin.nav.accounts",
+    roles: ["moderator", "admin"],
+    element: <AccountLookup />,
+  },
+  {
+    path: "/accounts/:id",
+    label: "admin.nav.accounts",
+    roles: ["moderator", "admin"],
+    element: <AccountPage />,
+    inMenu: false,
   },
   {
     path: "/config",
@@ -84,14 +105,16 @@ export function App() {
       {front && (
         <nav aria-label={t("admin.nav.label")}>
           <ul className="menu">
-            {screens.map((screen) => (
-              <li key={screen.path}>
-                {/* `end`: the front page is the current one only at "/" itself. */}
-                <NavLink to={screen.path} end>
-                  {t(screen.label)}
-                </NavLink>
-              </li>
-            ))}
+            {screens
+              .filter((screen) => screen.inMenu !== false)
+              .map((screen) => (
+                <li key={screen.path}>
+                  {/* `end`: the front page is the current one only at "/" itself. */}
+                  <NavLink to={screen.path} end>
+                    {t(screen.label)}
+                  </NavLink>
+                </li>
+              ))}
           </ul>
         </nav>
       )}

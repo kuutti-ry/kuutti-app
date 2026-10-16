@@ -151,3 +151,32 @@ h2:focus:not(:focus-visible) {
   display: grid;
   gap: 0.5rem;
 }
+/* A person's page (#306): label and value side by side, the value wrapping. */
+.person dl {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 0.25rem 1rem;
+}
+.person dl > div {
+  display: contents;
+}
+.person dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+/* The audit rows: the table scrolls on its own on a narrow screen, and its detail wraps. */
+.person table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+.person th,
+.person td {
+  text-align: start;
+  padding: 0.25rem 0.75rem 0.25rem 0;
+  vertical-align: top;
+}
+.person td code {
+  overflow-wrap: anywhere;
+}

@@ -1,5 +1,8 @@
 // Public surface of the safety slice in apps/api. Other slices import from here only.
 // The audit log (#49) is the first piece; sanctions (#307) the next; reports and blocks arrive with M4.
+
+// A person's page in the panel (#306).
+export { accountAdminRoutes } from "./account-routes.ts";
 export { auditBoundary, recordAudit } from "./audit.ts";
 // The tunables in the panel (#304, #305).
 export { configAdminRoutes } from "./config-routes.ts";

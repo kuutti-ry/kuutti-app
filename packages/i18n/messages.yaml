@@ -5244,6 +5244,174 @@ admin.overview.late:
   en: "Late (response time: {hours} h)"
   description: "Admin panel, after a queue whose oldest has waited longer than matching_config moderation_response_hours, the time the association promises (#299, #303); said in words and bold, never by colour alone."
 
+admin.nav.accounts:
+  en: "A person"
+  description: "Admin panel, the menu entry of the way to a person's page by account id (#306)."
+
+admin.account.lookupTitle:
+  en: "A person's page"
+  description: "Admin panel, the heading of the screen that opens a person's page by account id (#306)."
+
+admin.account.lookupExplain:
+  en: "Paste the account id from a report, a photo or a feedback row. There is no search by name or anything else."
+  description: "Admin panel, under the lookup's heading (#306): the id is the only way, by design."
+
+admin.account.id:
+  en: "Account id"
+  description: "Admin panel, the label of the lookup's field (#306)."
+
+admin.account.open:
+  en: "Open the page"
+  description: "Admin panel, the lookup's button (#306)."
+
+admin.account.notAnId:
+  en: "This is not an account id."
+  description: "Admin panel, the lookup's field holds something that is not a uuid (#306)."
+
+admin.account.pageLink:
+  en: "The person's page"
+  description: "Admin panel, a link from a queue item or a feedback row to the person's page (#306)."
+
+admin.account.title:
+  en: "Account {account}"
+  description: "Admin panel, the heading of a person's page; {account} is the first characters of the account id (#306)."
+
+admin.account.loading:
+  en: "Loading the page…"
+  description: "Admin panel, while a person's page is fetched (#306)."
+
+admin.account.error:
+  en: "The page could not be loaded."
+  description: "Admin panel, a person's page failed to load (#306)."
+
+admin.account.missing:
+  en: "No account has this id."
+  description: "Admin panel, a person's page for an id that is no account (#306)."
+
+admin.account.standingTitle:
+  en: "State"
+  description: "Admin panel, a person's page, the heading of the account's state and the identity's standing (#306)."
+
+admin.account.state:
+  en: "Account"
+  description: "Admin panel, a person's page, the label of the account's state and since when (#306)."
+
+admin.account.standing:
+  en: "Standing"
+  description: "Admin panel, a person's page, the label of the identity's standing and since when (#306)."
+
+admin.account.until:
+  en: "until: {time}"
+  description: "Admin panel, a person's page, after a suspension: when it ends (#306)."
+
+admin.account.registered:
+  en: "Registered"
+  description: "Admin panel, a person's page, the label of the registration time (#306)."
+
+admin.account.deleted:
+  en: "Deleted"
+  description: "Admin panel, a person's page, the label of the deletion time of an erased account (#306)."
+
+admin.account.profileTitle:
+  en: "As the card shows them"
+  description: "Admin panel, a person's page, the heading of the profile as others see it (#306)."
+
+admin.account.noProfile:
+  en: "No profile yet."
+  description: "Admin panel, a person's page, the account has saved no profile (#306)."
+
+admin.account.name:
+  en: "Name"
+  description: "Admin panel, a person's page, profile label (#306)."
+
+admin.account.age:
+  en: "Age"
+  description: "Admin panel, a person's page, profile label (#306)."
+
+admin.account.gender:
+  en: "Gender"
+  description: "Admin panel, a person's page, profile label: self-declared (#306)."
+
+admin.account.pond:
+  en: "Pond"
+  description: "Admin panel, a person's page, profile label (#306)."
+
+admin.account.bio:
+  en: "Bio"
+  description: "Admin panel, a person's page, profile label (#306)."
+
+admin.account.bioPreset:
+  en: "A ready line: {preset}"
+  description: "Admin panel, a person's page: the person chose a canned bio line instead of their own words; {preset} is its key (#306)."
+
+admin.account.photosTitle:
+  en: "Photos"
+  description: "Admin panel, a person's page, the heading of the photos (#306)."
+
+admin.account.showPhoto:
+  en: "Show the photo"
+  description: "Admin panel, a person's page, the button that fetches one photo; the fetch is an audit row (#306)."
+
+admin.account.image:
+  en: "Photo: {state}. Uploaded: {time}"
+  description: "Admin panel, a person's page, the alt text of a photo a moderator asked to see: its state and upload time (#306)."
+
+admin.account.photoFailed:
+  en: "The photo could not be shown."
+  description: "Admin panel, a person's page, a photo's signed URL was refused or failed (#306)."
+
+admin.account.sanctionsTitle:
+  en: "Sanctions"
+  description: "Admin panel, a person's page, the heading of the sanctions (#306, #307)."
+
+admin.account.sanctionsError:
+  en: "The sanctions could not be loaded."
+  description: "Admin panel, a person's page, the sanctions' own request failed (#306)."
+
+admin.account.lifted:
+  en: "lifted: {time}"
+  description: "Admin panel, a person's page, after a sanction: when it was lifted (#306)."
+
+admin.account.reviewed:
+  en: "Looked at again: {note}"
+  description: "Admin panel, a person's page, under a sanction: the second member of staff's note (#306)."
+
+admin.account.feedbackTitle:
+  en: "Feedback sent"
+  description: "Admin panel, a person's page, the heading of the feedback the person sent (#306)."
+
+admin.account.handled:
+  en: "handled: {time}"
+  description: "Admin panel, a person's page, after a feedback row: when a moderator marked it (#306)."
+
+admin.account.auditTitle:
+  en: "What staff did and saw"
+  description: "Admin panel, a person's page, the heading of the audit rows about the person and their photos (#306)."
+
+admin.account.auditCaption:
+  en: "Newest first, at most fifty"
+  description: "Admin panel, a person's page, the audit table's caption (#306)."
+
+admin.account.col.when:
+  en: "When"
+  description: "Admin panel, a person's page, audit table column (#306)."
+
+admin.account.col.who:
+  en: "Who"
+  description: "Admin panel, a person's page, audit table column: the staff identity id, shortened (#306)."
+
+admin.account.col.what:
+  en: "What"
+  description: "Admin panel, a person's page, audit table column: the action (#306)."
+
+admin.account.col.detail:
+  en: "Detail"
+  description: "Admin panel, a person's page, audit table column (#306)."
+
+admin.account.none:
+  en: "None."
+  description: "Admin panel, a person's page, an empty section (#306)."
+
 admin.refused:
   en: Your role does not allow this.
   description: "Admin panel, shown once above a screen when the API refused a request for the signed-in role (403), instead of the screen's own error (#302)."
