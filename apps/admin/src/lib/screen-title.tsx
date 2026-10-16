@@ -5,13 +5,13 @@ import { useLocation, useNavigationType } from "react-router";
 // A screen's heading and the page's title (#302). After the person moves
 // inside the panel the focus goes to the new screen's heading, so a keyboard
 // or screen-reader user starts there and hears its name. Nothing moves when
-// the panel loads, whether at a deep path, on a reload, or at the front page,
-// whose redirect to the first screen is a replace the person did not make.
+// the panel loads, whether at a deep path or on a reload, and a redirect is a
+// replace the person did not make.
 
 /** How many times the person has moved since the panel loaded; 0 until the first move. */
 const Moves = createContext(0);
 
-/** Around the routes: counts the person's own moves, not the load and not the front page's redirect. */
+/** Around the routes: counts the person's own moves, not the load and not a redirect's replace. */
 export function NavigationFocus({ children }: { children: ReactNode }) {
   const { key } = useLocation();
   const type = useNavigationType();

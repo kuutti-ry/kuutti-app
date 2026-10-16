@@ -41,6 +41,28 @@ export const AdminSession = z
   .meta({ id: "AdminSession" });
 export type AdminSession = z.infer<typeof AdminSession>;
 
+/** One queue on the panel's front page (#303): how many wait, and since when the oldest. */
+export const OverviewQueue = z
+  .object({
+    queue: z.enum(["photos", "feedback"]),
+    waiting: z.int().min(0),
+    /** When the oldest began to wait: its upload, or for a photo its owner's appeal; null when nothing waits. */
+    oldestSince: z.iso.datetime().nullable(),
+  })
+  .meta({ id: "OverviewQueue" });
+export type OverviewQueue = z.infer<typeof OverviewQueue>;
+
+/** The front page (#303): every queue, the API's clock to measure ages by, and the response time promised. */
+export const AdminOverview = z
+  .object({
+    now: z.iso.datetime(),
+    /** matching_config moderation_response_hours: past it, the oldest is late (#299). */
+    responseHours: z.number().min(0),
+    queues: z.array(OverviewQueue).max(10),
+  })
+  .meta({ id: "AdminOverview" });
+export type AdminOverview = z.infer<typeof AdminOverview>;
+
 export const AdminWhoAmI = z
   .object({ role: ModeratorRole, expiresAt: z.iso.datetime() })
   .meta({ id: "AdminWhoAmI" });

@@ -17,6 +17,7 @@ export { type MediaDeps, uploadPhoto } from "./photos.ts";
 export {
   listApprovedPhotos,
   listPhotos,
+  queueSummary,
   recordCardServed,
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";

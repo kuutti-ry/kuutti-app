@@ -39,6 +39,7 @@ import {
   configAdminRoutes,
   feedbackAdminRoutes,
   feedbackRoutes,
+  overviewAdminRoutes,
   sanctionAdminRoutes,
 } from "./safety/index.ts";
 
@@ -149,6 +150,7 @@ export function createApp(deps: Deps) {
   app.route("/", feedbackAdminRoutes(deps, moderators));
   app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   app.route("/", configAdminRoutes(deps, admins));
+  app.route("/", overviewAdminRoutes(deps, moderators));
   // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",

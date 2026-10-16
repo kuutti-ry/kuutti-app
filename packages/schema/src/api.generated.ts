@@ -3145,6 +3145,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What waits for the moderators
+         * @description Per queue (photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The queues. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminOverview"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gate": {
         parameters: {
             query?: never;
@@ -4386,6 +4443,19 @@ export interface components {
         ConfigChangeRequest: {
             value: components["schemas"]["ConfigValue"];
             reason: string;
+        };
+        AdminOverview: {
+            /** Format: date-time */
+            now: string;
+            responseHours: number;
+            queues: components["schemas"]["OverviewQueue"][];
+        };
+        OverviewQueue: {
+            /** @enum {string} */
+            queue: "photos" | "feedback";
+            waiting: number;
+            /** Format: date-time */
+            oldestSince: string | null;
         };
         GateResponse: {
             state: components["schemas"]["GateState"];

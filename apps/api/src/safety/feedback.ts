@@ -116,6 +116,16 @@ export async function listUnhandledFeedback(
   return { items: rows.map(toItem), total: total.rows[0]?.n ?? 0 };
 }
 
+/** What waits in the feedback for the front page (#303): how many, and since when the oldest. */
+export async function feedbackSummary(
+  db: Queryable,
+): Promise<{ waiting: number; oldestSince: Date | null }> {
+  const { rows } = await db.query<{ n: number; oldest: Date | null }>(
+    "SELECT count(*)::int AS n, min(created_at) AS oldest FROM feedback WHERE handled_at IS NULL",
+  );
+  return { waiting: rows[0]?.n ?? 0, oldestSince: rows[0]?.oldest ?? null };
+}
+
 export async function findFeedback(db: Queryable, id: string): Promise<FeedbackItem | null> {
   const { rows } = await db.query<FeedbackRow>(`SELECT ${COLUMNS} FROM feedback WHERE id = $1`, [
     id,

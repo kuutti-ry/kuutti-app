@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.27.0",
+    "version": "0.28.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3392,6 +3392,57 @@
         ],
         "additionalProperties": false
       },
+      "AdminOverview": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "responseHours": {
+            "type": "number",
+            "minimum": 0
+          },
+          "queues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewQueue"
+            },
+            "maxItems": 10
+          }
+        },
+        "required": [
+          "now",
+          "responseHours",
+          "queues"
+        ]
+      },
+      "OverviewQueue": {
+        "type": "object",
+        "properties": {
+          "queue": {
+            "type": "string",
+            "enum": [
+              "photos",
+              "feedback"
+            ]
+          },
+          "waiting": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "oldestSince": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "queue",
+          "waiting",
+          "oldestSince"
+        ]
+      },
       "GateResponse": {
         "type": "object",
         "properties": {
@@ -6485,6 +6536,49 @@
           },
           "409": {
             "description": "config_conflict: another admin changed the key meanwhile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/overview": {
+      "get": {
+        "summary": "What waits for the moderators",
+        "description": "Per queue (photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The queues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
             "content": {
               "application/json": {
                 "schema": {

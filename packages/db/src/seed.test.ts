@@ -83,6 +83,7 @@ describe("seed", () => {
           photo_fetches_per_day: { thumb: 600, card: 300, full: 60 },
           exports_per_day: 3,
           feedback_per_day: 5,
+          moderation_response_hours: 24,
           waitlist_k: 10,
           default_pond: "suomi",
           change_cadence_days: 30,

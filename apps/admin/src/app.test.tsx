@@ -40,6 +40,16 @@ const staff = {
   role: "moderator",
 };
 
+/** The front page's answer (#303): every queue empty, by the API's clock. */
+const overview = {
+  now: "2026-09-25T12:00:00.000Z",
+  responseHours: 24,
+  queues: [
+    { queue: "photos", waiting: 0, oldestSince: null },
+    { queue: "feedback", waiting: 0, oldestSince: null },
+  ],
+};
+
 const refused = () =>
   new Response(
     JSON.stringify({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }),
@@ -60,6 +70,7 @@ function staffApi(
     if (answer) return answer();
     if (key === "GET /health") return json(health);
     if (key === "GET /admin/whoami") return json({ role, expiresAt: staff.expiresAt });
+    if (key === "GET /admin/overview") return json(overview);
     if (key === "GET /admin/photos/queue") return json({ items: [], total: 0 });
     if (key === "GET /admin/feedback") return json({ items: [], total: 0 });
     if (key === "POST /admin/auth/logout") {
@@ -113,15 +124,16 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 
-  it("signed in as a moderator, names the role and the session's end and opens the queue", async () => {
+  it("signed in as a moderator, names the role and the session's end and opens the front page (#303)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     renderApp(staffApi());
     expect(await screen.findByText(/Signed in as moderator/)).toHaveTextContent(
       `Session ends: ${formatTime("en", new Date(staff.expiresAt))}`,
     );
     expect(
-      await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
+      await screen.findByRole("heading", { level: 2, name: "What waits" }),
     ).toBeInTheDocument();
+    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
     expect(screen.queryByText("Your role does not open any screen of this panel.")).toBeNull();
   });
 
@@ -138,12 +150,15 @@ describe("App", () => {
     expect(screen.getByText(/Signed in as researcher/)).toBeInTheDocument();
     expect(screen.queryByRole("navigation")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Photo review queue" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "What waits" })).toBeNull();
+    expect(calls).not.toContain("GET /admin/overview");
     expect(calls).not.toContain("GET /admin/photos/queue");
     expect(calls).not.toContain("GET /admin/feedback");
   });
 
   it("a session revoked while the panel is open goes back to the sign-in, saying so (#250)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/photos");
     const signedIn = staffApi();
     renderApp(async (input, init) => {
       const req = input instanceof Request ? input : new Request(input ?? "", init);
@@ -185,26 +200,67 @@ describe("App", () => {
     expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
   });
 
-  it("opens the first screen the role allows at the front page, the menu marking where the person is (#302)", async () => {
+  it("opens the overview at the front page, first in the menu and marked current only there (#302, #303)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
-    renderApp(staffApi());
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls));
+    const front = await screen.findByRole("heading", { level: 2, name: "What waits" });
+    expect(window.location.pathname).toBe("/");
+    const menu = screen.getByRole("navigation", { name: "Screens" });
+    const links = within(menu).getAllByRole("link");
+    expect(links.map((link) => link.textContent)).toEqual(["Overview", "Photos", "Feedback"]);
+    expect(within(menu).getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/");
+    expect(within(menu).getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(menu).getByRole("link", { name: "Photos" })).not.toHaveAttribute("aria-current");
+    expect(within(menu).getByRole("link", { name: "Feedback" })).not.toHaveAttribute(
+      "aria-current",
+    );
+    // Loading the panel is not the person's move: nothing takes the focus.
+    expect(front).not.toHaveFocus();
+    expect(document.title).toBe("What waits · Kuutti admin");
+    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
+    expect(calls).toContain("GET /admin/overview");
+    expect(calls).not.toContain("GET /admin/photos/queue");
+    expect(calls).not.toContain("GET /admin/feedback");
+
+    // Every path starts with "/": the overview is current at "/" alone, not under another screen.
+    fireEvent.click(within(menu).getByRole("link", { name: "Photos" }));
     expect(
       await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
     ).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/photos");
-    const menu = screen.getByRole("navigation", { name: "Screens" });
-    const links = within(menu).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Photos", "Feedback"]);
     expect(within(menu).getByRole("link", { name: "Photos" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(within(menu).getByRole("link", { name: "Feedback" })).not.toHaveAttribute(
+    expect(within(menu).getByRole("link", { name: "Overview" })).not.toHaveAttribute(
       "aria-current",
     );
-    // The front page's redirect is not the person's move: nothing takes the focus.
-    expect(screen.getByRole("heading", { level: 2, name: "Photo review queue" })).not.toHaveFocus();
-    expect(document.title).toBe("Photo review queue · Kuutti admin");
+
+    // And back again by the menu: the overview's heading takes the focus.
+    fireEvent.click(within(menu).getByRole("link", { name: "Overview" }));
+    const again = await screen.findByRole("heading", { level: 2, name: "What waits" });
+    expect(window.location.pathname).toBe("/");
+    await waitFor(() => expect(again).toHaveFocus());
+    expect(within(menu).getByRole("link", { name: "Overview" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(within(menu).getByRole("link", { name: "Photos" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("opens a queue from its line on the front page, its heading taking the focus (#303)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls));
+    await screen.findByText("Nothing waits in any queue.");
+    fireEvent.click(screen.getByRole("link", { name: "Photo review queue" }));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Photo review queue" });
+    expect(window.location.pathname).toBe("/photos");
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(calls).toContain("GET /admin/photos/queue");
   });
 
   it("moves between screens by the menu, and the new screen's heading takes the focus (#302)", async () => {
@@ -248,7 +304,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Photos", "Feedback", "Tunables"]);
+    ).toEqual(["Overview", "Photos", "Feedback", "Tunables"]);
     expect(calls).not.toContain("GET /admin/config");
     fireEvent.click(within(menu).getByRole("link", { name: "Tunables" }));
     const heading = await screen.findByRole("heading", { level: 2, name: "Tunables" });
@@ -295,7 +351,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Photos", "Feedback"]);
+    ).toEqual(["Overview", "Photos", "Feedback"]);
     expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
@@ -315,13 +371,15 @@ describe("App", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("link", { name: "Back to the start" }));
     expect(
-      await screen.findByRole("heading", { level: 2, name: "Photo review queue" }),
+      await screen.findByRole("heading", { level: 2, name: "What waits" }),
     ).toBeInTheDocument();
-    expect(window.location.pathname).toBe("/photos");
+    expect(window.location.pathname).toBe("/");
+    expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
   });
 
   it("says once that the role does not allow it when the API answers 403, never as the screen's failure, and not again once the role is honoured (#302)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/photos");
     let refuse = true;
     renderApp(
       staffApi("moderator", [], {
@@ -345,8 +403,19 @@ describe("App", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("says a refused front page once, by the shell, never as the overview's failure (#302, #303)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    renderApp(staffApi("moderator", [], { answers: { "GET /admin/overview": refused } }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.queryByText("What waits could not be loaded.")).toBeNull();
+    expect(screen.queryByText("Loading what waits…")).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "What waits" })).toBeInTheDocument();
+  });
+
   it("does not bring a refusal back when the person returns to the screen it was said on (#302)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/photos");
     let refuse = true;
     renderApp(
       staffApi("moderator", [], {
@@ -370,6 +439,7 @@ describe("App", () => {
 
   it("says a refused decision once, by the shell, and the item keeps its buttons (#302)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", "/photos");
     const photo = {
       photoId: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
       accountId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
@@ -413,6 +483,7 @@ describe("App", () => {
     expect(window.location.hash).toBe("");
     expect(calls).toContain("POST /admin/auth/exchange");
     expect(calls).not.toContain("GET /admin/photos/queue");
+    expect(calls).not.toContain("GET /admin/overview");
   });
 
   it("offers a skip link to the screen, first on the page (#302)", async () => {

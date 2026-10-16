@@ -497,10 +497,27 @@ const QUEUE_COLUMNS = `p.id, p.account_id, p.state, p.blurhash, p.width, p.heigh
 export async function listQueue(db: Queryable, limit: number): Promise<PhotoReviewItem[]> {
   const { rows } = await db.query<Row>(
     `SELECT ${QUEUE_COLUMNS} FROM photo p LEFT JOIN photo_review r ON r.photo_id = p.id
-     WHERE p.state = 'queued' ORDER BY p.created_at LIMIT $1`,
+     WHERE p.state = 'queued'
+     -- Longest waiting first: an appealed photo waits from its appeal, as the front page counts it (#303).
+     ORDER BY coalesce(r.appealed_at, p.created_at), p.id LIMIT $1`,
     [limit],
   );
   return rows.map(reviewItemFrom);
+}
+
+/**
+ * What waits in the photo queue for the front page (#303): how many, and
+ * since when the oldest, from its owner's appeal if it came back that way.
+ */
+export async function queueSummary(
+  db: Queryable,
+): Promise<{ waiting: number; oldestSince: Date | null }> {
+  const { rows } = await db.query<{ n: number; oldest: Date | null }>(
+    `SELECT count(*)::int AS n, min(coalesce(r.appealed_at, p.created_at)) AS oldest
+     FROM photo p LEFT JOIN photo_review r ON r.photo_id = p.id
+     WHERE p.state = 'queued'`,
+  );
+  return { waiting: rows[0]?.n ?? 0, oldestSince: rows[0]?.oldest ?? null };
 }
 
 export async function countQueue(db: Queryable): Promise<number> {
