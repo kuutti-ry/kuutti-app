@@ -6,7 +6,10 @@ import { recordFeedback } from "./feedback.ts";
 // Feedback from inside the app (#171, ADR-023, features/safety/feedback.feature):
 // the member route, the panel's routes, the cap, the event and the log.
 
-const TEXT = "The photos screen shows yesterday's tip 4711.";
+// A marker of letters: a number such as 4711 can turn up in a log line's
+// millisecond timestamp and fail the test by chance.
+const MARK = "qzxv";
+const TEXT = `The photos screen shows yesterday's tip ${MARK}.`;
 const json = (headers: Record<string, string>) => ({
   ...headers,
   "content-type": "application/json",
@@ -68,7 +71,7 @@ describe("Feedback of each kind lands with the build, and its text in no log lin
       locale,
     });
     expect(JSON.stringify(lines)).not.toContain(TEXT);
-    expect(JSON.stringify(lines)).not.toContain("4711");
+    expect(JSON.stringify(lines)).not.toContain(MARK);
   });
 });
 
