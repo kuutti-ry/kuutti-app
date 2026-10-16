@@ -5,6 +5,7 @@ import {
   AdminAuthStartQuery,
   AdminSession,
   AdminWhoAmI,
+  AuditQuery,
   ModerationLabel,
   ModeratorRole,
   PhotoDecisionRequest,
@@ -194,5 +195,28 @@ describe("a moderator's decision", () => {
         .rejectionReason,
     ).toBeNull();
     expect(codes(PhotoDecisionResponse, { ...answer, photoId: "p1" })).toEqual(["invalid_format"]);
+  });
+});
+
+describe("the audit log's window (#309)", () => {
+  it.each([
+    ["the first moment of 1970", "1970-01-01T00:00:00Z"],
+    ["milliseconds", "2026-10-16T10:00:00.123Z"],
+    ["microseconds, as the database writes them", "2026-10-16T10:00:00.123456Z"],
+  ])("takes %s", (_, value) => {
+    expect(AuditQuery.parse({ from: value, to: value })).toEqual({ from: value, to: value });
+  });
+
+  it.each([
+    ["a moment before 1970, which no row holds", "1969-12-31T23:59:59Z", "custom"],
+    ["year 0, which the database does not know", "0000-01-01T00:00:00Z", "custom"],
+    [
+      "a value longer than the database's field",
+      `2026-10-16T10:00:00.${"1".repeat(130)}Z`,
+      "too_big",
+    ],
+  ])("refuses %s", (_, value, code) => {
+    expect(codes(AuditQuery, { from: value })).toEqual([code]);
+    expect(codes(AuditQuery, { to: value })).toEqual([code]);
   });
 });

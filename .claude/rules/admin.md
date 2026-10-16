@@ -17,5 +17,6 @@ A static SPA built to S3 behind CloudFront on `admin.<domain>`; PR previews are 
 - Every moderator action writes the immutable audit log (who, what, when, why). Photo views go through short-TTL signed URLs and are logged.
 - Never auto-delete a photo, never expose a bulk export, never show `hetu_hmac` or `research_id` in the UI.
 - A person's page (`/accounts/:id`, #306) is reached by an account id only, never a search by name or anything else; opening it is an `account.view` audit row, a photo on it is fetched only on request (`photo.view`), and its profile is the card's own presenter (`fieldsOnCard`), so staff see what others see.
+- The audit log is read a page of fifty at a time (`/audit`, `GET /admin/audit`, #309), by a keyset cursor, never an offset; no route answers more than one page of audit rows (`AUDIT_PAGE_SIZE`, held by the route-table test), and there is no export; a read narrowed to one subject writes `audit.read` about it, as opening the person's page writes `account.view`. The staff list (`/staff`, #310) only reads: a role is granted and revoked with the maintainer's CLI (ADR-006 §5), never by a route.
 - English only. The accessibility rules in `CLAUDE.md` apply: keyboard navigation, labels, contrast.
 - Same zod contracts from `packages/schema`; no hand-rolled fetch types.

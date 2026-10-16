@@ -164,19 +164,39 @@ h2:focus:not(:focus-visible) {
   margin: 0;
   overflow-wrap: anywhere;
 }
-/* The audit rows: the table scrolls on its own on a narrow screen, and its detail wraps. */
-.person table {
+/* The audit rows, on a person's page (#306) and in the audit log (#309): the
+   table scrolls on its own on a narrow screen; a row's detail is key and value. */
+.person table,
+.audit table,
+.staff table {
   display: block;
   overflow-x: auto;
   border-collapse: collapse;
   margin: 0.5rem 0;
 }
 .person th,
-.person td {
+.person td,
+.audit th,
+.audit td,
+.staff th,
+.staff td {
   text-align: start;
   padding: 0.25rem 0.75rem 0.25rem 0;
   vertical-align: top;
 }
 .person td code {
+  overflow-wrap: anywhere;
+}
+dl.detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0 0.5rem;
+  margin: 0;
+}
+dl.detail > div {
+  display: contents;
+}
+.detail dd {
+  margin: 0;
   overflow-wrap: anywhere;
 }

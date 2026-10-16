@@ -544,10 +544,20 @@ export async function revokeAdminSession(db: Queryable, id: string, at: Date): P
   ]);
 }
 
-/** Expired or ended admin sessions: gone with the nightly sweep. */
+/**
+ * The nightly sweep: every ended staff session goes, except each current
+ * member's newest, which the staff list reads as their last sign-in (#310,
+ * ADR-006). Kept expired or revoked, it never authenticates; it goes once a
+ * newer session replaces it or the role is taken away.
+ */
 export async function deleteDeadAdminSessions(db: Queryable, now: Date): Promise<number> {
   const result = await db.query(
-    "DELETE FROM admin_session WHERE expires_at < $1 OR revoked_at IS NOT NULL",
+    `DELETE FROM admin_session
+     WHERE (expires_at < $1 OR revoked_at IS NOT NULL)
+       AND id NOT IN (
+         SELECT DISTINCT ON (s.identity_id) s.id
+         FROM admin_session s JOIN moderator_roles m ON m.identity_id = s.identity_id
+         ORDER BY s.identity_id, s.created_at DESC, s.id DESC)`,
     [now],
   );
   return result.rowCount ?? 0;

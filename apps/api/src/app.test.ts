@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { AUDIT_PAGE_SIZE } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
 import { createApp, PUBLIC_ROUTES } from "./app.ts";
@@ -91,6 +94,14 @@ describe("route table", () => {
     }
   });
 
+  it("holds the audit log and the staff list to the admin role (#309, #310)", async () => {
+    const routes = guardedRoutes(await bareApp());
+    const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;
+    for (const key of ["GET /admin/audit", "GET /admin/staff"]) {
+      expect(rolesOf(key), key).toEqual([["admin"]]);
+    }
+  });
+
   it("would catch a staff route behind the product guard alone", async () => {
     const app = await bareApp();
     // The mistake the check exists for: a product session admitted to staff data.
@@ -98,6 +109,201 @@ describe("route table", () => {
     app.use("/admin/probe", requireSession);
     app.get("/admin/probe", (c) => c.json({ ok: true }));
     expect(adminRoutesWithoutStaffGuard(guardedRoutes(app))).toEqual(["GET /admin/probe"]);
+  });
+});
+
+/** The contract as the API serves it outside production. */
+type Contract = {
+  paths: Record<string, Record<string, Operation>>;
+  components: { schemas: Record<string, unknown> };
+};
+type Operation = {
+  parameters?: { schema?: unknown }[];
+  requestBody?: { content?: Record<string, { schema?: unknown }> };
+  responses?: Record<string, { content?: Record<string, { schema?: unknown }> }>;
+};
+
+async function contract(): Promise<Contract> {
+  const response = await (await bareApp()).request("/openapi.json");
+  expect(response.status).toBe(200);
+  return (await response.json()) as Contract;
+}
+
+/** Every node of a schema, following its $refs into the components, each component once. */
+function* nodes(
+  schema: unknown,
+  schemas: Record<string, unknown>,
+  seen = new Set<string>(),
+): Generator<Record<string, unknown>> {
+  if (schema === null || typeof schema !== "object") return;
+  const node = schema as Record<string, unknown>;
+  yield node;
+  if (typeof node.$ref === "string") {
+    const name = node.$ref.replace("#/components/schemas/", "");
+    if (seen.has(name)) return;
+    seen.add(name);
+    yield* nodes(schemas[name], schemas, seen);
+    return;
+  }
+  for (const value of Object.values(node)) yield* nodes(value, schemas, seen);
+}
+
+const operations = (doc: Contract) =>
+  Object.entries(doc.paths).flatMap(([path, methods]) =>
+    Object.entries(methods).map(([method, op]) => ({ key: `${method.toUpperCase()} ${path}`, op })),
+  );
+
+/** The schemas of an audit row: the person's page's, and the reader's with the actor's role and the person (#309). */
+const AUDIT_ROWS = new Set([
+  "#/components/schemas/AdminAuditRow",
+  "#/components/schemas/AuditEntry",
+]);
+
+/** Each array of audit rows any answer of the API can carry, with its bound; null when unbounded. */
+function auditArrays(doc: Contract): { key: string; maxItems: number | null }[] {
+  return operations(doc).flatMap(({ key, op }) =>
+    Object.values(op.responses ?? {})
+      .flatMap((response) => Object.values(response.content ?? {}))
+      .flatMap(({ schema }) => [...nodes(schema, doc.components.schemas)])
+      .filter(
+        (node) =>
+          node.type === "array" &&
+          AUDIT_ROWS.has((node.items as { $ref?: string } | undefined)?.$ref ?? ""),
+      )
+      .map((node) => ({
+        key,
+        maxItems: typeof node.maxItems === "number" ? node.maxItems : null,
+      })),
+  );
+}
+
+const API_SOURCE = resolve(import.meta.dirname);
+
+/** The API's own production sources: no test, no test helper. */
+function* apiSources(path = API_SOURCE): Generator<string> {
+  if (statSync(path).isFile()) {
+    if (path.endsWith(".ts") && !path.endsWith(".test.ts")) yield path;
+    return;
+  }
+  for (const name of readdirSync(path)) {
+    if (path === API_SOURCE && name === "test") continue;
+    yield* apiSources(join(path, name));
+  }
+}
+
+const sourcesMatching = (pattern: RegExp) =>
+  [...apiSources()]
+    .filter((file) => pattern.test(readFileSync(file, "utf8")))
+    .map((file) => relative(API_SOURCE, file))
+    .sort();
+
+/**
+ * Never a bulk export of the audit log (#309, rules/admin.md). What the route
+ * table and the contract can hold: one route names the log, its page is
+ * AUDIT_PAGE_SIZE rows in the contract, and every answer that carries audit
+ * rows bounds them by a page; and the API's sources read the table in the
+ * places named here. Not checkable from here: that a handler's query keeps to
+ * its contract's bound (answers are not validated at run time; the routes'
+ * own tests count the rows), a query assembled at run time, or audit rows
+ * answered under a schema other than AdminAuditRow or AuditEntry.
+ */
+describe("the audit log, a page at a time", () => {
+  it("one route names the log, and its page is AUDIT_PAGE_SIZE rows in the contract", async () => {
+    const routes = guardedRoutes(await bareApp());
+    expect(routes.filter(({ path }) => /audit/i.test(path)).map(({ key }) => key)).toEqual([
+      "GET /admin/audit",
+    ]);
+    expect(AUDIT_PAGE_SIZE).toBe(50);
+    expect(auditArrays(await contract()).filter(({ key }) => key === "GET /admin/audit")).toEqual([
+      { key: "GET /admin/audit", maxItems: AUDIT_PAGE_SIZE },
+    ]);
+  });
+
+  it("no route of the API answers more than one page of audit rows at a time", async () => {
+    const arrays = auditArrays(await contract());
+    expect(arrays.length).toBeGreaterThan(0);
+    const over = arrays.filter(({ maxItems }) => maxItems === null || maxItems > AUDIT_PAGE_SIZE);
+    expect(over).toEqual([]);
+  });
+
+  it("the API reads audit_log in two places: the reader and the person's page", () => {
+    expect(sourcesMatching(/\b(FROM|JOIN)\s+(public\.)?audit_log\b/i)).toEqual([
+      join("safety", "accounts.ts"),
+      join("safety", "audit-routes.ts"),
+    ]);
+  });
+});
+
+/** The routes whose path names a role, staff, a moderator, a grant or a revocation. */
+const roleRoutes = (routes: GuardedRoute[]) =>
+  routes
+    .filter(({ path }) => /role|staff|moderator|grant|revoke/i.test(path))
+    .map(({ key }) => key);
+
+/**
+ * Granting and revoking a role stay the maintainer's tool (#310, ADR-006 §5:
+ * "written by the maintainer, never by a route"). What the route table and the
+ * contract can hold: one route names staff, and it only reads; nothing a
+ * request sends names a role; and no source of the API writes moderator_roles.
+ * Not checkable from here: a write assembled at run time, or one through
+ * another package's code (packages/db's CLI writes the table, and no API
+ * source may import it).
+ */
+describe("no route grants or revokes a role", () => {
+  it("one route names staff or a role, and it is a GET", async () => {
+    expect(roleRoutes(guardedRoutes(await bareApp()))).toEqual(["GET /admin/staff"]);
+  });
+
+  it("would catch a route that grants or revokes", async () => {
+    const app = await bareApp();
+    app.post("/admin/staff/:id", (c) => c.json({ ok: true }));
+    app.delete("/admin/roles/:id", (c) => c.json({ ok: true }));
+    expect(roleRoutes(guardedRoutes(app))).toEqual([
+      "GET /admin/staff",
+      "POST /admin/staff/:id",
+      "DELETE /admin/roles/:id",
+    ]);
+  });
+
+  it("nothing a request sends names a role", async () => {
+    const doc = await contract();
+    const roleNames = new Set(["moderator", "admin", "researcher"]);
+    const naming = operations(doc).filter(({ op }) =>
+      [
+        ...(op.parameters ?? []).map((parameter) => parameter.schema),
+        ...Object.values(op.requestBody?.content ?? {}).map((content) => content.schema),
+      ]
+        .flatMap((schema) => [...nodes(schema, doc.components.schemas)])
+        .some(
+          (node) =>
+            node.$ref === "#/components/schemas/ModeratorRole" ||
+            (Array.isArray(node.enum) && node.enum.some((value) => roleNames.has(value))),
+        ),
+    );
+    expect(naming.map(({ key }) => key)).toEqual([]);
+    // The walk does find a role where one is: in what the staff list answers.
+    expect(
+      operations(doc)
+        .filter(({ key }) => key === "GET /admin/staff")
+        .flatMap(({ op }) => Object.values(op.responses?.["200"]?.content ?? {}))
+        .flatMap(({ schema }) => [...nodes(schema, doc.components.schemas)])
+        .some((node) => node.$ref === "#/components/schemas/ModeratorRole"),
+    ).toBe(true);
+  });
+
+  it("no source of the API writes moderator_roles", () => {
+    expect(
+      sourcesMatching(
+        /\b(INSERT\s+INTO|UPDATE|DELETE\s+FROM|TRUNCATE)\s+(public\.)?moderator_roles\b/i,
+      ),
+    ).toEqual([]);
+    // The pattern finds the writes where they are: the maintainer's tool.
+    const cli = readFileSync(
+      resolve(API_SOURCE, "..", "..", "..", "packages", "db", "src", "cli", "moderator.ts"),
+      "utf8",
+    );
+    expect(cli).toMatch(/\bINSERT\s+INTO\s+moderator_roles\b/i);
+    expect(cli).toMatch(/\bDELETE\s+FROM\s+moderator_roles\b/i);
   });
 });
 

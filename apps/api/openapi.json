@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.29.0",
+    "version": "0.30.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3699,6 +3699,144 @@
           "detail"
         ]
       },
+      "AuditPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "maxItems": 50
+          },
+          "next": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "items",
+          "next"
+        ]
+      },
+      "AuditEntry": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actorIdentityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "subjectType": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "detail": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "nullable": true
+                }
+              ]
+            }
+          },
+          "actorRole": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ModeratorRole"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "accountId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "at",
+          "actorIdentityId",
+          "action",
+          "subjectType",
+          "subjectId",
+          "detail",
+          "actorRole",
+          "accountId"
+        ]
+      },
+      "StaffList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaffMember"
+            },
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "StaffMember": {
+        "type": "object",
+        "properties": {
+          "identityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ModeratorRole"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "grantedBy": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "lastSignInAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "identityId",
+          "role",
+          "grantedAt",
+          "grantedBy",
+          "lastSignInAt"
+        ]
+      },
       "GateResponse": {
         "type": "object",
         "properties": {
@@ -6909,6 +7047,171 @@
           },
           "404": {
             "description": "No such account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/audit": {
+      "get": {
+        "summary": "The audit log, a page at a time",
+        "description": "Who did or saw what, newest first, 50 rows a page; narrowed by actor, action, subject type and id, and a time window; `before` is the `next` of the page before. Never more than a page. Admins only; a read narrowed to a subject id writes audit.read about it first, any other read writes nothing.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "actor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 60,
+              "pattern": "^[a-z]+\\.[a-z]+$"
+            },
+            "required": false,
+            "name": "action",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "pattern": "^[a-z]+$"
+            },
+            "required": false,
+            "name": "subjectType",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": false,
+            "name": "subjectId",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "from",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 30,
+              "format": "date-time"
+            },
+            "required": false,
+            "name": "to",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or cursor_invalid: a cursor this route did not give.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/staff": {
+      "get": {
+        "summary": "Who holds a role",
+        "description": "Every member of staff by identity id: the role, when and by whom it was granted, the last sign-in to the panel. Granting and revoking stay the maintainer's tool. Admins only.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The staff.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
             "content": {
               "application/json": {
                 "schema": {

@@ -18,13 +18,15 @@ const AUDIT_ACTIONS = [
   "sanction.review",
   "config.change",
   "account.view",
+  "audit.read",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditEntry = {
   actorIdentityId: string;
   action: AuditAction;
-  subjectType: "photo" | "feedback" | "account" | "config";
+  /** "any": an audit read narrowed to a subject id of no named type (#309). */
+  subjectType: "photo" | "feedback" | "account" | "config" | "any";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

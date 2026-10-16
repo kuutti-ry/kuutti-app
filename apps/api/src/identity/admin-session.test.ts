@@ -426,6 +426,16 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     const live = await staffSession(ctx.client);
     const expired = await staffSession(ctx.client);
     const ended = await staffSession(ctx.client);
+    // Each of the two dead ones has a newer session of the same member, so
+    // neither is anyone's last sign-in.
+    const later = async (identityId: string) =>
+      ctx.client.query(
+        `INSERT INTO admin_session (identity_id, role, access_hash, expires_at, created_at)
+         VALUES ($1, 'moderator', md5(random()::text), now() + interval '1 hour', now() + interval '1 second')`,
+        [identityId],
+      );
+    await later(expired.identityId);
+    await later(ended.identityId);
     await ctx.client.query(
       "UPDATE admin_session SET expires_at = now() - interval '1 second' WHERE id = $1",
       [expired.sessionId],
@@ -440,5 +450,30 @@ describe("staff sessions: refusals, validation and the sweep", () => {
       [[live.sessionId, expired.sessionId, ended.sessionId]],
     );
     expect(rows).toEqual([{ id: live.sessionId }]);
+  });
+
+  test("the sweep keeps a member's newest session, ended, as their last sign-in, and lets it go with the role (#310)", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const member = await staffSession(ctx.client, "moderator");
+    const former = await staffSession(ctx.client, "moderator");
+    for (const { sessionId } of [member, former]) {
+      await ctx.client.query(
+        "UPDATE admin_session SET expires_at = now() - interval '1 second', revoked_at = now() WHERE id = $1",
+        [sessionId],
+      );
+    }
+    await ctx.client.query("DELETE FROM moderator_roles WHERE identity_id = $1", [
+      former.identityId,
+    ]);
+    await sweepAdminSessions({ db: ctx.client, now: () => new Date() });
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM admin_session WHERE id = ANY($1)",
+      [[member.sessionId, former.sessionId]],
+    );
+    expect(rows).toEqual([{ id: member.sessionId }]);
+    // Kept, it still opens nothing.
+    expect((await app.request("/admin/whoami", { headers: member.headers })).status).toBe(401);
   });
 });

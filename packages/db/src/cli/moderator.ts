@@ -15,16 +15,35 @@
 import { createPool } from "../pool.ts";
 
 const ROLES = new Set(["moderator", "admin", "researcher"]);
+/** As long as the staff list may show the name of who granted a role (StaffMember.grantedBy). */
+const GRANTOR_MAX = 200;
 
 function arg(name: string): string | undefined {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
+/** The flags that take the word after them as their value. */
+const VALUED = new Set(["--by", "--env"]);
+
+/**
+ * The words that are not a flag or a flag's value, by position: a role that
+ * happens to equal the --by name ("grant <hmac> admin --by admin") stays the
+ * role (#250, #310). The bare "--" pnpm passes through ("moderator -- list")
+ * is no flag and takes nothing with it.
+ */
+function positionals(argv: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const word = argv[i] as string;
+    if (VALUED.has(word)) i++;
+    else if (!word.startsWith("--")) out.push(word);
+  }
+  return out;
+}
+
 async function main(): Promise<number> {
-  const [command, hetuHmac, role] = process.argv
-    .slice(2)
-    .filter((a) => !a.startsWith("--") && a !== arg("--by") && a !== arg("--env"));
+  const [command, hetuHmac, role] = positionals(process.argv.slice(2));
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error("DATABASE_URL is not set");
@@ -92,6 +111,11 @@ async function main(): Promise<number> {
         console.error(
           "usage: moderator grant <hetu_hmac> <moderator|admin|researcher> --by <name>",
         );
+        return 2;
+      }
+      // The staff list's contract holds the name to 200 characters (#310).
+      if (by.length > GRANTOR_MAX) {
+        console.error(`--by is a name of at most ${GRANTOR_MAX} characters`);
         return 2;
       }
       if (found.standing !== "ok") {

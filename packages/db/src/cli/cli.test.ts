@@ -245,6 +245,55 @@ describe("pnpm --filter @kuutti/db moderator", () => {
     expect((await moderator(["recent"])).out).toEqual([`${hmac(1)} never banned`]);
   });
 
+  it("reads the commands as pnpm hands them over, after a bare --, the way every runbook writes them", async () => {
+    const id = await identity(1);
+    expect(await moderator(["--", "list"])).toEqual({ code: 0, out: ["no staff roles"], err: [] });
+    expect(await moderator(["--", "grant", hmac(1), "admin", "--by", "admin"])).toEqual({
+      code: 0,
+      out: ["granted admin"],
+      err: [],
+    });
+    expect((await moderator(["--", "recent"])).code).toBe(0);
+    expect(await moderator(["--", "revoke", hmac(1)])).toEqual({
+      code: 0,
+      out: ["revoked"],
+      err: [],
+    });
+    const { rows } = await pool.query("SELECT 1 FROM moderator_roles WHERE identity_id = $1", [id]);
+    expect(rows).toEqual([]);
+  });
+
+  it("refuses a --by name longer than the staff list shows, and takes one of 200 characters", async () => {
+    const id = await identity(1);
+    expect(await moderator(["grant", hmac(1), "moderator", "--by", "x".repeat(201)])).toEqual({
+      code: 2,
+      out: [],
+      err: ["--by is a name of at most 200 characters"],
+    });
+    const none = await pool.query("SELECT 1 FROM moderator_roles WHERE identity_id = $1", [id]);
+    expect(none.rows).toEqual([]);
+    expect((await moderator(["grant", hmac(1), "moderator", "--by", "x".repeat(200)])).out).toEqual(
+      ["granted moderator"],
+    );
+  });
+
+  it("keeps the role when it is the same word as the --by name, and the flags in any order (#250, #310)", async () => {
+    const id = await identity(1);
+    expect(await moderator(["grant", hmac(1), "admin", "--by", "admin"])).toEqual({
+      code: 0,
+      out: ["granted admin"],
+      err: [],
+    });
+    expect((await moderator(["--by", "moderator", "grant", hmac(1), "moderator"])).out).toEqual([
+      "granted moderator",
+    ]);
+    const { rows } = await pool.query<{ role: string; granted_by: string }>(
+      "SELECT role, granted_by FROM moderator_roles WHERE identity_id = $1",
+      [id],
+    );
+    expect(rows).toEqual([{ role: "moderator", granted_by: "moderator" }]);
+  });
+
   it("grants a role to an identity in good standing, and changes it when granted again", async () => {
     const id = await identity(1);
     expect(await moderator(["grant", hmac(1), "moderator", "--by", "Maintainer"])).toEqual({

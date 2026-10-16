@@ -5412,6 +5412,138 @@ admin.account.none:
   en: "None."
   description: "Admin panel, a person's page, an empty section (#306)."
 
+admin.nav.audit:
+  en: "Audit log"
+  description: "Admin panel, the menu entry of the audit log's reader, admins only (#309)."
+
+admin.nav.staff:
+  en: "Staff"
+  description: "Admin panel, the menu entry of the staff list, admins only (#310)."
+
+admin.audit.title:
+  en: "Audit log"
+  description: "Admin panel, the heading of the audit log's reader (#309)."
+
+admin.audit.filters:
+  en: "Filters"
+  description: "Admin panel, the accessible name of the audit log's filter form (#309)."
+
+admin.audit.actor:
+  en: "Who (identity id)"
+  description: "Admin panel, audit log filter label (#309)."
+
+admin.audit.action:
+  en: "What (such as sanction.apply)"
+  description: "Admin panel, audit log filter label (#309)."
+
+admin.audit.subjectType:
+  en: "Subject type (account, photo, feedback, config)"
+  description: "Admin panel, audit log filter label (#309)."
+
+admin.audit.subjectId:
+  en: "Subject id"
+  description: "Admin panel, audit log filter label (#309)."
+
+admin.audit.from:
+  en: "From day"
+  description: "Admin panel, audit log filter label: the first day included (#309)."
+
+admin.audit.to:
+  en: "To day"
+  description: "Admin panel, audit log filter label: the last day included (#309)."
+
+admin.audit.apply:
+  en: "Show"
+  description: "Admin panel, the audit log filter form's button (#309)."
+
+admin.audit.loading:
+  en: "Loading the audit log…"
+  description: "Admin panel, while a page of the audit log is fetched (#309)."
+
+admin.audit.error:
+  en: "The audit log could not be loaded."
+  description: "Admin panel, a page of the audit log failed to load (#309)."
+
+admin.audit.invalid:
+  en: "A filter is not valid: an id is a uuid, an action is two words with a dot."
+  description: "Admin panel, the API refused the filters (#309)."
+
+admin.audit.none:
+  en: "Nothing matches."
+  description: "Admin panel, the audit log's page is empty (#309)."
+
+admin.audit.caption:
+  en: "Newest first, fifty a page"
+  description: "Admin panel, the audit log table's caption (#309)."
+
+admin.audit.role:
+  en: "Role now"
+  description: "Admin panel, the audit log, the column of the actor's current role (#309)."
+
+admin.audit.noRole:
+  en: "None now"
+  description: "Admin panel, the audit log: the actor holds no role any more (#309)."
+
+admin.audit.subject:
+  en: "Subject"
+  description: "Admin panel, audit log table column (#309)."
+
+admin.audit.newer:
+  en: "Newer"
+  description: "Admin panel, the button to the page of newer audit rows (#309)."
+
+admin.audit.older:
+  en: "Older"
+  description: "Admin panel, the button to the page of older audit rows (#309)."
+
+admin.staff.title:
+  en: "Staff"
+  description: "Admin panel, the heading of the staff list (#310)."
+
+admin.staff.refresh:
+  en: "Refresh"
+  description: "Admin panel, the button that reloads the staff list (#310)."
+
+admin.staff.explain:
+  en: "Roles are granted and revoked by the maintainer's moderator tool, not here."
+  description: "Admin panel, under the staff list's heading (#310)."
+
+admin.staff.loading:
+  en: "Loading the staff…"
+  description: "Admin panel, while the staff list is fetched (#310)."
+
+admin.staff.error:
+  en: "The staff could not be loaded."
+  description: "Admin panel, the staff list failed to load (#310)."
+
+admin.staff.caption:
+  en: "{total, plural, one {# member of staff} other {# members of staff}}"
+  description: "Admin panel, the staff table's caption (#310)."
+
+admin.staff.col.identity:
+  en: "Identity"
+  description: "Admin panel, staff table column (#310)."
+
+admin.staff.col.role:
+  en: "Role"
+  description: "Admin panel, staff table column (#310)."
+
+admin.staff.col.granted:
+  en: "Granted"
+  description: "Admin panel, staff table column (#310)."
+
+admin.staff.col.by:
+  en: "By"
+  description: "Admin panel, staff table column: who granted the role, by name (#310)."
+
+admin.staff.col.lastSignIn:
+  en: "Last sign-in"
+  description: "Admin panel, staff table column (#310)."
+
+admin.staff.never:
+  en: "Never"
+  description: "Admin panel, the staff table: no panel sign-in yet (#310)."
+
 admin.refused:
   en: Your role does not allow this.
   description: "Admin panel, shown once above a screen when the API refused a request for the signed-in role (403), instead of the screen's own error (#302)."
