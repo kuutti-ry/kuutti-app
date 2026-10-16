@@ -74,7 +74,7 @@ const persona = (key: string) => {
 const lastDayOfMonth = (at: Date) =>
   at.getUTCDate() === new Date(Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 0)).getUTCDate();
 
-async function world(ctx: TestContext) {
+async function world(ctx: TestContext, overrides: Record<string, string> = {}) {
   const { logger, lines } = await captureLogger();
   // The pond the histories name, and the default pond (#146): the test database has no seed.
   await ctx.client.query(
@@ -87,6 +87,7 @@ async function world(ctx: TestContext) {
     OIDC_CLIENT_ID: "kuutti-local",
     OIDC_REDIRECT_URI: `${API}/auth/callback`,
     OIDC_ACR_VALUES: "http://ftn.ficora.fi/2017/loatest2",
+    ...overrides,
   });
   const options = brokerOptionsFromConfig(config);
   if (!options) throw new Error("no broker options from the test configuration");
@@ -202,6 +203,43 @@ describe("the walk to the bank and back", () => {
     // Never longer than the limit's own window, whatever the header says.
     expect(waited).toEqual([7000, 65_000]);
   });
+
+  // The API's own refusal, not a scripted one: the sign-in's window sends a
+  // start back to the app with Retry-After (ADR-026 §4), and the walk knows
+  // it for what it is. The window is the process's own minute, so the second
+  // try lands in it too and is said by its code.
+  test.skipIf(!reachable)(
+    "waits as long as the sign-in's window asks when the API sends a start back, once, and then says why",
+    async ({ ctx }) => {
+      const { bank } = await world(ctx, { SIGN_IN_RATE_LIMIT_PER_MINUTE: "1" });
+      // One login spends the window: its start; the exchange is no door.
+      expect(await loginAs(persona("aino"), bank)).toMatchObject({ kind: "session" });
+      const before = await ctx.client.query("SELECT 1 FROM auth_request");
+
+      const waited: number[] = [];
+      const asked: string[] = [];
+      const limited: BankContext = {
+        ...bank,
+        sleep: async (ms) => void waited.push(ms),
+        fetch: (input, init) => {
+          asked.push(new URL(input).pathname);
+          return bank.fetch(input, init);
+        },
+      };
+      await expect(loginAs(persona("eetu"), limited)).rejects.toThrow(
+        "/auth/start: the API refused the login with auth_rate_limited",
+      );
+      // The wait is the API's Retry-After, whole seconds within the minute.
+      expect(waited).toHaveLength(1);
+      expect((waited[0] ?? 0) % 1000).toBe(0);
+      expect(waited[0]).toBeGreaterThanOrEqual(1000);
+      expect(waited[0]).toBeLessThanOrEqual(60_000);
+      // Two starts, nothing sent to the bank, and no attempt written.
+      expect(asked).toEqual(["/auth/start", "/auth/start"]);
+      const after = await ctx.client.query("SELECT 1 FROM auth_request");
+      expect(after.rowCount).toBe(before.rowCount);
+    },
+  );
 
   test("an object store is this computer's by a loopback address or one of its own, and by no name", () => {
     const own = ["127.0.0.1", "::1", "192.168.1.20", "fe80::1c2d:3eff:fe4f:5a6b"];

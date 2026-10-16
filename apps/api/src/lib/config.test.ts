@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { ConfigError, parseConfig, ssmPrefix } from "./config.ts";
+import { parameterNameToEnvKey } from "./ssm.ts";
 
 describe("parseConfig", () => {
   it("fails without a database and names the key", () => {
@@ -135,6 +136,67 @@ describe("parseConfig for the staff login (#49)", () => {
         ADMIN_APP_URL: "https://admin.kuutti.app",
       }).ADMIN_APP_URL,
     ).toBe("https://admin.kuutti.app");
+  });
+});
+
+describe("parseConfig for the sign-in doors (ADR-026 §5)", () => {
+  const production = {
+    DATABASE_URL: "postgres://x",
+    APP_ENV: "production",
+    NODE_ENV: "production",
+    ADMIN_APP_URL: "https://admin.kuutti.app",
+  };
+  const preview = {
+    APP_ENV: "preview",
+    PR_NUMBER: "1",
+    DB_HOST: "rds.internal",
+    DB_NAME: "kuutti",
+    DB_PREVIEW_USER: "kuutti_preview",
+    DB_PREVIEW_PASSWORD: "preview-secret",
+  };
+
+  it("lets ten sign-ins a minute through one address in production, sixty everywhere else", () => {
+    expect(parseConfig(production).SIGN_IN_RATE_LIMIT_PER_MINUTE).toBe(10);
+    for (const APP_ENV of [undefined, "development", "test", "staging"]) {
+      expect(
+        parseConfig({ DATABASE_URL: "postgres://x", APP_ENV }).SIGN_IN_RATE_LIMIT_PER_MINUTE,
+        String(APP_ENV),
+      ).toBe(60);
+    }
+    expect(parseConfig(preview).SIGN_IN_RATE_LIMIT_PER_MINUTE).toBe(60);
+    // The doors' number is their own: the address's and the person's stays as it was.
+    expect(parseConfig(production).RATE_LIMIT_PER_MINUTE).toBe(120);
+  });
+
+  it("takes the parameter store's number over the default, down to one", () => {
+    expect(
+      parseConfig({ ...production, SIGN_IN_RATE_LIMIT_PER_MINUTE: "25" })
+        .SIGN_IN_RATE_LIMIT_PER_MINUTE,
+    ).toBe(25);
+    expect(
+      parseConfig({ ...preview, SIGN_IN_RATE_LIMIT_PER_MINUTE: "1" }).SIGN_IN_RATE_LIMIT_PER_MINUTE,
+    ).toBe(1);
+  });
+
+  it.each(["0", "-1", "1.5", "ten"])(
+    "refuses %s, which would shut the doors or is no whole number, and names the key",
+    (value) => {
+      expect(() => parseConfig({ ...production, SIGN_IN_RATE_LIMIT_PER_MINUTE: value })).toThrow(
+        /SIGN_IN_RATE_LIMIT_PER_MINUTE/,
+      );
+      expect(() =>
+        parseConfig({ DATABASE_URL: "postgres://x", SIGN_IN_RATE_LIMIT_PER_MINUTE: value }),
+      ).toThrow(ConfigError);
+    },
+  );
+
+  it("is read from the parameter the ADR names", () => {
+    expect(
+      parameterNameToEnvKey("/kuutti/prod/sign-in-rate-limit-per-minute", ssmPrefix("production")),
+    ).toBe("SIGN_IN_RATE_LIMIT_PER_MINUTE");
+    expect(
+      parameterNameToEnvKey("/kuutti/prod/rate-limit-per-minute", ssmPrefix("production")),
+    ).toBe("RATE_LIMIT_PER_MINUTE");
   });
 });
 

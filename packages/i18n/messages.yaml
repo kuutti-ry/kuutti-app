@@ -3189,6 +3189,13 @@ signIn.error.auth_provider_error:
   sv: Identifieringstjänsten slutförde inte inloggningen. Försök igen om en stund.
   machine: { fi: true, sv: true }
 
+signIn.error.auth_rate_limited:
+  en: Too many sign-ins were started just now. Wait a minute and try again.
+  description: "Sign-in screen, the API refused the sign-in for its rate (ADR-026): too many were started from this network within a minute, or too many are under way at once. Said for the start's deep link (error=auth_rate_limited) and for the exchange's 429 (rate_limited). The window is a minute, so 'a minute' is the wait."
+  fi: Kirjautumisia on juuri nyt aloitettu liian monta. Odota minuutti ja yritä uudelleen.
+  sv: Just nu har för många inloggningar påbörjats. Vänta en minut och försök igen.
+  machine: { fi: true, sv: true }
+
 signIn.error.unexpected_link:
   en: This sign-in link was not requested from this phone. Start the sign-in here, with the button.
   description: Sign-in screen, a deep link with a code arrived although this device did not open the bank login (or is already signed in); the link is refused.
@@ -4883,6 +4890,10 @@ admin.signIn.error.admin_not_allowed:
 admin.signIn.error.no_api:
   en: This build of the panel names no API to sign in to; it was built without VITE_API_URL.
   description: Admin panel, a production build without an API address; nothing is sent anywhere.
+
+admin.signIn.error.auth_rate_limited:
+  en: Too many sign-ins were started just now. Wait a minute and sign in again.
+  description: "Admin panel, the API refused the staff sign-in for its rate (ADR-026): too many from this network within a minute, or too many under way at once. Said for the fragment's error=auth_rate_limited and for the exchange's 429 (rate_limited)."
 
 admin.signIn.error.generic:
   en: Sign-in did not complete. Try again.

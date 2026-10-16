@@ -290,6 +290,46 @@ describe("sessions", () => {
     expect(left.rows).toEqual([{ id: c.sessionId }]);
   });
 
+  test("the sweep keeps a login attempt still open or holding a live code, and removes one over in both", async ({
+    ctx,
+  }) => {
+    // An attempt lives ten minutes and its code one more from the callback,
+    // so a late callback leaves a code that outlives its attempt (codes.ts).
+    await ctx.client.query(
+      `INSERT INTO auth_request (state, nonce, platform, expires_at, code_hash, code_expires_at) VALUES
+         ('open', 'n1', 'ios', now() + interval '5 minutes', NULL, NULL),
+         ('late-callback', 'n2', 'ios', now() - interval '1 second', 'h2', now() + interval '1 minute'),
+         ('code-over', 'n3', 'ios', now() - interval '1 second', 'h3', now() - interval '1 second'),
+         ('never-answered', 'n4', 'ios', now() - interval '1 second', NULL, NULL)`,
+    );
+    const swept = await sweepSessions({ db: ctx.client, now: () => new Date() });
+    expect(swept.authRequests).toBe(2);
+    const left = await ctx.client.query<{ state: string }>(
+      "SELECT state FROM auth_request ORDER BY state",
+    );
+    expect(left.rows.map((r) => r.state)).toEqual(["late-callback", "open"]);
+  });
+
+  test("the sweep keeps a session ended within its retention and removes every session of a deleted account", async ({
+    ctx,
+  }) => {
+    const kept = await device(ctx, await accountRow(ctx, "a"));
+    const gone = await accountRow(ctx, "b");
+    const live = await device(ctx, gone);
+    const ended = await device(ctx, gone);
+    await ctx.client.query(
+      "UPDATE session SET revoked_at = now() - interval '29 days' WHERE id = ANY($1)",
+      [[kept.sessionId, ended.sessionId]],
+    );
+    await ctx.client.query("UPDATE account SET state = 'deleted' WHERE id = $1", [gone]);
+    const swept = await sweepSessions({ db: ctx.client, now: () => new Date() });
+    expect(swept.sessions).toBe(2);
+    const left = await ctx.client.query("SELECT id FROM session WHERE id = ANY($1)", [
+      [kept.sessionId, live.sessionId, ended.sessionId],
+    ]);
+    expect(left.rows).toEqual([{ id: kept.sessionId }]);
+  });
+
   test("wrong user: a session is described only as its own account's, in the query itself", async ({
     ctx,
   }) => {

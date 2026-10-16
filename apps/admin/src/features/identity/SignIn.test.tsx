@@ -49,6 +49,35 @@ describe("SignIn", () => {
     expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeEnabled();
   });
 
+  it("says a start refused for the sign-in's rate in words, and lets the moderator try again (ADR-026 §4)", async () => {
+    window.history.replaceState(null, "", "/#error=auth_rate_limited");
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too many sign-ins were started just now. Wait a minute and sign in again.",
+    );
+    expect(screen.queryByText(/auth_rate_limited/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeEnabled();
+  });
+
+  it("says the same wait when the exchange is refused for the rate", async () => {
+    const fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({ error: { code: "rate_limited", message: "x", requestId: "r" } }),
+          { status: 429, headers: { "content-type": "application/json", "retry-after": "42" } },
+        ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    window.history.replaceState(null, "", `/#code=${"r".repeat(43)}`);
+    show();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Too many sign-ins were started just now. Wait a minute and sign in again.",
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage.getItem("kuutti.admin.session")).toBeNull();
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeEnabled();
+  });
+
   it("falls back to the generic message for a refusal it does not know", async () => {
     window.history.replaceState(null, "", "/#error=state_mismatch");
     show();

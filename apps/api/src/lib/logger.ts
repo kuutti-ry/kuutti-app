@@ -74,7 +74,10 @@ export async function createLogger(options: LoggerOptions): Promise<Logger> {
   return pino(base, options.destination ?? pino.destination(1));
 }
 
-/** Structured request log with the fields the checklist allows: ids, route, status, timing. */
+/**
+ * Structured request log with the fields the checklist allows: ids, route,
+ * status, timing. Never a client address (ADR-026 §7).
+ */
 export function requestLogger(
   logger: Logger,
   options: { trustedProxy: TrustedProxy } = { trustedProxy: "none" },
@@ -91,6 +94,8 @@ export function requestLogger(
           ? { cfRequestId: cloudFrontRequestId(c.req.header("x-amz-cf-id")) }
           : {}),
         accountId: c.get("accountId"),
+        // The panel's requests carry the staff identity as the app's carry the account (ADR-026 §7).
+        staffIdentityId: c.get("adminIdentityId"),
         method: c.req.method,
         route: c.req.routePath,
         status: c.res.status,

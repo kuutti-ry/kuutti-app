@@ -6,6 +6,7 @@ import type { Logger } from "../lib/logger.ts";
 import { ADMIN_PLATFORM, completeAdminLogin } from "./admin-session.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 import {
+  AUTH_REQUEST_CAP,
   AUTH_REQUEST_TTL_MS,
   appReturnUrl,
   hashOneTimeCode,
@@ -36,22 +37,55 @@ export type LoginDeps = {
   adminAppUrl: string;
 };
 
-/** /auth/start: remember state and nonce, send the browser to the bank chooser. */
+/**
+ * /auth/start, and /admin/auth/start with the staff platform: remember state
+ * and nonce, send the browser to the bank chooser. The attempt is written only
+ * while auth_request has room (ADR-026 §6). At the ceiling the expired rows go
+ * first; if the table is still full, the two oldest attempts the bank has not
+ * answered yet give way to this one, so a flood shortens how long an
+ * unanswered attempt lives rather than shutting the door on everybody. Only a
+ * table whose every row holds a code, which nobody can write without the
+ * bank, refuses a start, before the broker signs anything. `cap` is the
+ * ceiling; tests make it small.
+ */
 export async function startLogin(
   deps: LoginDeps,
-  input: { platform: AuthPlatform; locale: string | null },
+  input: { platform: AuthPlatform | typeof ADMIN_PLATFORM; locale: string | null },
+  cap = AUTH_REQUEST_CAP,
 ): Promise<URL> {
   const state = randomBytes(24).toString("base64url");
   const nonce = randomBytes(24).toString("base64url");
-  await repo.insertAuthRequest(deps.db, {
+  const now = deps.now();
+  const attempt = {
     state,
     nonce,
     platform: input.platform,
     locale: input.locale,
-    expiresAt: new Date(deps.now().getTime() + AUTH_REQUEST_TTL_MS),
-  });
+    expiresAt: new Date(now.getTime() + AUTH_REQUEST_TTL_MS),
+  };
+  let written = await repo.insertAuthRequest(deps.db, attempt, cap);
+  // The table is counted again only when the sweep freed something.
+  if (!written && (await repo.deleteExpiredAuthRequests(deps.db, now)) > 0) {
+    written = await repo.insertAuthRequest(deps.db, attempt, cap);
+  }
+  if (!written) {
+    // The eviction and the insert are one statement, so no other start can
+    // take the room it makes.
+    const evicted = await repo.evictAndInsertAuthRequest(deps.db, attempt);
+    if (evicted === 0) {
+      throw new AppError(429, "auth_rate_limited", "Too many logins are under way");
+    }
+    // A person whose attempt it ended meets auth_state_mismatch, whether the
+    // callback comes after the eviction or was already waiting on the bank
+    // (finishLogin). The line is the runbook's signal that the table is full
+    // (ADR-026 §7): this start goes on, so no refusal of it would show.
+    deps.logger.warn({ detail: { limiter: "evicted", evicted } }, "sign-in refused");
+  }
   return deps.broker.startLogin({ state, nonce, locale: input.locale });
 }
+
+const attemptGone = () =>
+  new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
 
 /**
  * /auth/callback: the bank has answered. The hetu exists inside this function
@@ -67,7 +101,7 @@ export async function completeLogin(
   const now = deps.now();
   const request = await repo.findAuthRequestByState(deps.db, input.query.state);
   if (!request || request.codeHash !== null || request.expiresAt.getTime() <= now.getTime()) {
-    throw new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
+    throw attemptGone();
   }
   // From here the attempt is known, and so is where its browser belongs: a
   // refusal of a staff attempt (#49) carries the platform, so the route sends
@@ -129,10 +163,23 @@ async function finishLogin(
     });
   }
 
+  // The attempt was unanswered while the bank answered, so a start at the
+  // ceiling may have ended it (ADR-026 §6). It is read again before the
+  // account is resolved, so a login whose attempt is gone creates and resumes
+  // nothing, and the browser leaves with auth_state_mismatch, as it would
+  // had the eviction come before the callback.
+  // shortcut: an eviction within the resolution itself, a few statements, is
+  // seen only when the attach writes nothing, and what the resolution
+  // created or resumed stays, with no code; marking the attempt answered
+  // before the resolution, in a way the eviction skips, would lift it
+  // (#324, which marks the attempt at its first callback anyway).
+  //
   // The account can be erased (#51) between its resolution and the code: the
-  // attach then writes nothing, and resolving again reads the cooldown the
-  // erasure recorded, so the browser leaves with auth_cooldown, not a code.
+  // attach then writes nothing, the attempt is still there, and resolving
+  // again reads the cooldown the erasure recorded, so the browser leaves with
+  // auth_cooldown, not a code.
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (!(await repo.findAuthRequestByState(deps.db, request.state))) throw attemptGone();
     const { accountId, outcome } = await resolveAccount(deps, derived, now);
     const { code, hash } = newOneTimeCode();
     const attached = await repo.attachCode(deps.db, {

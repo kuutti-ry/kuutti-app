@@ -14,19 +14,19 @@ import {
   SessionTokens,
   USER_AGENT_MAX,
 } from "@kuutti/schema";
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { isLocalisedErrorCode } from "../lib/i18n.ts";
+import { addressOf, rateLimit } from "../lib/rate-limit.ts";
 import {
   ADMIN_PLATFORM,
   adminErrorUrl,
   endAdminSession,
   exchangeAdminCode,
-  startAdminLogin,
 } from "./admin-session.ts";
 import { appErrorUrl } from "./codes.ts";
 import { hmacKeyFromHex } from "./hetu.ts";
@@ -46,6 +46,15 @@ const errorContent = (description: string) => ({
 });
 const json = <T>(schema: T) => ({ content: { "application/json": { schema } } });
 const bearer = { security: [{ session: [] }] };
+
+/** The sign-in doors' window (ADR-026 §4): a minute, which the demo's wait of at most 65 s outlasts. */
+const SIGN_IN_WINDOW_MS = 60_000;
+/**
+ * The doors count an IPv6 client by its /56 (ADR-026 §1, §4): one subscriber
+ * is usually given a /56, 256 /64s, and counted by /64 one home would have
+ * 256 windows to fill the table with. The address's own limit keeps the /64.
+ */
+const SIGN_IN_IPV6_PREFIX = 56;
 
 /** The cooldown's date, when the refusal carries one. */
 function untilOf(detail: unknown): string | undefined {
@@ -68,7 +77,7 @@ const startRoute = createRoute({
   responses: {
     302: {
       description:
-        "Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable.",
+        "Redirect to the broker; where none is configured (a pull-request preview, ADR-014 §1), to kuutti://auth?error=auth_unavailable; when this address has sent too many requests or started too many sign-ins, or too many are under way at once (ADR-026), to kuutti://auth?error=auth_rate_limited with Retry-After.",
     },
     400: errorContent("Validation failed."),
     503: errorContent("No identification broker is configured (anywhere but a preview)."),
@@ -101,6 +110,9 @@ const exchangeRoute = createRoute({
     200: { description: "The device's session.", ...json(AuthExchangeResponse) },
     400: errorContent("Validation failed."),
     401: errorContent("Unknown, used or expired code (auth_code_used)."),
+    429: errorContent(
+      "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
+    ),
   },
 });
 
@@ -160,7 +172,10 @@ const adminStartRoute = createRoute({
     "Opened by the moderation panel. The same bank login as the app's, marked as a staff attempt: it resolves to an identity with a moderator role and creates nothing. The browser returns to the panel with a one-time code in the URL fragment, or with error=admin_not_allowed.",
   request: { query: AdminAuthStartQuery },
   responses: {
-    302: { description: "Redirect to the broker." },
+    302: {
+      description:
+        "Redirect to the broker; when this address has sent too many requests or started too many sign-ins, or too many are under way at once (ADR-026), to the panel with error=auth_rate_limited in the fragment and Retry-After.",
+    },
     400: errorContent("Validation failed."),
     503: errorContent("No identification broker is configured."),
   },
@@ -177,6 +192,9 @@ const adminExchangeRoute = createRoute({
     400: errorContent("Validation failed."),
     401: errorContent("Unknown, used or expired code (auth_code_used)."),
     403: errorContent("admin_not_allowed: the role was taken away meanwhile."),
+    429: errorContent(
+      "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
+    ),
   },
 });
 
@@ -201,6 +219,35 @@ const adminLogoutRoute = createRoute({
     401: errorContent("unauthenticated, session_expired or session_revoked."),
   },
 });
+
+/** The two sign-in starts, the doors a browser opens (ADR-026 §4). */
+export function isSignInStart(path: string): boolean {
+  return path === startRoute.path || path === adminStartRoute.path;
+}
+
+/**
+ * A start refused for the rate of sign-ins, by an address's window or the
+ * table's ceiling (ADR-026 §4, §6), goes where every other sign-in refusal
+ * goes: back to the app's link, or to the panel's page for a staff start, with
+ * a code it has a text for, so nobody is left on a JSON page in the system
+ * browser. Retry-After is set already. It leaves one line with the code and
+ * which limit refused, never the address (§7).
+ */
+export function refuseSignInStart(
+  c: Context<AppEnv>,
+  deps: Pick<Deps, "config" | "logger">,
+  limiter: "address" | "cap",
+): Response {
+  deps.logger.warn(
+    { requestId: c.get("requestId"), code: "auth_rate_limited", detail: { limiter } },
+    "sign-in refused",
+  );
+  const back =
+    c.req.path === adminStartRoute.path
+      ? adminErrorUrl(deps.config.ADMIN_APP_URL, "auth_rate_limited").toString()
+      : appErrorUrl("auth_rate_limited");
+  return c.redirect(back, 302);
+}
 
 export function authRoutes(
   deps: Deps,
@@ -227,6 +274,28 @@ export function authRoutes(
     };
   };
 
+  // The doors' own window per address, one for the two starts, on each path
+  // before its handler: a refused start writes no attempt and has the broker
+  // sign nothing (ADR-026 §4). The exchanges are no doors: a person who has
+  // been to the bank is not refused at the last step for the rate of starts.
+  const doors = rateLimit({
+    limit: deps.config.SIGN_IN_RATE_LIMIT_PER_MINUTE,
+    windowMs: SIGN_IN_WINDOW_MS,
+    keyOf: addressOf(deps.config.TRUSTED_PROXY, { ipv6Prefix: SIGN_IN_IPV6_PREFIX }),
+    refuse: (c) => refuseSignInStart(c, deps, "address"),
+  });
+  for (const route of [startRoute, adminStartRoute]) {
+    app.use(route.getRoutingPath(), doors);
+  }
+
+  // The table's ceiling refuses a start as the doors do, the doors' window as
+  // the wait (ADR-026 §6); anything else is the error it was.
+  const whenFull = (c: Context<AppEnv>, error: unknown) => {
+    if (!(error instanceof AppError && error.code === "auth_rate_limited")) throw error;
+    c.header("Retry-After", String(SIGN_IN_WINDOW_MS / 1000));
+    return refuseSignInStart(c, deps, "cap");
+  };
+
   app.openapi(startRoute, async (c) => {
     const query = c.req.valid("query");
     // A pull-request preview has no bank (ADR-014 §1): the browser goes back
@@ -235,11 +304,15 @@ export function authRoutes(
     if (deps.config.preview && (!deps.broker || !hmacKey)) {
       return c.redirect(appErrorUrl("auth_unavailable"), 302);
     }
-    const url = await startLogin(loginDeps(c.get("requestId")), {
-      platform: query.platform,
-      locale: query.locale ?? c.get("locale"),
-    });
-    return c.redirect(url.toString(), 302);
+    try {
+      const url = await startLogin(loginDeps(c.get("requestId")), {
+        platform: query.platform,
+        locale: query.locale ?? c.get("locale"),
+      });
+      return c.redirect(url.toString(), 302);
+    } catch (error) {
+      return whenFull(c, error);
+    }
   });
 
   app.openapi(callbackRoute, async (c) => {
@@ -307,10 +380,15 @@ export function authRoutes(
   // rest sits behind the admin guard, registered on the path before the handler.
   app.openapi(adminStartRoute, async (c) => {
     const query = c.req.valid("query");
-    const url = await startAdminLogin(loginDeps(c.get("requestId")), {
-      locale: query.locale ?? c.get("locale"),
-    });
-    return c.redirect(url.toString(), 302);
+    try {
+      const url = await startLogin(loginDeps(c.get("requestId")), {
+        platform: ADMIN_PLATFORM,
+        locale: query.locale ?? c.get("locale"),
+      });
+      return c.redirect(url.toString(), 302);
+    } catch (error) {
+      return whenFull(c, error);
+    }
   });
 
   app.openapi(adminExchangeRoute, async (c) => {

@@ -800,6 +800,7 @@ export const fi: Readonly<Record<string, string>> = {
   "signIn.error.auth_code_used": "Tämä kirjautumislinkki on jo käytetty tai vanhentunut. Aloita alusta.",
   "signIn.error.auth_cooldown": "Poistit tilisi äskettäin. Uuden tilin voi luoda aikaisintaan: {date}",
   "signIn.error.auth_provider_error": "Tunnistuspalvelu ei saanut kirjautumista valmiiksi. Yritä hetken kuluttua uudelleen.",
+  "signIn.error.auth_rate_limited": "Kirjautumisia on juuri nyt aloitettu liian monta. Odota minuutti ja yritä uudelleen.",
   "signIn.error.auth_state_mismatch": "Tätä kirjautumisyritystä ei tunnisteta tai se on vanhentunut. Aloita alusta.",
   "signIn.error.auth_suspended": "Tämä tili on toistaiseksi jäädytetty.",
   "signIn.error.auth_suspended_until": "Tämä tili on jäädytetty. Voit kirjautua taas sisään alkaen: {date}",

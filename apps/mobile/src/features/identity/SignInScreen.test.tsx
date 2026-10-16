@@ -127,6 +127,49 @@ describe("SignInScreen", () => {
     expect(currentSession()).toBeNull();
   });
 
+  it.each([
+    ["en-US", "Too many sign-ins were started just now. Wait a minute and try again."],
+    [
+      "fi-FI",
+      "Kirjautumisia on juuri nyt aloitettu liian monta. Odota minuutti ja yritä uudelleen.",
+    ],
+    ["sv-FI", "Just nu har för många inloggningar påbörjats. Vänta en minut och försök igen."],
+  ])(
+    "says a start refused for the sign-in's rate in words on a %s phone (ADR-026 §4)",
+    async (languageTag, text) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      try {
+        await renderWithTheme(<SignInScreen error="auth_rate_limited" />);
+        expect(await screen.findByText(text)).toBeTruthy();
+        expect(screen.getAllByRole("button")).toHaveLength(1);
+        // The code itself is never shown.
+        expect(screen.queryByText(/auth_rate_limited/)).toBeNull();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    },
+  );
+
+  it("says the same wait when the exchange is refused for the rate, and keeps no session", async () => {
+    await markLoginStarted();
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ error: { code: "rate_limited", message: "x", requestId: "r" } }),
+        { status: 429, headers: { "content-type": "application/json", "retry-after": "42" } },
+      ),
+    );
+    await renderWithTheme(<SignInScreen code={CODE} />);
+    expect(
+      await screen.findByText(
+        "Too many sign-ins were started just now. Wait a minute and try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(screen.queryByText("Something went wrong. Try again.")).toBeNull();
+    expect(currentSession()).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
   it("shows the refusal the deep link carried", async () => {
     await renderWithTheme(<SignInScreen error="auth_under_18" />);
     expect(

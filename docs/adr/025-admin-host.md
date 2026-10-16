@@ -34,7 +34,7 @@ Four things are not settled by that line. Since #302 the panel has a page per pa
 
 8. **The sweep removes the prefix.** `preview-cleanup.yml` gains a job that removes `pr-<n>/` for every pull request the sweep selects, with the plan role, from `main`. A failure there never blocks the removal of the Dokploy application (ADR-012 §4): the job fails naming the command to run by hand, and a lifecycle rule expires every `pr-` object after 14 days as the backstop, the sweep's seven days with room.
 
-9. **No access log.** The host serves the same public files to everyone; who asked for what is in the API's log, which carries the staff member's account and the request id for every call. A log of the host would add staff members' IP addresses and nothing a moderator does. rules/infra.md keeps access logging to the research prefix.
+9. **No access log.** The host serves the same public files to everyone; who asked for what is in the API's log, whose request line carries the staff member's identity (`staffIdentityId`, ADR-026 §7) and the request id for every call that passes a staff guard. A log of the host would add staff members' IP addresses and nothing a moderator does. rules/infra.md keeps access logging to the research prefix.
 
 10. **The parameters.** Staging's `admin-app-url` becomes `https://admin.staging.kuutti.app`, and `cors-allowed-origins` that origin alone: once the bank returns the code to the hosted panel, a panel on a laptop cannot finish a staging login anyway. A developer's panel against their local API is unchanged (`pnpm env:up`).
 

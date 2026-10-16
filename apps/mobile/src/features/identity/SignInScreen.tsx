@@ -25,7 +25,9 @@ type Phase =
 /**
  * The refusals the API can send back through the deep link, each with its
  * own text, plus the app's own. A Map, so a crafted link (`?error=toString`)
- * finds nothing rather than a prototype member.
+ * finds nothing rather than a prototype member. The sign-in's rate limit
+ * refuses a start through the link and an exchange with a 429 (ADR-026 §4):
+ * one text for both, since both ask for the same wait.
  */
 const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["auth_code_used", "signIn.error.auth_code_used"],
@@ -35,6 +37,8 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
   ["auth_suspended", "signIn.error.auth_suspended"],
   ["auth_provider_error", "signIn.error.auth_provider_error"],
   ["auth_cancelled", "signIn.error.auth_cancelled"],
+  ["auth_rate_limited", "signIn.error.auth_rate_limited"],
+  ["rate_limited", "signIn.error.auth_rate_limited"],
   ["auth_unavailable", "signIn.unavailable"],
   ["unexpected_link", "signIn.error.unexpected_link"],
 ]);

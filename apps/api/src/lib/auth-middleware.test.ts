@@ -1,5 +1,5 @@
 import { ErrorResponse } from "@kuutti/schema";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { captureLogger } from "../test/harness.ts";
 import { callerOf, hashToken, requireSession, type SessionLookup } from "./auth-middleware.ts";
@@ -25,9 +25,17 @@ const live: SessionLookup = {
   identityStanding: "ok",
 };
 
-async function guarded(found: SessionLookup | null, options: { now?: () => Date } = {}) {
+/** A limiter that writes what it was handed into `events`, built over the guard's own record. */
+type LimitOf = (events: string[]) => MiddlewareHandler<AppEnv>;
+
+async function guarded(
+  found: SessionLookup | null,
+  options: { now?: () => Date; limit?: LimitOf } = {},
+) {
   const asked: string[] = [];
   const touched: { sessionId: string; at: Date }[] = [];
+  // What ran, in order: the limiter, the touch, the handler.
+  const events: string[] = [];
   const store = {
     findByAccessHash: async (_db: unknown, hash: string) => {
       asked.push(hash);
@@ -35,14 +43,19 @@ async function guarded(found: SessionLookup | null, options: { now?: () => Date 
     },
     touch: async (_db: unknown, sessionId: string, at: Date) => {
       touched.push({ sessionId, at });
+      events.push("touch");
     },
   };
   const { logger } = await captureLogger();
   const app = new Hono<AppEnv>();
   app.use("*", serverRequestId());
   app.onError(onError<AppEnv>(logger));
-  app.use("/me", requireSession({ db: DB, store, ...options }));
-  app.get("/me", (c) => c.json(callerOf(c)));
+  const { limit, ...rest } = options;
+  app.use("/me", requireSession({ db: DB, store, ...rest, limit: limit?.(events) }));
+  app.get("/me", (c) => {
+    events.push("handler");
+    return c.json(callerOf(c));
+  });
   // A route someone forgot to guard: the caller cannot be read there.
   app.get("/unguarded", (c) => c.json(callerOf(c)));
   const call = async (authorization?: string, path = "/me") => {
@@ -51,7 +64,7 @@ async function guarded(found: SessionLookup | null, options: { now?: () => Date 
     return { status: res.status, body };
   };
   const code = (body: unknown) => ErrorResponse.parse(body).error.code;
-  return { call, code, asked, touched };
+  return { call, code, asked, touched, events };
 }
 
 describe("requireSession", () => {
@@ -159,6 +172,75 @@ describe("requireSession", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * The person's limiter as the guard sees it (ADR-026 §1-2): it records the
+ * caller the guard has set by then, and admits or refuses.
+ */
+function personLimiter(answer: "admit" | "refuse") {
+  const seen: { accountId?: string; sessionId?: string }[] = [];
+  const limit: LimitOf = (events) => async (c, next) => {
+    events.push("limit");
+    seen.push({ accountId: c.get("accountId"), sessionId: c.get("sessionId") });
+    if (answer === "refuse") return c.json({ refusedBy: "the person's limiter" }, 429);
+    await next();
+  };
+  return { limit, seen };
+}
+
+describe("requireSession and the person's limiter (ADR-026)", () => {
+  it("hands an admitted request to the limiter with the caller set, and marks the session used only once it lets the request on", async () => {
+    const { limit, seen } = personLimiter("admit");
+    const { call, events, touched } = await guarded(live, { now: () => NOW, limit });
+    expect(await call(`Bearer ${TOKEN}`)).toEqual({
+      status: 200,
+      body: { accountId: "acc-1", sessionId: "ses-1" },
+    });
+    expect(seen).toEqual([{ accountId: "acc-1", sessionId: "ses-1" }]);
+    expect(events).toEqual(["limit", "touch", "handler"]);
+    expect(touched).toEqual([{ sessionId: "ses-1", at: NOW }]);
+  });
+
+  it("answers with the limiter's refusal, and a refused request writes nothing, not even the touch", async () => {
+    const { limit, seen } = personLimiter("refuse");
+    const { call, events, touched } = await guarded(live, { now: () => NOW, limit });
+    expect(await call(`Bearer ${TOKEN}`)).toEqual({
+      status: 429,
+      body: { refusedBy: "the person's limiter" },
+    });
+    expect(seen).toEqual([{ accountId: "acc-1", sessionId: "ses-1" }]);
+    expect(events).toEqual(["limit"]);
+    expect(touched).toEqual([]);
+  });
+
+  // A token that opens no session stays on the address's count (ADR-026 §2):
+  // the person's limiter never sees it.
+  it.each([
+    ["no token", undefined, live, "unauthenticated"],
+    ["a malformed token", `Bearer ${TOKEN.slice(1)}`, live, "unauthenticated"],
+    ["an unknown token", `Bearer ${TOKEN}`, null, "unauthenticated"],
+    [
+      "a revoked session",
+      `Bearer ${TOKEN}`,
+      { ...live, revokedAt: new Date("2026-10-11T08:00:00.000Z") },
+      "session_revoked",
+    ],
+    [
+      "an expired access token",
+      `Bearer ${TOKEN}`,
+      { ...live, accessExpiresAt: new Date(NOW.getTime() - 1) },
+      "session_expired",
+    ],
+  ] as const)("%s never reaches the limiter", async (_, authorization, found, expected) => {
+    const { limit, seen } = personLimiter("refuse");
+    const { call, code, events } = await guarded(found, { now: () => NOW, limit });
+    const answer = await call(authorization);
+    expect(answer.status).toBe(401);
+    expect(code(answer.body)).toBe(expected);
+    expect(seen).toEqual([]);
+    expect(events).toEqual([]);
   });
 });
 

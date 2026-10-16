@@ -9,7 +9,9 @@ import {
   adminSessionStore,
   authRoutes,
   type IdentityBroker,
+  isSignInStart,
   onboardingRoutes,
+  refuseSignInStart,
   sessionStore,
   wellKnownRoutes,
 } from "./identity/index.ts";
@@ -29,7 +31,7 @@ import {
 import { requestLocale, servedLocales } from "./lib/i18n.ts";
 import { type Logger, requestLogger } from "./lib/logger.ts";
 import { openApiDocument } from "./lib/openapi.ts";
-import { rateLimit } from "./lib/rate-limit.ts";
+import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
@@ -64,6 +66,20 @@ export type Deps = {
 };
 
 const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
+
+/**
+ * The routes that end a session or the account (ADR-026 §2): outside the
+ * person's budget, so somebody holding one stolen session cannot spend it to
+ * keep the owner from signing every device out, pausing or deleting; and
+ * never given back to the address, so they stay under the address's limit.
+ */
+export const ENDS_SESSION = new Set([
+  "/auth/logout",
+  "/auth/logout-all",
+  "/admin/auth/logout",
+  "/account/delete",
+  "/account/pause",
+]);
 
 /** Routes that answer without a session: the health probe, the contract, and the login itself. */
 export const PUBLIC_ROUTES = new Set([
@@ -111,12 +127,24 @@ export function createApp(deps: Deps) {
       ? next()
       : limitBody(c, next),
   );
+  // Counted by the client address while nobody is known yet; a request a
+  // guard admits is given back to the address and counted by its person
+  // instead, so people behind one address do not spend each other's budget,
+  // while a token that opens no session stays on the address (ADR-026 §1-2).
+  // A sign-in start it refuses goes back as the doors send one (§4).
   app.use(
     "*",
     rateLimit({
       limit: deps.config.RATE_LIMIT_PER_MINUTE,
       windowMs: 60_000,
-      trustedProxy: deps.config.TRUSTED_PROXY,
+      keyOf: addressOf(deps.config.TRUSTED_PROXY),
+      // Given back only for a request the person's limiter counted: a guard
+      // without it, or a session-ending route it skips, stays on the address.
+      refund: (c) => c.get("personCounted") === true,
+      refuse: (c, retryAfterSeconds) =>
+        isSignInStart(c.req.path)
+          ? refuseSignInStart(c, deps, "address")
+          : limited(c, retryAfterSeconds),
       skip: (path) => UNLIMITED_PATHS.has(path),
     }),
   );
@@ -127,19 +155,36 @@ export function createApp(deps: Deps) {
   // One guard for every route that reads user data (rule 6), and one for
   // staff (#49, checklist line 10) with the roles a route admits; app.test.ts
   // checks that no route outside PUBLIC_ROUTES is registered without one.
-  const guard = requireSession({ db: deps.db, store: sessionStore });
+  // Every guard hands the request it admits to one limiter keyed by the
+  // person, so a member of staff has one budget, not one per role check
+  // (ADR-026 §3); the routes that end a session stay outside it (§2).
+  const perPerson = rateLimit({
+    limit: deps.config.RATE_LIMIT_PER_MINUTE,
+    windowMs: 60_000,
+    keyOf: personOf,
+    skip: (path) => ENDS_SESSION.has(path),
+    onCount: (c) => c.set("personCounted", true),
+  });
+  const guard = requireSession({ db: deps.db, store: sessionStore, limit: perPerson });
   const anyStaff = requireAdmin({
     db: deps.db,
     store: adminSessionStore,
     roles: ["moderator", "admin", "researcher"],
+    limit: perPerson,
   });
   const moderators = requireAdmin({
     db: deps.db,
     store: adminSessionStore,
     roles: ["moderator", "admin"],
+    limit: perPerson,
   });
   // A ban and its lift and review (#307, ADR-024 §3).
-  const admins = requireAdmin({ db: deps.db, store: adminSessionStore, roles: ["admin"] });
+  const admins = requireAdmin({
+    db: deps.db,
+    store: adminSessionStore,
+    roles: ["admin"],
+    limit: perPerson,
+  });
 
   app.route("/", healthRoutes(deps));
   app.route("/", authRoutes(deps, guard, anyStaff));

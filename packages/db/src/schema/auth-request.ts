@@ -5,8 +5,12 @@ import { account, identity } from "./identity.ts";
  * One row per login attempt (#33): the state and nonce the API generated for
  * the broker, the platform to send the person back to, and, once the bank
  * has answered, the one-time code (hashed) the app exchanges. Rows live ten
- * minutes; the sweep of expired rows lands with the nightly jobs. Nothing in
- * them names the person.
+ * minutes. What bounds the table (ADR-026 §4, §6): the sign-in doors' window
+ * per client address, held in memory and never here; a ceiling of rows the
+ * insert itself checks (AUTH_REQUEST_CAP), at which the expired rows and then
+ * the oldest attempts without a code are deleted there and then; and the
+ * nightly sweep of expired rows. Nothing in them names the person, and
+ * nothing records where a request came from.
  */
 export const authRequest = pgTable(
   "auth_request",
