@@ -2998,6 +2998,153 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every tunable with its versions
+         * @description Each key of matching_config with its latest value, which every reader uses, and its versions newest first: the value, from when, by whom and why. Admins only.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The tunables. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConfigList"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/config/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change a tunable
+         * @description A new version of the key with the admin's reason, used from the next request on. The value keeps the current one's JSON type, and an object its keys. Keys are born in migrations. Admins only; written to audit_log.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    key: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConfigChangeRequest"];
+                };
+            };
+            responses: {
+                /** @description The row this change wrote. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConfigChange"];
+                    };
+                };
+                /** @description Validation failed, or config_shape: the value changes the current one's type or keys. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No such key. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description config_conflict: another admin changed the key meanwhile. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gate": {
         parameters: {
             query?: never;
@@ -4206,6 +4353,39 @@ export interface components {
             note: string;
             /** @enum {string} */
             outcome: "keep" | "lift";
+        };
+        ConfigList: {
+            items: components["schemas"]["ConfigKey"][];
+        };
+        ConfigKey: {
+            key: string;
+            value: components["schemas"]["ConfigValue"];
+            version: number;
+            versions: components["schemas"]["ConfigVersion"][];
+        };
+        ConfigValue: number | string | boolean | {
+            [key: string]: number | string | boolean;
+        };
+        ConfigVersion: {
+            version: number;
+            value: components["schemas"]["ConfigValue"];
+            /** Format: date-time */
+            validFrom: string;
+            createdBy: string;
+            reason: string | null;
+        };
+        ConfigChange: {
+            version: number;
+            value: components["schemas"]["ConfigValue"];
+            /** Format: date-time */
+            validFrom: string;
+            createdBy: string;
+            reason: string | null;
+            key: string;
+        };
+        ConfigChangeRequest: {
+            value: components["schemas"]["ConfigValue"];
+            reason: string;
         };
         GateResponse: {
             state: components["schemas"]["GateState"];

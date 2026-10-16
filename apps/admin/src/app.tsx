@@ -5,7 +5,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Route, Routes, useLocation } from "react-router";
 import { SignIn, useStaffSession } from "./features/identity/index.ts";
 import { PhotoQueue } from "./features/media/index.ts";
-import { FeedbackList } from "./features/safety/index.ts";
+import { ConfigList, FeedbackList } from "./features/safety/index.ts";
 import { setRoleAnswerHandler } from "./lib/api.ts";
 import { NavigationFocus, ScreenTitle } from "./lib/screen-title.tsx";
 import mark from "./logo-mark.png";
@@ -36,6 +36,12 @@ const SCREENS: readonly Screen[] = [
     label: "admin.nav.feedback",
     roles: ["moderator", "admin"],
     element: <FeedbackList />,
+  },
+  {
+    path: "/config",
+    label: "admin.nav.config",
+    roles: ["admin"],
+    element: <ConfigList />,
   },
 ];
 
@@ -116,12 +122,29 @@ function Screens({ screens, front }: { screens: readonly Screen[]; front: string
       {refusedOn === key && <p role="alert">{t("admin.refused")}</p>}
       <Routes>
         <Route path="/" element={<Navigate to={front} replace />} />
-        {screens.map((screen) => (
-          <Route key={screen.path} path={screen.path} element={screen.element} />
+        {SCREENS.map((screen) => (
+          <Route
+            key={screen.path}
+            path={screen.path}
+            element={
+              screens.includes(screen) ? screen.element : <NotForRole label={screen.label} />
+            }
+          />
         ))}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </NavigationFocus>
+  );
+}
+
+/** A screen the role does not open (#304): said where it is asked for, and nothing is fetched. */
+function NotForRole({ label }: { label: PlainMessageKey }) {
+  const { t } = useT();
+  return (
+    <section aria-labelledby="not-for-role-title">
+      <ScreenTitle id="not-for-role-title">{t(label)}</ScreenTitle>
+      <p>{t("admin.refused")}</p>
+    </section>
   );
 }
 

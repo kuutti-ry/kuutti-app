@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { ConfigKeyName, ConfigVersion } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { readJournal } from "./journal.ts";
 import { migrate } from "./migrate.ts";
@@ -290,6 +292,103 @@ describe("migrate", () => {
         refused("sanction_review_check"),
       );
     });
+  });
+
+  /**
+   * A copy of the migrations folder whose journal ends just before `tag`, so a
+   * database can be brought to the state a deployed one had before it.
+   */
+  function migrationsBefore(tag: string): string {
+    const journal = readJournal(MIGRATIONS) ?? [];
+    const end = journal.findIndex((entry) => entry.tag === tag);
+    expect(end, tag).toBeGreaterThan(0);
+    const dir = mkdtempSync(join(tmpdir(), "kuutti-db-"));
+    mkdirSync(join(dir, "meta"));
+    const entries = journal.slice(0, end);
+    for (const entry of entries) {
+      copyFileSync(resolve(MIGRATIONS, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
+    }
+    writeFileSync(join(dir, "meta", "_journal.json"), JSON.stringify({ version: "7", entries }));
+    return dir;
+  }
+
+  it("migration 0047 adds the reason to matching_config, nullable, and keeps every row as it was (#305)", async () => {
+    const before0047 = migrationsBefore("0047_config_reason");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before0047);
+          const reasonColumn = () =>
+            pool.query<{ data_type: string; is_nullable: string; column_default: string | null }>(
+              `SELECT data_type, is_nullable, column_default FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'matching_config' AND column_name = 'reason'`,
+            );
+          expect((await reasonColumn()).rows).toEqual([]);
+          const columns = "id, key, version, value, valid_from, created_by";
+          const order = "ORDER BY key, version";
+          const rows = (
+            await pool.query<Record<string, unknown>>(
+              `SELECT ${columns} FROM matching_config ${order}`,
+            )
+          ).rows;
+          // Versions 1 and 2 of the migrations before it, every one of them.
+          expect(rows).toHaveLength(
+            Object.keys(MATCHING_CONFIG_V1).length + Object.keys(MATCHING_CONFIG_V2).length,
+          );
+
+          expect(await migrate(pool, MIGRATIONS)).toEqual({ state: "applied", applied: 1 });
+          expect((await reasonColumn()).rows).toEqual([
+            { data_type: "text", is_nullable: "YES", column_default: null },
+          ]);
+          const after = await pool.query<{
+            key: string;
+            version: number;
+            value: unknown;
+            valid_from: Date;
+            created_by: string;
+            reason: string | null;
+          }>(`SELECT ${columns}, reason FROM matching_config ${order}`);
+          expect(after.rows).toEqual(rows.map((row) => ({ ...row, reason: null })));
+          // Each row reads in the panel as a version without a reason (#304).
+          for (const row of after.rows) {
+            expect(ConfigKeyName.safeParse(row.key).success, row.key).toBe(true);
+            expect(
+              ConfigVersion.safeParse({
+                version: row.version,
+                value: row.value,
+                validFrom: row.valid_from.toISOString(),
+                createdBy: row.created_by,
+                reason: row.reason,
+              }).error,
+              row.key,
+            ).toBeUndefined();
+          }
+
+          // A row without a reason is still written, as the seed writes one; the panel's carries its reason.
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, valid_from, created_by)
+             VALUES (3, 'default_pond', '"suomi"'::jsonb, '2026-10-16T09:00:00Z', 'seed')`,
+          );
+          await pool.query(
+            `INSERT INTO matching_config (version, key, value, valid_from, created_by, reason)
+             VALUES (2, 'gate_k', '25'::jsonb, '2026-10-16T09:00:00Z', 'admin', 'Smaller ponds first')`,
+          );
+          const written = await pool.query<{ key: string; reason: string | null }>(
+            `SELECT key, reason FROM matching_config
+             WHERE (key, version) IN (('default_pond', 3), ('gate_k', 2)) ORDER BY key`,
+          );
+          expect(written.rows).toEqual([
+            { key: "default_pond", reason: null },
+            { key: "gate_k", reason: "Smaller ponds first" },
+          ]);
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before0047, { recursive: true, force: true });
+    }
   });
 
   it("is a no-op the second time", async () => {
