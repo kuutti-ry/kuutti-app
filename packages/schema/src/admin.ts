@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { PhotoId, PhotoRejectionReason, PhotoState } from "./media.ts";
+import { BioPreset, PromptAnswer } from "./profile.ts";
+import { ProfileFields } from "./profile-fields.ts";
 
 /**
  * The moderation panel's contracts (#49, TD-5, TD-8, rules/admin.md). Staff
@@ -62,6 +64,91 @@ export const AdminOverview = z
   })
   .meta({ id: "AdminOverview" });
 export type AdminOverview = z.infer<typeof AdminOverview>;
+
+/** A person's page in the panel (#306): by account id only, never a search. */
+export const AdminAccountParams = z.object({ id: z.uuid() }).meta({ id: "AdminAccountParams" });
+
+/** One of the person's photos as staff list it; the picture itself comes by GET /admin/photos/{id}/card, one audit row per look. */
+export const AdminAccountPhoto = z
+  .object({
+    id: z.uuid(),
+    state: z.enum(["pending", "queued", "approved", "rejected"]),
+    rejectionReason: z.string().max(40).nullable(),
+    appealable: z.boolean(),
+    uploadedAt: z.iso.datetime(),
+  })
+  .meta({ id: "AdminAccountPhoto" });
+export type AdminAccountPhoto = z.infer<typeof AdminAccountPhoto>;
+
+/** One audit row about the person or one of their photos: who did or saw what, and when. */
+export const AdminAuditRow = z
+  .object({
+    at: z.iso.datetime(),
+    actorIdentityId: z.uuid(),
+    action: z.string().max(60),
+    subjectType: z.string().max(40),
+    subjectId: z.uuid(),
+    detail: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+      .nullable(),
+  })
+  .meta({ id: "AdminAuditRow" });
+export type AdminAuditRow = z.infer<typeof AdminAuditRow>;
+
+/**
+ * What a moderator may see about one person (#306): the account's raw state
+ * (a shadow ban shows to staff), the identity's standing, the profile as the
+ * card shows it, the photos, the feedback they sent, and what staff did or
+ * saw about them. Never the hash, the broker's ids, the research id or the
+ * e-mail. An erased account answers its deletion and standing, nothing else.
+ */
+export const AdminAccount = z
+  .object({
+    id: z.uuid(),
+    state: z.enum([
+      "registered",
+      "active",
+      "paused",
+      "shadow_banned",
+      "suspended",
+      "banned",
+      "deleted",
+    ]),
+    stateChangedAt: z.iso.datetime().nullable(),
+    registeredAt: z.iso.datetime(),
+    deletedAt: z.iso.datetime().nullable(),
+    standing: z.enum(["ok", "suspended", "banned"]),
+    standingChangedAt: z.iso.datetime().nullable(),
+    suspensionEndsAt: z.iso.datetime().nullable(),
+    age: z.int().min(0).max(130).nullable(),
+    gender: z.string().max(40).nullable(),
+    pond: z.string().max(80).nullable(),
+    profile: z
+      .object({
+        displayName: z.string(),
+        bio: z.string().nullable(),
+        /** The canned bio line the person chose instead of their own words, as the card shows it. */
+        bioPreset: BioPreset.nullable(),
+        prompts: z.array(PromptAnswer).max(10),
+        /** The fields as the card shows them (cardFields): what other people see. */
+        fields: ProfileFields,
+      })
+      .nullable(),
+    photos: z.array(AdminAccountPhoto).max(50),
+    feedback: z
+      .array(
+        z.object({
+          at: z.iso.datetime(),
+          kind: z.string(),
+          text: z.string(),
+          handledAt: z.iso.datetime().nullable(),
+        }),
+      )
+      .max(100),
+    audit: z.array(AdminAuditRow).max(100),
+  })
+  .meta({ id: "AdminAccount" });
+export type AdminAccount = z.infer<typeof AdminAccount>;
 
 export const AdminWhoAmI = z
   .object({ role: ModeratorRole, expiresAt: z.iso.datetime() })

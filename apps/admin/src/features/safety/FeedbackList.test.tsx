@@ -1,6 +1,6 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { setTokenSource } from "../../lib/api.ts";
@@ -81,7 +81,10 @@ describe("the feedback list", () => {
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual(["Bug", "Praise"]);
     expect(screen.getByText("A few lines, number 1.")).toBeTruthy();
-    expect(screen.getByText(/Version 0\.22\.0, android, sv · .* · account 6f1c1c4e/)).toBeTruthy();
+    // The sender by the start of the account id, then the link to their page (#306).
+    expect(
+      screen.getByText(/Version 0\.22\.0, android, sv · .* · account 6f1c1c4e ·$/),
+    ).toHaveTextContent(/· account 6f1c1c4e · The person's page$/);
     expect(calls[0]?.headers.get("authorization")).toBe(`Bearer ${"t".repeat(43)}`);
 
     const [first] = screen.getAllByRole("button", { name: "Mark as handled" });
@@ -161,5 +164,31 @@ describe("the feedback list", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Mark as handled" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Marking did not work.");
     expect(screen.getByRole("button", { name: "Mark as handled" })).toBeEnabled();
+  });
+
+  it("links each row to the sender's page by the whole account id, and the link opens it (#306)", async () => {
+    const other = "7a2d2d5f-0b9f-4b1c-8d4b-1d9e2f3a4b5c";
+    fetchMock([listOf([item(1), item(2, { accountId: other })])]);
+    function Sender() {
+      return <output>{useParams().id}</output>;
+    }
+    render(
+      <I18nProvider i18n={i18n}>
+        <MemoryRouter initialEntries={["/feedback"]}>
+          <Routes>
+            <Route path="/feedback" element={<FeedbackList />} />
+            <Route path="/accounts/:id" element={<Sender />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    const links = await screen.findAllByRole("link", { name: "The person's page" });
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      `/accounts/${item(1).accountId}`,
+      `/accounts/${other}`,
+    ]);
+    fireEvent.click(links[1] as HTMLElement);
+    expect(await screen.findByRole("status")).toHaveTextContent(other);
+    expect(screen.queryByText("A few lines, number 2.")).toBeNull();
   });
 });

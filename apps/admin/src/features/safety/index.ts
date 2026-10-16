@@ -1,5 +1,8 @@
 // Public surface of the safety slice in apps/admin (#171): the feedback people sent from the app.
 // The tunables (#304, #305), admins only.
+
+// A person's page (#306), by account id only.
+export { AccountLookup, AccountPage } from "./AccountPage.tsx";
 export { ConfigList } from "./ConfigList.tsx";
 export { FeedbackList } from "./FeedbackList.tsx";
 // The front page (#303): what waits and for how long.

@@ -50,6 +50,30 @@ const overview = {
   ],
 };
 
+/** A person's page (#306): an account with nothing on it yet. */
+const accountId = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+const account = {
+  id: accountId,
+  state: "registered",
+  stateChangedAt: null,
+  registeredAt: "2026-09-25T10:00:00.000Z",
+  deletedAt: null,
+  standing: "ok",
+  standingChangedAt: null,
+  suspensionEndsAt: null,
+  age: null,
+  gender: null,
+  pond: null,
+  profile: null,
+  photos: [],
+  feedback: [],
+  audit: [],
+};
+const accountAnswers = {
+  [`GET /admin/accounts/${accountId}`]: () => json(account),
+  [`GET /admin/accounts/${accountId}/sanctions`]: () => json({ items: [] }),
+};
+
 const refused = () =>
   new Response(
     JSON.stringify({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }),
@@ -208,7 +232,12 @@ describe("App", () => {
     expect(window.location.pathname).toBe("/");
     const menu = screen.getByRole("navigation", { name: "Screens" });
     const links = within(menu).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Overview", "Photos", "Feedback"]);
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Overview",
+      "Photos",
+      "Feedback",
+      "A person",
+    ]);
     expect(within(menu).getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/");
     expect(within(menu).getByRole("link", { name: "Overview" })).toHaveAttribute(
       "aria-current",
@@ -304,7 +333,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Photos", "Feedback", "Tunables"]);
+    ).toEqual(["Overview", "Photos", "Feedback", "A person", "Tunables"]);
     expect(calls).not.toContain("GET /admin/config");
     fireEvent.click(within(menu).getByRole("link", { name: "Tunables" }));
     const heading = await screen.findByRole("heading", { level: 2, name: "Tunables" });
@@ -351,7 +380,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Photos", "Feedback"]);
+    ).toEqual(["Overview", "Photos", "Feedback", "A person"]);
     expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
@@ -360,6 +389,71 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Feedback" })).toBeInTheDocument();
     expect(calls).toContain("GET /admin/feedback");
     expect(calls).not.toContain("GET /admin/config");
+  });
+
+  it("opens the way to a person's page from the menu, and a pasted id opens the page, each heading taking the focus (#306)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls, { answers: accountAnswers }));
+    const menu = await screen.findByRole("navigation", { name: "Screens" });
+    fireEvent.click(within(menu).getByRole("link", { name: "A person" }));
+    const lookup = await screen.findByRole("heading", { level: 2, name: "A person's page" });
+    expect(window.location.pathname).toBe("/accounts");
+    await waitFor(() => expect(lookup).toHaveFocus());
+    expect(within(menu).getByRole("link", { name: "A person" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(document.title).toBe("A person's page · Kuutti admin");
+    expect(calls.filter((call) => call.includes("/admin/accounts"))).toEqual([]);
+
+    fireEvent.change(screen.getByLabelText("Account id"), { target: { value: accountId } });
+    fireEvent.click(screen.getByRole("button", { name: "Open the page" }));
+    const page = await screen.findByRole("heading", { level: 2, name: "Account 6f1c1c4e" });
+    expect(window.location.pathname).toBe(`/accounts/${accountId}`);
+    await waitFor(() => expect(page).toHaveFocus());
+    expect(await screen.findByText("No profile yet.")).toBeInTheDocument();
+    expect(calls).toContain(`GET /admin/accounts/${accountId}`);
+    expect(calls).toContain(`GET /admin/accounts/${accountId}/sanctions`);
+    // The page itself is no entry of the menu.
+    expect(within(menu).getAllByRole("link", { name: "A person" })).toHaveLength(1);
+  });
+
+  it("opens a person's page from its own address, outside the menu and without taking the focus (#306)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", `/accounts/${accountId}`);
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls, { answers: accountAnswers }));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Account 6f1c1c4e" });
+    expect(heading).not.toHaveFocus();
+    expect(await screen.findByText("No profile yet.")).toBeInTheDocument();
+    expect(document.title).toBe("Account 6f1c1c4e · Kuutti admin");
+    const menu = screen.getByRole("navigation", { name: "Screens" });
+    expect(
+      within(menu)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Overview", "Photos", "Feedback", "A person"]);
+    expect(screen.queryByText("Nothing at this address")).toBeNull();
+    expect(calls).toContain(`GET /admin/accounts/${accountId}`);
+    expect(calls).not.toContain("GET /admin/overview");
+  });
+
+  it("says a refused person's page once, by the shell, never as the page's failure (#302, #306)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", `/accounts/${accountId}`);
+    const calls: string[] = [];
+    renderApp(
+      staffApi("moderator", calls, {
+        answers: { [`GET /admin/accounts/${accountId}`]: refused },
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.queryByText("The page could not be loaded.")).toBeNull();
+    expect(screen.queryByText("No account has this id.")).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "Account 6f1c1c4e" })).toBeInTheDocument();
+    expect(calls).not.toContain(`GET /admin/accounts/${accountId}/sanctions`);
   });
 
   it("says there is nothing at an address the panel does not have, and links back to the start (#302)", async () => {

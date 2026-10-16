@@ -36,6 +36,7 @@ import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./m
 import { pondRoutes } from "./pond/index.ts";
 import { exportProfile, profileRoutes } from "./profile/index.ts";
 import {
+  accountAdminRoutes,
   configAdminRoutes,
   feedbackAdminRoutes,
   feedbackRoutes,
@@ -151,6 +152,7 @@ export function createApp(deps: Deps) {
   app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   app.route("/", configAdminRoutes(deps, admins));
   app.route("/", overviewAdminRoutes(deps, moderators));
+  app.route("/", accountAdminRoutes(deps, moderators));
   // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",

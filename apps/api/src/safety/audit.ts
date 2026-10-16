@@ -17,6 +17,7 @@ const AUDIT_ACTIONS = [
   "sanction.lift",
   "sanction.review",
   "config.change",
+  "account.view",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

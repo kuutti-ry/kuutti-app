@@ -1,0 +1,293 @@
+import { formatDateTime } from "@kuutti/i18n";
+import { useT } from "@kuutti/i18n/react";
+import {
+  AdminAccount,
+  type AdminAccountPhoto,
+  PhotoUrlResponse,
+  type Sanction,
+  SanctionList,
+} from "@kuutti/schema";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router";
+import { api } from "../../lib/api.ts";
+import { ScreenTitle } from "../../lib/screen-title.tsx";
+
+// A person's page in the panel (#306): one account by its id, never a
+// search. Every open is an audit row on the API's side (account.view); a
+// photo is fetched only when the moderator asks to see it (#253), one
+// photo.view row per look. Read-only here: the actions on the person come
+// with #308. English only (TD-17); plain HTML, keyboard first.
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The way to a page: an account id, typed or pasted, and nothing else to search by. */
+export function AccountLookup() {
+  const { t } = useT();
+  const navigate = useNavigate();
+  const [id, setId] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const open = (event: FormEvent) => {
+    event.preventDefault();
+    const value = id.trim();
+    if (!UUID.test(value)) return setInvalid(true);
+    navigate(`/accounts/${value.toLowerCase()}`);
+  };
+  return (
+    <section aria-labelledby="lookup-title">
+      <ScreenTitle id="lookup-title">{t("admin.account.lookupTitle")}</ScreenTitle>
+      <p>{t("admin.account.lookupExplain")}</p>
+      <form className="actions" onSubmit={open}>
+        {invalid && <p role="alert">{t("admin.account.notAnId")}</p>}
+        <label htmlFor="lookup-id">{t("admin.account.id")}</label>
+        <input
+          id="lookup-id"
+          value={id}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => {
+            setId(event.target.value);
+            setInvalid(false);
+          }}
+        />
+        <button type="submit">{t("admin.account.open")}</button>
+      </form>
+    </section>
+  );
+}
+
+type State =
+  | { kind: "loading" }
+  | { kind: "error" }
+  | { kind: "missing" }
+  | { kind: "forbidden" }
+  | { kind: "ready"; page: AdminAccount; sanctions: Sanction[] | null };
+
+export function AccountPage() {
+  const { t, locale } = useT();
+  const { id = "" } = useParams();
+  const [state, setState] = useState<State>({ kind: "loading" });
+  const when = (at: string | null) => (at ? formatDateTime(locale, new Date(at)) : "–");
+
+  const load = useCallback(async () => {
+    setState({ kind: "loading" });
+    try {
+      const { data, response } = await api.GET("/admin/accounts/{id}", {
+        params: { path: { id } },
+      });
+      // A 403 is the shell's to say (#302).
+      if (response.status === 403) return setState({ kind: "forbidden" });
+      if (response.status === 404 || response.status === 400) return setState({ kind: "missing" });
+      if (!data) return setState({ kind: "error" });
+      const page = AdminAccount.parse(data);
+      // The sanctions come from their own route (#307); a failure there leaves the rest of the page.
+      const listed = await api
+        .GET("/admin/accounts/{id}/sanctions", { params: { path: { id } } })
+        .catch(() => null);
+      const sanctions = listed?.data ? SanctionList.parse(listed.data).items : null;
+      setState({ kind: "ready", page, sanctions });
+    } catch (error) {
+      console.error("account page load failed", error);
+      setState({ kind: "error" });
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const title = t("admin.account.title", { account: id.slice(0, 8) });
+  if (state.kind !== "ready") {
+    return (
+      <section aria-labelledby="account-title">
+        <ScreenTitle id="account-title">{title}</ScreenTitle>
+        {state.kind === "loading" && <p aria-busy="true">{t("admin.account.loading")}</p>}
+        {state.kind === "error" && <p role="alert">{t("admin.account.error")}</p>}
+        {state.kind === "missing" && <p>{t("admin.account.missing")}</p>}
+      </section>
+    );
+  }
+  const { page, sanctions } = state;
+  return (
+    <section aria-labelledby="account-title" className="person">
+      <ScreenTitle id="account-title">{title}</ScreenTitle>
+      <p>
+        <code>{page.id}</code>
+      </p>
+      <h3>{t("admin.account.standingTitle")}</h3>
+      <dl>
+        <dt>{t("admin.account.state")}</dt>
+        <dd>
+          {page.state} · {when(page.stateChangedAt)}
+        </dd>
+        <dt>{t("admin.account.standing")}</dt>
+        <dd>
+          {page.standing} · {when(page.standingChangedAt)}
+          {page.suspensionEndsAt &&
+            ` · ${t("admin.account.until", { time: when(page.suspensionEndsAt) })}`}
+        </dd>
+        <dt>{t("admin.account.registered")}</dt>
+        <dd>{when(page.registeredAt)}</dd>
+        {page.deletedAt && (
+          <>
+            <dt>{t("admin.account.deleted")}</dt>
+            <dd>{when(page.deletedAt)}</dd>
+          </>
+        )}
+      </dl>
+      {page.state !== "deleted" && (
+        <>
+          <h3>{t("admin.account.profileTitle")}</h3>
+          {page.profile ? (
+            <dl>
+              <dt>{t("admin.account.name")}</dt>
+              <dd>{page.profile.displayName}</dd>
+              <dt>{t("admin.account.age")}</dt>
+              <dd>{page.age ?? "–"}</dd>
+              <dt>{t("admin.account.gender")}</dt>
+              <dd>{page.gender ?? "–"}</dd>
+              <dt>{t("admin.account.pond")}</dt>
+              <dd>{page.pond ?? "–"}</dd>
+              <dt>{t("admin.account.bio")}</dt>
+              <dd>
+                {page.profile.bio ??
+                  (page.profile.bioPreset
+                    ? t("admin.account.bioPreset", { preset: page.profile.bioPreset })
+                    : "–")}
+              </dd>
+              {page.profile.prompts.map((p) => (
+                <div key={p.key}>
+                  <dt>
+                    <code>{p.key}</code>
+                  </dt>
+                  <dd>{p.answer}</dd>
+                </div>
+              ))}
+              {Object.entries(page.profile.fields).map(([key, value]) => (
+                <div key={key}>
+                  <dt>
+                    <code>{key}</code>
+                  </dt>
+                  <dd>{Array.isArray(value) ? value.join(", ") : String(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p>{t("admin.account.noProfile")}</p>
+          )}
+          <h3>{t("admin.account.photosTitle")}</h3>
+          {page.photos.length === 0 ? (
+            <p>{t("admin.account.none")}</p>
+          ) : (
+            <ul className="queue">
+              {page.photos.map((photo) => (
+                <PersonPhoto key={photo.id} photo={photo} />
+              ))}
+            </ul>
+          )}
+          <h3>{t("admin.account.sanctionsTitle")}</h3>
+          {sanctions === null ? (
+            <p role="alert">{t("admin.account.sanctionsError")}</p>
+          ) : sanctions.length === 0 ? (
+            <p>{t("admin.account.none")}</p>
+          ) : (
+            <ul>
+              {sanctions.map((s) => (
+                <li key={s.id}>
+                  <strong>{s.kind}</strong> · {s.reason} · {when(s.createdAt)}
+                  {s.endsAt && ` · ${t("admin.account.until", { time: when(s.endsAt) })}`}
+                  {s.liftedAt && ` · ${t("admin.account.lifted", { time: when(s.liftedAt) })}`}
+                  <br />
+                  {s.note}
+                  {s.reviewNote && (
+                    <>
+                      <br />
+                      {t("admin.account.reviewed", { note: s.reviewNote })}
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <h3>{t("admin.account.feedbackTitle")}</h3>
+          {page.feedback.length === 0 ? (
+            <p>{t("admin.account.none")}</p>
+          ) : (
+            <ul>
+              {page.feedback.map((f) => (
+                <li key={`${f.at}-${f.kind}`}>
+                  <strong>{f.kind}</strong> · {when(f.at)}
+                  {f.handledAt && ` · ${t("admin.account.handled", { time: when(f.handledAt) })}`}
+                  <br />
+                  {f.text}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      <h3>{t("admin.account.auditTitle")}</h3>
+      {page.audit.length === 0 ? (
+        <p>{t("admin.account.none")}</p>
+      ) : (
+        <table>
+          <caption>{t("admin.account.auditCaption")}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t("admin.account.col.when")}</th>
+              <th scope="col">{t("admin.account.col.who")}</th>
+              <th scope="col">{t("admin.account.col.what")}</th>
+              <th scope="col">{t("admin.account.col.detail")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {page.audit.map((row) => (
+              <tr key={`${row.at}-${row.action}-${row.subjectId}`}>
+                <td>{when(row.at)}</td>
+                <td>
+                  <code>{row.actorIdentityId.slice(0, 8)}</code>
+                </td>
+                <td>{row.action}</td>
+                <td>
+                  <code>{row.detail ? JSON.stringify(row.detail) : ""}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+/** One photo, its picture fetched only when asked: the request is the audit row (photo.view). */
+function PersonPhoto({ photo }: { photo: AdminAccountPhoto }) {
+  const { t, locale } = useT();
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const show = async () => {
+    const answer = await api
+      .GET("/admin/photos/{id}/card", { params: { path: { id: photo.id } } })
+      .catch(() => null);
+    if (!answer?.data) return setFailed(true);
+    setUrl(PhotoUrlResponse.parse(answer.data).url);
+  };
+  return (
+    <li className="item">
+      <p>
+        {photo.state}
+        {photo.rejectionReason && ` · ${photo.rejectionReason}`} ·{" "}
+        {formatDateTime(locale, new Date(photo.uploadedAt))}
+      </p>
+      {url ? (
+        <img src={url} alt={t("admin.queue.image")} width={240} height={320} />
+      ) : (
+        <>
+          {failed && <p role="alert">{t("admin.account.photoFailed")}</p>}
+          <button type="button" onClick={() => void show()}>
+            {t("admin.account.showPhoto")}
+          </button>
+        </>
+      )}
+    </li>
+  );
+}

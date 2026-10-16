@@ -31,6 +31,8 @@ export { findIdentityByHmac, findLiveAccount } from "./repo.ts";
 export { authRoutes } from "./routes.ts";
 export { sessionStore } from "./session-store.ts";
 export { sweepSessions } from "./sessions.ts";
+// A person's page in the panel (#306): the account and the identity's standing, for staff.
+export { accountForStaff } from "./staff-view.ts";
 // The account's state and the identity's standing, settled from the open
 // sanctions the safety slice counts (#307, ADR-024 §2); the sessions a
 // suspension or a ban ends.

@@ -16,5 +16,6 @@ A static SPA built to S3 behind CloudFront on `admin.<domain>`; PR previews are 
 - Launch screens: report queue (report, frozen conversation snapshot, both profiles by pseudonymous id, reporter history), photo review queue, actions warn / shadow-ban / suspend / ban with an appeal note, auto-shadow-ban threshold editor, `matching_config` editor.
 - Every moderator action writes the immutable audit log (who, what, when, why). Photo views go through short-TTL signed URLs and are logged.
 - Never auto-delete a photo, never expose a bulk export, never show `hetu_hmac` or `research_id` in the UI.
+- A person's page (`/accounts/:id`, #306) is reached by an account id only, never a search by name or anything else; opening it is an `account.view` audit row, a photo on it is fetched only on request (`photo.view`), and its profile is the card's own presenter (`fieldsOnCard`), so staff see what others see.
 - English only. The accessibility rules in `CLAUDE.md` apply: keyboard navigation, labels, contrast.
 - Same zod contracts from `packages/schema`; no hand-rolled fetch types.

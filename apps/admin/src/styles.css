@@ -151,3 +151,16 @@ h2:focus:not(:focus-visible) {
   display: grid;
   gap: 0.5rem;
 }
+/* A person's page (#306): label and value side by side, the value wrapping. */
+.person dl {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: 0.25rem 1rem;
+}
+.person dl > div {
+  display: contents;
+}
+.person dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

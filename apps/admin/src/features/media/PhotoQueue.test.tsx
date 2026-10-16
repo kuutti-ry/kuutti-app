@@ -1,6 +1,6 @@
 import { I18nProvider } from "@kuutti/i18n/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../i18n.ts";
 import { setTokenSource } from "../../lib/api.ts";
@@ -342,8 +342,10 @@ describe("PhotoQueue", () => {
     show();
     expect(await screen.findByText("2 faces found")).toBeInTheDocument();
     expect(screen.getByText("The automatic check found no moderation label.")).toBeInTheDocument();
-    // The owner is named by the first part of the pseudonymous id only.
-    expect(screen.getByText(/Account 6f1c1c4e$/)).toBeInTheDocument();
+    // The owner is named by the first part of the pseudonymous id only; the whole id is the link's (#306).
+    const caption = screen.getByText(/Account 6f1c1c4e ·$/);
+    expect(caption).toHaveTextContent(/· Account 6f1c1c4e · The person's page$/);
+    expect(caption).not.toHaveTextContent(item(1).accountId);
   });
 
   it("offers every rejection reason, and holds both buttons while a decision is saving", async () => {
@@ -448,5 +450,37 @@ describe("PhotoQueue", () => {
     expect(
       await screen.findByText("The owner asked a person to look at the automatic rejection."),
     ).toBeInTheDocument();
+  });
+
+  it("links each item to its owner's page by the whole account id, and the link opens it (#306)", async () => {
+    const other = "7a2d2d5f-0b9f-4b1c-8d4b-1d9e2f3a4b5c";
+    fetchMock([
+      (req) =>
+        req.method === "GET" && path(req) === "/admin/photos/queue"
+          ? json({ items: [item(1), item(2, { accountId: other })], total: 2 })
+          : null,
+      cardUrls,
+    ]);
+    function Owner() {
+      return <output>{useParams().id}</output>;
+    }
+    render(
+      <I18nProvider i18n={i18n}>
+        <MemoryRouter initialEntries={["/photos"]}>
+          <Routes>
+            <Route path="/photos" element={<PhotoQueue />} />
+            <Route path="/accounts/:id" element={<Owner />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    const links = await screen.findAllByRole("link", { name: "The person's page" });
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      `/accounts/${item(1).accountId}`,
+      `/accounts/${other}`,
+    ]);
+    fireEvent.click(links[1] as HTMLElement);
+    expect(await screen.findByRole("status")).toHaveTextContent(other);
+    expect(screen.queryByText("2 photos waiting")).toBeNull();
   });
 });

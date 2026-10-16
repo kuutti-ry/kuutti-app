@@ -64,7 +64,7 @@ export function sharedAnswers(
 }
 
 /** The card's fields: the info and hard ones (ADR-019 §2), less the field of study when the person hides it (#150). */
-function fieldsOnCard(fields: ProfileFields): ProfileFields {
+export function fieldsOnCard(fields: ProfileFields): ProfileFields {
   const out: Record<string, unknown> = { ...cardFields(fields) };
   if (fields.hideFromField === true) delete out.field;
   return out as ProfileFields;

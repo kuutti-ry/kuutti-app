@@ -2,6 +2,7 @@ import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { type FeedbackItem, type FeedbackKind, FeedbackList as FeedbackPage } from "@kuutti/schema";
 import { useState } from "react";
+import { Link } from "react-router";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
@@ -92,7 +93,8 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
           locale: item.locale,
           time: formatDateTime(locale, new Date(item.createdAt)),
           account: item.accountId.slice(0, 8),
-        })}
+        })}{" "}
+        · <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
       </p>
       <div className="actions">
         {state === "failed" && <p role="alert">{t("admin.feedback.handleFailed")}</p>}
