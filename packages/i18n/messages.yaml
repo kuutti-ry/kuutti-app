@@ -5204,7 +5204,7 @@ account.export.sanction.kind.ban:
   en: "Banned from Kuutti"
   description: "Inside the downloaded data file (#307, ADR-024 §8), what kind of sanction an entry is: a ban on the person, which keeps them out until it is lifted."
   fi: "Estetty Kuutista"
-  sv: "Avstängd från Kuutti för gott"
+  sv: "Avstängd från Kuutti"
   machine: { fi: true, sv: true }
 
 account.export.sanction.reason.harassment:

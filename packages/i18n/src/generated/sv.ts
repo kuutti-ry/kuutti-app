@@ -46,7 +46,7 @@ export const sv: Readonly<Record<string, string>> = {
   "account.export.photoCheck.reason.hate": "Kan visa en symbol som Kuutti inte tillåter",
   "account.export.photoCheck.reason.nudity": "Kan visa mer än Kuutti tillåter",
   "account.export.photoCheck.reason.violence": "Kan visa våld eller vapen",
-  "account.export.sanction.kind.ban": "Avstängd från Kuutti för gott",
+  "account.export.sanction.kind.ban": "Avstängd från Kuutti",
   "account.export.sanction.kind.shadow_ban": "Dold för andra en tid",
   "account.export.sanction.kind.suspend": "Avstängd till en viss dag",
   "account.export.sanction.kind.warn": "En varning",

@@ -744,7 +744,12 @@ describe("Sanctions", () => {
           reason: "harassment",
         }),
         step(m, "sanction.lift", { sanctionId: warning.id, kind: "warn", reason: "harassment" }),
-        step(n, "sanction.review", { sanctionId: suspension.id, kind: "suspend", outcome: "keep" }),
+        step(n, "sanction.review", {
+          sanctionId: suspension.id,
+          kind: "suspend",
+          reason: "harassment",
+          outcome: "keep",
+        }),
       ]),
     );
 
@@ -1095,6 +1100,80 @@ describe("applySanction", () => {
       ),
     ).toBe(1);
   });
+
+  test.for(["lift", "review"] as const)(
+    "a %s of a ban set through an erased account gives the live account back and forgets the kept row",
+    async (how, { ctx }) => {
+      const live = await signedInAccount(ctx.client);
+      const old = await tombstone(ctx, await identityOf(ctx, live.accountId));
+      const admin = await staffSession(ctx.client, "admin");
+      const other = await staffSession(ctx.client, "admin");
+      const ban = await applySanction(ctx.client, input(old, "ban", { actor: admin.identityId }));
+      if (how === "lift") {
+        await liftSanction(ctx.client, {
+          sanctionId: ban.id,
+          scope: "ban",
+          actor: admin.identityId,
+          at: T,
+        });
+      } else {
+        await reviewSanction(ctx.client, {
+          sanctionId: ban.id,
+          scope: "ban",
+          actor: other.identityId,
+          note: "Wrong person.",
+          outcome: "lift",
+          at: T,
+        });
+      }
+      // ADR-024 §2: every account of the identity is settled, the live one back to what it was.
+      expect(await stateOf(ctx, live.accountId)).toEqual(ACTIVE);
+      expect(await stateOf(ctx, old)).toMatchObject({ state: "deleted", standing: "ok" });
+      // §8: a row kept on the erased account only for its standing goes once lifted.
+      expect(await count(ctx, "SELECT count(*) AS n FROM sanction WHERE id = $1", [ban.id])).toBe(
+        0,
+      );
+    },
+  );
+
+  test("parses a review's note again: one the database would refuse never reaches it", async ({
+    ctx,
+  }) => {
+    const person = await signedInAccount(ctx.client);
+    const m = await staffSession(ctx.client, "moderator");
+    const n = await staffSession(ctx.client, "moderator");
+    const warning = await applySanction(
+      ctx.client,
+      input(person.accountId, "warn", { actor: m.identityId }),
+    );
+    for (const note of ["", "   ", "x".repeat(501)]) {
+      await expect(
+        reviewSanction(ctx.client, {
+          sanctionId: warning.id,
+          scope: "other",
+          actor: n.identityId,
+          note,
+          outcome: "keep",
+          at: T,
+        }),
+      ).rejects.toMatchObject({ status: 400, code: "validation_failed" });
+    }
+    expect((await sanctionRow(ctx, warning.id))?.reviewed_at).toBeNull();
+    expect(
+      await count(ctx, "SELECT count(*) AS n FROM audit_log WHERE actor_identity_id = $1", [
+        n.identityId,
+      ]),
+    ).toBe(0);
+    const kept = await reviewSanction(ctx.client, {
+      sanctionId: warning.id,
+      scope: "other",
+      actor: n.identityId,
+      note: "  Kept.  ",
+      outcome: "keep",
+      at: T,
+    });
+    expect(kept.reviewNote).toBe("Kept.");
+  });
 });
 
 describe("liftSanction and reviewSanction", () => {
@@ -1364,6 +1443,31 @@ describe("liftSanction and reviewSanction", () => {
 });
 
 describe("endSuspensions", () => {
+  test("the night ends only the suspension that is due when an account has two", async ({
+    ctx,
+  }) => {
+    const m = await staffSession(ctx.client);
+    const person = await signedInAccount(ctx.client);
+    const first = await applySanction(
+      ctx.client,
+      input(person.accountId, "suspend", { actor: m.identityId, endsOn: "2026-10-22" }),
+    );
+    const second = await applySanction(
+      ctx.client,
+      input(person.accountId, "suspend", { actor: m.identityId, endsOn: "2026-11-02" }),
+    );
+    expect(await endSuspensions(ctx.client, NIGHT_22_10)).toBe(1);
+    expect((await sanctionRow(ctx, first.id))?.lifted_at).toEqual(NIGHT_22_10);
+    expect((await sanctionRow(ctx, second.id))?.lifted_at).toBeNull();
+    expect(await stateOf(ctx, person.accountId)).toMatchObject({
+      state: "suspended",
+      standing: "suspended",
+      suspension_ends_at: new Date("2026-11-01T22:00:00Z"),
+    });
+    expect(await endSuspensions(ctx.client, new Date("2026-11-02T02:00:00Z"))).toBe(1);
+    expect(await stateOf(ctx, person.accountId)).toEqual(ACTIVE);
+  });
+
   test("the night ends what is past its day once, and leaves the rest", async ({ ctx }) => {
     const m = await staffSession(ctx.client);
     const due = await signedInAccount(ctx.client);
@@ -1429,7 +1533,9 @@ describe("endSuspensions", () => {
     });
   });
 
-  test("a suspension kept on an erased account is ended by the night", async ({ ctx }) => {
+  test("a suspension kept on an erased account is ended by the night, and its row goes then", async ({
+    ctx,
+  }) => {
     const a = await signedInAccount(ctx.client);
     const suspension = await applySanction(ctx.client, input(a.accountId, "suspend"));
     await applySanction(ctx.client, input(a.accountId, "warn"));
@@ -1453,7 +1559,8 @@ describe("endSuspensions", () => {
       standing: "ok",
       suspension_ends_at: null,
     });
-    expect(await sanctionRow(ctx, suspension.id)).toMatchObject({ lifted_at: NIGHT_22_10 });
+    // ADR-024 §8: kept only while it carried the standing; once ended, it goes as the erasure would have.
+    expect(await sanctionRow(ctx, suspension.id)).toBeUndefined();
   });
 });
 

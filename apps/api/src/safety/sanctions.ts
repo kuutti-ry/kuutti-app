@@ -151,14 +151,26 @@ async function refuseStaffTarget(db: Queryable, identityId: string): Promise<voi
   }
 }
 
-/** Every account of the identity settled from what is open for it: the target and the live one alike. */
+/**
+ * Every account of the identity settled from what is open for it: the target
+ * and the live one alike. Then what an erased account kept only because it
+ * carried the standing goes, once lifted (ADR-024 §8): the erasure would have
+ * deleted it had it been lifted then; the audit log keeps the history.
+ */
 async function settleAll(
   db: Queryable,
-  locked: { identityId: string; accounts: { id: string }[] },
+  locked: { identityId: string; accounts: { id: string; state: string }[] },
   at: Date,
 ): Promise<void> {
   for (const { id } of locked.accounts) {
     await settleStanding(db, { accountId: id, open: await openOf(db, id, locked.identityId), at });
+  }
+  const erased = locked.accounts.filter((a) => a.state === "deleted").map((a) => a.id);
+  if (erased.length > 0) {
+    await db.query(
+      "DELETE FROM sanction WHERE account_id = ANY($1::uuid[]) AND lifted_at IS NOT NULL",
+      [erased],
+    );
   }
 }
 
@@ -317,7 +329,12 @@ export async function reviewSanction(
       action: "sanction.review",
       subjectType: "account",
       subjectId: found.account_id,
-      detail: { sanctionId: found.id, kind: found.kind, outcome: input.outcome },
+      detail: {
+        sanctionId: found.id,
+        kind: found.kind,
+        reason: found.reason,
+        outcome: input.outcome,
+      },
     });
     const { rows } = await tx.query<Row>(
       `UPDATE sanction SET review_note = $2, reviewed_by = $3, reviewed_at = $4,
@@ -342,9 +359,9 @@ export async function reviewSanction(
  * end is closed by nobody and its account settled, one account per
  * transaction. Idempotent: a second process arming the same night finds
  * nothing left.
- * shortcut: lifted at the night's run; a login on the end day before 04:00 is
- * still refused. A lift at the login would close those hours.
  */
+// shortcut: lifted at the night's run; a login on the end day before 04:00 is
+// still refused. A lift at the login would close those hours.
 export async function endSuspensions(db: Queryable, at: Date): Promise<number> {
   const { rows } = await db.query<{ account_id: string }>(
     `SELECT DISTINCT account_id FROM sanction

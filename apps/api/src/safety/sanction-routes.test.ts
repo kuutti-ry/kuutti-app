@@ -722,7 +722,10 @@ describe("POST /admin/sanctions/{id}/review", () => {
     expect((await standingOf(ctx, person.accountId))?.state).toBe("suspended");
     expect((await auditOf(ctx, person.accountId)).map((r) => [r.action, r.detail])).toEqual([
       ["sanction.apply", { sanctionId: item.id, kind: "suspend", reason: "misrepresentation" }],
-      ["sanction.review", { sanctionId: item.id, kind: "suspend", outcome: "keep" }],
+      [
+        "sanction.review",
+        { sanctionId: item.id, kind: "suspend", reason: "misrepresentation", outcome: "keep" },
+      ],
     ]);
     const line = lineOf(api, "sanction reviewed");
     expect(line).toMatchObject({
