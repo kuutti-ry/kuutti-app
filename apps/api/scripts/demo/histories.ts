@@ -1,4 +1,4 @@
-import { type Queryable, transaction } from "@kuutti/db";
+import type { Queryable } from "@kuutti/db";
 import {
   type DemoPersona,
   MOCK_BANK_AMR,
@@ -16,6 +16,7 @@ import {
   type ProfileUpdate,
   SessionResponse,
 } from "@kuutti/schema";
+import { applySanction } from "../../src/safety/index.ts";
 import { type BankContext, call, DemoError, loginAs, upload } from "./bank.ts";
 import { approveLocally, type PhotoAssets, picturesOf } from "./photos.ts";
 
@@ -260,25 +261,27 @@ export async function giveHistory(
       met("the older wording", changed.rowCount);
       break;
     }
-    case "banned":
-      // What a moderator's decision will write (M4): the sanction is on the
-      // identity, so a new login finds it; the account and its sessions end.
-      await transaction(writer.db, async (tx) => {
-        const banned = await tx.query(
-          `UPDATE identity AS i SET standing = 'banned', standing_changed_at = ${next}
-           WHERE ${who.clause} AND i.id = (SELECT identity_id FROM account WHERE id = $1)`,
-          [...params, at],
-        );
-        met("the ban", banned.rowCount);
-        const ended = await tx.query(
-          `UPDATE account SET state = 'banned', state_changed_at = ${next}
-           WHERE id = $1 AND identity_id IN (SELECT i.id FROM identity i WHERE ${who.clause})`,
-          [...params, at],
-        );
-        met("the account's end", ended.rowCount);
-        await tx.query(`DELETE FROM session WHERE ${ofPersona}`, params);
+    case "banned": {
+      // The ban as staff's is recorded, through the one way a standing changes
+      // (ADR-024 §10): a sanction by nobody, so the panel lists it and an admin
+      // can lift it; the identity banned, the account settled, its sessions
+      // revoked. The account must be the persona's, as every direct write here.
+      const mine = await writer.db.query(
+        `SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
+         WHERE a.id = $1 AND ${who.clause}`,
+        params,
+      );
+      met("the sanction", mine.rowCount);
+      await applySanction(writer.db, {
+        accountId,
+        kind: "ban",
+        reason: "harassment",
+        note: "Demo: the story ends in a ban.",
+        actor: null,
+        at,
       });
       break;
+    }
     case "deleted":
       await writer.deleteAccount(accountId);
       break;

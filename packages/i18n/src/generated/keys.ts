@@ -47,6 +47,16 @@ export type MessageParams = {
   "account.export.photoCheck.reason.hate": Record<never, never>;
   "account.export.photoCheck.reason.nudity": Record<never, never>;
   "account.export.photoCheck.reason.violence": Record<never, never>;
+  "account.export.sanction.kind.ban": Record<never, never>;
+  "account.export.sanction.kind.shadow_ban": Record<never, never>;
+  "account.export.sanction.kind.suspend": Record<never, never>;
+  "account.export.sanction.kind.warn": Record<never, never>;
+  "account.export.sanction.reason.commercial_use": Record<never, never>;
+  "account.export.sanction.reason.harassment": Record<never, never>;
+  "account.export.sanction.reason.misrepresentation": Record<never, never>;
+  "account.export.sanction.reason.other": Record<never, never>;
+  "account.export.sanction.reason.scraping": Record<never, never>;
+  "account.export.sanction.reason.under_age": Record<never, never>;
   "account.export.title": Record<never, never>;
   "account.export.working": Record<never, never>;
   "account.research.explain": Record<never, never>;
@@ -859,6 +869,7 @@ export type MessageParams = {
   "signIn.error.auth_provider_error": Record<never, never>;
   "signIn.error.auth_state_mismatch": Record<never, never>;
   "signIn.error.auth_suspended": Record<never, never>;
+  "signIn.error.auth_suspended_until": { "date": string };
   "signIn.error.auth_under_18": Record<never, never>;
   "signIn.error.generic": Record<never, never>;
   "signIn.error.title": Record<never, never>;

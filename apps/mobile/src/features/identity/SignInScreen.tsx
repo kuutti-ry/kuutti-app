@@ -111,10 +111,17 @@ export function SignInScreen({ code, error, until }: SignInParams) {
   };
 
   const refusalText = (failure: { code: string; until?: string }): string => {
+    const day = failure.until ? new Date(failure.until) : null;
+    const valid = day !== null && !Number.isNaN(day.getTime());
     if (failure.code === "auth_cooldown") {
-      const day = failure.until ? new Date(failure.until) : null;
-      return t("signIn.error.auth_cooldown", {
-        date: day && !Number.isNaN(day.getTime()) ? formatDate(locale, day) : "",
+      return t("signIn.error.auth_cooldown", { date: valid ? formatDate(locale, day) : "" });
+    }
+    // A suspension ends at the start of a day in Finland (ADR-024 §5): that
+    // day, read in Finland's zone, so a phone abroad names the same one.
+    // Without a day the plain sentence, as an older API sends it.
+    if (failure.code === "auth_suspended" && valid) {
+      return t("signIn.error.auth_suspended_until", {
+        date: formatDate(locale, day, { timeZone: "Europe/Helsinki" }),
       });
     }
     return t(REFUSALS.get(failure.code) ?? "signIn.error.generic");

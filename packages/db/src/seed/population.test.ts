@@ -416,6 +416,92 @@ describe("writing the population", () => {
     });
   });
 
+  it("takes a person's sanctions with them, an open ban that outlived an erasure too, and nobody else's", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      const at = new Date("2026-10-16T09:00:00Z");
+      const count = async (sql: string) =>
+        Number((await pool.query<{ n: string }>(sql)).rows[0]?.n);
+      const accountOf = async (subject: string) => {
+        const { rows } = await pool.query<{ id: string; identity_id: string }>(
+          `SELECT a.id, a.identity_id FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject = $1`,
+          [subject],
+        );
+        const row = rows[0];
+        if (!row) throw new Error(`no account of ${subject}`);
+        return row;
+      };
+      const sanction = (
+        of: { id: string; identity_id: string },
+        kind: string,
+        extra: { endsAt?: Date; liftedAt?: Date; createdBy?: string } = {},
+      ) =>
+        pool.query(
+          `INSERT INTO sanction (identity_id, account_id, kind, reason, note, ends_at, created_by, created_at, lifted_at)
+           VALUES ($1, $2, $3::sanction_kind, 'harassment', 'A test note.', $4, $5, $6, $7)`,
+          [
+            of.identity_id,
+            of.id,
+            kind,
+            extra.endsAt ?? null,
+            extra.createdBy ?? null,
+            at,
+            extra.liftedAt ?? null,
+          ],
+        );
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        await writePopulation(pool, generatePopulation({ size: 40 }), VERSIONS);
+
+        // Somebody the seed made, a member of staff to the sanctions below, and sanctioned too.
+        const { rows: seeded } = await pool.query<{ id: string; identity_id: string }>(
+          `SELECT a.id, a.identity_id FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject IS NULL OR i.broker_subject NOT LIKE $1 LIMIT 1`,
+          [`${DEMO_SUBJECT_PREFIX}%`],
+        );
+        const staff = seeded[0];
+        if (!staff) throw new Error("the seed made no account");
+        await sanction(staff, "warn");
+
+        // A live person with a warning by staff and a shadow ban lifted.
+        const live = await accountOf(`${DEMO_SUBJECT_PREFIX}demo-0001`);
+        await sanction(live, "warn", { createdBy: staff.identity_id });
+        await sanction(live, "shadow_ban", { liftedAt: at, createdBy: staff.identity_id });
+        // An erased one, as the erasure leaves it: a tombstone, and the open
+        // ban and suspension that carry the identity's standing (ADR-024 §8).
+        const erased = await accountOf(`${DEMO_SUBJECT_PREFIX}demo-0002`);
+        await sanction(erased, "ban");
+        await sanction(erased, "suspend", { endsAt: new Date("2026-11-01T22:00:00Z") });
+        await pool.query(
+          `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
+             birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL
+           WHERE id = $1`,
+          [erased.id, at],
+        );
+        await pool.query("UPDATE identity SET standing = 'banned' WHERE id = $1", [
+          erased.identity_id,
+        ]);
+        expect(await count("SELECT count(*) AS n FROM sanction")).toBe(5);
+
+        expect(await removePopulation(pool)).toEqual({ removed: 40, spared: 0 });
+        // The seed's own row stays, and nothing of the forty.
+        const { rows: left } = await pool.query(
+          "SELECT account_id, kind, created_by FROM sanction",
+        );
+        expect(left).toEqual([{ account_id: staff.id, kind: "warn", created_by: null }]);
+        expect(
+          await count(
+            `SELECT count(*) AS n FROM identity WHERE broker_subject LIKE '${DEMO_SUBJECT_PREFIX}%'`,
+          ),
+        ).toBe(0);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   it("refuses anybody who is not synthetic, and a pond the seed has not made", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });

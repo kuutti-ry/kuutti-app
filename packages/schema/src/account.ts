@@ -8,6 +8,7 @@ import { Photo, PhotoCheckKind, PhotoRejectionReason, PhotoVariant } from "./med
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ResearchExport } from "./research.ts";
+import { ExportedSanction } from "./sanction.ts";
 
 /**
  * The account's own lifecycle (#51, TD-7): deletion per the erasure table and
@@ -184,6 +185,8 @@ export const AccountExport = z
     exports: z.array(z.object({ at: z.iso.datetime() })).max(1000),
     /** What the person sent as feedback (#171), newest first, at most 1000, with whether a moderator has read it. */
     feedback: z.array(ExportedFeedback).max(1000),
+    /** The sanctions on the person (#307, ADR-024 §8), newest first, at most 1000; never who and never staff's note. */
+    sanctions: z.array(ExportedSanction).max(1000),
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.25.0",
+    "version": "0.26.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -290,6 +290,13 @@
               "$ref": "#/components/schemas/ExportedFeedback"
             },
             "maxItems": 1000
+          },
+          "sanctions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedSanction"
+            },
+            "maxItems": 1000
           }
         },
         "required": [
@@ -309,7 +316,8 @@
           "research",
           "gate",
           "exports",
-          "feedback"
+          "feedback",
+          "sanctions"
         ]
       },
       "Gender": {
@@ -1459,6 +1467,71 @@
           "ios",
           "android",
           "web"
+        ]
+      },
+      "ExportedSanction": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SanctionKind"
+          },
+          "kindInWords": {
+            "type": "string"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "reasonInWords": {
+            "type": "string"
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "liftedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "lookedAtAgain": {
+            "type": "boolean",
+            "description": "Whether a second member of staff reviewed it."
+          }
+        },
+        "required": [
+          "kind",
+          "kindInWords",
+          "reason",
+          "reasonInWords",
+          "appliedAt",
+          "endsAt",
+          "liftedAt",
+          "lookedAtAgain"
+        ]
+      },
+      "SanctionKind": {
+        "type": "string",
+        "enum": [
+          "warn",
+          "shadow_ban",
+          "suspend",
+          "ban"
+        ]
+      },
+      "SanctionReason": {
+        "type": "string",
+        "enum": [
+          "harassment",
+          "misrepresentation",
+          "under_age",
+          "commercial_use",
+          "scraping",
+          "other"
         ]
       },
       "HealthResponse": {
@@ -2944,6 +3017,222 @@
           "handledAt"
         ]
       },
+      "SanctionList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Sanction"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "Sanction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SanctionKind"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "endsAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "liftedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "liftedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "reviewNote": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "reviewedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "accountId",
+          "kind",
+          "reason",
+          "note",
+          "endsAt",
+          "createdBy",
+          "createdAt",
+          "liftedAt",
+          "liftedBy",
+          "reviewNote",
+          "reviewedBy",
+          "reviewedAt"
+        ]
+      },
+      "SanctionRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "warn"
+                ]
+              },
+              "reason": {
+                "$ref": "#/components/schemas/SanctionReason"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "kind",
+              "reason",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "shadow_ban"
+                ]
+              },
+              "reason": {
+                "$ref": "#/components/schemas/SanctionReason"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              }
+            },
+            "required": [
+              "kind",
+              "reason",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "suspend"
+                ]
+              },
+              "reason": {
+                "$ref": "#/components/schemas/SanctionReason"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "endsOn": {
+                "type": "string",
+                "format": "date"
+              }
+            },
+            "required": [
+              "kind",
+              "reason",
+              "note",
+              "endsOn"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "BanRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "SanctionReviewRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "lift"
+            ]
+          }
+        },
+        "required": [
+          "note",
+          "outcome"
+        ],
+        "additionalProperties": false
+      },
       "GateResponse": {
         "type": "object",
         "properties": {
@@ -3314,7 +3603,7 @@
         ],
         "responses": {
           "302": {
-            "description": "Redirect to kuutti://auth?code=… on success, or to kuutti://auth?error=<code> (auth_state_mismatch, auth_cancelled, auth_under_18, auth_banned, auth_suspended, auth_cooldown with &until=<date>, auth_provider_error) so the app shows the refusal."
+            "description": "Redirect to kuutti://auth?code=… on success, or to kuutti://auth?error=<code> (auth_state_mismatch, auth_cancelled, auth_under_18, auth_banned, auth_suspended with &until=<date> when the suspension has an end, auth_cooldown with &until=<date>, auth_provider_error) so the app shows the refusal."
           }
         }
       }
@@ -5284,6 +5573,622 @@
           },
           "409": {
             "description": "feedback_handled: already marked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/accounts/{id}/sanctions": {
+      "get": {
+        "summary": "A person's sanctions",
+        "description": "Newest first: the account's own and the identity's bans set on any of its accounts, with staff's notes and who did what by identity id.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sanctions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SanctionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Warn, shadow-ban or suspend a person",
+        "description": "A reason from the closed list and a note of at most 500 characters; a suspension also its end, a day after today in Finland and at most 366 days ahead. A suspension ends every session. A ban is POST /admin/accounts/{id}/bans, for admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SanctionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed, or ends_on_invalid: the end is not after today or too far ahead.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "account_deleted: only a ban binds an erased account; staff_target: a member of staff loses the role first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/accounts/{id}/bans": {
+      "post": {
+        "summary": "Ban a person",
+        "description": "Admins only. On the identity, for good until an admin lifts it: every session ends, the bank login is refused, and no new account is possible. An erased account's identity can be banned too.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Banned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "staff_target: a member of staff loses the role first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/sanctions/{id}/lift": {
+      "post": {
+        "summary": "Lift a warning, a shadow ban or a suspension",
+        "description": "The account is settled from what is still open; no session comes back, the person signs in again. Written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lifted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such sanction here (a ban is lifted on its own route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "sanction_lifted: already lifted; own_account: nobody lifts a sanction on themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/sanctions/{id}/review": {
+      "post": {
+        "summary": "Look at a sanction again",
+        "description": "A second member of staff's note, and keep or lift. Somebody other than who applied it; once. Written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SanctionReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Looked at.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such sanction here (a ban is reviewed on its own route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "own_sanction: applied by the same person; own_account: a sanction on the reviewer; sanction_reviewed: looked at already; sanction_lifted: a lift of a lifted one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/bans/{id}/lift": {
+      "post": {
+        "summary": "Lift a ban",
+        "description": "The account is settled from what is still open; no session comes back, the person signs in again. Written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lifted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ban.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "sanction_lifted: already lifted; own_account: nobody lifts a sanction on themselves.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/bans/{id}/review": {
+      "post": {
+        "summary": "Look at a ban again",
+        "description": "A second member of staff's note, and keep or lift. Somebody other than who applied it; once. Written to audit_log.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SanctionReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Looked at.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sanction"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ban.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "own_sanction: applied by the same person; own_account: a sanction on the reviewer; sanction_reviewed: looked at already; sanction_lifted: a lift of a lifted one.",
             "content": {
               "application/json": {
                 "schema": {

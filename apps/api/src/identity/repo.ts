@@ -31,6 +31,7 @@ const identityFrom = (r: Row): Identity => ({
   deletionCount: r.deletion_count as number,
   reregisterAfter: (r.reregister_after as Date | null) ?? null,
   refusedAttempts: r.refused_attempts as number,
+  suspensionEndsAt: (r.suspension_ends_at as Date | null) ?? null,
   createdAt: r.created_at as Date,
 });
 
@@ -40,6 +41,7 @@ const accountFrom = (r: Row): Account => ({
   state: r.state as Account["state"],
   stateChangedAt: (r.state_changed_at as Date | null) ?? null,
   pausedFrom: (r.paused_from as Account["pausedFrom"]) ?? null,
+  sanctionedFrom: (r.sanctioned_from as Account["sanctionedFrom"]) ?? null,
   birthYear: (r.birth_year as number | null) ?? null,
   birthMonth: (r.birth_month as number | null) ?? null,
   gender: (r.gender as Account["gender"]) ?? null,
@@ -244,7 +246,13 @@ const sessionFrom = (r: Row): SessionRow => ({
 
 const SESSION_COLUMNS = "id, account_id, platform, user_agent, created_at, expires_at, revoked_at";
 
-/** Null when the account is no longer live: a login that outlived the erasure gets no session (#51). */
+/**
+ * Null when the account is no longer live: a login that outlived the erasure
+ * gets no session (#51), and neither does one that a sanction or a break
+ * overtook (ADR-024 §4). The guard's own rule, under the account row's share
+ * lock: a sanction committing first is seen here, and one committing after
+ * waits for this insert and revokes it.
+ */
 export async function insertSession(
   db: Queryable,
   input: {
@@ -261,7 +269,11 @@ export async function insertSession(
   const { rows } = await db.query<Row>(
     `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, expires_at, created_at, last_used_at)
      SELECT $1, $2, $3, $4, $5, $6, $7, $8, $8
-     WHERE EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted')
+     WHERE EXISTS (
+       SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
+       WHERE a.id = $1 AND i.standing = 'ok'
+         AND a.state IN ('registered', 'active', 'paused', 'shadow_banned')
+       FOR SHARE OF a)
      RETURNING ${SESSION_COLUMNS}`,
     [
       input.accountId,
@@ -474,18 +486,25 @@ const adminSessionFrom = (r: Row): AdminSessionRow => ({
   revokedAt: (r.revoked_at as Date | null) ?? null,
 });
 
+/**
+ * A panel session, only for an identity in good standing, under the identity
+ * row's share lock (ADR-024 §4): a sanction committing first is seen here,
+ * and one committing after waits for this insert and revokes it, so a login
+ * that raced a suspension leaves nothing a lift would revive. Null otherwise.
+ */
 export async function insertAdminSession(
   db: Queryable,
   input: { identityId: string; role: ModeratorRole; accessHash: string; expiresAt: Date; at: Date },
-): Promise<AdminSessionRow> {
+): Promise<AdminSessionRow | null> {
   const { rows } = await db.query<Row>(
     `INSERT INTO admin_session (identity_id, role, access_hash, expires_at, created_at, last_used_at)
-     VALUES ($1, $2, $3, $4, $5, $5) RETURNING id, identity_id, role, expires_at, revoked_at`,
+     SELECT $1, $2, $3, $4, $5, $5
+     WHERE EXISTS (SELECT 1 FROM identity WHERE id = $1 AND standing = 'ok' FOR SHARE)
+     RETURNING id, identity_id, role, expires_at, revoked_at`,
     [input.identityId, input.role, input.accessHash, input.expiresAt, input.at],
   );
   const row = rows[0];
-  if (!row) throw new Error("admin_session insert returned no row");
-  return adminSessionFrom(row);
+  return row ? adminSessionFrom(row) : null;
 }
 
 /** The admin guard's lookup: the session with the identity's standing and its current role. */
@@ -617,7 +636,7 @@ export async function tombstoneAccount(
   const result = await db.query(
     `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
        birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL,
-       gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL
+       gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL, sanctioned_from = NULL
      WHERE id = $1 AND state <> 'deleted'`,
     [accountId, at],
   );
@@ -729,17 +748,31 @@ export async function setEmail(
   return result.rowCount === 1;
 }
 
-/** registered becomes active once (the onboarding rule decides when); nothing else changes here. */
+/**
+ * registered becomes active once (the onboarding rule decides when); nothing
+ * else changes here. A shadow ban set while the account was still registered
+ * is honoured now (ADR-024 §2). The row's lock comes first and the decision
+ * in a statement of its own: a subquery inside the UPDATE would read the
+ * statement's snapshot and miss a ban that committed while it waited.
+ */
 export async function activateAccount(
   db: Queryable,
   accountId: string,
   at: Date,
 ): Promise<boolean> {
-  const result = await db.query(
-    "UPDATE account SET state = 'active', state_changed_at = $2 WHERE id = $1 AND state = 'registered'",
-    [accountId, at],
-  );
-  return result.rowCount === 1;
+  return transaction(db, async (tx) => {
+    await tx.query("SELECT 1 FROM account WHERE id = $1 FOR UPDATE", [accountId]);
+    const result = await tx.query(
+      `UPDATE account SET state_changed_at = $2,
+         state = CASE WHEN EXISTS (
+           SELECT 1 FROM sanction s
+           WHERE s.account_id = $1 AND s.kind = 'shadow_ban' AND s.lifted_at IS NULL)
+         THEN 'shadow_banned'::account_state ELSE 'active'::account_state END
+       WHERE id = $1 AND state = 'registered'`,
+      [accountId, at],
+    );
+    return result.rowCount === 1;
+  });
 }
 
 export type ConsentRow = {

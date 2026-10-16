@@ -10,9 +10,10 @@ Feature: Re-registration after deletion or ban
     And the refused attempt is recorded on the identity
 
   Scenario: A suspended identity waits
-    Given identity "A" has standing "suspended"
+    Given identity "A" has standing "suspended" until the start of 22.10.2026 in Finland
     When "A" authenticates with their bank
     Then no account is created
+    And the refusal names the instant the suspension ends
 
   Scenario Outline: Deletion cooldown
     Given identity "A" deleted their account <days> days ago

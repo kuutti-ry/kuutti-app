@@ -695,3 +695,37 @@ describe("onboarding and consents: the quiet branches", () => {
     ).toEqual([]);
   });
 });
+
+describe("onboarding: what a sanctioned person reads (#307, ADR-024 §7)", () => {
+  test("The onboarding status of a shadow-banned account says active and changes nothing", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    const changed = new Date("2026-10-01T08:30:00Z");
+    await ctx.client.query(
+      "UPDATE account SET state = 'shadow_banned', state_changed_at = $2 WHERE id = $1",
+      [a.accountId, changed],
+    );
+    const res = await app.request("/onboarding", { headers: a.headers });
+    expect(res.status).toBe(200);
+    expect(OnboardingStatus.parse(await res.json()).state).toBe("active");
+    // The read hides the ban; it neither lifts it nor moves the date.
+    const { rows } = await ctx.client.query(
+      "SELECT state, state_changed_at FROM account WHERE id = $1",
+      [a.accountId],
+    );
+    expect(rows).toEqual([{ state: "shadow_banned", state_changed_at: changed }]);
+  });
+
+  test("The onboarding status of a paused account still says paused", async ({ ctx }) => {
+    // Only a shadow ban is read as something else; a break is the person's own.
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client, "a");
+    await ctx.client.query(
+      "UPDATE account SET state = 'paused', paused_from = 'shadow_banned' WHERE id = $1",
+      [a.accountId],
+    );
+    expect((await status(app, a.headers)).state).toBe("paused");
+  });
+});

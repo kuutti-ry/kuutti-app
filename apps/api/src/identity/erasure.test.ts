@@ -1,5 +1,5 @@
 import { accountState, identityStanding } from "@kuutti/db";
-import { AccountState, IdentityStanding, Photo } from "@kuutti/schema";
+import { AccountExport, AccountState, IdentityStanding, Photo } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { objectKey } from "../media/index.ts";
@@ -740,5 +740,154 @@ describe("account erasure and export: what the verification of 08/10 found (#51)
     });
     expect(body.account.stateChangedAt).toBe(changed.toISOString());
     expect(body.sessions.map((s) => s.userAgent)).toEqual(["Kuutti/0.12 (iPhone; iOS 19)"]);
+  });
+});
+
+describe("the sanctions in erasure and export (#307, ADR-024 §8)", () => {
+  const T = new Date("2026-10-20T09:00:00Z");
+  const HOUR = 60 * 60 * 1000;
+  const after = (hours: number) => new Date(T.getTime() + hours * HOUR);
+
+  test("The sanctions go with the account, except the open bans and suspensions, and the export lists them without who", async ({
+    ctx,
+  }) => {
+    let clock = T;
+    const { app, logs } = await appWith(ctx, { media: false, now: () => clock });
+    const a = await signedInAccount(ctx.client, "a");
+    const b = await signedInAccount(ctx.client, "b");
+    const m = await staffSession(ctx.client, "moderator", "m");
+    const n = await staffSession(ctx.client, "moderator", "n");
+    const d = await staffSession(ctx.client, "admin", "d");
+    const post = async (
+      staff: { headers: Record<string, string> },
+      path: string,
+      body?: unknown,
+    ): Promise<{ id: string }> => {
+      const res = await app.request(path, {
+        method: "POST",
+        headers: { ...staff.headers, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      expect(res.status, path).toBeLessThan(300);
+      return (await res.json()) as { id: string };
+    };
+    const notes = {
+      warn: "Wrote something unkind to a person who reported it",
+      suspend: "Advertised a paid service in three chats",
+      review: "Read the chats again: one advert, lifting early",
+      ban: "A second identity's photos on this profile",
+      other: "Copied profiles, by the panel's count",
+    };
+
+    // A lifted warning, a suspension lifted on review by somebody else, and an open ban.
+    const warning = await post(m, `/admin/accounts/${a.accountId}/sanctions`, {
+      kind: "warn",
+      reason: "harassment",
+      note: notes.warn,
+    });
+    await post(m, `/admin/accounts/${b.accountId}/sanctions`, {
+      kind: "warn",
+      reason: "scraping",
+      note: notes.other,
+    });
+    clock = after(1);
+    await post(m, `/admin/sanctions/${warning.id}/lift`);
+    clock = after(2);
+    const suspension = await post(m, `/admin/accounts/${a.accountId}/sanctions`, {
+      kind: "suspend",
+      reason: "commercial_use",
+      note: notes.suspend,
+      endsOn: "2026-10-22",
+    });
+    clock = after(3);
+    await post(n, `/admin/sanctions/${suspension.id}/review`, {
+      note: notes.review,
+      outcome: "lift",
+    });
+    clock = after(4);
+    const ban = await post(d, `/admin/accounts/${a.accountId}/bans`, {
+      reason: "misrepresentation",
+      note: notes.ban,
+    });
+    clock = after(5);
+
+    // The ban ended A's sessions, so the export and the erasure are called as their routes call them.
+    const { logger, lines } = await captureLogger();
+    const deps = { db: ctx.client, logger, now: () => clock, version: "0.0.0-test" };
+    const { document } = await exportAccount(deps, a.accountId, englishT);
+    expect(document.sanctions).toEqual([
+      {
+        kind: "ban",
+        kindInWords: "Banned from Kuutti",
+        reason: "misrepresentation",
+        reasonInWords: "Pretending to be someone else, or telling untruths about oneself",
+        appliedAt: after(4).toISOString(),
+        endsAt: null,
+        liftedAt: null,
+        lookedAtAgain: false,
+      },
+      {
+        kind: "suspend",
+        kindInWords: "Suspended until a set day",
+        reason: "commercial_use",
+        reasonInWords: "Selling or advertising",
+        appliedAt: after(2).toISOString(),
+        // The start of 22.10.2026 in Finland, summer time.
+        endsAt: "2026-10-21T21:00:00.000Z",
+        liftedAt: after(3).toISOString(),
+        lookedAtAgain: true,
+      },
+      {
+        kind: "warn",
+        kindInWords: "A warning",
+        reason: "harassment",
+        reasonInWords: "Harassment",
+        appliedAt: T.toISOString(),
+        endsAt: null,
+        liftedAt: after(1).toISOString(),
+        lookedAtAgain: false,
+      },
+    ]);
+    expect(AccountExport.safeParse(document).success).toBe(true);
+    const text = JSON.stringify(document);
+    for (const who of [m.identityId, n.identityId, d.identityId, b.accountId]) {
+      expect(text).not.toContain(who);
+    }
+    for (const words of Object.values(notes)) expect(text).not.toContain(words);
+    expect(text).not.toMatch(/createdBy|liftedBy|reviewedBy|reviewNote|"note"/);
+
+    const audited = () =>
+      count(ctx, "SELECT count(*) AS n FROM audit_log WHERE subject_id = $1", [a.accountId]);
+    expect(await audited()).toBe(5);
+    const summary = await eraseAccount(deps, a.accountId);
+    expect(summary.sanctions).toBe(2);
+    expect(lines().find((l) => l.msg === "account erased")).toMatchObject({ sanctions: 2 });
+
+    const { rows: kept } = await ctx.client.query<{
+      id: string;
+      kind: string;
+      account_id: string;
+      lifted_at: Date | null;
+      standing: string;
+    }>(
+      `SELECT s.id, s.kind, s.account_id, s.lifted_at, i.standing
+       FROM sanction s JOIN identity i ON i.id = s.identity_id
+       WHERE s.identity_id = (SELECT identity_id FROM account WHERE id = $1)`,
+      [a.accountId],
+    );
+    expect(kept).toEqual([
+      { id: ban.id, kind: "ban", account_id: a.accountId, lifted_at: null, standing: "banned" },
+    ]);
+    const { rows: theirs } = await ctx.client.query(
+      "SELECT kind, reason, note, lifted_at FROM sanction WHERE account_id = $1",
+      [b.accountId],
+    );
+    expect(theirs).toEqual([
+      { kind: "warn", reason: "scraping", note: notes.other, lifted_at: null },
+    ]);
+    // The history stays in the audit log (ADR-024 §8), and no log line of it all carries a note.
+    expect(await audited()).toBe(5);
+    const logged = JSON.stringify([...logs(), ...lines()]);
+    for (const words of Object.values(notes)) expect(logged).not.toContain(words);
   });
 });

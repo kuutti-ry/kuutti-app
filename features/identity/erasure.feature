@@ -114,3 +114,9 @@ Feature: Account deletion per the erasure table
     Given "A" deleted once, was refused twice inside the cooldown, and came back on a device that named itself
     When "A" exports the account
     Then the export says so, field by field
+
+  Scenario: The sanctions go with the account, except the open bans and suspensions, and the export lists them without who
+    Given "A" has a lifted warning, a lifted suspension and an open ban, and "B" has a warning
+    When "A" exports their data and then is erased
+    Then the export lists A's sanctions with kind, reason and dates, never who and never the note
+    And only A's open ban remains, on the identity, and B's warning is untouched

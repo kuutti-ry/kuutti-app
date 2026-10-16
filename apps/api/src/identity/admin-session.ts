@@ -110,13 +110,15 @@ export async function exchangeAdminCode(
   if (!role) throw new AppError(403, "admin_not_allowed", "The role is gone");
   const accessToken = randomBytes(32).toString("base64url");
   const expiresAt = new Date(now.getTime() + ADMIN_SESSION_TTL_MS);
-  await repo.insertAdminSession(deps.db, {
+  const session = await repo.insertAdminSession(deps.db, {
     identityId: request.identityId,
     role,
     accessHash: hashToken(accessToken),
     expiresAt,
     at: now,
   });
+  // A suspension or a ban that landed between the bank and the exchange (ADR-024 §4).
+  if (!session) throw new AppError(403, "admin_not_allowed", "The standing changed");
   return { accessToken, expiresAt: expiresAt.toISOString(), role };
 }
 

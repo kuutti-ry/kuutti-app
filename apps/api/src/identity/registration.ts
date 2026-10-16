@@ -15,13 +15,15 @@ export type RegistrationDecision =
   | { kind: "create_identity" }
   | { kind: "create_account"; identityId: string }
   | { kind: "resume"; account: Account }
-  | { kind: "refuse"; reason: "banned" | "suspended" }
+  | { kind: "refuse"; reason: "banned" }
+  | { kind: "refuse"; reason: "suspended"; until: Date | null }
   | { kind: "refuse"; reason: "cooldown"; until: Date };
 
 /**
  * The re-registration rule of features/identity/re-registration.feature,
- * pure: a banned or suspended identity is refused whatever it does; an
- * identity inside its cooldown is refused with the date; an identity with a
+ * pure: a banned or suspended identity is refused whatever it does, a
+ * suspended one with the day its suspension ends when the identity has one
+ * (ADR-024 §5); an identity inside its cooldown is refused with the date; an identity with a
  * live account resumes it; anything else gets a fresh account with nothing
  * restored. A person the database has never seen gets an identity first.
  */
@@ -33,7 +35,9 @@ export function decideRegistration(input: {
   const { identity, liveAccount, now } = input;
   if (identity === null) return { kind: "create_identity" };
   if (identity.standing === "banned") return { kind: "refuse", reason: "banned" };
-  if (identity.standing === "suspended") return { kind: "refuse", reason: "suspended" };
+  if (identity.standing === "suspended") {
+    return { kind: "refuse", reason: "suspended", until: identity.suspensionEndsAt };
+  }
   if (liveAccount !== null) return { kind: "resume", account: liveAccount };
   if (identity.reregisterAfter !== null && now.getTime() < identity.reregisterAfter.getTime()) {
     return { kind: "refuse", reason: "cooldown", until: identity.reregisterAfter };

@@ -3147,6 +3147,13 @@ signIn.error.auth_suspended:
   sv: Det här kontot är tills vidare avstängt.
   machine: { fi: true, sv: true }
 
+signIn.error.auth_suspended_until:
+  en: "This account is suspended. You can sign in again from: {date}"
+  description: "Sign-in screen, the identity is suspended until a day (#307, ADR-024 §5); {date} is the first day the person may sign in again, formatted in Finland's time zone (after a colon, so no language inflects it). Without a valid day the screen says signIn.error.auth_suspended instead."
+  fi: "Tämä tili on jäädytetty. Voit kirjautua taas sisään alkaen: {date}"
+  sv: "Det här kontot är avstängt. Du kan logga in igen från och med: {date}"
+  machine: { fi: true, sv: true }
+
 signIn.paused.title:
   en: "Your account is on a break"
   description: "Sign-in screen, card shown right after the person paused the account on this device (#170)."
@@ -5170,6 +5177,76 @@ account.export.photoCheck.about:
   description: "Inside the downloaded data file (#253), the text that opens the photo check part. Plain and calm: a person reads what the check holds about them; never accusing words (strike, flag, violation, offence, suspicious)."
   fi: "Kuutti tarkistaa jokaisen kuvan ennen kuin kukaan muu näkee sen. Alla ovat kuvasi, joita tarkistus ei näyttänyt muille viimeisten kahdentoista kuukauden aikana, ja mihin asti uudet kuvasi tarkistetaan hieman tarkemmin, jos tarkistetaan. Niistä ei seuraa mitään muuta, ja molemmat päättyvät itsestään."
   sv: "Kuutti granskar varje foto innan någon annan ser det. Nedan finns de av dina foton som granskningen inte visade för andra under de senaste tolv månaderna, och till när dina nya foton granskas lite noggrannare, om de gör det. Inget annat följer av dem, och båda upphör av sig själva."
+  machine: { fi: true, sv: true }
+
+account.export.sanction.kind.warn:
+  en: "A warning"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), what kind of sanction an entry is: a warning from a moderator; nothing else followed from it."
+  fi: "Varoitus"
+  sv: "En varning"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.kind.shadow_ban:
+  en: "Hidden from others for a while"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), what kind of sanction an entry is: a shadow ban, said plainly; listed only once it has been lifted."
+  fi: "Piilotettu muilta joksikin aikaa"
+  sv: "Dold för andra en tid"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.kind.suspend:
+  en: "Suspended until a set day"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), what kind of sanction an entry is: a suspension; the day is in the entry's endsAt."
+  fi: "Jäädytetty tiettyyn päivään asti"
+  sv: "Avstängd till en viss dag"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.kind.ban:
+  en: "Banned from Kuutti"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), what kind of sanction an entry is: a ban on the person, which keeps them out until it is lifted."
+  fi: "Estetty Kuutista"
+  sv: "Avstängd från Kuutti för gott"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.reason.harassment:
+  en: "Harassment"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), the reason staff chose for a sanction from the closed list (harassment)."
+  fi: "Häirintä"
+  sv: "Trakasserier"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.reason.misrepresentation:
+  en: "Pretending to be someone else, or telling untruths about oneself"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), the reason staff chose for a sanction from the closed list (misrepresentation)."
+  fi: "Esiintyminen toisena tai valheelliset tiedot itsestä"
+  sv: "Att utge sig för att vara någon annan eller ge osanna uppgifter om sig själv"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.reason.under_age:
+  en: "Under 18"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), the reason staff chose for a sanction from the closed list (under_age)."
+  fi: "Alle 18-vuotias"
+  sv: "Under 18 år"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.reason.commercial_use:
+  en: "Selling or advertising"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), the reason staff chose for a sanction from the closed list (commercial_use)."
+  fi: "Myynti tai mainonta"
+  sv: "Försäljning eller reklam"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.reason.scraping:
+  en: "Copying or collecting other people's profiles"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), the reason staff chose for a sanction from the closed list (scraping)."
+  fi: "Muiden profiilien kopiointi tai kerääminen"
+  sv: "Kopiering eller insamling av andras profiler"
+  machine: { fi: true, sv: true }
+
+account.export.sanction.reason.other:
+  en: "Another reason"
+  description: "Inside the downloaded data file (#307, ADR-024 §8), the reason staff chose for a sanction from the closed list (other)."
+  fi: "Muu syy"
+  sv: "Annat skäl"
   machine: { fi: true, sv: true }
 
 account.export.photoCheck.reason.nudity:

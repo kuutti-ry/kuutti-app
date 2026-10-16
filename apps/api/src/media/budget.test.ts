@@ -7,7 +7,7 @@ import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixturePng, testMediaDeps } from "../test/media.ts";
 import { dayWindow, localYearMonth, secondsUntil } from "./budget.ts";
-import { insertPhoto, insertPhotoAccess, recordCardServed } from "./repo.ts";
+import { findVisiblePhoto, insertPhoto, insertPhotoAccess, recordCardServed } from "./repo.ts";
 
 // The exposure budget and the shown-record rule (#52, TD-6, ADR-008),
 // features/safety/exposure.feature. Photos are uploaded through the API so
@@ -211,6 +211,48 @@ describe("A photo held back by moderation is not served from a shown card", () =
     expect(await accessRows(ctx, a.accountId)).toBe(0);
     // The owner still sees their own photo, to replace it or to read why.
     expect((await fetchUrl(app, b.headers, theirs.id, "card")).status).toBe(200);
+  });
+});
+
+describe("A photo of an owner who is not active is not served from a shown card", () => {
+  // The card's rule (ADR-009 §6) holds for the URL too (ADR-024 §6): a
+  // sanctioned or paused owner's photos stop for everyone they were shown to,
+  // at once, and come back with a lift, since nothing was deleted. The owner
+  // still reads their own; a suspended or banned owner only past the guard,
+  // which already refuses their sessions.
+  test.for([
+    ["shadow_banned", true],
+    ["suspended", false],
+    ["banned", false],
+    ["paused", true],
+  ] as const)("%s", async ([state, ownerPassesGuard], { ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const viewer = await signedInAccount(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const theirs = await upload(app, owner.headers, await fixturePng(64, 64));
+    await approve(ctx, theirs.id);
+    await showCard(ctx, viewer.accountId, owner.accountId, [theirs.id]);
+    await ctx.client.query("UPDATE account SET state = $2 WHERE id = $1", [owner.accountId, state]);
+
+    expect((await fetchUrl(app, viewer.headers, theirs.id, "card")).status).toBe(404);
+    expect((await fetchUrl(app, viewer.headers, theirs.id, "full")).status).toBe(404);
+    expect(await accessRows(ctx, viewer.accountId)).toBe(0);
+    expect(logs().find((l) => l.msg === "photo refused")).toMatchObject({
+      accountId: viewer.accountId,
+      photoId: theirs.id,
+      reason: "not_visible",
+    });
+    expect(await findVisiblePhoto(ctx.client, owner.accountId, theirs.id)).toMatchObject({
+      id: theirs.id,
+    });
+    if (ownerPassesGuard) {
+      expect((await fetchUrl(app, owner.headers, theirs.id, "card")).status).toBe(200);
+    }
+
+    // The lift: the same shown record serves the photo again.
+    await ctx.client.query("UPDATE account SET state = 'active' WHERE id = $1", [owner.accountId]);
+    expect((await fetchUrl(app, viewer.headers, theirs.id, "card")).status).toBe(200);
+    expect(await accessRows(ctx, viewer.accountId)).toBe(1);
   });
 });
 

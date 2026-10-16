@@ -6,6 +6,8 @@ import {
   PHOTO_VARIANTS,
   PhotoRejectionReason,
   PhotoState,
+  SanctionKind,
+  SanctionReason,
 } from "@kuutti/schema";
 import { is } from "drizzle-orm";
 import { getTableConfig, isPgEnum, PgTable } from "drizzle-orm/pg-core";
@@ -47,6 +49,7 @@ describe("the tables", () => {
       "preferences",
       "profile",
       "research_subject",
+      "sanction",
       "session",
       "waitlist_snapshot",
     ]);
@@ -124,6 +127,7 @@ describe("the foreign keys", () => {
       "preferences",
       "profile",
       "research_subject",
+      "sanction",
       "session",
     ]);
     const toIdentity = references
@@ -137,6 +141,10 @@ describe("the foreign keys", () => {
       "feedback.handled_by",
       "moderator_roles.identity_id",
       "photo_review.decided_by",
+      "sanction.created_by",
+      "sanction.identity_id",
+      "sanction.lifted_by",
+      "sanction.reviewed_by",
     ]);
   });
 
@@ -152,6 +160,16 @@ describe("the foreign keys", () => {
     ).toEqual([
       "photo_check_note.account_id -> account.id no action",
       "photo_check_note.photo_id -> photo.id set null",
+    ]);
+  });
+
+  it("hang a sanction on the account and the identity, and every member of staff on it by identity, none of them cascading (#307)", () => {
+    expect(references.filter((reference) => reference.startsWith("sanction.")).sort()).toEqual([
+      "sanction.account_id -> account.id no action",
+      "sanction.created_by -> identity.id no action",
+      "sanction.identity_id -> identity.id no action",
+      "sanction.lifted_by -> identity.id no action",
+      "sanction.reviewed_by -> identity.id no action",
     ]);
   });
 
@@ -192,9 +210,32 @@ describe("the indexes", () => {
     ["auth_request", "auth_request_expires_at_idx", ["expires_at"]],
     ["photo_review", "photo_review_decision_idx", ["decision", "checked_at"]],
     ["photo_check_note", "photo_check_note_account_at_idx", ["account_id", "at"]],
+    ["sanction", "sanction_account_created_idx", ["account_id", "created_at"]],
+    ["sanction", "sanction_identity_open_idx", ["identity_id"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);
+  });
+
+  it("read only what is still open when settling a sanction (#307)", () => {
+    expect(index("sanction", "sanction_identity_open_idx")?.where).toBeDefined();
+    expect(index("sanction", "sanction_account_created_idx")?.where).toBeUndefined();
+  });
+});
+
+describe("the checks", () => {
+  it("hold a sanction's end, note, lift and review together in the database (#307, ADR-024 §1)", () => {
+    expect(
+      byName
+        .get("sanction")
+        ?.checks.map((check) => check.name)
+        .sort(),
+    ).toEqual([
+      "sanction_ends_at_check",
+      "sanction_lift_check",
+      "sanction_note_check",
+      "sanction_review_check",
+    ]);
   });
 });
 
@@ -211,6 +252,8 @@ describe("the enums", () => {
     expect(enums.photo_state).toEqual(PhotoState.options);
     expect(enums.photo_variant).toEqual([...PHOTO_VARIANTS]);
     expect(enums.photo_rejection_reason).toEqual(PhotoRejectionReason.options);
+    expect(enums.sanction_kind).toEqual(SanctionKind.options);
+    expect(enums.sanction_reason).toEqual(SanctionReason.options);
   });
 
   it("are all exported, so drizzle-kit generates them", () => {

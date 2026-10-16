@@ -41,8 +41,9 @@ export function requireAdmin(deps: {
   now?: () => Date;
 }): MiddlewareHandler<AppEnv> {
   const now = deps.now ?? (() => new Date());
-  // The function's name is what the route-table test looks for.
-  return async function requireAdmin(c, next) {
+  // The function's name is what the route-table test looks for, and the roles
+  // ride on it so the test can hold a route to the guard it needs (ADR-024 §3).
+  const guard: MiddlewareHandler<AppEnv> = async function requireAdmin(c, next) {
     const header = c.req.header("authorization") ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
     if (!TOKEN.test(token)) throw new AppError(401, "unauthenticated", "No admin token");
@@ -67,6 +68,7 @@ export function requireAdmin(deps: {
     await deps.store.touch(deps.db, found.sessionId, at);
     await next();
   };
+  return Object.assign(guard, { roles: deps.roles });
 }
 
 export type Staff = {

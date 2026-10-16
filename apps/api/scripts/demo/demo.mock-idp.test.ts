@@ -675,6 +675,12 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(await stateOf("helmi")).toEqual(["active"]);
     expect(await stateOf("onni")).toEqual(["registered"]);
     expect(await stateOf("tapio")).toEqual(["banned"]);
+    // His ban is a sanction row by nobody (ADR-024 §10): the panel lists it, an admin can lift it.
+    const { rows: bans } = await ctx.client.query<{ kind: string; created_by: string | null }>(
+      `SELECT s.kind, s.created_by FROM sanction s JOIN identity i ON i.id = s.identity_id
+       WHERE i.broker_subject = 'tapio'`,
+    );
+    expect(bans).toEqual([{ kind: "ban", created_by: null }]);
     expect(await stateOf("ilona")).toEqual(["deleted"]);
 
     const sanna = await as("sanna");
@@ -764,6 +770,8 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const personas = `broker_subject = ANY(ARRAY[${DEMO_PERSONAS.map((p) => `'${p.key}'`).join(",")}])`;
     // The seven with a history, Aino, and Aino's name at the other bank.
     expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(9);
+    // Tapio's ban, which his erasure keeps on the identity (ADR-024 §8).
+    expect(await count("SELECT count(*) AS n FROM sanction")).toBe(1);
 
     const result = await resetPersonas({ db: ctx.client, logger, now });
     // Eight identities of the mock bank; seven accounts were live (Ilona's was a tombstone
@@ -778,6 +786,7 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(
       await count("SELECT count(*) AS n FROM identity WHERE broker_subject = 'somebody'"),
     ).toBe(1);
+    expect(await count("SELECT count(*) AS n FROM sanction")).toBe(0);
 
     // Everybody is a newcomer again, the banned and the deleted included.
     for (const key of ["sanna", "tapio", "ilona", "aino"]) {

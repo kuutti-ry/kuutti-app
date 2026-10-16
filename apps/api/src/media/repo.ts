@@ -137,8 +137,10 @@ export async function insertPhoto(
 /**
  * The photo the caller may be issued a URL for (#52, TD-6): their own in any
  * state, or another account's approved photo on a card they were shown (the
- * card_shown row the card route of #47 writes). Both branches carry the
- * caller's account id (rule 6); there is no third.
+ * card_shown row the card route of #47 writes), while its owner is active: a
+ * shadow-banned, suspended, banned or paused owner's photos stop for everyone
+ * at once and come back with a lift (ADR-024 §6, the card's rule of ADR-009
+ * §6). Both branches carry the caller's account id (rule 6); there is no third.
  */
 export async function findVisiblePhoto(
   db: Queryable,
@@ -150,7 +152,8 @@ export async function findVisiblePhoto(
      WHERE id = $2
        AND (account_id = $1
          OR (state = 'approved'
-           AND EXISTS (SELECT 1 FROM card_shown WHERE account_id = $1 AND photo_id = photo.id)))`,
+           AND EXISTS (SELECT 1 FROM card_shown WHERE account_id = $1 AND photo_id = photo.id)
+           AND EXISTS (SELECT 1 FROM account owner WHERE owner.id = photo.account_id AND owner.state = 'active')))`,
     [accountId, photoId],
   );
   return rows[0] ? photoFrom(rows[0]) : null;

@@ -181,11 +181,16 @@ async function resolveAccount(
             until: decision.until.toISOString(),
           });
         }
-        throw new AppError(
-          403,
-          decision.reason === "banned" ? "auth_banned" : "auth_suspended",
-          "This person may not use Kuutti",
-        );
+        if (decision.reason === "suspended") {
+          // The day it ends travels to the app as &until=, as the cooldown's does (ADR-024 §5).
+          throw new AppError(
+            403,
+            "auth_suspended",
+            "This person may not use Kuutti for now",
+            decision.until ? { until: decision.until.toISOString() } : undefined,
+          );
+        }
+        throw new AppError(403, "auth_banned", "This person may not use Kuutti");
       }
       case "create_identity": {
         const created = await repo.insertIdentity(deps.db, {

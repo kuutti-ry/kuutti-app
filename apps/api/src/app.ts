@@ -35,7 +35,7 @@ import { preferencesRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { pondRoutes } from "./pond/index.ts";
 import { exportProfile, profileRoutes } from "./profile/index.ts";
-import { feedbackAdminRoutes, feedbackRoutes } from "./safety/index.ts";
+import { feedbackAdminRoutes, feedbackRoutes, sanctionAdminRoutes } from "./safety/index.ts";
 
 export type { AppEnv };
 
@@ -129,6 +129,8 @@ export function createApp(deps: Deps) {
     store: adminSessionStore,
     roles: ["moderator", "admin"],
   });
+  // A ban and its lift and review (#307, ADR-024 §3).
+  const admins = requireAdmin({ db: deps.db, store: adminSessionStore, roles: ["admin"] });
 
   app.route("/", healthRoutes(deps));
   app.route("/", authRoutes(deps, guard, anyStaff));
@@ -140,6 +142,7 @@ export function createApp(deps: Deps) {
   app.route("/", onboardingRoutes(deps, guard));
   app.route("/", feedbackRoutes(deps, guard));
   app.route("/", feedbackAdminRoutes(deps, moderators));
+  app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   // The gate's count reads across slices and lives with the jobs; the pond's route is handed it.
   app.route(
     "/",
