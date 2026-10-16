@@ -1,9 +1,9 @@
 {
   "name": "@kuutti/admin",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "private": true,
   "type": "module",
-  "description": "Moderation panel. Vite + React, static build behind CloudFront. Screens arrive with M4.",
+  "description": "Moderation panel. Vite + React, a static build behind CloudFront at admin.<domain>, previews under /pr-<n>/ (ADR-025).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -18,7 +18,8 @@
     "openapi-fetch": "^0.17.0",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "react-router": "8.4.0"
+    "react-router": "8.4.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",

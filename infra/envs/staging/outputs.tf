@@ -34,7 +34,7 @@ output "preview_database_document" {
 }
 
 output "api_url" {
-  description = "GitHub environment variable API_URL."
+  description = "GitHub environment variable API_URL; ADMIN_API_URL in the environment preview, since the panel's previews call this API (ADR-025 §6)."
   value       = "https://api.staging.${var.domain}"
 }
 
@@ -46,6 +46,21 @@ output "dokploy_url" {
 output "preview_api_domain" {
   description = "GitHub environment variable PREVIEW_API_DOMAIN (#9): previews answer on pr-<n>.<this>."
   value       = "preview.api.staging.${var.domain}"
+}
+
+output "admin_url" {
+  description = "GitHub environment variable ADMIN_URL, in the environments staging and preview: the moderation panel's host (#313, ADR-025)."
+  value       = module.admin.url
+}
+
+output "admin_bucket" {
+  description = "GitHub environment variable ADMIN_BUCKET, in the environments staging, preview and preview-cleanup (ADR-025 §5-§8)."
+  value       = module.admin.bucket
+}
+
+output "admin_distribution_id" {
+  description = "GitHub environment variable ADMIN_DISTRIBUTION_ID, in the environment staging: main's panel deploy invalidates it (ADR-025 §4)."
+  value       = module.admin.distribution_id
 }
 
 output "alerts_topic_arn" {

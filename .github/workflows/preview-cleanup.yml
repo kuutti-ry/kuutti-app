@@ -2,7 +2,8 @@ name: Preview cleanup
 
 # Removes previews nobody needs any more (#9, TD-2, TD-19, ADR-012): the Dokploy
 # application on the staging box, the EAS Hosting alias, the EAS Update branch,
-# and the database kuutti_pr_<n>, which only the box can reach. The database is
+# the panel's pr-<n>/ in the staging panel's bucket (ADR-025 §8), and the
+# database kuutti_pr_<n>, which only the box can reach. The database is
 # dropped through one Run Command document (modules/compute) that the plan role
 # may send to the staging box and nothing else.
 #
@@ -26,7 +27,9 @@ name: Preview cleanup
 # from a pull request. Order: select, drop the database, remove the EAS
 # alias and branch, remove the Dokploy application (the sweep's work list).
 # A failed database drop leaves the application for the next sweep; a failed
-# EAS removal does not, it fails the run by name.
+# EAS removal does not, it fails the run by name. The panel's prefix goes
+# beside them, after the selection alone, and like EAS never holds the
+# application back: a failure fails the run by name.
 #
 # Beside that, and needing none of it: the runs of preview.yml that still
 # wait for a reviewer of "preview" while their pull request has merged or
@@ -73,6 +76,8 @@ jobs:
       pull-requests: write
     outputs:
       numbers: ${{ steps.select.outputs.numbers }}
+      # The panel job has no environment to read it from (ADR-025 §8).
+      admin_bucket: ${{ steps.select.outputs.admin_bucket }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -87,8 +92,10 @@ jobs:
           DOKPLOY_TOKEN: ${{ secrets.DOKPLOY_TOKEN }}
           DOKPLOY_ENVIRONMENT_ID: ${{ vars.DOKPLOY_ENVIRONMENT_ID }}
           PREVIEW_API_DOMAIN: ${{ vars.PREVIEW_API_DOMAIN }}
+          ADMIN_BUCKET: ${{ vars.ADMIN_BUCKET }}
           INPUT_PR: ${{ github.event.inputs.pr }}
         run: |
+          echo "admin_bucket=$ADMIN_BUCKET" >> "$GITHUB_OUTPUT"
           if [ -n "$INPUT_PR" ]; then
             [[ "$INPUT_PR" =~ ^[0-9]{1,7}$ ]] || { echo "::error::not a pull request number: $INPUT_PR"; exit 1; }
             numbers=$(jq -cn --arg pr "$INPUT_PR" '[$pr]')
@@ -269,3 +276,59 @@ jobs:
         run: |
           echo "::error::left at EAS:$LEFT"
           exit 1
+
+  # The panel's preview, pr-<n>/ in the staging panel's bucket (ADR-025 §8).
+  # No environment, as the database job: the plan role trusts main, and may
+  # put and delete pr-* of that bucket and nothing else. Nothing waits for
+  # this job: a prefix left behind costs nothing, so it never holds back the
+  # Dokploy application; it fails the run naming the command for a removal by
+  # hand, and the bucket expires pr-* after 14 days whatever happens here.
+  admin:
+    name: remove admin pr-<n>/
+    needs: select
+    if: needs.select.outputs.numbers != '[]' && needs.select.outputs.numbers != ''
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ vars.AWS_PLAN_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: gha-preview-cleanup-${{ github.run_id }}
+      ADMIN_BUCKET: ${{ needs.select.outputs.admin_bucket }}
+    steps:
+      # Until the variable is set from staging's tofu output
+      # (infra/README.md, Admin panel), there is no prefix to remove.
+      - name: Is the panel's host applied?
+        id: ready
+        run: |
+          if [ -z "$ADMIN_BUCKET" ]; then
+            echo "::notice::ADMIN_BUCKET is not set in the preview-cleanup environment; no panel preview to remove (infra/README.md, Admin panel)"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.ready.outputs.ready == 'true'
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - if: steps.ready.outputs.ready == 'true'
+        run: .github/scripts/aws-oidc.sh
+
+      # Also after a failed exchange, so every prefix left is named with its
+      # command. The trailing slash keeps pr-1/ from reaching pr-12/; a prefix
+      # that is not there is removed without complaint.
+      - name: Remove pr-<n>/ from the panel's bucket
+        if: ${{ !cancelled() && steps.ready.outputs.ready == 'true' }}
+        env:
+          NUMBERS: ${{ needs.select.outputs.numbers }}
+        run: |
+          left=""
+          for pr in $(jq -r '.[]' <<< "$NUMBERS"); do
+            prefix="s3://$ADMIN_BUCKET/pr-$pr/"
+            if aws s3 rm "$prefix" --recursive; then echo "removed $prefix"
+            else echo "::error::$prefix could not be removed; by hand: aws s3 rm $prefix --recursive"; left="$left $prefix"; fi
+          done
+          [ -z "$left" ] || { echo "::error::left in the panel's bucket:$left"; exit 1; }

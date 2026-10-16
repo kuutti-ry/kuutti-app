@@ -9,11 +9,11 @@ Commands below use `tofu`. Terraform is command-compatible if you have it instea
 | path | contents | when |
 |---|---|---|
 | `bootstrap/` | state bucket, GitHub OIDC provider, CI roles, budget and billing alarm, the hosted zone of the project domain | once, before anything else |
-| `modules/` | `network`, `compute`, `data` (#7); `observability` (#11); `media` (#48, ADR-005: live on staging since 2026-10-09, dormant in production until its cutover below); email later | as the work needs them |
+| `modules/` | `network`, `compute`, `data` (#7); `observability` (#11); `media` (#48, ADR-005: live on staging since 2026-10-09, dormant in production until its cutover below); `admin` (#313, ADR-025: the moderation panel's host, composed by staging; production with #25); email later | as the work needs them |
 | `envs/staging`, `envs/prod` | one composition per environment: the modules plus the non-secret parameters | #7 |
 | `github/` | repository settings, branch protection, environments | not adopted; `gh api` below until the GitHub provider question is settled |
 
-Modules arrive with the work that needs them: network, compute and data (#7); observability (#11); media and delivery (#48, ADR-005); email when a mail channel does (TD-18). `scripts/` holds the one-time procedures that are deliberately not resources.
+Modules arrive with the work that needs them: network, compute and data (#7); observability (#11); media and delivery (#48, ADR-005); the moderation panel's host (#313, ADR-025); email when a mail channel does (TD-18). `scripts/` holds the one-time procedures that are deliberately not resources.
 
 ## Account, once (console, maintainer only)
 
@@ -251,9 +251,9 @@ The same in `infra/envs/prod`. Applies run through CI (#8): plans on every pull 
 | `infra-prod.yml` | `v*` tags | `kuutti-ci-apply` | applies `envs/prod` after the `prod` reviewer approves |
 | `infra-oidc.yml` | changes under `infra/**` | `kuutti-ci-plan` | proves the plan role still cannot decrypt a SecureString |
 | `eas-build.yml` | `main` (fingerprint changed), `v*` tags, by hand | none (GitHub environment `staging` or `prod`) | native builds on EAS: `development` and `preview` when the fingerprint of `main` differs from the last development build's, `production` on a tag; links on the pinned builds issue (`apps/mobile/README.md`) |
-| `build.yml` | every push and pull request | none | builds the API image on arm64 and smoke-tests it; on `main` pushes `ghcr.io/kuutti-ry/kuutti-api:<sha>` and `:main`, on a pull request from this repository `:pr-<n>-<sha7>` for its preview, on a tag retags that same image as `:vX.Y.Z`, then calls `deploy.yml` (Dokploy, `/health`, then the EAS Update to the environment's channel, #10) and, for tags, `release.yml` |
-| `preview.yml` | pull requests from this repository | none (GitHub environment `preview`) | the three previews of #9: the pull request's image as Dokploy application `api-pr-<n>` on the staging box with database `kuutti_pr_<n>`, the web export on EAS Hosting as alias `pr-<n>`, an EAS Update on branch `pr-<n>` when native code changed; one sticky comment |
-| `preview-cleanup.yml` | on every push to `main`, on a schedule and by hand, from `main` only (GitHub environment `preview-cleanup`, no reviewer; ADR-012) | `kuutti-ci-plan` | removes the Dokploy application, the EAS alias and branch, and drops `kuutti_pr_<n>` through the `kuutti-staging-preview-database` Run Command document, the Dokploy application last so a failed step is retried by the next sweep; the sweep also retires previews older than 7 days, and cancels the runs of `preview.yml` that wait for approval while their pull request is no longer open (the run's own token, no role) |
+| `build.yml` | every push and pull request | none; on `main` the panel's upload `kuutti-ci-apply` (GitHub environment `staging`) | builds the API image on arm64 and smoke-tests it; on `main` pushes `ghcr.io/kuutti-ry/kuutti-api:<sha>` and `:main`, on a pull request from this repository `:pr-<n>-<sha7>` for its preview, on a tag retags that same image as `:vX.Y.Z`, then calls `deploy.yml` (Dokploy, `/health`, then the EAS Update to the environment's channel, #10) and, for tags, `release.yml`; on `main`, after the staging deploy, builds the moderation panel against the staging API in a job that holds no credentials, and a second job syncs that build to the root of the panel's bucket (never under `pr-`), invalidates the distribution and checks the served page, its headers and the API's CORS for the panel's origin (ADR-025 §5) |
+| `preview.yml` | pull requests from this repository | none (GitHub environment `preview`); the panel's upload `kuutti-ci-plan`, from a job without an environment | four previews: the three of #9, the pull request's image as Dokploy application `api-pr-<n>` on the staging box with database `kuutti_pr_<n>`, the web export on EAS Hosting as alias `pr-<n>`, an EAS Update on branch `pr-<n>` when native code changed; and the moderation panel built under `/pr-<n>/` against the staging API, written to `pr-<n>/` of the panel's bucket (#313, ADR-025 §6); one sticky comment |
+| `preview-cleanup.yml` | on every push to `main`, on a schedule and by hand, from `main` only (GitHub environment `preview-cleanup`, no reviewer; ADR-012) | `kuutti-ci-plan` | removes the Dokploy application, the EAS alias and branch, and drops `kuutti_pr_<n>` through the `kuutti-staging-preview-database` Run Command document, the Dokploy application last so a failed step is retried by the next sweep; removes the panel's `pr-<n>/` prefix, where a failure fails the run with the command to run by hand and never holds the Dokploy removal (a lifecycle rule expires `pr-` objects after 14 days, ADR-025 §8); the sweep also retires previews older than 7 days, and cancels the runs of `preview.yml` that wait for approval while their pull request is no longer open (the run's own token, no role) |
 
 OpenTofu and the OIDC exchange are installed by `.github/scripts/install-tofu.sh` and `aws-oidc.sh`; no third-party action touches credentials. The bootstrap is neither planned nor applied by CI: its inputs are in the maintainer's tfvars, and its plan is the maintainer's drift check.
 
@@ -261,13 +261,14 @@ The staging apply and the staging deploy run only while the repository variable 
 
 Until an environment's `media_enabled` is set (Media, below), TLS terminates at Traefik on the box and the API answers on the Elastic IP directly (#7).
 
-Each environment composes the three modules (#7, TD-19):
+Each environment composes the three modules (#7, TD-19), and staging the panel's host as well (#313, ADR-025; production with #25):
 
 | module | creates | notes |
 |---|---|---|
 | `network` | VPC /16, one public subnet, two private subnets, DB subnet group, `api` and `db` security groups | no NAT; `db` admits 5432 from the `api` group only; port 22 only for `ssh_cidrs`, empty by default |
 | `data` | RDS PostgreSQL 17 single-AZ, gp3 20→100 GB, 35-day PITR, `rds.force_ssl=1`, Extended Support declined, master password held by AWS | staging `db.t4g.micro`, prod `db.t4g.small` with deletion protection and a final snapshot |
 | `compute` | t4g.small Ubuntu 24.04 arm64, Elastic IP, IMDSv2, instance role `kuutti-api-<env>` under the boundary, log group `/kuutti/<env>/api`, first-boot script installing Dokploy | staging also owns the account-wide Session Manager preferences, `/kuutti/ssm-sessions`, and the `kuutti-staging-preview-database` Run Command document (#9) |
+| `admin` | private bucket `kuutti-admin-<env>-<account>`, CloudFront distribution on `admin.staging.<domain>` with the panel's headers, the path fallback and the `pr-*` function, ACM certificate in us-east-1, alias records | staging only; Admin panel, below |
 
 The composition then writes the non-secret parameters `app-env`, `log-level`, `db-host`, `db-port`, `db-name`, `db-user` under `/kuutti/<env>/`, and, once `telia_client_id` has a value, `oidc-issuer`, `oidc-client-id`, `oidc-redirect-uri` and `oidc-acr-values` (#32, `docs/vendors/telia.md`); the API turns them into `APP_ENV`, `DB_HOST` and so on at boot and composes `DATABASE_URL` with `sslmode=require`.
 
@@ -320,7 +321,7 @@ pnpm --filter @kuutti/db moderator -- list
 pnpm --filter @kuutti/db moderator -- revoke <hetu_hmac>
 ```
 
-Revoking ends the person's admin sessions at once. The panel signs in at `/admin/auth/start` and returns to `ADMIN_APP_URL`, which must also be on the CORS allowlist: both are parameters of the environment (`admin_app_url`, `cors_allowed_origins` in `envs/<env>/variables.tf` → `admin-app-url`, `cors-allowed-origins`). Staging defaults to a developer's Vite panel at `http://localhost:5173` until the panel has a host; production defaults to `https://admin.kuutti.app`, which must exist before the first release (the API refuses a non-https value there at boot).
+Revoking ends the person's admin sessions at once. The panel signs in at `/admin/auth/start` and returns to `ADMIN_APP_URL`, which must also be on the CORS allowlist: both are parameters of the environment (`admin_app_url`, `cors_allowed_origins` in `envs/<env>/variables.tf` → `admin-app-url`, `cors-allowed-origins`). On staging the login returns to the hosted panel, `https://admin.staging.kuutti.app`, and the allowlist is that origin alone (Admin panel, below; ADR-025 §10); a developer's panel at `http://localhost:5173` talks to their own API (`pnpm env:up`), since the bank sends a staging login back to the hosted panel. Production defaults to `https://admin.kuutti.app`, which must exist before the first release (#25; the API refuses a non-https value there at boot).
 
 The audit table's role boundary (ADR-006, security checklist line 67) is not a migration: migrations run as `kuutti_app`, and Postgres lets an owner hand a table only to a role it could `SET ROLE` into. After the first deploy that created `audit_log`, run
 
@@ -332,6 +333,52 @@ which moves the table and its trigger function to `kuutti_audit` and leaves `kuu
 
 A later migration that touches `audit_log` would fail as `kuutti_app`, and with it the whole migration batch and the boot. The sequence for such a change is: `db-audit-owner.sh <env> release` (ownership back to `kuutti_app`), deploy, `db-audit-owner.sh <env>` again. The pull request that carries the migration says so in its body.
 
+### Admin panel (#313, ADR-025)
+
+`infra/modules/admin`, composed by staging (production with #25, on `admin.kuutti.app`): the moderators' panel as static files at `https://admin.staging.kuutti.app`. The module creates a private bucket `kuutti-admin-<env>-<account>` (public access blocked, bucket owner enforced, SSE-S3, no versioning since every object is the build of a commit; incomplete uploads go after a day and `pr-` objects after 14 days) that only the distribution reads, through origin access control; the distribution with its ACM certificate in us-east-1 and the A and AAAA alias records; the managed `CachingOptimized` policy; and a response-headers policy on every behaviour: a CSP of `default-src 'none'` whose `connect-src` is the API's origin alone, `img-src` `'self'` and the API's origin (the signed photo URLs, ADR-005), `script-src` and `style-src` `'self'`, and `worker-src`, `base-uri`, `form-action` and `frame-ancestors` `'none'`, with HSTS, `nosniff`, `no-referrer`, `X-Frame-Options: DENY`, `Permissions-Policy`, COOP and CORP, and `X-Robots-Tag: noindex, nofollow` (the whole list is ADR-025 §3). The bucket answers 403 for a key it does not have, because CloudFront may not list it, and the distribution turns 403 and 404 into `/index.html` with 200, so `/accounts/<id>` loads the panel and its router finds the page (#302). A pull request's preview is `pr-<n>/` of the same bucket (Previews, below): the viewer-request CloudFront Function `kuutti-staging-admin-previews` (`modules/admin/previews.js`), on the `pr-*` behaviour alone, answers a path inside a preview whose last segment has no dot with that preview's `index.html`. There is no access log: the API's log has every staff request with the account and the request id, and a log of the host would add staff members' IP addresses and nothing a moderator does (ADR-025 §9). Staging's `admin-app-url` is that address and its `cors-allowed-origins` that origin alone (ADR-025 §10).
+
+CI writes the bucket, nobody by hand. `build.yml` builds `main`'s panel against the staging API and syncs it to the root as `kuutti-ci-apply` from the `staging` environment, `index.html` with `Cache-Control: no-cache` and the hashed assets as immutable, then invalidates `/*`. `preview.yml` writes a pull request's build to `pr-<n>/` as the plan role, whose `admin-previews` policy allows putting and deleting objects under `pr-*` and nothing else, and `preview-cleanup.yml` removes the prefix with the rest of the preview.
+
+The first apply, once, by the maintainer, in this order (ADR-025, Consequences):
+
+1. **Bootstrap.** `tofu apply` in `infra/bootstrap` for the plan role's `admin-previews` policy (`s3:PutObject` and `s3:DeleteObject` on `kuutti-admin-staging-<account>/pr-*`).
+2. **The environment.** Merging applies `envs/staging` through `infra.yml`, as for every module: the bucket, the certificate (validated by a record in the zone, a few minutes), the function, the distribution (about ten minutes), the alias records, and the two parameters. From here until step 4, a staff login on staging lands on an empty host.
+3. **GitHub variables**, from the environment's outputs (`pnpm aws:login` first). The panel's jobs and its preview removal do nothing until they are set:
+
+   ```sh
+   cd infra/envs/staging
+   tofu init
+   gh variable set ADMIN_URL --env staging --body "$(tofu output -raw admin_url)"
+   gh variable set ADMIN_BUCKET --env staging --body "$(tofu output -raw admin_bucket)"
+   gh variable set ADMIN_DISTRIBUTION_ID --env staging --body "$(tofu output -raw admin_distribution_id)"
+   gh variable set ADMIN_URL --env preview --body "$(tofu output -raw admin_url)"
+   gh variable set ADMIN_BUCKET --env preview --body "$(tofu output -raw admin_bucket)"
+   gh variable set ADMIN_API_URL --env preview --body "$(tofu output -raw api_url)"   # the staging API: previews call it (ADR-025 §6)
+   gh variable set ADMIN_BUCKET --env preview-cleanup --body "$(tofu output -raw admin_bucket)"
+   for e in staging preview preview-cleanup; do gh variable list --env "$e"; done
+   ```
+
+4. **The first build.** Re-run `main`'s latest `build.yml` run, or merge anything: its panel jobs build and upload the panel, and its deploy boots the API again, which reads `admin-app-url` and `cors-allowed-origins` only at boot. A re-run is needed even when the merge's own deploy came after the apply, since its panel jobs found no variables.
+
+   ```sh
+   gh run rerun "$(gh run list --workflow build.yml --branch main --event push --limit 1 --json databaseId --jq '.[0].databaseId')"
+   ```
+
+Done when (the issue's list): the panel at its address signs in through Telia's test bed as an identity that holds a role (Photo moderation, above) and shows the queues; the headers, a deep path and the API's CORS answer as below; a pull request's panel appears under its prefix and is gone after the sweep (Previews, Done when).
+
+```sh
+A=https://admin.staging.kuutti.app
+curl -sI "$A/" | grep -i -E '^HTTP|^content-security-policy|^strict-transport-security|^x-frame-options|^x-robots-tag|^cache-control'
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' "$A/accounts/00000000-0000-0000-0000-000000000000"   # 200 text/html: the panel, not an S3 error
+for o in "$A" https://example.com http://localhost:5173; do
+  printf '%s: ' "$o"
+  curl -s -o /dev/null -D - -X OPTIONS -H "Origin: $o" -H 'Access-Control-Request-Method: GET' https://api.staging.kuutti.app/health \
+    | tr -d '\r' | grep -i '^access-control-allow-origin:' || echo refused
+done
+```
+
+The first origin is answered with itself, the other two are refused.
+
 ### Observability (#11)
 
 `infra/modules/observability`, composed by each environment: an SNS topic `kuutti-<env>-alerts` in eu-central-1, alarms for the instance status check, the instance and RDS CPU credit balances, RDS free storage and the API's 5xx rate (a metric filter on `/kuutti/<env>/api`), and three saved Logs Insights queries. The subscriber is the repository variable `ALERT_EMAIL` (`gh variable set ALERT_EMAIL --body <project alias>`), which CI hands to OpenTofu as `TF_VAR_alert_email`; confirm the subscription from that mailbox after the first apply (`aws sns list-subscriptions-by-topic --topic-arn <alerts_topic_arn>` shows `PendingConfirmation` until the link in AWS's mail is followed), then run the delivery test in `docs/runbooks/alerts.md`. Without the variable the topic exists with no subscriber. About 0.80 USD a month per environment.
@@ -342,7 +389,7 @@ Sentry (TD-19, the one vendor besides AWS, Expo, GitHub and Telia), maintainer o
 
 ### Cost
 
-TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, database, address, storage); both together are around 65 EUR, above the budget alert. Decision (2026-09-14): staging is applied now, prod when there is a first release; raising `monthly_budget_usd` in the bootstrap is the deliberate step that goes with it.
+TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, database, address, storage); both together are around 65 EUR, above the budget alert. Decision (2026-09-14): staging is applied now, prod when there is a first release; raising `monthly_budget_usd` in the bootstrap is the deliberate step that goes with it. The panel's host adds about nothing (ADR-025): CloudFront's free tier covers 1 TB out, 10 million requests and 2 million function invocations a month, the certificate and the alias queries are free, and the bucket holds a few megabytes.
 
 ### After the first apply, once per environment
 
@@ -383,19 +430,20 @@ TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, databa
 
 ### Previews (#9)
 
-Every pull request from this repository gets three previews, deployed by `preview.yml` and removed by `preview-cleanup.yml` (TD-2, TD-19). Removal is unattended (ADR-012): a sweep from `main`, started by every push to `main` (a merge is one) and by a schedule that GitHub keeps loosely (hours, not minutes), removes the previews of closed and merged pull requests and retires previews older than seven days, under the environment `preview-cleanup`, which holds the same tokens as `preview` and has no required reviewer, since nothing in it runs a pull request's code. The same sweep cancels the preview runs that still wait for a reviewer of `preview` when their pull request has merged or closed (idle while the environment has no reviewer, as since 2026-10-08, ADR-004 §3; while it has one, the deployments GitHub asks the reviewer about are of branches that have an open pull request, with the exception of what the sweep could not tell and therefore left: a run without a branch or a repository, a branch no pull request is found for, a question GitHub did not answer, each a warning in the sweep's log; ADR-012 §8). The 2026-09-27 outage, three previews of merged pull requests left on the box until it ran out of memory, is why.
+Every pull request from this repository gets four previews (the moderation panel's since #313), deployed by `preview.yml` and removed by `preview-cleanup.yml` (TD-2, TD-19). Removal is unattended (ADR-012): a sweep from `main`, started by every push to `main` (a merge is one) and by a schedule that GitHub keeps loosely (hours, not minutes), removes the previews of closed and merged pull requests and retires previews older than seven days, under the environment `preview-cleanup`, which holds the same tokens as `preview` and has no required reviewer, since nothing in it runs a pull request's code. The same sweep cancels the preview runs that still wait for a reviewer of `preview` when their pull request has merged or closed (idle while the environment has no reviewer, as since 2026-10-08, ADR-004 §3; while it has one, the deployments GitHub asks the reviewer about are of branches that have an open pull request, with the exception of what the sweep could not tell and therefore left: a run without a branch or a repository, a branch no pull request is found for, a question GitHub did not answer, each a warning in the sweep's log; ADR-012 §8). The 2026-09-27 outage, three previews of merged pull requests left on the box until it ran out of memory, is why.
 
 | lane | what | where |
 |---|---|---|
 | API | the image `build.yml` pushed as `:pr-<n>-<sha7>`, run as Dokploy application `api-pr-<n>` in the `previews` project on the staging box; at boot the API creates `kuutti_pr_<n>` on the staging RDS instance, migrates and seeds it (never a copy of anything) | `https://pr-<n>.<PREVIEW_API_DOMAIN>` |
 | Web | `expo export --platform web` of the same commit with `EXPO_PUBLIC_API_URL` pointed at that API, on EAS Hosting | `https://<EAS_HOSTING_SUBDOMAIN>--pr-<n>.expo.app` |
 | Native | an EAS Update on branch `pr-<n>` when native code, auth, push, camera or the `@expo/fingerprint` hash changed against `main`; the QR code opens it in the dev client (#10). Dormant until `expo-updates` is configured | the comment's QR code |
+| Admin | the moderation panel of the same commit, built with Vite's base `/pr-<n>/` and `VITE_API_URL` set to the staging API (a preview API has no bank, ADR-014 §1), written to `pr-<n>/` of the panel's bucket by a job without an environment, as the plan role; the CloudFront Function answers its pages with its own `index.html`. A member of staff signs in at the panel's root and opens the preview in the same tab, where the session is; a pull request that changes the API as well previews its panel against `main`'s API (ADR-025 §6) | `<ADMIN_URL>/pr-<n>/` |
 
 Dokploy's own GitHub-App preview deployments are not used. They exist only for applications built from a Git source, so they would build every pull request on the t4g.small (the rules say images are built in CI, not on the box), and the container receives nothing but `DOKPLOY_DEPLOY_URL`: no pull request number for `kuutti_pr_<n>`, no per-pull-request CORS origin. `preview.yml` instead creates a docker-source application per pull request through the same Dokploy API `deploy.yml` uses, with a member token that reaches only the `previews` project, and every address is a function of the pull request number, so the API allows exactly its own web origin.
 
-What a preview is: `APP_ENV=preview` and `PR_NUMBER=<n>` from Dokploy, everything else from `/kuutti/staging/*` through the instance role (the same role, unchanged; `/kuutti/prod/*` stays out of reach, as the cross-environment check under Checks proves). It connects as `kuutti_preview`, which owns the `kuutti_pr_*` databases and cannot open `kuutti`. Rate limit 30 requests a minute, `X-Robots-Tag: noindex`, pool of 3 connections. At most three previews at a time: a fourth pull request gets a comment and no deployment. A sweep from `main`, on every merge and on a schedule, removes the previews of pull requests that have closed or merged and retires previews older than 7 days (ADR-012). Forks and Dependabot get no secrets, so no preview.
+What a preview is: `APP_ENV=preview` and `PR_NUMBER=<n>` from Dokploy, everything else from `/kuutti/staging/*` through the instance role (the same role, unchanged; `/kuutti/prod/*` stays out of reach, as the cross-environment check under Checks proves). It connects as `kuutti_preview`, which owns the `kuutti_pr_*` databases and cannot open `kuutti`. Rate limit 30 requests a minute, `X-Robots-Tag: noindex`, pool of 3 connections. At most three pull requests have previews at a time: a fourth gets a comment and no deployment. A sweep from `main`, on every merge and on a schedule, removes the previews of pull requests that have closed or merged and retires previews older than 7 days (ADR-012). Forks and Dependabot get no secrets, so no preview.
 
-**Trust.** A preview runs a pull request's code on the staging box before anyone has reviewed it, with the staging instance role: it can read every `/kuutti/staging/*` parameter (from M2 that includes the staging hetu HMAC key and the Telia test-bed key), and its Dokploy token can attach any host name, the staging API's included, to a preview container. Opening a pull request from this repository therefore means staging-level trust, and since updates are not code-signed, the trust of a push to `main` (ADR-004). Since 2026-09-25 the `contributors` team (org members who are not owners) has write; the `preview` environment had the maintainer as required reviewer from that day to 2026-10-08 and none from then (ADR-004 §3; the read-back of the setting is in `docs/security-checklist.md`): a preview deploys on every push of a pull request from this repository, without a click, so write access here is that trust and is granted by name. The reviewer goes back on, or signing replaces it, before a production build reaches anyone outside the team (ADR-004 §3 and §4, `docs/runbooks/custody.md`); the second command below is what switches it on. Removal never waits either: `preview-cleanup.yml` runs from `main` under the environment `preview-cleanup`, which holds the same tokens and has no reviewer, because nothing in it runs a pull request's code (ADR-012). That holds only while the environment takes deployments from `main` alone: an environment is asked for by name, and without a branch policy a workflow on any branch could name it and be handed the tokens unreviewed (ADR-012 §9). The separate database role above keeps preview code out of staging data by construction. Two more things bound a preview: previews drop `DB_APP_PASSWORD` from their configuration at boot (`config.ts`), so the shared prefix does not put the environment's own database in a preview's memory; `dokploy-preview.sh` attaches only `pr-<n>.<preview domain>` hosts, and the box pins `dokploy.<env>` and `api.<env>` with priority Traefik routers (`00-control-plane.yml`, written by user data and `dokploy-setup.sh`), so a member token cannot take the control plane or the staging API even with the script edited.
+**Trust.** A preview runs a pull request's code on the staging box before anyone has reviewed it, with the staging instance role: it can read every `/kuutti/staging/*` parameter (from M2 that includes the staging hetu HMAC key and the Telia test-bed key), and its Dokploy token can attach any host name, the staging API's included, to a preview container. Opening a pull request from this repository therefore means staging-level trust, and since updates are not code-signed, the trust of a push to `main` (ADR-004). Since 2026-09-25 the `contributors` team (org members who are not owners) has write; the `preview` environment had the maintainer as required reviewer from that day to 2026-10-08 and none from then (ADR-004 §3; the read-back of the setting is in `docs/security-checklist.md`): a preview deploys on every push of a pull request from this repository, without a click, so write access here is that trust and is granted by name. The reviewer goes back on, or signing replaces it, before a production build reaches anyone outside the team (ADR-004 §3 and §4, `docs/runbooks/custody.md`); the second command below is what switches it on. Removal never waits either: `preview-cleanup.yml` runs from `main` under the environment `preview-cleanup`, which holds the same tokens and has no reviewer, because nothing in it runs a pull request's code (ADR-012). That holds only while the environment takes deployments from `main` alone: an environment is asked for by name, and without a branch policy a workflow on any branch could name it and be handed the tokens unreviewed (ADR-012 §9). The separate database role above keeps preview code out of staging data by construction. Two more things bound a preview: previews drop `DB_APP_PASSWORD` from their configuration at boot (`config.ts`), so the shared prefix does not put the environment's own database in a preview's memory; `dokploy-preview.sh` attaches only `pr-<n>.<preview domain>` hosts, and the box pins `dokploy.<env>` and `api.<env>` with priority Traefik routers (`00-control-plane.yml`, written by user data and `dokploy-setup.sh`), so a member token cannot take the control plane or the staging API even with the script edited. A panel preview runs the pull request's code on the staging panel's origin, so in the tab it is opened in it can read a staging staff session, and the plan role's `admin-previews` policy lets a pull request replace or remove another's panel preview, never the root: the same trust, and staging holds invented people only (ADR-025 §6 and §7, ADR-018).
 
 ```sh
 # preview as decided on 2026-10-08 (no reviewer; any branch of this repository):
@@ -418,8 +466,8 @@ Once, after staging is applied and its Dokploy is configured:
 2. **DNS.** Nothing to do: `*.preview.api.staging.kuutti.app` is declared in `envs/staging/dns.tf`. Traefik issues one Let's Encrypt certificate per preview host.
 3. **Dokploy.** A project `previews`; its default environment holds the applications, and its id (from the environment's URL in Dokploy) is `DOKPLOY_ENVIRONMENT_ID`. A member user `ci-preview` (Settings, Users) with access to the `previews` project and that environment only, permissions to create and delete services and to create domains, nothing else (no volumes, no Traefik files, no Docker access); sign in as that member and generate its API key. The staging `api` application stays out of the member's reach. Check as the member that `application.one` on the staging application's id is refused before enabling previews.
 4. **EAS.** Once in `apps/mobile`: `eas init` writes `extra.eas.projectId` into `app.json`, commit it. The first hosting deploy picks the subdomain that every preview alias hangs off: `npx expo export --platform web && eas deploy --dev-domain kuutti`; that name is `EAS_HOSTING_SUBDOMAIN`. On expo.dev, a robot user with the Hosting and Update permissions provides `EXPO_TOKEN`. The native lane starts publishing when #10 adds `expo-updates` (`updates.url` in `app.json`); nothing here changes then.
-5. **Bootstrap.** `tofu apply` in `infra/bootstrap` for the plan role's `preview-cleanup` policy (it may send exactly the document below to exactly the staging box). The next staging apply lands the document `kuutti-staging-preview-database`.
-6. **GitHub.** The environment `preview` with no required reviewer (Trust, above: the reviewer is ADR-004 §3's call, off from 2026-10-08) and no deployment branch restriction (pull requests deploy from any branch of this repository), four variables and two secrets; the environment `preview-cleanup` with no reviewer and the same four variables and two secrets (ADR-012); then the switch:
+5. **Bootstrap.** `tofu apply` in `infra/bootstrap` for the plan role's `preview-cleanup` policy (it may send exactly the document below to exactly the staging box) and its `admin-previews` policy (it may put and delete objects under `pr-*` of the panel's bucket `kuutti-admin-staging-<account>`, and nothing else; ADR-025 §7). The next staging apply lands the document `kuutti-staging-preview-database` and the panel's host (Admin panel, above).
+6. **GitHub.** The environment `preview` with no required reviewer (Trust, above: the reviewer is ADR-004 §3's call, off from 2026-10-08) and no deployment branch restriction (pull requests deploy from any branch of this repository), seven variables (the panel's three from the staging outputs, Admin panel above) and two secrets; the environment `preview-cleanup` with no reviewer, the same four variables of #9, the panel's `ADMIN_BUCKET`, and the two secrets (ADR-012); then the switch:
 
    ```sh
    R=repos/kuutti-ry/kuutti-app
@@ -430,6 +478,9 @@ Once, after staging is applied and its Dokploy is configured:
    gh variable set DOKPLOY_ENVIRONMENT_ID --env preview --body <id>
    gh variable set PREVIEW_API_DOMAIN --env preview --body preview.api.staging.kuutti.app
    gh variable set EAS_HOSTING_SUBDOMAIN --env preview --body kuutti
+   gh variable set ADMIN_URL --env preview --body "$(tofu -chdir=infra/envs/staging output -raw admin_url)"
+   gh variable set ADMIN_BUCKET --env preview --body "$(tofu -chdir=infra/envs/staging output -raw admin_bucket)"
+   gh variable set ADMIN_API_URL --env preview --body "$(tofu -chdir=infra/envs/staging output -raw api_url)"
    gh secret set DOKPLOY_TOKEN --env preview     # the ci-preview member's key
    gh secret set EXPO_TOKEN --env preview        # the robot user's token
    # No reviewer, and main only: a workflow on a branch that names it gets nothing (ADR-012 §9).
@@ -437,7 +488,7 @@ Once, after staging is applied and its Dokploy is configured:
    {"wait_timer":0,"reviewers":[],"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}
    JSON
    gh api -X POST "$R/environments/preview-cleanup/deployment-branch-policies" -f name=main -f type=branch
-   for v in DOKPLOY_URL DOKPLOY_ENVIRONMENT_ID PREVIEW_API_DOMAIN EAS_HOSTING_SUBDOMAIN; do
+   for v in DOKPLOY_URL DOKPLOY_ENVIRONMENT_ID PREVIEW_API_DOMAIN EAS_HOSTING_SUBDOMAIN ADMIN_BUCKET; do
      gh variable set "$v" --env preview-cleanup --body "$(gh variable get "$v" --env preview)"
    done
    gh secret set DOKPLOY_TOKEN --env preview-cleanup
@@ -445,7 +496,7 @@ Once, after staging is applied and its Dokploy is configured:
    gh variable set PREVIEWS_ENABLED --body true
    ```
 
-Done when (the issue's list): a pull request that changes a screen gets its comment within 10 minutes and the page shows the version and commit of its own API; `/health` of the preview reports the pull request's commit; `psql -l` through the tunnel lists `kuutti_pr_<n>` while the pull request is open and not after it closes; a row written through one preview is absent from another; the fourth concurrent pull request gets the limit comment; the workflow's CORS step refuses the staging web origin and another pull request's; the preview reads only `/kuutti/staging/*`.
+Done when (the issue's list): a pull request that changes a screen gets its comment within 10 minutes and the page shows the version and commit of its own API; `/health` of the preview reports the pull request's commit; `psql -l` through the tunnel lists `kuutti_pr_<n>` while the pull request is open and not after it closes; a row written through one preview is absent from another; the fourth concurrent pull request gets the limit comment; the workflow's CORS step refuses the staging web origin and another pull request's; the preview reads only `/kuutti/staging/*`; `aws s3 ls s3://kuutti-admin-staging-<account>/pr-<n>/` lists the panel's preview while the pull request is open and nothing after the sweep, and `<ADMIN_URL>/pr-<n>/photos` answers that preview's `index.html`, whose scripts are under `/pr-<n>/assets/`.
 
 ### Backups and rebuilding the box
 

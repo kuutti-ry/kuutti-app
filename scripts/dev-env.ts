@@ -529,7 +529,7 @@ async function up(skip: Set<string>, seed: boolean): Promise<void> {
     env("check: curl -s http://localhost:3000/health   (db ok, migrations current)");
   if (!skip.has("mobile"))
     env("check: open http://localhost:8081   (web target; the dev client uses the same Metro)");
-  if (!skip.has("admin")) env("check: open http://localhost:5173   (admin placeholder)");
+  if (!skip.has("admin")) env("check: open http://localhost:5173   (the moderation panel)");
 }
 
 async function down(): Promise<void> {

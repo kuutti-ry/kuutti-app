@@ -5,7 +5,7 @@ paths:
 
 # Admin panel (Vite + React) rules
 
-A static SPA built to S3 behind CloudFront on `admin.<domain>`; PR previews are a bucket prefix. It calls admin routes on the same Hono API.
+A static SPA built to S3 behind CloudFront (`infra/modules/admin`, ADR-025): `https://admin.staging.kuutti.app`, built from `main` against the staging API; `admin.kuutti.app` in production with #25. A pull request's preview is `/pr-<n>/` of the staging host, built with Vite's base `/pr-<n>/` and also against the staging API (a preview API has no bank); the router's basename is `import.meta.env.BASE_URL` without its trailing slash, so every in-app link goes through `Link`, `NavLink` or `navigate`, never a bare `href="/…"`. Staff sign in at the root and open the preview in the same tab, where the session is. It calls admin routes on the same Hono API, whose origin is the CSP's only `connect-src` and, with `'self'`, its `img-src`: no inline script or style, no third party, no asset inlined as a `data:` URL, and zod runs jitless.
 
 - Components (decided in #302): plain React, `react-router`'s declarative routes (`BrowserRouter`, one path per screen), and the one stylesheet `src/styles.css`. No Refine, no shadcn (the panel has no Tailwind), no table library until a table needs sorting in the browser; a list pages on the server. The screens and the menu are one table in `src/app.tsx`, each with the roles it is shown to; the API's guard is what refuses. The front page at `/` is the overview of what waits (#303); a new queue joins it in `GET /admin/overview` and the overview's table.
 - A screen the role does not open answers at its path with its heading and "Your role does not allow this", and asks the API for nothing (`NotForRole`, #304); the API's guard is what refuses.

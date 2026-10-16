@@ -14,12 +14,16 @@ import { i18n } from "./i18n.ts";
  */
 export function mount(element: HTMLElement): Root {
   restoreReturnPath();
+  // A preview is built with Vite's base /pr-<n>/ and served under it (ADR-025
+  // §6). The router takes the base without its last slash: it does not match
+  // /pr-12 against the basename /pr-12/, and that address opens the preview too.
+  const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || "/";
   const root = createRoot(element);
   root.render(
     <StrictMode>
       <I18nProvider i18n={i18n}>
         <StaffSessionProvider>
-          <BrowserRouter>
+          <BrowserRouter basename={basename}>
             <App />
           </BrowserRouter>
         </StaffSessionProvider>
