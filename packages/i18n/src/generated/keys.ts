@@ -453,6 +453,7 @@ export type MessageParams = {
   "onboarding.welcome.title": Record<never, never>;
   "photos.add": Record<never, never>;
   "photos.appeal": Record<never, never>;
+  "photos.appeal.label": { "position": number };
   "photos.caption.add": Record<never, never>;
   "photos.caption.ask_me": Record<never, never>;
   "photos.caption.at_work": Record<never, never>;

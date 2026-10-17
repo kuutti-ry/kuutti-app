@@ -2785,7 +2785,7 @@ about.source.body:
 
 about.source.open:
   en: Open the source code in the browser
-  description: Screen-reader label of the link that opens the source repository in the system browser.
+  description: "Screen-reader hint of the link that opens the source repository in the system browser; the link's name is the address itself (#217)."
   fi: Avaa lähdekoodi selaimessa
   sv: Öppna källkoden i webbläsaren
   machine: { fi: true, sv: true }
@@ -3852,6 +3852,13 @@ photos.appeal:
   description: Photos screen, button under a photo the automatic check rejected; a person then decides (#253). Not offered after a nudity label the check was very sure of.
   fi: Pyydä ihmistä katsomaan
   sv: Be en person titta
+  machine: { fi: true, sv: true }
+
+photos.appeal.label:
+  en: "Ask a person to look at photo {position, number}"
+  description: "Photos screen, screen-reader label of the appeal button under a rejected photo, so that with several the buttons tell apart (#217); it begins with the button's visible words, photos.appeal. {position} counts from 1."
+  fi: "Pyydä ihmistä katsomaan kuvaa {position, number}"
+  sv: "Be en person titta på foto {position, number}"
   machine: { fi: true, sv: true }
 
 photos.remove.title:

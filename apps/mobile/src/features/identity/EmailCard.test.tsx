@@ -111,6 +111,31 @@ describe("EmailCard", () => {
     expect(router.replace).toHaveBeenCalledWith("/");
   });
 
+  it("as the last of the later screens, scrolls, so at the largest text every line is in reach (#217)", async () => {
+    fakeApi("aino@example.fi");
+    await show(<EmailScreen />);
+    await waitFor(() => expect(screen.getByText("An address is set.")).toBeTruthy());
+    /** Whether the element lies inside the screen's scroll view, which a finger can move. */
+    const scrolls = (element: { type: unknown; parent: unknown }): boolean => {
+      for (let node: unknown = element.parent; node; node = (node as { parent: unknown }).parent) {
+        if ((node as { type: unknown }).type === "RCTScrollView") return true;
+      }
+      return false;
+    };
+    for (const element of [
+      screen.getByText("While you wait"),
+      screen.getByText("A way back in"),
+      screen.getByLabelText("E-mail address"),
+      screen.getByRole("button", { name: "Remove the address" }),
+      screen.getByText("That is everything. Thank you."),
+      screen.getByRole("button", { name: "Your deal-breakers" }),
+      screen.getByRole("button", { name: "Done" }),
+    ]) {
+      expect(scrolls(element)).toBe(true);
+    }
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
   it("says the address could not be saved when the API fails, as opposed to refusing it", async () => {
     fakeApi();
     const answers = globalThis.fetch;

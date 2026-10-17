@@ -452,6 +452,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "onboarding.welcome.title": "［Hóów wéé dóó thííñgš hééréé］",
   "photos.add": "［ÁÁdd áá phóótóó］",
   "photos.appeal": "［ÁÁšk áá pééršóóñ tóó lóóóók］",
+  "photos.appeal.label": "［ÁÁšk áá pééršóóñ tóó lóóóók áát phóótóó {position, number}］",
   "photos.caption.add": "［ÁÁdd áá çááptííóóñ］",
   "photos.caption.ask_me": "［ÁÁšk méé áábóóúút thííš óóñéé］",
   "photos.caption.at_work": "［ÁÁt wóórk］",
