@@ -1076,6 +1076,15 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description not_found: the account was erased while the photo was processed. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
                 /** @description photo_limit: the account has max_photos photos already. */
                 409: {
                     headers: {

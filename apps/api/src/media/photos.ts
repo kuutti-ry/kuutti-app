@@ -122,8 +122,13 @@ export async function uploadPhoto(
     throw error;
   }
   if (!row) {
-    // Two uploads raced past the count above; this one lost.
     await dropOrphans();
+    // The insert refuses for two reasons: the account was erased while this
+    // upload was processed (#51), or two uploads raced past the count above
+    // and this one lost. Only the second is the cap (#235).
+    if (!(await repo.isAccountLive(deps.db, input.accountId))) {
+      throw new AppError(404, "not_found", "No live account");
+    }
     throw new AppError(409, "photo_limit", "The account has its maximum number of photos", {
       maxPhotos,
     });
