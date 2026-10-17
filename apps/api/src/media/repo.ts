@@ -149,7 +149,9 @@ export async function isAccountLive(db: Queryable, accountId: string): Promise<b
  * card_shown row the card route of #47 writes), while its owner is active: a
  * shadow-banned, suspended, banned or paused owner's photos stop for everyone
  * at once and come back with a lift (ADR-024 §6, the card's rule of ADR-009
- * §6). Both branches carry the caller's account id (rule 6); there is no third.
+ * §6). A block between the two, set by either, stops them for good (#84,
+ * ADR-030 §2): `blocked_between` of migration 0051. Both branches carry the
+ * caller's account id (rule 6); there is no third.
  */
 export async function findVisiblePhoto(
   db: Queryable,
@@ -162,10 +164,36 @@ export async function findVisiblePhoto(
        AND (account_id = $1
          OR (state = 'approved'
            AND EXISTS (SELECT 1 FROM card_shown WHERE account_id = $1 AND photo_id = photo.id)
-           AND EXISTS (SELECT 1 FROM account owner WHERE owner.id = photo.account_id AND owner.state = 'active')))`,
+           AND EXISTS (SELECT 1 FROM account owner WHERE owner.id = photo.account_id AND owner.state = 'active')
+           AND NOT blocked_between($1, photo.account_id)))`,
     [accountId, photoId],
   );
   return rows[0] ? photoFrom(rows[0]) : null;
+}
+
+/**
+ * Whether the viewer was shown a card of the subject (#84): a card_shown row
+ * of the viewer's on a photo the subject still has. What a first block or
+ * report from a card stands on; scoped by the viewer (rule 6). The rows
+ * outlive a sanction, a break and a block; they go with the photo, and with
+ * the viewer's erasure.
+ */
+export async function wasShown(
+  db: Queryable,
+  input: { viewerAccountId: string; subjectAccountId: string },
+): Promise<boolean> {
+  // shortcut: the proof goes with the subject's photos, so somebody whose
+  // shown photos were all deleted since (an erasure, a new set, M4's sweep of
+  // old rows, ADR-008 §3) can no longer be blocked or reported from that card,
+  // and a first try answers 404 where a paused person's answers 204 (ADR-030
+  // §5, §6); a record of the contact that outlives the photos, or the round's
+  // own (#96), lifts it.
+  const { rows } = await db.query<{ shown: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM card_shown s JOIN photo p ON p.id = s.photo_id
+                    WHERE s.account_id = $1 AND p.account_id = $2) AS shown`,
+    [input.viewerAccountId, input.subjectAccountId],
+  );
+  return rows[0]?.shown === true;
 }
 
 export type CardServed = {
@@ -173,6 +201,8 @@ export type CardServed = {
   used: number;
   /** True when the card was within the budget (or already shown today) and its shown records were written. */
   recorded: boolean;
+  /** A block stands between the two (#84, ADR-030 §2): nothing was written, whatever the budget. */
+  blocked: boolean;
 };
 
 /**
@@ -183,8 +213,11 @@ export type CardServed = {
  * exposure_cards_per_day); a subject already shown today costs nothing more,
  * and a row from an earlier day takes today's date when its card comes round
  * again, so the card counts against today's budget once (#64 review).
- * The viewer's account id is in every branch (rule 6); the photo ids are the
- * card the server built, never a request body.
+ * A block between the two writes nothing (#84, ADR-030 §2): asked in this
+ * statement, so a block that lands after the card builder's own look is
+ * still honoured where the record is written. The viewer's account id is in
+ * every branch (rule 6); the photo ids are the card the server built, never
+ * a request body.
  */
 export async function recordCardServed(
   db: Queryable,
@@ -201,19 +234,22 @@ export async function recordCardServed(
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `card_shown:${input.viewerAccountId}`,
     ]);
-    const { rows } = await tx.query<{ used: number; allowed: boolean }>(
-      `WITH today AS (SELECT DISTINCT p.account_id AS subject
+    const { rows } = await tx.query<{ used: number; allowed: boolean; blocked: boolean }>(
+      `WITH blocked AS (SELECT blocked_between($1, $2) AS b),
+            today AS (SELECT DISTINCT p.account_id AS subject
                       FROM card_shown s JOIN photo p ON p.id = s.photo_id
                       WHERE s.account_id = $1 AND s.at >= $5),
             used AS (SELECT count(*)::int AS n FROM today),
-            allowed AS (SELECT (SELECT n FROM used) < $6
-                            OR EXISTS (SELECT 1 FROM today WHERE subject = $2) AS ok),
+            allowed AS (SELECT NOT (SELECT b FROM blocked)
+                            AND ((SELECT n FROM used) < $6
+                              OR EXISTS (SELECT 1 FROM today WHERE subject = $2)) AS ok),
             ins AS (INSERT INTO card_shown (account_id, photo_id, at)
                     SELECT $1, unnest($3::uuid[]), $4 FROM allowed WHERE allowed.ok
                     ON CONFLICT (account_id, photo_id) DO UPDATE SET at = EXCLUDED.at
                       WHERE card_shown.at < $5
                     RETURNING 1 AS one)
-       SELECT (SELECT n FROM used) AS used, (SELECT ok FROM allowed) AS allowed`,
+       SELECT (SELECT n FROM used) AS used, (SELECT ok FROM allowed) AS allowed,
+              (SELECT b FROM blocked) AS blocked`,
       [
         input.viewerAccountId,
         input.subjectAccountId,
@@ -225,7 +261,7 @@ export async function recordCardServed(
     );
     const row = rows[0];
     if (!row) throw new Error("card_shown insert returned no row");
-    return { used: row.used, recorded: row.allowed };
+    return { used: row.used, recorded: row.allowed, blocked: row.blocked };
   });
 }
 
@@ -290,6 +326,8 @@ export type PhotoAccessResult = {
   used: number;
   /** True when the row was written: the account is live and under its budget. */
   recorded: boolean;
+  /** A block stands between the caller and the photo's owner (#84, ADR-030 §2): nothing was written, whatever the budget. */
+  blocked: boolean;
 };
 
 /**
@@ -299,7 +337,10 @@ export type PhotoAccessResult = {
  * under a transaction-scoped advisory lock on (account, variant): under READ
  * COMMITTED each statement takes its own snapshot, so without the lock a
  * parallel burst could pass the count together (budget.test.ts proves the
- * limit holds against a pool). A tombstone writes nothing (#51).
+ * limit holds against a pool). A tombstone writes nothing (#51). Nor does a
+ * block between the caller and the photo's owner (#84, ADR-030 §2), asked in
+ * this statement as `recordCardServed` asks it, so a block that lands after
+ * `findVisiblePhoto` looked still refuses the URL.
  */
 export async function insertPhotoAccess(
   db: Queryable,
@@ -317,21 +358,35 @@ export async function insertPhotoAccess(
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `photo_access:${input.accountId}:${input.variant}`,
     ]);
-    const { rows } = await tx.query<{ live: boolean; used: number; inserted: number }>(
+    const { rows } = await tx.query<{
+      live: boolean;
+      used: number;
+      blocked: boolean;
+      inserted: number;
+    }>(
       `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
           used AS (SELECT count(*)::int AS n FROM photo_access
                    WHERE account_id = $1 AND variant = $3 AND at >= $5),
+          blocked AS (SELECT EXISTS (SELECT 1 FROM photo
+                                     WHERE id = $2 AND account_id <> $1
+                                       AND blocked_between($1, account_id)) AS b),
           ins AS (INSERT INTO photo_access (account_id, photo_id, variant, at)
-                  SELECT $1, $2, $3, $4 FROM live, used WHERE used.n < $6
+                  SELECT $1, $2, $3, $4 FROM live, used, blocked WHERE used.n < $6 AND NOT blocked.b
                   RETURNING 1 AS one)
      SELECT EXISTS (SELECT 1 FROM live) AS live,
             (SELECT n FROM used) AS used,
+            (SELECT b FROM blocked) AS blocked,
             (SELECT count(*) FROM ins)::int AS inserted`,
       [input.accountId, input.photoId, input.variant, input.at, input.since, input.limit],
     );
     const row = rows[0];
     if (!row) throw new Error("photo_access insert returned no row");
-    return { live: row.live, used: row.used, recorded: row.inserted === 1 };
+    return {
+      live: row.live,
+      used: row.used,
+      recorded: row.inserted === 1,
+      blocked: row.blocked,
+    };
   });
 }
 

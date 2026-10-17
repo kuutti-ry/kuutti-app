@@ -23,7 +23,12 @@ import {
   researchAnonymityJob,
   researchEventsJob,
 } from "./research/index.ts";
-import { auditBoundary, endSuspensions, prunePhotoCheckNotes } from "./safety/index.ts";
+import {
+  auditBoundary,
+  endSuspensions,
+  prunePhotoCheckNotes,
+  pruneReports,
+} from "./safety/index.ts";
 
 export type BootOptions = {
   config: Config;
@@ -216,6 +221,8 @@ export async function boot({
       name: "prune-photo-check-notes",
       run: async () => ({ pruned: await prunePhotoCheckNotes(pool, now()) }),
     },
+    // Reports keep twelve months from filing, whoever was erased meanwhile (#84, ADR-030 §8).
+    { name: "prune-reports", run: async () => ({ pruned: await pruneReports(pool, now()) }) },
   ];
   // Photos the automatic check missed get one more look (#49); none without a moderator.
   const mediaDeps = media.deps;

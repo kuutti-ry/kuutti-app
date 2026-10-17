@@ -1,4 +1,6 @@
+import type { Queryable } from "@kuutti/db";
 import type { ProfileUpdate } from "@kuutti/schema";
+import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test } from "../test/harness.ts";
@@ -161,6 +163,134 @@ describe("the card for a viewer who is not the owner", () => {
     });
     expect(preview.card?.displayName).toBe("Aino");
     expect(preview.completeness).toEqual({ complete: false, missing: ["seeks", "age_window"] });
+  });
+});
+
+describe("the card across a block (#84, ADR-030, features/safety/blocks.feature)", () => {
+  test("Neither card is built for the other after a block, and nothing is recorded", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 5 });
+    const { deps, logs } = await depsOf(ctx, { readPreferences: onboarded });
+    const [a, b, c] = [
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+    ];
+    for (const who of [a, b, c]) {
+      await profileRow(ctx, who.accountId);
+      await approvedPhotos(ctx, who.accountId, 2);
+    }
+    // A blocked B (as POST /blocks writes it).
+    await ctx.client.query(
+      `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+       SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+      [a.accountId, b.accountId],
+    );
+    const card = (viewer: string, subject: string) =>
+      buildCard(deps, { viewerAccountId: viewer, subjectAccountId: subject });
+    // Both ways, the answer for anybody outside the pool, and nothing written or counted.
+    await expect(card(a.accountId, b.accountId)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    await expect(card(b.accountId, a.accountId)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+    });
+    expect(await shownRows(ctx, a.accountId)).toBe(0);
+    expect(await shownRows(ctx, b.accountId)).toBe(0);
+    expect(logs().some((line) => line.msg === "card served")).toBe(false);
+    // Decided before the budget: with none left a blocked card is still the 404, another card the 429.
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 0 });
+    await expect(card(b.accountId, a.accountId)).rejects.toMatchObject({ status: 404 });
+    await expect(card(b.accountId, c.accountId)).rejects.toMatchObject({ status: 429 });
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 5 });
+    // Everybody else is shown as before, and each still previews their own card.
+    expect((await card(a.accountId, c.accountId)).card?.accountId).toBe(c.accountId);
+    expect((await card(c.accountId, b.accountId)).card?.accountId).toBe(b.accountId);
+    expect((await card(b.accountId, b.accountId)).card?.accountId).toBe(b.accountId);
+  });
+
+  test("a block that lands after the card's first look is asked again where the card is recorded", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 5 });
+    const { deps, logs } = await depsOf(ctx, { readPreferences: onboarded });
+    const [a, b] = [await signedInAccount(ctx.client), await signedInAccount(ctx.client)];
+    for (const who of [a, b]) {
+      await profileRow(ctx, who.accountId);
+      await approvedPhotos(ctx, who.accountId, 2);
+    }
+    // B blocks A while A's card of B is being built: after findCardSubject
+    // looked, just before the shown record takes the viewer's lock.
+    let ran = false;
+    const db: Queryable = {
+      async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+        if (!ran && text.includes("pg_advisory_xact_lock")) {
+          ran = true;
+          await ctx.client.query(
+            `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+             SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+            [b.accountId, a.accountId],
+          );
+        }
+        return ctx.client.query<R>(text, values);
+      },
+    };
+    await expect(
+      buildCard({ ...deps, db }, { viewerAccountId: a.accountId, subjectAccountId: b.accountId }),
+    ).rejects.toMatchObject({ status: 404, code: "not_found" });
+    expect(ran).toBe(true);
+    expect(await shownRows(ctx, a.accountId)).toBe(0);
+    expect(logs().some((line) => line.msg === "card served" || line.msg === "card refused")).toBe(
+      false,
+    );
+  });
+
+  test("a block holds for a later account of either identity: no card either way", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { exposure_cards_per_day: 5 });
+    const { deps } = await depsOf(ctx, { readPreferences: onboarded });
+    const [a, b] = [await signedInAccount(ctx.client), await signedInAccount(ctx.client)];
+    await ctx.client.query(
+      `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+       SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+      [a.accountId, b.accountId],
+    );
+    // Each erased and back on the same identity (TD-7's cooldown passed), complete again.
+    const later = async (accountId: string) => {
+      await ctx.client.query(
+        "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+        [accountId],
+      );
+      const { rows } = await ctx.client.query<{ id: string }>(
+        `INSERT INTO account (identity_id, state, birth_year, birth_month)
+         SELECT identity_id, 'active', 1990, 6 FROM account WHERE id = $1 RETURNING id`,
+        [accountId],
+      );
+      const id = rows[0]?.id ?? "";
+      await profileRow(ctx, id);
+      await approvedPhotos(ctx, id, 2);
+      return id;
+    };
+    for (const who of [a, b]) {
+      await profileRow(ctx, who.accountId);
+      await approvedPhotos(ctx, who.accountId, 2);
+    }
+    const bAgain = await later(b.accountId);
+    const card = (viewer: string, subject: string) =>
+      buildCard(deps, { viewerAccountId: viewer, subjectAccountId: subject });
+    // The blocked person back: neither card is built for the other.
+    await expect(card(bAgain, a.accountId)).rejects.toMatchObject({ status: 404 });
+    await expect(card(a.accountId, bAgain)).rejects.toMatchObject({ status: 404 });
+    // The blocker back as well: still neither.
+    const aAgain = await later(a.accountId);
+    await expect(card(aAgain, bAgain)).rejects.toMatchObject({ status: 404 });
+    await expect(card(bAgain, aAgain)).rejects.toMatchObject({ status: 404 });
+    for (const viewer of [a.accountId, aAgain, bAgain])
+      expect(await shownRows(ctx, viewer)).toBe(0);
   });
 });
 

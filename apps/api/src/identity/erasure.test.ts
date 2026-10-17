@@ -1,10 +1,12 @@
 import { accountState, identityStanding } from "@kuutti/db";
+import { createI18n, typedT } from "@kuutti/i18n";
 import { AccountExport, AccountState, IdentityStanding, Photo } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { objectKey } from "../media/index.ts";
 import { prunePhotoCheckNotes } from "../safety/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
+import { cardShown } from "../test/cards.ts";
 import { exportOf, openExport } from "../test/export.ts";
 import { captureLogger, englishT, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
@@ -889,5 +891,183 @@ describe("the sanctions in erasure and export (#307, ADR-024 §8)", () => {
     expect(await audited()).toBe(5);
     const logged = JSON.stringify([...logs(), ...lines()]);
     for (const words of Object.values(notes)) expect(logged).not.toContain(words);
+  });
+});
+
+describe("reports and blocks in erasure and export (#84, ADR-030 §8)", () => {
+  const post = async (
+    app: ReturnType<typeof createApp>,
+    who: { headers: Record<string, string> },
+    path: string,
+    body: unknown,
+  ) => {
+    const response = await app.request(path, {
+      method: "POST",
+      headers: { ...who.headers, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(response.status, path).toBe(204);
+  };
+  const rowsOf = async (ctx: TestContext) => ({
+    reports: await count(ctx, "SELECT count(*) AS n FROM report"),
+    blocks: await count(ctx, "SELECT count(*) AS n FROM block"),
+  });
+
+  test("Reports and blocks outlive the erasure of either person", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, { media: false });
+    const [a, b, c] = [
+      await signedInAccount(ctx.client, "a"),
+      await signedInAccount(ctx.client, "b"),
+      await signedInAccount(ctx.client, "c"),
+    ];
+    await cardShown(ctx.client, a.accountId, b.accountId);
+    await cardShown(ctx.client, c.accountId, a.accountId);
+    // A reports B (which blocks B), and C blocks A.
+    await post(app, a, "/reports", { accountId: b.accountId, reason: "harassment", note: "Rude." });
+    await post(app, c, "/blocks", { accountId: a.accountId });
+    expect(await rowsOf(ctx)).toEqual({ reports: 1, blocks: 2 });
+
+    expect((await del(app, a.headers)).status).toBe(204);
+    expect(await rowsOf(ctx)).toEqual({ reports: 1, blocks: 2 });
+    expect((await del(app, b.headers)).status).toBe(204);
+    expect(await rowsOf(ctx)).toEqual({ reports: 1, blocks: 2 });
+    // The report as filed, its note with it, for the moderators' twelve months.
+    const { rows } = await ctx.client.query(
+      "SELECT reporter_account_id, reported_account_id, reason, note FROM report",
+    );
+    expect(rows).toEqual([
+      {
+        reporter_account_id: a.accountId,
+        reported_account_id: b.accountId,
+        reason: "harassment",
+        note: "Rude.",
+      },
+    ]);
+    expect(logs().filter((l) => l.msg === "account erased")).toHaveLength(2);
+  });
+
+  test("The export lists the reports filed with their outcome and the blocks set, never the other person's id", async ({
+    ctx,
+  }) => {
+    let clock = new Date("2026-10-20T09:00:00Z");
+    const { app } = await appWith(ctx, { media: false, now: () => clock });
+    const a = await signedInAccount(ctx.client, "a");
+    const others = {
+      b: await signedInAccount(ctx.client, "b"),
+      c: await signedInAccount(ctx.client, "c"),
+      d: await signedInAccount(ctx.client, "d"),
+      e: await signedInAccount(ctx.client, "e"),
+      f: await signedInAccount(ctx.client, "f"),
+    };
+    const staff = await staffSession(ctx.client);
+    for (const who of [others.b, others.c, others.d]) {
+      await cardShown(ctx.client, a.accountId, who.accountId);
+    }
+    for (const who of [others.e, others.f]) await cardShown(ctx.client, who.accountId, a.accountId);
+    // A reports B and C an hour apart and blocks D; a moderator acts on C's.
+    await post(app, a, "/reports", {
+      accountId: others.b.accountId,
+      reason: "harassment",
+      note: "Rude.",
+    });
+    clock = new Date("2026-10-20T10:00:00Z");
+    await post(app, a, "/reports", { accountId: others.c.accountId, reason: "commercial_use" });
+    clock = new Date("2026-10-20T11:00:00Z");
+    await post(app, a, "/blocks", { accountId: others.d.accountId });
+    const decided = new Date("2026-10-21T08:00:00Z");
+    await ctx.client.query(
+      `UPDATE report SET outcome = 'acted', decided_at = $2, decided_by = $3
+       WHERE reported_account_id = $1`,
+      [others.c.accountId, decided, staff.identityId],
+    );
+    // About A: E reports A, F blocks A. Neither is A's to read.
+    await post(app, others.e, "/reports", {
+      accountId: a.accountId,
+      reason: "other",
+      note: "Odd.",
+    });
+    await post(app, others.f, "/blocks", { accountId: a.accountId });
+
+    const document = await exportOf(app, a.headers);
+    expect(document.reports).toEqual({
+      about:
+        "The reports you filed, with what came of them. The person you reported is not named here, and they were not told who reported them.",
+      items: [
+        {
+          at: "2026-10-20T10:00:00.000Z",
+          reason: "commercial_use",
+          reasonInWords: "Selling, advertising or asking for money",
+          note: null,
+          outcome: "acted",
+          outcomeInWords: "A moderator acted on it",
+          decidedAt: decided.toISOString(),
+        },
+        {
+          at: "2026-10-20T09:00:00.000Z",
+          reason: "harassment",
+          reasonInWords: "Harassing, threatening or hateful",
+          note: "Rude.",
+          outcome: null,
+          outcomeInWords: "Waiting for a moderator",
+          decidedAt: null,
+        },
+      ],
+    });
+    expect(document.blocks.items).toEqual([
+      { at: "2026-10-20T11:00:00.000Z" },
+      { at: "2026-10-20T10:00:00.000Z" },
+      { at: "2026-10-20T09:00:00.000Z" },
+    ]);
+    expect(document.blocks.about).toContain("Who it was is not written here");
+    const text = JSON.stringify(document);
+    for (const who of Object.values(others)) expect(text).not.toContain(who.accountId);
+    expect(text).not.toContain("Odd.");
+
+    // In the person's language, as the rest of the file (fi and sv machine text until reviewed).
+    const { logger } = await captureLogger();
+    const deps = { db: ctx.client, logger, now: () => clock, version: "0.0.0-test" };
+    for (const [locale, waiting, harassment] of [
+      ["fi", "Odottaa moderaattoria", "Häiritsevä, uhkaava tai vihamielinen"],
+      ["sv", "Väntar på en moderator", "Trakasserande, hotfull eller hatisk"],
+    ] as const) {
+      const t = typedT(createI18n({ locale }), locale);
+      const { document: translated } = await exportAccount(deps, a.accountId, t);
+      expect(translated.reports.items[1]).toMatchObject({
+        outcomeInWords: waiting,
+        reasonInWords: harassment,
+      });
+      expect(translated.reports.about).not.toBe(document.reports.about);
+      expect(translated.blocks.about).not.toBe(document.blocks.about);
+    }
+  });
+
+  test("a later account of the identity reads the reports and blocks the earlier one left, as both are kept on it", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, { media: false });
+    const [a, b, d] = [
+      await signedInAccount(ctx.client, "a"),
+      await signedInAccount(ctx.client, "b"),
+      await signedInAccount(ctx.client, "d"),
+    ];
+    await cardShown(ctx.client, a.accountId, b.accountId);
+    await cardShown(ctx.client, a.accountId, d.accountId);
+    await post(app, a, "/reports", { accountId: b.accountId, reason: "harassment", note: "Rude." });
+    await post(app, a, "/blocks", { accountId: d.accountId });
+    expect((await del(app, a.headers)).status).toBe(204);
+    // A comes back after the cooldown: a new account on the same identity.
+    const again = await signedInAccount(ctx.client, "a again");
+    await ctx.client.query(
+      "UPDATE account SET identity_id = (SELECT identity_id FROM account WHERE id = $2) WHERE id = $1",
+      [again.accountId, a.accountId],
+    );
+    const document = await exportOf(app, again.headers);
+    expect(document.reports.items).toEqual([
+      expect.objectContaining({ reason: "harassment", note: "Rude.", outcome: null }),
+    ]);
+    // The report's block and the block itself: the two that still hold on the identity.
+    expect(document.blocks.items).toHaveLength(2);
+    const text = JSON.stringify(document);
+    for (const who of [a, b, d]) expect(text).not.toContain(who.accountId);
   });
 });

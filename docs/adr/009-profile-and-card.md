@@ -1,6 +1,6 @@
 # ADR-009: The profile registry, the plain-text rule, completeness, and one card builder
 
-- Status: accepted; amended by ADR-019 on 2026-10-08 (every field carries its roles, the special-category flag is set on politics and religion and the gate compares the consent's version, the card carries info and hard fields only, the fields and options are the field sheet's); amended on 2026-10-08 for #149 (§1: the deal-breakers are rows of `preferences` on the registry's whitelist, under the disclose-to-filter rule); amended on 2026-10-08 for #150 (§7: the card carries the gender and the identity label, what both answered, never a field the person hides; the formats are the sheet's)
+- Status: accepted; amended by ADR-019 on 2026-10-08 (every field carries its roles, the special-category flag is set on politics and religion and the gate compares the consent's version, the card carries info and hard fields only, the fields and options are the field sheet's); amended on 2026-10-08 for #149 (§1: the deal-breakers are rows of `preferences` on the registry's whitelist, under the disclose-to-filter rule); amended on 2026-10-08 for #150 (§7: the card carries the gender and the identity label, what both answered, never a field the person hides; the formats are the sheet's); amended on 2026-10-17 for #84 (§6: no card across a block, ADR-030 §2; see History)
 - Date: 2026-09-26
 - Follows: TD-16 (the profile), TD-6 (what a verified stranger learns before a match), TD-8 (`contact_details` as a refusal reason), CLAUDE.md rules 3, 5 and 6 and Product constraints (no pre-match links; every tunable in `matching_config`), `.claude/rules/schema.md` (strict contracts; the card carries nothing about anyone else), `.claude/rules/db.md` (the erasure table), ADR-005 clause 4, ADR-006 (an automatic approval requires a face), ADR-007 §4 (the erasure join), ADR-008 §3 (the shown record and the card budget); issue #47
 
@@ -25,3 +25,7 @@ Nothing can be matched without a profile, and everything on a card is a decision
 - Three new error codes with texts: `text_contact_details`, `consent_required` (text key `errors.special_category_locked`, since the catalogue routes any key with "consent" in it to the binding `legal.*` texts), `card_budget_exceeded`.
 - The card route of #47 that the pointers of #48, #49 and #52 anticipated is the preview; the route that serves other people's cards is M4's, and it has nothing to decide about photos, budget or the shown record.
 - Open, and the maintainer's: the option lists and their texts, which fields carry the special-category flag, the display name as a field of this issue (neither the bank nor #46 gives one), the lengths and the twelve prompts.
+
+## History
+
+- 2026-10-17 (#84, ADR-030 §2): §6's builder refuses the card to anyone but the owner while a block stands between the two, set by either: `findCardSubject` names the viewer and reads `blocked_between`, and `buildCard` answers the 404 of somebody outside the pool right after the state, before photos, completeness and the budget, so nothing is recorded or counted.

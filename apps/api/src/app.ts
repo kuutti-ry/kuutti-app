@@ -44,6 +44,7 @@ import {
   feedbackAdminRoutes,
   feedbackRoutes,
   overviewAdminRoutes,
+  reportRoutes,
   sanctionAdminRoutes,
   staffAdminRoutes,
 } from "./safety/index.ts";
@@ -196,6 +197,7 @@ export function createApp(deps: Deps) {
   app.route("/", onboardingRoutes(deps, guard));
   app.route("/", feedbackRoutes(deps, guard));
   app.route("/", feedbackAdminRoutes(deps, moderators));
+  app.route("/", reportRoutes(deps, guard));
   app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   app.route("/", configAdminRoutes(deps, admins));
   app.route("/", overviewAdminRoutes(deps, moderators));

@@ -185,6 +185,21 @@ function anExport(): Record<string, unknown> {
         lookedAtAgain: true,
       },
     ],
+    reports: {
+      about: "The reports you filed.",
+      items: [
+        {
+          at,
+          reason: "harassment",
+          reasonInWords: "Harassment",
+          note: "Rude.",
+          outcome: null,
+          outcomeInWords: "Waiting for a moderator",
+          decidedAt: null,
+        },
+      ],
+    },
+    blocks: { about: "When you blocked someone.", items: [{ at }] },
   };
 }
 
@@ -197,6 +212,9 @@ describe("the account export", () => {
     expect(parsed.exports).toEqual([{ at }]);
     expect(parsed.dealBreakers[0]?.paused).toBe(false);
     expect(parsed.sanctions[0]).toMatchObject({ kind: "suspend", lookedAtAgain: true });
+    // The reports filed and the blocks set (#84), never whom.
+    expect(parsed.reports.items[0]).toMatchObject({ reason: "harassment", outcome: null });
+    expect(parsed.blocks.items).toEqual([{ at }]);
   });
 
   it("drops a key it does not define, so a stray hetu_hmac or research_id never reaches the file", () => {

@@ -2993,6 +2993,13 @@ errors.feedback_budget_exceeded:
   sv: Det räcker med respons för i dag. Du kan skicka mer efter midnatt.
   machine: { fi: true, sv: true }
 
+errors.report_budget_exceeded:
+  en: That is enough reports for today. You can still block this person, but then you cannot report them later.
+  description: "Report route (429 with Retry-After), the account has filed the day's reports, matching_config reports_per_day (#84, ADR-030 §4); nothing was written, the block neither, so the person is pointed to blocking, which has no cap. The app's report step shows it with a Block button under it. A blocked person's card is gone for good and there is no list of blocks, so a report after a block is impossible in the app: the text must not promise one. Never a number, the cap is a tunable."
+  fi: Tältä päivältä ilmoituksia on jo tarpeeksi. Voit silti estää tämän henkilön, mutta silloin et voi ilmoittaa hänestä myöhemmin.
+  sv: Det räcker med anmälningar för i dag. Du kan ändå blockera den här personen, men då kan du inte anmäla hen senare.
+  machine: { fi: true, sv: true }
+
 errors.text_contact_details:
   en: Your profile text cannot contain an e-mail address, a link, a phone number or a social media handle.
   description: Profile save (400), a text field carried a way to reach the person outside Kuutti (#47, the plain-text rule). The API says which field in the envelope's detail, never in the message.
@@ -5966,6 +5973,41 @@ account.export.sanction.reason.other:
   sv: "Annat skäl"
   machine: { fi: true, sv: true }
 
+account.export.report.about:
+  en: "The reports you filed, with what came of them. The person you reported is not named here, and they were not told who reported them."
+  description: "Inside the downloaded data file (#84, ADR-030 §8), the text that opens the part listing the reports the person filed from a card; each entry's reason is in the words the person chose it by in the app (safety.report.reason.*). Plain and calm; never the other person's name or id."
+  fi: "Tekemäsi ilmoitukset ja se, mitä niistä seurasi. Henkilöä, josta ilmoitit, ei nimetä tässä, eikä hänelle kerrottu, kuka hänestä ilmoitti."
+  sv: "Anmälningarna du har gjort och vad som blev av dem. Personen du anmälde nämns inte här, och hen fick inte veta vem som anmälde hen."
+  machine: { fi: true, sv: true }
+
+account.export.report.outcome.open:
+  en: "Waiting for a moderator"
+  description: "Inside the downloaded data file (#84, ADR-030 §8), what came of a report the person filed: nothing yet, a moderator has not decided."
+  fi: "Odottaa moderaattoria"
+  sv: "Väntar på en moderator"
+  machine: { fi: true, sv: true }
+
+account.export.report.outcome.dismissed:
+  en: "A moderator looked at it and took no action"
+  description: "Inside the downloaded data file (#84, #312), what came of a report the person filed: a moderator decided no action was needed. Neutral; not a judgement of the person who reported."
+  fi: "Moderaattori tarkisti sen eikä ryhtynyt toimiin"
+  sv: "En moderator granskade den och vidtog inga åtgärder"
+  machine: { fi: true, sv: true }
+
+account.export.report.outcome.acted:
+  en: "A moderator acted on it"
+  description: "Inside the downloaded data file (#84, #312), what came of a report the person filed: a moderator took action on the reported person. Never which action: that is the other person's."
+  fi: "Moderaattori ryhtyi toimiin"
+  sv: "En moderator vidtog åtgärder"
+  machine: { fi: true, sv: true }
+
+account.export.block.about:
+  en: "When you blocked someone. Who it was is not written here. A block holds even if either of you deletes their account and comes back."
+  description: "Inside the downloaded data file (#84, ADR-030 §8), the text that opens the part listing the person's blocks by date only. Plain; says why no name is there and that a block outlives a deletion."
+  fi: "Milloin estit jonkun. Sitä, kuka hän oli, ei kirjoiteta tähän. Esto pysyy voimassa, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi."
+  sv: "När du blockerade någon. Vem det var står inte här. En blockering gäller även om någon av er raderar sitt konto och kommer tillbaka."
+  machine: { fi: true, sv: true }
+
 account.export.photoCheck.reason.nudity:
   en: May show more than Kuutti allows
   description: Inside the downloaded data file (#253), why the check did not show a photo to others; the nudity group, said gently.
@@ -6822,6 +6864,188 @@ feedback.limited:
   description: "Feedback screen, the request refused because the day's feedback is sent (matching_config feedback_per_day, #171); the day rolls at midnight in Finland. Never a number, the cap is a tunable."
   fi: "Tältä päivältä palautetta on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen."
   sv: "Det räcker med respons för i dag. Du kan skicka mer efter midnatt."
+  machine: { fi: true, sv: true }
+
+safety.actions.title:
+  en: "Block or report"
+  description: "Somebody else's card (#84, ADR-030 §11): the label of the icon button in the card's header (heard, never seen: the icon is decorative), the same as an accessibility action on the card's name, and the title of the dialog it opens. No name in it, so nothing needs inflecting. Short."
+  fi: "Estä tai ilmoita"
+  sv: "Blockera eller anmäl"
+  machine: { fi: true, sv: true }
+
+safety.actions.block:
+  en: "Block"
+  description: "The block-or-report dialog (#84, ADR-030 §11): the button that chooses a block, and the button that confirms it on the next step. A verb, a button; the word carries the meaning, not the colour."
+  fi: "Estä"
+  sv: "Blockera"
+  machine: { fi: true, sv: true }
+
+safety.actions.blockHint:
+  en: "You will not see each other again. They are not told."
+  description: "The block-or-report dialog (#84), the line under the Block button: what a block does. Calm; the other person is not told."
+  fi: "Ette näe toisianne enää. Hänelle ei kerrota."
+  sv: "Ni ser inte varandra igen. Personen får inte veta det."
+  machine: { fi: true, sv: true }
+
+safety.actions.report:
+  en: "Report and block"
+  description: "The block-or-report dialog (#84, ADR-030 §4): the button that chooses a report, which blocks as well, and the title of the report step."
+  fi: "Ilmoita ja estä"
+  sv: "Anmäl och blockera"
+  machine: { fi: true, sv: true }
+
+safety.actions.reportHint:
+  en: "Tell the moderators what is wrong. This blocks them too. They are not told who reported them."
+  description: "The block-or-report dialog (#84, ADR-030 §4), the line under the Report and block button: who reads a report, that it blocks as well, and that the reported person never learns who sent it."
+  fi: "Kerro moderaattoreille, mikä on vialla. Tämä myös estää hänet. Hänelle ei kerrota, kuka ilmoitti."
+  sv: "Berätta för moderatorerna vad som är fel. Det blockerar också personen. Personen får inte veta vem som anmälde."
+  machine: { fi: true, sv: true }
+
+safety.actions.cancel:
+  en: "Cancel"
+  description: "The block-or-report dialog (#84), the button that closes it on any step with nothing sent."
+  fi: "Peruuta"
+  sv: "Avbryt"
+  machine: { fi: true, sv: true }
+
+safety.actions.close:
+  en: "Close"
+  description: "The block-or-report dialog (#84): the label of its corner close control (heard, never seen: the control is an icon)."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
+safety.done:
+  en: "Done"
+  description: "The block-or-report dialog (#84, ADR-030 §11), the button after a block or a report went through, or after the card turned out to be gone: closes the dialog and takes the card away. A different word from the corner's Close, so a screen reader's list of buttons tells them apart."
+  fi: "Valmis"
+  sv: "Klar"
+  machine: { fi: true, sv: true }
+
+safety.gone:
+  en: "This profile is no longer available."
+  description: "The block-or-report dialog (#84, ADR-030 §5 and §11), said when the API answered that there is no such card: the card's person, or the photos the card showed, are gone meanwhile, so trying again cannot help; nothing was blocked or reported, and closing the dialog takes the card away. Calm; never says why."
+  fi: "Tämä profiili ei ole enää saatavilla."
+  sv: "Den här profilen är inte längre tillgänglig."
+  machine: { fi: true, sv: true }
+
+safety.sending:
+  en: "Sending…"
+  description: "The block-or-report dialog (#84), said while a block or a report is on its way; the buttons wait meanwhile."
+  fi: "Lähetetään…"
+  sv: "Skickar…"
+  machine: { fi: true, sv: true }
+
+safety.block.title:
+  en: "Block this person?"
+  description: "The block-or-report dialog (#84, ADR-030 §1), the title of the step that confirms a block."
+  fi: "Estetäänkö tämä henkilö?"
+  sv: "Blockera den här personen?"
+  machine: { fi: true, sv: true }
+
+safety.block.body:
+  en: "You will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told."
+  description: "The block-or-report dialog (#84, ADR-030 §1 and §8), under the confirmation's title: a block holds both ways, through either person's deletion, for good, and the other person is not told. Plain, calm, no blame. Never the app's name in an inflected position."
+  fi: "Ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota."
+  sv: "Ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta det."
+  machine: { fi: true, sv: true }
+
+safety.block.done:
+  en: "Blocked. You will not see each other again."
+  description: "The block-or-report dialog (#84), after the block went through; closing the dialog takes the card away."
+  fi: "Estetty. Ette näe toisianne enää."
+  sv: "Blockerad. Ni ser inte varandra igen."
+  machine: { fi: true, sv: true }
+
+safety.block.failed:
+  en: "The block did not go through. Try again."
+  description: "The block-or-report dialog (#84), a block the API did not take (no connection, a server error); the dialog stays open."
+  fi: "Esto ei onnistunut. Yritä uudelleen."
+  sv: "Blockeringen gick inte igenom. Försök igen."
+  machine: { fi: true, sv: true }
+
+safety.report.alsoBlocks:
+  en: "A report also blocks them, for good: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told."
+  description: "The block-or-report dialog (#84, ADR-030 §1 and §4), under the report step's title: sending a report sets the same final block as the Block path, so it says what safety.block.body says; there is no confirmation step after it."
+  fi: "Ilmoitus myös estää hänet pysyvästi: ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä. Estoa ei voi perua. Hänelle ei kerrota."
+  sv: "En anmälan blockerar också personen, för gott: ni ser inte varandra här igen, även om någon av er raderar sitt konto. En blockering kan inte ångras. Personen får inte veta det."
+  machine: { fi: true, sv: true }
+
+safety.report.reasonLabel:
+  en: "What is wrong?"
+  description: "The report step (#84), the heading over the six reasons and the radio group's heard name. One reason is required."
+  fi: "Mikä on vialla?"
+  sv: "Vad är fel?"
+  machine: { fi: true, sv: true }
+
+safety.report.reason.harassment:
+  en: "Harassing, threatening or hateful"
+  description: "The report step (#84, #106's list), one of six reasons, a radio button: the person harasses, threatens or spreads hate. Describes the behaviour, not the person's worth. Also the reason of a filed report in the person's data download (ADR-030 §8)."
+  fi: "Häiritsevä, uhkaava tai vihamielinen"
+  sv: "Trakasserande, hotfull eller hatisk"
+  machine: { fi: true, sv: true }
+
+safety.report.reason.misrepresentation:
+  en: "A fake profile, or someone else's photos"
+  description: "The report step (#84, #106's list), one of six reasons, a radio button: the profile pretends to be someone else or uses another person's photos. Also the reason of a filed report in the person's data download (ADR-030 §8)."
+  fi: "Valeprofiili tai jonkun muun kuvat"
+  sv: "Falsk profil eller någon annans bilder"
+  machine: { fi: true, sv: true }
+
+safety.report.reason.under_age:
+  en: "May be under 18"
+  description: "The report step (#84, #106's list), one of six reasons, a radio button: the person may be a minor. Also the reason of a filed report in the person's data download (ADR-030 §8)."
+  fi: "Saattaa olla alle 18-vuotias"
+  sv: "Kan vara under 18 år"
+  machine: { fi: true, sv: true }
+
+safety.report.reason.commercial_use:
+  en: "Selling, advertising or asking for money"
+  description: "The report step (#84, #106's list), one of six reasons, a radio button: the person uses the app to sell, advertise or ask for money. Also the reason of a filed report in the person's data download (ADR-030 §8)."
+  fi: "Myy, mainostaa tai pyytää rahaa"
+  sv: "Säljer, gör reklam eller ber om pengar"
+  machine: { fi: true, sv: true }
+
+safety.report.reason.scraping:
+  en: "Seems automated, or collects people's details"
+  description: "The report step (#84, #106's list: scraping), one of six reasons, a radio button: the account seems run by a program, or gathers other people's profiles or details. Plain words, no technical term. Also the reason of a filed report in the person's data download (ADR-030 §8)."
+  fi: "Vaikuttaa automaattiselta tai kerää ihmisten tietoja"
+  sv: "Verkar automatiserad eller samlar in andras uppgifter"
+  machine: { fi: true, sv: true }
+
+safety.report.reason.other:
+  en: "Something else"
+  description: "The report step (#84, #106's list), the last of six reasons, a radio button: anything the other five do not cover; the note can say what. Also the reason of a filed report in the person's data download (ADR-030 §8)."
+  fi: "Jokin muu"
+  sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+safety.report.noteLabel:
+  en: "Anything the moderators should know (optional, up to {max, number} characters)"
+  description: "The report step (#84, ADR-030 §4), the label of the optional text field, read and heard; max is the field's limit (500), which cuts typing and pasting off, so it is said. Only the moderators read the note, and the person's own data download."
+  fi: "Mitä moderaattoreiden pitäisi tietää (vapaaehtoinen, enintään {max, number} merkkiä)"
+  sv: "Något moderatorerna bör veta (valfritt, högst {max, number} tecken)"
+  machine: { fi: true, sv: true }
+
+safety.report.send:
+  en: "Send report"
+  description: "The report step (#84), the button that sends the report and the block; disabled until a reason is chosen."
+  fi: "Lähetä ilmoitus"
+  sv: "Skicka anmälan"
+  machine: { fi: true, sv: true }
+
+safety.report.done:
+  en: "Thank you. A moderator will look at it, and you will not see each other again."
+  description: "The block-or-report dialog (#84), after the report went through (and its block); closing the dialog takes the card away. Also said when a report of the same person was already waiting, which the API answers alike."
+  fi: "Kiitos. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne."
+  sv: "Tack. En moderator tittar på anmälan, och ni ser inte varandra igen."
+  machine: { fi: true, sv: true }
+
+safety.report.failed:
+  en: "The report could not be sent. Try again."
+  description: "The report step (#84), a report the API did not take (no connection, a server error); the dialog stays open with the reason and the words kept."
+  fi: "Ilmoituksen lähetys ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte att skicka anmälan. Försök igen."
   machine: { fi: true, sv: true }
 
 settings.research.title:

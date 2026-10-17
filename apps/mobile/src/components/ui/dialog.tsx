@@ -7,11 +7,13 @@ import { FullWindowOverlay as RNFullWindowOverlay } from "react-native-screens";
 import { Icon } from "@/components/ui/icon";
 import { NativeOnlyAnimatedView } from "@/components/ui/native-only-animated-view";
 import { cn } from "@/lib/utils";
-import { TOUCH_TARGET } from "@/theme/a11y";
+import { MAX_FONT_SCALE, TOUCH_TARGET } from "@/theme/a11y";
 
 // From React Native Reusables (#12, TD-9), adapted: the close control is a
-// labelled 44 pt button (closeLabel is required), the scrim is a token, and
-// entering and exiting animations follow the OS reduce-motion setting.
+// labelled 44 pt button (closeLabel is required), the scrim is a token,
+// entering and exiting animations follow the OS reduce-motion setting, and
+// the title and the description keep the app's cap on text size, as the
+// Text primitive does (the primitive's own are plain React Native text).
 const MINIMUM_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
 const Dialog = DialogPrimitive.Root;
@@ -136,6 +138,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
   return (
     <DialogPrimitive.Title
       className={cn("text-foreground text-lg font-semibold", className)}
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...props}
     />
   );
@@ -148,6 +151,7 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       className={cn("text-muted-foreground text-sm", className)}
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...props}
     />
   );

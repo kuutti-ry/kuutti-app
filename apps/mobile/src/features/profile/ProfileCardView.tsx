@@ -5,16 +5,21 @@ import {
   type ProfileCard,
   type ProfileFieldKey,
 } from "@kuutti/schema";
-import { View } from "react-native";
+import { useState } from "react";
+import { type AccessibilityActionEvent, View } from "react-native";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Text } from "@/components/ui/text";
 import { captionKey, type OnRefused, PhotoDescriptionText, PhotoImage } from "@/features/media";
 import { pondName } from "@/features/pond";
+import { SafetyActions } from "@/features/safety";
 import { useT } from "@/lib/locale";
 import { usePhotoDescriptionText } from "@/lib/photo-descriptions";
 import { FieldLabel } from "./fieldIcons";
 import { hasGlyphs, OptionGlyph } from "./glyphs";
 import { genderKey, optionKey, presetKey, promptKey } from "./keys";
+
+/** The card's own accessibility action, by name; its label is the heard one. */
+const SAFETY_ACTION = "blockOrReport";
 
 /**
  * A card as others see it (#47, #150): the main photo in the card variant,
@@ -24,16 +29,25 @@ import { genderKey, optionKey, presetKey, promptKey } from "./keys";
  * info fields the API left on the card with what both answered marked in
  * words, and the rest of the prompts. The rounds of M4 render the same
  * component; the reason label of rules/mobile.md joins there.
+ *
+ * Someone else's card carries "Block or report" (#84, ADR-030 §11): an icon
+ * button beside the name, and the same as an accessibility action on the
+ * name. Only a screen that passes `onGone` shows it, so the owner's preview
+ * never does.
  */
 export function ProfileCardView({
   card,
   onRefused,
+  onGone,
 }: {
   card: ProfileCard;
   /** A photo URL the API refused (#52 budget or another code): the screen says so instead of a silent placeholder. */
   onRefused?: OnRefused;
+  /** Someone else's card: the person blocked or reported them, and the screen takes the card away. */
+  onGone?: (accountId: string) => void;
 }) {
   const { t, locale } = useT();
+  const [safetyOpen, setSafetyOpen] = useState(false);
   const described = usePhotoDescriptionText();
   const [main, ...rest] = card.photos;
   const [firstPrompt, ...morePrompts] = card.prompts;
@@ -98,11 +112,30 @@ export function ProfileCardView({
       <CardHeader>
         {main?.caption && <Caption text={t(captionKey(main.caption))} />}
         {mainWords && <PhotoDescriptionText text={mainWords} />}
-        {/* The age in the title, as visible as the name: every account is bank-verified,
-            so the card does not say so (#239). */}
-        <CardTitle>
-          {t("profile.card.nameAge", { name: card.displayName, years: card.age.years })}
-        </CardTitle>
+        <View className="flex-row items-start gap-2">
+          {/* The age in the title, as visible as the name: every account is bank-verified,
+              so the card does not say so (#239). */}
+          <CardTitle
+            className="flex-1"
+            {...(onGone && {
+              // A screen reader reaches block or report from the name too.
+              accessibilityActions: [{ name: SAFETY_ACTION, label: t("safety.actions.title") }],
+              onAccessibilityAction: (event: AccessibilityActionEvent) => {
+                if (event.nativeEvent.actionName === SAFETY_ACTION) setSafetyOpen(true);
+              },
+            })}
+          >
+            {t("profile.card.nameAge", { name: card.displayName, years: card.age.years })}
+          </CardTitle>
+          {onGone && (
+            <SafetyActions
+              accountId={card.accountId}
+              open={safetyOpen}
+              onOpenChange={setSafetyOpen}
+              onGone={onGone}
+            />
+          )}
+        </View>
         {card.gender && <Text variant="muted">{t(genderKey(card.gender))}</Text>}
         {identityLabel && (
           <Text variant="muted">{t(optionKey("identityLabel", identityLabel))}</Text>

@@ -6,6 +6,7 @@ import {
   PHOTO_VARIANTS,
   PhotoRejectionReason,
   PhotoState,
+  ReportOutcome,
   SanctionKind,
   SanctionReason,
 } from "@kuutti/schema";
@@ -34,6 +35,7 @@ describe("the tables", () => {
       "admin_session",
       "audit_log",
       "auth_request",
+      "block",
       "card_shown",
       "consent",
       "feedback",
@@ -48,6 +50,7 @@ describe("the tables", () => {
       "ponds",
       "preferences",
       "profile",
+      "report",
       "research_subject",
       "sanction",
       "session",
@@ -110,7 +113,7 @@ describe("the foreign keys", () => {
     ]);
   });
 
-  it("hang every personal row on the account, and staff and sanctions on the identity", () => {
+  it("hang every personal row on the account, and staff, sanctions and blocks on the identity", () => {
     const toAccount = references
       .filter((reference) => reference.includes(" -> account.id"))
       .map((reference) => reference.split(".")[0]);
@@ -126,6 +129,8 @@ describe("the foreign keys", () => {
       "photo_check_note",
       "preferences",
       "profile",
+      "report",
+      "report",
       "research_subject",
       "sanction",
       "session",
@@ -138,9 +143,12 @@ describe("the foreign keys", () => {
       "admin_session.identity_id",
       "audit_log.actor_identity_id",
       "auth_request.identity_id",
+      "block.blocked_identity_id",
+      "block.blocker_identity_id",
       "feedback.handled_by",
       "moderator_roles.identity_id",
       "photo_review.decided_by",
+      "report.decided_by",
       "sanction.created_by",
       "sanction.identity_id",
       "sanction.lifted_by",
@@ -173,6 +181,19 @@ describe("the foreign keys", () => {
     ]);
   });
 
+  it("keep a block between two identities and a report between two accounts, the decision's sanction let go by an erasure (#84, ADR-030)", () => {
+    expect(references.filter((reference) => reference.startsWith("block.")).sort()).toEqual([
+      "block.blocked_identity_id -> identity.id no action",
+      "block.blocker_identity_id -> identity.id no action",
+    ]);
+    expect(references.filter((reference) => reference.startsWith("report.")).sort()).toEqual([
+      "report.decided_by -> identity.id no action",
+      "report.reported_account_id -> account.id no action",
+      "report.reporter_account_id -> account.id no action",
+      "report.sanction_id -> sanction.id set null",
+    ]);
+  });
+
   it("make the ponds a tree", () => {
     expect(references).toContain("ponds.parent_id -> ponds.id no action");
   });
@@ -195,6 +216,8 @@ describe("the indexes", () => {
     ["matching_config", "matching_config_key_version_idx", ["key", "version"]],
     ["preferences", "preferences_account_field_idx", ["account_id", "field"]],
     ["card_shown", "card_shown_account_photo_idx", ["account_id", "photo_id"]],
+    ["block", "block_pair_idx", ["blocker_identity_id", "blocked_identity_id"]],
+    ["report", "report_open_pair_idx", ["reporter_account_id", "reported_account_id"]],
   ])("keep %s unique by %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(true);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -212,6 +235,7 @@ describe("the indexes", () => {
     ["photo_check_note", "photo_check_note_account_at_idx", ["account_id", "at"]],
     ["sanction", "sanction_account_created_idx", ["account_id", "created_at"]],
     ["sanction", "sanction_identity_open_idx", ["identity_id"]],
+    ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -220,6 +244,11 @@ describe("the indexes", () => {
   it("read only what is still open when settling a sanction (#307)", () => {
     expect(index("sanction", "sanction_identity_open_idx")?.where).toBeDefined();
     expect(index("sanction", "sanction_account_created_idx")?.where).toBeUndefined();
+  });
+
+  it("hold one open report per pair, and a block once per direction (#84)", () => {
+    expect(index("report", "report_open_pair_idx")?.where).toBeDefined();
+    expect(index("block", "block_pair_idx")?.where).toBeUndefined();
   });
 });
 
@@ -235,6 +264,20 @@ describe("the checks", () => {
       "sanction_lift_check",
       "sanction_note_check",
       "sanction_review_check",
+    ]);
+  });
+
+  it("refuse a block or a report of oneself, a note out of bounds and a half-written decision (#84, ADR-030)", () => {
+    const checks = (table: string) =>
+      byName
+        .get(table)
+        ?.checks.map((check) => check.name)
+        .sort();
+    expect(checks("block")).toEqual(["block_not_self_check"]);
+    expect(checks("report")).toEqual([
+      "report_decision_check",
+      "report_not_self_check",
+      "report_note_check",
     ]);
   });
 });
@@ -254,6 +297,9 @@ describe("the enums", () => {
     expect(enums.photo_rejection_reason).toEqual(PhotoRejectionReason.options);
     expect(enums.sanction_kind).toEqual(SanctionKind.options);
     expect(enums.sanction_reason).toEqual(SanctionReason.options);
+    expect(enums.report_outcome).toEqual(ReportOutcome.options);
+    // Where a report was made: a card, until the chat of #101 adds the conversation.
+    expect(enums.report_source).toEqual(["card"]);
   });
 
   it("are all exported, so drizzle-kit generates them", () => {

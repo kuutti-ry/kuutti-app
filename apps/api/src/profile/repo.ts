@@ -143,24 +143,29 @@ export type CardSubject = {
   /** Self-declared, display only (ADR-019 §1). */
   gender: Gender | null;
   profile: ProfileRow | null;
+  /** A block stands between the viewer and the subject, set by either (#84, ADR-030 §2). */
+  blocked: boolean;
 };
 
 /**
  * The account and profile behind a card. Read by the subject's id: the
  * viewer's right to see it is decided by the caller (the owner previewing
  * themselves, or M4's round after the matching rules), and recorded by
- * recordCardServed in the media slice for anyone but the owner.
+ * recordCardServed in the media slice for anyone but the owner. The viewer
+ * is named in the statement for the one thing that is theirs to know here,
+ * whether a block stands between the two (`blocked_between`, migration 0051).
  */
 export async function findCardSubject(
   db: Queryable,
-  subjectAccountId: string,
+  input: { viewerAccountId: string; subjectAccountId: string },
 ): Promise<CardSubject | null> {
   const { rows } = await db.query<Row>(
     `SELECT a.id, a.state, a.birth_year, a.birth_month, a.gender,
+            blocked_between($2, a.id) AS blocked,
             p.account_id, p.display_name, p.bio, p.bio_preset, p.fields, p.prompts, p.updated_at
      FROM account a LEFT JOIN profile p ON p.account_id = a.id
      WHERE a.id = $1`,
-    [subjectAccountId],
+    [input.subjectAccountId, input.viewerAccountId],
   );
   const r = rows[0];
   if (!r) return null;
@@ -171,6 +176,7 @@ export async function findCardSubject(
     birthMonth: (r.birth_month as number | null) ?? null,
     gender: (r.gender as Gender | null) ?? null,
     profile: r.account_id ? profileFrom(r) : null,
+    blocked: r.blocked === true,
   };
 }
 

@@ -37,8 +37,12 @@ export { profile } from "./profile.ts";
 export { researchSubject } from "./research.ts";
 export {
   auditLog,
+  block,
   photoCheckKind,
   photoCheckNote,
+  report,
+  reportOutcome,
+  reportSource,
   sanction,
   sanctionKind,
   sanctionReason,

@@ -13,6 +13,7 @@ export * from "./media.ts";
 export * from "./onboarding.ts";
 export * from "./profile.ts";
 export * from "./profile-fields.ts";
+export * from "./report.ts";
 export * from "./research.ts";
 export * from "./sanction.ts";
 export * from "./waitlist.ts";

@@ -99,11 +99,12 @@ export async function completenessOf(
 /**
  * The card (#47, ADR-009), one builder for two callers. For the owner it is
  * the preview: complete or not, nothing recorded. For anyone else (the round
- * builder of M4; no route in M3) the subject must be live and complete, the
- * shown record is written for every photo on the card and the card counts
- * against matching_config exposure_cards_per_day, both in one statement in
- * the media slice (#52); above the budget a 429 with Retry-After until the
- * Finnish day rolls, said in words and logged. Note for the route M4 adds:
+ * builder of M4; no route in M3) the subject must be live and complete, with
+ * no block between the two (#84), the shown record is written for every
+ * photo on the card and the card counts against matching_config
+ * exposure_cards_per_day, both in one statement in the media slice (#52);
+ * above the budget a 429 with Retry-After until the Finnish day rolls, said
+ * in words and logged. Note for the route M4 adds:
  * completeness (404) is decided before the budget (429), so a viewer over
  * budget could tell a complete subject from the rest by the status; that
  * route answers 429 before the lookup, or 404 in both cases.
@@ -113,13 +114,16 @@ export async function buildCard(
   input: { viewerAccountId: string; subjectAccountId: string },
 ): Promise<{ card: ProfileCard | null; completeness: Completeness }> {
   const own = input.viewerAccountId === input.subjectAccountId;
-  const subject = await repo.findCardSubject(deps.db, input.subjectAccountId);
+  const subject = await repo.findCardSubject(deps.db, input);
   if (!subject || subject.state === "deleted") {
     throw new AppError(404, "not_found", "No such card");
   }
   // For anyone but the owner only a live account is a card: a suspension or
-  // a shadow ban holds at this gate too, whatever the caller filtered.
-  if (!own && subject.state !== "active") {
+  // a shadow ban holds at this gate too, whatever the caller filtered. A
+  // block of either side holds here as well (rule 7, #84, ADR-030 §2), the
+  // same answer as for anybody outside the pool, before anything is
+  // recorded or counted.
+  if (!own && (subject.state !== "active" || subject.blocked)) {
     throw new AppError(404, "not_found", "No such card");
   }
   const [photos, pond, viewer] = await Promise.all([
@@ -146,6 +150,8 @@ export async function buildCard(
       since: day.start,
       limit,
     });
+    // A block that landed after findCardSubject's look: the same 404, nothing written.
+    if (served.blocked) throw new AppError(404, "not_found", "No such card");
     if (!served.recorded) {
       const retryAfterSeconds = secondsUntil(day.end, at);
       deps.logger.warn(

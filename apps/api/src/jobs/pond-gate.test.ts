@@ -6,6 +6,7 @@ import { it } from "vitest";
 import { eraseAccount, exportAccount } from "../identity/index.ts";
 import { savePreferences } from "../matching/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
+import { cardShown } from "../test/cards.ts";
 import {
   captureLogger,
   describe,
@@ -797,6 +798,87 @@ describe("the person's own gate", () => {
     const gate = await gateOf({ db: ctx.client, logger, now: () => NIGHT_1 }, ids[0] as string);
     expect(gate).toMatchObject({ state: "closed" });
     expect((await rowsOf(ctx, pond)).map((row) => row.account_id)).toEqual([ids[0]]);
+  });
+});
+
+/** `blocker` blocks `blocked` from a card they were shown, through the route (#84). */
+async function blocks(ctx: TestContext, blocker: string | undefined, blocked: string | undefined) {
+  if (!blocker || !blocked) throw new Error("nobody to block");
+  await cardShown(ctx.client, blocker, blocked);
+  const who = await signInAs(ctx.client, blocker);
+  const response = await ctx.app.request("/blocks", {
+    method: "POST",
+    headers: { ...who.headers, "content-type": "application/json" },
+    body: JSON.stringify({ accountId: blocked }),
+  });
+  expect(response.status).toBe(204);
+}
+
+const blockedBetween = async (ctx: TestContext, a: string | undefined, b: string | undefined) =>
+  (
+    await ctx.client.query<{ blocked: boolean }>("SELECT blocked_between($1, $2) AS blocked", [
+      a,
+      b,
+    ])
+  ).rows[0]?.blocked;
+
+// features/safety/blocks.feature (#84, ADR-030 §3): a blocked pair is not in
+// each other's pool, so neither counts toward the other's figure; admission
+// and the line are about the pond and read no block.
+describe("the gate across a block", () => {
+  test("The gate's count leaves a blocked pair out of each other's pool", async ({ ctx }) => {
+    const pond = await setUp(ctx, "test-gate-blocks");
+    const [she, her] = await people(ctx.client, pond, 2, ALIKE);
+    const others = await people(ctx.client, pond, 29, ALIKE);
+    await blocks(ctx, she, her);
+    const { result } = await counted(ctx, NIGHT_1);
+    // Thirty-one, each with thirty others: the gate opens for the twenty-nine,
+    // and the two stay one short, whoever set the block.
+    expect(result).toMatchObject({ counted: 31, admitted: 31, opened: 29 });
+    for (const blocked of [she, her]) {
+      expect(await rowOf(ctx, blocked)).toMatchObject({ pool_said: 20, opened_at: null });
+    }
+    expect(await rowOf(ctx, others[0])).toMatchObject({ pool_said: 30, opened_at: NIGHT_1 });
+    expect((await askedBy(ctx, her)).gate).toMatchObject({ state: "closed", needed: 10 });
+  });
+
+  test("a first ask counts the pool without the blocked one too", async ({ ctx }) => {
+    const pond = await setUp(ctx, "test-gate-blocks-first");
+    const [them] = await people(ctx.client, pond, 30, ALIKE);
+    await counted(ctx, NIGHT_1);
+    // A newcomer of the thirty-first who blocks one of them before she first asks.
+    const [she] = await people(ctx.client, pond, 1, ALIKE);
+    await blocks(ctx, she, them);
+    const { gate } = await askedBy(ctx, she);
+    expect(gate).toMatchObject({ state: "closed", needed: 10 });
+    expect(await rowOf(ctx, she)).toMatchObject({ pool_said: 20, opened_at: null });
+  });
+
+  test("A block holds for a later account of either identity", async ({ ctx }) => {
+    const pond = await setUp(ctx, "test-gate-blocks-later");
+    const [a, b, c] = await people(ctx.client, pond, 3, ALIKE);
+    await people(ctx.client, pond, 28, ALIKE);
+    await blocks(ctx, a, b);
+    // B deletes the account, the cooldown passes, and B comes back: a new
+    // account on the same identity (a complete person here, given B's identity).
+    const { logger } = await captureLogger();
+    await eraseAccount({ db: ctx.client, logger, now: () => NIGHT_1 }, b as string);
+    const [again] = await people(ctx.client, pond, 1, ALIKE);
+    await ctx.client.query(
+      "UPDATE account SET identity_id = (SELECT identity_id FROM account WHERE id = $2) WHERE id = $1",
+      [again, b],
+    );
+    await counted(ctx, NIGHT_2);
+    // Still out of each other's pool: thirty others each, one of them blocked.
+    expect(await rowOf(ctx, a)).toMatchObject({ pool_said: 20, opened_at: null });
+    expect(await rowOf(ctx, again)).toMatchObject({ pool_said: 20, opened_at: null });
+    expect(await rowOf(ctx, c)).toMatchObject({ pool_said: 30, opened_at: NIGHT_2 });
+    // The card and the photos ask the same of the identities, both ways; the
+    // card builder and the photo route are held to it across a later account
+    // of either in profile/service.test.ts and media/budget.test.ts.
+    expect(await blockedBetween(ctx, a, again)).toBe(true);
+    expect(await blockedBetween(ctx, again, a)).toBe(true);
+    expect(await blockedBetween(ctx, c, again)).toBe(false);
   });
 });
 

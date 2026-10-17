@@ -6,10 +6,10 @@ import type { AgeWindow, Gender, ProfileFields } from "@kuutti/schema";
  * in A's: each one's gender is among those the other seeks, each one's age
  * is inside the other's window, and the two want the same thing, or one of
  * them is open to either and the other is no dance partner (ADR-015 §10,
- * §13). The pond gate counts a person's pool
- * with this (#94) and the round builder draws its candidates through it
- * (#95); blocks and deal-breakers join here with #87, so that no caller can
- * show somebody a filter excludes.
+ * §13), and neither has blocked the other (#84, ADR-030 §2). The pond gate
+ * counts a person's pool with this (#94) and the round builder draws its
+ * candidates through it (#95); deal-breakers join here with #87, so that no
+ * caller can show somebody a filter excludes.
  *
  * Pure, and it names no gender: the rule is the same for everybody.
  */
@@ -24,6 +24,10 @@ export type PoolPerson = {
   age: number;
   /** What the person is here for; an onboarding step (#146), so never missing from a finished profile. */
   intent: Intent;
+  /** The person's identity: a block is between identities, so it holds for a later account (#84). */
+  identityId: string;
+  /** The identities this person blocked (#84). Read here and nowhere else: a block is a filter, never a signal. */
+  blocks: ReadonlySet<string>;
 };
 
 /**
@@ -40,6 +44,7 @@ export function intentsFit(a: Intent, b: Intent): boolean {
 /** One direction: whether `candidate` passes what `viewer` asked for. */
 export function passesFiltersOf(viewer: PoolPerson, candidate: PoolPerson): boolean {
   return (
+    !viewer.blocks.has(candidate.identityId) &&
     viewer.seeks.includes(candidate.gender) &&
     candidate.age >= viewer.ageWindow.min &&
     candidate.age <= viewer.ageWindow.max &&

@@ -120,3 +120,15 @@ Feature: Account deletion per the erasure table
     When "A" exports their data and then is erased
     Then the export lists A's sanctions with kind, reason and dates, never who and never the note
     And only A's open ban remains, on the identity, and B's warning is untouched
+
+  Scenario: Reports and blocks outlive the erasure of either person
+    Given "A" reported "B" and "C" blocked "A"
+    When "A" deletes the account, and then "B" does
+    Then the report, its note with it, and both blocks remain
+
+  Scenario: The export lists the reports filed with their outcome and the blocks set, never the other person's id
+    Given "A" reported "B" and "C", a moderator acted on the second, and "A" blocked "D"
+    And "E" reported "A" and "F" blocked "A"
+    When "A" exports the account, in English, Finnish or Swedish
+    Then the export lists A's two reports with their reasons, A's own note and what came of them, and A's three blocks by date, in the request's language
+    And nothing names "B", "C", "D", "E" or "F", and nothing of E's report or F's block is there

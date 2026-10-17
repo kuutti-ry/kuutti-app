@@ -1,5 +1,15 @@
 import { sql } from "drizzle-orm";
-import { check, index, jsonb, pgEnum, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { account, identity } from "./identity.ts";
 import { photo } from "./media.ts";
 
@@ -125,6 +135,95 @@ export const sanction = pgTable(
       sql`(${table.reviewedAt} IS NULL AND ${table.reviewedBy} IS NULL AND ${table.reviewNote} IS NULL)
         OR (${table.reviewedAt} IS NOT NULL AND ${table.reviewedBy} IS NOT NULL
           AND ${table.reviewNote} IS NOT NULL AND char_length(${table.reviewNote}) BETWEEN 1 AND 500)`,
+    ),
+  ],
+);
+
+/**
+ * A block (#84, ADR-030): one person set it from a card they were shown, and
+ * from then on neither is shown to the other, in either direction, anywhere
+ * a person is shown to a person (rule 7). Between the two identities, not the
+ * accounts, so it holds for a later account of either; final, with no list
+ * and no unblock. Nothing reads it but the filters: the pool's count
+ * (`inEachOthersPool`), and `blocked_between(a, b)`, the database function of
+ * migration 0051 that the card and the photo reads ask. Kept through the
+ * erasure of either person, as long as the identities (TD-7's kept side);
+ * the export lists the person's own blocks by date, never whom.
+ */
+export const block = pgTable(
+  "block",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    blockerIdentityId: uuid("blocker_identity_id")
+      .notNull()
+      .references(() => identity.id),
+    blockedIdentityId: uuid("blocked_identity_id")
+      .notNull()
+      .references(() => identity.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // One row per pair and direction, what a second block's ON CONFLICT DO
+    // NOTHING needs; both directions of `blocked_between` and the export's
+    // own blocks are lookups on it.
+    uniqueIndex("block_pair_idx").on(table.blockerIdentityId, table.blockedIdentityId),
+    check("block_not_self_check", sql`${table.blockerIdentityId} <> ${table.blockedIdentityId}`),
+  ],
+);
+
+/**
+ * A report (#84, ADR-030): one person tells the moderators about another,
+ * from a card they were shown, with a reason of #106's list and, if they
+ * like, a few lines; it blocks both ways in the same transaction. The note
+ * reaches no log line, error detail or event (rule 5). At most
+ * matching_config reports_per_day per account and Finnish day, counted in the
+ * statement that writes the row; one open report per pair. The decision
+ * columns are #312's: dismissed, or acted on with the sanction it led to
+ * (#307), by whom and when; the export says the outcome. Kept twelve months
+ * from filing (a nightly prune), whoever of the two is erased in between
+ * (TD-7's "report snapshots for 12 months"). `source` says where it was
+ * made; #101 adds the conversation and its frozen copy.
+ */
+export const reportSource = pgEnum("report_source", ["card"]);
+export const reportOutcome = pgEnum("report_outcome", ["dismissed", "acted"]);
+
+export const report = pgTable(
+  "report",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reporterAccountId: uuid("reporter_account_id")
+      .notNull()
+      .references(() => account.id),
+    reportedAccountId: uuid("reported_account_id")
+      .notNull()
+      .references(() => account.id),
+    source: reportSource("source").notNull(),
+    reason: sanctionReason("reason").notNull(),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    outcome: reportOutcome("outcome"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decidedBy: uuid("decided_by").references(() => identity.id),
+    // Erasure deletes a lifted sanction (ADR-024 §8); the report keeps its outcome.
+    sanctionId: uuid("sanction_id").references(() => sanction.id, { onDelete: "set null" }),
+  },
+  (table) => [
+    // The day's count and the export: the reporter's rows by time.
+    index("report_reporter_created_idx").on(table.reporterAccountId, table.createdAt),
+    // One open report per pair; a second one while it is open writes nothing.
+    uniqueIndex("report_open_pair_idx")
+      .on(table.reporterAccountId, table.reportedAccountId)
+      .where(sql`${table.decidedAt} IS NULL`),
+    check("report_not_self_check", sql`${table.reporterAccountId} <> ${table.reportedAccountId}`),
+    check(
+      "report_note_check",
+      sql`${table.note} IS NULL OR char_length(${table.note}) BETWEEN 1 AND 500`,
+    ),
+    check(
+      "report_decision_check",
+      sql`(${table.outcome} IS NULL) = (${table.decidedAt} IS NULL)
+        AND (${table.decidedBy} IS NULL) = (${table.decidedAt} IS NULL)
+        AND (${table.sanctionId} IS NULL OR ${table.outcome} = 'acted')`,
     ),
   ],
 );

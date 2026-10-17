@@ -99,6 +99,17 @@ export async function deleteIdentities(
       identities,
     ])
   ).rows.map((r) => r.id);
+  // Reports and blocks outlive the erasure by design (ADR-030 §10), so the
+  // reset would meet them again: they go here, whichever side the identities
+  // are on. Neither names an account_id column of its own.
+  await tx.query(
+    "DELETE FROM report WHERE reporter_account_id = ANY($1) OR reported_account_id = ANY($1)",
+    [accounts],
+  );
+  await tx.query(
+    "DELETE FROM block WHERE blocker_identity_id = ANY($1) OR blocked_identity_id = ANY($1)",
+    [identities],
+  );
   for (const table of ACCOUNT_TABLES) {
     await tx.query(`DELETE FROM ${table} WHERE account_id = ANY($1)`, [accounts]);
   }
