@@ -58,17 +58,49 @@ describe("the profile client", () => {
     });
   });
 
-  it("saves the document and answers what the API stored", async () => {
+  it("saves what the screen makes of the document stored when the save goes, and answers what the API stored (#238)", async () => {
     const update = { displayName: "Aino", bio: null, bioPreset: null, fields: {}, prompts: [] };
-    const seen = answering(json(EMPTY), refusal("validation_failed", 422));
-    expect(await saveProfile(update)).toEqual(EMPTY);
-    expect(seen[0]?.method).toBe("PUT");
-    expect(JSON.parse(await (seen[0] as Request).text())).toEqual(update);
-    await expect(saveProfile(update)).rejects.toMatchObject({
+    const stored = {
+      profile: { ...update, specialCategoryConsent: null, updatedAt: "2026-09-26T10:00:00.000Z" },
+      completeness: EMPTY.completeness,
+    };
+    const seen = answering(
+      json(stored),
+      json(EMPTY),
+      json(EMPTY),
+      refusal("validation_failed", 422),
+    );
+    const build = jest.fn(() => ({ ...update, displayName: "Aino K" }));
+    expect(await saveProfile(build)).toEqual(EMPTY);
+    expect(seen.map((request) => `${request.method} ${pathOf(request)}`)).toEqual([
+      "GET /profile",
+      "PUT /profile",
+    ]);
+    expect(build).toHaveBeenCalledWith(stored.profile);
+    expect(JSON.parse(await (seen[1] as Request).text())).toEqual({
+      ...update,
+      displayName: "Aino K",
+    });
+    // Before the first save nothing is stored, and the screen builds on nothing.
+    const first = jest.fn(() => update);
+    await expect(saveProfile(first)).rejects.toMatchObject({
       status: 422,
       code: "validation_failed",
       message: "profile save answered 422",
     });
+    expect(first).toHaveBeenCalledWith(null);
+  });
+
+  it("sends nothing when the stored document cannot be read first, and fails with that read's code", async () => {
+    const seen = answering(refusal("internal_error", 500));
+    const build = jest.fn();
+    await expect(saveProfile(build)).rejects.toMatchObject({
+      status: 500,
+      code: "internal_error",
+      message: "profile answered 500",
+    });
+    expect(build).not.toHaveBeenCalled();
+    expect(seen.map((request) => request.method)).toEqual(["GET"]);
   });
 
   it("reads a card photo's description less a key this build cannot say (#296)", async () => {
@@ -159,49 +191,60 @@ describe("the profile client: a save on its way (#238)", () => {
 
   it("holds a read of the profile, the card or the deal-breakers until the save before it has landed", async () => {
     const waiting = holding();
-    const save = saveProfile(update);
+    const save = saveProfile(() => update);
     const reads = [fetchProfile(), fetchCardPreview(), fetchDealBreakers()];
     await flush();
-    expect(sent(waiting)).toEqual(["PUT /profile"]);
+    expect(sent(waiting)).toEqual(["GET /profile"]);
     waiting[0]?.answer(json(EMPTY));
+    await flush();
+    expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile"]);
+    waiting[1]?.answer(json(EMPTY));
     expect(await save).toEqual(EMPTY);
     await flush();
     expect(sent(waiting)).toEqual([
+      "GET /profile",
       "PUT /profile",
       "GET /profile",
       "GET /profile/card",
       "GET /preferences/deal-breakers",
     ]);
-    for (const { answer } of waiting.slice(1)) answer(refusal("internal_error", 500));
+    for (const { answer } of waiting.slice(2)) answer(refusal("internal_error", 500));
     for (const read of reads) await expect(read).rejects.toBeInstanceOf(ApiError);
   });
 
-  it("sends a second save only once the first has its answer, and a refused one holds up nothing after it", async () => {
+  it("reads for a second save only once the first has its answer, and a refused one holds up nothing after it", async () => {
     const waiting = holding();
-    const first = saveProfile(update);
-    const second = saveProfile({ ...update, displayName: "Aino K" });
+    const first = saveProfile(() => update);
+    const second = saveProfile(() => ({ ...update, displayName: "Aino K" }));
     await flush();
-    expect(sent(waiting)).toEqual(["PUT /profile"]);
-    waiting[0]?.answer(refusal("text_contact_details", 400));
+    expect(sent(waiting)).toEqual(["GET /profile"]);
+    waiting[0]?.answer(json(EMPTY));
+    await flush();
+    expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile"]);
+    waiting[1]?.answer(refusal("text_contact_details", 400));
     await expect(first).rejects.toMatchObject({ code: "text_contact_details" });
     await flush();
-    expect(sent(waiting)).toEqual(["PUT /profile", "PUT /profile"]);
-    expect(JSON.parse(await (waiting[1] as (typeof waiting)[number]).request.text())).toMatchObject(
+    // The second reads what is stored after the first: it builds on that, never on what was before.
+    expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile", "GET /profile"]);
+    waiting[2]?.answer(json(EMPTY));
+    await flush();
+    expect(sent(waiting)).toEqual(["GET /profile", "PUT /profile", "GET /profile", "PUT /profile"]);
+    expect(JSON.parse(await (waiting[3] as (typeof waiting)[number]).request.text())).toMatchObject(
       {
         displayName: "Aino K",
       },
     );
-    waiting[1]?.answer(json(EMPTY));
+    waiting[3]?.answer(json(EMPTY));
     expect(await second).toEqual(EMPTY);
     const read = fetchProfile();
     await flush();
-    waiting[2]?.answer(json(EMPTY));
+    waiting[4]?.answer(json(EMPTY));
     expect(await read).toEqual(EMPTY);
   });
 
   it("lets a read through at once when a save failed on the network", async () => {
     const waiting = holding();
-    const save = saveProfile(update);
+    const save = saveProfile(() => update);
     await flush();
     globalThis.fetch = jest.fn(async () => json(EMPTY)) as unknown as typeof fetch;
     waiting[0]?.answer(Promise.reject(new TypeError("Network request failed")) as never);

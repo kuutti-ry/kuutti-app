@@ -98,9 +98,10 @@ const TILE_ACTIONS: ReadonlyArray<{ name: string; key: PlainMessageKey }> = [
  * button to remove it after a confirmation. Tapping a photo opens the zoom
  * screen, the one place the full variant is requested. A new photo goes
  * through the on-device check and the pre-resize before the upload, with its
- * progress in words.
+ * progress in words. Opened from onboarding, it says that step's "Step x of
+ * n" as every other step does (#146).
  */
-export function PhotosScreen() {
+export function PhotosScreen({ progress }: { progress?: { step: number; total: number } }) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
@@ -155,6 +156,11 @@ export function PhotosScreen() {
         <Text variant="h1" accessibilityRole="header">
           {t("photos.title")}
         </Text>
+        {progress && (
+          <Text variant="muted" accessibilityLiveRegion="polite">
+            {t("onboarding.progress", progress)}
+          </Text>
+        )}
         {list && <Text>{t("photos.explain", { max: list.maxPhotos })}</Text>}
         {list && (
           <Text variant="muted" accessibilityLiveRegion="polite">

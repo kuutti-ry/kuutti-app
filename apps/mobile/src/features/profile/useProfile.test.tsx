@@ -1,7 +1,7 @@
 import type { ProfileUpdate } from "@kuutti/schema";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { saveSession } from "@/lib/session";
-import { EMPTY_PROFILE, useProfile } from "./useProfile";
+import { changesOf, EMPTY_PROFILE, useProfile, withChanges } from "./useProfile";
 
 // The profile as a draft (#47): what the API stored, what is typed since, the
 // save that trims and leaves unanswered prompts out, and what a failed read or
@@ -182,6 +182,36 @@ describe("useProfile: editing and saving", () => {
     expect(result.current.dirty).toBe(true);
   });
 
+  it("saves what its draft changed onto the document as stored, so two drafts read together both keep theirs (#238)", async () => {
+    // One stored document, as the API keeps it: a save replaces it whole.
+    let document: ProfileUpdate = DOCUMENT;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.method === "PUT") document = (await request.json()) as ProfileUpdate;
+      return json(stored(document));
+    }) as unknown as typeof fetch;
+    const name = await ready();
+    const height = await ready();
+    await act(async () => name.result.current.update({ displayName: "Aino K" }));
+    await act(async () =>
+      height.result.current.update({ fields: { ...DOCUMENT.fields, height: 180 } }),
+    );
+    await act(async () => {
+      await name.result.current.save();
+    });
+    await act(async () => {
+      await height.result.current.save();
+    });
+    expect(document).toEqual({
+      ...DOCUMENT,
+      displayName: "Aino K",
+      fields: { intent: "long_term", height: 180 },
+    });
+    // Each draft is the stored document after its save: nothing of the other is undone on screen.
+    expect(height.result.current.draft).toEqual(document);
+    expect(height.result.current.dirty).toBe(false);
+  });
+
   it("keeps the draft when the API answers a save without a document", async () => {
     serve([() => json(stored(DOCUMENT))], [() => json(stored(null))]);
     const { result } = await ready();
@@ -225,16 +255,22 @@ describe("useProfile: editing and saving", () => {
 });
 
 describe("useProfile: a section that has gone (#238)", () => {
-  it("puts a held draft back over the stored document, with the reason, on the first read only", async () => {
-    serve([() => json(stored(DOCUMENT))]);
+  it("puts held changes back over the stored document, with the reason, on the first read only", async () => {
+    // Saved by another section since the changes were refused: kept under them (#238).
+    serve([() => json(stored({ ...DOCUMENT, displayName: "Aino K" }))]);
     const held = {
-      draft: { ...DOCUMENT, bio: "Call me on 040 123 4567." },
+      changes: { bio: "Call me on 040 123 4567.", bioPreset: null },
       notice: { kind: "error", code: "text_contact_details" } as const,
     };
     const view = await renderHook(() => useProfile(held));
     await waitFor(() => expect(view.result.current.status).toBe("ready"));
-    expect(view.result.current.draft.bio).toBe("Call me on 040 123 4567.");
+    expect(view.result.current.draft).toEqual({
+      ...DOCUMENT,
+      displayName: "Aino K",
+      bio: "Call me on 040 123 4567.",
+    });
     expect(view.result.current.saved.bio).toBe("Long walks.");
+    expect(view.result.current.changes).toEqual(held.changes);
     expect(view.result.current.dirty).toBe(true);
     expect(view.result.current.notice).toEqual(held.notice);
     await act(async () => {
@@ -285,5 +321,62 @@ describe("useProfile: a section that has gone (#238)", () => {
     await act(async () => unmount());
     answer?.(json(stored({ ...DOCUMENT, displayName: "Aino K" })));
     expect(await saving).toBeNull();
+  });
+});
+
+describe("changesOf and withChanges: what a draft changed, put on another document (#238)", () => {
+  it("names nothing for the same document with its keys in another order", () => {
+    const reordered = {
+      ...DOCUMENT,
+      fields: { height: 170, intent: "long_term" },
+    } as ProfileUpdate;
+    expect(changesOf(DOCUMENT, reordered)).toEqual({});
+  });
+
+  it("names the name, the prompts, and each field set, changed or taken away", () => {
+    const to = {
+      ...DOCUMENT,
+      displayName: "Aino K",
+      prompts: [],
+      fields: { intent: "casual", smoking: "never" },
+    } as ProfileUpdate;
+    expect(changesOf(DOCUMENT, to)).toEqual({
+      displayName: "Aino K",
+      prompts: [],
+      fields: { intent: "casual", height: undefined, smoking: "never" },
+    });
+  });
+
+  it("names a bio and a ready line together when either changes: the API takes one, never both", () => {
+    expect(changesOf(DOCUMENT, { ...DOCUMENT, bio: null, bioPreset: "photos_speak" })).toEqual({
+      bio: null,
+      bioPreset: "photos_speak",
+    });
+    expect(changesOf(DOCUMENT, { ...DOCUMENT, bio: "Short walks." })).toEqual({
+      bio: "Short walks.",
+      bioPreset: null,
+    });
+  });
+
+  it("puts the changes on the document and keeps what they do not name, a field taken away gone", () => {
+    const document = {
+      ...DOCUMENT,
+      displayName: "Aino K",
+      fields: { intent: "casual", height: 170 },
+    };
+    expect(
+      withChanges(document as ProfileUpdate, {
+        bio: null,
+        bioPreset: "ask_me_instead",
+        fields: { height: undefined, smoking: "never" },
+      }),
+    ).toEqual({
+      ...DOCUMENT,
+      displayName: "Aino K",
+      bio: null,
+      bioPreset: "ask_me_instead",
+      fields: { intent: "casual", smoking: "never" },
+    });
+    expect(withChanges(DOCUMENT, {})).toEqual(DOCUMENT);
   });
 });

@@ -328,6 +328,16 @@ describe("PhotosScreen", () => {
     expect(screen.queryByText(withoutObjects)).toBeNull();
   });
 
+  it("says the onboarding's step when opened from it, as every other step does, and none otherwise (#146)", async () => {
+    fetchMock([answersList(list(2)), answersUrls]);
+    await show(<PhotosScreen progress={{ step: 8, total: 10 }} />);
+    expect(await screen.findByText("Step 8 of 10")).toBeTruthy();
+    expect(screen.getByText("Step 8 of 10").props.accessibilityLiveRegion).toBe("polite");
+    await show(<PhotosScreen />);
+    expect(await screen.findByText("2 photos, at most 3")).toBeTruthy();
+    expect(screen.queryByText(/^Step /)).toBeNull();
+  });
+
   it("Done returns to where the person came from, since no header offers a way back", async () => {
     fetchMock([answersList(list(2)), answersUrls]);
     await show(<PhotosScreen />);

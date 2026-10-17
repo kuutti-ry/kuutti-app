@@ -191,6 +191,29 @@ describe("the bank login's return, /auth", () => {
   });
 });
 
+describe("the photos screen, /photos", () => {
+  it("hands the onboarding's step as numbers when it opened the screen (#146)", async () => {
+    params({ step: "8", total: "10" });
+    await render(<PhotosRoute />);
+    expect(propsOf("PhotosScreen")).toEqual({ progress: { step: 8, total: 10 } });
+  });
+
+  it.each<Record<string, string | readonly string[]>>([
+    { step: "8" },
+    { total: "10" },
+    { step: "", total: "10" },
+    { step: "eight", total: "10" },
+    { step: "11", total: "10" },
+    { step: "0", total: "10" },
+    { step: "1.5", total: "10" },
+    { step: ["8", "9"], total: "10" },
+  ])("hands no step for %j, which no onboarding sends", async (value) => {
+    params(value);
+    await render(<PhotosRoute />);
+    expect(propsOf("PhotosScreen")).toEqual({});
+  });
+});
+
 describe("the zoom screen, /photos/[id]", () => {
   it("hands the photo, its placeholder and its place in the grid as numbers", async () => {
     params({ id: "p1", blurhash: "LEHV6n", position: "2", total: "3" });

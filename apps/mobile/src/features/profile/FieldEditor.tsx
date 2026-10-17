@@ -223,8 +223,8 @@ export function FieldEditor({
       )}
       {spec.kind === "number" && (
         <>
+          {/* No label of its own: the FieldLabel above names it (#238). */}
           <Stepper
-            label={label}
             value={typeof value === "number" ? value : Math.round((spec.min + spec.max) / 2)}
             shown={
               typeof value === "number" ? formatHeight(locale, value) : t("profile.number.unset")

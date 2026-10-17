@@ -554,6 +554,7 @@ export type MessageParams = {
   "photos.error.generic": Record<never, never>;
   "photos.error.media_busy": Record<never, never>;
   "photos.error.media_unavailable": Record<never, never>;
+  "photos.error.notShown": Record<never, never>;
   "photos.error.permission": Record<never, never>;
   "photos.error.photo_budget_exceeded": Record<never, never>;
   "photos.error.photo_invalid": Record<never, never>;

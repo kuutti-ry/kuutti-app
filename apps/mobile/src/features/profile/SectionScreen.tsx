@@ -63,22 +63,23 @@ function ItemEditor({
   return <FieldEditor field={item} draft={draft} update={update} />;
 }
 
-/** Drafts the API refused after their section had gone, by section (#238). */
-// shortcut: a refused section comes back on top of whatever is open; had the
-// person already edited another section there, both save the whole document
-// and the one left last wins. Only after a refusal slower than opening and
-// editing another section; a save of the changed fields alone would lift it.
+/**
+ * Changes the API refused after their section had gone, by section (#238). A
+ * refused section comes back on top of whatever is open; each section saves
+ * only its own changes onto the document as stored (useProfile), so neither
+ * undoes the other.
+ */
 const refusedDrafts = new Map<string, HeldDraft>();
 
 /**
  * One section of the profile (#227): its editors only, and no Save button.
- * Leaving (the back button, the swipe, Android's back key) saves the whole
- * document once when something changed. The leaving is never held up: held,
- * the native swipe on iOS popped the screen, put it back and popped it again
- * (#238). So the save goes as the screen goes, and a refusal brings the
- * section back with the draft and the reason, and asks before leaving without
- * saving. Not a save per tap: each save is a `profile_saved` research event
- * (ADR-011), and a refused bio is best said on the screen that holds it.
+ * Leaving (the back button, the swipe, Android's back key) saves the
+ * section's changes once when something changed. The leaving is never held
+ * up: held, the native swipe on iOS popped the screen, put it back and popped
+ * it again (#238). So the save goes as the screen goes, and a refusal brings
+ * the section back with the draft and the reason, and asks before leaving
+ * without saving. Not a save per tap: each save is a `profile_saved` research
+ * event (ADR-011), and a refused bio is best said on the screen that holds it.
  */
 export function SectionScreen({ section: id }: { section: string }) {
   const { t } = useT();
@@ -103,10 +104,11 @@ export function SectionScreen({ section: id }: { section: string }) {
   const onLeave = useEffectEvent(() => {
     if (left.current || !section || !profile.dirty) return;
     left.current = true;
+    const { changes } = profile;
     void profile.save().then((notice) => {
       // A session that ended has taken the person to the sign-in, and the draft with it.
       if (!notice || !currentSession()) return;
-      refusedDrafts.set(id, { draft, notice });
+      refusedDrafts.set(id, { changes, notice });
       router.push(sectionPath(section.id));
     });
   });

@@ -553,6 +553,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "photos.error.generic": "［Théé phóótóó çóóúúld ñóót béé úúplóóáádééd. Trýý áágááííñ.］",
   "photos.error.media_busy": "［Mááñýý phóótóóš ááréé bééííñg próóçééššééd rííght ñóów. Trýý áágááííñ ííñ áá móómééñt.］",
   "photos.error.media_unavailable": "［Phóótóóš ááréé ñóót áávááííláábléé rííght ñóów.］",
+  "photos.error.notShown": "［Théé phóótóó çóóúúld ñóót béé šhóówñ.］",
   "photos.error.permission": "［Kúúúúttíí çóóúúld ñóót óópééñ ýýóóúúr phóótóóš. ÁÁllóów ááççééšš ííñ théé phóóñéé'š šééttííñgš ááñd trýý áágááííñ.］",
   "photos.error.photo_budget_exceeded": "［Tháát ííš ééñóóúúgh phóótóóš fóór tóódááýý. Thééýý lóóáád áágááííñ ááftéér míídñííght.］",
   "photos.error.photo_invalid": "［Théé phóótóó çóóúúld ñóót béé rééáád. Trýý ááñóóthéér pííçtúúréé.］",

@@ -238,18 +238,18 @@ describe("CardPreviewScreen", () => {
     );
   });
 
-  it("says the generic line under the card for any other refused photo", async () => {
+  it("says under the card that a photo could not be shown for any other refusal (#235)", async () => {
     refusingPhotos("not_found", 404);
     await show();
-    await waitFor(() =>
-      expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText("The photo could not be shown.")).toBeTruthy());
+    // The person was looking at their card, not uploading.
+    expect(screen.queryByText(/uploaded/)).toBeNull();
     expect(
       screen.queryByText("That is enough photos for today. They load again after midnight."),
     ).toBeNull();
   });
 
-  it("says the generic line under the card for a photo refused without the API's word", async () => {
+  it("says under the card that a photo could not be shown when it was refused without the API's word", async () => {
     globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
       const request = input instanceof Request ? input : new Request(input, init);
       if (new URL(request.url).pathname === "/profile/card") {
@@ -258,8 +258,6 @@ describe("CardPreviewScreen", () => {
       return new Response("<html>Bad gateway</html>", { status: 502 });
     }) as unknown as typeof fetch;
     await show();
-    await waitFor(() =>
-      expect(screen.getByText("The photo could not be uploaded. Try again.")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText("The photo could not be shown.")).toBeTruthy());
   });
 });

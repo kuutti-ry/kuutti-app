@@ -276,6 +276,49 @@ describe("SectionScreen", () => {
     expect(puts).toHaveLength(1);
   });
 
+  it("keeps another section's save when a refused one comes back and is left after it (#238)", async () => {
+    // One stored document, as the API keeps it: a save replaces it, a contact detail is refused.
+    let document = stored({ smoking: "never" });
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (request.method === "PUT") {
+        const body = (await request.json()) as { displayName: string };
+        if (body.displayName.includes("@")) {
+          const error = { code: "text_contact_details", message: "no", requestId: "r" };
+          return json({ error }, 400);
+        }
+        document = { ...document, ...body };
+      }
+      return json({ profile: document, completeness: { complete: false, missing } });
+    }) as unknown as typeof fetch;
+
+    const basics = await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByLabelText("Name on your card")).toBeTruthy());
+    await type(screen.getByLabelText("Name on your card"), "aino@example.com");
+    await leaveAndGo(basics);
+    expect(router.push).toHaveBeenCalledWith("/profile/section/basics");
+
+    // Meanwhile another section is changed and saved.
+    const relationship = await show(<SectionScreen section="relationship" />);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Something casual" })).toBeTruthy(),
+    );
+    await press(screen.getByRole("button", { name: "Something casual" }));
+    await leaveAndGo(relationship);
+    expect(document.fields).toEqual({ smoking: "never", intent: "casual" });
+
+    // The refused section, back, fixed and left last, saves its own change and undoes none.
+    const again = await show(<SectionScreen section="basics" />);
+    await waitFor(() => expect(screen.getByText("Leave without saving?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Keep editing" }));
+    await type(screen.getByLabelText("Name on your card"), "Aino K");
+    await leaveAndGo(again);
+    expect(document).toMatchObject({
+      displayName: "Aino K",
+      fields: { smoking: "never", intent: "casual" },
+    });
+  });
+
   it("opens nothing again when the session ended while the save was on its way", async () => {
     fakeApi({ saveStatus: 401, saveCode: "unauthenticated" });
     const view = await show(<SectionScreen section="basics" />);

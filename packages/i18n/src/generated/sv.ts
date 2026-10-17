@@ -305,6 +305,7 @@ export const sv: Readonly<Record<string, string>> = {
   "photos.error.generic": "Fotot kunde inte laddas upp. Försök igen.",
   "photos.error.media_busy": "Många foton bearbetas just nu. Försök igen om en stund.",
   "photos.error.media_unavailable": "Foton är inte tillgängliga just nu.",
+  "photos.error.notShown": "Fotot kunde inte visas.",
   "photos.error.permission": "Kuutti kunde inte öppna dina foton. Tillåt åtkomst i telefonens inställningar och försök igen.",
   "photos.error.photo_budget_exceeded": "Det räcker med foton för i dag. De laddas igen efter midnatt.",
   "photos.error.photo_invalid": "Fotot kunde inte läsas. Prova en annan bild.",

@@ -64,7 +64,8 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     gender: string | null;
     seeks: string[] | null;
     ageWindow: { min: number; max: number } | null;
-    consents: { kind: string; version: string; locale: string }[];
+    /** Every row given; a withdrawn one keeps its row with the time (ADR-010 §4). */
+    consents: { kind: string; version: string; locale: string; withdrawnAt?: string }[];
     profile: Profile | null;
     photos: number;
     /** From when a gender change is possible again; set, the API refuses one with 429 (#147). */
@@ -83,7 +84,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
   };
   const calls: { method: string; path: string; body: unknown }[] = [];
   const has = (kind: string, version: string) =>
-    server.consents.some((c) => c.kind === kind && c.version === version);
+    server.consents.some((c) => c.kind === kind && c.version === version && !c.withdrawnAt);
   const status = () => {
     const bio = server.profile?.bio ?? "";
     const prompts = server.profile?.prompts.filter((p) => p.answer.length > 0).length ?? 0;
@@ -100,7 +101,7 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       // A ready line counts like a bio (#239), as the API's completeness has it.
       ...(bio.length >= 50 || server.profile?.bioPreset || prompts >= 2 ? [] : ["prompts_or_bio"]),
     ];
-    const research = server.consents.find((c) => c.kind === "research");
+    const research = server.consents.find((c) => c.kind === "research" && !c.withdrawnAt);
     return {
       state: missing.some((step) => ACTIVATION.includes(step)) ? "registered" : "active",
       age: options.age ?? 36,
@@ -170,12 +171,15 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
       return json({ seeks: server.seeks, ageWindow: server.ageWindow });
     }
     if (path === "/consents") {
-      server.consents.push(body as { kind: string; version: string; locale: string });
+      if (request.method === "POST") {
+        server.consents.push(body as { kind: string; version: string; locale: string });
+      }
       return json({
-        consents: server.consents.map((c) => ({
+        // The newest hundred, as the API lists them (ADR-010 §4).
+        consents: server.consents.slice(-100).map((c) => ({
           ...c,
           givenAt: "2026-09-26T10:00:00.000Z",
-          withdrawnAt: null,
+          withdrawnAt: c.withdrawnAt ?? null,
         })),
         currentVersions: status().currentVersions,
       });
@@ -269,8 +273,13 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["man", "non_binary"]);
     expect(server.ageWindow).toEqual({ min: 30, max: 42 });
     checkA11y();
+    expect(screen.getByText("Step 8 of 10")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Add photos" }));
-    expect(router.push).toHaveBeenCalledWith("/photos");
+    // The photos screen says the same step as every other one (#146).
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/photos",
+      params: { step: "8", total: "10" },
+    });
     // Back from the photos screen with three photos: the focus reads the status again.
     server.photos = 3;
     await act(async () => {
@@ -552,6 +561,75 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Yes, I take part" }));
     await flush();
     expect(server.consents.at(-1)).toEqual(consented("research"));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+  });
+
+  it("does not offer research again when whom one seeks is asked anew after a withdrawal (#146)", async () => {
+    // Onboarding walked once, research declined; then the sensitive-answers consent was
+    // withdrawn in Settings, and whom one seeks with it. The withdrawn row stays (ADR-010 §4).
+    const { server } = fakeApi();
+    atResearch(server);
+    server.consents = server.consents.map((c) =>
+      c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
+    );
+    server.seeks = null;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Men" }));
+    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText("Help us learn how matching works")).toBeNull();
+    expect(server.seeks).toEqual(["man"]);
+  });
+
+  it("does not offer research again however long the consent history behind the withdrawal (#250)", async () => {
+    // A hundred research changes since (ten a day at most, ADR-010 §4): the list
+    // of consents no longer reaches the withdrawn row.
+    const { server } = fakeApi();
+    atResearch(server);
+    server.consents = server.consents.map((c) =>
+      c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
+    );
+    for (let i = 0; i < 100; i++) {
+      server.consents.push({ ...consented("research"), withdrawnAt: "2026-10-01T10:00:00.000Z" });
+    }
+    server.seeks = null;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Men" }));
+    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText("Help us learn how matching works")).toBeNull();
+  });
+
+  it("offers research once in a first walk where the consent was withdrawn before the research step (#250)", async () => {
+    // Settings reached halfway (a deep link, a status read that failed): the
+    // withdrawn row is there, but the photos step, and research after it, never were.
+    const { server } = fakeApi();
+    atResearch(server);
+    server.consents = server.consents.map((c) =>
+      c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
+    );
+    server.seeks = null;
+    server.photos = 0;
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Men" }));
+    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
+    server.photos = 3;
+    await act(async () => {
+      focus();
+      await settle(120);
+    });
+    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Not now" }));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
   });
 

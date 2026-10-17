@@ -1,12 +1,20 @@
-import type { Completeness, ProfileDocument, ProfileUpdate } from "@kuutti/schema";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type { Completeness, ProfileDocument, ProfileFields, ProfileUpdate } from "@kuutti/schema";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { fetchProfile, saveProfile } from "./client";
 
 export type ProfileNotice = { kind: "error"; code: string | undefined } | null;
 
-/** A draft the API refused after its screen had gone, and why (#238): a screen opened with it resumes there. */
-export type HeldDraft = { draft: ProfileUpdate; notice: NonNullable<ProfileNotice> };
+/**
+ * What a draft changed from the document it was read from (#238): the parts
+ * that differ, and the fields one by one, a field taken away as undefined.
+ */
+export type ProfileChanges = Partial<Omit<ProfileUpdate, "fields">> & {
+  fields?: Record<string, unknown>;
+};
+
+/** Changes the API refused after their screen had gone, and why (#238): a screen opened with them resumes there. */
+export type HeldDraft = { changes: ProfileChanges; notice: NonNullable<ProfileNotice> };
 
 export const EMPTY_PROFILE: ProfileUpdate = {
   displayName: "",
@@ -28,6 +36,37 @@ const canonical = (value: unknown): string =>
       : v,
   );
 
+/** What `to` changed from `from`; nothing for the same document with its keys in another order. */
+export function changesOf(from: ProfileUpdate, to: ProfileUpdate): ProfileChanges {
+  const changes: ProfileChanges = {};
+  if (from.displayName !== to.displayName) changes.displayName = to.displayName;
+  // A bio and a ready line go together: the API takes one or the other, never both.
+  if (from.bio !== to.bio || from.bioPreset !== to.bioPreset) {
+    changes.bio = to.bio;
+    changes.bioPreset = to.bioPreset;
+  }
+  if (canonical(from.prompts) !== canonical(to.prompts)) changes.prompts = to.prompts;
+  const was = from.fields as Record<string, unknown>;
+  const is = to.fields as Record<string, unknown>;
+  const fields: Record<string, unknown> = {};
+  for (const key of new Set([...Object.keys(was), ...Object.keys(is)])) {
+    if (canonical(was[key]) !== canonical(is[key])) fields[key] = is[key];
+  }
+  if (Object.keys(fields).length > 0) changes.fields = fields;
+  return changes;
+}
+
+/** The document with the changes put on it; what they do not name stays as the document has it. */
+export function withChanges(document: ProfileUpdate, changes: ProfileChanges): ProfileUpdate {
+  const { fields: changed = {}, ...parts } = changes;
+  const fields: Record<string, unknown> = { ...document.fields };
+  for (const [key, value] of Object.entries(changed)) {
+    if (value === undefined) delete fields[key];
+    else fields[key] = value;
+  }
+  return { ...document, ...parts, fields: fields as ProfileFields };
+}
+
 const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
   displayName: profile.displayName,
   bio: profile.bio,
@@ -37,11 +76,14 @@ const toUpdate = (profile: ProfileDocument): ProfileUpdate => ({
 });
 
 /**
- * The person's profile as a draft they edit and save whole (#47): the API
- * stores the document, answers it back with what is still missing, and the
- * screen shows both. A prompt without an answer yet is kept in the draft and
- * left out of the save. Given a held draft, the first read puts it back over
- * the stored document, with the reason it was refused.
+ * The person's profile as a draft they edit (#47): the API stores the
+ * document, answers it back with what is still missing, and the screen shows
+ * both. A save sends what the draft changed, put on the document as stored
+ * when the save goes (#238): two screens read together, a section brought
+ * back over another, each keep their own change, and neither undoes the
+ * other's. A prompt without an answer yet is kept in the draft and left out
+ * of the save. Given held changes, the first read puts them back over the
+ * stored document, with the reason they were refused.
  */
 export function useProfile(held?: HeldDraft) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -73,7 +115,7 @@ export function useProfile(held?: HeldDraft) {
       const document = response.profile ? toUpdate(response.profile) : EMPTY_PROFILE;
       const resumed = resume.current;
       resume.current = undefined;
-      setDraft(resumed?.draft ?? document);
+      setDraft(resumed ? withChanges(document, resumed.changes) : document);
       setSaved(document);
       if (resumed) setNotice(resumed.notice);
       setCompleteness(response.completeness);
@@ -103,23 +145,26 @@ export function useProfile(held?: HeldDraft) {
     setSaving(true);
     setNotice(null);
     const submitted = draft;
+    const changes = changesOf(saved, {
+      ...draft,
+      displayName: draft.displayName.trim(),
+      bio: draft.bio?.trim() ? draft.bio.trim() : null,
+      prompts: draft.prompts
+        .filter((p) => p.answer.trim().length > 0)
+        .map((p) => ({ key: p.key, answer: p.answer.trim() })),
+    });
     try {
-      const response = await saveProfile({
-        ...submitted,
-        displayName: draft.displayName.trim(),
-        bio: draft.bio?.trim() ? draft.bio.trim() : null,
-        prompts: draft.prompts
-          .filter((p) => p.answer.trim().length > 0)
-          .map((p) => ({ key: p.key, answer: p.answer.trim() })),
-      });
+      const response = await saveProfile((stored) =>
+        withChanges(stored ? toUpdate(stored) : EMPTY_PROFILE, changes),
+      );
       if (!mounted.current) return null;
-      // The stored document replaces the draft only if nothing was typed while
-      // the save was in flight; otherwise those keystrokes would vanish.
+      // The stored document becomes the draft, with anything typed while the
+      // save was in flight put back on it; otherwise those keystrokes would vanish.
       const stored = response.profile;
       if (stored) {
         const document = toUpdate(stored);
         setSaved(document);
-        setDraft((current) => (current === submitted ? document : current));
+        setDraft((current) => withChanges(document, changesOf(submitted, current)));
       }
       setCompleteness(response.completeness);
       return null;
@@ -133,10 +178,11 @@ export function useProfile(held?: HeldDraft) {
     } finally {
       if (mounted.current) setSaving(false);
     }
-  }, [draft]);
+  }, [draft, saved]);
 
-  /** Whether the draft differs from what is saved: what leaving the screen would lose. */
-  const dirty = canonical(draft) !== canonical(saved);
+  /** What the draft changed from what is saved: what leaving the screen would lose. */
+  const changes = useMemo(() => changesOf(saved, draft), [saved, draft]);
+  const dirty = Object.keys(changes).length > 0;
 
   return {
     status,
@@ -146,6 +192,7 @@ export function useProfile(held?: HeldDraft) {
     completeness,
     saving,
     notice,
+    changes,
     dirty,
     update,
     save,

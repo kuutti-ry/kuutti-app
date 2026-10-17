@@ -38,7 +38,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `age-window-bounds` *once* | Siiri | 94 to 99 at 99, neither end leaves the bounds; no label for a woman; two areas |
 | `identity-label-on-card` *once* | Eetu | the label chosen after non-binary shows on the card after the gender |
 | `terms-asked-again` *once* | Kerttu | an older wording of the terms asked again, nothing else but research |
-| `sensitive-answers-withdrawal` | Noa | the consent withdrawn asks whom one seeks again, not the ages; Anyone is all three |
+| `sensitive-answers-withdrawal` | Noa | the consent withdrawn asks whom one seeks again, not the ages and not research; Anyone is all three |
 | `account-deletion` *once* | Aino | asked first, signed out, the next login refused for the cooldown |
 | `deal-breakers-limit` | Sanna | an accepted answer before saving; two at most, the third refused |
 | `deal-breakers-own-answer` | Noa | only on what she answered; Answer it opens the field |

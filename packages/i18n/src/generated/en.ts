@@ -553,6 +553,7 @@ export const en: Readonly<Record<string, string>> = {
   "photos.error.generic": "The photo could not be uploaded. Try again.",
   "photos.error.media_busy": "Many photos are being processed right now. Try again in a moment.",
   "photos.error.media_unavailable": "Photos are not available right now.",
+  "photos.error.notShown": "The photo could not be shown.",
   "photos.error.permission": "Kuutti could not open your photos. Allow access in the phone's settings and try again.",
   "photos.error.photo_budget_exceeded": "That is enough photos for today. They load again after midnight.",
   "photos.error.photo_invalid": "The photo could not be read. Try another picture.",
