@@ -52,6 +52,8 @@
         <li><button type="button" data-persona="tapio">Tapio Heikkinen</button></li>
         <li><button type="button" data-persona="ilona">Ilona Öhman</button></li>
         <li><button type="button" data-persona="helmi">Helmi Mäkelä</button></li>
+        <li><button type="button" data-persona="antti">Antti Nurmi</button></li>
+        <li><button type="button" data-persona="ville">Ville Rantanen</button></li>
         <li><button type="button" data-persona="eetu">Eetu Laine</button></li>
         <li><button type="button" data-persona="venla">Venla Nieminen</button></li>
         <li><button type="button" data-persona="lauri">Lauri Hämäläinen</button></li>
@@ -80,7 +82,7 @@
     </section>
     <section aria-labelledby="group-history">
       <h2 id="group-history">People with a history</h2>
-      <p class="lead">The same identity on every day, and the same person as a test user of Telia&#39;s bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.</p>
+      <p class="lead">The same identity on every day, and, but for the chat&#39;s two, the same person as a test user of Telia&#39;s bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.</p>
       <ul>
         <li>
           <button type="button" data-persona="sanna">
@@ -129,6 +131,18 @@
             <span class="name">Helmi Mäkelä</span>
             <span class="note">Onboarded without photos: the persona of the break&#39;s flow, who takes a break and comes back (#170).</span>
             <span class="bank">On staging: Mobiilivarmenne emulator, 0401234567 (prefilled)</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" data-persona="antti">
+            <span class="name">Antti Nurmi</span>
+            <span class="note">Onboarded without photos: a conversation with Ville, and a silent one with Sanna in the archive. The chat&#39;s flow writes as him (#348).</span>
+          </button>
+        </li>
+        <li>
+          <button type="button" data-persona="ville">
+            <span class="name">Ville Rantanen</span>
+            <span class="note">Onboarded without photos: a few days of messages with Antti, and the chat&#39;s flow reads as him (#348).</span>
           </button>
         </li>
       </ul>
@@ -188,7 +202,7 @@
       </section>
     </main>
     <script>
-      const PERSONAS = [{"key":"aino","given":"Aino","family":"Virtanen","born":{"year":1992,"month":12,"day":29},"individual":918},{"key":"mikael","given":"Mikael","family":"Lindqvist","born":{"year":1970,"month":1,"day":1},"individual":960},{"key":"sanna","given":"Sanna","family":"Korhonen","born":{"year":1977,"month":6,"day":17},"individual":924},{"key":"onni","given":"Onni","family":"Korhonen","born":{"year":2000,"month":2,"day":1},"individual":961},{"key":"noa","given":"Noa","family":"Salmi","born":{"year":1983,"month":8,"day":3},"individual":925},{"key":"kerttu","given":"Kerttu","family":"Åkerlund","born":{"year":1980,"month":2,"day":1},"individual":952},{"key":"tapio","given":"Tapio","family":"Heikkinen","born":{"year":1970,"month":7,"day":7},"individual":905},{"key":"ilona","given":"Ilona","family":"Öhman","born":{"year":1970,"month":1,"day":1},"individual":999},{"key":"helmi","given":"Helmi","family":"Mäkelä","born":{"year":1932,"month":1,"day":1},"individual":998},{"key":"eetu","given":"Eetu","family":"Laine","born":{"yearsAgo":18,"monthsAgo":1},"individual":909},{"key":"venla","given":"Venla","family":"Nieminen","born":{"yearsAgo":18,"monthsAgo":0},"individual":910},{"key":"lauri","given":"Lauri","family":"Hämäläinen","born":{"yearsAgo":17,"monthsAgo":1},"individual":911},{"key":"siiri","given":"Siiri","family":"Koskinen","born":{"yearsAgo":99,"monthsAgo":1},"individual":912}];
+      const PERSONAS = [{"key":"aino","given":"Aino","family":"Virtanen","born":{"year":1992,"month":12,"day":29},"individual":918},{"key":"mikael","given":"Mikael","family":"Lindqvist","born":{"year":1970,"month":1,"day":1},"individual":960},{"key":"sanna","given":"Sanna","family":"Korhonen","born":{"year":1977,"month":6,"day":17},"individual":924},{"key":"onni","given":"Onni","family":"Korhonen","born":{"year":2000,"month":2,"day":1},"individual":961},{"key":"noa","given":"Noa","family":"Salmi","born":{"year":1983,"month":8,"day":3},"individual":925},{"key":"kerttu","given":"Kerttu","family":"Åkerlund","born":{"year":1980,"month":2,"day":1},"individual":952},{"key":"tapio","given":"Tapio","family":"Heikkinen","born":{"year":1970,"month":7,"day":7},"individual":905},{"key":"ilona","given":"Ilona","family":"Öhman","born":{"year":1970,"month":1,"day":1},"individual":999},{"key":"helmi","given":"Helmi","family":"Mäkelä","born":{"year":1932,"month":1,"day":1},"individual":998},{"key":"antti","given":"Antti","family":"Nurmi","born":{"year":1979,"month":5,"day":14},"individual":962},{"key":"ville","given":"Ville","family":"Rantanen","born":{"year":1976,"month":3,"day":8},"individual":963},{"key":"eetu","given":"Eetu","family":"Laine","born":{"yearsAgo":18,"monthsAgo":1},"individual":909},{"key":"venla","given":"Venla","family":"Nieminen","born":{"yearsAgo":18,"monthsAgo":0},"individual":910},{"key":"lauri","given":"Lauri","family":"Hämäläinen","born":{"yearsAgo":17,"monthsAgo":1},"individual":911},{"key":"siiri","given":"Siiri","family":"Koskinen","born":{"yearsAgo":99,"monthsAgo":1},"individual":912}];
       const ACR = "http://ftn.ficora.fi/2017/loatest2";
       const AMR = "https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.mock.1";
       const CHECK = "0123456789ABCDEFHJKLMNPRSTUVWXY";

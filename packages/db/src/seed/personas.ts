@@ -1,7 +1,7 @@
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, #140, ADR-014): thirteen named persons the
+ * The people of the mock bank (#73, #140, ADR-014): fifteen named persons the
  * local identity provider can log in as with one tap, so that a demo or a
  * test of the first ten minutes does not start with typing claims into a
  * form. The whole product path runs for them as for anybody: the OIDC
@@ -15,6 +15,13 @@ import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
  * same person's. The bank's name for the person is in the claims, as the real
  * broker sends it, and is stored nowhere; what the app calls the persona is
  * the display name the story gives.
+ *
+ * Two more are born on a fixed day and exist at the mock bank only: Antti
+ * and Ville, the pair of the chat's flows (#348, #101). Every test user of
+ * the bed whose code the product's parser accepts is a persona already
+ * (docs/vendors/telia.md 1.4), so nobody signs in as them on staging (the
+ * maintainer's choice of 17/10/2026, ADR-014 §4); their stories are given
+ * there as anywhere.
  *
  * Their codes are artificial: the individual number is in 900 to 999, which
  * the population register does not give to a person (rule 1 is about real
@@ -63,7 +70,7 @@ export type DemoPersona = {
   group: "walkthrough" | "history" | "ages";
   /** What the persona is for, shown under the name. */
   note: string;
-  /** Where the same person is on Telia's bed; absent for the ages, who exist at the mock bank only. */
+  /** Where the same person is on Telia's bed; absent for the ages and the chat's pair, who exist at the mock bank only. */
   bank?: TestBank;
 };
 
@@ -165,6 +172,25 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     group: "history",
     note: "Onboarded without photos: the persona of the break's flow, who takes a break and comes back (#170).",
     bank: { name: "Mobiilivarmenne emulator", user: "0401234567", note: "prefilled" },
+  },
+  // The chat's pair (#348): no test user of the bed is left for them.
+  {
+    key: "antti",
+    given: "Antti",
+    family: "Nurmi",
+    born: { year: 1979, month: 5, day: 14 },
+    individual: 962,
+    group: "history",
+    note: "Onboarded without photos: a conversation with Ville, and a silent one with Sanna in the archive. The chat's flow writes as him (#348).",
+  },
+  {
+    key: "ville",
+    given: "Ville",
+    family: "Rantanen",
+    born: { year: 1976, month: 3, day: 8 },
+    individual: 963,
+    group: "history",
+    note: "Onboarded without photos: a few days of messages with Antti, and the chat's flow reads as him (#348).",
   },
   {
     key: "eetu",

@@ -34,6 +34,7 @@ import {
   type TestContext,
   test,
 } from "../../src/test/harness.ts";
+import { giveConversations } from "./histories.ts";
 import { resetPersonas } from "./reset.ts";
 import { giveStories, personaHashes, viaServices } from "./services.ts";
 
@@ -159,11 +160,16 @@ describe("the stories through the services", () => {
   test("leave each persona where the test bank's login will find it, and a second run changes nothing", async ({
     ctx,
   }) => {
-    const { writer, hmacKey } = await world(ctx);
+    const { writer, hmacKey, now } = await world(ctx);
     const first = await giveStories(writer);
     expect(first.map((r) => [r.key, r.login])).toEqual(
       PERSONA_HISTORIES.map((h) => [h.key, "created"]),
     );
+    expect(await giveConversations(ctx.client, first, now())).toEqual({
+      written: 2,
+      already: 0,
+      missing: 0,
+    });
     expect(await markedIdentities(ctx)).toBe(PERSONA_HISTORIES.length);
 
     // What the callback decides on the bed, by the same hash: the story's ending.
@@ -228,9 +234,17 @@ describe("the stories through the services", () => {
       ["tapio", "already"],
       ["ilona", "already"],
       ["helmi", "resumed"],
+      ["antti", "resumed"],
+      ["ville", "resumed"],
     ]);
     const after = await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM account");
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
+    // Nor a second conversation: the resumed accounts have theirs.
+    expect(await giveConversations(ctx.client, second, now())).toEqual({
+      written: 0,
+      already: 2,
+      missing: 0,
+    });
     // Nor a second ban: Tapio was told already.
     expect(await bansOf(ctx, tapio.identity?.id)).toHaveLength(1);
   });
@@ -276,7 +290,7 @@ describe("the stories through the services", () => {
     ctx,
   }) => {
     const { writer, hmacKey, logger, now } = await world(ctx);
-    await giveStories(writer);
+    await giveConversations(ctx.client, await giveStories(writer), now());
     const personas = personaHashes(hmacKey, now());
     const sanctions = () =>
       ctx.client
@@ -285,7 +299,7 @@ describe("the stories through the services", () => {
     expect(await sanctions()).toBe(1);
     expect(await resetPersonas({ db: ctx.client, logger, now, personas })).toEqual({
       identities: PERSONA_HISTORIES.length,
-      // Ilona's account was erased by her own story; the other five are live.
+      // Ilona's account was erased by her own story; the others are live.
       erased: PERSONA_HISTORIES.length - 1,
       objects: 0,
       spared: [],
@@ -293,6 +307,9 @@ describe("the stories through the services", () => {
     expect(await markedIdentities(ctx)).toBe(0);
     // Tapio's ban outlived his erasure on the identity (ADR-024 §8) and went with it.
     expect(await sanctions()).toBe(0);
+    // Both people of each conversation were erased, so the conversations went too (ADR-031 §5).
+    const conversations = await ctx.client.query("SELECT 1 FROM conversation");
+    expect(conversations.rows).toEqual([]);
     for (const history of PERSONA_HISTORIES) {
       expect((await loginWouldBe(ctx, hmacKey, history.key)).identity, history.key).toBeNull();
     }

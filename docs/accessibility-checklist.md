@@ -22,7 +22,7 @@ Every row is walked with all ten, on each platform. They are numbered so that a 
 ## Setting up
 
 - **Phones.** A real iPhone and a real Android phone, with the build the pass is for: the `preview` build on the `staging` channel, or the dev client (`docs/runbooks/devices.md`). The iOS Simulator has no VoiceOver, and the Accessibility Inspector, a jest run, a screenshot or a read of the code is no walk.
-- **People.** The personas, on staging through Telia's test banks (`services/mock-idp/README.md`): Aino for the sign-in, every onboarding step and the later questions; Sanna for a finished profile with photos; Noa for photos rejected with their reasons; Kerttu for the terms asked again; Helmi for the break, and for the profile's list of what the card still needs (onboarded, no photos); Tapio and Ilona for the refused sign-ins. Eetu, Venla, Lauri and Siiri exist at the local mock bank only, so the age refusals are walked with a dev client against the local environment. So is a photo in review: on staging the check decides Noa's pictures itself and her profile is complete, while locally it queues everything and her profile lists what is missing. A walk that changes its persona (onboarding, the break, the deletion) is followed by the reset (`docs/demo/runbook.md`).
+- **People.** The personas, on staging through Telia's test banks (`services/mock-idp/README.md`): Aino for the sign-in, every onboarding step and the later questions; Sanna for a finished profile with photos; Noa for photos rejected with their reasons; Kerttu for the terms asked again; Helmi for the break, and for the profile's list of what the card still needs (onboarded, no photos); Tapio and Ilona for the refused sign-ins. Antti and Ville, for the conversations (Antti's silent match with Sanna is in his archive), and Eetu, Venla, Lauri and Siiri exist at the local mock bank only, so the age refusals are walked with a dev client against the local environment. So is a photo in review: on staging the check decides Noa's pictures itself and her profile is complete, while locally it queues everything and her profile lists what is missing. A walk that changes its persona (onboarding, the break, the deletion) is followed by the reset (`docs/demo/runbook.md`).
 - **Order of a pass.** One platform at a time: the reader through every row at the default text size (checks 1 to 5); again at the largest text with reduced motion on, a screenshot of each screen (6 to 8); high contrast in light and in dark (9); the keyboard or a switch (10). The rows are in the order a newcomer meets the screens.
 
 ## The record
@@ -82,15 +82,13 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 
 ### Conversations
 
-No persona has a conversation yet: the history group holds no pair whose filters let them meet, so the stories write none (#348). Until a pair has one, these rows are walked on a build whose database a developer gave a conversation by hand, or wait for the pair.
-
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
-| Home's Conversations button | `/` (Sanna) | named Conversations with the unread count in words ("nothing unread" at none); the mark beside it silent | | |
-| Conversations | `/chats` | back named; the loading line said, the failure and Try again; the empty line; the Open and Archived headers and the archive's line; each row heard once, as the name and age (or Deleted user), the unread count in words, the last line (You: before one's own, or how a closed one ended) and its time or day; the thumb and the mark silent; pull to refresh is not the only way: the list reads again on returning to it | | |
-| A conversation | `/chats/<id>` | the name and age as the header; Earlier messages a named button where there are more; each day line; each message heard once as who, when and what, the time under it silent; Read under the last one read; the field named Message with its placeholder; the characters left; Send named, heard as dimmed while empty or too long; Sending… under a message on its way; a refusal (a phone number) said under the field with the words kept | | |
-| An archived conversation | `/chats/<id>` | the line that writing brings it back, above the field; gone after a message | | |
-| A closed conversation | `/chats/<id>` | no field and no Send; the ending said in its place: deleted their account, or ended, never blocked | | |
+| Home's Conversations button | `/` (Antti: one unread; Sanna: none) | named Conversations with the unread count in words ("nothing unread" at none); the mark beside it silent | | |
+| Conversations | `/chats` (Antti) | back named; the loading line said, the failure and Try again; the empty line; the Open and Archived headers and the archive's line; each row heard once, as the name and age (or Deleted user), the unread count in words, the last line (You: before one's own, or how a closed one ended) and its time or day; the thumb and the mark silent; pull to refresh is not the only way: the list reads again on returning to it | | |
+| A conversation | `/chats/<id>` (Antti's with Ville) | the name and age as the header; Earlier messages a named button where there are more; each day line; each message heard once as who, when and what, the time under it silent; Read under the last one read; the field named Message with its placeholder; the characters left; Send named, heard as dimmed while empty or too long; Sending… under a message on its way; a refusal (a phone number) said under the field with the words kept | | |
+| An archived conversation | `/chats/<id>` (Antti's with Sanna) | the line that writing brings it back, above the field; gone after a message | | |
+| A closed conversation | `/chats/<id>` (Ville's, after Antti deletes his account) | no field and no Send; the ending said in its place: deleted their account, or ended, never blocked | | |
 
 ### Profile
 

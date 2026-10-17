@@ -139,7 +139,7 @@ export function personaHashes(hmacKey: Buffer, at: Date): Map<string, string> {
   return hashes;
 }
 
-/** The six histories, in their order; a persona the caller names is left alone. */
+/** The histories, in their order; a persona the caller names is left alone. */
 export async function giveStories(
   writer: HistoryWriter,
   skip: readonly string[] = [],

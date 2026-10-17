@@ -5,6 +5,7 @@ import {
   OLDER_TERMS_VERSION,
   type PersonaHistory,
   personaOf,
+  writeConversations,
 } from "@kuutti/db/demo";
 import type { AuthExchangeResponse } from "@kuutti/schema";
 import {
@@ -74,6 +75,8 @@ export type HistoryWriter = {
 
 export type HistoryResult = {
   key: string;
+  /** The account the story was given to; null where the story's own ending refused the login. */
+  accountId: string | null;
   /** Pictures uploaded for the persona this time: faces and negatives. */
   photos: number;
   /** `already`: the story's own ending (a ban, a deletion) refused the login, so it was told before. */
@@ -173,6 +176,7 @@ export async function giveHistory(
     if (asTold) {
       return {
         key: history.key,
+        accountId: null,
         photos: 0,
         onboarded: history.onboarding !== null,
         profile: history.profile !== null,
@@ -187,6 +191,7 @@ export async function giveHistory(
   const { accountId } = login;
   const told = {
     key: history.key,
+    accountId,
     photos: 0,
     onboarded: history.onboarding !== null,
     profile: history.profile !== null,
@@ -293,4 +298,15 @@ export async function giveHistory(
     await writer.logout(accountId);
   }
   return { ...told, photos, login: login.outcome };
+}
+
+/**
+ * The stories' conversations (#348): between the accounts the histories were
+ * just given to, as rows until #100 writes them from the second like. A
+ * persona whose story ended in a refusal, or that was left alone, has none.
+ */
+export function giveConversations(db: Queryable, results: readonly HistoryResult[], at: Date) {
+  const accounts = new Map<string, string>();
+  for (const { key, accountId } of results) if (accountId) accounts.set(key, accountId);
+  return writeConversations(db, accounts, at);
 }

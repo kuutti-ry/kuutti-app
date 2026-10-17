@@ -34,10 +34,10 @@ const persona = (key: string) => {
 };
 
 describe("the personas of the mock bank", () => {
-  it("are thirteen, each with a name of its own and an artificial code", () => {
-    expect(DEMO_PERSONAS).toHaveLength(13);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(13);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(13);
+  it("are fifteen, each with a name of its own and an artificial code", () => {
+    expect(DEMO_PERSONAS).toHaveLength(15);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(15);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(15);
     for (const p of DEMO_PERSONAS) {
       expect(p.key).toMatch(/^[a-z]+$/);
       // 900 to 999: never given to a person.
@@ -82,8 +82,13 @@ describe("the personas of the mock bank", () => {
       expect(p.bank, key).toBeDefined();
       for (const at of DAYS) expect(personaHetu(p, at), key).toBe(code);
     }
-    for (const p of DEMO_PERSONAS) {
-      expect(p.bank !== undefined, p.key).toBe(hasFixedIdentity(p));
+    // The rest are the mock bank's alone: the ages, and the chat's pair, for
+    // whom the bed has no test user left (#348).
+    const mockOnly = DEMO_PERSONAS.filter((p) => p.bank === undefined).map((p) => p.key);
+    expect(mockOnly).toEqual(["antti", "ville", "eetu", "venla", "lauri", "siiri"]);
+    for (const key of ["antti", "ville"]) {
+      expect(hasFixedIdentity(persona(key)), key).toBe(true);
+      expect(Object.values(bed), key).not.toContain(personaHetu(persona(key), DAYS[0] as Date));
     }
   });
 

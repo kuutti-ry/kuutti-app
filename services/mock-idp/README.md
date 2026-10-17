@@ -4,7 +4,7 @@ Local stand-in for the Telia ID Broker (Finnish Trust Network): [navikt/mock-oau
 
 - Discovery: `http://127.0.0.1:8080/ftn/.well-known/openid-configuration`
 - Any `client_id` and `client_secret` are accepted. `redirect_uri` is not validated.
-- The login page is ours (`login.html`, `loginPagePath` in `config.json`): a button for each of the thirteen personas and, below them, a form for anybody else.
+- The login page is ours (`login.html`, `loginPagePath` in `config.json`): a button for each of the fifteen personas and, below them, a form for anybody else.
 
 ## The personas
 
@@ -21,12 +21,14 @@ One tap logs a persona in. Nothing in the API or the app knows about them: the b
 | Tapio Heikkinen | 07/07/1970 | OP, prefilled | a banned identity: the login is refused |
 | Ilona Öhman | 01/01/1970 | Aktia, prefilled | deleted her account: refused until the waiting time is over |
 | Helmi Mäkelä | 01/01/1932 | Mobiilivarmenne emulator, prefilled | onboarded without photos: the persona of the break's flow (#170), who takes a break and comes back |
+| Antti Nurmi | 14/05/1979 | mock bank only | onboarded without photos: a conversation with Ville, and a silent one with Sanna in the archive; the chat's flow writes as him (#348) |
+| Ville Rantanen | 08/03/1976 | mock bank only | onboarded without photos: a few days of messages with Antti; the chat's flow reads as him (#348) |
 | Eetu Laine | the 1st of last month, 18 years ago | mock bank only | the youngest who gets in |
 | Venla Nieminen | the 1st of this month, 18 years ago | mock bank only | refused until the last day of the month: age is counted from the end of the birth month (TD-14) |
 | Lauri Hämäläinen | the 1st of last month, 17 years ago | mock bank only | refused |
 | Siiri Koskinen | the 1st of last month, 99 years ago | mock bank only | the upper end of the age window |
 
-The first nine are the same identity on every day, and the same person as a test user of Telia's pre-production bed (#140, `docs/vendors/telia.md` section 1.4): this page issues locally the very code the test bank returns on staging, so a story given on staging is the persona's, whether they sign in at Nordea or here. The bank's own name for the person (Nordea calls DEMOUSER2 Aino Olivia Virtanen, OP calls its user Väinö Tunnistus) is in the claims and stored nowhere; what the app calls the persona is the display name of the story. What Kuutti holds about the seven "with a history" is given by `pnpm demo:reset`; before it has run they are newcomers like Aino and Mikael. The last four are born relative to today, so their age holds whenever this runs and their identity changes as the months pass; they carry no history.
+The first nine are the same identity on every day, and the same person as a test user of Telia's pre-production bed (#140, `docs/vendors/telia.md` section 1.4): this page issues locally the very code the test bank returns on staging, so a story given on staging is the persona's, whether they sign in at Nordea or here. The bank's own name for the person (Nordea calls DEMOUSER2 Aino Olivia Virtanen, OP calls its user Väinö Tunnistus) is in the claims and stored nowhere; what the app calls the persona is the display name of the story. Antti and Ville are born on a fixed day too and exist at this page only: every test user of the bed whose code the product's parser accepts is one of the nine, so nobody signs in as them on staging (the maintainer's choice of 17/10/2026); their stories are given there as here. What Kuutti holds about the nine "with a history" is given by `pnpm demo:reset`; before it has run they are newcomers like Aino and Mikael. The last four are born relative to today, so their age holds whenever this runs and their identity changes as the months pass; they carry no history.
 
 ## Resetting
 
@@ -34,7 +36,7 @@ The first nine are the same identity on every day, and the same person as a test
 pnpm demo:reset
 ```
 
-Returns all thirteen to where they begin, in a couple of seconds, with the local environment running (`pnpm env:up`). First every persona is forgotten: each live account goes through the erasure path, the function behind "delete my account", and then what erasure keeps of a person (the tombstone, the consents, the identity with its waiting time) is deleted too, which is right for a persona and never done for a person. Then the seven histories are given anew: the command logs each persona in at this mock bank and sends the answers of onboarding and the profile through the API's own routes, as the app does. What no route does is done in the database afterwards: Kerttu's consent is given the version of an older wording, and Tapio's identity is banned. Ilona deletes her account herself.
+Returns all fifteen to where they begin, in a couple of seconds, with the local environment running (`pnpm env:up`). First every persona is forgotten: each live account goes through the erasure path, the function behind "delete my account", and then what erasure keeps of a person (the tombstone, the consents, the identity with its waiting time) is deleted too, which is right for a persona and never done for a person. Then the nine histories are given anew: the command logs each persona in at this mock bank and sends the answers of onboarding and the profile through the API's own routes, as the app does. What no route does is done in the database afterwards: Kerttu's consent is given the version of an older wording, and Tapio's identity is banned. Ilona deletes her account herself. Last come the stories' two conversations (`packages/db/src/seed/conversations.ts`): Antti's with Ville, four days of messages, and his match with Sanna, silent and archived. They are rows, as the match's record will be, until #100 writes a conversation from the second like.
 
 `pnpm demo:reset -- --bare` forgets everybody and gives no history. `pnpm demo:reset -- --objects-lost` goes ahead although the store does not hold the photos, for objects that are gone for good (a stand-in whose directory was emptied, or a reset that was taken back after some objects had been deleted). The histories are data in `packages/db/src/seed/histories.ts`.
 

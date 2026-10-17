@@ -63,6 +63,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `take-a-break` | Helmi | paused behind the tick, signed out with the reason, not back on reopening; the next bank login brings her back where she left off, the photos step (#170) |
 | `language` | Sanna | the language choice changes the app at once (#220) |
 | `give-feedback` | Sanna | a kind ticked in words, a few lines, Send, the thanks (#171) |
+| `chat-text` | Antti, Ville | Antti's list: Ville's conversation open, the silent match with Sanna in the archived group; a message Antti writes reaches Ville with its time, and Antti then sees Read under it (#348). Each run adds a message of its own words, so it runs again without a reset |
 
 Mikael is left out: given the moderator role on a machine, he is spared by `pnpm demo:reset`, which then exits with an error after doing the rest.
 
