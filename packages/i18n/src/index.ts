@@ -28,6 +28,7 @@ export {
   type TFunction,
   typedT,
 } from "./instance.ts";
+export { type LegalTextKind, legalPageUrl } from "./legal.ts";
 export {
   type AnyLocale,
   DEFAULT_LOCALE,

@@ -135,6 +135,13 @@ jobs:
           pnpm i18n:build
           git diff --exit-code -- packages/i18n/src/generated
           test -z "$(git status --porcelain -- packages/i18n/src/generated)" || { git status --porcelain -- packages/i18n/src/generated; echo "run pnpm i18n:build and commit src/generated"; exit 1; }
+      # One version per kind across the app and the website (#208, ADR-010 §4):
+      # the deployed site's /legal/versions.json names, for each kind, the
+      # version CONSENT_VERSIONS carries and the address the app links to. A
+      # file that cannot be read fails too. The site's CI runs the mirror
+      # against src/generated/consent.ts on main. Public file, no token.
+      - name: The consent versions are the website's
+        run: pnpm check:legal-versions
 
   licenses:
     name: licenses

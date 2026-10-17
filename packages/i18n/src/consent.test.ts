@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   CONSENT_TEXT_HASHES,
   CONSENT_TEXT_LOCALES,
   CONSENT_VERSIONS,
 } from "./generated/consent.ts";
+import { isLegalTextKind, legalPageUrl } from "./legal.ts";
 
 /**
  * The binding Finnish wording and its version move together (#46, ADR-010
@@ -33,5 +35,38 @@ describe("consent versions", () => {
         golden,
       );
     }
+  });
+
+  // The site's anchors (kuutti-app-site, #208): the research opt-in and the
+  // sensitive answers are read on the privacy page.
+  it("links each kind to the site's page at the anchor of the version this app carries", () => {
+    expect(
+      Object.fromEntries(
+        Object.entries(CONSENT_VERSIONS).map(([kind, version]) => [
+          kind,
+          isLegalTextKind(kind) ? legalPageUrl(kind, version) : null,
+        ]),
+      ),
+    ).toEqual({
+      privacy: `https://kuutti.app/legal/privacy/#privacy-${CONSENT_VERSIONS.privacy}`,
+      research: `https://kuutti.app/legal/privacy/#research-${CONSENT_VERSIONS.research}`,
+      special_category: `https://kuutti.app/legal/privacy/#special_category-${CONSENT_VERSIONS.special_category}`,
+      terms: `https://kuutti.app/legal/terms/#terms-${CONSENT_VERSIONS.terms}`,
+    });
+    expect(isLegalTextKind("toString")).toBe(false);
+  });
+
+  // The website's CI reads CONSENT_VERSIONS out of this module on main
+  // (appVersionsFrom in kuutti-app-site src/lib/consent.ts: this expression,
+  // then JSON of what the braces hold without its last comma). A change of
+  // the generator's shape fails here first; change the site's reader with it
+  // and merge that first, or the site's CI goes red on its next run (#208).
+  it("keeps CONSENT_VERSIONS in the shape the website's mirror check reads", () => {
+    const source = readFileSync(new URL("./generated/consent.ts", import.meta.url), "utf8");
+    const block = /export const CONSENT_VERSIONS\b[^=]*=\s*\{([^}]*)\};/.exec(source);
+    expect(block).not.toBeNull();
+    expect(JSON.parse(`{${(block?.[1] ?? "").trim().replace(/,$/, "")}}`)).toEqual(
+      CONSENT_VERSIONS,
+    );
   });
 });

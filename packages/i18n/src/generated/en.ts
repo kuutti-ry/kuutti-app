@@ -396,6 +396,7 @@ export const en: Readonly<Record<string, string>> = {
   "onboarding.changeFrom": "Next change possible: {date}.",
   "onboarding.consents.binding": "The Finnish text is the one that counts; this is a translation.",
   "onboarding.consents.explain": "Read both. You accept exactly this version of each text; if one changes, we ask you again.",
+  "onboarding.consents.fullText": "Read the full text on kuutti.app (version {version})",
   "onboarding.consents.outdatedApp": "This text has a newer version than the one built into this app. Update the app to continue.",
   "onboarding.consents.version": "Version {version}",
   "onboarding.continue": "Continue",

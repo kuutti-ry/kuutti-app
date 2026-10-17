@@ -1,6 +1,10 @@
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CONSENT_VERSIONS } from "../src/generated/consent.ts";
+import { fi } from "../src/generated/fi.ts";
+import { isLegalTextKind, legalPageUrl } from "../src/legal.ts";
 import { compile } from "./lib/compile.ts";
+import { siteFingerprint } from "./lib/legal-versions.ts";
 import { reviewHash } from "./lib/review-hash.ts";
 import { parseMessages } from "./lib/schema.ts";
 
@@ -141,6 +145,7 @@ const SCRIPTS = {
   "build.ts": () => import("./build.ts"),
   "check.ts": () => import("./check.ts"),
   "check-ui-strings.ts": () => import("./check-ui-strings.ts"),
+  "check-legal-versions.ts": () => import("./check-legal-versions.ts"),
   "review.ts": () => import("./review.ts"),
   "translate.ts": () => import("./translate.ts"),
 };
@@ -298,6 +303,162 @@ describe("pnpm i18n:check", () => {
     const result = await run("check.ts");
     expect(result.code).toBe(1);
     expect(result.err[0]).toMatch(/^✖ messages\.yaml is not valid:/);
+  });
+});
+
+describe("pnpm check:legal-versions", () => {
+  // The site's /legal/versions.json as its build writes it for this app's
+  // versions and wordings (#208): the research opt-in and the sensitive
+  // answers fingerprinted from this app's Finnish, which the site carries as
+  // it is; `moved` replaces one kind's entry. The network is a stand-in.
+  const DEPLOYED = "https://kuutti.app/legal/versions.json";
+  const hashOf = (kind: string) =>
+    kind === "research" || kind === "special_category"
+      ? siteFingerprint(fi[`legal.${kind}.title`] ?? "", fi[`legal.${kind}.summary`] ?? "")
+      : "0123456789abcdef";
+  const versions = (moved: Record<string, unknown> = {}) =>
+    JSON.stringify({
+      ...Object.fromEntries(
+        Object.entries(CONSENT_VERSIONS).map(([kind, version]) => [
+          kind,
+          {
+            version,
+            hash: hashOf(kind),
+            language: "fi",
+            url: isLegalTextKind(kind) ? legalPageUrl(kind, version) : "",
+            dated: "2026-10-17",
+          },
+        ]),
+      ),
+      ...moved,
+    });
+  const site = vi.fn(async (_url: string, _init?: RequestInit) => new Response(versions()));
+
+  beforeEach(() => {
+    site.mockClear();
+    site.mockImplementation(async () => new Response(versions()));
+    vi.stubGlobal("fetch", site);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("passes when the deployed site publishes every version the app carries, at the app's links", async () => {
+    const result = await run("check-legal-versions.ts");
+    expect(result.code).toBe(0);
+    expect(site).toHaveBeenCalledTimes(1);
+    expect(site.mock.calls[0]?.[0]).toBe(DEPLOYED);
+    expect(result.out).toEqual([
+      `✔ check:legal-versions: the app's consent versions are the site's (${DEPLOYED}): ` +
+        Object.entries(CONSENT_VERSIONS)
+          .map(([kind, version]) => `${kind} ${version}`)
+          .join(", "),
+    ]);
+  });
+
+  it("fails when the site published a version the app does not carry: the deliberate mismatch", async () => {
+    site.mockImplementation(
+      async () =>
+        new Response(
+          versions({
+            privacy: {
+              version: "2026-11-1",
+              hash: "0123456789abcdef",
+              language: "fi",
+              url: "https://kuutti.app/legal/privacy/#privacy-2026-11-1",
+            },
+          }),
+        ),
+    );
+    const result = await run("check-legal-versions.ts");
+    expect(result.code).toBe(1);
+    expect(result.err).toEqual([
+      expect.stringMatching(
+        `^✖ privacy: the app carries ${CONSENT_VERSIONS.privacy}, the site publishes 2026-11-1`,
+      ),
+      `✖ check:legal-versions: the app's consent versions are not the site's (${DEPLOYED})`,
+    ]);
+    expect(result.out).toEqual([]);
+  });
+
+  it("fails when the site's research text is not this app's Finnish wording under the same version", async () => {
+    site.mockImplementation(
+      async () =>
+        new Response(
+          versions({
+            research: {
+              version: CONSENT_VERSIONS.research,
+              hash: "72a206b59f5659c5",
+              language: "fi",
+              url: legalPageUrl("research", CONSENT_VERSIONS.research ?? ""),
+            },
+          }),
+        ),
+    );
+    const result = await run("check-legal-versions.ts");
+    expect(result.code).toBe(1);
+    expect(result.err[0]).toMatch(
+      /^✖ research: the site's text of .* \(fi, 72a206b59f5659c5\) is not this app's Finnish legal\.research\.title and summary/,
+    );
+  });
+
+  it("fails rather than passes when the site has not published the file", async () => {
+    site.mockImplementation(async () => new Response("Not found", { status: 404 }));
+    const result = await run("check-legal-versions.ts");
+    expect(result.code).toBe(1);
+    expect(result.err).toEqual([
+      `✖ the site's versions (${DEPLOYED}) could not be read: ${DEPLOYED} answered 404`,
+    ]);
+  });
+
+  it("reads a local copy with --file, after the -- pnpm passes through, and never the network", async () => {
+    disk.files.set("/site/dist/legal/versions.json", versions());
+    const result = await run("check-legal-versions.ts", [
+      "--",
+      "--file",
+      "/site/dist/legal/versions.json",
+    ]);
+    expect(result.code).toBe(0);
+    expect(result.out[0]).toMatch(/are the site's \(\/site\/dist\/legal\/versions\.json\)/);
+    expect(site).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, string | undefined, RegExp]>([
+    ["a file that is not there", undefined, /could not be read: ENOENT/],
+    ["a file that is not JSON", "<html></html>", /could not be read: is not JSON$/],
+    ["a file without versions", '{"terms":{"url":"x"}}', /terms\.version: /],
+  ])("stops on %s, with the reason", async (_, content, message) => {
+    if (content !== undefined) disk.files.set("/fixture.json", content);
+    const result = await run("check-legal-versions.ts", ["--file", "/fixture.json"]);
+    expect(result.code).toBe(1);
+    expect(result.err).toEqual([expect.stringMatching(message)]);
+    expect(site).not.toHaveBeenCalled();
+  });
+
+  it("refuses --file with no value rather than checking the deployed file (#235)", async () => {
+    const result = await run("check-legal-versions.ts", ["--file="]);
+    expect(result).toMatchObject({ code: 1, err: ["✖ --file takes a value"] });
+    expect(site).not.toHaveBeenCalled();
+  });
+
+  it("annotates the pull request in GitHub Actions, escaped so a text cannot start a command", async () => {
+    site.mockImplementation(
+      async () =>
+        new Response(
+          versions({
+            terms: {
+              version: "x\n::stop-commands::y",
+              hash: "0123456789abcdef",
+              language: "en",
+              url: "u",
+            },
+          }),
+        ),
+    );
+    const result = await run("check-legal-versions.ts", [], { GITHUB_ACTIONS: "true" });
+    expect(result.code).toBe(1);
+    expect(result.err[0]).toMatch(/^::error::terms: the app carries .*%0A::stop-commands::y/);
+    expect(result.err.join("\n")).not.toMatch(/\n::stop-commands/);
   });
 });
 

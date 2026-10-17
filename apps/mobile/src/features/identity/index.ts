@@ -4,6 +4,7 @@ export { AccountActions } from "./AccountActions";
 export { BreakScreen } from "./BreakScreen";
 export { type ConsentState, ConsentSwitch, useConsentStates } from "./ConsentSwitches";
 export { EmailCard, EmailScreen } from "./EmailCard";
+export { LegalTextLink } from "./LegalTextLink";
 export { OnboardingScreen } from "./onboarding/OnboardingScreen";
 export { useOnboardingGate } from "./onboarding/useOnboardingGate";
 export { SignedOutToStart } from "./SignedOutToStart";

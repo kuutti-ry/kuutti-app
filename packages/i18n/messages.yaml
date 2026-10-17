@@ -3455,6 +3455,13 @@ onboarding.consents.version:
   sv: "Version {version}"
   machine: { fi: true, sv: true }
 
+onboarding.consents.fullText:
+  en: "Read the full text on kuutti.app (version {version})"
+  description: "A link under each legal summary (the terms, the privacy summary, the research opt-in, the sensitive answers; onboarding and Settings) to the full text on the website, at the anchor of {version}, the consent_version this app carries (#208, ADR-010 §4). Opens the browser."
+  fi: "Lue koko teksti osoitteessa kuutti.app (versio {version})"
+  sv: "Läs hela texten på kuutti.app (version {version})"
+  machine: { fi: true, sv: true }
+
 onboarding.consents.outdatedApp:
   en: "This text has a newer version than the one built into this app. Update the app to continue."
   description: "Shown on the consents step when the API's current consent_version differs from the version of the text bundled in the app (#46, ADR-010 §4): the person may only accept the exact wording they read."

@@ -1,7 +1,7 @@
 {
   "name": "kuutti",
   "private": true,
-  "version": "0.33.15",
+  "version": "0.34.0",
   "type": "module",
   "description": "Kuutti monorepo root. Workspace members arrive with the M1 scaffold (#2).",
   "license": "SEE LICENSE IN LICENSE-EXCEPTION",
@@ -37,6 +37,7 @@
     "version:bump": "node scripts/bump-version.ts",
     "check:licenses": "node scripts/check-licenses.ts",
     "check:adr-index": "node scripts/check-adr-index.ts",
+    "check:legal-versions": "node packages/i18n/scripts/check-legal-versions.ts",
     "demo:bank": "node packages/db/src/cli/demo-bank.ts",
     "demo:population": "pnpm --filter @kuutti/api run demo:population",
     "demo:reset": "pnpm --filter @kuutti/api run demo:reset",
