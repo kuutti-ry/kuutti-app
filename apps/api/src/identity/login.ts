@@ -44,9 +44,11 @@ export type LoginDeps = {
  * first; if the table is still full, the two oldest attempts the bank has not
  * answered yet give way to this one, so a flood shortens how long an
  * unanswered attempt lives rather than shutting the door on everybody. Only a
- * table whose every row holds a code, which nobody can write without the
- * bank, refuses a start, before the broker signs anything. `cap` is the
- * ceiling; tests make it small.
+ * table whose every row the bank has answered, each holding a code or a
+ * callback under way, refuses a start, before the broker signs anything;
+ * nobody keeps such a row without the bank, since a callback the bank does
+ * not complete ends its attempt at once (ADR-026 §8). `cap` is the ceiling;
+ * tests make it small.
  */
 export async function startLogin(
   deps: LoginDeps,
@@ -75,9 +77,9 @@ export async function startLogin(
     if (evicted === 0) {
       throw new AppError(429, "auth_rate_limited", "Too many logins are under way");
     }
-    // A person whose attempt it ended meets auth_state_mismatch, whether the
-    // callback comes after the eviction or was already waiting on the bank
-    // (finishLogin). The line is the runbook's signal that the table is full
+    // A person whose attempt it ended meets auth_state_mismatch at the
+    // callback; an attempt whose callback has come back is never taken
+    // (ADR-026 §8). The line is the runbook's signal that the table is full
     // (ADR-026 §7): this start goes on, so no refusal of it would show.
     deps.logger.warn({ detail: { limiter: "evicted", evicted } }, "sign-in refused");
   }
@@ -93,23 +95,38 @@ const attemptGone = () =>
  * with the broker's result. The re-registration rule decides what the login
  * is; a refusal is counted on the identity; a success leaves a one-time code
  * for the app to exchange, and the browser is sent to the app's deep link.
+ * A state is answered once (#324, ADR-026 §8).
  */
 export async function completeLogin(
   deps: LoginDeps,
   input: { callbackUrl: URL; query: AuthCallbackQuery },
 ): Promise<URL> {
   const now = deps.now();
-  const request = await repo.findAuthRequestByState(deps.db, input.query.state);
-  if (!request || request.codeHash !== null || request.expiresAt.getTime() <= now.getTime()) {
-    throw attemptGone();
-  }
-  // From here the attempt is known, and so is where its browser belongs: a
-  // refusal of a staff attempt (#49) carries the platform, so the route sends
-  // the browser to the panel, not to the app.
+  // The attempt is spent in the statement that finds it, before the broker is
+  // asked anything, so a replay of this return, at once or later, costs no
+  // token call; the claim's deadline keeps the eviction and the sweep off it
+  // while the bank answers. The refusal comes before the platform is known,
+  // so a replayed staff state lands on the app's link, as any unknown one does.
+  const request = await repo.claimAuthRequest(deps.db, {
+    state: input.query.state,
+    now,
+    until: new Date(now.getTime() + AUTH_REQUEST_TTL_MS),
+  });
+  if (!request) throw attemptGone();
   try {
     return await finishLogin(deps, input, request, now);
   } catch (error) {
-    if (request.platform === ADMIN_PLATFORM && error instanceof AppError) {
+    // A 500 keeps its claim until the deadline, and its own error reaches the
+    // error sink unmasked.
+    if (!(error instanceof AppError)) throw error;
+    // A refused or failed callback ends its attempt there and then: the mark
+    // keeps refusing a replay, and the row is the sweep's, not one the
+    // eviction must skip until its deadline (ADR-026 §6, §8).
+    await repo.expireAuthRequest(deps.db, request.id, now);
+    // From here the attempt is known, and so is where its browser belongs: a
+    // refusal of a staff attempt (#49) carries the platform, so the route
+    // sends the browser to the panel, not to the app.
+    if (request.platform === ADMIN_PLATFORM) {
       throw new AppError(error.status, error.code, error.message, {
         ...(typeof error.detail === "object" && error.detail !== null ? error.detail : {}),
         platform: ADMIN_PLATFORM,
@@ -122,7 +139,7 @@ export async function completeLogin(
 async function finishLogin(
   deps: LoginDeps,
   input: { callbackUrl: URL; query: AuthCallbackQuery },
-  request: NonNullable<Awaited<ReturnType<typeof repo.findAuthRequestByState>>>,
+  request: NonNullable<Awaited<ReturnType<typeof repo.claimAuthRequest>>>,
   now: Date,
 ): Promise<URL> {
   if (input.query.error) {
@@ -130,8 +147,8 @@ async function finishLogin(
     // not a failure of anything. Any other code reaches the log (OAuth codes
     // are snake_case words); free text does not.
     if (input.query.error === "access_denied") {
-      // The attempt is over: its state cannot be completed with a code later.
-      await repo.expireAuthRequest(deps.db, request.id, now);
+      // The attempt is over, as every refusal's is (completeLogin): its state
+      // cannot be completed with a code later.
       throw new AppError(400, "auth_cancelled", "The person cancelled at the bank");
     }
     const code = /^[a-z_]+$/.test(input.query.error) ? input.query.error : "unnamed error";
@@ -163,23 +180,11 @@ async function finishLogin(
     });
   }
 
-  // The attempt was unanswered while the bank answered, so a start at the
-  // ceiling may have ended it (ADR-026 §6). It is read again before the
-  // account is resolved, so a login whose attempt is gone creates and resumes
-  // nothing, and the browser leaves with auth_state_mismatch, as it would
-  // had the eviction come before the callback.
-  // shortcut: an eviction within the resolution itself, a few statements, is
-  // seen only when the attach writes nothing, and what the resolution
-  // created or resumed stays, with no code; marking the attempt answered
-  // before the resolution, in a way the eviction skips, would lift it
-  // (#324, which marks the attempt at its first callback anyway).
-  //
   // The account can be erased (#51) between its resolution and the code: the
   // attach then writes nothing, the attempt is still there, and resolving
   // again reads the cooldown the erasure recorded, so the browser leaves with
   // auth_cooldown, not a code.
   for (let attempt = 0; attempt < 2; attempt++) {
-    if (!(await repo.findAuthRequestByState(deps.db, request.state))) throw attemptGone();
     const { accountId, outcome } = await resolveAccount(deps, derived, now);
     const { code, hash } = newOneTimeCode();
     const attached = await repo.attachCode(deps.db, {

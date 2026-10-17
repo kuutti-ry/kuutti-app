@@ -36,26 +36,21 @@ export function adminErrorUrl(adminAppUrl: string, code: string): URL {
  * The admin half of the callback, after the bank has answered and the hetu
  * has become hetu_hmac (login.ts owns that part). A known identity in good
  * standing with a role gets a one-time code; anyone else is refused with
- * admin_not_allowed and the attempt is spent.
+ * admin_not_allowed and the attempt is spent, as every refusal's is
+ * (completeLogin, ADR-026 §8).
  */
 export async function completeAdminLogin(
   deps: AdminLoginDeps,
   input: {
-    request: { id: string; state: string };
+    request: { id: string };
     hetuHmac: string;
     reference: repo.BrokerReference;
     now: Date;
   },
 ): Promise<URL> {
-  // As the app's callback does (ADR-026 §6): an attempt a start at the ceiling
-  // ended while the bank answered writes nothing, not even the reference.
-  if (!(await repo.findAuthRequestByState(deps.db, input.request.state))) {
-    throw new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
-  }
   const identity = await repo.findIdentityByHmac(deps.db, input.hetuHmac);
   const role = identity ? await repo.findModeratorRole(deps.db, identity.id) : null;
   if (!identity || !role || identity.standing !== "ok") {
-    await repo.expireAuthRequest(deps.db, input.request.id, input.now);
     throw new AppError(403, "admin_not_allowed", "This bank login has no moderator role", {
       known: identity !== null,
       standing: identity?.standing ?? null,
@@ -63,17 +58,12 @@ export async function completeAdminLogin(
   }
   await repo.updateBrokerReference(deps.db, identity.id, input.reference);
   const { code, hash } = newOneTimeCode();
-  const attached = await repo.attachAdminCode(deps.db, {
+  await repo.attachAdminCode(deps.db, {
     id: input.request.id,
     codeHash: hash,
     codeExpiresAt: new Date(input.now.getTime() + ONE_TIME_CODE_TTL_MS),
     identityId: identity.id,
   });
-  // A start at the ceiling ended the attempt while the bank answered (ADR-026
-  // §6): the code would exist nowhere, so the panel gets the error instead.
-  if (!attached) {
-    throw new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
-  }
   return adminReturnUrl(deps.adminAppUrl, code);
 }
 

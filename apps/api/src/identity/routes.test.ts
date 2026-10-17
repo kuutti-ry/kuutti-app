@@ -130,6 +130,18 @@ function refusal(res: Response): { error: string | null; until: string | null } 
   return { error: location.searchParams.get("error"), until: location.searchParams.get("until") };
 }
 
+/**
+ * What a callback left of an attempt: its outcome, and whether its expiry
+ * has come (against the clock, since now() is the test transaction's start).
+ */
+async function attemptOf(ctx: { client: Queryable }, state: string) {
+  const { rows } = await ctx.client.query<{ outcome: string | null; spent: boolean }>(
+    "SELECT outcome, expires_at <= clock_timestamp() AS spent FROM auth_request WHERE state = $1",
+    [state],
+  );
+  return rows[0];
+}
+
 describe("bank login", () => {
   test("A login starts with the platform recorded and the browser sent to the bank chooser", async ({
     ctx,
@@ -299,6 +311,23 @@ describe("bank login", () => {
     expect(JSON.stringify(logs())).not.toContain("provider");
     const rows = await ctx.client.query("SELECT count(*) AS n FROM identity");
     expect(Number(rows.rows[0]?.n)).toBe(0);
+  });
+
+  test("A return from the bank is answered once, and a failed one is spent too", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU);
+    const state = await start(app);
+    expect(refusal(await callback(app, state, "broken")).error).toBe("auth_provider_error");
+    // The same return again, now with a code the broker would complete (#324).
+    expect(refusal(await callback(app, state)).error).toBe("auth_state_mismatch");
+    expect(broker.completed).toEqual([state]);
+    const created = await ctx.client.query(
+      "SELECT (SELECT count(*)::int FROM identity) AS identities, (SELECT count(*)::int FROM account) AS accounts",
+    );
+    expect(created.rows[0]).toEqual({ identities: 0, accounts: 0 });
+    // Spent at the first return, and the sweep's from then on (ADR-026 §8).
+    expect(await attemptOf(ctx, state)).toEqual({ outcome: "answered", spent: true });
   });
 
   test("A minor is refused and nothing is stored", async ({ ctx }) => {
@@ -486,6 +515,68 @@ describe("the callback's refusals and failures", () => {
     expect(broker.completed).toEqual([]);
   });
 
+  /** How a first return leaves without a code; the same state then comes back with a good one. */
+  type FailedReturn = {
+    error: string;
+    /** The code the broker is handed, "good" when absent. */
+    code?: string;
+    /** The bank's error in place of a code, which reaches no broker. */
+    bankError?: string;
+    anHourAgo?: boolean;
+    hetu?: string;
+    banned?: boolean;
+  };
+  // Every way a first return can leave without a code (#324, ADR-026 §8).
+  const failedReturns: Array<[string, FailedReturn]> = [
+    ["the broker cannot complete", { code: "broken", error: "auth_provider_error" }],
+    ["the adapter refuses", { code: "refused", error: "auth_provider_error" }],
+    ["the broker fails with no Error at all", { code: "garbage", error: "auth_provider_error" }],
+    ["brings the bank's error", { bankError: "server_error", error: "auth_provider_error" }],
+    [
+      "reports an authentication from before the attempt",
+      { anHourAgo: true, error: "auth_provider_error" },
+    ],
+    ["brings an invalid identity code", { hetu: "010190-123B", error: "auth_provider_error" }],
+    ["brings a minor", { hetu: MINOR_HETU, error: "auth_under_18" }],
+    ["brings a banned identity", { banned: true, error: "auth_banned" }],
+  ];
+  test.for(failedReturns)(
+    "a callback that %s spends its attempt: the same state again is refused without asking the bank",
+    async ([, first], { ctx }) => {
+      const { app, broker } = await appWith(
+        ctx,
+        first.hetu ?? ADULT_HETU,
+        first.anHourAgo ? { authenticatedAt: new Date(Date.now() - 60 * 60_000) } : {},
+      );
+      if (first.banned) {
+        const { hetuHmac } = deriveIdentity(ADULT_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+        await ctx.client.query("INSERT INTO identity (hetu_hmac, standing) VALUES ($1, 'banned')", [
+          hetuHmac,
+        ]);
+      }
+      const state = await start(app);
+      const back = first.bankError
+        ? await app.request(
+            `/auth/callback?error=${first.bankError}&state=${encodeURIComponent(state)}`,
+          )
+        : await callback(app, state, first.code);
+      expect(refusal(back).error).toBe(first.error);
+      // The bank's own error reaches no broker; every other return asks it once.
+      const asked = [...broker.completed];
+      expect(asked).toEqual(first.bankError ? [] : [state]);
+
+      expect(refusal(await callback(app, state)).error).toBe("auth_state_mismatch");
+      expect(broker.completed).toEqual(asked);
+      expect(await attemptOf(ctx, state)).toEqual({ outcome: "answered", spent: true });
+      // Nothing created, and a refused identity counted once for the one bank login.
+      const { rows } = await ctx.client.query(
+        `SELECT (SELECT count(*)::int FROM account) AS accounts,
+                (SELECT coalesce(sum(refused_attempts), 0)::int FROM identity) AS refused`,
+      );
+      expect(rows[0]).toEqual({ accounts: 0, refused: first.banned ? 1 : 0 });
+    },
+  );
+
   test("A callback reaching an API without a broker sends the browser back with auth_provider_error", async ({
     ctx,
   }) => {
@@ -513,6 +604,48 @@ describe("the callback's refusals and failures", () => {
     expect(await errorCode(res)).toBe("internal_error");
     expect(reported).toHaveLength(1);
     expect(lines().filter((l) => l.msg === "unhandled error")).toHaveLength(1);
+  });
+
+  test("A failure after the attempt is claimed is a 500 the error sink sees, and the claim holds until its deadline", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    const reported: unknown[] = [];
+    const broker = fakeBroker(ADULT_HETU);
+    // The connection drops at the identity's insert: after the claim and the
+    // bank's answer, before anything is written.
+    const db = interleaved(ctx.client, { before: /^INSERT INTO identity \(hetu_hmac/ }, () =>
+      Promise.reject(new Error("connection terminated unexpectedly")),
+    );
+    const app = createApp({
+      config: testConfig({ HETU_HMAC_KEY: KEY_HEX }),
+      logger,
+      db,
+      broker,
+      report: (error) => reported.push(error),
+    });
+    const state = await start(app);
+    const before = Date.now();
+    const res = await callback(app, state);
+    const after = Date.now();
+    expect(db.ran()).toBe(true);
+    expect(res.status).toBe(500);
+    expect(res.headers.get("location")).toBeNull();
+    expect(await errorCode(res)).toBe("internal_error");
+    expect(reported).toHaveLength(1);
+    expect(lines().filter((l) => l.msg === "unhandled error")).toHaveLength(1);
+    // Not ended at once as a refusal is: the claim's deadline bounds the row
+    // (ADR-026 §8), and the state is spent all the same.
+    const { rows } = await ctx.client.query<{ outcome: string | null; expires_at: Date }>(
+      "SELECT outcome, expires_at FROM auth_request WHERE state = $1",
+      [state],
+    );
+    expect(rows[0]?.outcome).toBe("answered");
+    const deadline = rows[0]?.expires_at.getTime() ?? 0;
+    expect(deadline).toBeGreaterThanOrEqual(before + AUTH_REQUEST_TTL_MS);
+    expect(deadline).toBeLessThanOrEqual(after + AUTH_REQUEST_TTL_MS);
+    expect(refusal(await callback(app, state)).error).toBe("auth_state_mismatch");
+    expect(broker.completed).toEqual([state]);
   });
 
   test("A preview handed a broker still has no key, and sends the app back without asking the bank", async ({
@@ -914,6 +1047,25 @@ describe("the table's ceiling (ADR-026 §6)", () => {
     expect(await states(ctx)).toEqual(["full-1", "full-2", "full-5", ...broker.started]);
   });
 
+  test("an attempt whose callback is under way is never ended to make room, however old", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP);
+    // The two oldest are back from the bank, and the broker is still
+    // answering their callbacks, which claimed them (ADR-026 §8) before the
+    // others started, so their deadlines still come first.
+    await ctx.client.query(
+      "UPDATE auth_request SET outcome = 'answered' WHERE state IN ('full-1', 'full-2')",
+    );
+    const { broker, logs, start } = await starter(ctx.client);
+    await start();
+    expect(broker.started).toHaveLength(1);
+    expect(await states(ctx)).toEqual(["full-1", "full-2", "full-5", ...broker.started]);
+    expect(refusedLines(logs)).toEqual([
+      expect.objectContaining({ detail: { limiter: "evicted", evicted: 2 } }),
+    ]);
+  });
+
   test("a table past its cap, as concurrent starts may leave it, drains back under the cap, one row a start", async ({
     ctx,
   }) => {
@@ -951,12 +1103,43 @@ describe("the table's ceiling (ADR-026 §6)", () => {
     expect(refusedLines(logs)).toEqual([]);
   });
 
-  test("At the table's cap a login is refused only when every attempt holds a code", async ({
+  test("a refused callback's attempt is the sweep's, so it makes room before any eviction", async ({
+    ctx,
+  }) => {
+    await fillTo(ctx, SMALL_CAP - 1);
+    // The youngest attempt fills the table, comes back from the bank, and the
+    // broker cannot complete it: its callback ends it there and then.
+    const { app } = await appWith(ctx, ADULT_HETU);
+    expect(refusal(await callback(app, await start(app), "broken")).error).toBe(
+      "auth_provider_error",
+    );
+    expect(await attempts(ctx)).toBe(SMALL_CAP);
+    const atTheCap = await starter(ctx.client);
+    await atTheCap.start();
+    expect(await states(ctx)).toEqual([
+      "full-1",
+      "full-2",
+      "full-3",
+      "full-4",
+      ...atTheCap.broker.started,
+    ]);
+    // Nothing unanswered and open had to go.
+    expect(refusedLines(atTheCap.logs)).toEqual([]);
+  });
+
+  test("At the table's cap a login is refused only when every attempt is back from the bank", async ({
     ctx,
   }) => {
     // The routes' own ceiling, every row of it a code waiting for its
-    // exchange: nobody can write one without the bank.
+    // exchange but one, whose callback is under way: nobody keeps such
+    // a row without the bank, since a callback the bank does not complete
+    // ends its attempt at once (ADR-026 §8).
     await fillTo(ctx, AUTH_REQUEST_CAP, { coded: true });
+    await ctx.client.query(
+      `UPDATE auth_request SET code_hash = NULL, code_expires_at = NULL, outcome = 'answered',
+         expires_at = now() + interval '10 minutes'
+       WHERE state = 'full-1'`,
+    );
     const { app, broker, logs } = await appWith(ctx, ADULT_HETU);
     const refused = await app.request("/auth/start?platform=ios");
     expect(sentTo(refused)).toBe("kuutti://auth?error=auth_rate_limited");

@@ -113,10 +113,11 @@ export async function insertAuthRequest(
  * no count, so no other start can take the room in between and the cost is a
  * walk of the expiry index and two deletes by primary key. Two rather than
  * one, so a table that concurrent starts left past the ceiling drains back
- * under it. An attempt that holds a code is never taken: its person has been
- * to the bank and is on the way back. Rows another start is deleting are
- * skipped rather than waited for. Returns how many were deleted; 0 means
- * there was no unanswered attempt to take, and nothing was inserted.
+ * under it. An attempt the bank has answered, holding a code or claimed by
+ * its callback (ADR-026 §8), is never taken: its person has been to the bank
+ * and is on the way back. Rows another start is deleting or a callback is
+ * claiming are skipped rather than waited for. Returns how many were deleted;
+ * 0 means there was no unanswered attempt to take, and nothing was inserted.
  */
 export async function evictAndInsertAuthRequest(
   db: Queryable,
@@ -125,8 +126,8 @@ export async function evictAndInsertAuthRequest(
   const { rows } = await db.query<{ evicted: number }>(
     `WITH gone AS (
        DELETE FROM auth_request WHERE id = ANY(ARRAY(
-         SELECT id FROM auth_request WHERE code_hash IS NULL ORDER BY expires_at
-         LIMIT 2 FOR UPDATE SKIP LOCKED))
+         SELECT id FROM auth_request WHERE code_hash IS NULL AND outcome IS NULL
+         ORDER BY expires_at LIMIT 2 FOR UPDATE SKIP LOCKED))
        RETURNING id)
      INSERT INTO auth_request (state, nonce, platform, locale, expires_at)
      SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz
@@ -137,11 +138,27 @@ export async function evictAndInsertAuthRequest(
   return rows[0]?.evicted ?? 0;
 }
 
-export async function findAuthRequestByState(
+/**
+ * The callback's first statement (#324, ADR-026 §8): finds the attempt by its
+ * state and spends it in the same statement, before the broker is asked
+ * anything, so a second return with that state, at once or later, finds
+ * nothing and costs no token call. Two returns at once: the second waits on
+ * the row's lock and then reads the mark. The mark is `outcome = 'answered'`,
+ * which the eviction skips, and the expiry moves to `until`, so neither the
+ * eviction nor the sweep of expired rows ends an attempt under way; the
+ * attach replaces the mark with what the login decided. Null when the state
+ * is unknown, already answered, holds a code or has expired at `now`.
+ */
+export async function claimAuthRequest(
   db: Queryable,
-  state: string,
+  input: { state: string; now: Date; until: Date },
 ): Promise<AuthRequest | null> {
-  const { rows } = await db.query<Row>("SELECT * FROM auth_request WHERE state = $1", [state]);
+  const { rows } = await db.query<Row>(
+    `UPDATE auth_request SET outcome = 'answered', expires_at = $3
+     WHERE state = $1 AND outcome IS NULL AND code_hash IS NULL AND expires_at > $2
+     RETURNING *`,
+    [input.state, input.now, input.until],
+  );
   return rows[0] ? authRequestFrom(rows[0]) : null;
 }
 
@@ -159,8 +176,7 @@ export async function findAuthRequestByCodeHash(
  * Publishes the one-time code for the account the callback resolved. False
  * when the account was erased between the resolution and this statement
  * (#51): no code is attached to a tombstone, and the caller resolves again,
- * which now reads the cooldown. False too when the attempt itself is gone,
- * ended at the ceiling (ADR-026 §6); the caller reads it again to tell.
+ * which now reads the cooldown.
  */
 export async function attachCode(
   db: Queryable,
@@ -174,7 +190,12 @@ export async function attachCode(
   return result.rowCount === 1;
 }
 
-/** Ends a login attempt without a code: the person cancelled at the bank. */
+/**
+ * Ends a claimed attempt whose callback was refused or failed (ADR-026 §8):
+ * its expiry becomes now, so the row is the sweep's, the first thing the
+ * ceiling clears, rather than one the eviction must skip until its deadline.
+ * The mark stays, so the state is still refused at a replay.
+ */
 export async function expireAuthRequest(db: Queryable, id: string, at: Date): Promise<void> {
   await db.query("UPDATE auth_request SET expires_at = $2 WHERE id = $1", [id, at]);
 }
@@ -510,19 +531,18 @@ export async function findModeratorRole(
 
 /**
  * An admin login's one-time code resolves to an identity, never to an
- * account. False when the attempt is gone: a start at the ceiling ended it
- * while the bank answered (ADR-026 §6).
+ * account. The callback has claimed the attempt (ADR-026 §8), so neither the
+ * eviction nor the sweep can have ended it, and no row count is asked for.
  */
 export async function attachAdminCode(
   db: Queryable,
   input: { id: string; codeHash: string; codeExpiresAt: Date; identityId: string },
-): Promise<boolean> {
-  const result = await db.query(
+): Promise<void> {
+  await db.query(
     `UPDATE auth_request SET code_hash = $2, code_expires_at = $3, identity_id = $4, outcome = 'admin'
      WHERE id = $1`,
     [input.id, input.codeHash, input.codeExpiresAt, input.identityId],
   );
-  return result.rowCount === 1;
 }
 
 export type AdminSessionRow = {
