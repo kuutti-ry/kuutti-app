@@ -7,7 +7,7 @@ import {
 } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, ScrollView, View } from "react-native";
+import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -90,8 +90,13 @@ export function ConversationScreen({ id }: { id: string }) {
   // sequence: a message the caller may not read still has its place.
   const [more, setMore] = useState(false);
   const unsent = useRef<{ body: string; clientId: string } | null>(null);
-  // Only a screen in front marks read: one under another screen is not being read.
+  // Only a screen in front marks read: one under another screen, or under
+  // the app switcher or the control centre (iOS's inactive), is not being read.
   const focused = useRef(false);
+  const inFront = () =>
+    focused.current &&
+    AppState.currentState !== "background" &&
+    AppState.currentState !== "inactive";
   const live = useChatLive();
   const here = live.conversations[id];
   const arrived = here?.messages;
@@ -101,10 +106,18 @@ export function ConversationScreen({ id }: { id: string }) {
     (detail: ConversationDetail, messages: ChatMessage[]) => {
       loaded.current = messages;
       setView({ status: "ready", detail, messages });
+      // A send whose answer was lost and whose words came back with a
+      // refusal: the message arrived after all, so it was sent.
+      const lost = unsent.current;
+      if (lost && messages.some((m) => m.clientId === lost.clientId)) {
+        unsent.current = null;
+        setRefusal(null);
+        setText((words) => (words === lost.body ? "" : words));
+      }
       // The newest is on the screen now: read up to it, once per new message of theirs.
       const newest = messages.at(-1);
       if (
-        focused.current &&
+        inFront() &&
         newest &&
         newest.seq > marked.current &&
         messages.some((m) => m.side === "theirs")
@@ -148,10 +161,28 @@ export function ConversationScreen({ id }: { id: string }) {
     }, [load]),
   );
 
-  // What the socket brought joins what is shown, and is marked read while in front.
+  // Back from the app switcher or the control centre: what came meanwhile is read now.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active" && focused.current) void load();
+    });
+    return () => subscription.remove();
+  }, [load]);
+
+  // What the socket brought joins what is shown, and is marked read while in
+  // front; only from the oldest shown on, so a message held from long before
+  // the page leaves no gap that Earlier messages would step over.
   const shownDetail = view.status === "ready" ? view.detail : null;
   useEffect(() => {
-    if (shownDetail && arrived) show(shownDetail, merged(loaded.current, arrived));
+    if (!shownDetail || !arrived) return;
+    const oldest = loaded.current[0]?.seq ?? 0;
+    show(
+      shownDetail,
+      merged(
+        loaded.current,
+        arrived.filter((m) => m.seq >= oldest),
+      ),
+    );
   }, [shownDetail, arrived, show]);
 
   // The newest held is what the socket's next resume names.

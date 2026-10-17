@@ -2,6 +2,7 @@ import type { ChatMessage, ConversationDetail } from "@kuutti/schema";
 import { act, fireEvent, screen, userEvent, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
+import { AccessibilityInfo, AppState, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -442,6 +443,9 @@ describe("one conversation", () => {
 describe("one conversation, live over the socket", () => {
   const ONLINE = "Online";
   const LOST = "Connection lost. Reconnecting…";
+  const FAILED = "The message was not sent. Check your connection and send it again.";
+  const announced = () =>
+    (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
   const mine = (seq: number, body: string, clientId: string): ChatMessage => ({
     ...message(seq, "mine", body, DAY_2_LATER),
     clientId,
@@ -582,6 +586,120 @@ describe("one conversation, live over the socket", () => {
     ).toBeNull();
     expect(composer().props.value).toBe("");
     expect(said("You", DAY_2_LATER, "Huomenna")).toBeTruthy();
+  });
+
+  it("takes back the refusal when the socket brings a message whose answer was lost, and the words unless they were changed", async () => {
+    await live(detail(), [[message(1, "theirs", "Moi", DAY_1)]], () =>
+      Promise.reject(new TypeError("Network request failed")),
+    );
+    await screen.findByLabelText("Message");
+    await ready();
+    await type("Nähdään!");
+    await userEvent.setup().press(sendButton());
+    await settle();
+    expect(screen.getByText(FAILED)).toBeTruthy();
+    expect(composer().props.value).toBe("Nähdään!");
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: mine(2, "Nähdään!", "11111111-1111-4111-8111-111111111111"),
+    });
+    expect(screen.queryByText(FAILED)).toBeNull();
+    expect(composer().props.value).toBe("");
+    expect(said("You", DAY_2_LATER, "Nähdään!")).toBeTruthy();
+    // Words changed meanwhile are the person's: they stay.
+    await type("Huomenna");
+    await userEvent.setup().press(sendButton());
+    await settle();
+    await type("Huomenna kuudelta");
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: mine(3, "Huomenna", "22222222-2222-4222-8222-222222222222"),
+    });
+    expect(screen.queryByText(FAILED)).toBeNull();
+    expect(composer().props.value).toBe("Huomenna kuudelta");
+  });
+
+  it("joins only what the socket brought from the oldest message shown on", async () => {
+    await live(detail(), [
+      [message(6, "theirs", "Kuusi", DAY_2), message(5, "theirs", "Viisi", DAY_2)],
+    ]);
+    await screen.findByLabelText(`Sanna, ${timeOf("en", DAY_2)}, Viisi`);
+    await ready();
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: message(2, "theirs", "Kaksi", DAY_1),
+    });
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: message(7, "theirs", "Seitsemän", DAY_2_LATER),
+    });
+    expect(screen.queryByLabelText(`Sanna, ${timeOf("en", DAY_1)}, Kaksi`)).toBeNull();
+    expect(said("Sanna", DAY_2_LATER, "Seitsemän")).toBeTruthy();
+  });
+
+  it("marks nothing read while the app is inactive, and reads what came when it is active again", async () => {
+    const listeners: Array<(state: string) => void> = [];
+    jest.spyOn(AppState, "addEventListener").mockImplementation((_event, listener) => {
+      listeners.push(listener as (state: string) => void);
+      return { remove: jest.fn() } as never;
+    });
+    const was = AppState.currentState;
+    const calls = await live(detail(), [
+      [message(1, "theirs", "Moi", DAY_1)],
+      [message(2, "theirs", "Oletko siellä?", DAY_2_LATER)],
+    ]);
+    const reads = () => calls.filter((c) => c.path.endsWith("/read")).map((c) => c.body);
+    try {
+      await screen.findByLabelText(`Sanna, ${timeOf("en", DAY_1)}, Moi`);
+      await ready();
+      await settle();
+      (AppState as { currentState: unknown }).currentState = "inactive";
+      await frame({
+        type: "message",
+        conversationId: ID,
+        message: message(2, "theirs", "Oletko siellä?", DAY_2_LATER),
+      });
+      await settle();
+      expect(reads()).toEqual([{ upTo: 1 }]);
+      (AppState as { currentState: unknown }).currentState = "active";
+      await act(async () => {
+        for (const listener of listeners) listener("active");
+      });
+      await settle();
+      expect(reads()).toEqual([{ upTo: 1 }, { upTo: 2 }]);
+    } finally {
+      (AppState as { currentState: unknown }).currentState = was;
+    }
+  });
+
+  it("tells VoiceOver once that the connection is lost, iOS having no live regions", async () => {
+    (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+    jest.replaceProperty(Platform, "OS", "ios");
+    await live(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await screen.findByLabelText("Message");
+    await ready();
+    jest.useFakeTimers();
+    await act(async () => FakeWebSocket.latest().drop());
+    expect(announced()).toEqual([LOST]);
+    // Still lost after the next try: said once.
+    await act(() => jest.advanceTimersByTimeAsync(1000));
+    await act(async () => FakeWebSocket.latest().drop());
+    expect(announced()).toEqual([LOST]);
+  });
+
+  it("leaves the lost connection to the live region on Android", async () => {
+    (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+    jest.replaceProperty(Platform, "OS", "android");
+    await live(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await screen.findByLabelText("Message");
+    await ready();
+    await act(async () => FakeWebSocket.latest().drop());
+    expect(screen.getByText(LOST).props.accessibilityLiveRegion).toBe("polite");
+    expect(announced()).toEqual([]);
   });
 
   it("says the connection is lost at the top, politely, until the socket is open again", async () => {

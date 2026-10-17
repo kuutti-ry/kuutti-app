@@ -37,7 +37,7 @@ const frames = (...all: ServerFrame[]): ChatLive =>
   all.reduce((live, frame) => reduce(live, { type: "frame", frame }), EMPTY);
 
 describe("the chat's live store", () => {
-  it("joins messages by sequence, each once, the later winning, and moves no counter: the list applies a message itself", () => {
+  it("joins messages by sequence, each once, the later winning", () => {
     const live = frames(
       { type: "message", conversationId: A, message: message(3) },
       { type: "message", conversationId: A, message: message(1) },
@@ -48,24 +48,22 @@ describe("the chat's live store", () => {
       [3, "Korjattu"],
     ]);
     expect(live.conversations[A]?.cursor).toBe(3);
-    expect(live.changes).toBe(0);
   });
 
-  it("raises the read mark only, follows presence, and changes nothing to count", () => {
+  it("raises the read mark only, and follows presence", () => {
     const live = frames(
       { type: "read", conversationId: A, upTo: 5 },
       { type: "read", conversationId: A, upTo: 2 },
       { type: "presence", conversationId: A, online: true },
     );
     expect(live.conversations[A]).toMatchObject({ readUpTo: 5, online: true, cursor: 0 });
-    expect(live.changes).toBe(0);
     expect(
       reduce(live, { type: "frame", frame: { type: "presence", conversationId: A, online: false } })
         .conversations[A]?.online,
     ).toBe(false);
   });
 
-  it("keeps the newest state of a conversation, gone included, and counts the change", () => {
+  it("keeps the newest state of a conversation, gone included", () => {
     const live = frames(
       { type: "conversation", conversationId: A, state: "archived", closedHow: null },
       { type: "conversation", conversationId: B, state: "gone", closedHow: null },
@@ -73,7 +71,6 @@ describe("the chat's live store", () => {
     );
     expect(live.conversations[A]?.state).toEqual({ state: "closed", closedHow: "erasure" });
     expect(live.conversations[B]?.state).toEqual({ state: "gone", closedHow: null });
-    expect(live.changes).toBe(3);
   });
 
   it("leaves ready, ping and error to the socket", () => {
@@ -107,7 +104,7 @@ describe("the chat's live store", () => {
 
   it("is inert without its provider: nothing live, a report goes nowhere", async () => {
     const { result } = await renderHook(() => useChatLive());
-    expect(result.current).toMatchObject({ status: "connecting", changes: 0, conversations: {} });
+    expect(result.current).toMatchObject({ status: "connecting", conversations: {} });
     expect(() => result.current.report({ [A]: 1 })).not.toThrow();
   });
 });
@@ -172,12 +169,11 @@ describe("the chat's live provider", () => {
     ]);
     await act(async () => ws.receive({ type: "message", conversationId: A, message: message(5) }));
     expect(result.current.conversations[A]?.messages).toEqual([message(5)]);
-    expect(result.current.changes).toBe(0);
     await act(async () => ws.drop());
     expect(result.current.status).toBe("lost");
     // Someone else may sign in on this phone next.
     await act(async () => clearSession());
-    expect(result.current).toMatchObject({ status: "connecting", changes: 0, conversations: {} });
+    expect(result.current).toMatchObject({ status: "connecting", conversations: {} });
     expect(FakeWebSocket.instances).toHaveLength(1);
   });
 

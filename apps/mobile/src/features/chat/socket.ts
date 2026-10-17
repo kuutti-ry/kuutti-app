@@ -92,18 +92,21 @@ export function connect(handlers: SocketHandlers): () => void {
 
   // Ahead of expiry while open; a refresh that did not move the expiry (the
   // API unwell, or offline) leaves it to the API's session_expired and the
-  // reconnect's own refresh.
-  const keepFresh = () => {
+  // reconnect's own refresh. So does a new token already due when it comes,
+  // as on a phone whose clock runs ahead: refreshing again at once would
+  // never end.
+  const keepFresh = (justRefreshed = false) => {
     const session = currentSession();
     if (stopped || !live || !session) return;
     const wait = new Date(session.accessExpiresAt).getTime() - REFRESH_LEAD_MS - Date.now();
     if (wait > 0) {
-      refresher = setTimeout(keepFresh, Math.min(wait, TIMER_MAX_MS));
+      refresher = setTimeout(() => keepFresh(), Math.min(wait, TIMER_MAX_MS));
       return;
     }
+    if (justRefreshed) return;
     refreshSession().then(
       (next) => {
-        if (next && next.accessExpiresAt !== session.accessExpiresAt) keepFresh();
+        if (next && next.accessExpiresAt !== session.accessExpiresAt) keepFresh(true);
       },
       () => undefined,
     );

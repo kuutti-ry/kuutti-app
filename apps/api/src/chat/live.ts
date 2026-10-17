@@ -126,60 +126,82 @@ function createChatHub(deps: { db: Queryable; logger: Logger; presence: Presence
     },
 
     /**
-     * The account's first socket opened, or its last closed: the counterparts
-     * of its open and archived conversations are told, nobody for a
-     * shadow-banned account (ADR-024 §6), nothing across a close or a block.
+     * The account came online or went offline to others: its first visible
+     * socket opened, its last closed, or a shadow ban hid or showed it. The
+     * counterparts of its open and archived conversations are told how it
+     * stands when the frame is sent, not when the change began, so two
+     * changes close together end on the truth; nobody across a close or a
+     * block.
      */
-    async announcePresence(socket: LiveSocket, online: boolean): Promise<void> {
-      if (socket.hidden) return;
-      for (const row of await repo.listConversations(db, socket.accountId, CONVERSATIONS_MAX * 2)) {
+    async announcePresence(accountId: string): Promise<void> {
+      const rows = await repo.listConversations(db, accountId, CONVERSATIONS_MAX * 2);
+      const online = presence.online(accountId);
+      for (const row of rows) {
         if (row.counterpartId === null || visibleState(row).state === "closed") continue;
         sendTo(row.counterpartId, { type: "presence", conversationId: row.id, online });
       }
     },
 
     /**
-     * The phone's resume: per conversation it names, every message after the
+     * The phone's resume: per conversation it names, the messages after the
      * sequence it holds, in order, then the counterpart's read mark, presence
      * and the conversation's state; `gone` for one it may not see. A phone
      * resumes as soon as the socket is ready, often before its list has
      * loaded and named anything, so every visible conversation it did not
-     * name hears its counterpart's presence first, and the last named
-     * conversation's state still ends the answer.
+     * name hears its counterpart's presence first. One read of the list
+     * answers every name, since the phone knows no conversation outside
+     * it, and a second after any paging gives the states that end the
+     * answer.
      */
     async resume(
       socket: LiveSocket,
       conversations: ReadonlyArray<{ id: string; seq: number }>,
     ): Promise<void> {
+      const listed = async () =>
+        new Map(
+          (await repo.listConversations(db, socket.accountId, CONVERSATIONS_MAX * 2)).map((row) => [
+            row.id,
+            row,
+          ]),
+        );
+      const rows = await listed();
       const named = new Set(conversations.map(({ id }) => id));
-      for (const row of await repo.listConversations(db, socket.accountId, CONVERSATIONS_MAX * 2)) {
+      for (const row of rows.values()) {
         if (named.has(row.id)) continue;
         socket.send({ type: "presence", conversationId: row.id, online: counterpartOnline(row) });
       }
+      let paged = false;
       for (const { id, seq } of conversations) {
-        const row = await repo.findConversation(db, socket.accountId, id);
+        const row = rows.get(id);
+        // shortcut: one page per conversation, so a resume costs at most a
+        // page for each conversation the person has; a phone further behind
+        // gets the oldest page it lacks, and the rest when it next reads the
+        // conversation over HTTP. A frame telling it to read the rest would
+        // lift this if people turn out to come back that far behind.
+        if (!row?.last || row.last.seq <= seq) continue;
+        paged = true;
+        const page = await repo.listMessages(db, {
+          accountId: socket.accountId,
+          conversationId: id,
+          after: seq,
+          limit: MESSAGES_PAGE_MAX,
+        });
+        for (const message of page) {
+          socket.send({
+            type: "message",
+            conversationId: id,
+            message: toMessage(message, row.side),
+          });
+        }
+      }
+      // The state ends the answer, read after the paging: a close or a block
+      // the hub sent meanwhile must not be followed by the state before it.
+      const now = paged ? await listed() : rows;
+      for (const { id } of conversations) {
+        const row = now.get(id);
         if (!row) {
           socket.send({ type: "conversation", conversationId: id, state: "gone", closedHow: null });
           continue;
-        }
-        let after = seq;
-        for (;;) {
-          const page = await repo.listMessages(db, {
-            accountId: socket.accountId,
-            conversationId: id,
-            after,
-            limit: MESSAGES_PAGE_MAX,
-          });
-          for (const message of page) {
-            socket.send({
-              type: "message",
-              conversationId: id,
-              message: toMessage(message, row.side),
-            });
-          }
-          const last = page.at(-1);
-          if (!last || page.length < MESSAGES_PAGE_MAX) break;
-          after = last.seq;
         }
         socket.send({ type: "read", conversationId: id, upTo: row.counterpartReadUpTo });
         socket.send({ type: "presence", conversationId: id, online: counterpartOnline(row) });
@@ -217,6 +239,12 @@ export function createLive(deps: {
     presence,
     hub,
     schedule: deps.schedule ?? realSchedule,
+    /**
+     * Whether the listener is on the channel (listen.ts sets it). A socket
+     * admitted while it is not would miss what is committed until it is,
+     * so none is (#349).
+     */
+    listening: false,
     /** Every socket closed with the code and why: a shutdown, or the listener lost. */
     closeAll(code: number, error: FrameErrorCode): void {
       for (const socket of presence.all()) socket.close(code, error);

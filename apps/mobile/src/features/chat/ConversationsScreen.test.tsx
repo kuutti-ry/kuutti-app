@@ -319,7 +319,7 @@ describe("the thumbs of the list", () => {
 });
 
 describe("the list, live over the socket", () => {
-  it("names every conversation's newest in the resume, applies a message without reading the list, reads again on a change of state or a new conversation, and says when the connection is lost", async () => {
+  it("names every conversation's newest in the resume, applies a message without reading the list, reads again once on a state other than the row's or a new conversation, and says when the connection is lost", async () => {
     FakeWebSocket.install();
     const asked = api(() => json(LIST));
     await renderWithTheme(
@@ -346,10 +346,19 @@ describe("the list, live over the socket", () => {
         { id: ID(5), seq: 1 },
       ],
     });
-    // Presence and a read mark change no row: nothing is read again.
+    // Presence, a read mark and the resume's states as the rows hold them
+    // change no row: nothing is read again.
     await act(async () => {
       ws.receive({ type: "presence", conversationId: ID(1), online: true });
       ws.receive({ type: "read", conversationId: ID(1), upTo: 3 });
+      for (const c of [...LIST.open, ...LIST.archived]) {
+        ws.receive({
+          type: "conversation",
+          conversationId: c.id,
+          state: c.state,
+          closedHow: c.closedHow,
+        });
+      }
     });
     await settle();
     expect(asked).toHaveLength(2);
@@ -384,6 +393,17 @@ describe("the list, live over the socket", () => {
     await settle();
     expect(asked).toHaveLength(4);
     // A change of state reads it again.
+    await act(async () =>
+      ws.receive({
+        type: "conversation",
+        conversationId: ID(1),
+        state: "archived",
+        closedHow: null,
+      }),
+    );
+    await settle();
+    expect(asked).toHaveLength(6);
+    // The same word again, while the list still answers as before: not again.
     await act(async () =>
       ws.receive({
         type: "conversation",

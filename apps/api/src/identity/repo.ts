@@ -6,6 +6,7 @@ import {
   transaction,
 } from "@kuutti/db";
 import type { IdentityStanding, ModeratorRole } from "@kuutti/schema";
+import type { SessionStanding } from "../lib/auth-middleware.ts";
 
 // Raw parameterised SQL rather than the Drizzle builder (rules/api.md asks for
 // a reason): `Deps.db` is the `Queryable` seam through which the test harness
@@ -473,22 +474,26 @@ const SESSION_ALIVE = `EXISTS (
  * a refresh keeps, never by the access hash, which it rotates: `ended` when
  * the row is gone (erasure deletes it), revoked, or the account or identity
  * is no longer in a live state; `expired` when its access token, or the
- * session itself, is past its time. Scoped by the account (rule 6).
+ * session itself, is past its time, as the session guard reads it: the
+ * instant itself still live. A shadow ban leaves the session live
+ * (ADR-024 §6), so the socket reads it here to hide the account. Scoped by
+ * the account (rule 6).
  */
 export async function sessionStanding(
   db: Queryable,
   input: { sessionId: string; accountId: string; at: Date },
-): Promise<"live" | "expired" | "ended"> {
-  const { rows } = await db.query<{ expired: boolean }>(
-    `SELECT (session.access_expires_at <= $3 OR session.expires_at <= $3) AS expired
-     FROM session
+): Promise<SessionStanding> {
+  const { rows } = await db.query<{ expired: boolean; shadow_banned: boolean }>(
+    `SELECT (session.access_expires_at < $3 OR session.expires_at < $3) AS expired,
+       a.state = 'shadow_banned' AS shadow_banned
+     FROM session JOIN account a ON a.id = session.account_id
      WHERE session.id = $1 AND session.account_id = $2 AND session.revoked_at IS NULL
        AND ${SESSION_ALIVE}`,
     [input.sessionId, input.accountId, input.at],
   );
   const row = rows[0];
-  if (!row) return "ended";
-  return row.expired ? "expired" : "live";
+  if (!row) return { standing: "ended", shadowBanned: false };
+  return { standing: row.expired ? "expired" : "live", shadowBanned: row.shadow_banned };
 }
 
 export async function touchSession(db: Queryable, sessionId: string, at: Date): Promise<void> {

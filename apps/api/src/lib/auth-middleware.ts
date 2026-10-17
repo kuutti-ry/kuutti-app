@@ -21,11 +21,17 @@ export type SessionLookup = {
   identityStanding: string;
 };
 
+/** How a session stands for an open socket (#349), and whether its account is shadow-banned. */
+export type SessionStanding = {
+  standing: "live" | "expired" | "ended";
+  shadowBanned: boolean;
+};
+
 export type SessionStore = {
   findByAccessHash(db: Queryable, accessHash: string): Promise<SessionLookup | null>;
   touch(db: Queryable, sessionId: string, at: Date): Promise<void>;
   /** How an authenticated session stands now, by its id: the chat's open socket asks on each ping (#349). */
-  standing(db: Queryable, caller: Caller, at: Date): Promise<"live" | "expired" | "ended">;
+  standing(db: Queryable, caller: Caller, at: Date): Promise<SessionStanding>;
 };
 
 export const hashToken = (token: string): string =>

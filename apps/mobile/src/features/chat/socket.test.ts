@@ -285,6 +285,20 @@ describe("the chat's socket", () => {
     expect(asked()).toBe(2);
   });
 
+  it("refreshes ahead once, not again at once, when the new token is already due: a phone whose clock runs ahead", async () => {
+    // The API's fifteen minutes end within the minute's lead on this clock.
+    const asked = refreshes(
+      () => json(tokens("2", 14.5)),
+      () => json(tokens("3", 14.6)),
+    );
+    stop = connect(handlers);
+    ready();
+    await advance(14 * 60_000);
+    expect(asked()).toBe(1);
+    await advance(60_000);
+    expect(asked()).toBe(1);
+  });
+
   it("leaves an ahead-of-time refresh that cannot reach the API to the reconnect's own", async () => {
     const asked = refreshes(() => {
       throw new TypeError("Network request failed");

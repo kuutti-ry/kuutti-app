@@ -37,7 +37,7 @@ function withEarlierThumbs(earlier: ConversationList, list: ConversationList): C
  * The list as the socket moved it since the last read (#349): a newer message
  * becomes the row's last line and goes to the top, one of theirs counts as
  * unread, and a message brings an archived conversation back (TD-13). So a
- * message costs no read of the list; a change of state does (`changes`).
+ * message costs no read of the list; a state other than the row's does.
  */
 export function withLive(
   list: ConversationList,
@@ -79,9 +79,10 @@ export function withLive(
  * What is shown stays until the new answer is there, and a read that fails
  * takes nothing away that was known. `thumbs: false` is the home screen's
  * count: nothing signed, nothing spent. The socket's messages are applied as
- * they come (`withLive`); a change of state, or a message in a conversation
- * the list does not hold, reads it again quietly (#349). Each conversation's
- * newest sequence goes to the socket's next resume.
+ * they come (`withLive`); a state other than the row's, or a conversation the
+ * list does not hold, reads it again quietly, once for each such word
+ * (#349). Each conversation's newest sequence goes to the socket's next
+ * resume.
  */
 export function useConversations(thumbs = true): ConversationsView & {
   refresh: () => Promise<void>;
@@ -140,25 +141,31 @@ export function useConversations(thumbs = true): ConversationsView & {
     return () => subscription.remove();
   }, [read]);
 
-  const { changes, report, conversations } = useChatLive();
-  const seen = useRef(changes);
-  useEffect(() => {
-    if (changes === seen.current) return;
-    seen.current = changes;
-    void read(true);
-  }, [changes, read]);
+  const { report, conversations } = useChatLive();
 
-  // A message in a conversation the list does not hold (a match since the
-  // last read): read again, once for each such conversation.
+  // What the socket says that the list does not show: a conversation it does
+  // not hold (a match since the last read), or a state other than the row's.
+  // A resume ends every conversation it names with its state, so comparing,
+  // rather than counting frames, reads the list again only when something
+  // changed; and once for each such word, so a disagreement cannot loop.
   const askedFor = useRef(new Set<string>());
   useEffect(() => {
     if (state.status !== "ready") return;
-    const known = new Set([...state.list.open, ...state.list.archived].map((c) => c.id));
-    const unknown = Object.keys(conversations).filter(
-      (id) => !known.has(id) && !askedFor.current.has(id) && conversations[id]?.messages.length,
-    );
-    if (unknown.length === 0) return;
-    for (const id of unknown) askedFor.current.add(id);
+    const rows = new Map([...state.list.open, ...state.list.archived].map((c) => [c.id, c]));
+    const words = Object.entries(conversations).flatMap(([id, c]) => {
+      const row = rows.get(id);
+      if (!row) {
+        const there = c.messages.length > 0 || (c.state !== null && c.state.state !== "gone");
+        return there ? [`${id} new`] : [];
+      }
+      if (!c.state || (c.state.state === row.state && c.state.closedHow === row.closedHow)) {
+        return [];
+      }
+      return [`${id} ${c.state.state} ${c.state.closedHow}`];
+    });
+    const fresh = words.filter((word) => !askedFor.current.has(word));
+    if (fresh.length === 0) return;
+    for (const word of fresh) askedFor.current.add(word);
     void read(true);
   }, [conversations, state, read]);
 

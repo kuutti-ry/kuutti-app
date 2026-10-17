@@ -31,6 +31,7 @@ export function startChatListener(deps: { pool: Pool; logger: Logger; live: Live
     client = null;
     from.release(true);
     deps.logger.warn({ err }, "chat listener lost");
+    deps.live.listening = false;
     deps.live.closeAll(1012, "restarting");
     if (!stopped) {
       deps.live.schedule(delay, () => void connect());
@@ -49,6 +50,12 @@ export function startChatListener(deps: { pool: Pool; logger: Logger; live: Live
       delay = Math.min(delay * 2, 30_000);
       return;
     }
+    // Stopped while the connection was on its way: given back, or the pool
+    // would wait for it at shutdown.
+    if (stopped) {
+      next.release(true);
+      return;
+    }
     client = next;
     next.on("notification", (note) => {
       const payload = note.payload;
@@ -64,6 +71,7 @@ export function startChatListener(deps: { pool: Pool; logger: Logger; live: Live
     try {
       await next.query(`LISTEN ${CHAT_CHANNEL}`);
       delay = 1_000;
+      deps.live.listening = true;
       deps.logger.info({ channel: CHAT_CHANNEL }, "chat listener on");
       listening();
     } catch (err) {
@@ -76,6 +84,7 @@ export function startChatListener(deps: { pool: Pool; logger: Logger; live: Live
     ready,
     async stop() {
       stopped = true;
+      deps.live.listening = false;
       const held = client;
       client = null;
       if (held) {

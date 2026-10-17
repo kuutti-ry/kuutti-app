@@ -41,16 +41,18 @@ export const AuthFrame = z
   .meta({ id: "AuthFrame" });
 
 /**
- * After every `ready`: the newest sequence the phone holds per conversation.
- * The API answers with every message after it, in order, and the
- * counterpart's presence and read mark.
+ * After every `ready`: the newest sequence the phone holds per conversation,
+ * each conversation once. The API answers with the messages after it, in
+ * order, a page at most, and the counterpart's presence and read mark.
  */
 export const ResumeFrame = z
   .object({
     type: z.literal("resume"),
     conversations: z
       .array(z.object({ id: conversationId, seq: z.int().min(0).max(MESSAGE_SEQ_MAX) }).strict())
-      .max(CONVERSATIONS_MAX * 2),
+      .max(CONVERSATIONS_MAX * 2)
+      // Each conversation once: a name repeated would replay it again.
+      .refine((list) => new Set(list.map((c) => c.id)).size === list.length),
   })
   .strict()
   .meta({ id: "ResumeFrame" });

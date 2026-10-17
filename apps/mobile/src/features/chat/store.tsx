@@ -34,8 +34,6 @@ export type ConversationLive = {
 
 export type ChatLive = {
   status: SocketStatus;
-  /** Moves on every conversation frame: the list reads again when it does; a message it applies itself. */
-  changes: number;
   conversations: Record<string, ConversationLive>;
 };
 
@@ -46,7 +44,7 @@ type ChatLiveAction =
   | { type: "cursors"; cursors: Record<string, number> }
   | { type: "clear" };
 
-export const EMPTY: ChatLive = { status: "connecting", changes: 0, conversations: {} };
+export const EMPTY: ChatLive = { status: "connecting", conversations: {} };
 
 const BLANK: ConversationLive = {
   messages: [],
@@ -64,12 +62,10 @@ function changed(
   live: ChatLive,
   id: string,
   change: (conversation: ConversationLive) => Partial<ConversationLive>,
-  changes = live.changes,
 ): ChatLive {
   const conversation = live.conversations[id] ?? BLANK;
   return {
     ...live,
-    changes,
     conversations: { ...live.conversations, [id]: { ...conversation, ...change(conversation) } },
   };
 }
@@ -104,12 +100,9 @@ export function reduce(live: ChatLive, action: ChatLiveAction): ChatLive {
     case "presence":
       return changed(live, frame.conversationId, () => ({ online: frame.online }));
     case "conversation":
-      return changed(
-        live,
-        frame.conversationId,
-        () => ({ state: { state: frame.state, closedHow: frame.closedHow } }),
-        live.changes + 1,
-      );
+      return changed(live, frame.conversationId, () => ({
+        state: { state: frame.state, closedHow: frame.closedHow },
+      }));
     default:
       // ready, ping and error are the socket's own.
       return live;

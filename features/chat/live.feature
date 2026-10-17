@@ -20,7 +20,7 @@ Feature: The chat's live socket
 
   Scenario: A frame outside the contract closes the socket
     Given "A"'s phone is signed in
-    When it sends text that is no JSON, a frame of an unknown type, a second auth, a resume naming no conversation id, a binary frame, a second resume, or a frame past the bound
+    When it sends text that is no JSON, a frame of an unknown type, a second auth, a resume naming no conversation id or one conversation twice, a binary frame, a second resume, or a frame past the bound
     Then the socket says bad_frame and closes with 1008, or closes with 1009 for the frame past the bound
 
   Scenario: An upgrade from an origin the API does not admit is refused; its own host and an admitted one pass
@@ -48,6 +48,11 @@ Feature: The chat's live socket
     When "A"'s phone resumes naming only a conversation not its own, and then another phone of A's names theirs
     Then the first hears B online before the answer about what it named, and the second hears it once
 
+  Scenario: A resume far behind gets the oldest page it lacks, the rest left to HTTP
+    Given "A"'s conversation with "B" holds a page and one more of messages A's phone has never had
+    When A's phone resumes from none of them, and then from the newest
+    Then the first resume gets the oldest page in order before the read mark, the presence and the state, and the second no message
+
   Scenario: The other side's read mark reaches the writer
     Given "A"'s phone is on the socket and "A" wrote to "B"
     When "B" reads it
@@ -73,6 +78,11 @@ Feature: The chat's live socket
     When "A" writes to "B"
     Then A's phone gets the message and B's gets nothing of it, and B never hears A online
 
+  Scenario: A shadow ban put on while the socket is open hides the person at the next ping
+    Given "A" and "B" are on the socket in their conversation, and B hears A online
+    When "A" is shadow-banned and the ping comes
+    Then B hears A offline, and B's next resume says so too
+
   Scenario: A session that ends closes its sockets at once
     When "A" logs out, or "B" deletes the account
     Then their phones are told session_revoked and closed
@@ -90,4 +100,4 @@ Feature: The chat's live socket
   Scenario: A lost listener closes every socket, and the phones resume from Postgres
     Given "A"'s phone is on the socket
     When the API's connection to the channel is lost, "B" writes meanwhile, and the connection comes back
-    Then A's phone is told restarting and closed with 1012, resumes and gets B's message, and then gets the next one live
+    Then A's phone is told restarting and closed with 1012, as is a phone that tries before the connection is back, then it resumes and gets B's message, and then gets the next one live

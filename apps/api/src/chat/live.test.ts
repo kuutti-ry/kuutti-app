@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { createPool, migrate, type Pool, withTemporaryDatabase } from "@kuutti/db";
-import { FRAME_BYTES_MAX, ServerFrame } from "@kuutti/schema";
+import { FRAME_BYTES_MAX, MESSAGES_PAGE_MAX, ServerFrame } from "@kuutti/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket, { WebSocketServer } from "ws";
 import { createApp } from "../app.ts";
@@ -219,11 +219,17 @@ function phone(options: { origin?: string } = {}): Promise<Phone> {
   });
 }
 
-/** A signed-in phone: authenticated, `ready`, and resumed on these conversations. */
-async function signedIn(token: string, resume: Array<{ id: string; seq: number }> = []) {
+/** A phone past its first frame: authenticated and `ready`, its resume not yet sent. */
+async function authed(token: string) {
   const p = await phone();
   p.send({ type: "auth", token });
   await p.next((f) => f.type === "ready");
+  return p;
+}
+
+/** A signed-in phone: authenticated, `ready`, and resumed on these conversations. */
+async function signedIn(token: string, resume: Array<{ id: string; seq: number }> = []) {
+  const p = await authed(token);
   p.send({ type: "resume", conversations: resume });
   for (const { id } of resume) {
     await p.next((f) => f.type === "conversation" && f.conversationId === id);
@@ -305,32 +311,42 @@ describe("the socket's door", () => {
 
   it("A frame outside the contract closes the socket", async () => {
     const a = await signedInAccount(ctx.pool);
+    const id = randomUUID();
+    // Each the first frame after ready, a resume included.
     const outside: unknown[] = [
       "not json",
       { type: "typing" },
       { type: "auth", token: a.accessToken },
       { type: "resume", conversations: [{ id: "nope", seq: 0 }] },
+      {
+        type: "resume",
+        conversations: [
+          { id, seq: 0 },
+          { id, seq: 1 },
+        ],
+      },
     ];
     for (const frame of outside) {
-      const p = await signedIn(a.accessToken);
+      const p = await authed(a.accessToken);
       p.send(frame);
       expect(await p.next((f) => f.type === "error")).toEqual({ type: "error", code: "bad_frame" });
       expect((await p.closed).code).toBe(1008);
     }
-    // A binary frame is no frame of the contract either.
-    const binary = await phone();
+    // A binary frame is no frame of the contract either, nor a second resume.
+    const binary = await signedIn(a.accessToken);
     binary.send(Buffer.from([1, 2, 3]));
     expect(await binary.next((f) => f.type === "error")).toEqual({
       type: "error",
       code: "bad_frame",
     });
-    // A second resume.
+    expect((await binary.closed).code).toBe(1008);
     const twice = await signedIn(a.accessToken);
     twice.send({ type: "resume", conversations: [] });
     expect(await twice.next((f) => f.type === "error")).toEqual({
       type: "error",
       code: "bad_frame",
     });
+    expect((await twice.closed).code).toBe(1008);
     // A frame past the bound is cut before it is read.
     const big = await phone();
     big.send(JSON.stringify({ type: "auth", token: "x".repeat(FRAME_BYTES_MAX) }));
@@ -435,6 +451,25 @@ describe("what the socket carries", () => {
     for (const p of [pb, first, second]) p.close();
   });
 
+  it("A resume far behind gets the oldest page it lacks, the rest left to HTTP", async () => {
+    const a = await signedInAccount(ctx.pool);
+    const b = await signedInAccount(ctx.pool);
+    const id = await conversationBetween(ctx.pool, a.accountId, b.accountId, {
+      messages: Array.from({ length: MESSAGES_PAGE_MAX + 1 }, (_, i) => ({
+        from: "b" as const,
+        body: `Viesti ${i + 1}`,
+      })),
+    });
+    const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
+    const seqs = pa.frames.flatMap((f) => (f.type === "message" ? [f.message.seq] : []));
+    expect(seqs).toEqual(Array.from({ length: MESSAGES_PAGE_MAX }, (_, i) => i + 1));
+    expect(pa.frames.slice(-3).map((f) => f.type)).toEqual(["read", "presence", "conversation"]);
+    // Holding the newest, the resume sends no message at all.
+    const current = await signedIn(a.accessToken, [{ id, seq: MESSAGES_PAGE_MAX + 1 }]);
+    expect(current.frames.some((f) => f.type === "message")).toBe(false);
+    for (const p of [pa, current]) p.close();
+  });
+
   it("The other side's read mark reaches the writer", async () => {
     const { a, b, id } = await pair();
     const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
@@ -487,7 +522,12 @@ describe("what the socket carries", () => {
 
 describe("what the socket withholds", () => {
   it("A block reaches both sides as a conversation frame, and nothing after it", async () => {
-    const { a, b, id } = await pair();
+    const a = await signedInAccount(ctx.pool);
+    const b = await signedInAccount(ctx.pool);
+    // A message of B's, so A's read mark can move after the block.
+    const id = await conversationBetween(ctx.pool, a.accountId, b.accountId, {
+      messages: [{ from: "b", body: "Moi" }],
+    });
     const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
     const pb = await signedIn(b.accessToken, [{ id, seq: 0 }]);
     await cardShown(ctx.pool, b.accountId, a.accountId);
@@ -509,26 +549,24 @@ describe("what the socket withholds", () => {
       state: "gone",
       closedHow: null,
     });
-    // A's read mark moves; B, gone from the conversation, hears nothing of it.
+    const sinceBlock =
+      pb.frames.findIndex((f) => f.type === "conversation" && f.state === "gone") + 1;
+    // A's read mark moves (the trigger fires); B, gone from the conversation, hears nothing of it.
     expect((await send(a.headers, id, "Hei")).status).toBe(409);
-    expect((await markRead(a.headers, id, 0)).status).toBe(204);
+    expect((await markRead(a.headers, id, 1)).status).toBe(204);
+    const { rows } = await ctx.pool.query<{ read_up_to: number }>(
+      "SELECT read_up_to FROM conversation_participant WHERE conversation_id = $1 AND account_id = $2",
+      [id, a.accountId],
+    );
+    expect(rows[0]?.read_up_to).toBe(1);
     const other = await signedInAccount(ctx.pool);
     const later = await conversationBetween(ctx.pool, other.accountId, b.accountId);
     expect((await send(other.headers, later, "Tässä")).status).toBe(201);
     await pb.next(isMessage(later, 1));
+    // Since the block, nothing of the conversation has reached B.
     expect(
-      pb.frames.filter(
-        (f) =>
-          "conversationId" in f &&
-          f.conversationId === id &&
-          f.type !== "conversation" &&
-          f.type !== "read" &&
-          f.type !== "presence",
-      ),
+      pb.frames.slice(sinceBlock).filter((f) => "conversationId" in f && f.conversationId === id),
     ).toEqual([]);
-    expect(pb.frames.filter((f) => f.type === "read" && f.conversationId === id)).toEqual([
-      { type: "read", conversationId: id, upTo: 0 },
-    ]);
   });
 
   it("A shadow-banned sender's message reaches no counterpart, and the sender is never online", async () => {
@@ -556,6 +594,35 @@ describe("what the socket withholds", () => {
     ]);
   });
 
+  it("A shadow ban put on while the socket is open hides the person at the next ping", async () => {
+    const { a, b, id } = await pair();
+    const pb = await signedIn(b.accessToken, [{ id, seq: 0 }]);
+    const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
+    expect(await pb.next((f) => f.type === "presence")).toEqual({
+      type: "presence",
+      conversationId: id,
+      online: true,
+    });
+    await applySanction(ctx.pool, {
+      accountId: a.accountId,
+      kind: "shadow_ban",
+      reason: "commercial_use",
+      note: "Sends the same link to everybody.",
+      actor: null,
+      at: new Date(Date.now() - 1000),
+    });
+    ctx.timers.run(PING_MS);
+    expect(await pb.next((f) => f.type === "presence")).toEqual({
+      type: "presence",
+      conversationId: id,
+      online: false,
+    });
+    // And a resume of B's says the same.
+    const again = await signedIn(b.accessToken, [{ id, seq: 0 }]);
+    expect(again.frames).toContainEqual({ type: "presence", conversationId: id, online: false });
+    for (const p of [pa, pb, again]) p.close();
+  });
+
   it("A session that ends closes its sockets at once", async () => {
     const a = await signedInAccount(ctx.pool);
     const b = await signedInAccount(ctx.pool);
@@ -575,6 +642,7 @@ describe("what the socket withholds", () => {
       type: "error",
       code: "session_revoked",
     });
+    expect((await pb.closed).code).toBe(1008);
   });
 
   it("Archive and erasure reach the other side as the conversation's state", async () => {
@@ -650,6 +718,14 @@ describe("the socket's keepalive", () => {
     expect((await pa.closed).code).toBe(1012);
     // A message meanwhile, then the listener back and the phone's resume.
     expect((await send(b.headers, id, "Kuuletko?")).status).toBe(201);
+    // A phone that tries while the listener is down is told so, and tries later.
+    const early = await phone();
+    early.send({ type: "auth", token: a.accessToken });
+    expect(await early.next((f) => f.type === "error")).toEqual({
+      type: "error",
+      code: "restarting",
+    });
+    expect((await early.closed).code).toBe(1012);
     const on = ctx.log.next("chat listener on");
     ctx.timers.run(1_000);
     await on;

@@ -7,7 +7,7 @@ import { createLive, type Schedule } from "./live.ts";
 
 // The listener's own life (#349): a connection refused and tried again, the
 // notifications handed on in order, a lost connection closing every socket,
-// and the stop. A stand-in for the pool's connection; live.test.ts runs the
+// whether it is listening, and the stop, one that comes first included. A stand-in for the pool's connection; live.test.ts runs the
 // real one against Postgres.
 
 class FakeClient extends EventEmitter {
@@ -94,7 +94,9 @@ describe("the chat listener", () => {
       delivered.push(payload);
     };
     const listener = startChatListener({ pool, logger, live });
+    expect(live.listening).toBe(false);
     await listener.ready;
+    expect(live.listening).toBe(true);
     first.emit("notification", { channel: "kuutti_chat", payload: "one" });
     first.emit("notification", { channel: "other", payload: "x" });
     first.emit("notification", { channel: "kuutti_chat", payload: "" });
@@ -105,11 +107,32 @@ describe("the chat listener", () => {
     first.emit("error", new Error("terminated"));
     first.emit("end");
     expect(closed).toEqual(["restarting"]);
+    expect(live.listening).toBe(false);
     expect(first.released).toEqual([true]);
     expect(lines().filter((l) => l.msg === "chat listener lost")).toHaveLength(1);
     timers.tasks.at(-1)?.task();
-    await vi.waitUntil(() => second.queries.includes("LISTEN kuutti_chat"));
+    await vi.waitUntil(() => live.listening);
+    expect(second.queries).toEqual(["LISTEN kuutti_chat"]);
     await listener.stop();
+    expect(live.listening).toBe(false);
+  });
+
+  it("gives back a connection that arrives after the stop, and listens on nothing", async () => {
+    const late = new FakeClient();
+    let arrive: (client: FakeClient) => void = () => undefined;
+    const { live, pool, logger } = await setup([
+      () =>
+        new Promise<FakeClient>((resolve) => {
+          arrive = resolve;
+        }),
+    ]);
+    const listener = startChatListener({ pool, logger, live });
+    await listener.stop();
+    arrive(late);
+    await vi.waitUntil(() => late.released.length === 1);
+    expect(late.released).toEqual([true]);
+    expect(late.queries).toEqual([]);
+    expect(live.listening).toBe(false);
   });
 
   it("treats a refused LISTEN as a lost connection, and a failed delivery as a logged one", async () => {

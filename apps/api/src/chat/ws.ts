@@ -37,6 +37,7 @@ export type SocketDeps = {
 
 const POLICY = 1008;
 const GOING_AWAY = 1001;
+const RESTARTING = 1012;
 
 /** The 401s of the session guard, as the socket's error codes say them. */
 const AUTH_CODES: Record<string, FrameErrorCode> = {
@@ -94,17 +95,22 @@ export function chatSocketRoutes(deps: SocketDeps) {
 
 /**
  * One connection's life. Built for every GET /ws, the plain ones too, so
- * nothing happens here until the socket opens.
+ * nothing happens here until the socket opens. Exported for ws.test.ts,
+ * which interleaves its awaits with frames and a close.
  */
-function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
+export function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
   const { logger, live, timing } = deps;
   let ws: WSContext | null = null;
-  let phase: "waiting" | "ready" | "resumed" | "closed" = "waiting";
+  let phase: "waiting" | "authenticating" | "ready" | "resumed" | "closed" = "waiting";
   let socket: LiveSocket | null = null;
   let cancelAuth = () => {};
   let cancelPing = () => {};
   let cancelPong = () => {};
   let closing = false;
+  // Refused or closed: a frame still arriving is not read, and an await
+  // that returns finds nothing to do (ws reads frames until the close's
+  // answer, and a phone may vanish while its token is being looked up).
+  const gone = () => closing || phase === "closed";
 
   const send = (frame: ServerFrame) => {
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(frame));
@@ -122,12 +128,19 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
     cancelPing = live.schedule(timing.pingMs, () => {
       void tick().catch((err: unknown) => {
         logger.error({ err, requestId }, "chat socket ping failed");
+        // Asked again at the next ping, never dropped: the expiry and the
+        // pong's deadline depend on it.
+        if (!gone()) {
+          cancelPing();
+          ping();
+        }
       });
     });
   };
   async function tick(): Promise<void> {
-    if (!socket || phase === "closed") return;
-    const standing = await deps.store.standing(deps.db, socket, deps.now());
+    if (!socket || gone()) return;
+    const { standing, shadowBanned } = await deps.store.standing(deps.db, socket, deps.now());
+    if (gone()) return;
     if (standing !== "live") {
       refuse(POLICY, standing === "expired" ? "session_expired" : "session_revoked");
       return;
@@ -135,9 +148,15 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
     send({ type: "ping" });
     cancelPong = live.schedule(timing.pongMs, () => refuse(GOING_AWAY, "pong_timeout"));
     ping();
+    // A shadow ban put on or lifted since: the account hides or shows itself.
+    if (shadowBanned !== socket.hidden) {
+      const { changed } = live.presence.setHidden(socket.accountId, shadowBanned);
+      if (changed) await live.hub.announcePresence(socket.accountId);
+    }
   }
 
   async function onFrame(data: unknown): Promise<void> {
+    if (gone()) return;
     let frame: ClientFrame | null = null;
     if (typeof data === "string") {
       try {
@@ -150,7 +169,9 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
     if (!frame) return refuse(POLICY, "bad_frame");
     switch (frame.type) {
       case "auth":
+        // Set before the first await: a second auth is refused unread.
         if (phase !== "waiting") return refuse(POLICY, "bad_frame");
+        phase = "authenticating";
         return onAuth(frame.token);
       case "resume":
         if (phase !== "ready" || !socket) return refuse(POLICY, "bad_frame");
@@ -165,6 +186,7 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
 
   async function onAuth(token: string): Promise<void> {
     cancelAuth();
+    if (!live.listening) return refuse(RESTARTING, "restarting");
     const at = deps.now();
     let found: Awaited<ReturnType<typeof authenticate>>;
     try {
@@ -175,9 +197,12 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
       }
       throw err;
     }
-    // Closed while the token was looked up: nothing to register.
-    if (phase === "closed") return;
+    if (gone()) return;
     await deps.store.touch(deps.db, found.sessionId, at);
+    // Checked again where nothing awaits before the registration: the
+    // listener lost meanwhile has already closed every socket it knew.
+    if (gone()) return;
+    if (!live.listening) return refuse(RESTARTING, "restarting");
     phase = "ready";
     socket = {
       accountId: found.accountId,
@@ -186,18 +211,20 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
       send,
       close: (code, error) => refuse(code, error),
     };
-    const { first, evicted } = live.presence.add(socket);
+    const { shown, evicted } = live.presence.add(socket);
     for (const old of evicted) old.close(POLICY, "too_many_sockets");
     // A session ended between the token's check and the registration missed
     // the trigger's close: asked once more, now that an end would find it.
-    const standing = await deps.store.standing(deps.db, socket, deps.now());
+    const { standing } = await deps.store.standing(deps.db, socket, deps.now());
+    // Closed meanwhile: onGone has taken it out again, or will.
+    if (gone()) return;
     if (standing !== "live") {
       return refuse(POLICY, standing === "expired" ? "session_expired" : "session_revoked");
     }
     logger.info({ requestId, accountId: found.accountId }, "chat socket opened");
     send({ type: "ready" });
     ping();
-    if (first) await live.hub.announcePresence(socket, true);
+    if (shown) await live.hub.announcePresence(found.accountId);
   }
 
   async function onGone(): Promise<void> {
@@ -206,8 +233,8 @@ function socketEvents(deps: SocketDeps, requestId: string): WSEvents {
     cancelPing();
     cancelPong();
     if (!socket) return;
-    const { last } = live.presence.remove(socket);
-    if (last) await live.hub.announcePresence(socket, false);
+    const { changed } = live.presence.remove(socket);
+    if (changed) await live.hub.announcePresence(socket.accountId);
   }
 
   return {
