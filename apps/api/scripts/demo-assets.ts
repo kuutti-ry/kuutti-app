@@ -57,10 +57,13 @@ for (let i = 0; i < args.length; i += 1) {
   const flag = equals > 0 ? arg.slice(0, equals) : arg;
   if (seen.has(flag)) fail(`${flag} is given twice`);
   seen.add(flag);
+  // An empty value is no value, and neither is the next flag: `--check=` would
+  // otherwise fetch the release, `--tag --check=<dir>` a tag named "--check=<dir>" (#235).
   const value = () => {
-    if (equals > 0) return arg.slice(equals + 1);
+    if (equals > 0) return arg.slice(equals + 1) || undefined;
+    if (args[i + 1]?.startsWith("--")) return undefined;
     i += 1;
-    return args[i];
+    return args[i] || undefined;
   };
   if (flag === "--tag") tag = value() ?? fail("--tag takes a release tag");
   else if (flag === "--check") check = value() ?? fail("--check takes a directory");

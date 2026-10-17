@@ -110,4 +110,25 @@ describe("pnpm demo:bank", () => {
     });
     expect(disk.written).toEqual([]);
   });
+
+  it("takes --check after the separator pnpm hands through", async () => {
+    disk.page = PAGE;
+    expect((await run(["--", "--check"])).code).toBe(0);
+    expect(disk.read).toEqual([PAGE_PATH]);
+    expect(disk.written).toEqual([]);
+  });
+
+  // #235: each of these wrote the page, as if no flag had been given.
+  it.each([
+    [["--check="], "✖ demo:bank: Option '--check' does not take an argument"],
+    [["--check=false"], "✖ demo:bank: Option '--check' does not take an argument"],
+    [["--chek"], "✖ demo:bank: Unknown option '--chek'"],
+    [["check"], "✖ demo:bank: Unexpected argument 'check'"],
+  ])("refuses %j before it reads or writes the page", async (args, message) => {
+    disk.page = PAGE;
+    const result = await run(args);
+    expect(result).toEqual({ code: 1, out: [], err: [expect.stringContaining(message)] });
+    expect(disk.read).toEqual([]);
+    expect(disk.written).toEqual([]);
+  });
 });

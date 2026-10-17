@@ -4,6 +4,7 @@
  *   pnpm env:up [--skip api,mobile,admin] [--no-seed]   start everything, Ctrl+C stops the apps
  *   pnpm env:down                                       stop the apps and the database
  *   pnpm env:status                                     who holds which port, database state
+ *   node scripts/dev-env.ts --self-test                 the command line's cases; starts nothing
  *
  * What `up` does, in order:
  *   1. Database: `docker compose up -d --wait` when a compose file exists and
@@ -22,10 +23,11 @@
  * script never opens it (rule 9). DATABASE_URL falls back to the local
  * default, which is not a secret. No dependencies. Node 22.18+.
  */
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { connect } from "node:net";
 import { resolve } from "node:path";
+import { parseArgs as parseOptions } from "node:util";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const DEFAULT_DATABASE_URL = "postgres://kuutti:kuutti@127.0.0.1:5432/kuutti";
@@ -85,11 +87,11 @@ function log(tag: string, color: string, line: string): void {
   process.stdout.write(`${paint(color, `[${tag}]`)} ${line}\n`);
 }
 const env = (line: string) => log("env", "34", line);
-const fail = (line: string): never => {
+function fail(line: string): never {
   log("env", "31", line);
   killChildrenNow();
   process.exit(1);
-};
+}
 
 // ---------------------------------------------------------------- processes
 
@@ -495,11 +497,101 @@ async function httpOk(url: string): Promise<boolean> {
 
 // ---------------------------------------------------------------- commands
 
+/**
+ * Strict: a --skip without a usable value, a name that is no service, a misspelt flag, or a
+ * flag on a command that takes none is refused before the database or a port is touched, never
+ * read as no flag: a bare `--skip` started every app and freed the ports of the ones it was
+ * meant to leave alone (#235). Throws the refusal, so --self-test can hold it.
+ */
 function parseArgs(argv: string[]) {
-  const command = argv[0] ?? "up";
-  const skip = new Set((argv[argv.indexOf("--skip") + 1] ?? "").split(",").filter(Boolean));
-  if (!argv.includes("--skip")) skip.clear();
-  return { command, skip, seed: !argv.includes("--no-seed") };
+  const { values, positionals } = parseOptions({
+    // pnpm hands the separator through: `pnpm env:up -- --skip mobile`.
+    args: argv.filter((arg) => arg !== "--"),
+    allowPositionals: true,
+    options: { skip: { type: "string", multiple: true }, "no-seed": { type: "boolean" } },
+  });
+  const [command = "up", ...extra] = positionals;
+  if (extra.length > 0) {
+    throw new Error(
+      `unexpected ${extra.join(" ")}: --skip takes one list, as in --skip mobile,admin`,
+    );
+  }
+  if (command !== "up" && (values.skip || values["no-seed"])) {
+    throw new Error(`--skip and --no-seed are for up, not ${command}`);
+  }
+  const names = SERVICES.map((s) => s.name);
+  const skip = new Set<string>();
+  for (const list of values.skip ?? []) {
+    for (const name of list.split(",")) {
+      if (!names.includes(name)) {
+        throw new Error(
+          `--skip takes a comma-separated list of ${names.join(", ")}, not "${list}"`,
+        );
+      }
+      skip.add(name);
+    }
+  }
+  return { command, skip, seed: !values["no-seed"] };
+}
+
+/**
+ * The line a refused command line prints. Node's own messages go on with advice this script
+ * refuses as well (`-- "--no-seeds"`, `--skip=-XYZ`), so their first sentence stays, then the usage.
+ */
+function refusal(error: unknown): string {
+  return `${(error as Error).message.split(/\.\s/)[0]}; use ${USAGE}`;
+}
+const USAGE = "pnpm env:up [--skip api,mobile,admin] [--no-seed], env:down or env:status";
+
+/** The command line's cases; touches no database, port or process. */
+function selfTest(): never {
+  const outcome = (argv: string[]) => {
+    try {
+      const { command, skip, seed } = parseArgs(argv);
+      return `${command} skip=${[...skip].join(",")} seed=${seed}`;
+    } catch (error) {
+      return refusal(error);
+    }
+  };
+  const no = (message: string) => `${message}; use ${USAGE}`;
+  const list = (value: string) =>
+    no(`--skip takes a comma-separated list of api, mobile, admin, not "${value}"`);
+  const cases: Array<[string[], string]> = [
+    [["up"], "up skip= seed=true"],
+    [["up", "--skip", "mobile,admin", "--no-seed"], "up skip=mobile,admin seed=false"],
+    [["up", "--skip=mobile"], "up skip=mobile seed=true"],
+    [["up", "--", "--skip", "api", "--skip", "admin"], "up skip=api,admin seed=true"],
+    [["status"], "status skip= seed=true"],
+    [["up", "--skip"], no("Option '--skip <value>' argument missing")],
+    [["up", "--skip", "--no-seed"], no("Option '--skip' argument is ambiguous")],
+    [["up", "--skip="], list("")],
+    [["up", "--skip", ""], list("")],
+    [["up", "--skip", "mobil"], list("mobil")],
+    [["up", "--skip", "mobile,"], list("mobile,")],
+    [
+      ["up", "--skip", "mobile", "admin"],
+      no("unexpected admin: --skip takes one list, as in --skip mobile,admin"),
+    ],
+    [["up", "--no-seeds"], no("Unknown option '--no-seeds'")],
+    [["down", "--skip", "mobile"], no("--skip and --no-seed are for up, not down")],
+  ];
+  const failed = cases.filter(([argv, expected]) => outcome(argv) !== expected);
+  for (const [argv, expected] of failed) {
+    console.error(`✖ self-test: ${JSON.stringify(argv)} gave ${outcome(argv)}, not ${expected}`);
+  }
+  // The refusal comes before the database and the ports: the script itself, with an empty PATH (no
+  // docker, lsof or pnpm) and a DATABASE_URL that throws at its first use, prints it first and alone.
+  const child = spawnSync(process.execPath, [import.meta.filename, "up", "--skip"], {
+    env: { PATH: "", DATABASE_URL: "not a url" },
+    encoding: "utf8",
+  });
+  const refused = `[env] ${no("Option '--skip <value>' argument missing")}\n`;
+  const early = child.status === 1 && child.stdout === refused;
+  if (!early)
+    console.error(`✖ self-test: up --skip exited ${child.status}, printed ${child.stdout}`);
+  if (failed.length > 0 || !early) process.exit(1);
+  console.log(`✔ dev-env self-test: ${cases.length} command lines, refused before the database`);
+  process.exit(0);
 }
 
 async function up(skip: Set<string>, seed: boolean): Promise<void> {
@@ -566,7 +658,14 @@ async function status(): Promise<void> {
   }
 }
 
-const { command, skip, seed } = parseArgs(process.argv.slice(2));
+if (process.argv.includes("--self-test")) selfTest();
+let parsed: ReturnType<typeof parseArgs>;
+try {
+  parsed = parseArgs(process.argv.slice(2));
+} catch (error) {
+  fail(refusal(error));
+}
+const { command, skip, seed } = parsed;
 for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
   process.on(signal, () => {
     if (shuttingDown) return;

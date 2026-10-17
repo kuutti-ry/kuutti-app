@@ -56,6 +56,17 @@ describe.concurrent("demo:assets refuses what it does not understand", () => {
     [["--tag"], "✖ --tag takes a release tag"],
     [["--check"], "✖ --check takes a directory"],
     [["--manifest"], "✖ --manifest takes a directory"],
+    // An empty value is no value, and neither is the next flag (#235): each would
+    // fetch the release or a tag named after nothing or after that flag, or read
+    // a directory named after that flag. The argument after it refuses on its own
+    // before any fetch or read, so a flag let through fails here on the reason,
+    // never by reaching the network or the disk.
+    [["--tag=", "--force"], "✖ --tag takes a release tag"],
+    [["--check=", "--force"], "✖ --check takes a directory"],
+    [["--manifest", "", "--force"], "✖ --manifest takes a directory"],
+    [["--tag", "--check=/x", "--force"], "✖ --tag takes a release tag"],
+    [["--check", "--manifest", "b"], "✖ --check takes a directory"],
+    [["--manifest", "--check", "a"], "✖ --manifest takes a directory"],
     [["--force"], "✖ unknown argument --force: --tag, --check and --manifest are all there is"],
     [["--check", "a", "--manifest", "b"], "✖ --check and --manifest exclude each other"],
     // pnpm hands its separator through; it is dropped, and what follows is read.
@@ -191,6 +202,11 @@ describe.concurrent("demo:reset", () => {
     ],
     [["--api"], {}, "✖ --api takes the address of the API"],
     [["--env"], {}, "✖ --env takes the name of the environment"],
+    // An empty value is no value, and neither is the next flag (#235).
+    [["--api="], {}, "✖ --api takes the address of the API"],
+    [["--env="], {}, "✖ --env takes the name of the environment"],
+    [["--api", "--bare"], {}, "✖ --api takes the address of the API"],
+    [["--env", "--bare"], {}, "✖ --env takes the name of the environment"],
     [
       ["--hard"],
       {},

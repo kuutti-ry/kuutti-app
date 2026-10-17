@@ -70,6 +70,12 @@ function fail(message: string): never {
   process.exit(1);
 }
 
+// An empty value is no value: `--prefix=` or `--keys ""` would otherwise select
+// every namespace, and without --dry-run send it and write the answers (#235).
+for (const [name, value] of Object.entries(values)) {
+  if (value === "") fail(`--${name} takes a value`);
+}
+
 if (values.locale !== undefined && !isTranslatedLocale(values.locale)) {
   fail(`--locale is ${TRANSLATED_LOCALES.join(" or ")}`);
 }

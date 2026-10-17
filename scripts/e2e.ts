@@ -5,6 +5,7 @@
  *   pnpm e2e -- --device <udid>                one simulator, booted for the run and shut down after
  *   pnpm e2e -- apps/mobile/e2e/flows/x.yaml   one flow
  *   pnpm e2e -- --shard 2/4                    the second of four stretches of the order (CI's jobs)
+ *   node scripts/e2e.ts --self-test            the command line's cases; copies and runs nothing
  *
  * The flows start from the cast's stories, so `pnpm demo:reset` comes first,
  * and the photo flows take their pictures from the release `pnpm demo:assets`
@@ -18,6 +19,7 @@ import {
   cpSync,
   existsSync,
   lstatSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -35,6 +37,16 @@ const ROOT = resolve(import.meta.dirname, "..");
 const WORKSPACE = "apps/mobile/e2e";
 const MEDIA = resolve(ROOT, "apps/mobile/e2e/media");
 
+if (process.argv.includes("--self-test")) selfTest();
+let parsed: ReturnType<typeof parseArgs>;
+try {
+  parsed = parseArgs(process.argv.slice(2));
+} catch (error) {
+  console.error(`e2e: ${(error as Error).message}`);
+  process.exit(1);
+}
+const { global, shard, args } = parsed;
+
 const photos = demoAssetsDir();
 if (!existsSync(photos)) {
   console.error(`e2e: no pictures in ${photos}; run pnpm demo:assets first`);
@@ -44,11 +56,6 @@ if (!existsSync(photos)) {
 if (lstatSync(MEDIA, { throwIfNoEntry: false })?.isSymbolicLink()) rmSync(MEDIA);
 cpSync(photos, MEDIA, { recursive: true, force: true });
 
-const args = process.argv.slice(2).filter((arg) => arg !== "--");
-const device = args.indexOf("--device");
-const global = device >= 0 ? args.splice(device, 2) : [];
-const shardAt = args.indexOf("--shard");
-const shard = shardAt >= 0 ? args.splice(shardAt, 2)[1] : undefined;
 const single = args.some((arg) => arg.endsWith(".yaml"));
 const config = single ? [] : planRun(shard);
 // A simulator named by its UDID is booted if it is not and shut down after the run, passed or
@@ -106,10 +113,6 @@ function planRun(shard: string | undefined): string[] {
   if (shard === undefined) return [];
 
   const [i, n] = shard.split("/").map(Number);
-  if (!Number.isInteger(i) || !Number.isInteger(n) || i < 1 || i > n) {
-    console.error(`e2e: --shard wants i/n with 1 <= i <= n, not ${shard}`);
-    process.exit(1);
-  }
   const total = order.reduce((sum, name) => sum + (flows.get(name)?.weight ?? 0), 0);
   let before = 0;
   const part = order.filter((name) => {
@@ -146,4 +149,110 @@ function weightOf(text: string): number {
   const commands = body.match(/^\s*- [a-zA-Z]/gm)?.length ?? 0;
   const signIns = body.match(/common\/(sign-in|bank-login)\.yaml/g)?.length ?? 0;
   return commands + 10 * signIns;
+}
+
+/**
+ * --device and --shard are this script's, as `--shard 2/4` or `--shard=2/4`; the rest is Maestro's
+ * (flows, --format, -e). A flag without a usable value is refused before anything is copied or
+ * booted, never read as no flag: `--shard` last, or before --device, ran every flow (#235).
+ */
+function parseArgs(argv: string[]): { global: string[]; shard?: string; args: string[] } {
+  const args = argv.filter((arg) => arg !== "--");
+  const named = (flag: string) => (arg: string) => arg === flag || arg.startsWith(`${flag}=`);
+  // A bare --self-test never gets here; with a value it would go to Maestro and the run would start.
+  if (args.some(named("--self-test"))) throw new Error("--self-test takes no value");
+  const take = (flag: string): string | undefined => {
+    const at = args.findIndex(named(flag));
+    if (at < 0) return undefined;
+    const [arg = ""] = args.splice(at, 1);
+    const value = arg === flag ? (args.splice(at, 1)[0] ?? "") : arg.slice(flag.length + 1);
+    if (args.some(named(flag))) throw new Error(`${flag} is given twice`);
+    return value;
+  };
+  const device = take("--device");
+  // Maestro (2.11) splits a list at commas and drops the blank IDs, so `--device "$A,$B"` with
+  // both unset would run as if no device were named.
+  if (device?.startsWith("-") || device?.split(",").some((id) => id.trim() === "")) {
+    throw new Error("--device takes a simulator's UDID or an emulator's serial");
+  }
+  const shard = take("--shard");
+  if (shard !== undefined) {
+    const [i = 0, n = 0] = shard.split("/").map(Number);
+    if (!Number.isInteger(i) || !Number.isInteger(n) || i < 1 || i > n) {
+      throw new Error(`--shard wants i/n with 1 <= i <= n, not ${shard || "nothing"}`);
+    }
+    // A flow named runs alone and the shard would be dropped without a word.
+    if (args.some((arg) => arg.endsWith(".yaml"))) {
+      throw new Error("--shard cuts the whole order; it takes no flow of its own");
+    }
+  }
+  return { global: device === undefined ? [] : ["--device", device], shard, args };
+}
+
+/** The command line's cases; copies, boots and runs nothing. */
+function selfTest(): never {
+  const outcome = (argv: string[]) => {
+    try {
+      return JSON.stringify(parseArgs(argv));
+    } catch (error) {
+      return (error as Error).message;
+    }
+  };
+  const udid = "6F0C5E7A-1B2C-4D3E-8F9A-0B1C2D3E4F5A";
+  const flow = "apps/mobile/e2e/flows/language.yaml";
+  const noShard = "--shard wants i/n with 1 <= i <= n, not nothing";
+  const noDevice = "--device takes a simulator's UDID or an emulator's serial";
+  const cases: Array<[string[], string]> = [
+    [[], `{"global":[],"args":[]}`],
+    [
+      ["--", "--device", udid, "--shard", "2/4", "--format", "junit"],
+      `{"global":["--device","${udid}"],"shard":"2/4","args":["--format","junit"]}`,
+    ],
+    [
+      ["--device=emulator-5554", "--shard=4/4"],
+      `{"global":["--device","emulator-5554"],"shard":"4/4","args":[]}`,
+    ],
+    [[flow], `{"global":[],"args":["${flow}"]}`],
+    [["--shard", "2/4", flow], "--shard cuts the whole order; it takes no flow of its own"],
+    [["--self-test="], "--self-test takes no value"],
+    [["--shard"], noShard],
+    [["--shard", "--device", udid], noShard],
+    [["--shard="], noShard],
+    [["--shard", ""], noShard],
+    [["--shard", "--format", "junit"], "--shard wants i/n with 1 <= i <= n, not --format"],
+    [["--shard", "5/4"], "--shard wants i/n with 1 <= i <= n, not 5/4"],
+    [["--shard", "1/4", "--shard=2/4"], "--shard is given twice"],
+    [["--device"], noDevice],
+    [["--device", "--shard", "2/4"], noDevice],
+    [["--device="], noDevice],
+    [["--device", " "], noDevice],
+    [["--device", ","], noDevice],
+    [["--device", `${udid},`], noDevice],
+    [["--device", udid, "--device", "emulator-5554"], "--device is given twice"],
+  ];
+  const failed = cases.filter(([argv, expected]) => outcome(argv) !== expected);
+  for (const [argv, expected] of failed) {
+    console.error(`✖ self-test: ${JSON.stringify(argv)} gave ${outcome(argv)}, not ${expected}`);
+  }
+  // The refusal comes before the copy: the script itself, given a picture cache with a marker in a
+  // home of its own and an empty PATH (no simctl, no Maestro), must exit without the marker in media/.
+  const home = mkdtempSync(join(tmpdir(), "kuutti-e2e-self-test-"));
+  mkdirSync(demoAssetsDir(undefined, home), { recursive: true });
+  writeFileSync(join(demoAssetsDir(undefined, home), "self-test.marker"), "");
+  const child = spawnSync(process.execPath, [import.meta.filename, "--shard"], {
+    env: { HOME: home, PATH: "" },
+    encoding: "utf8",
+  });
+  const copied = existsSync(join(MEDIA, "self-test.marker"));
+  rmSync(join(MEDIA, "self-test.marker"), { force: true });
+  rmSync(home, { recursive: true, force: true });
+  const early = child.status === 1 && child.stderr === `e2e: ${noShard}\n` && !copied;
+  if (!early) {
+    console.error(
+      `✖ self-test: --shard exited ${child.status} (${child.stderr.trim()}), copied ${copied}`,
+    );
+  }
+  if (failed.length > 0 || !early) process.exit(1);
+  console.log(`✔ e2e self-test: ${cases.length} command lines, refused before the copy`);
+  process.exit(0);
 }

@@ -69,10 +69,13 @@ for (let i = 0; i < args.length; i += 1) {
   const flag = equals > 0 ? arg.slice(0, equals) : arg;
   if (seen.has(flag)) fail(`${flag} is given twice`);
   seen.add(flag);
+  // An empty value is no value, and neither is the next flag: `--env=` was
+  // refused as an environment named "", `--api --bare` as an address "--bare" (#235).
   const value = () => {
-    if (equals > 0) return arg.slice(equals + 1);
+    if (equals > 0) return arg.slice(equals + 1) || undefined;
+    if (args[i + 1]?.startsWith("--")) return undefined;
     i += 1;
-    return args[i];
+    return args[i] || undefined;
   };
   if (arg === "--bare") bare = true;
   else if (arg === "--objects-lost") objectsLost = true;
