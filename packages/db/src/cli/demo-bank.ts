@@ -7,13 +7,27 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseArgs } from "node:util";
 import { renderBankPage } from "../seed/bank-page.ts";
 import { DEMO_PERSONAS } from "../seed/personas.ts";
 
 const BANK_PAGE_PATH = resolve(import.meta.dirname, "../../../../services/mock-idp/login.html");
 
+// Strict: `--check=` or a misspelt flag is refused, not read as no flag, which writes (#235).
+let check: boolean | undefined;
+try {
+  ({ check } = parseArgs({
+    // pnpm hands the separator through.
+    args: process.argv.slice(2).filter((arg, i) => !(arg === "--" && i === 0)),
+    options: { check: { type: "boolean" } },
+  }).values);
+} catch (error) {
+  console.error(`✖ demo:bank: ${(error as Error).message}`);
+  process.exit(1);
+}
+
 const page = renderBankPage(DEMO_PERSONAS);
-if (process.argv.includes("--check")) {
+if (check) {
   let current = "";
   try {
     current = readFileSync(BANK_PAGE_PATH, "utf8");

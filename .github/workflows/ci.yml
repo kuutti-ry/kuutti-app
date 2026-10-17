@@ -35,6 +35,12 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/pnpm
       - run: pnpm lint
+      # The local stack's and the end-to-end runner's command lines refuse a flag
+      # given without a value before they start or copy anything (#235).
+      - name: env:up and e2e refuse a flag without a value
+        run: |
+          node scripts/dev-env.ts --self-test
+          node scripts/e2e.ts --self-test
       # Every PEM stays out of git; .gitignore un-ignores exactly one public
       # certificate bundle. TruffleHog filters unverifiable keys, so this is
       # the backstop.

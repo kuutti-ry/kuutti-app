@@ -7,11 +7,18 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parseArgs } from "node:util";
 import { commandData } from "./lib/annotate.ts";
 import { checkMessages, stale, unreviewed } from "./lib/check.ts";
 import { parseMessages } from "./lib/schema.ts";
 
-const release = process.argv.includes("--release");
+// Strict, so `--release=`, `--release=true` or a misspelt `--relase` stops here
+// rather than running the check without the release rules (#235). pnpm passes
+// the `--` of `pnpm i18n:check -- --release` through; it is not an argument.
+const { release } = parseArgs({
+  args: process.argv.slice(2).filter((arg, i) => !(arg === "--" && i === 0)),
+  options: { release: { type: "boolean", default: false } },
+}).values;
 const annotate = process.env.GITHUB_ACTIONS === "true";
 
 let messages: ReturnType<typeof parseMessages>;

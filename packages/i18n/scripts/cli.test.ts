@@ -41,6 +41,21 @@ describe("pnpm i18n:review", () => {
     expect(option.out).toMatch(/could not read messages\.yaml/);
   });
 
+  it.each<[string, string[]]>([
+    ["--approved-since", ["--approved-since="]],
+    ["--export", ["--export="]],
+    ["--import", ["--import="]],
+    ["--locale", ["--locale="]],
+    ["--out", ["--out="]],
+    ["--prefix", ["--prefix="]],
+    ["--locale", ["--locale", ""]],
+  ])("refuses %s with no value, as in %j, rather than printing the table (#235)", (flag, args) => {
+    const result = run("review.ts", args);
+    expect(result.code).toBe(1);
+    expect(result.out).toMatch(`${flag} takes a value`);
+    expect(result.out).not.toMatch(/fi reviewed/);
+  });
+
   it("compares against the commit it is given", () => {
     const head = run("review.ts", ["--approved-since", "HEAD"]);
     expect(head.code).toBe(0);
@@ -60,4 +75,39 @@ describe("pnpm i18n:translate", () => {
     );
     expect(run("translate.ts", ["--retranslate"]).out).toMatch(/needs --prefix or --keys/);
   });
+
+  // With --dry-run, so a run that got past the refusal sends nothing: it prints
+  // its plan, which comes before every request and every write, and stops (#235).
+  it.each<[string, string[]]>([
+    ["--prefix", ["--prefix="]],
+    ["--keys", ["--keys="]],
+    ["--prefix", ["--prefix", ""]],
+    ["--prefix", ["--stale", "--prefix="]],
+    ["--keys", ["--stale", "--keys", ""]],
+  ])(
+    "refuses %s with no value, as in %j, rather than taking every namespace (#235)",
+    (flag, args) => {
+      const result = run("translate.ts", [...args, "--dry-run"]);
+      expect(result.code).toBe(1);
+      expect(result.out).toMatch(`${flag} takes a value`);
+      expect(result.out).not.toMatch(/^(fi|sv): |Dry run/m);
+    },
+  );
+});
+
+describe("pnpm i18n:check", () => {
+  it.each<[string, RegExp]>([
+    ["--release=", /Option '--release' does not take an argument/],
+    ["--release=true", /Option '--release' does not take an argument/],
+    ["--relase", /Unknown option '--relase'/],
+    ["release", /Unexpected argument 'release'/],
+  ])(
+    "refuses %s rather than running the check without the release rules (#235)",
+    (arg, message) => {
+      const result = run("check.ts", [arg]);
+      expect(result.code).toBe(1);
+      expect(result.out).toMatch(message);
+      expect(result.out).not.toMatch(/i18n:check.*: \d+ keys/);
+    },
+  );
 });

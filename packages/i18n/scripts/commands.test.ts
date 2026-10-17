@@ -270,6 +270,11 @@ describe("pnpm i18n:check", () => {
     expect(result.out.at(-1)).toMatch(/^✖ i18n:check --release: 3 keys, 1 errors, 1 warnings/);
   });
 
+  it("checks a release after the -- that pnpm passes through", async () => {
+    const result = await run("check.ts", ["--", "--release"]);
+    expect(result.out.at(-1)).toMatch(/^✖ i18n:check --release: 3 keys, 1 errors, 1 warnings/);
+  });
+
   it("annotates the pull request in GitHub Actions, escaped so a text cannot start a command", async () => {
     disk.files.set(
       MESSAGES,
@@ -700,6 +705,11 @@ admin.title:
     [["--batch-id", "../../etc/passwd"], "✖ that is not a batch id"],
     [["--retranslate"], "✖ --retranslate needs --prefix or --keys"],
     [["--compare"], "✖ --compare needs --prefix or --keys"],
+    // Without the refusal these took every namespace, sent it and wrote (#235).
+    [["--prefix="], "✖ --prefix takes a value"],
+    [["--keys", ""], "✖ --keys takes a value"],
+    [["--stale", "--prefix="], "✖ --prefix takes a value"],
+    [["--mode", "batch", "--keys="], "✖ --keys takes a value"],
   ])("refuses %o before anything is sent", async (args, message) => {
     const result = await run("translate.ts", args);
     expect(result).toMatchObject({ code: 1, err: [message] });
