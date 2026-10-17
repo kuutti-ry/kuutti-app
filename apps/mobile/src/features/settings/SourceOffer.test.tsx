@@ -5,7 +5,7 @@ import { renderWithTheme } from "@/test/render";
 import { SourceOffer } from "./SourceOffer";
 
 // The source-code offer of AGPL-3.0 section 13 (#16): the address as text and
-// as a labelled link that opens it outside the app.
+// as a link named by it that opens it outside the app.
 
 const SOURCE = "https://codeberg.org/example/kuutti-fork";
 
@@ -22,12 +22,13 @@ describe("SourceOffer", () => {
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
   });
 
-  it("opens the address in the browser from a labelled link", async () => {
+  it("opens the address in the browser from a link named by the address, the browser in its hint (#217)", async () => {
     const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SourceOffer source={SOURCE} />);
-    await fireEvent.press(
-      screen.getByRole("link", { name: "Open the source code in the browser" }),
-    );
+    // A screen reader hears the offer itself, not only that there is one.
+    const link = screen.getByRole("link", { name: SOURCE });
+    expect(link.props.accessibilityHint).toBe("Open the source code in the browser");
+    await fireEvent.press(link);
     expect(open).toHaveBeenCalledWith(SOURCE);
   });
 });

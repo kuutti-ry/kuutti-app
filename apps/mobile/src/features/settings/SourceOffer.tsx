@@ -12,6 +12,10 @@ import { useT } from "@/lib/locale";
  * (#287), and on the tech config screen beside the API's commit. The address
  * is text as well as a link, so the offer stands where no browser opens. The
  * contract only admits https URLs. Each screen carries the heading.
+ *
+ * The link is named by the address, as the legal-text link is by its words: a
+ * screen reader hears the offer itself, and voice control finds it by what it
+ * shows. Where it leads is the hint (#217).
  */
 export function SourceOffer({ source }: { source: string }) {
   const { t } = useT();
@@ -23,7 +27,8 @@ export function SourceOffer({ source }: { source: string }) {
       <Button
         variant="ghost"
         accessibilityRole="link"
-        accessibilityLabel={t("about.source.open")}
+        accessibilityLabel={source}
+        accessibilityHint={t("about.source.open")}
         onPress={() => void Linking.openURL(source)}
       >
         <Text className="shrink text-primary underline">{source}</Text>

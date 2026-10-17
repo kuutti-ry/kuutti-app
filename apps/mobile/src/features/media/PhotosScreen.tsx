@@ -281,7 +281,7 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
                     {photo.state === "rejected" && photo.appealable && (
                       <Button
                         variant="outline"
-                        accessibilityLabel={t("photos.appeal")}
+                        accessibilityLabel={t("photos.appeal.label", { position: index + 1 })}
                         disabled={busy}
                         onPress={() => {
                           tap();

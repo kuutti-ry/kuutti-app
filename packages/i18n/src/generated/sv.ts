@@ -204,6 +204,7 @@ export const sv: Readonly<Record<string, string>> = {
   "onboarding.welcome.title": "Så här gör vi här",
   "photos.add": "Lägg till ett foto",
   "photos.appeal": "Be en person titta",
+  "photos.appeal.label": "Be en person titta på foto {position, number}",
   "photos.caption.add": "Lägg till en bildtext",
   "photos.caption.ask_me": "Fråga mig om den här",
   "photos.caption.at_work": "På jobbet",

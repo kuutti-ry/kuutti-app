@@ -68,7 +68,7 @@ describe("the tech config screen", () => {
     expect(screen.queryByRole("link", { name: "Releases on GitHub" })).toBeNull();
     expect(screen.getByRole("header", { name: "Source code" })).toBeTruthy();
     const user = userEvent.setup();
-    await user.press(screen.getByRole("link", { name: "Open the source code in the browser" }));
+    await user.press(screen.getByRole("link", { name: "https://github.com/kuutti-ry/kuutti-app" }));
     expect(open.mock.calls.map((c) => c[0])).toEqual(["https://github.com/kuutti-ry/kuutti-app"]);
   });
 

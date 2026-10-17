@@ -1,7 +1,7 @@
 import { EMAIL_MAX } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
@@ -149,14 +149,21 @@ export function EmailCard() {
   );
 }
 
-/** The e-mail as the last of the later screens (#148): the card, and the way home. */
+/**
+ * The e-mail as the last of the later screens (#148): the card, and the way
+ * home. It scrolls, so at the largest text every line and every button can
+ * still be reached (#217).
+ */
 export function EmailScreen() {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-grow items-center gap-6 p-6">
+      <ScrollView
+        contentContainerClassName="flex-grow items-center gap-6 p-6"
+        keyboardShouldPersistTaps="handled"
+      >
         <Text variant="h1" accessibilityRole="header">
           {t("profile.later.title")}
         </Text>
@@ -180,7 +187,7 @@ export function EmailScreen() {
         >
           {t("account.email.done")}
         </Button>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

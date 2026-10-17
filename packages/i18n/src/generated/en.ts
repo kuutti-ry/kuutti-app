@@ -452,6 +452,7 @@ export const en: Readonly<Record<string, string>> = {
   "onboarding.welcome.title": "How we do things here",
   "photos.add": "Add a photo",
   "photos.appeal": "Ask a person to look",
+  "photos.appeal.label": "Ask a person to look at photo {position, number}",
   "photos.caption.add": "Add a caption",
   "photos.caption.ask_me": "Ask me about this one",
   "photos.caption.at_work": "At work",

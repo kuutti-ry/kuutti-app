@@ -244,14 +244,45 @@ describe("PhotosScreen", () => {
     ]);
     await show(<PhotosScreen />);
     expect(await screen.findByText(/A profile photo has to show you/)).toBeTruthy();
-    const ask = screen.getByRole("button", { name: "Ask a person to look" });
+    const ask = screen.getByRole("button", { name: "Ask a person to look at photo 2" });
     expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
     await press(ask);
     expect(
       calls.some((c) => c.method === "POST" && /\/appeal$/.test(new URL(c.url).pathname)),
     ).toBe(true);
     expect(await screen.findByText("Being reviewed")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Ask a person to look" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Ask a person to look/ })).toBeNull();
+  });
+
+  it("names each appeal by its photo's place, so several rejected photos do not sound alike (#217)", async () => {
+    const rejected = (n: number) => ({
+      ...photo(n),
+      state: "rejected",
+      rejectionReason: "no_person",
+      appealable: true,
+    });
+    const { calls } = fetchMock([
+      answersList({ photos: [rejected(1), photo(2), rejected(3)], maxPhotos: 3, tips: [] }),
+      answersUrls,
+      (req) =>
+        req.method === "POST" && /\/appeal$/.test(new URL(req.url).pathname)
+          ? json({ ...rejected(3), state: "queued", rejectionReason: null, appealable: false })
+          : null,
+    ]);
+    await show(<PhotosScreen />);
+    const asks = await screen.findAllByRole("button", { name: /^Ask a person to look/ });
+    expect(asks.map((ask) => ask.props.accessibilityLabel)).toEqual([
+      "Ask a person to look at photo 1",
+      "Ask a person to look at photo 3",
+    ]);
+    // The label begins with the words the button shows, for voice control.
+    expect(screen.getAllByText("Ask a person to look")).toHaveLength(2);
+    await press(screen.getByRole("button", { name: "Ask a person to look at photo 3" }));
+    expect(
+      calls
+        .filter((c) => c.method === "POST" && /\/appeal$/.test(new URL(c.url).pathname))
+        .map((c) => new URL(c.url).pathname),
+    ).toEqual([`/photos/${photo(3).id}/appeal`]);
   });
 
   it("offers no appeal where the API says there is none, and says so when the ask is refused", async () => {
@@ -271,8 +302,8 @@ describe("PhotosScreen", () => {
           : null,
     ]);
     await show(<PhotosScreen />);
-    expect(await screen.findAllByRole("button", { name: "Ask a person to look" })).toHaveLength(1);
-    await press(screen.getByRole("button", { name: "Ask a person to look" }));
+    expect(await screen.findAllByRole("button", { name: /^Ask a person to look/ })).toHaveLength(1);
+    await press(screen.getByRole("button", { name: "Ask a person to look at photo 2" }));
     expect(
       await screen.findByText(
         "A person cannot be asked to look at this photo. Remove it and try another one.",

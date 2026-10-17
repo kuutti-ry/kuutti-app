@@ -212,6 +212,7 @@ export const fi: Readonly<Record<string, string>> = {
   "onboarding.welcome.title": "Näin täällä toimitaan",
   "photos.add": "Lisää kuva",
   "photos.appeal": "Pyydä ihmistä katsomaan",
+  "photos.appeal.label": "Pyydä ihmistä katsomaan kuvaa {position, number}",
   "photos.caption.add": "Lisää kuvateksti",
   "photos.caption.ask_me": "Kysy tästä",
   "photos.caption.at_work": "Töissä",
