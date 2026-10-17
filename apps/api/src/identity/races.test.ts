@@ -397,6 +397,136 @@ describe("a bank login racing another request", () => {
     expect(logs().find((l) => l.msg === "bank login")).toMatchObject({ outcome: "resumed" });
   });
 
+  /** The code the callback sent back, exchanged: what the app is signed in to. */
+  async function exchanged(app: ReturnType<typeof createApp>, back: Response) {
+    expect(back.status).toBe(302);
+    const code = new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "";
+    const res = await app.request("/auth/exchange", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code, verifier: VERIFIER }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { outcome: string; accessToken: string };
+    const me = await app.request("/auth/session", {
+      headers: { authorization: `Bearer ${body.accessToken}` },
+    });
+    return {
+      outcome: body.outcome,
+      accountId: ((await me.json()) as { accountId: string }).accountId,
+    };
+  }
+
+  const ACCOUNT_INSERT = /INSERT INTO account \(identity_id, state, birth_year, birth_month\)/;
+
+  test("two first logins of the same person at once, the other one's account committed between this one's identity and account, leave one account, and this one resumes it", async ({
+    ctx,
+  }) => {
+    let otherAccount = "";
+    // The other device lost the identity insert to this login, read the identity
+    // this login had just committed, and committed its account first (#235, bug 1).
+    const db = interleaved(ctx.client, { before: ACCOUNT_INSERT }, async () => {
+      const account = await ctx.client.query<{ id: string }>(
+        `INSERT INTO account (identity_id, state, birth_year, birth_month)
+         SELECT id, 'registered', 1985, 3 FROM identity WHERE hetu_hmac = $1 RETURNING id`,
+        [HMAC],
+      );
+      otherAccount = account.rows[0]?.id ?? "";
+    });
+    const { app, logs } = await appOn(db, { bank: true });
+    const back = await app.request(
+      `/auth/callback?code=ok&state=${encodeURIComponent(await start(app))}`,
+    );
+    expect(db.ran()).toBe(true);
+    expect(otherAccount).not.toBe("");
+    expect(await exchanged(app, back)).toEqual({ outcome: "resumed", accountId: otherAccount });
+    const { rows } = await ctx.client.query<{ accounts: string }>(
+      `SELECT count(*) AS accounts FROM account a JOIN identity i ON i.id = a.identity_id
+       WHERE i.hetu_hmac = $1`,
+      [HMAC],
+    );
+    expect(rows).toEqual([{ accounts: "1" }]);
+    expect(logs().find((l) => l.msg === "bank login")).toMatchObject({ outcome: "resumed" });
+    expect(logs().filter((l) => (l.level ?? 0) >= 50)).toEqual([]);
+  });
+
+  test("two first logins of the same person at once, this one losing the identity and then the account to the other, resume the other's account", async ({
+    ctx,
+  }) => {
+    let otherAccount = "";
+    // The other device commits its identity just before this one's insert, and
+    // its account just before this one's second pass inserts an account.
+    const identityFirst = interleaved(
+      ctx.client,
+      { before: /INSERT INTO identity \(hetu_hmac, broker_subject, broker_session_index/ },
+      () =>
+        ctx.client.query(
+          "INSERT INTO identity (hetu_hmac, broker_subject) VALUES ($1, 'OTHER-DEVICE')",
+          [HMAC],
+        ),
+    );
+    const db = interleaved(identityFirst, { before: ACCOUNT_INSERT }, async () => {
+      const account = await ctx.client.query<{ id: string }>(
+        `INSERT INTO account (identity_id, state, birth_year, birth_month)
+           SELECT id, 'registered', 1985, 3 FROM identity WHERE hetu_hmac = $1 RETURNING id`,
+        [HMAC],
+      );
+      otherAccount = account.rows[0]?.id ?? "";
+    });
+    const { app, logs } = await appOn(db, { bank: true });
+    const back = await app.request(
+      `/auth/callback?code=ok&state=${encodeURIComponent(await start(app))}`,
+    );
+    expect(identityFirst.ran()).toBe(true);
+    expect(db.ran()).toBe(true);
+    expect(otherAccount).not.toBe("");
+    expect(await exchanged(app, back)).toEqual({ outcome: "resumed", accountId: otherAccount });
+    const { rows } = await ctx.client.query<{ subject: string; accounts: string }>(
+      `SELECT i.broker_subject AS subject, (SELECT count(*) FROM account a WHERE a.identity_id = i.id) AS accounts
+       FROM identity i WHERE i.hetu_hmac = $1`,
+      [HMAC],
+    );
+    expect(rows).toEqual([{ subject: "THIS-DEVICE", accounts: "1" }]);
+    expect(logs().filter((l) => (l.level ?? 0) >= 50)).toEqual([]);
+  });
+
+  test("two logins at once of a person whose cooldown has passed leave one new account, and the later one resumes it", async ({
+    ctx,
+  }) => {
+    // Erased before, the cooldown over: both logins decide to create an account.
+    const { rows: identities } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO identity (hetu_hmac, broker_subject, deletion_count, reregister_after)
+       VALUES ($1, 'BEFORE', 1, $2) RETURNING id`,
+      [HMAC, new Date(NOW.getTime() - 24 * 60 * 60_000)],
+    );
+    const identityId = identities[0]?.id;
+    await ctx.client.query(
+      `INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, 'deleted', 1985, 3)`,
+      [identityId],
+    );
+    let otherAccount = "";
+    const db = interleaved(ctx.client, { before: ACCOUNT_INSERT }, async () => {
+      const account = await ctx.client.query<{ id: string }>(
+        `INSERT INTO account (identity_id, state, birth_year, birth_month)
+         VALUES ($1, 'registered', 1985, 3) RETURNING id`,
+        [identityId],
+      );
+      otherAccount = account.rows[0]?.id ?? "";
+    });
+    const { app, logs } = await appOn(db, { bank: true });
+    const back = await app.request(
+      `/auth/callback?code=ok&state=${encodeURIComponent(await start(app))}`,
+    );
+    expect(db.ran()).toBe(true);
+    expect(await exchanged(app, back)).toEqual({ outcome: "resumed", accountId: otherAccount });
+    const { rows } = await ctx.client.query<{ state: string }>(
+      "SELECT state FROM account WHERE identity_id = $1 ORDER BY state::text",
+      [identityId],
+    );
+    expect(rows).toEqual([{ state: "deleted" }, { state: "registered" }]);
+    expect(logs().filter((l) => (l.level ?? 0) >= 50)).toEqual([]);
+  });
+
   test("an erasure between the login's decision and its code sends the browser back with the cooldown", async ({
     ctx,
   }) => {
@@ -903,4 +1033,63 @@ describe("an artificial registration racing another", () => {
     );
     expect(rows).toEqual([{ subject: "other", accounts: "0" }]);
   });
+
+  test("an account written meanwhile by another run for the identity this one created is refused, not doubled", async ({
+    ctx,
+  }) => {
+    const key = hmacKeyFromHex(KEY_HEX);
+    const hetu = "170677-924F";
+    const { hetuHmac } = deriveArtificialIdentity(hetu, key, NOW);
+    const db = interleaved(
+      ctx.client,
+      { before: /INSERT INTO account \(identity_id, state, birth_year, birth_month\)/ },
+      () =>
+        ctx.client.query(
+          `INSERT INTO account (identity_id, state, birth_year, birth_month)
+           SELECT id, 'registered', 1977, 6 FROM identity WHERE hetu_hmac = $1`,
+          [hetuHmac],
+        ),
+    );
+    await expect(
+      registerArtificial(db, { hetu, key, subject: "test:race", now: NOW }),
+    ).rejects.toThrow(/account was written meanwhile/);
+    expect(db.ran()).toBe(true);
+    expect(await liveAccounts(ctx, hetuHmac)).toBe("1");
+  });
+
+  test("an account written meanwhile by another run for an erased identity past its waiting time is refused, not doubled", async ({
+    ctx,
+  }) => {
+    const key = hmacKeyFromHex(KEY_HEX);
+    const hetu = "170677-924F";
+    const { hetuHmac } = deriveArtificialIdentity(hetu, key, NOW);
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO identity (hetu_hmac, broker_subject, deletion_count, reregister_after)
+       VALUES ($1, 'before', 1, $2) RETURNING id`,
+      [hetuHmac, new Date(NOW.getTime() - 24 * 60 * 60_000)],
+    );
+    const db = interleaved(
+      ctx.client,
+      { before: /INSERT INTO account \(identity_id, state, birth_year, birth_month\)/ },
+      () =>
+        ctx.client.query(
+          `INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, 'registered', 1977, 6)`,
+          [rows[0]?.id],
+        ),
+    );
+    await expect(
+      registerArtificial(db, { hetu, key, subject: "test:race", now: NOW }),
+    ).rejects.toThrow(/account was written meanwhile/);
+    expect(db.ran()).toBe(true);
+    expect(await liveAccounts(ctx, hetuHmac)).toBe("1");
+  });
 });
+
+async function liveAccounts(ctx: { client: Queryable }, hetuHmac: string) {
+  const { rows } = await ctx.client.query<{ n: string }>(
+    `SELECT count(*) AS n FROM account a JOIN identity i ON i.id = a.identity_id
+     WHERE i.hetu_hmac = $1 AND a.state <> 'deleted'`,
+    [hetuHmac],
+  );
+  return rows[0]?.n;
+}
