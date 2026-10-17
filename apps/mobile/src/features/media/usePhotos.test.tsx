@@ -341,6 +341,65 @@ describe("usePhotos: removing", () => {
     ]);
   });
 
+  it.each([
+    ["a cancelled picker", "cancelled"],
+    ["a refused removal", "refused"],
+  ] as const)(
+    "applies the read after a removal when %s ends meanwhile (#287)",
+    async (_what, how) => {
+      // The read after the removal is held; meanwhile another change starts and
+      // ends without touching the list. The held read must still land: it is
+      // the one that takes the fish tip away with its photo.
+      let reads = 0;
+      let answerHeld: (response: Response) => void = () => {};
+      const held = new Promise<Response>((resolve) => {
+        answerHeld = resolve;
+      });
+      serve(
+        (r) => {
+          if (!isList(r)) return null;
+          reads += 1;
+          return reads === 1 ? json({ ...list(1, 2, 3), tips: ["fish"] }) : held;
+        },
+        (r) => {
+          if (r.method !== "DELETE") return null;
+          // The first removal goes through; the second, of photo 2, is refused.
+          return r.url.endsWith(photo(1).id)
+            ? new Response(null, { status: 204 })
+            : refusal("media_unavailable", 503);
+        },
+      );
+      const { result } = await ready();
+      let removing: Promise<void> | undefined;
+      await act(async () => {
+        removing = result.current.remove(photo(1).id);
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      });
+      expect(reads).toBe(2);
+      await act(async () =>
+        how === "cancelled" ? result.current.add() : result.current.remove(photo(2).id),
+      );
+      await act(async () => {
+        answerHeld(
+          json({
+            ...list(2, 3),
+            photos: [
+              { ...photo(2), position: 0 },
+              { ...photo(3), position: 1 },
+            ],
+            tips: [],
+          }),
+        );
+        await removing;
+      });
+      expect(result.current.list?.tips).toEqual([]);
+      expect(ids(result.current)).toEqual([
+        [photo(2).id, 0],
+        [photo(3).id, 1],
+      ]);
+    },
+  );
+
   it("keeps the list as it is when the read after a removal fails", async () => {
     serve(
       listing(

@@ -62,6 +62,7 @@ export const en: Readonly<Record<string, string>> = {
   "account.research.failed": "The research choice could not be saved. Try again.",
   "account.research.label": "Take part in research",
   "account.specialCategory.explain": "Whom you seek, the parties you could vote for and your religion. Switching this off removes those answers and pauses matching; your profile stays, and you are asked whom you seek again before matching resumes.",
+  "account.specialCategory.failed": "The sensitive-answers choice could not be saved. Try again.",
   "account.specialCategory.label": "Store my sensitive answers",
   "account.title": "Your account",
   "admin.account.age": "Age",

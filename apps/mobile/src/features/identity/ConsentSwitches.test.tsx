@@ -199,6 +199,45 @@ describe("ConsentSwitch", () => {
     ]);
   }
 
+  it("says the sensitive answers' own words when their choice could not be saved (#287)", async () => {
+    const versions = {
+      terms: CONSENT_VERSIONS.terms,
+      privacy: CONSENT_VERSIONS.privacy,
+      research: CONSENT_VERSIONS.research,
+      special_category: CONSENT_VERSIONS.special_category,
+    };
+    const given = {
+      kind: "special_category",
+      version: CONSENT_VERSIONS.special_category,
+      locale: "en",
+      givenAt: "2026-09-26T10:00:00.000Z",
+      withdrawnAt: null,
+    };
+    fetchMock([
+      (req) => {
+        const path = new URL(req.url).pathname;
+        if (req.method === "GET" && path === "/consents") {
+          return json({ consents: [given], currentVersions: versions });
+        }
+        if (req.method === "DELETE" && path === "/consents/special_category") {
+          return json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
+        }
+        return null;
+      },
+    ]);
+    await show(<ConsentSwitch kind="special_category" />);
+    const toggle = await screen.findByLabelText("Store my sensitive answers");
+    expect(toggle.props.accessibilityState?.checked).toBe(true);
+    await fireEvent(toggle, "press");
+    expect(
+      await screen.findByText("The sensitive-answers choice could not be saved. Try again."),
+    ).toBeTruthy();
+    expect(screen.queryByText("The research choice could not be saved. Try again.")).toBeNull();
+    expect(
+      screen.getByLabelText("Store my sensitive answers").props.accessibilityState?.checked,
+    ).toBe(true);
+  });
+
   it("toggles from its words too", async () => {
     newerSensitiveWording();
     await show(<ConsentSwitch kind="research" />);
@@ -287,7 +326,7 @@ describe("useConsentStates", () => {
     expect(result.current).toEqual({ research: "on", special_category: "outdated" });
   });
 
-  it("is unavailable for both when the read fails, and loading without a session, reading nothing", async () => {
+  it("is unavailable for both when the read fails", async () => {
     fetchMock([
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
     ]);
@@ -295,6 +334,9 @@ describe("useConsentStates", () => {
       research: "unavailable",
       special_category: "unavailable",
     });
+  });
+
+  it("is loading without a session, and reads nothing", async () => {
     await clearSession();
     const calls = fetchMock([]);
     expect((await states()).current).toEqual({ research: "loading", special_category: "loading" });

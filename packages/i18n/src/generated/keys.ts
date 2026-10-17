@@ -63,6 +63,7 @@ export type MessageParams = {
   "account.research.failed": Record<never, never>;
   "account.research.label": Record<never, never>;
   "account.specialCategory.explain": Record<never, never>;
+  "account.specialCategory.failed": Record<never, never>;
   "account.specialCategory.label": Record<never, never>;
   "account.title": Record<never, never>;
   "admin.account.age": Record<never, never>;

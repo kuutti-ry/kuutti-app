@@ -6143,6 +6143,13 @@ account.research.failed:
   sv: "Forskningsvalet kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
+account.specialCategory.failed:
+  en: "The sensitive-answers choice could not be saved. Try again."
+  description: "Notice on the sensitive answers' screen in Settings when giving or withdrawing the special-category consent failed (#146, #287); it said the research choice before."
+  fi: "Arkaluonteisia vastauksia koskevaa valintaa ei voitu tallentaa. Yritä uudelleen."
+  sv: "Valet om känsliga svar kunde inte sparas. Försök igen."
+  machine: { fi: true, sv: true }
+
 account.specialCategory.label:
   en: "Store my sensitive answers"
   description: "Label of the switch for the special-category consent on its screen in Settings (#146, ADR-019 §4, #287)."
