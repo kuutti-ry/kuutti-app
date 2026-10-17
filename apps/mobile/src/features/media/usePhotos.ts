@@ -76,10 +76,13 @@ export function usePhotos() {
   }, [reload]);
 
   /**
-   * Changes started so far: upload, removal, appeal, reorder. A read after a
-   * change applies its answer only when no later change has started since,
-   * so a slow answer never puts back an order or a photo the person has just
-   * moved or removed.
+   * Changes made to the list so far: an upload, a removal, an appeal or a
+   * caption once the API took it, a reorder as it starts (its list changes
+   * at once). A read after a change applies its answer only when no later
+   * change has been made since, so a slow answer never puts back an order or
+   * a photo the person has just moved or removed. A change that ends without
+   * touching the list (a cancelled picker, a refused removal) leaves the read
+   * in flight to apply, or its tips would outlive their photo (#287).
    */
   const changes = useRef(0);
 
@@ -99,7 +102,6 @@ export function usePhotos() {
   }, [update]);
 
   const add = useCallback(async () => {
-    changes.current += 1;
     update({ busy: { kind: "picking" }, notice: null });
     try {
       const picked = await pickPhoto();
@@ -117,6 +119,7 @@ export function usePhotos() {
       const photo = await uploadPhoto(prepared, (fraction) =>
         update({ busy: { kind: "uploading", percent: Math.round(fraction * 100) } }),
       );
+      changes.current += 1;
       setState((previous) => ({
         ...previous,
         busy: { kind: "idle" },
@@ -132,10 +135,10 @@ export function usePhotos() {
 
   const remove = useCallback(
     async (id: string) => {
-      changes.current += 1;
       update({ busy: { kind: "removing", id }, notice: null });
       try {
         await deletePhoto(id);
+        changes.current += 1;
         setState((previous) => ({
           ...previous,
           busy: { kind: "idle" },
@@ -157,10 +160,10 @@ export function usePhotos() {
   // The check's rejection to a person (#253): the photo comes back queued, in its place.
   const appeal = useCallback(
     async (id: string) => {
-      changes.current += 1;
       update({ busy: { kind: "appealing", id }, notice: null });
       try {
         const photo = await appealPhoto(id);
+        changes.current += 1;
         setState((previous) => ({
           ...previous,
           busy: { kind: "idle" },
@@ -177,10 +180,10 @@ export function usePhotos() {
   /** The owner's line under a photo (#296), or none: the photo comes back with it, in its place. */
   const caption = useCallback(
     async (id: string, line: PhotoCaption | null) => {
-      changes.current += 1;
       update({ busy: { kind: "captioning", id }, notice: null });
       try {
         const photo = await setPhotoCaption(id, line);
+        changes.current += 1;
         setState((previous) => ({
           ...previous,
           busy: { kind: "idle" },

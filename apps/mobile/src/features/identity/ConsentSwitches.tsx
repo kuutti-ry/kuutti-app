@@ -90,6 +90,10 @@ const EXPLAIN = {
   research: "account.research.explain",
   special_category: "account.specialCategory.explain",
 } as const;
+const FAILED = {
+  research: "account.research.failed",
+  special_category: "account.specialCategory.failed",
+} as const;
 
 /**
  * One withdrawable consent on its own screen (#46, #146, #287): a choice
@@ -142,9 +146,7 @@ export function ConsentSwitch({ kind }: { kind: WithdrawableConsentKind }) {
       <Text variant="muted">
         {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : t(EXPLAIN[kind])}
       </Text>
-      {consent.failed && (
-        <Text accessibilityLiveRegion="assertive">{t("account.research.failed")}</Text>
-      )}
+      {consent.failed && <Text accessibilityLiveRegion="assertive">{t(FAILED[kind])}</Text>}
     </View>
   );
 }

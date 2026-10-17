@@ -62,6 +62,7 @@ export const sv: Readonly<Record<string, string>> = {
   "account.research.failed": "Forskningsvalet kunde inte sparas. Försök igen.",
   "account.research.label": "Delta i forskningen",
   "account.specialCategory.explain": "Vem du söker, partierna du kunde rösta på och din religion. Stänger du av det här tas de svaren bort och matchningen pausas; din profil finns kvar, och du får frågan om vem du söker igen innan matchningen fortsätter.",
+  "account.specialCategory.failed": "Valet om känsliga svar kunde inte sparas. Försök igen.",
   "account.specialCategory.label": "Spara mina känsliga svar",
   "account.title": "Ditt konto",
   "errors.admin_forbidden": "Din roll tillåter inte det här.",

@@ -62,6 +62,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "account.research.failed": "［Théé rééšééáárçh çhóóííçéé çóóúúld ñóót béé šáávééd. Trýý áágááííñ.］",
   "account.research.label": "［Táákéé páárt ííñ rééšééáárçh］",
   "account.specialCategory.explain": "［Whóóm ýýóóúú šéééék, théé páártííééš ýýóóúú çóóúúld vóótéé fóór ááñd ýýóóúúr réélíígííóóñ. Šwíítçhííñg thííš óóff réémóóvééš thóóšéé ááñšwéérš ááñd pááúúšééš máátçhííñg; ýýóóúúr próófííléé štááýýš, ááñd ýýóóúú ááréé ááškééd whóóm ýýóóúú šéééék áágááííñ bééfóóréé máátçhííñg rééšúúmééš.］",
+  "account.specialCategory.failed": "［Théé šééñšíítíívéé-ááñšwéérš çhóóííçéé çóóúúld ñóót béé šáávééd. Trýý áágááííñ.］",
   "account.specialCategory.label": "［Štóóréé mýý šééñšíítíívéé ááñšwéérš］",
   "account.title": "［ÝÝóóúúr ááççóóúúñt］",
   "admin.account.age": "Age",

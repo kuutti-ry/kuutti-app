@@ -62,6 +62,7 @@ export const fi: Readonly<Record<string, string>> = {
   "account.research.failed": "Tutkimusvalintaa ei voitu tallentaa. Yritä uudelleen.",
   "account.research.label": "Osallistu tutkimukseen",
   "account.specialCategory.explain": "Kenen seuraa etsit, puolueet, joita voisit äänestää, ja uskontosi. Kytkimen sammuttaminen poistaa nämä vastaukset ja keskeyttää yhdistämisen; profiilisi säilyy, ja sinulta kysytään uudelleen, kenen seuraa etsit, ennen kuin yhdistäminen jatkuu.",
+  "account.specialCategory.failed": "Arkaluonteisia vastauksia koskevaa valintaa ei voitu tallentaa. Yritä uudelleen.",
   "account.specialCategory.label": "Tallenna arkaluonteiset vastaukseni",
   "account.title": "Tilisi",
   "errors.admin_forbidden": "Roolisi ei salli tätä.",

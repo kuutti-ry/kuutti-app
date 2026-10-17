@@ -213,6 +213,39 @@ describe("the settings screen", () => {
     });
   });
 
+  it("says Off for a consent not given (#287)", async () => {
+    globalThis.fetch = jest.fn(async (input: Request | string) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname === "/consents") {
+        return json({
+          consents: [],
+          currentVersions: {
+            ...consentsAnswer.currentVersions,
+            special_category: CONSENT_VERSIONS.special_category,
+          },
+        });
+      }
+      return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
+    }) as unknown as typeof fetch;
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    expect(row("Research").props.accessibilityValue).toEqual({ text: "Off" });
+    expect(row("Sensitive answers").props.accessibilityValue).toEqual({ text: "Off" });
+  });
+
+  it("says no state on a consent row while the consents could not be read; its screen says why", async () => {
+    globalThis.fetch = jest.fn(async () =>
+      json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
+    ) as unknown as typeof fetch;
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    expect(row("Research").props.accessibilityValue?.text).toBeUndefined();
+    expect(screen.queryByText("On")).toBeNull();
+    expect(screen.queryByText("Off")).toBeNull();
+  });
+
   it("names the version without a build, and a question mark when the build names none", async () => {
     mockBuild.mockReturnValue({ version: null, commit: null });
     await renderWithTheme(<SettingsScreen />);
