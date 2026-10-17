@@ -3966,6 +3966,13 @@ photos.error.photo_budget_exceeded:
   sv: Det räcker med foton för i dag. De laddas igen efter midnatt.
   machine: { fi: true, sv: true }
 
+photos.error.notShown:
+  en: The photo could not be shown.
+  description: "Zoom screen and the card preview: the API refused a photo's URL for any reason but the day's budget, or answered without its own words (a gateway's page). The person was looking at the photo, not uploading it (#235)."
+  fi: Kuvaa ei voitu näyttää.
+  sv: Fotot kunde inte visas.
+  machine: { fi: true, sv: true }
+
 photos.zoom.label:
   en: "Photo {position, number} / {total, number}, full size"
   description: Zoom screen, screen-reader label of the large photo. {position} counts from 1; {total} is how many photos there are.

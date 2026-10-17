@@ -69,4 +69,23 @@ describe("Stepper", () => {
     await show({ className: "flex-1" });
     expect(rootClass()).toMatch(/\bflex-1\b/);
   });
+
+  /** The children of every host Text drawn: a label left empty still takes a line of the column. */
+  const texts = () => {
+    const found: unknown[] = [];
+    const visit = (node: HostNode | string) => {
+      if (typeof node === "string") return;
+      if (node.type === "Text") found.push(node.children ?? []);
+      for (const child of node.children ?? []) visit(child);
+    };
+    visit(screen.toJSON() as HostNode);
+    return found;
+  };
+
+  it("draws no label of its own where the field above names the number (#238)", async () => {
+    await show({ label: undefined });
+    // The number is the one text: no empty label line above it.
+    expect(texts()).toEqual([["170 cm"]]);
+    expect(screen.getByRole("button", { name: "One centimetre more" })).toBeTruthy();
+  });
 });

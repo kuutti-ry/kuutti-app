@@ -21,7 +21,8 @@ export function CardPreviewScreen() {
   const { t } = useT();
   const router = useRouter();
   const [state, setState] = useState<State>({ status: "loading" });
-  // A photo URL the API refused (the day's budget, #52): said under the card, never a silent gap.
+  // A photo URL the API refused (the day's budget, #52): said under the card, never a
+  // silent gap; anything else is a photo not shown, never an upload (#235).
   const [refusal, setRefusal] = useState<string | null>(null);
   // Bumped by "Try again": the read runs again.
   const [attempt, setAttempt] = useState(0);
@@ -67,7 +68,7 @@ export function CardPreviewScreen() {
             {t(
               refusal === "photo_budget_exceeded"
                 ? "photos.error.photo_budget_exceeded"
-                : "photos.error.generic",
+                : "photos.error.notShown",
             )}
           </Text>
         )}

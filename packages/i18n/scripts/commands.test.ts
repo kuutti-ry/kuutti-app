@@ -578,6 +578,41 @@ describe("pnpm i18n:review", () => {
       const result = await run("review.ts", ["--reflag", "--locale", "fi", "--stale", "--dry-run"]);
       expect(result.out.at(-1)).toBe("(dry run: messages.yaml not written) Flagged 1 fi texts");
     });
+
+    it("refuses --stale beside named keys rather than flag every stale text instead of them (#250)", async () => {
+      disk.files.set(MESSAGES, SOURCE.replace("  en: Goodbye", "  en: Goodbye now"));
+      const result = await run("review.ts", [
+        "--reflag",
+        "--locale",
+        "fi",
+        "--stale",
+        "demo.greeting",
+      ]);
+      expect(result).toMatchObject({
+        code: 1,
+        err: ["✖ --reflag takes --stale or the keys, not both"],
+      });
+      expect(result.out).toEqual([]);
+      expect(disk.written.size).toBe(0);
+    });
+
+    it("refuses --prefix, which --list reads, rather than flag every stale text outside it (#250)", async () => {
+      disk.files.set(MESSAGES, SOURCE.replace("  en: Goodbye", "  en: Goodbye now"));
+      const result = await run("review.ts", [
+        "--reflag",
+        "--locale",
+        "fi",
+        "--stale",
+        "--prefix",
+        "other.",
+      ]);
+      expect(result).toMatchObject({
+        code: 1,
+        err: ["✖ --reflag takes the keys or prefix.*, not --prefix"],
+      });
+      expect(result.out).toEqual([]);
+      expect(disk.written.size).toBe(0);
+    });
   });
 
   describe("--approved-since", () => {

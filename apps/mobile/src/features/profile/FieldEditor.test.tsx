@@ -280,6 +280,13 @@ describe("FieldEditor: a number", () => {
     expect(fields).toEqual({});
   });
 
+  it("names the field once: its own label, not the stepper's again (#238)", async () => {
+    await show("height", { height: 170 } as ProfileFields);
+    expect(screen.getAllByText("Height")).toHaveLength(1);
+    // The one kept is the field's own, with its icon, as every other field has it.
+    expect(screen.getByTestId("field-icon-height", { includeHiddenElements: true })).toBeTruthy();
+  });
+
   it("stops at either end of the range", async () => {
     await show("height", { height: 260 } as ProfileFields);
     const up = screen.getByRole("button", { name: "One more" });

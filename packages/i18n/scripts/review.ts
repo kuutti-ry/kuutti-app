@@ -211,6 +211,10 @@ if (values["approved-since"]) {
   if (Object.keys(result.refused).length > 0) process.exitCode = 1;
 } else if (values.reflag) {
   const locale = requireLocale();
+  // The keys or --stale, as the usage says: given both, or --prefix (--list's), what
+  // narrowed it was dropped and every stale text flagged (#250).
+  if (values.prefix) fail("--reflag takes the keys or prefix.*, not --prefix");
+  if (values.stale && positionals.length > 0) fail("--reflag takes --stale or the keys, not both");
   const keys = values.stale ? stale(messages, locale) : selected();
   const result = reflag(yamlText, messages, locale, keys);
   report("Flagged for review again", result.flagged);

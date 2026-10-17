@@ -4,6 +4,7 @@ import {
   DealBreakersResponse,
   type DealBreakersUpdate,
   ErrorResponse,
+  type ProfileDocument,
   ProfileResponse,
   type ProfileUpdate,
   photoWithKnownDescription,
@@ -29,19 +30,33 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 // out of order. Settled either way: a failed save is its screen's to report.
 let lastSave: Promise<unknown> = Promise.resolve();
 
-export async function fetchProfile(): Promise<ProfileResponse> {
-  await lastSave;
+async function readProfile(): Promise<ProfileResponse> {
   const { data, error, response } = await api.GET("/profile");
   if (!data) throw failed(response, error, "profile");
   return ProfileResponse.parse(data);
 }
 
-export function saveProfile(update: ProfileUpdate): Promise<ProfileResponse> {
+export async function fetchProfile(): Promise<ProfileResponse> {
+  await lastSave;
+  return readProfile();
+}
+
+/**
+ * Saves the document `build` makes of the one stored when this save's turn
+ * comes, read just before it goes: a screen puts its own changes on it, so a
+ * save from another screen since that screen read the profile is kept, never
+ * undone by a whole draft read before it (#238). The API takes the whole
+ * document (ADR-003); the read is what keeps it current.
+ */
+export function saveProfile(
+  build: (stored: ProfileDocument | null) => ProfileUpdate,
+): Promise<ProfileResponse> {
   const sent = lastSave.then(async () => {
+    const { profile } = await readProfile();
     // The generated body type spells the strict objects with an index signature
     // the zod type has no room for; the contract is the zod schema (ADR-003).
     const { data, error, response } = await api.PUT("/profile", {
-      body: update as unknown as ApiComponents["schemas"]["ProfileUpdate"],
+      body: build(profile) as unknown as ApiComponents["schemas"]["ProfileUpdate"],
     });
     if (!data) throw failed(response, error, "profile save");
     return ProfileResponse.parse(data);

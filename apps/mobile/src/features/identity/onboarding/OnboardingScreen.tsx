@@ -168,6 +168,17 @@ export function OnboardingScreen() {
   const [labelPending, setLabelPending] = useState(false);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
+  // Research put before (#146, #219), which this screen's memory, gone with the
+  // screen, cannot say but the status can: research is asked only once nothing
+  // else is open, so whom one seeks open alone means every step after it was
+  // answered and research put, and the sensitive-answers consent withdrawn or
+  // its wording changed since (ADR-010 §10, §13). Withdrawn halfway through a
+  // first walk, the later steps are open too, and research still comes after them.
+  useEffect(() => {
+    if (state.status !== "ready") return;
+    const { missing } = state.onboarding;
+    if (missing.length === 1 && missing[0] === "seeks") setResearchOffered(true);
+  }, [state]);
 
   const current: Step | null =
     state.status === "ready" ? nextStep(state.onboarding, { researchOffered, labelPending }) : null;
@@ -645,7 +656,11 @@ export function OnboardingScreen() {
             <Button
               onPress={() => {
                 tap();
-                router.push("/photos");
+                // The photos screen says this step too, as every other step does (#146).
+                router.push({
+                  pathname: "/photos",
+                  params: { step: String(position), total: String(STEPS.length) },
+                });
               }}
             >
               {t("onboarding.photos.open")}

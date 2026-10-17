@@ -11,6 +11,8 @@ import { useHapticTap } from "@/theme/haptics";
  * A number between a minus and a plus: every answer a button (ADR-010 §9),
  * each with its own spoken label, the number announced as it changes. The
  * age window of onboarding and the height of the profile (#146, #148).
+ * The label is left out where the field above already names the number: the
+ * height said "Height" twice (#238).
  * It takes no flex of its own: as `flex-1` in a column it could shrink to
  * nothing while its buttons still drew over the hint below (#238), so a row
  * that shares out its width passes `flex-1` itself.
@@ -27,7 +29,7 @@ export function Stepper({
   onChange,
 }: {
   className?: string;
-  label: string;
+  label?: string;
   value: number;
   /** The number as text, with its unit where it has one. */
   shown: string;
@@ -40,7 +42,7 @@ export function Stepper({
   const tap = useHapticTap();
   return (
     <View className={cn("items-center gap-1", className)}>
-      <Text variant="small">{label}</Text>
+      {label !== undefined && <Text variant="small">{label}</Text>}
       <View className="flex-row items-center gap-2">
         <Button
           variant="outline"

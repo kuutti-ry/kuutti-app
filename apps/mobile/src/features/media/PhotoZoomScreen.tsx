@@ -50,7 +50,8 @@ export function PhotoZoomScreen({
   const words = described.shown ? described.describe(description) : null;
   const router = useRouter();
   const tap = useHapticTap();
-  // The API said no (#52): the person reads why under the placeholder, never a silent gap.
+  // The API said no (#52): the person reads why under the placeholder, never a
+  // silent gap; anything but the day's budget is a photo not shown, never an upload (#235).
   const [refusal, setRefusal] = useState<string | null>(null);
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -86,7 +87,7 @@ export function PhotoZoomScreen({
             {t(
               refusal === "photo_budget_exceeded"
                 ? "photos.error.photo_budget_exceeded"
-                : "photos.error.generic",
+                : "photos.error.notShown",
             )}
           </Text>
         )}

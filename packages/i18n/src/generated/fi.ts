@@ -313,6 +313,7 @@ export const fi: Readonly<Record<string, string>> = {
   "photos.error.generic": "Kuvan lähetys ei onnistunut. Yritä uudelleen.",
   "photos.error.media_busy": "Kuvia käsitellään juuri nyt paljon. Yritä hetken kuluttua uudelleen.",
   "photos.error.media_unavailable": "Kuvat eivät ole juuri nyt käytettävissä.",
+  "photos.error.notShown": "Kuvaa ei voitu näyttää.",
   "photos.error.permission": "Kuutti ei päässyt kuviisi. Salli pääsy puhelimen asetuksista ja yritä uudelleen.",
   "photos.error.photo_budget_exceeded": "Kuvia on katsottu tänään riittävästi. Ne latautuvat taas keskiyön jälkeen.",
   "photos.error.photo_invalid": "Kuvaa ei voitu lukea. Kokeile toista kuvaa.",
