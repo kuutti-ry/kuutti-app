@@ -16,7 +16,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `packages/i18n` | `messages.yaml`, typed `t()`, i18next + ICU | `.claude/rules/i18n.md` |
 | `packages/tunnistus-oidc` | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; MIT, ADR-017 | `docs/vendors/telia.md` |
 | `services/mock-idp` | navikt/mock-oauth2-server with FTN-shaped claims for local dev; its login page names the thirteen demo personas (ADR-014) | `.claude/rules/infra.md` |
-| `docs/` | security checklist, `adr/` | |
+| `docs/` | security checklist, accessibility checklist, `adr/` | |
 | `features/` | Gherkin specs for the rules layer, one directory per slice | `.claude/rules/layout.md` |
 
 Inside each app, code is organised by vertical slice (identity, profile, media, pond, matching, chat, safety, research, rewards, notifications), never by layer; see `.claude/rules/layout.md`. Rules in `.claude/rules/` load automatically when you work on matching paths.
@@ -121,6 +121,7 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 - Every touchable has `accessibilityLabel` and `accessibilityRole`; targets are at least 44 pt.
 - OS font scaling and reduce-motion are respected; no fixed-height text containers.
 - Decisions are buttons, not swipes. A swipe may exist as an accessibility alternative, never as the primary input.
+- Screen-reader walks of the phone app: each changed screen (`.claude/rules/mobile.md`), every screen before a release (`docs/accessibility-checklist.md`).
 
 ## Product constraints
 
