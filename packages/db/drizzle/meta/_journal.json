@@ -372,6 +372,20 @@
       "when": 1792248775241,
       "tag": "0052_reports_per_day",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1792254818619,
+      "tag": "0053_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1792254819240,
+      "tag": "0054_chat_limits",
+      "breakpoints": true
     }
   ]
 }

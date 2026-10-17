@@ -15,3 +15,5 @@ export {
   saveProfile,
   withdrawSpecialCategoryAnswers,
 } from "./service.ts";
+// The plain-text rule for a message (#348, ADR-031 §3): the same refusal as the card's.
+export { contactDetailsIn } from "./text.ts";

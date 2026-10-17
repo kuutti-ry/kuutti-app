@@ -3000,6 +3000,34 @@ errors.report_budget_exceeded:
   sv: Det räcker med anmälningar för i dag. Du kan ändå blockera den här personen, men då kan du inte anmäla hen senare.
   machine: { fi: true, sv: true }
 
+errors.conversation_closed:
+  en: "This conversation has ended, so the message was not sent."
+  description: "Send (409, #348, ADR-031 §3): the conversation is closed, a block stands between the two, or the other person deleted their account. Must not say which: a block reads as an ended conversation (ADR-030 §6)."
+  fi: "Tämä keskustelu on päättynyt, joten viestiä ei lähetetty."
+  sv: "Det här samtalet har avslutats, så meddelandet skickades inte."
+  machine: { fi: true, sv: true }
+
+errors.message_too_long:
+  en: "The message is too long. Make it shorter and send it again."
+  description: "Send (400, #348): over matching_config message_max_length characters after trimming. Never a number: the limit is a tunable, and the composer counts down."
+  fi: "Viesti on liian pitkä. Lyhennä sitä ja lähetä uudelleen."
+  sv: "Meddelandet är för långt. Korta det och skicka igen."
+  machine: { fi: true, sv: true }
+
+errors.contact_details:
+  en: "A message cannot carry an e-mail address, a link, a phone number or a social media handle."
+  description: "Send (400, #348, the plain-text rule of #47 for messages): the text carried a way to reach the person outside Kuutti. The API logs the kind found, never the text."
+  fi: "Viestissä ei voi olla sähköpostiosoitetta, linkkiä, puhelinnumeroa tai somekäyttäjänimeä."
+  sv: "Ett meddelande kan inte innehålla en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier."
+  machine: { fi: true, sv: true }
+
+errors.message_budget_exceeded:
+  en: "You are sending messages very fast. Wait a moment and send again."
+  description: "Send (429 with Retry-After, #348, ADR-026): over matching_config messages_per_minute for the account. Calm, never a number."
+  fi: "Lähetät viestejä hyvin nopeasti. Odota hetki ja lähetä uudelleen."
+  sv: "Du skickar meddelanden väldigt snabbt. Vänta en stund och skicka igen."
+  machine: { fi: true, sv: true }
+
 errors.text_contact_details:
   en: Your profile text cannot contain an e-mail address, a link, a phone number or a social media handle.
   description: Profile save (400), a text field carried a way to reach the person outside Kuutti (#47, the plain-text rule). The API says which field in the envelope's detail, never in the message.
@@ -6452,6 +6480,239 @@ pond.gate.retry:
   sv: "Försök igen"
   machine: { fi: true, sv: true }
 
+# --- The chat (#348, ADR-031): the list of conversations, a conversation and its composer ---
+
+chat.list.title:
+  en: "Conversations"
+  description: "Title of the list of conversations (#348)."
+  fi: "Keskustelut"
+  sv: "Samtal"
+  machine: { fi: true, sv: true }
+
+chat.back:
+  en: "Back"
+  description: "What a screen reader says for the arrow at the top of the conversation screens (#348): back to where the person came from."
+  fi: "Takaisin"
+  sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+chat.list.open:
+  en: "Open"
+  description: "Heading of the list's first group (#348): the conversations going on now."
+  fi: "Avoimet"
+  sv: "Öppna"
+  machine: { fi: true, sv: true }
+
+chat.list.archived:
+  en: "Archived"
+  description: "Heading of the list's second group (#348): conversations quiet for a week, and ended ones."
+  fi: "Arkistoidut"
+  sv: "Arkiverade"
+  machine: { fi: true, sv: true }
+
+chat.list.archivedHint:
+  en: "A conversation quiet for a week moves here. Writing in it brings it back."
+  description: "One line under the Archived heading (#348, TD-13). The week is silent_match_archive_days; say it plainly, no countdown."
+  fi: "Viikon hiljaa ollut keskustelu siirtyy tänne. Kun kirjoitat siihen, se palaa."
+  sv: "Ett samtal som varit tyst en vecka flyttas hit. När du skriver i det kommer det tillbaka."
+  machine: { fi: true, sv: true }
+
+chat.list.empty:
+  en: "No conversations yet. A conversation opens here when you match with someone."
+  description: "The list when the person has no conversation (#348). Calm, no hurry."
+  fi: "Ei vielä keskusteluja. Keskustelu avautuu tänne, kun saat mätsin."
+  sv: "Inga samtal än. Ett samtal öppnas här när du får en match."
+  machine: { fi: true, sv: true }
+
+chat.list.loading:
+  en: "Loading conversations…"
+  description: "The list while it loads (#348)."
+  fi: "Ladataan keskusteluja…"
+  sv: "Laddar samtal…"
+  machine: { fi: true, sv: true }
+
+chat.list.failed:
+  en: "Your conversations could not be loaded."
+  description: "The list when it did not load (#348); the reason and a retry follow."
+  fi: "Keskustelujasi ei voitu ladata."
+  sv: "Dina samtal kunde inte laddas."
+  machine: { fi: true, sv: true }
+
+chat.deletedUser:
+  en: "Deleted user"
+  description: "Stands for the counterpart of a conversation once they deleted their account (#348, TD-7): the messages stay with the person, under this name."
+  fi: "Poistettu käyttäjä"
+  sv: "Raderad användare"
+  machine: { fi: true, sv: true }
+
+chat.row.noMessages:
+  en: "No messages yet"
+  description: "A row of the list before the first message (#348)."
+  fi: "Ei vielä viestejä"
+  sv: "Inga meddelanden än"
+  machine: { fi: true, sv: true }
+
+chat.row.mine:
+  en: "You: {preview}"
+  description: "A row of the list when the last message is the person's own (#348): the first words after it."
+  fi: "Sinä: {preview}"
+  sv: "Du: {preview}"
+  machine: { fi: true, sv: true }
+
+chat.row.unread:
+  en: "{unread, plural, one {# unread message} other {# unread messages}}"
+  description: "What a screen reader says of a row's unread mark (#348)."
+  fi: "{unread, plural, one {# lukematon viesti} other {# lukematonta viestiä}}"
+  sv: "{unread, plural, one {# oläst meddelande} other {# olästa meddelanden}}"
+  machine: { fi: true, sv: true }
+
+chat.unread.badge:
+  en: "{unread, plural, one {# new} other {# new}}"
+  description: "The unread mark on the home screen's button and on a row (#348): a shape with this text, never colour alone. Very short."
+  fi: "{unread, plural, one {# uusi} other {# uutta}}"
+  sv: "{unread, plural, one {# ny} other {# nya}}"
+  machine: { fi: true, sv: true }
+
+chat.state.ended:
+  en: "This conversation has ended."
+  description: "A closed conversation, in its row and instead of the composer (#348, #351): an ended one, however it ended. Never says blocked or removed (ADR-030 §6)."
+  fi: "Tämä keskustelu on päättynyt."
+  sv: "Det här samtalet har avslutats."
+  machine: { fi: true, sv: true }
+
+chat.state.deleted:
+  en: "This person deleted their account."
+  description: "A closed conversation whose counterpart deleted their account (#348, TD-7), in its row and instead of the composer."
+  fi: "Tämä henkilö poisti tilinsä."
+  sv: "Den här personen har raderat sitt konto."
+  machine: { fi: true, sv: true }
+
+chat.conversation.loading:
+  en: "Loading the conversation…"
+  description: "The conversation screen while it loads (#348)."
+  fi: "Ladataan keskustelua…"
+  sv: "Laddar samtalet…"
+  machine: { fi: true, sv: true }
+
+chat.conversation.failed:
+  en: "The conversation could not be loaded."
+  description: "The conversation screen when it did not load (#348); the reason and a retry follow."
+  fi: "Keskustelua ei voitu ladata."
+  sv: "Samtalet kunde inte laddas."
+  machine: { fi: true, sv: true }
+
+chat.conversation.gone:
+  en: "This conversation is no longer available."
+  description: "The conversation screen when the API answers 404 (#348): it is not the person's, or no longer to be seen."
+  fi: "Tämä keskustelu ei ole enää saatavilla."
+  sv: "Det här samtalet är inte längre tillgängligt."
+  machine: { fi: true, sv: true }
+
+chat.archived.banner:
+  en: "This conversation was quiet for a week. Write to bring it back."
+  description: "Banner above the composer of an archived conversation (#348, TD-13)."
+  fi: "Tämä keskustelu oli hiljaa viikon. Kirjoita, niin se palaa."
+  sv: "Det här samtalet var tyst en vecka. Skriv, så kommer det tillbaka."
+  machine: { fi: true, sv: true }
+
+chat.history.earlier:
+  en: "Earlier messages"
+  description: "Button above the oldest message shown that loads the ones before it (#348): a button, not a gesture."
+  fi: "Aiemmat viestit"
+  sv: "Tidigare meddelanden"
+  machine: { fi: true, sv: true }
+
+chat.message.you:
+  en: "You"
+  description: "Who wrote a message, the person themselves, as a screen reader says it at the start of the message (#348)."
+  fi: "Sinä"
+  sv: "Du"
+  machine: { fi: true, sv: true }
+
+chat.message.label:
+  en: "{who}, {time}, {text}"
+  description: "What a screen reader says for one message (#348): who wrote it (a name, or chat.message.you), the time (14.03), and the text."
+  fi: "{who}, {time}, {text}"
+  sv: "{who}, {time}, {text}"
+  machine: { fi: true, sv: true }
+
+chat.message.read:
+  en: "Read"
+  description: "Under the person's last message the other has read (#348)."
+  fi: "Luettu"
+  sv: "Läst"
+  machine: { fi: true, sv: true }
+
+chat.message.sending:
+  en: "Sending…"
+  description: "Under a message on its way, before the API answered (#348)."
+  fi: "Lähetetään…"
+  sv: "Skickar…"
+  machine: { fi: true, sv: true }
+
+chat.composer.label:
+  en: "Message"
+  description: "Accessible name of the composer's text field (#348)."
+  fi: "Viesti"
+  sv: "Meddelande"
+  machine: { fi: true, sv: true }
+
+chat.composer.placeholder:
+  en: "Write a message"
+  description: "Placeholder of the composer's text field (#348)."
+  fi: "Kirjoita viesti"
+  sv: "Skriv ett meddelande"
+  machine: { fi: true, sv: true }
+
+chat.composer.remaining:
+  en: "{characters, plural, one {# character left} other {# characters left}}"
+  description: "Under the composer (#348): what is left of matching_config message_max_length."
+  fi: "{characters, plural, one {# merkki jäljellä} other {# merkkiä jäljellä}}"
+  sv: "{characters, plural, one {# tecken kvar} other {# tecken kvar}}"
+  machine: { fi: true, sv: true }
+
+chat.composer.send:
+  en: "Send"
+  description: "The composer's send button (#348). Short."
+  fi: "Lähetä"
+  sv: "Skicka"
+  machine: { fi: true, sv: true }
+
+chat.composer.error.message_too_long:
+  en: "The message is too long. Make it shorter and send it again."
+  description: "Under the composer when the API refused the length (#348). The words stay in the field."
+  fi: "Viesti on liian pitkä. Lyhennä sitä ja lähetä uudelleen."
+  sv: "Meddelandet är för långt. Korta det och skicka igen."
+  machine: { fi: true, sv: true }
+
+chat.composer.error.contact_details:
+  en: "A message cannot carry an e-mail address, a link, a phone number or a social media handle."
+  description: "Under the composer when the API found contact details (#348, the plain-text rule). The words stay in the field."
+  fi: "Viestissä ei voi olla sähköpostiosoitetta, linkkiä, puhelinnumeroa tai somekäyttäjänimeä."
+  sv: "Ett meddelande kan inte innehålla en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier."
+  machine: { fi: true, sv: true }
+
+chat.composer.error.conversation_closed:
+  en: "This conversation has ended, so the message was not sent."
+  description: "Under the composer when the conversation closed while the person wrote (#348). Never says why."
+  fi: "Tämä keskustelu on päättynyt, joten viestiä ei lähetetty."
+  sv: "Det här samtalet har avslutats, så meddelandet skickades inte."
+  machine: { fi: true, sv: true }
+
+chat.composer.error.message_budget_exceeded:
+  en: "You are sending messages very fast. Wait a moment and send again."
+  description: "Under the composer over matching_config messages_per_minute (#348). The words stay in the field."
+  fi: "Lähetät viestejä hyvin nopeasti. Odota hetki ja lähetä uudelleen."
+  sv: "Du skickar meddelanden väldigt snabbt. Vänta en stund och skicka igen."
+  machine: { fi: true, sv: true }
+
+chat.composer.error.failed:
+  en: "The message was not sent. Check your connection and send it again."
+  description: "Under the composer when the send failed for any other reason (#348). The words stay in the field."
+  fi: "Viestiä ei lähetetty. Tarkista yhteys ja lähetä uudelleen."
+  sv: "Meddelandet skickades inte. Kontrollera anslutningen och skicka igen."
+  machine: { fi: true, sv: true }
+
 # --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---
 home.title:
   en: "Kuutti"
@@ -6507,6 +6768,20 @@ home.welcomeBack:
   description: "Home screen, one line after a bank login that ended a break (#170)."
   fi: "Tervetuloa takaisin. Profiilisi näkyy taas."
   sv: "Välkommen tillbaka. Din profil syns igen."
+  machine: { fi: true, sv: true }
+
+home.chats.open:
+  en: "Conversations"
+  description: "Home screen button that opens the list of conversations (#348). Short: it sits beside the profile button."
+  fi: "Keskustelut"
+  sv: "Samtal"
+  machine: { fi: true, sv: true }
+
+home.chats.label:
+  en: "{unread, plural, =0 {Conversations, nothing unread} one {Conversations, # unread message} other {Conversations, # unread messages}}"
+  description: "What a screen reader says for the home screen's Conversations button (#348): the unread count in words, since the badge beside it is a shape with a number."
+  fi: "{unread, plural, =0 {Keskustelut, ei lukemattomia} one {Keskustelut, # lukematon viesti} other {Keskustelut, # lukematonta viestiä}}"
+  sv: "{unread, plural, =0 {Samtal, inget oläst} one {Samtal, # oläst meddelande} other {Samtal, # olästa meddelanden}}"
   machine: { fi: true, sv: true }
 
 settings.back:

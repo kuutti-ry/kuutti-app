@@ -18,7 +18,12 @@ export const TRUSTED_PROXIES = ["none", "traefik", "cloudfront"] as const;
 export type TrustedProxy = (typeof TRUSTED_PROXIES)[number];
 
 export type RateLimitOptions = {
-  limit: number;
+  /**
+   * Requests per window: a number, or a function asked on each request, so a
+   * limit that is a `matching_config` row holds from the request after an
+   * admin's edit (#348, #305).
+   */
+  limit: number | ((c: Context<AppEnv>) => number | Promise<number>);
   windowMs: number;
   /** Whose budget a request spends; null shares one bucket rather than bypassing the limit (fail closed). */
   keyOf: (c: Context<AppEnv>) => string | null;
@@ -79,9 +84,10 @@ export function rateLimit(options: RateLimitOptions): MiddlewareHandler<AppEnv> 
       if (!sweeping) sweepLater();
     }
     bucket.count += 1;
-    c.header("RateLimit-Limit", String(options.limit));
-    c.header("RateLimit-Remaining", String(Math.max(0, options.limit - bucket.count)));
-    if (bucket.count > options.limit) {
+    const limit = typeof options.limit === "function" ? await options.limit(c) : options.limit;
+    c.header("RateLimit-Limit", String(limit));
+    c.header("RateLimit-Remaining", String(Math.max(0, limit - bucket.count)));
+    if (bucket.count > limit) {
       const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - at) / 1000));
       c.header("Retry-After", String(retryAfter));
       return refuse(c, retryAfter);

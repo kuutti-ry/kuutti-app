@@ -172,6 +172,33 @@ export async function findVisiblePhoto(
 }
 
 /**
+ * The main photo of the counterpart in a conversation of the viewer's (#348,
+ * ADR-031 §4): their first approved photo by position, while the owner is
+ * active and no block stands between the two, the card's rule (ADR-009 §6,
+ * ADR-024 §6, ADR-030 §2). The proof of contact is the conversation, asked in
+ * this statement through the viewer's own participant row (rule 6), the
+ * owner on its other side, as a card shown is asked for a photo.
+ */
+export async function findMainPhotoOf(
+  db: Queryable,
+  input: { viewerAccountId: string; ownerAccountId: string; conversationId: string },
+): Promise<PhotoRow | null> {
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS} FROM photo
+     WHERE account_id = $2 AND state = 'approved'
+       AND EXISTS (SELECT 1 FROM conversation_participant me
+                   JOIN conversation_participant them
+                     ON them.conversation_id = me.conversation_id AND them.side <> me.side
+                   WHERE me.conversation_id = $3 AND me.account_id = $1 AND them.account_id = $2)
+       AND EXISTS (SELECT 1 FROM account owner WHERE owner.id = $2 AND owner.state = 'active')
+       AND NOT blocked_between($1, $2)
+     ORDER BY position, id LIMIT 1`,
+    [input.viewerAccountId, input.ownerAccountId, input.conversationId],
+  );
+  return rows[0] ? photoFrom(rows[0]) : null;
+}
+
+/**
  * Whether the viewer was shown a card of the subject (#84): a card_shown row
  * of the viewer's on a photo the subject still has. What a first block or
  * report from a card stands on; scoped by the viewer (rule 6). The rows

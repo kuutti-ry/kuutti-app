@@ -2579,6 +2579,358 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's conversations
+         * @description Open conversations, then the archived and the closed ones, each newest first by the last message the caller may read, else by the opening. Each with the counterpart (name, age and the main photo's thumb, signed for fifteen minutes and logged as a fetch; or deleted), the last message's first characters and the unread count. With thumbs=false, no thumb is signed.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    thumbs?: "true" | "false";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The two groups. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationList"];
+                    };
+                };
+                /** @description Validation failed: thumbs other than true or false, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One conversation
+         * @description The summary, the longest message the composer may send, and the highest sequence the counterpart has read.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The conversation. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationDetail"];
+                    };
+                };
+                /** @description Validation failed: the id is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A page of messages
+         * @description With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban still open is not among them.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    before?: number | null;
+                    after?: number | null;
+                    limit?: number;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The page. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MessagePage"];
+                    };
+                };
+                /** @description Validation failed: before and after together, a sequence or a limit out of range, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Send a text message
+         * @description In one transaction: the conversation's row locked, the next sequence taken, the last message's time set and the archive left. A clientId already stored answers 200 with that message and writes nothing. At most matching_config messages_per_minute a minute per account, message_max_length characters after trimming, and no e-mail address, link, phone number or handle.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SendMessageRequest"];
+                };
+            };
+            responses: {
+                /** @description Sent before: the stored message, nothing written. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatMessage"];
+                    };
+                };
+                /** @description Sent. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatMessage"];
+                    };
+                };
+                /** @description validation_failed (an empty body, a malformed client id, an unknown key, a client id the other side used); message_too_long (over message_max_length after trimming); contact_details (an e-mail address, a link, a phone number or a handle). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description conversation_closed: closed, a block stands between the two, or the counterpart deleted their account; nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description message_budget_exceeded: the minute's messages are sent; Retry-After is the wait. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark the conversation read up to a sequence
+         * @description The caller's read mark goes up to upTo, never down and never past the newest message.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReadRequest"];
+                };
+            };
+            responses: {
+                /** @description Marked. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed: not a whole sequence from zero, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/accounts/{id}/sanctions": {
         parameters: {
             query?: never;
@@ -4079,6 +4431,7 @@ export interface components {
             sanctions: components["schemas"]["ExportedSanction"][];
             reports: components["schemas"]["ExportedReports"];
             blocks: components["schemas"]["ExportedBlocks"];
+            conversations: components["schemas"]["ExportedConversation"][];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -4353,6 +4706,26 @@ export interface components {
                 at: string;
             }[];
         };
+        ExportedConversation: {
+            /** Format: date-time */
+            openedAt: string;
+            state: components["schemas"]["ConversationState"];
+            closedHow: components["schemas"]["ConversationClosedHow"];
+            mine: {
+                /** Format: date-time */
+                at: string;
+                body: string;
+            }[];
+            theirs: {
+                /** Format: date-time */
+                at: string;
+                length: number;
+            }[];
+        };
+        /** @enum {string} */
+        ConversationState: "open" | "archived" | "closed";
+        /** @enum {string|null} */
+        ConversationClosedHow: "unmatch" | "erasure" | null;
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -4784,6 +5157,91 @@ export interface components {
             accountId: string;
             reason: components["schemas"]["SanctionReason"];
             note?: string;
+        };
+        ConversationList: {
+            open: components["schemas"]["ConversationSummary"][];
+            archived: components["schemas"]["ConversationSummary"][];
+        };
+        ConversationSummary: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["ConversationState"];
+            closedHow: components["schemas"]["ConversationClosedHow"];
+            counterpart: components["schemas"]["Counterpart"];
+            lastMessage: components["schemas"]["LastMessage"];
+            unread: number;
+        };
+        Counterpart: components["schemas"]["CounterpartPerson"] | components["schemas"]["CounterpartDeleted"];
+        CounterpartPerson: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            deleted: "CounterpartPerson";
+            name: string;
+            age: number;
+            thumb: components["schemas"]["ConversationThumb"];
+        };
+        ConversationThumb: {
+            /** Format: uuid */
+            photoId: string;
+            /** Format: uri */
+            url: string;
+            blurhash: string;
+            /** Format: date-time */
+            expiresAt: string;
+        } | null;
+        CounterpartDeleted: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            deleted: "CounterpartDeleted";
+        };
+        LastMessage: {
+            /** Format: date-time */
+            at: string;
+            kind: components["schemas"]["MessageKind"];
+            preview: string;
+            side: components["schemas"]["MessageSide"];
+        } | null;
+        /** @enum {string} */
+        MessageKind: "text";
+        /** @enum {string} */
+        MessageSide: "mine" | "theirs";
+        ConversationDetail: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["ConversationState"];
+            closedHow: components["schemas"]["ConversationClosedHow"];
+            counterpart: components["schemas"]["Counterpart"];
+            lastMessage: components["schemas"]["LastMessage"];
+            unread: number;
+            limits: {
+                maxLength: number;
+            };
+            counterpartReadUpTo: number;
+        };
+        MessagePage: {
+            messages: components["schemas"]["ChatMessage"][];
+        };
+        ChatMessage: {
+            /** Format: uuid */
+            id: string;
+            seq: number;
+            side: components["schemas"]["MessageSide"];
+            kind: components["schemas"]["MessageKind"];
+            body: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        SendMessageRequest: {
+            /** Format: uuid */
+            clientId: string;
+            body: string;
+        };
+        ReadRequest: {
+            upTo: number;
         };
         SanctionList: {
             items: components["schemas"]["SanctionEntry"][];

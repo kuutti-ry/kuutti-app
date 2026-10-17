@@ -84,6 +84,18 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
       return { afterDays: 3 };
     case "feedback_sent":
       return { kind: "bug" };
+    case "message_sent":
+      return {
+        kind: "text",
+        length: "21-80",
+        firstInConversation: false,
+        sinceOpened: "1d_7d",
+        sincePrevious: "1m_1h",
+      };
+    case "conversation_archived":
+      return { messages: "1-5", days: "7-13" };
+    case "conversation_closed":
+      return { how: "erasure", messages: "6-20" };
   }
 }
 

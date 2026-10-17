@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { AccountState } from "./account-state.ts";
+import { CONVERSATIONS_MAX, ExportedConversation } from "./chat.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
 import { ExportedGate } from "./gate.ts";
@@ -192,6 +193,8 @@ export const AccountExport = z
     reports: ExportedReports,
     /** The blocks the person set (#84, ADR-030 §8), by date; never whom, and never a block set against the person. */
     blocks: ExportedBlocks,
+    /** The person's conversations (#348, ADR-031 §5), oldest first: their own messages with the words, the counterpart's as time and length; never whom. */
+    conversations: z.array(ExportedConversation).max(CONVERSATIONS_MAX * 2),
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

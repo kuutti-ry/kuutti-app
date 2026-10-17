@@ -85,6 +85,8 @@ describe("seed", () => {
           feedback_per_day: 5,
           moderation_response_hours: 24,
           reports_per_day: 5,
+          message_max_length: 2000,
+          messages_per_minute: 30,
           waitlist_k: 10,
           default_pond: "suomi",
           change_cadence_days: 30,

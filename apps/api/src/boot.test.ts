@@ -204,7 +204,7 @@ describe("boot", () => {
   });
 
   // Without an object store there is no research copy either (#194).
-  it("arms the nine nightly jobs, each of which runs against the database it was given", async () => {
+  it("arms the ten nightly jobs, each of which runs against the database it was given", async () => {
     const { jobs } = await booted();
     expect(jobs.map((j) => j.name)).toEqual([
       "sweep-sessions",
@@ -216,6 +216,7 @@ describe("boot", () => {
       "pond-gate",
       "prune-photo-check-notes",
       "prune-reports",
+      "archive-silent-conversations",
     ]);
     const { logger, lines } = await captureLogger();
     await runNightly(jobs, logger);
@@ -237,7 +238,7 @@ describe("boot", () => {
       "research-export",
       "research-events-partitions",
     ]);
-    expect(jobs).toHaveLength(11);
+    expect(jobs).toHaveLength(12);
     // The prune asks the copy first; tonight no month is due, so the bucket is asked nothing.
     const partitions = jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).toMatchObject({ dropped: 0, uncopied: 0 });

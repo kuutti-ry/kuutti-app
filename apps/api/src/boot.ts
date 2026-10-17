@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { createPool, migrate, type Pool, seed } from "@kuutti/db";
 import { discoverProvider, type ProviderMetadata } from "@kuutti/tunnistus-oidc";
 import { type App, createApp } from "./app.ts";
+import { archiveJob } from "./chat/index.ts";
 import {
   brokerOptionsFromConfig,
   type IdentityBroker,
@@ -245,6 +246,8 @@ export async function boot({
     },
     // Reports keep twelve months from filing, whoever was erased meanwhile (#84, ADR-030 §8).
     { name: "prune-reports", run: async () => ({ pruned: await pruneReports(pool, now()) }) },
+    // Conversations silent for silent_match_archive_days are put away (#348, TD-13).
+    archiveJob({ db: pool, logger, now }),
   ];
   // Photos the automatic check missed get one more look (#49); none without a moderator.
   const mediaDeps = media.deps;

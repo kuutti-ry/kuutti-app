@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.36.1",
+    "version": "0.37.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -303,6 +303,13 @@
           },
           "blocks": {
             "$ref": "#/components/schemas/ExportedBlocks"
+          },
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedConversation"
+            },
+            "maxItems": 2000
           }
         },
         "required": [
@@ -325,7 +332,8 @@
           "feedback",
           "sanctions",
           "reports",
-          "blocks"
+          "blocks",
+          "conversations"
         ]
       },
       "Gender": {
@@ -1638,6 +1646,87 @@
         "required": [
           "about",
           "items"
+        ]
+      },
+      "ExportedConversation": {
+        "type": "object",
+        "properties": {
+          "openedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConversationState"
+          },
+          "closedHow": {
+            "$ref": "#/components/schemas/ConversationClosedHow"
+          },
+          "mine": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "body": {
+                  "type": "string",
+                  "maxLength": 10000
+                }
+              },
+              "required": [
+                "at",
+                "body"
+              ]
+            },
+            "maxItems": 1000000
+          },
+          "theirs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "length": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "at",
+                "length"
+              ]
+            },
+            "maxItems": 1000000
+          }
+        },
+        "required": [
+          "openedAt",
+          "state",
+          "closedHow",
+          "mine",
+          "theirs"
+        ]
+      },
+      "ConversationState": {
+        "type": "string",
+        "enum": [
+          "open",
+          "archived",
+          "closed"
+        ]
+      },
+      "ConversationClosedHow": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "unmatch",
+          "erasure",
+          null
         ]
       },
       "HealthResponse": {
@@ -3163,6 +3252,321 @@
         "required": [
           "accountId",
           "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ConversationList": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "maxItems": 1000
+          },
+          "archived": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "open",
+          "archived"
+        ]
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConversationState"
+          },
+          "closedHow": {
+            "$ref": "#/components/schemas/ConversationClosedHow"
+          },
+          "counterpart": {
+            "$ref": "#/components/schemas/Counterpart"
+          },
+          "lastMessage": {
+            "$ref": "#/components/schemas/LastMessage"
+          },
+          "unread": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "closedHow",
+          "counterpart",
+          "lastMessage",
+          "unread"
+        ]
+      },
+      "Counterpart": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/CounterpartPerson"
+          },
+          {
+            "$ref": "#/components/schemas/CounterpartDeleted"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "deleted",
+          "mapping": {}
+        }
+      },
+      "CounterpartPerson": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "age": {
+            "type": "integer",
+            "minimum": 18,
+            "maximum": 130
+          },
+          "thumb": {
+            "$ref": "#/components/schemas/ConversationThumb"
+          }
+        },
+        "required": [
+          "deleted",
+          "name",
+          "age",
+          "thumb"
+        ]
+      },
+      "ConversationThumb": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "photoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "blurhash": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "photoId",
+          "url",
+          "blurhash",
+          "expiresAt"
+        ]
+      },
+      "CounterpartDeleted": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "deleted"
+        ]
+      },
+      "LastMessage": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
+          "preview": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "side": {
+            "$ref": "#/components/schemas/MessageSide"
+          }
+        },
+        "required": [
+          "at",
+          "kind",
+          "preview",
+          "side"
+        ]
+      },
+      "MessageKind": {
+        "type": "string",
+        "enum": [
+          "text"
+        ]
+      },
+      "MessageSide": {
+        "type": "string",
+        "enum": [
+          "mine",
+          "theirs"
+        ]
+      },
+      "ConversationDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConversationState"
+          },
+          "closedHow": {
+            "$ref": "#/components/schemas/ConversationClosedHow"
+          },
+          "counterpart": {
+            "$ref": "#/components/schemas/Counterpart"
+          },
+          "lastMessage": {
+            "$ref": "#/components/schemas/LastMessage"
+          },
+          "unread": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "maxLength": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "maxLength"
+            ]
+          },
+          "counterpartReadUpTo": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "closedHow",
+          "counterpart",
+          "lastMessage",
+          "unread",
+          "limits",
+          "counterpartReadUpTo"
+        ]
+      },
+      "MessagePage": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "messages"
+        ]
+      },
+      "ChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "side": {
+            "$ref": "#/components/schemas/MessageSide"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "seq",
+          "side",
+          "kind",
+          "body",
+          "createdAt"
+        ]
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "properties": {
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "clientId",
+          "body"
+        ],
+        "additionalProperties": false
+      },
+      "ReadRequest": {
+        "type": "object",
+        "properties": {
+          "upTo": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "upTo"
         ],
         "additionalProperties": false
       },
@@ -6599,6 +7003,394 @@
           },
           "429": {
             "description": "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations": {
+      "get": {
+        "summary": "The caller's conversations",
+        "description": "Open conversations, then the archived and the closed ones, each newest first by the last message the caller may read, else by the opening. Each with the counterpart (name, age and the main photo's thumb, signed for fifteen minutes and logged as a fetch; or deleted), the last message's first characters and the unread count. With thumbs=false, no thumb is signed.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "default": "true"
+            },
+            "required": false,
+            "name": "thumbs",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The two groups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: thumbs other than true or false, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}": {
+      "get": {
+        "summary": "One conversation",
+        "description": "The summary, the longest message the composer may send, and the highest sequence the counterpart has read.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: the id is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}/messages": {
+      "get": {
+        "summary": "A page of messages",
+        "description": "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban still open is not among them.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 2147483647
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: before and after together, a sequence or a limit out of range, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Send a text message",
+        "description": "In one transaction: the conversation's row locked, the next sequence taken, the last message's time set and the archive left. A clientId already stored answers 200 with that message and writes nothing. At most matching_config messages_per_minute a minute per account, message_max_length characters after trimming, and no e-mail address, link, phone number or handle.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent before: the stored message, nothing written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed (an empty body, a malformed client id, an unknown key, a client id the other side used); message_too_long (over message_max_length after trimming); contact_details (an e-mail address, a link, a phone number or a handle).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conversation_closed: closed, a block stands between the two, or the counterpart deleted their account; nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "message_budget_exceeded: the minute's messages are sent; Retry-After is the wait.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}/read": {
+      "post": {
+        "summary": "Mark the conversation read up to a sequence",
+        "description": "The caller's read mark goes up to upTo, never down and never past the newest message.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Marked."
+          },
+          "400": {
+            "description": "Validation failed: not a whole sequence from zero, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
             "content": {
               "application/json": {
                 "schema": {

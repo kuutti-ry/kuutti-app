@@ -1,5 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import {
+  type ConversationThumb,
   PHOTO_VARIANTS,
   type Photo,
   type PhotoCaption,
@@ -317,4 +318,55 @@ export async function issuePhotoUrl(
     "photo url issued",
   );
   return { url, variant: input.variant, expiresAt: expiresAt.toISOString() };
+}
+
+/**
+ * The thumb of a conversation's counterpart, for the list (#348, ADR-031 §4):
+ * their main photo's thumb variant, signed for fifteen minutes and written to
+ * the fetch log under the day's thumb budget, as any fetch is (ADR-008). It
+ * never touches the card budget: the conversation is the proof of contact,
+ * as a card shown is for a report (ADR-030 §5). Null when there is nothing
+ * to show: no approved photo, the owner not active, a block between the two,
+ * no conversation of the viewer's with the owner on its other side, the
+ * viewer erased meanwhile, or the day's thumbs spent, which leaves its line
+ * as a refused fetch does.
+ */
+export async function issueConversationThumb(
+  deps: PhotoServiceDeps,
+  input: { viewerAccountId: string; ownerAccountId: string; conversationId: string },
+): Promise<ConversationThumb | null> {
+  const row = await repo.findMainPhotoOf(deps.db, input);
+  if (!row) return null;
+  const at = deps.now();
+  const expiresAt = new Date(at.getTime() + URL_TTL_MS);
+  const url = await deps.signer.sign(objectKey(row.key, "thumb"), expiresAt);
+  const day = dayWindow(at);
+  const limit = (await readPhotoFetchBudget(deps.db)).thumb;
+  const access = await repo.insertPhotoAccess(deps.db, {
+    accountId: input.viewerAccountId,
+    photoId: row.id,
+    variant: "thumb",
+    at,
+    since: day.start,
+    limit,
+  });
+  if (!access.live || access.blocked) return null;
+  if (!access.recorded) {
+    deps.logger.warn(
+      {
+        accountId: input.viewerAccountId,
+        variant: "thumb",
+        used: access.used,
+        limit,
+        reason: "budget",
+      },
+      "photo refused",
+    );
+    return null;
+  }
+  deps.logger.info(
+    { accountId: input.viewerAccountId, photoId: row.id, variant: "thumb", at },
+    "photo url issued",
+  );
+  return { photoId: row.id, url, blurhash: row.blurhash, expiresAt: expiresAt.toISOString() };
 }

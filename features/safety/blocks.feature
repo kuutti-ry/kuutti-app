@@ -45,7 +45,7 @@ Feature: Blocking somebody from a card
     Then "A" and the new account of "B" are still out of each other's pool, and their cards and photos stay refused
 
   Scenario: Nothing but the filters reads a block
-    Then only the pool's count, the card, the photos, the block itself and the demo's removal name the block table or its test
+    Then only the pool's count, the card, the photos, the conversation, the block itself and the demo's removal name the block table or its test
 
   Scenario: Blocking refuses without a session
     When nobody, a token nobody issued, a staff token, an ended session or an expired one blocks

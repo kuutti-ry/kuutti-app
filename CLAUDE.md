@@ -112,7 +112,7 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 - Code nothing uses is removed, once indirect use is ruled out (names in strings, routes called from outside, files loaded by convention); an unreachable branch stays only in ADR-021 §7's four cases. A bug a test finds gets its own change, with the test that failed first.
 - A test fails on PII patterns in log output.
 - Tests are deterministic: no real network, no wall-clock dependence, no random data without a seed.
-- Rules-layer behaviour (identity, matching, pond, safety, erasure, and media's photo check) is specified in `features/<slice>/*.feature`. A `Scenario` is an `it()` with the scenario name verbatim; a `Scenario Outline` is a `describe()` with the outline name around `it.each` over the Examples rows. `pnpm check:scenarios` fails CI on any scenario without a same-named test; `@pending` marks a spec that lands before its code. If a `Given` needs more than three lines of setup, it is not a Gherkin scenario: write an ordinary test. ADR-002.
+- Rules-layer behaviour (identity, matching, pond, safety, chat, erasure, and media's photo check) is specified in `features/<slice>/*.feature`. A `Scenario` is an `it()` with the scenario name verbatim; a `Scenario Outline` is a `describe()` with the outline name around `it.each` over the Examples rows. `pnpm check:scenarios` fails CI on any scenario without a same-named test; `@pending` marks a spec that lands before its code. If a `Given` needs more than three lines of setup, it is not a Gherkin scenario: write an ordinary test. ADR-002.
 
 ## Accessibility (mobile and admin)
 

@@ -80,6 +80,18 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 |---|---|---|---|---|
 | Home, signed in | `/` (Sanna) | Settings and Tech config named (Tech config outside production only); the mark silent; the title a header; welcome back said once after a break (Helmi); the gate's checking line said, and its failure; the area card's figures in words, none below the threshold; the gate card in words, nothing on it tappable; the button to the profile | | |
 
+### Conversations
+
+No persona has a conversation yet: the history group holds no pair whose filters let them meet, so the stories write none (#348). Until a pair has one, these rows are walked on a build whose database a developer gave a conversation by hand, or wait for the pair.
+
+| screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
+|---|---|---|---|---|
+| Home's Conversations button | `/` (Sanna) | named Conversations with the unread count in words ("nothing unread" at none); the mark beside it silent | | |
+| Conversations | `/chats` | back named; the loading line said, the failure and Try again; the empty line; the Open and Archived headers and the archive's line; each row heard once, as the name and age (or Deleted user), the unread count in words, the last line (You: before one's own, or how a closed one ended) and its time or day; the thumb and the mark silent; pull to refresh is not the only way: the list reads again on returning to it | | |
+| A conversation | `/chats/<id>` | the name and age as the header; Earlier messages a named button where there are more; each day line; each message heard once as who, when and what, the time under it silent; Read under the last one read; the field named Message with its placeholder; the characters left; Send named, heard as dimmed while empty or too long; Sending… under a message on its way; a refusal (a phone number) said under the field with the words kept | | |
+| An archived conversation | `/chats/<id>` | the line that writing brings it back, above the field; gone after a message | | |
+| A closed conversation | `/chats/<id>` | no field and no Send; the ending said in its place: deleted their account, or ended, never blocked | | |
+
 ### Profile
 
 Sanna; Helmi and Noa where it says.

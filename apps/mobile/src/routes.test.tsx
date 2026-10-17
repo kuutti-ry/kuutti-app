@@ -6,6 +6,8 @@ import { redirectSystemPath } from "../app/+native-intent";
 import NotFoundRoute from "../app/+not-found";
 import EmailRoute from "../app/account/email";
 import AuthReturnRoute from "../app/auth";
+import ConversationRoute from "../app/chats/[id]";
+import ConversationsRoute from "../app/chats/index";
 import IndexRoute from "../app/index";
 import OnboardingRoute from "../app/onboarding";
 import PhotoZoomRoute from "../app/photos/[id]";
@@ -55,6 +57,16 @@ jest.mock("@/features/identity", () => {
     SignedOutToStart: probe("SignedOutToStart"),
     SessionProvider: ({ children }: { children: React.ReactNode }) =>
       createElement(Fragment, null, children),
+  };
+});
+jest.mock("@/features/chat", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  const probe = (name: string) => (props: object) =>
+    createElement(Text, { testID: name }, JSON.stringify(props));
+  return {
+    ConversationScreen: probe("ConversationScreen"),
+    ConversationsScreen: probe("ConversationsScreen"),
   };
 });
 jest.mock("@/features/home", () => {
@@ -141,6 +153,7 @@ describe("the screens without params", () => {
   it.each([
     ["/", IndexRoute, "HomeRoute"],
     ["/account/email", EmailRoute, "EmailScreen"],
+    ["/chats", ConversationsRoute, "ConversationsScreen"],
     ["/onboarding", OnboardingRoute, "OnboardingScreen"],
     ["/photos", PhotosRoute, "PhotosScreen"],
     ["/profile", ProfileRoute, "ProfileScreen"],
@@ -170,6 +183,22 @@ describe("the screens without params", () => {
   it("sends a link it has no screen for to the start", async () => {
     await render(<NotFoundRoute />);
     expect(screen.getByTestId("Redirect").props.children).toBe("/");
+  });
+});
+
+describe("one conversation, /chats/[id]", () => {
+  it.each([
+    [
+      "the id",
+      { id: "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70" },
+      "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70",
+    ],
+    ["the first of a repeated id", { id: ["a", "b"] }, "a"],
+    ["nothing, without an id", {}, ""],
+  ] as const)("hands the screen %s", async (_what, given, id) => {
+    params(given);
+    await render(<ConversationRoute />);
+    expect(propsOf("ConversationScreen")).toEqual({ id });
   });
 });
 
