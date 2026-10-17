@@ -21,13 +21,15 @@ import * as repo from "./repo.ts";
 
 export const MESSAGES_PER_MINUTE_KEY = "messages_per_minute";
 
-const toMessage = (row: repo.MessageRow, side: repo.Side): ChatMessage => ({
+/** A message as the account on `side` reads it: the phone's own id only on its own messages. */
+export const toMessage = (row: repo.MessageRow, side: repo.Side): ChatMessage => ({
   id: row.id,
   seq: row.seq,
   side: row.side === side ? "mine" : "theirs",
   kind: row.kind,
   body: row.body,
   createdAt: row.createdAt.toISOString(),
+  clientId: row.side === side ? row.clientId : null,
 });
 
 type Outcome =

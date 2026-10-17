@@ -8,4 +8,8 @@ export {
   eraseConversationsOf,
   exportConversations,
 } from "./conversations.ts";
+export { startChatListener } from "./listen.ts";
+// The live half (#349): the registry and hub, the listener, the socket's route.
+export { createLive, type Live } from "./live.ts";
 export { chatRoutes } from "./routes.ts";
+export { chatSocketRoutes, createSocketServer } from "./ws.ts";

@@ -94,6 +94,8 @@ export type Counterpart = z.infer<typeof Counterpart>;
 
 export const LastMessage = z
   .object({
+    /** Its place in the conversation: what the app's resume names as the newest it holds (#349). */
+    seq: z.int().min(1),
     at: z.iso.datetime(),
     kind: MessageKind,
     /** The first characters of the text. */
@@ -154,6 +156,12 @@ export const ChatMessage = z
     kind: MessageKind,
     body: z.string().max(MESSAGE_BODY_CEILING).nullable(),
     createdAt: z.iso.datetime(),
+    /**
+     * The id the phone gave its own message, so a phone matches what it shows
+     * as sending with what arrives (#349); null on the other side's, whose ids
+     * stay theirs.
+     */
+    clientId: z.uuid().nullable(),
   })
   .meta({ id: "ChatMessage" });
 export type ChatMessage = z.infer<typeof ChatMessage>;

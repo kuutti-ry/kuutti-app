@@ -60,11 +60,13 @@ jest.mock("@/features/identity", () => {
   };
 });
 jest.mock("@/features/chat", () => {
-  const { createElement } = require("react") as typeof import("react");
+  const { createElement, Fragment } = require("react") as typeof import("react");
   const { Text } = require("react-native") as typeof import("react-native");
   const probe = (name: string) => (props: object) =>
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
+    ChatLiveProvider: ({ children }: { children: React.ReactNode }) =>
+      createElement(Fragment, null, children),
     ConversationScreen: probe("ConversationScreen"),
     ConversationsScreen: probe("ConversationsScreen"),
   };

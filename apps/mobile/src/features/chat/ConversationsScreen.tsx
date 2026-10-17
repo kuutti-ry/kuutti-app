@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
+import { ConnectionLine } from "./ConnectionLine";
 import { whenOf } from "./time";
 import { UnreadBadge } from "./UnreadBadge";
 import { useConversations } from "./useConversations";
@@ -95,8 +96,9 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
 /**
  * The list of conversations (#348): the open ones, then the archived and the
  * closed ones under a heading of their own, each newest first, as the API
- * orders them. Read again on focus and by pulling down. A row opens the
- * conversation.
+ * orders them. Read again on focus, by pulling down, and when the socket
+ * brings something new (#349), with a line at the top while it is lost. A
+ * row opens the conversation.
  */
 export function ConversationsScreen() {
   const { t } = useT();
@@ -117,6 +119,7 @@ export function ConversationsScreen() {
         backLabel={t("chat.back")}
         onBack={() => router.back()}
       />
+      <ConnectionLine />
       <ScrollView
         testID="conversations"
         contentContainerClassName="gap-4 p-6"

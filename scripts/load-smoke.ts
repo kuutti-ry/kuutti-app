@@ -5,7 +5,7 @@
  *
  *   pnpm load:smoke -- --target http://localhost:3000                      the public routes alone
  *   pnpm load:smoke -- --target <api> --sessions <file> --rates 0.5,1,2 [--stage 60]
- *                      [--concurrency 16] [--stop-p95 1000] [--confirm-staging]
+ *                      [--sockets 28] [--concurrency 16] [--stop-p95 1000] [--confirm-staging]
  *   node scripts/load-smoke.ts --self-test     the command line, the refusals and the sums, and
  *                                              runs against a stand-in on this computer
  *
@@ -21,6 +21,12 @@
  * counts in the percentiles at the timeout. The run stops after the first stage that bends (its p95
  * over --stop-p95, more than 1 % errors or dropped visits), or that held back more than 1 % of its
  * visits' parts for a resting budget: that stage sent less than its rate, and is no measurement.
+ *
+ * With --sockets, that many of the chat's sockets (GET /ws, #349) open round the accounts before
+ * the first stage and are held, idle, through the run: each signs in with its first frame, sends
+ * its one resume naming no conversation, and answers every ping. Each frame the server sends is
+ * read against the contract and counted when outside it, never printed. A socket that does not
+ * open, or that the server closes, stops the run.
  *
  * Sessions come from the product's own sign-in, never from a door of the load's: a file of refresh
  * tokens, one a line, under a `# target <origin>` line naming the API they belong to, made by
@@ -38,17 +44,21 @@
  * - The sessions file is refused inside any git work tree, readable by others, with a token twice,
  *   or naming another API than the target: an unknown token and a revoked one get the same 401.
  * - Hard caps no flag passes: 20 visits a second, 8 stages, 10 minutes, 64 requests in flight,
- *   50 sessions, 60 thumbnail URLs per account (a tenth of the day's budget), 10 s a request.
+ *   50 sessions, 60 thumbnail URLs per account (a tenth of the day's budget), 10 s a request,
+ *   200 sockets and 4 an account (the API holds 5 and closes the oldest for a sixth, which must
+ *   never be a persona's own phone).
  * - ADR-026's budgets: never a sign-in start (the doors). The plan takes at most 40 % of the
- *   address's window and of each person's (from the RateLimit-Limit the API reports); as it goes,
+ *   address's window and of each person's (from the RateLimit-Limit the API reports), a socket's
+ *   upgrade counted on the address, which never gives it back (no guard admits it); as it goes,
  *   an answer with under half its window left rests that budget for a window. The first 429 of any
  *   kind or 401 of a session stops the run. At the third server error or unanswered request the
  *   run stops sending; the requests already in flight, up to --concurrency, still finish, so the
  *   5xx alarm (five in five minutes) may mail at the bend.
- * - Nothing personal out: routes by template, error codes from the envelope, sessions and
- *   accounts by count; never a token, an id, a URL the API handed out, or a body.
+ * - Nothing personal out: routes by template, error codes from the envelope or the error frame,
+ *   sessions, accounts and sockets by count; never a token, an id, a URL the API handed out, a
+ *   body or a frame.
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import {
   chmodSync,
   existsSync,
@@ -64,7 +74,9 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import type { Duplex } from "node:stream";
 // By path: the root is no workspace of @kuutti/schema. The contracts are the API's (ADR-003).
+import { ClientFrame, ServerFrame } from "../packages/schema/src/chat-frames.ts";
 import { ErrorResponse } from "../packages/schema/src/errors.ts";
 import { HealthResponse } from "../packages/schema/src/health.ts";
 import {
@@ -92,6 +104,8 @@ const NUMBERS = {
   "--stage": { min: 10, max: 300, fallback: 60 },
   "--concurrency": { min: 1, max: 64, fallback: 16 },
   "--stop-p95": { min: 50, max: 10_000, fallback: 1000 },
+  // Four for each of the file's fifty sessions at most; none unless asked.
+  "--sockets": { min: 1, max: 200, fallback: 0 },
 } as const;
 const DEFAULT_RATES = [0.5];
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -119,8 +133,18 @@ const WAITLIST_EVERY = 2;
 const EXCHANGE_EVERY = 4;
 /** The signed-in requests of every visit: onboarding, gate, profile, photo list. */
 const SIGNED_IN_PER_VISIT = 4;
+/**
+ * The chat's sockets an account may hold in a run: one under the API's WS_SOCKETS_PER_ACCOUNT (5),
+ * which closes an account's oldest for a sixth, so a persona's own phone is never the one closed.
+ */
+const SOCKETS_PER_ACCOUNT = 4;
 const ERROR_CODE = /^[a-z0-9_]{1,64}$/;
 const TARGET_LINE = /^# target (\S+)$/;
+// The self-test's stand-in's, up here: the self-test runs before the constants further down exist.
+/** RFC 6455 §1.3: the key's answer is the SHA-1 of the key and this. */
+const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+/** What the stand-in's frames outside the contract carry: never printed. */
+const STRAY = "stray-6f1d0c";
 
 type Kind = "local" | "staging";
 type Options = {
@@ -131,6 +155,8 @@ type Options = {
   stageSeconds: number;
   concurrency: number;
   stopP95: number;
+  /** The chat's sockets held through the run; 0 for none. */
+  sockets: number;
 };
 type Io = { log: (line: string) => void };
 
@@ -162,9 +188,20 @@ type Sample = { route: string; ms: number | null; outcome: Outcome; label: strin
 type Account = { access: string[]; visits: number; urlsLeft: number; restUntil: number };
 /** Why the run stopped sending: a guard (2, no measurement) or the server's errors (0, a bend). */
 type Stop = { why: string; status: 2 } | { status: 0 };
+/** The chat's sockets of a run: how many were asked, how many are open, and their stray frames. */
+type Sockets = {
+  asked: number;
+  open: number;
+  /** Frames the server sent outside the contract: counted, never printed. */
+  outside: number;
+  all: WebSocket[];
+  /** Set once the run closes them itself: a close from then on is the run's, not the server's. */
+  closing: boolean;
+};
 type Run = {
   base: URL;
   accounts: Account[];
+  sockets: Sockets;
   thumbEvery: number;
   slots: ReturnType<typeof slots>;
   anonymousRestUntil: number;
@@ -232,7 +269,7 @@ function parseArgs(argv: string[], env: Record<string, string | undefined>): Opt
     if (flag !== "--target" && flag !== "--sessions" && flag !== "--rates" && !(flag in NUMBERS)) {
       if (!flag.startsWith("-")) {
         throw new Error(
-          "unexpected argument: every option is named (--target, --sessions, --rates, --stage, --concurrency, --stop-p95, --confirm-staging)",
+          "unexpected argument: every option is named (--target, --sessions, --rates, --stage, --sockets, --concurrency, --stop-p95, --confirm-staging)",
         );
       }
       throw new Error(`unknown option ${flag}`);
@@ -308,6 +345,10 @@ function parseArgs(argv: string[], env: Record<string, string | undefined>): Opt
       `the run would last ${rates.length * stageSeconds} s; at most ${CAP.runSeconds} (an access token lives fifteen minutes and is refreshed once, at the start)`,
     );
   }
+  const sockets = whole("--sockets");
+  if (sockets > 0 && !values.has("--sessions")) {
+    throw new Error("--sockets needs --sessions: a socket signs in with a session's access token");
+  }
   return {
     target,
     kind,
@@ -316,6 +357,7 @@ function parseArgs(argv: string[], env: Record<string, string | undefined>): Opt
     stageSeconds,
     concurrency: whole("--concurrency"),
     stopP95: whole("--stop-p95"),
+    sockets,
   };
 }
 
@@ -356,10 +398,13 @@ function percentile(values: readonly number[], p: number): number | null {
  * address's counts the public requests and holds a signed-in one until it is answered, so the
  * requests in flight count against it too; each account's counts its signed-in requests, the
  * visits going round its accounts. The photos screen comes on one visit in thumbEvery, spread so
- * an account's URLs last the whole run: ADR-008's budget, not the app, sets how often.
+ * an account's URLs last the whole run: ADR-008's budget, not the app, sets how often. A socket's
+ * upgrade counts on the address and is never given back (the socket signs in by its first frame,
+ * so no guard admits it); they go out before the first stage and fall in one window or two, and
+ * the plan counts them in every one, on the safe side.
  */
 function planOf(
-  options: Pick<Options, "rates" | "stageSeconds" | "concurrency">,
+  options: Pick<Options, "rates" | "stageSeconds" | "concurrency" | "sockets">,
   budgets: { addressLimit: number; personLimit: number; accounts: number; photosMax: number },
 ): { thumbEvery: number; ceiling: number; neededLimit: number } {
   const { accounts, photosMax } = budgets;
@@ -371,7 +416,9 @@ function planOf(
   const publicPerVisit = 1 / WAITLIST_EVERY + 1 / EXCHANGE_EVERY;
   // The photos screen reads the list again, then a URL a photo.
   const personPerVisit = SIGNED_IN_PER_VISIT + (1 + photosMax) / thumbEvery;
-  const held = accounts > 0 ? options.concurrency : 0;
+  // What the address's window holds besides the public requests: the signed-in requests in
+  // flight, and the sockets' upgrades.
+  const held = (accounts > 0 ? options.concurrency : 0) + options.sockets;
   const byAddress = (PLAN_SHARE * budgets.addressLimit - held) / (publicPerVisit * 60);
   const byPerson =
     accounts > 0
@@ -689,6 +736,130 @@ async function stage(run: Run, rate: number, seconds: number): Promise<StageResu
   };
 }
 
+/**
+ * The chat's sockets (#349), opened round the accounts and each account's sessions, --concurrency
+ * at a time, before the first stage; one that does not open stops the run.
+ */
+async function openSockets(run: Run, concurrency: number): Promise<void> {
+  const url = new URL("/ws", run.base);
+  url.protocol = run.base.protocol === "https:" ? "wss:" : "ws:";
+  const { asked } = run.sockets;
+  const tokenOf = (nth: number): string => {
+    const account = run.accounts[nth % run.accounts.length];
+    return account?.access[Math.floor(nth / run.accounts.length) % account.access.length] ?? "";
+  };
+  for (let from = 0; from < asked && !run.stop; from += concurrency) {
+    const batch = Array.from({ length: Math.min(concurrency, asked - from) }, (_, i) => from + i);
+    const failures = await Promise.all(
+      batch.map((nth) => holdSocket(run, url, tokenOf(nth), nth + 1)),
+    );
+    const failure = failures.find((why) => why !== null);
+    if (failure && run.stop?.status !== 2) run.stop = { why: failure, status: 2 };
+  }
+}
+
+/**
+ * One socket, held as a phone holds it with the chat shut: it signs in with its first frame,
+ * sends its one resume naming no conversation, and answers every ping. Settles with null once
+ * ready, or with why it did not open; once ready, its loss stops the run. Each frame is read
+ * against the contract and counted when outside it, never printed: a frame may carry a person's
+ * words. Of an error frame only its code is kept, which the contract holds to a list.
+ */
+function holdSocket(run: Run, url: URL, token: string, nth: number): Promise<string | null> {
+  const sockets = run.sockets;
+  const socket = new WebSocket(url, { headers: { "user-agent": "kuutti-load-smoke" } });
+  sockets.all.push(socket);
+  const name = `socket ${nth} of ${sockets.asked}`;
+  return new Promise((settle) => {
+    let opened = false;
+    let ready = false;
+    let over = false;
+    let code = "";
+    const end = (how: string) => {
+      if (over || sockets.closing) return;
+      over = true;
+      clearTimeout(timer);
+      const why = `${how}${code ? ` (${code})` : ""}`;
+      if (!ready) {
+        settle(`${name} did not open: ${why}`);
+        return;
+      }
+      sockets.open -= 1;
+      if (run.stop?.status !== 2) {
+        run.stop = { why: `${name} was lost during the run: ${why}`, status: 2 };
+      }
+    };
+    const timer = setTimeout(
+      () => end(`no ready within ${REQUEST_TIMEOUT_MS / 1000} s`),
+      REQUEST_TIMEOUT_MS,
+    );
+    socket.addEventListener("open", () => {
+      opened = true;
+      send(socket, { type: "auth", token });
+    });
+    socket.addEventListener("message", (event) => {
+      const frame = ServerFrame.safeParse(jsonOf(event.data));
+      if (!frame.success) {
+        sockets.outside += 1;
+      } else if (frame.data.type === "ping") {
+        send(socket, { type: "pong" });
+      } else if (frame.data.type === "error") {
+        code = frame.data.code;
+      } else if (frame.data.type === "ready" && !ready && !over) {
+        ready = true;
+        sockets.open += 1;
+        clearTimeout(timer);
+        send(socket, { type: "resume", conversations: [] });
+        settle(null);
+      }
+    });
+    // Node's client fires an error alone, and no close, for a refused upgrade: either ends it.
+    socket.addEventListener("error", () =>
+      end(opened ? "its connection failed" : "its upgrade was refused, or its connection failed"),
+    );
+    socket.addEventListener("close", (event) => end(`closed with ${event.code}`));
+  });
+}
+
+function send(socket: WebSocket, frame: ClientFrame): void {
+  socket.send(JSON.stringify(frame));
+}
+
+/** A text frame's JSON, or null: a binary frame, or text that is no JSON, is outside the contract. */
+function jsonOf(data: unknown): unknown {
+  if (typeof data !== "string") return null;
+  try {
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Every socket closed, before every return of a run that opened one. An open one's closing
+ * handshake is awaited, so the API sees each go, for at most a request's timeout; one still
+ * opening, or refused, is closed without the wait, for Node's client fires no close for it.
+ */
+async function closeSockets(sockets: Sockets): Promise<void> {
+  sockets.closing = true;
+  if (sockets.all.length === 0) return;
+  const closed = sockets.all
+    .filter((socket) => socket.readyState === WebSocket.OPEN)
+    .map(
+      (socket) =>
+        new Promise<void>((done) => socket.addEventListener("close", () => done(), { once: true })),
+    );
+  for (const socket of sockets.all) socket.close(1000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    Promise.all(closed),
+    new Promise<void>((done) => {
+      timer = setTimeout(done, REQUEST_TIMEOUT_MS);
+    }),
+  ]);
+  clearTimeout(timer);
+}
+
 function ms(value: number | null): string {
   return value === null ? "-" : `${Math.round(value)} ms`;
 }
@@ -895,6 +1066,12 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
   } else {
     io.log("load-smoke: no sessions: the public part of each visit alone");
   }
+  const socketsMax = people.accounts.length * SOCKETS_PER_ACCOUNT;
+  if (options.sockets > socketsMax) {
+    return refuse(
+      `${options.sockets} sockets is more than ${SOCKETS_PER_ACCOUNT} for each of the ${people.accounts.length} account${people.accounts.length === 1 ? "" : "s"} the sessions are of: at most ${socketsMax}. The API holds five an account and closes the oldest for a sixth, which must never be a persona's own phone; more test persons signed in lift it`,
+    );
+  }
 
   const waitlist = await ask(base, "/waitlist");
   if (typeof waitlist === "string") return refuse(`/waitlist: ${waitlist}`);
@@ -913,13 +1090,14 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
   const over = options.rates.filter((rate) => rate > plan.ceiling);
   if (over.length > 0) {
     return refuse(
-      `${over.join(", ")} visits a second is more than the budgets allow: at most ${plan.ceiling.toFixed(2)} with ${accounts} account${accounts === 1 ? "" : "s"} under a limit of ${address.limit} a minute, the plan taking ${PLAN_SHARE * 100} % of each window (ADR-026). More accounts (another test person signed in), or a rate-limit-per-minute of at least ${plan.neededLimit} for the run (the maintainer's, ADR-026 §5), lift it`,
+      `${over.join(", ")} visits a second is more than the budgets allow: at most ${plan.ceiling.toFixed(2)} with ${accounts} account${accounts === 1 ? "" : "s"} under a limit of ${address.limit} a minute${options.sockets > 0 ? ` and ${options.sockets} upgrades on the address` : ""}, the plan taking ${PLAN_SHARE * 100} % of each window (ADR-026). More accounts (another test person signed in)${options.sockets > 0 ? ", fewer sockets" : ""}, or a rate-limit-per-minute of at least ${plan.neededLimit} for the run (the maintainer's, ADR-026 §5), lift it`,
     );
   }
 
   const run: Run = {
     base,
     accounts: people.accounts,
+    sockets: { asked: options.sockets, open: 0, outside: 0, all: [], closing: false },
     thumbEvery: plan.thumbEvery,
     slots: slots(options.concurrency),
     anonymousRestUntil: 0,
@@ -936,62 +1114,81 @@ async function execute(options: Options, io: Io, now: Date = new Date()): Promis
   io.log(
     `load-smoke: ${options.rates.length} stage${options.rates.length === 1 ? "" : "s"} of ${options.stageSeconds} s; the budgets allow ${plan.ceiling.toFixed(2)} visits a second${accounts > 0 ? `; the photos screen on ${plan.thumbEvery === 1 ? "every visit" : `one visit in ${plan.thumbEvery}`}, ${urlsPerVisit} signed URLs a visit` : ""}`,
   );
-  const results: StageResult[] = [];
-  let end: { result: StageResult; why: string; bent: boolean } | null = null;
-  for (const [i, rate] of options.rates.entries()) {
-    io.log(
-      `load-smoke: stage ${i + 1} of ${options.rates.length} from ${new Date().toISOString()}: ${rate} visits a second for ${options.stageSeconds} s`,
-    );
-    const result = await stage(run, rate, options.stageSeconds);
-    io.log(
-      `  ${result.started} visits, ${result.dropped} dropped, ${result.held} of ${result.parts} parts held back for a resting budget; ${result.requests} requests, ${perSecond(result.rps)} answered a second, ${result.urls} of them thumbnail URLs; p50 ${ms(result.p50)}, p95 ${ms(result.p95)}, p99 ${ms(result.p99)}, max ${ms(result.max)}; ${result.errors} errors, ${result.timeouts} timed out`,
-    );
-    if (result.byRoute.length > 0) io.log(`  p95 by route: ${result.byRoute.join(", ")}`);
-    if (result.problems.length > 0) io.log(`  not as expected: ${result.problems.join(", ")}`);
-    results.push(result);
-    if (run.stop?.status === 2) {
-      io.log(`load-smoke: stopped: ${run.stop.why}. These numbers are not a measurement.`);
-      return 2;
+  const socketNote = () =>
+    options.sockets > 0
+      ? `; ${run.sockets.open} of ${options.sockets} sockets open${run.sockets.outside > 0 ? `, ${run.sockets.outside} frames from them outside the contract` : ""}`
+      : "";
+  try {
+    if (options.sockets > 0) {
+      await openSockets(run, options.concurrency);
+      if (run.stop?.status === 2) {
+        io.log(`load-smoke: stopped before the first stage: ${run.stop.why}`);
+        return 2;
+      }
+      io.log(
+        `load-smoke: ${options.sockets} socket${options.sockets === 1 ? "" : "s"} open round ${accounts} account${accounts === 1 ? "" : "s"}, held idle through the run`,
+      );
     }
-    // The server's errors are the box's answer, whatever else the stage did; a stage that sent
-    // less than its rate neither held nor bent there.
-    const stopped = run.stop
-      ? `${run.serverErrors} server errors or unanswered requests (the run stops sending at the third; what was in flight still finished)`
-      : null;
-    const short = stopped ? null : shortOf(result);
-    const why = stopped ?? short ?? bendOf(result, options.stopP95);
-    if (why) {
-      end = { result, why, bent: short === null };
-      break;
+    const results: StageResult[] = [];
+    let end: { result: StageResult; why: string; bent: boolean } | null = null;
+    for (const [i, rate] of options.rates.entries()) {
+      io.log(
+        `load-smoke: stage ${i + 1} of ${options.rates.length} from ${new Date().toISOString()}: ${rate} visits a second for ${options.stageSeconds} s`,
+      );
+      const result = await stage(run, rate, options.stageSeconds);
+      io.log(
+        `  ${result.started} visits, ${result.dropped} dropped, ${result.held} of ${result.parts} parts held back for a resting budget; ${result.requests} requests, ${perSecond(result.rps)} answered a second, ${result.urls} of them thumbnail URLs; p50 ${ms(result.p50)}, p95 ${ms(result.p95)}, p99 ${ms(result.p99)}, max ${ms(result.max)}; ${result.errors} errors, ${result.timeouts} timed out${socketNote()}`,
+      );
+      if (result.byRoute.length > 0) io.log(`  p95 by route: ${result.byRoute.join(", ")}`);
+      if (result.problems.length > 0) io.log(`  not as expected: ${result.problems.join(", ")}`);
+      results.push(result);
+      if (run.stop?.status === 2) {
+        io.log(`load-smoke: stopped: ${run.stop.why}. These numbers are not a measurement.`);
+        return 2;
+      }
+      // The server's errors are the box's answer, whatever else the stage did; a stage that sent
+      // less than its rate neither held nor bent there.
+      const stopped = run.stop
+        ? `${run.serverErrors} server errors or unanswered requests (the run stops sending at the third; what was in flight still finished)`
+        : null;
+      const short = stopped ? null : shortOf(result);
+      const why = stopped ?? short ?? bendOf(result, options.stopP95);
+      if (why) {
+        end = { result, why, bent: short === null };
+        break;
+      }
     }
-  }
 
-  const held = results.filter((result) => result !== end?.result).at(-1);
-  const cell = (result: StageResult) => {
-    const notes = [
-      result.held > 0 ? `${result.held} parts held back` : "",
-      result.timeouts > 0 ? `${result.timeouts} timed out` : "",
-    ].filter(Boolean);
-    return `${result.rate} · ${perSecond(result.rps)} · ${ms(result.p95).replace(" ms", "")}${notes.length > 0 ? ` (${notes.join(", ")})` : ""}`;
-  };
-  const verdict = !end
-    ? `did not bend up to ${options.rates.at(-1)} visits a second`
-    : end.bent
-      ? `bent at ${end.result.rate}: ${end.why}`
-      : `the stage at ${end.result.rate} is no measurement: ${end.why}`;
-  io.log(
-    `load-smoke: held ${held ? `at ${held.rate} visits a second` : "at no stage"}; ${verdict}`,
-  );
-  io.log("load-smoke: the row for docs/runbooks/capacity.md (the server's columns are yours):");
-  const endCell = !end
-    ? "-"
-    : end.bent
-      ? `${cell(end.result)} (${end.why})`
-      : `not measured at ${end.result.rate} (${end.why})`;
-  io.log(
-    `| ${now.toISOString().slice(0, 10)} | | ${version} | ${options.kind} | ${accounts} · ${people.sessions} · ${address.limit} | ${grid} | ${held ? cell(held) : "-"} | ${endCell} | | | | | |`,
-  );
-  return 0;
+    const held = results.filter((result) => result !== end?.result).at(-1);
+    const cell = (result: StageResult) => {
+      const notes = [
+        result.held > 0 ? `${result.held} parts held back` : "",
+        result.timeouts > 0 ? `${result.timeouts} timed out` : "",
+      ].filter(Boolean);
+      return `${result.rate} · ${perSecond(result.rps)} · ${ms(result.p95).replace(" ms", "")}${notes.length > 0 ? ` (${notes.join(", ")})` : ""}`;
+    };
+    const verdict = !end
+      ? `did not bend up to ${options.rates.at(-1)} visits a second`
+      : end.bent
+        ? `bent at ${end.result.rate}: ${end.why}`
+        : `the stage at ${end.result.rate} is no measurement: ${end.why}`;
+    io.log(
+      `load-smoke: held ${held ? `at ${held.rate} visits a second` : "at no stage"}; ${verdict}`,
+    );
+    io.log("load-smoke: the row for docs/runbooks/capacity.md (the server's columns are yours):");
+    const endCell = !end
+      ? "-"
+      : end.bent
+        ? `${cell(end.result)} (${end.why})`
+        : `not measured at ${end.result.rate} (${end.why})`;
+    const socketCell = options.sockets > 0 ? `${run.sockets.open} of ${options.sockets}` : "-";
+    io.log(
+      `| ${now.toISOString().slice(0, 10)} | | ${version} | ${options.kind} | ${accounts} · ${people.sessions} · ${address.limit} | ${grid} | ${socketCell} | ${held ? cell(held) : "-"} | ${endCell} | | | | | |`,
+    );
+    return 0;
+  } finally {
+    await closeSockets(run.sockets);
+  }
 }
 
 /** The command line, the refusals and the sums, then runs against a stand-in API on this computer. */
@@ -1008,7 +1205,7 @@ async function selfTest(): Promise<never> {
   const outcome = (argv: string[], env: Record<string, string> = {}) => {
     try {
       const o = parseArgs(argv, env);
-      return `${o.kind} ${o.target.origin} ${o.rates.join(",")} ${o.stageSeconds} ${o.concurrency} ${o.stopP95} ${o.sessions ?? "-"}`;
+      return `${o.kind} ${o.target.origin} ${o.rates.join(",")} ${o.stageSeconds} ${o.concurrency} ${o.stopP95} ${o.sessions ?? "-"} ${o.sockets}`;
     } catch (error) {
       return (error as Error).message;
     }
@@ -1024,16 +1221,16 @@ async function selfTest(): Promise<never> {
     `--rates wants visits a second, each above 0 and at most 20, not ${what}`;
   const lines: Array<[string[], string, Record<string, string>?]> = [
     [[], `--target is required: http://localhost:3000, or ${STAGING} with --confirm-staging`],
-    [["--target", local], `local ${local} 0.5 60 16 1000 -`],
+    [["--target", local], `local ${local} 0.5 60 16 1000 - 0`],
     [
       ["--", "--target=http://127.0.0.1:3000", "--rates", "0.5, 1,2", "--stage", "30"],
-      "local http://127.0.0.1:3000 0.5,1,2 30 16 1000 -",
+      "local http://127.0.0.1:3000 0.5,1,2 30 16 1000 - 0",
     ],
     [
       ["--target", "http://[::1]:3000", "--concurrency=8", "--stop-p95", "800", "--sessions", "s"],
-      "local http://[::1]:3000 0.5 60 8 800 s",
+      "local http://[::1]:3000 0.5 60 8 800 s 0",
     ],
-    [["--target", `${STAGING}/`, "--confirm-staging"], `staging ${STAGING} 0.5 60 16 1000 -`],
+    [["--target", `${STAGING}/`, "--confirm-staging"], `staging ${STAGING} 0.5 60 16 1000 - 0`],
     [["--target", STAGING], confirm],
     [
       ["--target", local, "--confirm-staging"],
@@ -1103,10 +1300,28 @@ async function selfTest(): Promise<never> {
       "--stop-p95 wants a whole number from 50 to 10000, not fast",
     ],
     [["--target", local, "--sessions"], "--sessions takes a value"],
+    [["--target", local, "--sessions", "s", "--sockets=4"], `local ${local} 0.5 60 16 1000 s 4`],
+    [
+      ["--target", local, "--sessions", "s", "--sockets", "200"],
+      `local ${local} 0.5 60 16 1000 s 200`,
+    ],
+    [["--target", local, "--sessions", "s", "--sockets"], "--sockets takes a value"],
+    [
+      ["--target", local, "--sessions", "s", "--sockets", "0"],
+      "--sockets wants a whole number from 1 to 200, not 0",
+    ],
+    [
+      ["--target", local, "--sessions", "s", "--sockets", "201"],
+      "--sockets wants a whole number from 1 to 200, not 201",
+    ],
+    [
+      ["--target", local, "--sockets", "4"],
+      "--sockets needs --sessions: a socket signs in with a session's access token",
+    ],
     [["--target", local, "--verbose=1"], "unknown option --verbose"],
     [
       ["--target", local, "extra"],
-      "unexpected argument: every option is named (--target, --sessions, --rates, --stage, --concurrency, --stop-p95, --confirm-staging)",
+      "unexpected argument: every option is named (--target, --sessions, --rates, --stage, --sockets, --concurrency, --stop-p95, --confirm-staging)",
     ],
     [
       ["--target", local],
@@ -1124,10 +1339,10 @@ async function selfTest(): Promise<never> {
       "APP_ENV says staging, and the target is this computer",
       { APP_ENV: "staging" },
     ],
-    [["--target", local], `local ${local} 0.5 60 16 1000 -`, { APP_ENV: "test" }],
+    [["--target", local], `local ${local} 0.5 60 16 1000 - 0`, { APP_ENV: "test" }],
     [
       ["--target", STAGING, "--confirm-staging"],
-      `staging ${STAGING} 0.5 60 16 1000 -`,
+      `staging ${STAGING} 0.5 60 16 1000 - 0`,
       { APP_ENV: "staging" },
     ],
   ];
@@ -1173,7 +1388,7 @@ async function selfTest(): Promise<never> {
     "plan without sessions",
     shape(
       planOf(
-        { rates: [0.5], stageSeconds: 60, concurrency: 16 },
+        { rates: [0.5], stageSeconds: 60, concurrency: 16, sockets: 0 },
         { addressLimit: 120, personLimit: 0, accounts: 0, photosMax: 0 },
       ),
     ),
@@ -1186,7 +1401,7 @@ async function selfTest(): Promise<never> {
     "plan with seven accounts",
     shape(
       planOf(
-        { rates: [0.5, 1], stageSeconds: 60, concurrency: 16 },
+        { rates: [0.5, 1], stageSeconds: 60, concurrency: 16, sockets: 0 },
         { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
       ),
     ),
@@ -1198,11 +1413,47 @@ async function selfTest(): Promise<never> {
     "plan with a raised limit",
     shape(
       planOf(
-        { rates: [2, 4, 6], stageSeconds: 60, concurrency: 32 },
+        { rates: [2, 4, 6], stageSeconds: 60, concurrency: 32, sockets: 0 },
         { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
       ),
     ),
     [11, "8.178", 755],
+  );
+  // The same with four sockets for each of the seven accounts: their 28 upgrades stay on the
+  // address, (400 - 32 - 28) / 45, and six visits a second need (270 + 60) / 0.4.
+  expect(
+    "plan with a raised limit and sockets",
+    shape(
+      planOf(
+        { rates: [2, 4, 6], stageSeconds: 60, concurrency: 32, sockets: 28 },
+        { addressLimit: 1000, personLimit: 1000, accounts: 7, photosMax: 6 },
+      ),
+    ),
+    [11, "7.556", 825],
+  );
+  // Under the default limit the 28 upgrades take nearly all the address's share, (48 - 16 - 28) /
+  // 45; one visit a second needs (45 + 44) / 0.4.
+  expect(
+    "plan with sockets under the default limit",
+    shape(
+      planOf(
+        { rates: [0.5, 1], stageSeconds: 60, concurrency: 16, sockets: 28 },
+        { addressLimit: 120, personLimit: 120, accounts: 7, photosMax: 6 },
+      ),
+    ),
+    [2, "0.089", 223],
+  );
+  // Forty take more than all of it: nothing is allowed, and half a visit a second needs
+  // (22.5 + 56) / 0.4.
+  expect(
+    "plan with more sockets than the address's share",
+    shape(
+      planOf(
+        { rates: [0.5], stageSeconds: 60, concurrency: 16, sockets: 40 },
+        { addressLimit: 120, personLimit: 120, accounts: 10, photosMax: 6 },
+      ),
+    ),
+    [1, "0.000", 197],
   );
   // One account without photos: five requests a visit (the photos screen's list on each) against
   // its 40 % of 120, 48 / 300.
@@ -1210,7 +1461,7 @@ async function selfTest(): Promise<never> {
     "plan of an account without photos",
     shape(
       planOf(
-        { rates: [1], stageSeconds: 60, concurrency: 16 },
+        { rates: [1], stageSeconds: 60, concurrency: 16, sockets: 0 },
         { addressLimit: 120, personLimit: 120, accounts: 1, photosMax: 0 },
       ),
     ),
@@ -1383,6 +1634,7 @@ async function standInRuns(
         stageSeconds: 1,
         concurrency: 4,
         stopP95: 1000,
+        sockets: 0,
         ...over,
       },
       { log: (line) => out.push(line) },
@@ -1448,7 +1700,7 @@ async function standInRuns(
     expect(
       "the row of a whole run",
       runA.out.some((line) =>
-        /^\| \d{4}-\d{2}-\d{2} \| \| 0\.0\.0-test \(abc1234\) \| local \| 1 · 1 · 60000 \| 1 in 1 · 2\.00 \| 4 · [\d.]+ · \d+ \| - \| /.test(
+        /^\| \d{4}-\d{2}-\d{2} \| \| 0\.0\.0-test \(abc1234\) \| local \| 1 · 1 · 60000 \| 1 in 1 · 2\.00 \| - \| 4 · [\d.]+ · \d+ \| - \| /.test(
           line,
         ),
       ),
@@ -1603,6 +1855,156 @@ async function standInRuns(
       [0, 1, true],
     );
 
+    // A whole run holding four sockets on its one account: each signs in with a token the run
+    // was given, resumes nothing, answers the ping, and is closed by the run before it returns.
+    const held = await standIn([token()]);
+    const fileHeld = sessionsFile("s1", ours(held.url, [...held.refresh][0] ?? ""));
+    const runHeld = await drive(held.url, fileHeld, { sockets: 4 });
+    const closedBeforeReturn = held.sockets.map((socket) => socket.closedWith);
+    await held.close();
+    expect(
+      "a run with sockets: its exit and upgrades",
+      [runHeld.status, times(held.seen, "GET /ws")],
+      [0, 4],
+    );
+    expect(
+      "a run with sockets: what each socket said, masked",
+      held.sockets.map((socket) => [...socket.said, socket.masked]),
+      Array.from({ length: 4 }, () => ["auth", "resume 0", "pong", true]),
+    );
+    expect(
+      "a run with sockets: each closed before the run returned",
+      closedBeforeReturn,
+      [1000, 1000, 1000, 1000],
+    );
+    expect(
+      "a run with sockets: what it printed",
+      [
+        runHeld.out.includes(
+          "load-smoke: 4 sockets open round 1 account, held idle through the run",
+        ),
+        runHeld.out.some((line) => line.startsWith("  ") && line.endsWith("; 4 of 4 sockets open")),
+        runHeld.out.some((line) =>
+          /^\| .+ \| 1 · 1 · 60000 \| 1 in 1 · 2\.00 \| 4 of 4 \| 4 · [\d.]+ · \d+ \| - \| /.test(
+            line,
+          ),
+        ),
+      ],
+      [true, true, true],
+    );
+
+    // More sockets than four for each account the sessions are of: refused before any load.
+    const many = await standIn([token()]);
+    const fileMany = sessionsFile("s2", ours(many.url, [...many.refresh][0] ?? ""));
+    const runMany = await drive(many.url, fileMany, { sockets: 5 });
+    await many.close();
+    expect(
+      "too many sockets",
+      [runMany.status, runMany.out.at(-1), many.seen],
+      [
+        1,
+        "load-smoke: 5 sockets is more than 4 for each of the 1 account the sessions are of: at most 4. The API holds five an account and closes the oldest for a sixth, which must never be a persona's own phone; more test persons signed in lift it",
+        [
+          "GET /health",
+          "GET /openapi.json",
+          "POST /auth/refresh",
+          "GET /auth/session",
+          "GET /photos",
+        ],
+      ],
+    );
+
+    // A socket whose auth is refused: the run stops before the first stage, with the code alone.
+    const unauthenticated = await standIn([token()], { socket: "refuse-auth" });
+    const fileUnauthenticated = sessionsFile(
+      "s3",
+      ours(unauthenticated.url, [...unauthenticated.refresh][0] ?? ""),
+    );
+    const runUnauthenticated = await drive(unauthenticated.url, fileUnauthenticated, {
+      sockets: 1,
+    });
+    await unauthenticated.close();
+    expect(
+      "a socket refused its auth",
+      [
+        runUnauthenticated.status,
+        runUnauthenticated.out.at(-1),
+        unauthenticated.sockets.map((socket) => [...socket.said, socket.closedWith]),
+        unauthenticated.seen.includes("GET /onboarding"),
+      ],
+      [
+        2,
+        "load-smoke: stopped before the first stage: socket 1 of 1 did not open: closed with 1008 (unauthenticated)",
+        [["auth", 1008]],
+        false,
+      ],
+    );
+
+    // An upgrade refused outright, as the address's limiter would: Node's client says no more.
+    const limited = await standIn([token()], { socket: "refuse-upgrade" });
+    const fileLimited = sessionsFile("s4", ours(limited.url, [...limited.refresh][0] ?? ""));
+    const runLimited = await drive(limited.url, fileLimited, { sockets: 1 });
+    await limited.close();
+    expect(
+      "a refused upgrade",
+      [runLimited.status, runLimited.out.at(-1), times(limited.seen, "GET /ws")],
+      [
+        2,
+        "load-smoke: stopped before the first stage: socket 1 of 1 did not open: its upgrade was refused, or its connection failed",
+        1,
+      ],
+    );
+
+    // A socket the server drops during the run stops it: no measurement, no row.
+    const dropped = await standIn([token()], { socket: "drop" });
+    const fileDropped = sessionsFile("s5", ours(dropped.url, [...dropped.refresh][0] ?? ""));
+    const runDropped = await drive(dropped.url, fileDropped, { sockets: 1 });
+    await dropped.close();
+    expect(
+      "a socket dropped during the run",
+      [
+        runDropped.status,
+        runDropped.out.at(-1),
+        runDropped.out.some((line) => line.startsWith("| ")),
+      ],
+      [
+        2,
+        "load-smoke: stopped: socket 1 of 1 was lost during the run: closed with 1006. These numbers are not a measurement.",
+        false,
+      ],
+    );
+
+    // Frames outside the contract are counted, and the run goes on.
+    const stray = await standIn([token()], { socket: "outside" });
+    const fileStray = sessionsFile("s6", ours(stray.url, [...stray.refresh][0] ?? ""));
+    const runStray = await drive(stray.url, fileStray, { sockets: 1 });
+    await stray.close();
+    expect(
+      "frames outside the contract",
+      [
+        runStray.status,
+        runStray.out.some((line) =>
+          line.endsWith("; 1 of 1 sockets open, 2 frames from them outside the contract"),
+        ),
+        stray.sockets.map((socket) => socket.said),
+      ],
+      [0, true, [["auth", "resume 0", "pong"]]],
+    );
+    const socketRuns = [runHeld, runMany, runUnauthenticated, runLimited, runDropped, runStray];
+    const socketSecrets = [held, many, unauthenticated, limited, dropped, stray].flatMap((api) => [
+      ...api.refresh,
+      ...api.access,
+      api.accountId,
+      ...api.photoIds,
+    ]);
+    expect(
+      "a token, an id or a frame in the output of the runs with sockets",
+      [...socketSecrets, STRAY].filter((secret) =>
+        socketRuns.some((run) => run.printed.includes(secret)),
+      ).length,
+      0,
+    );
+
     // Refused before anybody is asked: each file a run must not take.
     const idle = await standIn([]);
     const one = token();
@@ -1665,16 +2067,25 @@ async function standInRuns(
 }
 
 type Twist = { status?: number; code?: string; json?: unknown; limit?: number; remaining?: number };
+/**
+ * How the stand-in's socket misbehaves: it refuses the upgrade (as the address's limiter would),
+ * refuses the auth, drops every connection at the first visit's signed-in part, or says two
+ * things outside the contract before its ready.
+ */
+type SocketTwist = "refuse-upgrade" | "refuse-auth" | "drop" | "outside";
 
 /**
  * Kuutti's API as far as a run asks it: every answer from the contract, the budgets roomy, unless
- * a twist answers a route (by template, and how many times it was asked before) otherwise.
+ * a twist answers a route (by template, and how many times it was asked before) otherwise. Its
+ * socket is RFC 6455 by hand (the root has no WebSocket server, and needs none): the handshake,
+ * masked frames in, unmasked frames out, the closing handshake; no fragments, no extensions.
  */
 async function standIn(
   refreshTokens: string[],
   behaviour: {
     production?: boolean;
     twist?: (route: string, nth: number) => Twist | undefined;
+    socket?: SocketTwist;
   } = {},
 ) {
   const refresh = new Set(refreshTokens);
@@ -1693,6 +2104,9 @@ async function standIn(
   }));
   const later = "2026-12-31T00:00:00.000Z";
   const seen: string[] = [];
+  /** Each socket: what its client said, in order, whether every frame came masked, how it closed. */
+  const sockets: Array<{ said: string[]; masked: boolean; closedWith: number | null }> = [];
+  const upgraded = new Set<Duplex>();
   const server = createServer(async (req, res) => {
     let body = "";
     for await (const chunk of req) body += chunk;
@@ -1702,6 +2116,9 @@ async function standIn(
     );
     const twist = behaviour.twist?.(route, seen.filter((r) => r === route).length);
     seen.push(route);
+    if (behaviour.socket === "drop" && route === "GET /onboarding") {
+      for (const socket of upgraded) socket.destroy();
+    }
     const answer = (status: number, json: unknown) => {
       res.writeHead(status, {
         "content-type": "application/json",
@@ -1773,6 +2190,78 @@ async function standIn(
     if (["GET /onboarding", "GET /gate", "GET /profile"].includes(route)) return answer(200, {});
     return refused(404, "not_found");
   });
+  server.on("upgrade", (req, socket: Duplex) => {
+    seen.push(`GET ${new URL(req.url ?? "/", "http://stand-in").pathname}`);
+    upgraded.add(socket);
+    socket.on("close", () => upgraded.delete(socket));
+    // A connection the client or the stand-in tore down: nothing to answer.
+    socket.on("error", () => {});
+    if (behaviour.socket === "refuse-upgrade") {
+      socket.end(
+        "HTTP/1.1 429 Too Many Requests\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+      );
+      return;
+    }
+    const accept = createHash("sha1")
+      .update(`${req.headers["sec-websocket-key"]}${WS_GUID}`)
+      .digest("base64");
+    socket.write(
+      `HTTP/1.1 101 Switching Protocols\r\nupgrade: websocket\r\nconnection: Upgrade\r\nsec-websocket-accept: ${accept}\r\n\r\n`,
+    );
+    const record = { said: [] as string[], masked: true, closedWith: null as number | null };
+    sockets.push(record);
+    let closing = false;
+    const say = (frame: unknown) =>
+      socket.write(
+        wsFrame(0x1, Buffer.from(typeof frame === "string" ? frame : JSON.stringify(frame))),
+      );
+    const close = (code: number) => {
+      if (closing) return;
+      closing = true;
+      const payload = Buffer.alloc(2);
+      payload.writeUInt16BE(code);
+      socket.write(wsFrame(0x8, payload));
+    };
+    let buffered = Buffer.alloc(0);
+    socket.on("data", (chunk: Buffer) => {
+      buffered = Buffer.concat([buffered, chunk]);
+      for (let frame = wsRead(buffered); frame; frame = wsRead(buffered)) {
+        buffered = buffered.subarray(frame.size);
+        record.masked &&= frame.masked;
+        if (frame.opcode === 0x8) {
+          record.closedWith = frame.payload.length >= 2 ? frame.payload.readUInt16BE(0) : 1005;
+          close(record.closedWith);
+          socket.end();
+          return;
+        }
+        if (frame.opcode !== 0x1) continue;
+        const said = ClientFrame.safeParse(jsonOf(frame.payload.toString("utf8")));
+        if (!said.success) {
+          record.said.push("outside");
+          say({ type: "error", code: "bad_frame" });
+          close(1008);
+        } else if (said.data.type === "auth") {
+          const known = access.has(said.data.token);
+          record.said.push(known ? "auth" : "auth with a token nobody was given");
+          if (behaviour.socket === "outside") {
+            say({ type: "hello", note: STRAY });
+            say(`no JSON ${STRAY}`);
+          }
+          if (!known || behaviour.socket === "refuse-auth") {
+            say({ type: "error", code: "unauthenticated" });
+            close(1008);
+          } else {
+            say({ type: "ready" });
+          }
+        } else if (said.data.type === "resume") {
+          record.said.push(`resume ${said.data.conversations.length}`);
+          say({ type: "ping" });
+        } else {
+          record.said.push(said.data.type);
+        }
+      }
+    });
+  });
   await new Promise<void>((listening) => server.listen(0, "127.0.0.1", listening));
   const { port } = server.address() as AddressInfo;
   return {
@@ -1782,10 +2271,40 @@ async function standIn(
     access,
     accountId,
     photoIds: photos.map((photo) => photo.id),
+    sockets,
     close: () =>
       new Promise<void>((closed) => {
+        // An upgraded connection is no longer the HTTP server's to close, and would hold it open.
+        for (const socket of upgraded) socket.destroy();
         server.closeAllConnections();
         server.close(() => closed());
       }),
   };
+}
+
+// Every frame of a run, either way, is under 126 bytes: its length is the second byte's seven
+// bits, and the stand-in reads and writes no longer one.
+
+/** A whole frame of the stand-in's, unmasked as a server's are. */
+function wsFrame(opcode: number, payload: Buffer): Buffer {
+  return Buffer.concat([Buffer.from([0x80 | opcode, payload.length]), payload]);
+}
+
+/** The first whole frame in what a client sent, unmasked, or null until it has all arrived. */
+function wsRead(
+  buffer: Buffer,
+): { opcode: number; masked: boolean; payload: Buffer; size: number } | null {
+  const first = buffer[0];
+  const second = buffer[1];
+  if (first === undefined || second === undefined) return null;
+  const masked = (second & 0x80) !== 0;
+  const length = second & 0x7f;
+  const size = 2 + (masked ? 4 : 0) + length;
+  if (buffer.length < size) return null;
+  const mask = buffer.subarray(2, 6);
+  const payload = Buffer.from(buffer.subarray(size - length, size));
+  if (masked) {
+    for (let i = 0; i < payload.length; i++) payload[i] = (payload[i] ?? 0) ^ (mask[i % 4] ?? 0);
+  }
+  return { opcode: first & 0x0f, masked, payload, size };
 }

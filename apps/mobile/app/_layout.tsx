@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react-native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
+import { ChatLiveProvider } from "@/features/chat";
 import { SessionProvider, SignedOutToStart } from "@/features/identity";
 import { ScreenReaderHint } from "@/features/settings";
 import { LocaleProvider } from "@/lib/locale";
@@ -21,16 +22,19 @@ function RootLayout() {
       <ThemeProvider>
         <PhotoDescriptionsProvider>
           <SessionProvider>
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: "transparent" },
-              }}
-            />
-            <StatusBar style="auto" />
-            <SignedOutToStart />
-            {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
-            <ScreenReaderHint />
+            {/* The chat's socket while signed in and in front (#349). */}
+            <ChatLiveProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: "transparent" },
+                }}
+              />
+              <StatusBar style="auto" />
+              <SignedOutToStart />
+              {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
+              <ScreenReaderHint />
+            </ChatLiveProvider>
           </SessionProvider>
         </PhotoDescriptionsProvider>
       </ThemeProvider>

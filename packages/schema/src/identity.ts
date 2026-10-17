@@ -69,7 +69,8 @@ export type AuthExchangeRequest = z.infer<typeof AuthExchangeRequest>;
 
 /** 32 random bytes as base64url, like the one-time code: the shape of both session tokens. */
 const SESSION_TOKEN_PATTERN = ONE_TIME_CODE_PATTERN;
-const SessionToken = z.string().regex(SESSION_TOKEN_PATTERN);
+/** An access or refresh token's shape; the chat's socket takes the access token in its first frame (#349). */
+export const SessionToken = z.string().regex(SESSION_TOKEN_PATTERN);
 
 /**
  * What a login hands the device (#35): a short-lived access token for the

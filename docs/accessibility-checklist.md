@@ -89,6 +89,8 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 | A conversation | `/chats/<id>` (Antti's with Ville) | the name and age as the header; Earlier messages a named button where there are more; each day line; each message heard once as who, when and what, the time under it silent; Read under the last one read; the field named Message with its placeholder; the characters left; Send named, heard as dimmed while empty or too long; Sending… under a message on its way; a refusal (a phone number) said under the field with the words kept | | |
 | An archived conversation | `/chats/<id>` (Antti's with Sanna) | the line that writing brings it back, above the field; gone after a message | | |
 | A closed conversation | `/chats/<id>` (Ville's, after Antti deletes his account) | no field and no Send; the ending said in its place: deleted their account, or ended, never blocked | | |
+| A conversation, live (#349) | `/chats/<id>` (Antti's with Ville, Ville on a second phone) | a message from the other phone appears without leaving the screen and is heard once when reached; Read appears under one's own once they read it; Online under the header, heard as a word, the dot beside it silent, gone when they close the app and on a closed conversation; a message sent shows Sending… only until it is there | | |
+| The connection line | `/chats` and `/chats/<id>` (Antti), flight mode on and off | "Connection lost. Reconnecting…" at the top, under the header, said once when it appears without interrupting (VoiceOver is told it, TalkBack reads the region); gone once the connection is back; the screen still usable under it | | |
 
 ### Profile
 

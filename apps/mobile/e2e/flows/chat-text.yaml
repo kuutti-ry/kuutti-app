@@ -41,6 +41,10 @@ name: A message reaches the other person with its time, the writer then sees it 
     notVisible: "Sending…|Lähetetään…|Skickar…"
     timeout: 15000
 - assertVisible: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+# The live socket (#349) connected on the phone: by now, after the typing
+# and the send, a socket that could not connect would have said so at the
+# top. Two phones talking live are the API's socket tests; Maestro drives one.
+- assertNotVisible: "Connection lost\\. Reconnecting…|Yhteys katkesi\\. Yhdistetään uudelleen…|Anslutningen bröts\\. Ansluter igen…"
 
 # Ville: the row says a message is unread and what it says; the message says
 # who wrote it and when. Opening the conversation reads it.

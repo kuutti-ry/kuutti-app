@@ -5,4 +5,5 @@ import * as repo from "./repo.ts";
 export const sessionStore: SessionStore = {
   findByAccessHash: repo.findSessionByAccessHash,
   touch: repo.touchSession,
+  standing: (db, caller, at) => repo.sessionStanding(db, { ...caller, at }),
 };

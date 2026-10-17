@@ -5199,6 +5199,7 @@ export interface components {
             deleted: "CounterpartDeleted";
         };
         LastMessage: {
+            seq: number;
             /** Format: date-time */
             at: string;
             kind: components["schemas"]["MessageKind"];
@@ -5234,6 +5235,8 @@ export interface components {
             body: string | null;
             /** Format: date-time */
             createdAt: string;
+            /** Format: uuid */
+            clientId: string | null;
         };
         SendMessageRequest: {
             /** Format: uuid */

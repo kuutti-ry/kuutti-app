@@ -3,3 +3,4 @@
 export { ChatsButton } from "./ChatsButton";
 export { ConversationScreen } from "./ConversationScreen";
 export { ConversationsScreen } from "./ConversationsScreen";
+export { ChatLiveProvider } from "./store";

@@ -1,8 +1,10 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { createServer, type Server } from "node:net";
 import { resolve } from "node:path";
-import { withTemporaryDatabase } from "@kuutti/db";
+import { createPool, withTemporaryDatabase } from "@kuutti/db";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import WebSocket from "ws";
+import { signedInAccount } from "./test/account.ts";
 
 // The process around boot.ts (index.ts): the server, its one failure that has
 // a name, and the signals a redeploy sends. Each case is the real entry in a
@@ -124,4 +126,33 @@ describe("the API process", () => {
     },
     60_000,
   );
+
+  // #349: an open socket would hold the server open past the 10 s exit; it
+  // is told `restarting` and closed, and the process still exits 0.
+  it("closes an open chat socket on SIGTERM with restarting, and still exits 0", async () => {
+    const probe = await listening("0.0.0.0");
+    const port = portOf(probe);
+    await new Promise((closed) => probe.close(closed));
+    const { child, exited, logged } = api(port);
+    await logged("chat listener on");
+    await logged("API listening");
+    const pool = createPool({ connectionString: databaseUrl, max: 1 });
+    const person = await signedInAccount(pool).finally(() => pool.end());
+    const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
+    const frames: string[] = [];
+    socket.on("message", (data) => frames.push(String(data)));
+    const closed = new Promise<number>((done) => socket.on("close", (code) => done(code)));
+    await new Promise<void>((open) => socket.once("open", () => open()));
+    const ready = new Promise<void>((done) =>
+      socket.on("message", (data) => {
+        if (String(data).includes('"ready"')) done();
+      }),
+    );
+    socket.send(JSON.stringify({ type: "auth", token: person.accessToken }));
+    await ready;
+    child.kill("SIGTERM");
+    expect(await closed).toBe(1012);
+    expect(frames).toContain(JSON.stringify({ type: "error", code: "restarting" }));
+    expect(await exited).toBe(0);
+  }, 60_000);
 });
