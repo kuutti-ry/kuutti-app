@@ -134,6 +134,15 @@ export async function insertPhoto(
   return rows[0] ? photoFrom(rows[0]) : null;
 }
 
+/** Whether the account still has a live row: an upload's insert refuses a tombstone as it refuses the cap. */
+export async function isAccountLive(db: Queryable, accountId: string): Promise<boolean> {
+  const { rows } = await db.query<{ live: boolean }>(
+    "SELECT EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted') AS live",
+    [accountId],
+  );
+  return rows[0]?.live === true;
+}
+
 /**
  * The photo the caller may be issued a URL for (#52, TD-6): their own in any
  * state, or another account's approved photo on a card they were shown (the

@@ -71,12 +71,20 @@ export async function boot({
   // only; a broker that does not is the wrong one.
   let broker: IdentityBroker | undefined;
   if (config.OIDC_ISSUER) {
+    // The step that failed names the cause in the local warning: the error's
+    // own message is redacted from every line (lib/logger.ts), and a fixed
+    // name of ours carries nothing a configuration or a broker wrote (#235).
+    // "configuration" is our own parameters, keys read included; "broker" is
+    // making the client, which also refuses a Telia issuer without our keys.
+    let stage: "discovery" | "configuration" | "broker" = "discovery";
     try {
       const provider = await discover(config.OIDC_ISSUER);
       const methods = provider.token_endpoint_auth_methods_supported ?? [];
       if (isTeliaIssuer(config.OIDC_ISSUER) && !methods.includes("private_key_jwt")) {
         throw new DiscoveryError(config.OIDC_ISSUER, "no private_key_jwt at the token endpoint");
       }
+      // The key ids below read our keys, which a mis-pasted PEM fails.
+      stage = "configuration";
       logger.info(
         {
           issuer: provider.issuer,
@@ -91,8 +99,10 @@ export async function boot({
         "bank identification",
       );
       const options = brokerOptionsFromConfig(config);
-      if (options && config.HETU_HMAC_KEY) broker = await createBroker(options);
-      else {
+      if (options && config.HETU_HMAC_KEY) {
+        stage = "broker";
+        broker = await createBroker(options);
+      } else {
         // Half a configuration is a misnamed parameter, not a choice: a
         // deployed box must not boot healthy with the login answering 503.
         throw new Error(
@@ -101,7 +111,10 @@ export async function boot({
       }
     } catch (error) {
       if (config.APP_ENV === "development" || config.APP_ENV === "test") {
-        logger.warn({ err: error }, "bank identification unavailable; is the mock IdP running?");
+        logger.warn(
+          { err: error, stage },
+          "bank identification unavailable; is the mock IdP running?",
+        );
       } else {
         throw error;
       }
@@ -134,10 +147,16 @@ export async function boot({
   });
   // An idle client the server drops (an RDS reboot or failover) is reported
   // here; pg-pool discards it and connects again on demand. Without a listener
-  // the event is an uncaught exception and the process exits. Code and message
-  // only: the error carries its client, connection parameters included.
+  // the event is an uncaught exception and the process exits. The code and the
+  // error's class only: the error carries its client, connection parameters
+  // included, and its message is redacted from every line (lib/logger.ts, #235).
+  // The class, not `name`: pg's DatabaseError names itself after the protocol
+  // message, "error", where its class says it came from the server.
   pool.on("error", (error: Error & { code?: string }) => {
-    logger.error({ code: error.code, message: error.message }, "idle database client dropped");
+    logger.error(
+      { code: error.code, type: error.constructor.name },
+      "idle database client dropped",
+    );
   });
 
   // Migrations run before the server listens, under the advisory lock (rule 10).

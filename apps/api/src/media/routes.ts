@@ -67,6 +67,7 @@ const uploadRoute = createRoute({
     201: { description: "Stored, pending moderation.", ...json(Photo) },
     400: errorContent("Validation failed (no photo part, or not an accepted type)."),
     401: unauthenticated,
+    404: errorContent("not_found: the account was erased while the photo was processed."),
     409: errorContent("photo_limit: the account has max_photos photos already."),
     413: errorContent("payload_too_large: over 10 MB."),
     415: errorContent("photo_unsupported: the bytes are not a JPEG, PNG or WebP."),

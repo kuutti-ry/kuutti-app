@@ -235,10 +235,18 @@ describe("boot", () => {
     expect(await sweep?.run()).toEqual({ rechecked: 0, failed: 0 });
   });
 
-  it("logs an idle client the server dropped by its code, never its connection parameters, and lives on", async () => {
+  it("logs an idle client the server dropped by its code and class, never its connection parameters, and lives on", async () => {
     const { pool, lines } = await booted();
+    // The shape pg delivers for 57P01 (pg-protocol's DatabaseError): its name
+    // is the protocol message's, "error", and its class says where it came from.
+    class DatabaseError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "error";
+      }
+    }
     const dropped = Object.assign(
-      new Error("terminating connection due to administrator command"),
+      new DatabaseError("terminating connection due to administrator command"),
       {
         code: "57P01",
         client: { connectionParameters: { password: "kuutti-boot-test-secret" } },
@@ -246,8 +254,16 @@ describe("boot", () => {
     );
     pool.emit("error", dropped);
     const logged = line(lines, "idle database client dropped");
-    expect(logged).toMatchObject({ level: ERROR, code: "57P01" });
-    expect(logged).not.toHaveProperty("client");
+    // The message is no field of the line: the logger would print it as "[redacted]" (#235).
+    expect(logged).toEqual({
+      level: ERROR,
+      time: expect.any(Number),
+      pid: expect.any(Number),
+      hostname: expect.any(String),
+      code: "57P01",
+      type: "DatabaseError",
+      msg: "idle database client dropped",
+    });
     expect(JSON.stringify(lines())).not.toContain("kuutti-boot-test-secret");
     expect((await pool.query("SELECT 1 AS one")).rows).toEqual([{ one: 1 }]);
   });
@@ -450,7 +466,7 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       };
       const { app, lines } = await booted(teliaConfig(), notTelia);
       const warned = line(lines, "bank identification unavailable; is the mock IdP running?");
-      expect(warned?.level).toBe(WARN);
+      expect(warned).toMatchObject({ level: WARN, stage: "discovery" });
       expect(JSON.stringify(warned?.err)).toContain("DiscoveryError");
       expect(line(lines, "bank identification")).toBeUndefined();
       expect(stub.made).toEqual([]);
@@ -481,15 +497,37 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       expect(line(lines, "bank identification")).toMatchObject({
         keys: { signing: null, encryption: null },
       });
-      expect(line(lines, "bank identification unavailable; is the mock IdP running?")?.level).toBe(
-        WARN,
-      );
+      // Making the client is where the keys are required (OidcBroker.create).
+      expect(
+        line(lines, "bank identification unavailable; is the mock IdP running?"),
+      ).toMatchObject({
+        level: WARN,
+        stage: "broker",
+      });
       expect((await startLogin(app)).status).toBe(503);
 
       const staging = await refused({ ...withoutKeys, APP_ENV: "staging" }, { discover });
       expect((staging.error as Error).message).toBe(
         "a Telia issuer needs TELIA_SIGNING_KEY and TELIA_ENCRYPTION_KEY",
       );
+    });
+
+    it("a key that is no PEM is our configuration, not the broker's discovery: the local warning says so", async () => {
+      const discover = async () =>
+        metadata({
+          issuer: TELIA_ISSUER,
+          token_endpoint_auth_methods_supported: ["private_key_jwt"],
+        });
+      const stub = stubBroker();
+      const { lines } = await booted(
+        { ...teliaConfig(), TELIA_SIGNING_KEY: "not a key" },
+        { discover, createBroker: stub.createBroker },
+      );
+      expect(
+        line(lines, "bank identification unavailable; is the mock IdP running?"),
+      ).toMatchObject({ level: WARN, stage: "configuration" });
+      expect(line(lines, "bank identification")).toBeUndefined();
+      expect(stub.made).toEqual([]);
     });
 
     it("an issuer on Telia's host whose document lists no client authentication is refused the same way", async () => {
@@ -514,10 +552,10 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       const stub = stubBroker();
       const options = { discover: async () => metadata(), createBroker: stub.createBroker };
       const local = await booted({ ...mockBank, ...missing }, options);
-      // The reason is the thrown error's message, which the logger redacts like any (lib/logger.ts).
+      // The thrown error's message is redacted like any (lib/logger.ts); the stage names the cause.
       expect(
-        line(local.lines, "bank identification unavailable; is the mock IdP running?")?.level,
-      ).toBe(WARN);
+        line(local.lines, "bank identification unavailable; is the mock IdP running?"),
+      ).toMatchObject({ level: WARN, stage: "configuration" });
       expect(stub.made).toEqual([]);
       expect((await startLogin(local.app)).status).toBe(503);
 
@@ -537,8 +575,8 @@ describe("boot: bank identification (#32, ADR-017)", () => {
     };
     const development = await booted({ ...mockBank, APP_ENV: "development" }, down);
     expect(
-      line(development.lines, "bank identification unavailable; is the mock IdP running?")?.level,
-    ).toBe(WARN);
+      line(development.lines, "bank identification unavailable; is the mock IdP running?"),
+    ).toMatchObject({ level: WARN, stage: "discovery" });
     expect(line(development.lines, "migrations")).toBeDefined();
 
     const production = await refused(

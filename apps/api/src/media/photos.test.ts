@@ -180,6 +180,7 @@ describe("an upload that fails after processing", () => {
   }) => {
     // The guard passed; the erasure committed before the insert. The insert
     // refuses the tombstone by itself, and the objects go with the refusal.
+    // The answer is the tombstone's, not the cap's (#235).
     const bucket = flakyStore();
     const me = await signedInAccount(ctx.client);
     let erased = false;
@@ -196,11 +197,13 @@ describe("an upload that fails after processing", () => {
         await bucket.store.put(key, body, contentType);
       },
     };
-    const { app } = await appWith(ctx, { store: erasing });
+    const { app, logs } = await appWith(ctx, { store: erasing });
     const res = await upload(app, me.headers, await fixturePng(324, 240));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe("not_found");
     expect(bucket.objects.size).toBe(0);
     expect(await photoRows(ctx, me.accountId)).toEqual([]);
+    expect(JSON.stringify(logs())).not.toContain("photo_limit");
   });
 });
 
