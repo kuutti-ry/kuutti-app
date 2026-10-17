@@ -1,6 +1,6 @@
 # ADR-008: The exposure budget, the shown record, and whose word the API takes for a client
 
-- Status: accepted
+- Status: accepted, amended 2026-10-16 (§3: an owner's photos are served to others only while the owner is active, #307, ADR-024 §6; the key made of §5's address, #41, ADR-026; see History)
 - Date: 2026-09-26
 - Follows: TD-6 (photos and profiles are the asset a scraper wants; exposure is counted and budgeted), CLAUDE.md rules 6 and 8 and Product constraints (every tunable in `matching_config`), `.claude/rules/api.md` Routes and Media, ADR-005 clause 7 (the ingress switch), ADR-001 (the alarm is code), audit F19 and F26; issue #52
 

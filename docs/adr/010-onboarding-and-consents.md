@@ -1,6 +1,6 @@
 # ADR-010: Onboarding, versioned consents, and the activation rule
 
-- Status: accepted; amended by §10 on 2026-10-08 (#146: the steps of the field sheet, one country-wide pond, the special-category consent as a kind of its own) and by §11 on 2026-10-09 (the one pond is the capital region)
+- Status: accepted; amended by §10 on 2026-10-08 (#146: the steps of the field sheet, one country-wide pond, the special-category consent as a kind of its own), by §11 on 2026-10-09 (the one pond is the capital region), by §12 and §13 on 2026-10-10 (#174: a second pond and the names by language; #146: whom one seeks saved on its own) and by §14 on 2026-10-13 (#51: the consent rows go with the account)
 - Date: 2026-09-26
 - Follows: TD-5 (research use of events needs its own yes), TD-7 (the erasure table; what deletion keeps), TD-10 and TD-13 (the pond), TD-11 and CLAUDE.md rule 7 (seeks and the age window are hard filters), TD-17 (the Finnish text is binding), CLAUDE.md rules 3, 5 and 6, `.claude/rules/db.md` (`preferences` shape, erasure), `.claude/rules/i18n.md` (legal texts are versioned and never machine-translated), `.claude/rules/schema.md`, ADR-007 §4, ADR-009 §2 and §4; issue #46
 

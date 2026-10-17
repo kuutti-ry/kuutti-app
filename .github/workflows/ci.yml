@@ -161,12 +161,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # The checker has no dependencies, so there is nothing to install.
+      # The checkers have no dependencies, so there is nothing to install.
       - uses: ./.github/actions/pnpm
         with:
           install: "false"
       - name: Every non-pending scenario has a same-named test (ADR-002)
         run: pnpm check:scenarios --list
+      - name: Every ADR is in docs/adr/README.md with its status (#203)
+        run: pnpm check:adr-index --self-test
 
   schema-drift:
     name: schema-drift
