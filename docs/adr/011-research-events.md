@@ -1,6 +1,6 @@
 # ADR-011: The research_id mapping, server-side track(), and the partitioned events table
 
-- Status: accepted, amended 2026-10-13 (§9: what makes the block anonymous, #51) and 2026-10-15 (§7 and §10: the events leave the person's export, #51; see History)
+- Status: accepted, amended 2026-10-13 (§9: what makes the block anonymous, #51), 2026-10-15 (§7 and §10: the events leave the person's export, #51) and 2026-10-17 by ADR-029, proposed (§9: the research copy counts what it released, and a withheld value is `*`, #194; see History)
 - Date: 2026-09-26
 - Follows: TD-5 (research use of events needs its own yes), TD-7 (the erasure table names the `research_id` mapping), CLAUDE.md rules 5, 6 and 10, `.claude/rules/db.md` (`events`: append-only, monthly partitions, 90-day retention, keyed by `research_id`), `.claude/rules/schema.md` (the event registry), `.claude/rules/api.md` (events and logs; nightly jobs), ADR-007 §4, ADR-009 §2, ADR-010 §4 and its consequences; issue #50
 
@@ -52,10 +52,11 @@ The research opt-in exists as a consent row bound to a wording (#46). Nothing ye
 - Two tables (`research_subject`, `events`), migrations 0014 (generated) and 0015 (custom); one nightly job; one boot step.
 - `profile → research` and `identity → research` are the only edges into the slice; `research → media` for the Finnish calendar month, and `research` reads `ponds` and `profile.fields` from packages/db read-only, so that `profile` can emit events without the research slice importing it back (rules/layout.md).
 - The seed leaves the research consent to the flow, as it does the other consents.
-- Open, and the maintainer's: the age bands; the two events and their props; a fresh pseudonym on every re-consent; the next field to flag for the snapshot, with the census's answer (§9); the Parquet export and the researcher's read access, and when in M4 the owner role of ADR-006 lands.
+- Open, and the maintainer's: the age bands; the two events and their props; a fresh pseudonym on every re-consent; the next field to flag for the snapshot, with the census's answer (§9); and when in M4 the owner role of ADR-006 lands. The Parquet export and the researcher's read access are ADR-029's (#194).
 
 ## History
 
 - 2026-10-13: the consent rows no longer survive erasure (ADR-010 §14, #51), so the handle §1 names, a consent's `given_at` beside an opt-in event's hour, goes with the account. The tombstone's `registered_at` is the one that remains; the truncation to the hour and to whole days stays.
 - 2026-10-15: the events leave the person's export (§10, #51, the maintainer's decision): the copy shows the enrolment, since when and under which wording, and no event; `ResearchEventRecord` and the events reader are removed. Version 0.21.0.
 - 2026-10-15 (#171, ADR-023): `feedback_sent { kind }` joins the registry, the kind alone; the words of the feedback reach no event.
+- 2026-10-17 (#194, ADR-029, proposed): the research copy. Its census counts the distinct pseudonyms that carry a value in the copy's files of the previous ninety days and the day being written, and only those whose consent is live that night, so that k counts people; not the live table, which would let a cell released generalised open exactly once newcomers join it and leave fewer than k carrying the value across the files (ADR-029 §4); the cascade of §9 is unchanged, except that a withheld pond or field is `*`, not null, since null already says not chosen. The prune of §6 stays as built and checks the copy before a month goes (ADR-029 §6). `research-anonymity` keeps counting the live table, as the early warning.

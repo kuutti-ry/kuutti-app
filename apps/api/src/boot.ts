@@ -16,12 +16,16 @@ import { ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
+import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
 import { createMediaDeps, sweepPendingPhotos } from "./media/index.ts";
 import {
+  copiedBeforeDrop,
   ensureEventPartitions,
   researchAnonymityJob,
+  researchCopyJob,
   researchEventsJob,
+  s3CopyStore,
 } from "./research/index.ts";
 import {
   auditBoundary,
@@ -200,13 +204,31 @@ export async function boot({
     ...(media.deps ? { media: media.deps } : {}),
   });
   // Nightly housekeeping inside the process (rules/api.md): ended sessions and
-  // stale login attempts (#35). The round builder and the research export join here.
+  // stale login attempts (#35). The round builder joins here.
   const now = () => new Date();
+  // The research copy (#194, ADR-029) goes to the bucket the photos use, under
+  // research/, wherever media has one: on staging and beside a developer's
+  // stand-in, never in a preview, whose media is off (lib/config.ts), and
+  // never where nothing is configured.
+  // shortcut: none in production either. The copy keeps the research_id past
+  // the ninety days the research text promises, and whether the text or the
+  // copy changes is the maintainer's (ADR-029, Open); his answer lifts this.
+  const copy =
+    media.setup.mode === "off" || config.APP_ENV === "production"
+      ? undefined
+      : { db: pool, now, store: s3CopyStore(createS3Client(config), config.S3_BUCKET) };
   const jobs: NightlyJob[] = [
     { name: "sweep-sessions", run: () => sweepSessions({ db: pool, now }) },
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
-    // Next month's events partition ready, months past retention dropped (#50).
-    researchEventsJob({ db: pool, now }),
+    // Yesterday's research events to the copy, before the prune can drop a month of them (#194).
+    ...(copy ? [researchCopyJob(copy)] : []),
+    // Next month's events partition ready, months past retention dropped (#50),
+    // a month's copy checked first where there is one (ADR-029 §6).
+    researchEventsJob({
+      db: pool,
+      now,
+      ...(copy ? { beforeDrop: (months) => copiedBeforeDrop({ ...copy, logger }, months) } : {}),
+    }),
     // The census of the research block: a cell under k is a warning (ADR-011 §9).
     researchAnonymityJob({ db: pool, logger }),
     // Suspensions past their day end (#307, ADR-024 §5), before the counter

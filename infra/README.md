@@ -9,11 +9,11 @@ Commands below use `tofu`. Terraform is command-compatible if you have it instea
 | path | contents | when |
 |---|---|---|
 | `bootstrap/` | state bucket, GitHub OIDC provider, CI roles, budget and billing alarm, the hosted zone of the project domain | once, before anything else |
-| `modules/` | `network`, `compute`, `data` (#7); `observability` (#11); `media` (#48, ADR-005: live on staging since 2026-10-09, dormant in production until its cutover below); `admin` (#313, ADR-025: the moderation panel's host, composed by staging; production with #25); email later | as the work needs them |
+| `modules/` | `network`, `compute`, `data` (#7); `observability` (#11); `media` (#48, ADR-005: live on staging since 2026-10-09, dormant in production until its cutover below); `admin` (#313, ADR-025: the moderation panel's host, composed by staging; production with #25); `research` (#194, ADR-029: the research copy's rights, the researcher's read-only role and its access log, composed by staging with `media`; production with ADR-029's open points); email later | as the work needs them |
 | `envs/staging`, `envs/prod` | one composition per environment: the modules plus the non-secret parameters | #7 |
 | `github/` | repository settings, branch protection, environments | not adopted; `gh api` below until the GitHub provider question is settled |
 
-Modules arrive with the work that needs them: network, compute and data (#7); observability (#11); media and delivery (#48, ADR-005); the moderation panel's host (#313, ADR-025); email when a mail channel does (TD-18). `scripts/` holds the one-time procedures that are deliberately not resources.
+Modules arrive with the work that needs them: network, compute and data (#7); observability (#11); media and delivery (#48, ADR-005); the moderation panel's host (#313, ADR-025); the research copy's access (#194, ADR-029); email when a mail channel does (TD-18). `scripts/` holds the one-time procedures that are deliberately not resources.
 
 ## Account, once (console, maintainer only)
 
@@ -292,6 +292,8 @@ After the cutover the box still admits 443 from anywhere, because Dokploy's cont
 
 **Anti-scraping and the order of the switches (#52, ADR-008 §5).** Three switches belong together, and the order matters. The origin request policy forwards the CloudFront headers, so the API sees `CloudFront-Viewer-Address`; the rate limiter reads it only when `trusted-proxy` says `cloudfront` (`trusted_proxy` in `envs/<env>/main.tf`), and that flips in the same apply as `cloudfront_only_ingress`, never before: until the box admits CloudFront alone, anyone reaching the origin could send the header. And `media_enabled` does not go first: between the cutover and the ingress switch every request would reach Traefik from a CloudFront edge, the limiter (still in `traefik` mode, keyed on the last `X-Forwarded-For` hop) would count per edge address, and people behind one edge would share a bucket. So the follow-up above (Dokploy and the previews behind the distribution) precedes the cutover, and the cutover commit sets all three. Staging went first regardless, on 2026-10-09 (ADR-005 and ADR-008, History): the team accepts the shared edge bucket there until the follow-up lands; production keeps the order. The observability module's `PhotoBudgetRefusals` metric and its alarm (`budget_refusals_per_day`, 100) count the API's `photo refused` lines; to see the alarm trip on staging, sign in on a phone, set a small `photo_fetches_per_day` in `matching_config` and reload the grid a hundred times, then restore the row as a new version.
 
+The research copy (#194, ADR-029) goes to the same bucket under `research/`: the API's nightly job `research-export` writes one Parquet file a day there. The rights it needs (put only where nothing is, read, list; no delete), the move to Glacier Instant Retrieval after a year, the researcher's read-only role and the access log of every read follow as #194's infra half, `modules/research`, a pull request of its own that the maintainer applies. Until it is applied, staging's export fails every night with AccessDenied, says so in `nightly job failed`, and writes nothing; apply it before the app half deploys, or the same day. Production writes no copy, whatever its media, until the maintainer has answered ADR-029's ninety days, and the infra half composes `modules/research` in staging only.
+
 ### The demo on staging (#141, ADR-018)
 
 Staging holds no real person: its identities are Telia's test persons (#140) and the synthetic population. The personas' stories, the population and the reset are written from inside the API's container and nowhere else; each command refuses outside it (ADR-018 §3). Reach the container through a Session Manager session on the box (the API runs as Dokploy's `api` application; its container name starts with the application's), or through Dokploy's terminal for that application:
@@ -379,9 +381,139 @@ done
 
 The first origin is answered with itself, the other two are refused.
 
+### Research copy (#194, ADR-029)
+
+The API's nightly job `research-export` writes one Parquet file a day to `research/YYYY/MM/YYYY-MM-DD.parquet` in the environment's media bucket (ADR-029 §1 to §7, the app half; the researcher's guide is `docs/research/README.md`). `infra/modules/research`, composed by staging behind `media_enabled` (the copy lives in the media bucket), gives it three things. Production does not compose it: the API writes no copy there until the maintainer has answered ADR-029's ninety days (a `shortcut:` in the app half's `boot.ts`), and a write right and a reader's role with nothing to write or read would only be more to keep safe. The change that lifts the shortcut adds `module "research"` and its outputs to `envs/prod` as staging has them; that is less than a switch kept off for months, and the module already takes `prod` and names its permission set `KuuttiResearchProd`.
+
+- **The API's rights**, the instance role's inline policy `research-objects`: `s3:PutObject` on `research/*` only with `If-None-Match: *` (`s3:if-none-match` equal to `*`, as ADR-029 §9 says; a day that has its file answers 412 and the file stands), `s3:GetObject` on `research/*` for the census, `s3:ListBucket` with the prefix `research/`. No delete: not even the API can replace or remove a day (ADR-029 §5, §9).
+- **The researcher's role** `kuutti-<env>-research-read`, under `/kuutti/` and the boundary, sessions of an hour: `s3:ListBucket` with the prefix `research/` and `s3:GetObject` on `research/*` of that environment's bucket, nothing else. Its trust names this account and admits only the role Identity Center provisions for one permission set, `KuuttiResearchStaging` or `KuuttiResearchProd` (output `research_permission_set`), so whoever reads is an Identity Center assignment, made and removed below, and staging's assignment opens nothing in production. The trust never needs to change, and CI could not change it: the apply role has no `iam:UpdateAssumeRolePolicy`, so a change to it in code fails in CI and is the maintainer's own apply (ADR-029 §10).
+- **The access log**, the trail `kuutti-<env>-research-access`: S3 data events for the objects under `research/` and nothing else (no management events), with log-file validation, into `kuutti-research-access-<env>-<account>` (private, SSE-S3, versioned, every version kept five years, the maintainer's to confirm). It records each read of the researcher under the role, and the API's writes and census reads each night (ADR-029 §11). Not S3 server access logs, which are per bucket (every photo fetch through CloudFront with them) and delivered on a best-effort basis; not CloudWatch Logs, for which the trail would need a role passed to CloudTrail, and the apply role passes roles to EC2 and RDS monitoring only.
+
+`modules/media` has the lifecycle rule `research-to-glacier-ir`: a day's file moves to Glacier Instant Retrieval after 365 days, still read at once and the same way, and nothing expires (ADR-029 §8). A file under 128 KB stays in Standard. That is S3's default since September 2024, set explicitly in the module, and it is right here: Glacier Instant Retrieval bills every object as at least 128 KB and each transition is a request, so moving a small file would make it dearer. Staging's files, with little in them, stay; production's, with the events of thousands of people, are expected to pass 128 KB and move. `modules/observability` has the alarm `kuutti-<env>-nightly-job-failed` (`docs/runbooks/alerts.md`). Cost: data events at 0.10 USD per 100,000, about a hundred a night, so cents a year; the log bucket holds megabytes; the alarm and its metric 0.40 USD a month per environment.
+
+**Apply, in this order** (maintainer):
+
+1. **This change.** Merging applies `envs/staging` through `infra.yml`, as for every module. Nothing in `bootstrap` changes: the apply role creates a role under the boundary, puts inline policies on roles that carry it, and creates the trail and the bucket under PowerUserAccess; it passes no role.
+2. **The app half**, the export job, after it or the same day. Deployed before, it is harmless: its nightly export fails with AccessDenied, writes nothing, and the first night after the apply catches up on every day the table still holds.
+3. **The checks** below, the morning after the first night with both.
+4. **The handover**, staging only. Production has neither the module nor the copy until the maintainer has answered ADR-029's ninety days (above); its handover then waits on ADR-029's other open points too: the wording of the research consent, the DPIA (#190), the agreement with the partner.
+
+**Check** (`pnpm aws:login`, then in `infra/envs/staging` after `tofu init`). The policies, by simulation, so nothing is read or written:
+
+```sh
+ROLE=$(tofu output -raw research_read_role_arn)
+API=$(aws iam get-role --role-name kuutti-api-staging --query Role.Arn --output text)
+B=$(tofu output -raw research_uri | cut -d/ -f3)
+DAY="arn:aws:s3:::$B/research/2026/10/2026-10-16.parquet"
+sim() { aws iam simulate-principal-policy --policy-source-arn "$1" "${@:2}" --query 'EvaluationResults[].[EvalActionName,EvalDecision]' --output text; }
+sim "$ROLE" --action-names s3:GetObject --resource-arns "$DAY"                                # allowed
+sim "$ROLE" --action-names s3:PutObject s3:DeleteObject --resource-arns "$DAY"                # implicitDeny twice
+sim "$ROLE" --action-names s3:GetObject --resource-arns "arn:aws:s3:::$B/media/x/full.webp"   # implicitDeny
+sim "$ROLE" --action-names s3:ListBucket --resource-arns "arn:aws:s3:::$B" \
+  --context-entries 'ContextKeyName=s3:prefix,ContextKeyValues=research/,ContextKeyType=string'   # allowed
+sim "$ROLE" --action-names s3:ListBucket --resource-arns "arn:aws:s3:::$B" \
+  --context-entries 'ContextKeyName=s3:prefix,ContextKeyValues=media/,ContextKeyType=string'      # implicitDeny
+sim "$API" --action-names s3:PutObject --resource-arns "$DAY" \
+  --context-entries 'ContextKeyName=s3:if-none-match,ContextKeyValues=*,ContextKeyType=string'    # allowed
+sim "$API" --action-names s3:PutObject s3:DeleteObject --resource-arns "$DAY"                 # implicitDeny twice: no overwrite, no delete
+aws iam get-role --role-name kuutti-staging-research-read \
+  --query 'Role.[AssumeRolePolicyDocument.Statement[0].Condition,PermissionsBoundary.PermissionsBoundaryArn,MaxSessionDuration]'
+aws s3api get-bucket-lifecycle-configuration --bucket "$B" --query '[TransitionDefaultMinimumObjectSize,Rules[].ID]'
+```
+
+The night's export, in the API's log and in the trail. A simulation does not show whether S3 hands the `If-None-Match` header to an identity policy; the night's write does, so `written` of 1 or more in the job's line is that proof, and `nightly job failed` with AccessDenied on a PutObject under `research/` points at the condition first:
+
+```sh
+aws logs tail /kuutti/staging/api --since 12h --filter-pattern '{ $.job = "research-export" }'
+```
+
+Then a read, as the researcher would make it: assign the permission set to your own user (Hand over, below), read with the profile, remove the assignment.
+
+```sh
+K=$(aws s3 ls "$(tofu output -raw research_uri)" --recursive --profile kuutti-research | tail -1 | awk '{print $4}')
+aws s3 cp "s3://$B/$K" /tmp/ --profile kuutti-research
+aws s3 ls "s3://$B/media/" --profile kuutti-research   # AccessDenied
+```
+
+Within a quarter of an hour the trail has it, and the log files check out:
+
+```sh
+LOG=$(tofu output -raw research_access_log_bucket)
+TRAIL=$(tofu output -raw research_trail_name)
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+P="s3://$LOG/AWSLogs/$ACCOUNT/CloudTrail/eu-central-1/$(date -u +%Y/%m/%d)/"
+for f in $(aws s3 ls "$P" | awk '{print $4}'); do aws s3 cp "$P$f" - | gunzip; done \
+  | jq -r '.Records[] | [.eventTime, .eventName, .userIdentity.arn, .requestParameters.key, .errorCode // ""] | @tsv'
+aws cloudtrail get-trail-status --name "$TRAIL" --query '[IsLogging,LatestDeliveryTime,LatestDeliveryError]'
+aws cloudtrail validate-logs --trail-arn "arn:aws:cloudtrail:eu-central-1:$ACCOUNT:trail/$TRAIL" --start-time "$(date -u -v-1d +%FT%TZ)"
+```
+
+The rows are the GetObject as `arn:aws:sts::<account>:assumed-role/kuutti-staging-research-read/<session name>` and the night's PutObject and GetObjects as `assumed-role/kuutti-api-staging/i-…`. The refused listing of `media/` is not among them: it is outside `research/`, and a listing is no object call. `validate-logs` needs the hourly digests, so it says something once the trail has run for a day.
+
+**Hand over** (Identity Center, your admin session; for production, the legal steps first). Once per environment, the permission set whose one right is assuming the role:
+
+```sh
+SET=$(tofu output -raw research_permission_set)
+ROLE=$(tofu output -raw research_read_role_arn)
+INSTANCE=$(aws sso-admin list-instances --query 'Instances[0].InstanceArn' --output text)
+STORE=$(aws sso-admin list-instances --query 'Instances[0].IdentityStoreId' --output text)
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+PS=$(aws sso-admin create-permission-set --instance-arn "$INSTANCE" --name "$SET" --session-duration PT1H \
+  --description "Assume the research copy's read-only role and nothing else (#194, ADR-029)" \
+  --query PermissionSet.PermissionSetArn --output text)
+aws sso-admin put-inline-policy-to-permission-set --instance-arn "$INSTANCE" --permission-set-arn "$PS" \
+  --inline-policy "$(jq -nc --arg role "$ROLE" '{Version: "2012-10-17", Statement: [{Effect: "Allow", Action: "sts:AssumeRole", Resource: $role}]}')"
+```
+
+`PS` again later, from the name:
+
+```sh
+PS=$(aws sso-admin list-permission-sets --instance-arn "$INSTANCE" --query 'PermissionSets[]' --output text | tr '\t' '\n' \
+  | while read -r p; do [ "$(aws sso-admin describe-permission-set --instance-arn "$INSTANCE" --permission-set-arn "$p" --query PermissionSet.Name --output text)" = "$SET" ] && echo "$p"; done)
+```
+
+The researcher is a user of Identity Center, created in its console (Users, Add user, with "Send an email to this user with password setup instructions"; a user made with `aws identitystore create-user` gets no such mail), user name their work address; the instance's settings make them register an MFA device at the first sign-in (`docs/runbooks/aws-account-setup.md`, step 5). Then the assignment, which provisions the role `AWSReservedSSO_<set>_<hash>` in the account, the one the trust admits:
+
+```sh
+RESEARCHER=$(aws identitystore get-user-id --identity-store-id "$STORE" \
+  --alternate-identifier '{"UniqueAttribute": {"AttributePath": "userName", "AttributeValue": "<user name>"}}' --query UserId --output text)
+aws sso-admin create-account-assignment --instance-arn "$INSTANCE" --target-id "$ACCOUNT" --target-type AWS_ACCOUNT \
+  --permission-set-arn "$PS" --principal-type USER --principal-id "$RESEARCHER"
+```
+
+Send them this profile block, filled in (nothing in it is secret), and `docs/research/README.md`. They sign in with `aws sso login --sso-session kuutti` and copy the folder down with `aws s3 sync <research_uri> ./research/ --profile kuutti-research`.
+
+```ini
+[sso-session kuutti]
+sso_start_url = <the access portal URL your own aws:login profile uses>
+sso_region = eu-central-1
+sso_registration_scopes = sso:account:access
+
+[profile kuutti-research-sso]
+sso_session = kuutti
+sso_account_id = <ACCOUNT>
+sso_role_name = <SET>
+region = eu-central-1
+
+[profile kuutti-research]
+source_profile = kuutti-research-sso
+role_arn = <ROLE>
+role_session_name = <their user name>
+region = eu-central-1
+```
+
+Revoking is removing the assignment: `aws sso-admin delete-account-assignment` with the arguments of its creation. Credentials already issued run out within the hour; to end them at once, deny every session issued before now, which is what the IAM console's "Revoke active sessions" writes:
+
+```sh
+aws iam put-role-policy --role-name kuutti-staging-research-read --policy-name AWSRevokeOlderSessions \
+  --policy-document "$(jq -nc --arg t "$(date -u +%FT%TZ)" '{Version: "2012-10-17", Statement: [{Effect: "Deny", Action: "*", Resource: "*", Condition: {DateLessThan: {"aws:TokenIssueTime": $t}}}]}')"
+```
+
+What stays possible, accepted: the trail names the role session, whose name is the researcher's own setting; which Identity Center user stood behind a session is in the `AssumeRole` management event, which this trail does not record and CloudTrail's Event history keeps for 90 days (with one person per permission set that is moot). The trust has one pattern for the role's path with the region segment and one without, and no wildcard before the role's name; the suffix after the name is a wildcard, so a set named `KuuttiResearchStaging_<anything>` would pass too. Only the maintainer creates sets, and matching the suffix exactly waits for a provisioned role's ARN to show its length, since CI could not correct the trust afterwards (ADR-029 §10). On staging, the code of a pull request's preview runs under the same instance role and could read `research/` or write a day not yet written (ADR-004 §3, ADR-029 §12). The night refuses to go on past a file of a day not yet closed, which no night of the API writes, and stays stopped (the alarm mails) until you remove the file with your own session; a closed day the night has not reached yet cannot be told from its own. Such a file stands as the day's for good: the researcher copies it down, nothing checks it against rule 5 (only the format's name is read), and the census counts its pseudonyms as released, so invented carriers can open cells under k in the files of the ninety days after it. Staging's people are invented, and production has no previews.
+
 ### Observability (#11)
 
-`infra/modules/observability`, composed by each environment: an SNS topic `kuutti-<env>-alerts` in eu-central-1, alarms for the instance status check, the instance and RDS CPU credit balances, RDS free storage and the API's 5xx rate (a metric filter on `/kuutti/<env>/api`), and three saved Logs Insights queries. The subscriber is the repository variable `ALERT_EMAIL` (`gh variable set ALERT_EMAIL --body <project alias>`), which CI hands to OpenTofu as `TF_VAR_alert_email`; confirm the subscription from that mailbox after the first apply (`aws sns list-subscriptions-by-topic --topic-arn <alerts_topic_arn>` shows `PendingConfirmation` until the link in AWS's mail is followed), then run the delivery test in `docs/runbooks/alerts.md`. Without the variable the topic exists with no subscriber. About 0.80 USD a month per environment.
+`infra/modules/observability`, composed by each environment: an SNS topic `kuutti-<env>-alerts` in eu-central-1, alarms for the instance status check, the instance and RDS CPU credit balances, RDS free storage, the API's 5xx rate (a metric filter on `/kuutti/<env>/api`) and a failed nightly job (#194), and three saved Logs Insights queries. The subscriber is the repository variable `ALERT_EMAIL` (`gh variable set ALERT_EMAIL --body <project alias>`), which CI hands to OpenTofu as `TF_VAR_alert_email`; confirm the subscription from that mailbox after the first apply (`aws sns list-subscriptions-by-topic --topic-arn <alerts_topic_arn>` shows `PendingConfirmation` until the link in AWS's mail is followed), then run the delivery test in `docs/runbooks/alerts.md`. Without the variable the topic exists with no subscriber. About 2 USD a month per environment (the module's header has the sum).
 
 Logs reach that group through the Docker daemon's default driver, which user data sets to `awslogs` before Dokploy's installer starts a single container (`modules/compute/templates/user_data.sh.tpl`): every container on the box logs to `/kuutti/<env>/api`, one stream per container name, Dokploy's own included. Nothing to set per application. The instance role allows the stream calls; the group has 30-day retention.
 

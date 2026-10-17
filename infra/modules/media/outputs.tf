@@ -3,6 +3,16 @@ output "bucket" {
   value       = aws_s3_bucket.media.bucket
 }
 
+output "bucket_arn" {
+  description = "For modules/research: the research copy lives in this bucket (#194, ADR-029)."
+  value       = aws_s3_bucket.media.arn
+}
+
+output "research_prefix" {
+  description = "Where in the bucket the research copy lives; the lifecycle rule moves it to Glacier Instant Retrieval after a year (#194, ADR-029 §8)."
+  value       = local.research_prefix
+}
+
 output "media_url_base" {
   description = "SSM parameter media-url-base: the API's MEDIA_URL_BASE, the distribution's name; objects are signed under /media/."
   value       = "https://${var.api_fqdn}"

@@ -67,3 +67,29 @@ output "alerts_topic_arn" {
   description = "Alarm notifications (#11); the email subscription is confirmed from the mailbox."
   value       = module.observability.alerts_topic_arn
 }
+
+# The research copy (#194, ADR-029); null while media_enabled is off.
+# infra/README.md, Research copy, uses them for the handover and the checks.
+output "research_read_role_arn" {
+  description = "The researcher's read-only role: the role_arn of the profile handed over and the one resource of the permission set's inline policy."
+  value       = one(module.research[*].read_role_arn)
+}
+
+output "research_permission_set" {
+  description = "The Identity Center permission set the role's trust admits; created and assigned by the maintainer."
+  value       = one(module.research[*].permission_set)
+}
+
+output "research_uri" {
+  description = "Where the copy is read from."
+  value       = one(module.research[*].uri)
+}
+
+output "research_access_log_bucket" {
+  description = "The trail's bucket: every object call under research/."
+  value       = one(module.research[*].access_log_bucket)
+}
+
+output "research_trail_name" {
+  value = one(module.research[*].trail_name)
+}

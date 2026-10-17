@@ -43,7 +43,8 @@ export function partitionStart(name: string): Date | null {
   return monthPartition(Number(m[1]), Number(m[2])).from;
 }
 
-async function existing(db: Queryable): Promise<string[]> {
+/** The partitions of `events` by name, ascending: by month, since the names carry it. */
+export async function eventPartitions(db: Queryable): Promise<string[]> {
   const { rows } = await db.query<{ relname: string }>(
     `SELECT c.relname FROM pg_inherits i
      JOIN pg_class c ON c.oid = i.inhrelid
@@ -59,7 +60,7 @@ export async function ensureEventPartitions(
 ): Promise<{ created: number; partitions: string[] }> {
   return transaction(db, async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock($1)", [PARTITIONS_LOCK_KEY]);
-    const have = new Set(await existing(tx));
+    const have = new Set(await eventPartitions(tx));
     let created = 0;
     for (const p of partitionsAhead(now)) {
       if (have.has(p.name)) continue;
@@ -77,7 +78,22 @@ export async function ensureEventPartitions(
       );
       created += 1;
     }
-    return { created, partitions: [...(await existing(tx))] };
+    return { created, partitions: [...(await eventPartitions(tx))] };
+  });
+}
+
+/** Whether a month has reached the retention by its oldest possible row. */
+function expired(start: Date, now: Date): boolean {
+  return start.getTime() <= now.getTime() - EVENTS_RETENTION_DAYS * DAY_MS;
+}
+
+/** The months the prune would drop as of `now`, ascending. */
+async function expiredPartitions(db: Queryable, now: Date): Promise<MonthPartition[]> {
+  return (await eventPartitions(db)).flatMap((name) => {
+    const start = partitionStart(name);
+    return start && expired(start, now)
+      ? [monthPartition(start.getUTCFullYear(), start.getUTCMonth() + 1)]
+      : [];
   });
 }
 
@@ -85,35 +101,45 @@ export async function pruneEventPartitions(
   db: Queryable,
   now: Date,
 ): Promise<{ dropped: number; partitions: string[] }> {
-  const cutoff = new Date(now.getTime() - EVENTS_RETENTION_DAYS * DAY_MS);
   return transaction(db, async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock($1)", [PARTITIONS_LOCK_KEY]);
     let dropped = 0;
-    for (const name of await existing(tx)) {
-      const start = partitionStart(name);
-      if (!start || start.getTime() > cutoff.getTime()) continue;
+    for (const { name } of await expiredPartitions(tx, now)) {
       // Its oldest row has reached the retention: the whole month goes, the
       // one deletion the table allows, and nothing in it is older than promised.
       await tx.query(`DROP TABLE "${name}"`);
       dropped += 1;
     }
-    return { dropped, partitions: [...(await existing(tx))] };
+    return { dropped, partitions: [...(await eventPartitions(tx))] };
   });
 }
 
-/** The nightly job: next month ready, months past retention gone. */
-export function researchEventsJob(deps: { db: Queryable; now: () => Date }): NightlyJob {
+/**
+ * The nightly job: next month ready, months past retention gone. Where the
+ * research copy is written, `beforeDrop` checks it first and answers the days
+ * of the months to drop that have no file (ADR-029 §6); the drop goes ahead
+ * either way, since the binding text's ninety days win over the copy.
+ */
+export function researchEventsJob(deps: {
+  db: Queryable;
+  now: () => Date;
+  beforeDrop?: (months: MonthPartition[]) => Promise<number>;
+}): NightlyJob {
   return {
     name: "research-events-partitions",
     run: async () => {
-      // One clock read: a month rolling over between the two steps would leave a month uncreated.
+      // One clock read: a month rolling over between the steps would leave a month uncreated.
       const now = deps.now();
       const ensured = await ensureEventPartitions(deps.db, now);
+      const uncopied: Record<string, number> = deps.beforeDrop
+        ? { uncopied: await deps.beforeDrop(await expiredPartitions(deps.db, now)) }
+        : {};
       const pruned = await pruneEventPartitions(deps.db, now);
       return {
         created: ensured.created,
         dropped: pruned.dropped,
         partitions: pruned.partitions.length,
+        ...uncopied,
       };
     },
   };

@@ -84,6 +84,27 @@ describe("ensure and prune", () => {
     expect(result.created).toBe(2); // 2021_07 and 2021_08
     expect(result.dropped).toBe(2); // 2021_01 and 2021_02
     expect(result.partitions).toBeGreaterThanOrEqual(2);
+    // Where no research copy is written, nothing is said about one.
+    expect(result).not.toHaveProperty("uncopied");
+  });
+
+  test("asks the copy about exactly the months it drops, and drops them whatever it answers", async ({
+    ctx,
+  }) => {
+    await ensureEventPartitions(ctx.client, new Date("2021-01-10T00:00:00Z")); // 2021_01, 2021_02
+    const asked: string[][] = [];
+    const job = researchEventsJob({
+      db: ctx.client,
+      now: () => new Date("2021-07-01T00:00:00Z"),
+      beforeDrop: async (months) => {
+        asked.push(months.map((m) => m.name));
+        return 3;
+      },
+    });
+    const result = await job.run();
+    expect(asked).toEqual([["events_2021_01", "events_2021_02"]]);
+    // ADR-029 §6, P1: the ninety days of the binding text win over the copy.
+    expect(result).toMatchObject({ dropped: 2, uncopied: 3 });
   });
 
   test("rows are never updated, deleted or truncated", async ({ ctx }) => {
