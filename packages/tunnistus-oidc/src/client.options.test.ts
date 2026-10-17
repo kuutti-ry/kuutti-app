@@ -98,21 +98,50 @@ describe("choosing the dialect", () => {
     }
   });
 
+  it("takes Telia's hosts in any case and on the default port for the Telia dialect, keys and all", async () => {
+    for (const issuer of [
+      "https://TUNNISTUS-PP.telia.fi/uas",
+      "https://tunnistus-pp.telia.fi:443/uas",
+      "https://Tunnistus-PP.Telia.FI:443/uas",
+    ]) {
+      const provider = fixtureProvider({ jwks });
+      const client = await fixtureClient(keys, provider, { issuer });
+      expect(client.dialect).toBe("telia");
+      await expect(fixtureClient(keys, provider, { issuer, signingKeyPem: null })).rejects.toThrow(
+        "the telia dialect needs the signing and encryption keys",
+      );
+    }
+  });
+
   it("takes any other issuer for the plain dialect, which carries no keys", async () => {
     const client = await createTunnistusClient(plainOptions(plainProvider()));
     expect(client.dialect).toBe("plain");
     expect(client.keyIds).toBeNull();
   });
 
-  it("lets the caller name the plain dialect for a Telia issuer: the keys are then ignored", async () => {
-    const provider = teliaProvider();
-    const client = await fixtureClient(keys, provider, { dialect: "plain" });
-    expect(client.dialect).toBe("plain");
-    expect(client.keyIds).toBeNull();
-    const url = await client.startLogin({ state: "s", nonce: "n" });
-    expect(url.searchParams.get("request")).toBeNull();
-    expect(url.searchParams.get("scope")).toBe("openid");
-  });
+  it.each([
+    ["the plain dialect named for it", { dialect: "plain" as const }],
+    ["http", { issuer: "http://tunnistus.telia.fi/uas" }],
+    [
+      "http in the Telia dialect",
+      { issuer: "http://tunnistus-pp.telia.fi/uas", dialect: "telia" as const },
+    ],
+    ["another port", { issuer: "https://tunnistus.telia.fi:8443/uas" }],
+    [
+      "another port, in capitals with a trailing dot",
+      { issuer: "https://TUNNISTUS-PP.telia.fi.:8443/uas" },
+    ],
+  ])(
+    "does not start on Telia's host with %s: only the Telia dialect, over https on the default port, and asks nothing of the broker",
+    async (_name, overrides) => {
+      const provider = teliaProvider();
+      await expect(fixtureClient(keys, provider, overrides)).rejects.toMatchObject({
+        name: "TunnistusError",
+        reason: "Telia's host takes the telia dialect only, over https on the default port",
+      });
+      expect(provider.requests).toEqual([]);
+    },
+  );
 
   it("lets the caller name the Telia dialect for another host, with the same demand for both keys", async () => {
     const provider = fixtureProvider({ issuer: "https://broker.example/uas", jwks });
@@ -194,22 +223,23 @@ describe("the keys", () => {
     ).rejects.toThrow();
   });
 
-  it("signs nothing with an RSA key under 2048 bits (guide 2.1.1): the request and the token request fail", async () => {
-    // The client starts with it; the signature is refused when it is made.
-    const small = generateKeyPairSync("rsa", { modulusLength: 1024 }).privateKey.export({
-      format: "pem",
-      type: "pkcs8",
-    }) as string;
-    const provider = teliaProvider();
-    const client = await fixtureClient(keys, provider, { signingKeyPem: small });
-    await expect(client.startLogin({ state: "s", nonce: "n" })).rejects.toThrow(
-      "unsupported operation",
-    );
-    await expect(
-      client.completeLogin({ callbackUrl: callback("s"), state: "s", nonce: "n" }),
-    ).rejects.toMatchObject({ reason: "unsupported operation" });
-    expect(provider.lastTokenForm()).toBeNull();
-  });
+  it.each([
+    ["signing", "signingKeyPem"],
+    ["encryption", "encryptionKeyPem"],
+  ])(
+    "does not start with an RSA %s key under 2048 bits (guide 2.1.1), names its size, and asks nothing of the broker",
+    async (_name, option) => {
+      const small = generateKeyPairSync("rsa", { modulusLength: 1024 }).privateKey.export({
+        format: "pem",
+        type: "pkcs8",
+      }) as string;
+      const provider = teliaProvider();
+      await expect(fixtureClient(keys, provider, { [option]: small })).rejects.toThrow(
+        "a Telia key is RSA of 2048 bits or more (guide 2.1.1), not 1024",
+      );
+      expect(provider.requests).toEqual([]);
+    },
+  );
 });
 
 describe("the level asked for (acr_values)", () => {
@@ -226,6 +256,37 @@ describe("the level asked for (acr_values)", () => {
     ).toBe(ACR_LOA2);
   });
 
+  it("sends the levels trimmed and one space apart, and accepts only those", async () => {
+    const provider = teliaProvider({ acr: "mpki.telia.emulator.1" });
+    const client = await fixtureClient(keys, provider, {
+      acrValues: ` \t${ACR_LOA2}   ${ACR_LOATEST2}\n`,
+    });
+    const request = decodeJwt(
+      (await client.startLogin({ state: "s", nonce: "n" })).searchParams.get("request") ?? "",
+    );
+    expect(request.acr_values).toBe(`${ACR_LOA2} ${ACR_LOATEST2}`);
+    await expect(
+      client.completeLogin({ callbackUrl: callback("s"), state: "s", nonce: "n" }),
+    ).rejects.toMatchObject({ reason: "unexpected acr" });
+  });
+
+  it.each([
+    ["null", null],
+    ["empty", ""],
+    ["blank", "  "],
+    ["whitespace", "\t\n"],
+  ])(
+    "does not start in the Telia dialect with acrValues %s: the level is mandatory (Traficom 213/2023 S)",
+    async (_name, acrValues) => {
+      const provider = teliaProvider({ acr: "mpki.telia.emulator.1" });
+      await expect(fixtureClient(keys, provider, { acrValues })).rejects.toMatchObject({
+        name: "TunnistusError",
+        reason: "the telia dialect needs acr_values (Traficom 213/2023 S)",
+      });
+      expect(provider.requests).toEqual([]);
+    },
+  );
+
   it("refuses a level outside the ones asked for", async () => {
     const client = await fixtureClient(keys, teliaProvider({ acr: "mpki.telia.emulator.1" }));
     await expect(
@@ -236,6 +297,7 @@ describe("the level asked for (acr_values)", () => {
   it.each([
     ["null", null],
     ["empty", ""],
+    ["blank", "  "],
   ])(
     "with acrValues %s the plain dialect asks for no level and accepts the one the mock sends",
     async (_name, acrValues) => {

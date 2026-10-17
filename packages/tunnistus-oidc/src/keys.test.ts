@@ -65,6 +65,22 @@ describe("keys", () => {
     expect(() => publicJwk(pem, "sig")).toThrow("a Telia key is RSA (guide 2.1.1)");
   });
 
+  it("refuses an RSA key under 2048 bits, naming its size (guide 2.1.1), and takes 2048 itself", () => {
+    const pem = (bits: number) =>
+      generateKeyPairSync("rsa", { modulusLength: bits }).privateKey.export({
+        format: "pem",
+        type: "pkcs8",
+      }) as string;
+    for (const bits of [1024, 2047]) {
+      const small = pem(bits);
+      const refusal = `a Telia key is RSA of 2048 bits or more (guide 2.1.1), not ${bits}`;
+      expect(() => keyIdOf(small)).toThrow(refusal);
+      expect(() => publicJwk(small, "sig")).toThrow(refusal);
+      expect(() => publicJwk(small, "enc")).toThrow(refusal);
+    }
+    expect(keyIdOf(pem(2048))).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
+
   it("refuses a public key, an empty string and something that is not a key", async () => {
     const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const publicPem = publicKey.export({ format: "pem", type: "spki" }) as string;

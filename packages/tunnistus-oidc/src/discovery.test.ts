@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { DiscoveryError, discoverProvider, isTeliaIssuer } from "./discovery.ts";
+import { DiscoveryError, discoverProvider, isOnTeliaHost, isTeliaIssuer } from "./discovery.ts";
 
 const SEEDED = { seed: 20261011 };
 
@@ -110,7 +110,7 @@ describe("OpenID discovery", () => {
     },
   );
 
-  it("refuses the optional lists when they are not lists of strings, and accepts them absent", async () => {
+  it("refuses the optional lists when they are not lists of strings", async () => {
     for (const field of ["token_endpoint_auth_methods_supported", "acr_values_supported"]) {
       await expect(
         discoverProvider(issuer, answering(200, { ...document, [field]: "private_key_jwt" })),
@@ -119,8 +119,24 @@ describe("OpenID discovery", () => {
         discoverProvider(issuer, answering(200, { ...document, [field]: [1, 2] })),
       ).rejects.toThrow(/not a provider document/);
     }
+  });
+
+  it("refuses a Telia document that does not offer private_key_jwt (guide 2.6), and asks it of no other provider", async () => {
     const { token_endpoint_auth_methods_supported: _methods, ...bare } = document;
-    await expect(discoverProvider(issuer, answering(200, bare))).resolves.toEqual(bare);
+    for (const withoutIt of [
+      bare,
+      { ...document, token_endpoint_auth_methods_supported: [] },
+      { ...document, token_endpoint_auth_methods_supported: ["client_secret_basic", "none"] },
+    ]) {
+      await expect(discoverProvider(issuer, answering(200, withoutIt))).rejects.toThrow(
+        `OpenID discovery for ${issuer} failed: no private_key_jwt at the token endpoint`,
+      );
+    }
+    const mock = "http://127.0.0.1:8080/ftn";
+    const mockDocument = { ...bare, issuer: mock };
+    await expect(discoverProvider(mock, async () => Response.json(mockDocument))).resolves.toEqual(
+      mockDocument,
+    );
   });
 
   it("returns the fields it checks and drops the rest", async () => {
@@ -150,39 +166,75 @@ describe("OpenID discovery", () => {
     expect(error).toMatchObject({ name: "DiscoveryError", issuer: `${issuer}/` });
   });
 
-  it("takes the host as written: no other scheme, host, port or spelling counts as Telia's", () => {
+  it("takes the host the URL names, over https only: no other scheme, host or port counts as Telia's", () => {
     for (const other of [
       "http://tunnistus.telia.fi/uas",
-      "https://tunnistus.telia.fi",
-      "https://TUNNISTUS.telia.fi/uas",
-      "https://tunnistus.telia.fi:443/uas",
+      "http://TUNNISTUS-PP.telia.fi:443/uas",
+      "https://tunnistus.telia.fi:8443/uas",
       "https://evil.tunnistus.telia.fi/uas",
       "https://tunnistus-pp.telia.fi.example/uas",
       "https://tunnistus.telia.fi@evil.example/uas",
       "https://tunnistus-qa.telia.fi/uas",
+      "tunnistus.telia.fi/uas",
+      "",
+    ]) {
+      expect(isTeliaIssuer(other), other).toBe(false);
+    }
+    for (const telia of [
+      "https://tunnistus.telia.fi/",
+      "https://tunnistus.telia.fi",
+      "https://TUNNISTUS.telia.fi/uas",
+      "https://tunnistus.telia.fi:443/uas",
+      "https://Tunnistus-PP.Telia.FI:443/uas",
+      "https://tunnistus-pp.telia.fi./uas",
       " https://tunnistus.telia.fi/uas",
     ]) {
-      expect(isTeliaIssuer(other)).toBe(false);
+      expect(isTeliaIssuer(telia), telia).toBe(true);
     }
-    expect(isTeliaIssuer("https://tunnistus.telia.fi/")).toBe(true);
   });
 
-  it("takes no URL on another host for Telia's, and any path on Telia's two (property)", () => {
+  it("tells Telia's host whatever the scheme or port, and no other host", () => {
+    for (const telia of [
+      "https://tunnistus.telia.fi/uas",
+      "http://tunnistus.telia.fi/uas",
+      "https://TUNNISTUS-PP.telia.fi:8443/uas",
+      "http://tunnistus-pp.telia.fi.:80/",
+    ]) {
+      expect(isOnTeliaHost(telia), telia).toBe(true);
+    }
+    for (const other of [
+      "https://tunnistus.telia.fi.example/uas",
+      "https://tunnistus.telia.fi@evil.example/uas",
+      "http://127.0.0.1:8080/ftn",
+      "tunnistus.telia.fi/uas",
+      "",
+    ]) {
+      expect(isOnTeliaHost(other), other).toBe(false);
+    }
+  });
+
+  it("takes no URL on another host for Telia's, and any path on Telia's two in any case and on the default port (property)", () => {
     fc.assert(
       fc.property(fc.webUrl({ withQueryParameters: true, withFragments: true }), (url) => {
-        const { host, protocol } = new URL(url);
-        const telia =
-          protocol === "https:" && ["tunnistus.telia.fi", "tunnistus-pp.telia.fi"].includes(host);
-        expect(isTeliaIssuer(url)).toBe(telia && url.startsWith(`https://${host}/`));
+        const { hostname, port, protocol } = new URL(url);
+        expect(isTeliaIssuer(url)).toBe(
+          protocol === "https:" &&
+            port === "" &&
+            ["tunnistus.telia.fi", "tunnistus-pp.telia.fi"].includes(hostname),
+        );
       }),
       SEEDED,
     );
     fc.assert(
       fc.property(
         fc.constantFrom("tunnistus.telia.fi", "tunnistus-pp.telia.fi"),
+        fc.array(fc.boolean(), { minLength: 21, maxLength: 21 }),
+        fc.constantFrom("", ":443"),
         fc.webPath(),
-        (host, path) => {
-          expect(isTeliaIssuer(`https://${host}/${path.replace(/^\//, "")}`)).toBe(true);
+        (host, capitals, port, path) => {
+          const spelled = [...host].map((c, i) => (capitals[i] ? c.toUpperCase() : c)).join("");
+          expect(isTeliaIssuer(`https://${spelled}${port}/${path.replace(/^\//, "")}`)).toBe(true);
+          expect(isTeliaIssuer(`http://${spelled}${port}/${path.replace(/^\//, "")}`)).toBe(false);
         },
       ),
       SEEDED,

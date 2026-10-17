@@ -13,7 +13,8 @@ export const ProviderMetadata = z.object({
   token_endpoint: z.url(),
   jwks_uri: z.url(),
   // Telia authenticates clients with private_key_jwt only (guide 2.6); a mock
-  // lists several. Anything that does not offer it cannot be the broker.
+  // lists several. A document on Telia's host that does not offer it cannot
+  // be the broker, and discoverProvider refuses it.
   token_endpoint_auth_methods_supported: z.array(z.string()).optional(),
   acr_values_supported: z.array(z.string()).optional(),
 });
@@ -35,6 +36,7 @@ type Fetch = (input: string, init?: { signal?: AbortSignal }) => Promise<Respons
  * Fetches and validates the provider's metadata. The `issuer` in the document
  * must equal the configured one, character for character (OpenID Connect
  * Discovery 4.3): a document served from somewhere else is not the broker.
+ * On Telia's host the document must offer private_key_jwt (guide 2.6).
  */
 export async function discoverProvider(
   issuer: string,
@@ -57,10 +59,39 @@ export async function discoverProvider(
   if (parsed.data.issuer !== normalised) {
     throw new DiscoveryError(issuer, `document names issuer ${parsed.data.issuer}`);
   }
+  if (
+    isTeliaIssuer(issuer) &&
+    !parsed.data.token_endpoint_auth_methods_supported?.includes("private_key_jwt")
+  ) {
+    throw new DiscoveryError(issuer, "no private_key_jwt at the token endpoint");
+  }
   return parsed.data;
 }
 
-/** Telia's pre-production and production hosts, where the Telia dialect is the only one. */
+const TELIA_HOSTS = new Set(["tunnistus.telia.fi", "tunnistus-pp.telia.fi"]);
+
+/**
+ * The issuer as URL when it names one of Telia's two hosts, whatever its
+ * scheme or port. Read through URL, as the client reads the issuer it
+ * connects to: the host in any case, the trailing dot of a fully qualified
+ * name (#235).
+ */
+function teliaHostUrl(issuer: string): URL | null {
+  const url = URL.parse(issuer);
+  return url && TELIA_HOSTS.has(url.hostname.replace(/\.$/, "")) ? url : null;
+}
+
+/** On Telia's host, whatever the scheme or port: where nothing but the Telia dialect may speak. */
+export function isOnTeliaHost(issuer: string): boolean {
+  return teliaHostUrl(issuer) !== null;
+}
+
+/**
+ * Telia's pre-production and production issuers, where the Telia dialect is
+ * the only one: its host over https on the default port, written or not.
+ * Telia's documents name https issuers, so an http one is never the broker.
+ */
 export function isTeliaIssuer(issuer: string): boolean {
-  return /^https:\/\/tunnistus(-pp)?\.telia\.fi\//.test(issuer);
+  const url = teliaHostUrl(issuer);
+  return url?.protocol === "https:" && url.port === "";
 }

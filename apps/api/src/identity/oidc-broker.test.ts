@@ -85,6 +85,42 @@ describe("OidcBroker, the adapter over @kuutti/tunnistus-oidc", () => {
       }),
     ).rejects.toThrow(/TELIA_SIGNING_KEY and TELIA_ENCRYPTION_KEY/);
   });
+
+  it("knows Telia's issuer in another spelling (capitals, the default port) and asks the keys of it too", async () => {
+    await expect(
+      OidcBroker.create({
+        issuer: "https://TUNNISTUS-PP.telia.fi:443/uas",
+        clientId: telia.clientId,
+        redirectUri: telia.redirectUri,
+        acrValues: ACR_LOATEST2,
+        signingKeyPem: null,
+        encryptionKeyPem: null,
+        fetch: telia.fetch,
+      }),
+    ).rejects.toThrow("a Telia issuer needs TELIA_SIGNING_KEY and TELIA_ENCRYPTION_KEY");
+  });
+
+  it("does not boot against Telia's host over http or on another port: the kit refuses it", async () => {
+    for (const issuer of [
+      "http://tunnistus-pp.telia.fi/uas",
+      "https://tunnistus-pp.telia.fi:8443/uas",
+    ]) {
+      await expect(
+        OidcBroker.create({
+          issuer,
+          clientId: telia.clientId,
+          redirectUri: telia.redirectUri,
+          acrValues: ACR_LOATEST2,
+          signingKeyPem: telia.signingKeyPem,
+          encryptionKeyPem: telia.encryptionKeyPem,
+          fetch: telia.fetch,
+        }),
+      ).rejects.toMatchObject({
+        name: "TunnistusError",
+        reason: "Telia's host takes the telia dialect only, over https on the default port",
+      });
+    }
+  });
 });
 
 describe("the broker's configuration", () => {

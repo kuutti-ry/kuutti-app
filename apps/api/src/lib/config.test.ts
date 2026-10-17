@@ -387,4 +387,17 @@ describe("ssmPrefix", () => {
     expect(config.OIDC_REDIRECT_URI).toBe("https://api.staging.kuutti.app/auth/callback");
     expect(config.HETU_HMAC_KEY).toBe("a".repeat(64));
   });
+
+  it("trims the level asked of the bank and refuses a blank one (Traficom 213/2023 S)", () => {
+    const local = { DATABASE_URL: "postgres://x" };
+    expect(
+      parseConfig({ ...local, OIDC_ACR_VALUES: " http://ftn.ficora.fi/2017/loatest2\n" })
+        .OIDC_ACR_VALUES,
+    ).toBe("http://ftn.ficora.fi/2017/loatest2");
+    for (const blank of ["", "  ", "\n"]) {
+      expect(() => parseConfig({ ...local, OIDC_ACR_VALUES: blank })).toThrow(
+        /^Invalid configuration: OIDC_ACR_VALUES: /,
+      );
+    }
+  });
 });

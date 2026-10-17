@@ -5,6 +5,7 @@ import {
   ACR_LOATEST2,
   createTunnistusClient,
   type TunnistusClient,
+  type TunnistusClientOptions,
   TunnistusError,
 } from "./client.ts";
 import { keyIdOf } from "./keys.ts";
@@ -322,8 +323,11 @@ describe("the double's other answers, through the client", () => {
       { redirectUri: "https://api.kuutti.app/auth/callback" },
       /^redirect_uri is not registered$/,
     ],
-    ["no acr_values", { acrValues: null }, /^acr_values is mandatory \(Traficom 213\/2023 S\)$/],
-    ["the plain dialect", { dialect: "plain" as const }, /^no request object \(guide 2\.4\.1\)$/],
+    [
+      "a level the broker does not offer",
+      { acrValues: "http://ftn.ficora.fi/2017/loa3" },
+      /^acr_values names a level the broker does not offer$/,
+    ],
   ])(
     "is refused at the authorization endpoint when it has %s",
     async (_name, overrides, refusal) => {
@@ -341,6 +345,48 @@ describe("the double's other answers, through the client", () => {
       await expect(telia.authorize(url)).rejects.toThrow(/^authorization endpoint answered 400: /);
       expect(telia.seen.refusals).toHaveLength(1);
       expect(telia.seen.refusals[0]).toMatch(refusal);
+    },
+  );
+
+  it.each([
+    ["none", null],
+    ["a blank one", "  "],
+  ])(
+    "has no client with %s for a level, so no login completes at the level the broker happens to answer",
+    async (_name, acrValues) => {
+      telia.person = { ...telia.person, acr: "mpki.telia.emulator.1" };
+      await expect(clientFor(telia, acrValues)).rejects.toMatchObject({
+        reason: "the telia dialect needs acr_values (Traficom 213/2023 S)",
+      });
+    },
+  );
+
+  it.each([
+    ["lists other client authentication only", ["client_secret_basic", "client_secret_post"]],
+    ["lists none", undefined],
+  ])(
+    "has no client against a broker whose document %s: Telia authenticates clients with private_key_jwt (guide 2.6)",
+    async (_name, methods) => {
+      const fetch: TunnistusClientOptions["fetch"] = async (url, init) => {
+        const response = await telia.fetch(url, init);
+        if (!url.endsWith("/.well-known/openid-configuration")) return response;
+        const document = await response.json();
+        return Response.json({ ...document, token_endpoint_auth_methods_supported: methods });
+      };
+      await expect(
+        createTunnistusClient({
+          issuer: TELIA_ISSUER,
+          clientId: telia.clientId,
+          redirectUri: telia.redirectUri,
+          acrValues: ACR_LOATEST2,
+          signingKeyPem: telia.signingKeyPem,
+          encryptionKeyPem: telia.encryptionKeyPem,
+          fetch,
+        }),
+      ).rejects.toMatchObject({
+        name: "TunnistusError",
+        reason: "no private_key_jwt at the token endpoint",
+      });
     },
   );
 

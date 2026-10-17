@@ -440,16 +440,25 @@ describe("age from year and month", () => {
 });
 
 describe("generateHetu", () => {
-  it("stays within the ages asked for, in 002–899, with a sign of the right century", () => {
+  it("stays within the ages asked for, in 002–899, with a sign of the right century, or refuses a year the format cannot carry", () => {
     fc.assert(
       fc.property(
         unitFloats,
         fc.integer({ min: 0, max: 100 }),
         fc.integer({ min: 0, max: 30 }),
-        fc.date({ min: new Date("1950-01-01"), max: new Date("2070-12-31"), noInvalidDate: true }),
+        fc.date({ min: new Date("1750-01-01"), max: new Date("2250-12-31"), noInvalidDate: true }),
         (values, minAge, span, at) => {
           const maxAge = minAge + span;
-          const code = generateHetu(rngFrom(values), { minAge, maxAge, at });
+          let code: string;
+          try {
+            code = generateHetu(rngFrom(values), { minAge, maxAge, at });
+          } catch (error) {
+            // Only when some birth year the ages allow is outside 1800–2099.
+            expect(error).toBeInstanceOf(RangeError);
+            const year = at.getUTCFullYear();
+            expect(year - maxAge - 1 < 1800 || year - minAge > 2099).toBe(true);
+            return;
+          }
           const parsed = parseHetu(code);
           expect(parsed).not.toBeNull();
           if (!parsed) return;
@@ -465,6 +474,26 @@ describe("generateHetu", () => {
       ),
       { ...SEEDED, numRuns: 500 },
     );
+  });
+
+  it("refuses a birth year outside 1800–2099, which no century sign carries, naming the year", () => {
+    const at = (iso: string) => new Date(`${iso}T12:00:00Z`);
+    // 2150 at eighteen was 010132-…, which reads as 1932.
+    expect(() => generateHetu(() => 0, { at: at("2150-12-31"), minAge: 18, maxAge: 18 })).toThrow(
+      new RangeError("no century sign carries the birth year 2132 (1800–2099)"),
+    );
+    expect(() => generateHetu(() => 0, { at: at("1817-12-31"), minAge: 18, maxAge: 18 })).toThrow(
+      new RangeError("no century sign carries the birth year 1799 (1800–2099)"),
+    );
+    // The two ends themselves (January, so the year is not moved back).
+    for (const [iso, year] of [
+      ["2117-12-31", 2099],
+      ["1818-12-31", 1800],
+    ] as const) {
+      const parsed = parseHetu(generateHetu(() => 0, { at: at(iso), minAge: 18, maxAge: 18 }));
+      expect(parsed?.birthYear).toBe(year);
+      expect(CENTURY_SIGNS[parsed?.centurySign ?? ""]).toBe(Math.floor(year / 100) * 100);
+    }
   });
 
   it("reaches both ends of the individual numbers and every sign of a century", () => {
