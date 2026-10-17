@@ -351,9 +351,10 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     expect(again.href).toContain("error=auth_state_mismatch");
     expect(again.href).not.toContain("code=");
     expect(broker.completed).toEqual([state]);
+    // Against this process's clock, the one the API wrote expires_at with.
     const attempt = await ctx.client.query(
-      "SELECT outcome, expires_at <= clock_timestamp() AS spent FROM auth_request WHERE state = $1",
-      [state],
+      "SELECT outcome, expires_at <= $2 AS spent FROM auth_request WHERE state = $1",
+      [state, new Date()],
     );
     expect(attempt.rows).toEqual([{ outcome: "answered", spent: true }]);
     expect(await count(ctx, "SELECT count(*) AS n FROM admin_session")).toBe(0);
