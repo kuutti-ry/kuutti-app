@@ -67,6 +67,6 @@ apps/mobile/
 
 ## Specs and tests
 
-- Rules-layer slices (`identity`, `matching`, `media`'s photo check, `pond`, `safety`, erasure) have `features/<slice>/*.feature`. The rest have ordinary tests.
+- Rules-layer slices (`identity`, `matching`, `media`'s photo check, `pond`, `safety`, `chat`, erasure) have `features/<slice>/*.feature`. The rest have ordinary tests.
 - Scenario name = test name, verbatim. `Scenario Outline` = `describe(<name>)` around `it.each(rows)`. `@pending` for spec-before-code.
 - `pnpm check:scenarios` runs in CI. Renaming a scenario without renaming its test fails the build; that is the point.

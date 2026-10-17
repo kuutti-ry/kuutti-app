@@ -10,7 +10,7 @@ import { addressOf, personOf, rateLimit, TRUSTED_PROXIES } from "./rate-limit.ts
 import { serverRequestId } from "./request-id.ts";
 
 describe("logger redaction", () => {
-  it("never writes hetu, email, message text, credentials or a report's note", async () => {
+  it("never writes hetu, email, message text, credentials, a report's note or a message's body", async () => {
     const { logger, lines } = await captureLogger();
     logger.info(
       {
@@ -19,11 +19,13 @@ describe("logger redaction", () => {
         message: "hello there",
         authorization: "Bearer secret-token",
         note: "he asked for my number",
+        body: "see you at the station",
         nested: {
           personal_identity_code: "010190-123A",
           email: "c@d.fi",
           text: "private words",
           note: "she is in year nine",
+          body: "my number is in my bio",
         },
         accountId: "acc-1",
       },
@@ -39,6 +41,8 @@ describe("logger redaction", () => {
       "private words",
       "he asked for my number",
       "she is in year nine",
+      "see you at the station",
+      "my number is in my bio",
     ]) {
       expect(out).not.toContain(forbidden);
     }

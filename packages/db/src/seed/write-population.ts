@@ -110,6 +110,14 @@ export async function deleteIdentities(
     "DELETE FROM block WHERE blocker_identity_id = ANY($1) OR blocked_identity_id = ANY($1)",
     [identities],
   );
+  // The conversations the accounts are in go whole, the other side's
+  // participant row and the messages with them (#348): they too outlive an
+  // erasure for the counterpart, and the reset starts clean.
+  await tx.query(
+    `DELETE FROM conversation WHERE id IN (
+       SELECT conversation_id FROM conversation_participant WHERE account_id = ANY($1))`,
+    [accounts],
+  );
   for (const table of ACCOUNT_TABLES) {
     await tx.query(`DELETE FROM ${table} WHERE account_id = ANY($1)`, [accounts]);
   }

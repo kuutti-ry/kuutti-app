@@ -3,6 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Queryable } from "@kuutti/db";
 import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
+import { chatRoutes } from "./chat/index.ts";
 import { healthRoutes } from "./health/index.ts";
 import {
   accountRoutes,
@@ -198,6 +199,8 @@ export function createApp(deps: Deps) {
   app.route("/", feedbackRoutes(deps, guard));
   app.route("/", feedbackAdminRoutes(deps, moderators));
   app.route("/", reportRoutes(deps, guard));
+  // The conversations a match opens and their text messages (#348, ADR-031).
+  app.route("/", chatRoutes(deps, guard));
   app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   app.route("/", configAdminRoutes(deps, admins));
   app.route("/", overviewAdminRoutes(deps, moderators));

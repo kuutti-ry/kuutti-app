@@ -132,3 +132,15 @@ Feature: Account deletion per the erasure table
     When "A" exports the account, in English, Finnish or Swedish
     Then the export lists A's two reports with their reasons, A's own note and what came of them, and A's three blocks by date, in the request's language
     And nothing names "B", "C", "D", "E" or "F", and nothing of E's report or F's block is there
+
+  Scenario: Erasure leaves the counterpart "Deleted user" and the messages, and closes the conversation
+    Given "A" and "B" wrote to each other, and "A" wrote once more under a shadow ban still open
+    When "A" deletes the account
+    Then "B" reads every message "B" could read before, under "Deleted user", in a conversation closed as deleted
+    And "A"'s link to it is gone, the withheld message too, and "B" cannot write
+
+  Scenario: The export carries the person's own messages and the counterpart's as a time and a length
+    Given "A" and "B" wrote to each other
+    When "A" exports the account
+    Then each conversation has its opening, its state, "A"'s messages with their words and "B"'s with a time and a length
+    And nothing in it is "B"'s account id or "B"'s words

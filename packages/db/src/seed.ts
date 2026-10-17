@@ -102,6 +102,11 @@ export const MATCHING_CONFIG_V1 = {
   // day, counted from report in the statement that writes the row; the sixth
   // is refused in words, and nothing is written, the block included.
   reports_per_day: 5,
+  // #348 (ADR-031 §6, migration 0054): the longest message, in characters
+  // after trimming, and the messages one account may send in a minute; the
+  // send reads both on each request.
+  message_max_length: 2000,
+  messages_per_minute: 30,
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,

@@ -1,4 +1,12 @@
 import { z } from "zod";
+import {
+  ConversationClosedHow,
+  DaysBand,
+  ElapsedBand,
+  MessageCountBand,
+  MessageKind,
+  MessageLengthBand,
+} from "./chat.ts";
 import { FeedbackKind } from "./feedback.ts";
 import { Gender } from "./onboarding.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
@@ -45,6 +53,41 @@ export const RESEARCH_EVENTS = {
     props: props({
       /** Whole days from the pause to the login that ended it: coarse on purpose, like sinceRegistrationD. */
       afterDays: z.int().min(0),
+    }),
+  },
+  // The chat (#348, ADR-031 §7): the sender's, the two people's, never the
+  // text. Lengths, waits, counts and days are bands: an exact value beside
+  // the hour would point at one row (ADR-011 §1), and the copy releases a
+  // value only where k people share it (ADR-029 §4). No event says a block or
+  // a sanction ended a conversation (ADR-030 §9, ADR-024).
+  message_sent: {
+    question:
+      "How do conversations go: how long the messages are, and how soon they follow the match and each other (#348)?",
+    props: props({
+      kind: MessageKind,
+      length: MessageLengthBand,
+      firstInConversation: z.boolean(),
+      /** From the match's opening to this message. */
+      sinceOpened: ElapsedBand,
+      /** From the message before it, either side's; null for the first. */
+      sincePrevious: ElapsedBand.nullable(),
+    }),
+  },
+  conversation_archived: {
+    question:
+      "How many matches fall silent, after how many messages and how long after the match (#348, TD-13)?",
+    props: props({
+      messages: MessageCountBand,
+      /** Whole days from the opening to the night that archived it. */
+      days: DaysBand,
+    }),
+  },
+  conversation_closed: {
+    question:
+      "How do conversations end that the person did not end themselves by a block: an unmatch or an erasure, after how many messages (#348)?",
+    props: props({
+      how: ConversationClosedHow,
+      messages: MessageCountBand,
     }),
   },
 } as const;

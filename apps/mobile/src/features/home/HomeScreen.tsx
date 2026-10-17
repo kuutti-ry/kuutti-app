@@ -9,6 +9,7 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
+import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
 import { GateCard, WaitlistCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
@@ -110,6 +111,8 @@ export function HomeScreen() {
             >
               <Text>{t("profile.home.open")}</Text>
             </Button>
+            {/* The conversations a match opens, with what is unread (#348). */}
+            <ChatsButton />
           </View>
         )}
       </ScrollView>

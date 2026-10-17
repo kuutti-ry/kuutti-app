@@ -111,6 +111,8 @@ function requestFor(
             message: FIXTURES.message,
             text: FIXTURES.message,
             note: FIXTURES.message,
+            // A message's text (#348), under the name the send takes it by.
+            body: FIXTURES.message,
             nested: { hetu: FIXTURES.hetu, body: FIXTURES.message },
           }),
         }

@@ -2,6 +2,7 @@ export * from "./account.ts";
 export * from "./account-state.ts";
 export * from "./admin.ts";
 export type { components as ApiComponents, paths as ApiPaths } from "./api.generated.ts";
+export * from "./chat.ts";
 export * from "./config.ts";
 export * from "./deal-breakers.ts";
 export { ErrorResponse } from "./errors.ts";

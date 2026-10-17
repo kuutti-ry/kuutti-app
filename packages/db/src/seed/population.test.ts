@@ -502,7 +502,7 @@ describe("writing the population", () => {
     });
   });
 
-  it("takes a person's reports and blocks with them, on either side of them, and nobody else's (#84)", async () => {
+  it("takes a person's reports, blocks and conversations with them, on either side of them, and nobody else's (#84, #348)", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });
       const accountOf = async (subject: string) => {
@@ -552,8 +552,32 @@ describe("writing the population", () => {
         await blocked(live, kept);
         await blocked(kept, gone);
         await blocked(other, kept);
+        // A conversation with a synthetic person goes whole; one between the kept two stays (#348).
+        const conversation = async (a: Person, b: Person) => {
+          const { rows } = await pool.query<{ id: string }>(
+            "INSERT INTO conversation DEFAULT VALUES RETURNING id",
+          );
+          const id = rows[0]?.id as string;
+          await pool.query(
+            `INSERT INTO conversation_participant (conversation_id, account_id, side)
+             VALUES ($1, $2, 'a'), ($1, $3, 'b')`,
+            [id, a.id, b.id],
+          );
+          await pool.query(
+            `INSERT INTO message (conversation_id, seq, side, client_id, kind, body)
+             VALUES ($1, 1, 'a', gen_random_uuid(), 'text', 'Hei')`,
+            [id],
+          );
+          return id;
+        };
+        await conversation(live, kept);
+        const between = await conversation(kept, other);
 
         expect(await removePopulation(pool)).toEqual({ removed: 40, spared: 0 });
+        const { rows: conversations } = await pool.query("SELECT id FROM conversation");
+        expect(conversations).toEqual([{ id: between }]);
+        const { rows: messages } = await pool.query("SELECT conversation_id FROM message");
+        expect(messages).toEqual([{ conversation_id: between }]);
         const { rows: reports } = await pool.query(
           "SELECT reporter_account_id, reported_account_id FROM report",
         );

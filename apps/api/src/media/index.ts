@@ -13,7 +13,7 @@ export {
   type PhotoErasure,
 } from "./erasure.ts";
 export { sweepPendingPhotos } from "./moderation.ts";
-export { type MediaDeps, uploadPhoto } from "./photos.ts";
+export { issueConversationThumb, type MediaDeps, uploadPhoto } from "./photos.ts";
 export {
   listApprovedPhotos,
   listPhotos,

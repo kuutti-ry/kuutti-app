@@ -100,6 +100,8 @@ describe("the guard's own reading", () => {
 describe("blocks and reports", () => {
   it("Nothing but the filters reads a block", () => {
     expect(readersOf(readsBlock)).toEqual([
+      // The conversation: a block ends it for both, and its blocker never sees it again (ADR-030 §2, ADR-031 §2).
+      "apps/api/src/chat/repo.ts",
       // The gate's count: who is in whose pool (ADR-015 §1).
       "apps/api/src/jobs/pond-gate.ts",
       // The photos a card showed (ADR-008 §3).

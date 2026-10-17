@@ -200,6 +200,16 @@ function anExport(): Record<string, unknown> {
       ],
     },
     blocks: { about: "When you blocked someone.", items: [{ at }] },
+    // The person's own words and the counterpart's as a time and a length (#348).
+    conversations: [
+      {
+        openedAt: at,
+        state: "open",
+        closedHow: null,
+        mine: [{ at, body: "Hei" }],
+        theirs: [{ at, length: 12 }],
+      },
+    ],
   };
 }
 

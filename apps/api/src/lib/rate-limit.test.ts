@@ -298,6 +298,40 @@ describe("rate limit bookkeeping", () => {
     expect(blocked.headers.get("retry-after")).toBe("1");
   });
 
+  // #348: a limit that is a matching_config row is asked on each request, so
+  // an admin's new version holds from the next one (#305).
+  it("asks a function for its limit on every request, and holds the new number from the next one", async () => {
+    let limit = 1;
+    const asked: string[] = [];
+    const app = new Hono<AppEnv>();
+    app.use("*", serverRequestId());
+    app.use(
+      "*",
+      rateLimit({
+        limit: async (c) => {
+          asked.push(c.req.path);
+          return limit;
+        },
+        windowMs: 1_000,
+        keyOf: addressOf("traefik"),
+        now: () => 0,
+      }),
+    );
+    app.get("/", (c) => c.text("ok"));
+    const client = from({ "x-forwarded-for": "203.0.113.7" });
+    const first = await app.request("/", client);
+    expect(first.status).toBe(200);
+    expect(first.headers.get("ratelimit-limit")).toBe("1");
+    expect((await app.request("/", client)).status).toBe(429);
+    limit = 3;
+    const third = await app.request("/", client);
+    expect(third.status).toBe(200);
+    expect(third.headers.get("ratelimit-limit")).toBe("3");
+    expect(third.headers.get("ratelimit-remaining")).toBe("0");
+    expect((await app.request("/", client)).status).toBe(429);
+    expect(asked).toEqual(["/", "/", "/", "/"]);
+  });
+
   it("a window is over at its last millisecond, not before", async () => {
     let clock = 0;
     const app = limitedApp(() => clock);

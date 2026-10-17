@@ -1,6 +1,7 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { describePhoto, type TFunction } from "@kuutti/i18n";
 import type { AccountExport, ExportedPhotoCheck } from "@kuutti/schema";
+import { eraseConversationsOf, exportConversations } from "../chat/index.ts";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
@@ -57,6 +58,12 @@ import { visibleState } from "./standing.ts";
 // person nor of the blocker meets the other. The export lists the reports
 // the person filed and the blocks they set, from this account or an earlier
 // one of their identity, since both are kept on it; never whom.
+// The conversations (#348, ADR-031 §5): the person's link goes and their open
+// conversations close; the messages stay for the counterpart, who reads
+// "Deleted user" (TD-7's kept side), except those the counterpart never
+// received (sent under a shadow ban still open), which go; a conversation
+// whose other person was erased before goes whole. The export carries the
+// person's own messages and the counterpart's as a time and a length.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -85,6 +92,12 @@ export type ErasureSummary = {
   sanctions: number;
   /** 0 or 1: the research_id mapping (#50); the events stay, unlinkable. */
   researchSubjects: number;
+  /** The conversations whose link to the person was cut (#348); their messages stay for the counterpart. */
+  conversations: number;
+  /** The person's messages the counterpart never received, under a shadow ban still open (#348). */
+  withheldMessages: number;
+  /** Conversations whose other person was erased before: nobody is left to keep them for (#348). */
+  emptiedConversations: number;
   photos: number;
   accessRows: number;
   shownRows: number;
@@ -122,6 +135,11 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const consents = await repo.deleteConsentsOfAccount(tx, accountId);
     const exports = await repo.deleteExportsOfAccount(tx, accountId);
     const feedback = await deleteFeedbackOfAccount(tx, accountId);
+    // Before the sanctions go: what an open shadow ban withheld is known by it (ADR-031 §5).
+    const chat = await eraseConversationsOf(
+      { db: tx, logger: deps.logger, now: () => at },
+      accountId,
+    );
     const sanctions = await deleteSanctionsOfAccount(tx, accountId);
     // Kept: the reports either way and the blocks on the identity (ADR-030 §8).
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
@@ -145,6 +163,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       feedback,
       sanctions,
       researchSubjects,
+      chat,
       reregisterAfter: deletion.reregisterAfter,
     };
   });
@@ -165,6 +184,9 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     feedback: result.feedback,
     sanctions: result.sanctions,
     researchSubjects: result.researchSubjects,
+    conversations: result.chat.conversations,
+    withheldMessages: result.chat.withheld,
+    emptiedConversations: result.chat.emptied,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
     shownRows: result.photos.shownRows,
@@ -238,6 +260,7 @@ export async function exportAccount(
     sanctions,
     reports,
     blocks,
+    conversations,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
@@ -251,6 +274,7 @@ export async function exportAccount(
     listSanctionsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     listReportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     listBlocksOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    exportConversations(deps.db, accountId),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -328,6 +352,8 @@ export async function exportAccount(
       about: t("account.export.block.about"),
       items: blocks.map((block) => ({ at: block.at.toISOString() })),
     },
+    // The person's own words, and the counterpart's as a time and a length (ADR-031 §5); never whom.
+    conversations,
   };
   return { document, files: photos.files };
 }

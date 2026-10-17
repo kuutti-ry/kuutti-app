@@ -8,6 +8,7 @@ import {
   type SanctionReason,
   SUSPENSION_DAYS_MAX,
 } from "@kuutti/schema";
+import { closeConversationsOf } from "../chat/index.ts";
 import {
   endSessionsForSanction,
   lockAccountForSanction,
@@ -189,8 +190,9 @@ export type ApplyInput = {
 /**
  * Applies a sanction (ADR-024 §2-§4): the audit row, the sanction row, the
  * account and identity settled, and for a suspension or a ban every session
- * ended. A ban binds an erased account's identity too; anything else refuses a
- * tombstone. Nothing the person can read changes for a shadow ban.
+ * ended; a ban closes the person's conversations too (#348). A ban binds an
+ * erased account's identity too; anything else refuses a tombstone. Nothing
+ * the person can read changes for a shadow ban.
  */
 export async function applySanction(db: Queryable, input: ApplyInput): Promise<Sanction> {
   const note = noteOf(input.note);
@@ -240,6 +242,15 @@ export async function applySanction(db: Queryable, input: ApplyInput): Promise<S
       await endSessionsForSanction(tx, {
         accountIds: account.accounts.filter((a) => a.state !== "deleted").map((a) => a.id),
         identityId: account.identityId,
+        at: input.at,
+      });
+    }
+    // A ban closes the person's conversations for good (#348, ADR-031 §2);
+    // a suspension closes none, and they wait for its end.
+    if (input.kind === "ban") {
+      await closeConversationsOf(tx, {
+        accountIds: account.accounts.filter((a) => a.state !== "deleted").map((a) => a.id),
+        how: "sanction",
         at: input.at,
       });
     }

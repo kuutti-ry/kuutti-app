@@ -1,7 +1,9 @@
 import {
   AccountState,
   CONSENT_KINDS,
+  ConversationCloseKind,
   GENDERS,
+  MessageKind,
   ModeratorRole,
   PHOTO_VARIANTS,
   PhotoRejectionReason,
@@ -38,10 +40,13 @@ describe("the tables", () => {
       "block",
       "card_shown",
       "consent",
+      "conversation",
+      "conversation_participant",
       "feedback",
       "gate",
       "identity",
       "matching_config",
+      "message",
       "moderator_roles",
       "photo",
       "photo_access",
@@ -106,9 +111,12 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, and from a conversation to its people and messages; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
+      // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5).
+      "conversation_participant.conversation_id -> conversation.id cascade",
+      "message.conversation_id -> conversation.id cascade",
       "photo_review.photo_id -> photo.id cascade",
     ]);
   });
@@ -122,6 +130,8 @@ describe("the foreign keys", () => {
       "auth_request",
       "card_shown",
       "consent",
+      // The person's place in a conversation, cut to null at erasure (#348).
+      "conversation_participant",
       "feedback",
       "gate",
       "photo",
@@ -280,6 +290,31 @@ describe("the checks", () => {
       "report_note_check",
     ]);
   });
+
+  it("hold a conversation's close together, its sequences from one, and a text with its body (#348, ADR-031 §2)", () => {
+    const checks = (table: string) =>
+      byName
+        .get(table)
+        ?.checks.map((check) => check.name)
+        .sort();
+    expect(checks("conversation")).toEqual([
+      "conversation_closed_check",
+      "conversation_next_seq_check",
+    ]);
+    expect(checks("conversation_participant")).toEqual(["conversation_participant_read_check"]);
+    expect(checks("message")).toEqual(["message_seq_check", "message_text_body_check"]);
+    const unique = (table: string) =>
+      byName
+        .get(table)
+        ?.indexes.filter((index) => index.config.unique)
+        .map((index) => index.config.name)
+        .sort();
+    expect(unique("conversation_participant")).toEqual([
+      "conversation_participant_account_idx",
+      "conversation_participant_side_idx",
+    ]);
+    expect(unique("message")).toEqual(["message_client_idx", "message_seq_idx"]);
+  });
 });
 
 describe("the enums", () => {
@@ -300,6 +335,9 @@ describe("the enums", () => {
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
     // Where a report was made: a card, until the chat of #101 adds the conversation.
     expect(enums.report_source).toEqual(["card"]);
+    expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
+    expect(enums.conversation_side).toEqual(["a", "b"]);
+    expect(enums.message_kind).toEqual(MessageKind.options);
   });
 
   it("are all exported, so drizzle-kit generates them", () => {

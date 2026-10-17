@@ -335,8 +335,13 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0048, #303; 0052, #84) are not there yet.
-          const later = new Set(["moderation_response_hours", "reports_per_day"]);
+          // the keys a later migration adds (0048, #303; 0052, #84; 0054, #348) are not there yet.
+          const later = new Set([
+            "moderation_response_hours",
+            "reports_per_day",
+            "message_max_length",
+            "messages_per_minute",
+          ]);
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
               Object.keys(MATCHING_CONFIG_V2).length,
@@ -415,11 +420,14 @@ describe("migrate", () => {
           "block",
           "card_shown",
           "consent",
+          "conversation",
+          "conversation_participant",
           "events",
           "feedback",
           "gate",
           "identity",
           "matching_config",
+          "message",
           "moderator_roles",
           "photo",
           "photo_access",
