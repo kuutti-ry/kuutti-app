@@ -224,15 +224,19 @@ type Derived = Awaited<ReturnType<typeof deriveFromBroker>>;
 /**
  * The re-registration rule applied and acted on. Two logins of the same
  * person can run at once (two devices): when this one loses the insert of the
- * identity, the rule is applied once more against the row the other created,
- * which then reads as a resume.
+ * identity or of the account, the rule is applied once more against the rows
+ * the other created, which then read as a resume. Three passes are enough:
+ * an identity is never deleted (outside the demo tools' resets), so its
+ * insert is lost once at most, and an account lost to another login is live
+ * when the next pass reads it (erasing it in between leaves a cooldown, which
+ * refuses).
  */
 async function resolveAccount(
   deps: LoginDeps,
   derived: Derived,
   now: Date,
 ): Promise<{ accountId: string; outcome: AuthExchangeResponse["outcome"] }> {
-  for (let attempt = 0; ; attempt++) {
+  for (let pass = 0; pass < 3; pass++) {
     const identity = await repo.findIdentityByHmac(deps.db, derived.hetuHmac);
     const liveAccount = identity ? await repo.findLiveAccount(deps.db, identity.id) : null;
     const decision = decideRegistration({ identity, liveAccount, now });
@@ -261,15 +265,13 @@ async function resolveAccount(
           hetuHmac: derived.hetuHmac,
           ...derived.reference,
         });
-        if (!created) {
-          if (attempt > 0) throw new Error("identity insert lost twice");
-          continue;
-        }
+        if (!created) continue;
         const account = await repo.insertAccount(deps.db, {
           identityId: created.id,
           birthYear: derived.birthYear,
           birthMonth: derived.birthMonth,
         });
+        if (!account) continue;
         return { accountId: account.id, outcome: "created" };
       }
       case "create_account": {
@@ -279,6 +281,7 @@ async function resolveAccount(
           birthYear: derived.birthYear,
           birthMonth: derived.birthMonth,
         });
+        if (!account) continue;
         return { accountId: account.id, outcome: "created" };
       }
       case "resume": {
@@ -292,6 +295,7 @@ async function resolveAccount(
       }
     }
   }
+  throw new Error("registration lost to another login three times");
 }
 
 /** The broker's answer reduced to what the identity keeps; the hetu does not leave this function. */

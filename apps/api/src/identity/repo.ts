@@ -334,18 +334,24 @@ export async function countRefusedAttempt(db: Queryable, identityId: string): Pr
   ]);
 }
 
+/**
+ * Null when the identity has a live account already: two logins of the same
+ * person can both decide to create one (two devices), and the loser must go
+ * through the decision again, where it resumes the winner's, rather than
+ * surface the unique violation of `account_one_live_per_identity_idx`.
+ */
 export async function insertAccount(
   db: Queryable,
   input: { identityId: string; birthYear: number; birthMonth: number },
-): Promise<Account> {
+): Promise<Account | null> {
   const { rows } = await db.query<Row>(
     `INSERT INTO account (identity_id, state, birth_year, birth_month)
-     VALUES ($1, 'registered', $2, $3) RETURNING *`,
+     VALUES ($1, 'registered', $2, $3)
+     ON CONFLICT (identity_id) WHERE state <> 'deleted' DO NOTHING RETURNING *`,
     [input.identityId, input.birthYear, input.birthMonth],
   );
   const row = rows[0];
-  if (!row) throw new Error("account insert returned no row");
-  return accountFrom(row);
+  return row ? accountFrom(row) : null;
 }
 
 // Sessions (#35). Every read is keyed by a token hash or by (session id,
