@@ -7,7 +7,7 @@ import {
 } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Fragment, useCallback, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -179,10 +179,9 @@ export function ConversationScreen({ id }: { id: string }) {
         </View>
       )}
       {view.status === "ready" && (
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        // Padding on Android too: the app draws edge to edge, so the window
+        // no longer resizes for the keyboard, which then covered the composer.
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
           <Conversation
             detail={view.detail}
             messages={view.messages}
