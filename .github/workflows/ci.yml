@@ -194,8 +194,12 @@ jobs:
       - name: No forbidden identifiers in the schema
         run: pnpm check:schema-words
 
-      - name: One counted version in the root and the apps
+      - name: One counted version in the root, the apps and openapi.json (ADR-028)
         run: pnpm check:version
+
+      # The bump itself is not checked here: Dependabot's pull requests never bump (ADR-028 §6).
+      - name: The bump command's own logic (ADR-028)
+        run: node scripts/bump-version.ts --self-test
 
   compose:
     name: compose

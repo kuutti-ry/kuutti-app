@@ -1,0 +1,34 @@
+#!/bin/sh
+# Refuses to push a branch other than main whose root package.json version is
+# not past origin/main's: a pull request carries its own bump (#172, ADR-028),
+# and a rebase onto a main that another pull request bumped can leave the
+# branch on main's own number. It also refuses a branch whose base is older
+# than main's last bump, which would conflict on the version lines (#333).
+# The comparison is node's (`node scripts/bump-version.ts --check-ahead
+# <commit>`), against origin/main (upstream/main in a fork's clone) as this
+# clone last fetched it; the hook does not fetch. Enable once per clone,
+# together with the other hooks:
+#
+#   git config core.hooksPath .githooks
+#
+# `pnpm version:bump patch` (or minor) writes the next number from main's.
+# `git push --no-verify` skips it for the push that has to go out as it is.
+command -v node >/dev/null 2>&1 || exit 0
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main) continue ;;
+    refs/heads/*) ;;
+    *) continue ;;
+  esac
+  # A deletion pushes the zero id: nothing to compare.
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;;
+  esac
+  if ! node scripts/bump-version.ts --check-ahead "$local_sha"; then
+    echo "pre-push: ${remote_ref#refs/heads/} is refused ('git push --no-verify' skips this check)." >&2
+    status=1
+  fi
+done
+exit $status

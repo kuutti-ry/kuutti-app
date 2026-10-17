@@ -44,6 +44,7 @@ The TD numbers are the technical decisions log, TD-1 to TD-19, which lives in th
 | [ADR-025](025-admin-host.md) | The moderation panel's host | accepted (the open points at the end are the maintainer's) | 2026-10-16 | TD-2 | |
 | [ADR-026](026-limits-per-person-and-sign-in-doors.md) | Limits per person, and the sign-in doors | accepted (the numbers of §5 are the maintainer's to change, in the parameter store), amended 2026-10-16 (§6, §8: a callback spends its attempt, #324) and 2026-10-17 (§8: a staff attempt's refusal at the claim goes back to the panel, #250); see History | 2026-10-16 | TD-3, TD-6 | |
 | [ADR-027](027-sign-in-code-bound-to-the-device.md) | The sign-in code works only on the phone that started the login | accepted (the random source of §5 is a `shortcut:` until the native batch, #184) | 2026-10-17 | TD-1 | |
+| [ADR-028](028-versioning-and-the-bump.md) | The version bump is one command, counted from main | accepted (the maintainer's request of 2026-10-17; a required CI check stays out, §6, and adding one is his) | 2026-10-17 | none | |
 
 ## The TD numbers
 
