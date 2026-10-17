@@ -7,8 +7,20 @@
 #
 #   git config core.hooksPath .githooks
 #
+# It also refuses half a version bump (ADR-028): when the root's package.json,
+# an app's, or apps/api/openapi.json is staged, the five as staged must carry
+# one number (`node scripts/check-version.ts --staged`). `pnpm version:bump
+# patch` (or minor) writes all five.
+#
 # `pnpm format` fixes most of what it names. `git commit --no-verify` skips it
 # for the commit that has to go out as it is.
+if ! git diff --cached --quiet -- package.json apps/api/package.json apps/admin/package.json \
+  apps/mobile/package.json apps/api/openapi.json && command -v node >/dev/null 2>&1; then
+  if ! node scripts/check-version.ts --staged >/dev/null; then
+    echo "pre-commit: the staged version is half a bump. Run 'pnpm version:bump patch' (or minor), stage the five files and commit again." >&2
+    exit 1
+  fi
+fi
 biome=node_modules/.bin/biome
 if [ ! -x "$biome" ]; then
   echo "pre-commit: Biome is not installed here (pnpm install), so the staged files go unchecked." >&2
