@@ -1,0 +1,1 @@
+ALTER TABLE "auth_request" ADD COLUMN "code_challenge" text;

@@ -20,6 +20,10 @@ import {
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 // One instant for the whole file, so two calls with the same arguments are equal.
 const BASE = Date.now();
+// Any well-formed sign-in verifier (ADR-027): 64 lowercase hex characters.
+const VERIFIER = "5a1e".repeat(16);
+const OTHER_VERIFIER = "beef".repeat(16);
+const TEN_MINUTES = 10 * 60 * 1000;
 const tokens = (n: number, accessExpiresInMs = 15 * 60 * 1000): SessionTokens => ({
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token(`access${n}`),
@@ -58,11 +62,17 @@ describe("session storage", () => {
     stop();
   });
 
-  it("keeps the pending login mark on this device too", async () => {
-    await markLoginStarted(BASE);
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith("kuutti.session.pending", String(BASE), {
-      keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
-    });
+  it("keeps the pending login mark on this device too, with its verifier", async () => {
+    await markLoginStarted(VERIFIER, BASE);
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      "kuutti.session.pending",
+      JSON.stringify({ at: BASE, verifier: VERIFIER }),
+      { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY },
+    );
+    // Deleted before written, as the session is.
+    const order = (fn: unknown) => (fn as jest.Mock).mock.invocationCallOrder.at(-1) ?? 0;
+    expect(order(SecureStore.deleteItemAsync)).toBeLessThan(order(SecureStore.setItemAsync));
+    await takeLoginStarted(BASE);
   });
 
   it("treats a value that does not parse as no session", async () => {
@@ -73,6 +83,68 @@ describe("session storage", () => {
   it("calls an access token stale thirty seconds before its expiry", () => {
     expect(accessTokenIsStale(tokens(1, 60 * 1000))).toBe(false);
     expect(accessTokenIsStale(tokens(1, 20 * 1000))).toBe(true);
+  });
+});
+
+describe("the pending login mark", () => {
+  // What a sign-in attempt leaves on the phone until its code comes back: when
+  // it started, and the verifier its code is bound to (ADR-027). Each test
+  // starts with none.
+  const { __store: store } = jest.requireMock("expo-secure-store") as {
+    __store: Map<string, string>;
+  };
+  beforeEach(async () => {
+    await takeLoginStarted();
+  });
+
+  it("gives back the verifier of the login it marked, once", async () => {
+    await markLoginStarted(VERIFIER, BASE);
+    expect(await takeLoginStarted(BASE + 1000)).toBe(VERIFIER);
+    expect(await takeLoginStarted(BASE + 2000)).toBeNull();
+    expect(store.has("kuutti.session.pending")).toBe(false);
+  });
+
+  it("keeps only the latest start's verifier", async () => {
+    await markLoginStarted(VERIFIER, BASE);
+    await markLoginStarted(OTHER_VERIFIER, BASE + 1000);
+    expect(await takeLoginStarted(BASE + 2000)).toBe(OTHER_VERIFIER);
+    expect(await takeLoginStarted(BASE + 3000)).toBeNull();
+  });
+
+  it("finds the mark in the secure store after the app was ended while the browser was open", async () => {
+    store.set("kuutti.session.pending", JSON.stringify({ at: BASE, verifier: VERIFIER }));
+    expect(await takeLoginStarted(BASE + 1000)).toBe(VERIFIER);
+  });
+
+  it.each([
+    ["at its tenth minute", BASE, BASE + TEN_MINUTES, VERIFIER],
+    ["just past its ten minutes", BASE, BASE + TEN_MINUTES + 1, null],
+    ["started later than now by a clock set back", BASE + 1000, BASE, null],
+  ])("holds the mark to its ten minutes, %s", async (_when, at, now, expected) => {
+    await markLoginStarted(VERIFIER, at);
+    expect(await takeLoginStarted(now)).toBe(expected);
+  });
+
+  it.each([
+    ["the time alone, as one from before ADR-027", String(BASE)],
+    ["not JSON", "{x"],
+    ["no verifier", JSON.stringify({ at: BASE })],
+    [
+      "a verifier the exchange would refuse",
+      JSON.stringify({ at: BASE, verifier: "5A1E".repeat(16) }),
+    ],
+    ["a time that is not a number", JSON.stringify({ at: String(BASE), verifier: VERIFIER })],
+    ["null", "null"],
+  ])("counts as none a stored mark holding %s", async (_what, value) => {
+    store.set("kuutti.session.pending", value);
+    expect(await takeLoginStarted(BASE + 1000)).toBeNull();
+    expect(store.has("kuutti.session.pending")).toBe(false);
+  });
+
+  it("counts an unreadable secure store as no mark", async () => {
+    store.set("kuutti.session.pending", JSON.stringify({ at: BASE, verifier: VERIFIER }));
+    (SecureStore.getItemAsync as jest.Mock).mockRejectedValueOnce(new Error("keychain locked"));
+    expect(await takeLoginStarted(BASE + 1000)).toBeNull();
   });
 });
 
@@ -182,9 +254,9 @@ describe("on the web preview", () => {
   });
 
   it("keeps the login mark in memory, good once", async () => {
-    await markLoginStarted(BASE);
-    expect(await takeLoginStarted(BASE + 1000)).toBe(true);
-    expect(await takeLoginStarted(BASE + 2000)).toBe(false);
+    await markLoginStarted(VERIFIER, BASE);
+    expect(await takeLoginStarted(BASE + 1000)).toBe(VERIFIER);
+    expect(await takeLoginStarted(BASE + 2000)).toBeNull();
     expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
     expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
   });

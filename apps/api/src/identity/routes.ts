@@ -72,7 +72,7 @@ const startRoute = createRoute({
   path: "/auth/start",
   summary: "Begin a bank login",
   description:
-    "Opened in the system browser by the app. Redirects to the identification broker's bank chooser; the person comes back through /auth/callback and the app receives a one-time code by deep link.",
+    "Opened in the system browser by the app, with the SHA-256 of the app's verifier for this attempt (code_challenge, ADR-027). Redirects to the identification broker's bank chooser; the person comes back through /auth/callback and the app receives a one-time code by deep link.",
   request: { query: AuthStartQuery },
   responses: {
     302: {
@@ -104,12 +104,14 @@ const exchangeRoute = createRoute({
   path: "/auth/exchange",
   summary: "Exchange the one-time code for a session",
   description:
-    "Single use, within 60 seconds of the callback. Answers with this device's access and refresh tokens; the app keeps both in secure storage.",
+    "Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. Answers with this device's access and refresh tokens; the app keeps both in secure storage.",
   request: { body: json(AuthExchangeRequest) },
   responses: {
     200: { description: "The device's session.", ...json(AuthExchangeResponse) },
     400: errorContent("Validation failed."),
-    401: errorContent("Unknown, used or expired code (auth_code_used)."),
+    401: errorContent(
+      "Unknown, used or expired code, or a verifier that is not its attempt's (auth_code_used).",
+    ),
     429: errorContent(
       "rate_limited: too many requests from this address (ADR-026 §1); Retry-After is the wait.",
     ),
@@ -308,6 +310,7 @@ export function authRoutes(
       const url = await startLogin(loginDeps(c.get("requestId")), {
         platform: query.platform,
         locale: query.locale ?? c.get("locale"),
+        codeChallenge: query.code_challenge,
       });
       return c.redirect(url.toString(), 302);
     } catch (error) {
@@ -341,8 +344,8 @@ export function authRoutes(
   });
 
   app.openapi(exchangeRoute, async (c) => {
-    const { code } = c.req.valid("json");
-    const login = await exchangeCode(sessionDeps, code);
+    const { code, verifier } = c.req.valid("json");
+    const login = await exchangeCode(sessionDeps, { code, verifier });
     const tokens = await issueSession(sessionDeps, {
       accountId: login.accountId,
       platform: login.platform,
@@ -384,6 +387,8 @@ export function authRoutes(
       const url = await startLogin(loginDeps(c.get("requestId")), {
         platform: ADMIN_PLATFORM,
         locale: query.locale ?? c.get("locale"),
+        // Unbound: the panel's code returns to its own https origin (ADR-027).
+        codeChallenge: null,
       });
       return c.redirect(url.toString(), 302);
     } catch (error) {

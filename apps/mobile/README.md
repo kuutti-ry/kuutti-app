@@ -45,7 +45,7 @@ Checks: an Android team member installs the dev client from the link and sees th
 
 ## Signing in and recovering an account
 
-Bank ID is the account: there is no password and no e-mail to recover through. The app opens the API's `/auth/start` in the system browser, the bank identifies the person, and the app receives a one-time code by deep link, which it exchanges for this device's session (an access token that renews itself, and a refresh token good for ninety days, both in the secure store). A lost or stolen phone is handled by signing in on a new phone and choosing "log out everywhere" on the settings screen: every device's session ends on its next request, and the old phone is back at the sign-in screen. Nothing is stored that could sign someone in without their bank.
+Bank ID is the account: there is no password and no e-mail to recover through. The app opens the API's `/auth/start` in the system browser, the bank identifies the person, and the app receives a one-time code by deep link, which only this phone can exchange, with the verifier it kept for the attempt (ADR-027), for this device's session (an access token that renews itself, and a refresh token good for ninety days, both in the secure store). A lost or stolen phone is handled by signing in on a new phone and choosing "log out everywhere" on the settings screen: every device's session ends on its next request, and the old phone is back at the sign-in screen. Nothing is stored that could sign someone in without their bank.
 
 ## Error reporting (Sentry, #11)
 

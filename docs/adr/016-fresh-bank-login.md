@@ -29,5 +29,5 @@ Until now the request object carried neither lever, and the confirmations table 
 
 ## Not decided here
 
-- PKCE (`code_challenge`, S256): the broker advertises it, the guide does not mention it, and with `private_key_jwt` and a confidential client it defends against code injection only. It needs a column for the verifier; it is a change of its own if wanted.
+- PKCE (`code_challenge`, S256): the broker advertises it, the guide does not mention it, and with `private_key_jwt` and a confidential client it defends against code injection only. It needs a column for the verifier; it is a change of its own if wanted. The app's own one-time code is bound to its attempt by ADR-027; this item is Telia's code only.
 - Whether `max_age` is also sent, should Telia turn out to honour one lever and not the other. The first pre-production login answers that.

@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { ErrorResponse } from "@kuutti/schema";
 import { createApp, ENDS_SESSION } from "../app.ts";
 import { type SignedIn, signedInAccount, signInAs, staffSession } from "../test/account.ts";
+import { CHALLENGE } from "../test/attempt.ts";
 import {
   captureLogger,
   describe,
@@ -266,7 +267,10 @@ describe("a sign-in start the address's limit refuses (ADR-026 §4)", () => {
     expect(refusedSignIns()).toEqual([address, address]);
     expect(JSON.stringify(logs())).not.toContain("203.0.113");
     // Another address is not refused: here, with no bank configured, the start says so.
-    expect((await get("/auth/start?platform=ios", undefined, OTHER_ADDRESS)).status).toBe(503);
+    expect(
+      (await get(`/auth/start?platform=ios&code_challenge=${CHALLENGE}`, undefined, OTHER_ADDRESS))
+        .status,
+    ).toBe(503);
   });
 });
 

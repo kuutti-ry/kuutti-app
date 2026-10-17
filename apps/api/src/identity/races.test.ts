@@ -10,6 +10,7 @@ import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
+import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { people, pondNamed } from "../test/people.ts";
 import { deriveArtificialIdentity, registerArtificial } from "./artificial.ts";
@@ -342,7 +343,7 @@ describe("the status read racing another request", () => {
 
 describe("a bank login racing another request", () => {
   async function start(app: ReturnType<typeof createApp>) {
-    const res = await app.request("/auth/start?platform=ios&locale=fi");
+    const res = await app.request(`/auth/start?platform=ios&locale=fi&code_challenge=${CHALLENGE}`);
     expect(res.status).toBe(302);
     return new URL(res.headers.get("location") ?? "").searchParams.get("state") ?? "";
   }
@@ -376,7 +377,7 @@ describe("a bank login racing another request", () => {
     const exchanged = await app.request("/auth/exchange", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, verifier: VERIFIER }),
     });
     expect(exchanged.status).toBe(200);
     const body = (await exchanged.json()) as { outcome: string; accessToken: string };
@@ -474,7 +475,7 @@ describe("a bank login racing another request", () => {
     const res = await app.request("/auth/exchange", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, verifier: VERIFIER }),
     });
     expect(db.ran()).toBe(true);
     // The code reads as spent: the person signs in again once the cooldown has passed.
@@ -503,7 +504,8 @@ describe("a bank login racing another request", () => {
     app.request(path, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code }),
+      // The staff exchange is strict and unbound (ADR-027): its body is the code alone.
+      body: JSON.stringify(path === "/auth/exchange" ? { code, verifier: VERIFIER } : { code }),
     });
 
   /** The app's exchange of the code its link carries: what the login was, once it answered 200. */
@@ -618,7 +620,11 @@ describe("a bank login racing another request", () => {
       logger,
       adminAppUrl: "http://localhost:5173",
     };
-    await startLogin(deps, { platform: "ios", locale: null }, rows[0]?.n ?? 0);
+    await startLogin(
+      deps,
+      { platform: "ios", locale: null, codeChallenge: CHALLENGE },
+      rows[0]?.n ?? 0,
+    );
     const line = lines().find((l) => l.msg === "sign-in refused");
     return (line?.detail as { evicted?: number } | undefined)?.evicted ?? 0;
   }

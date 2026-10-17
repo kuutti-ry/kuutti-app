@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/mobile",
-  "version": "0.33.1",
+  "version": "0.33.2",
   "private": true,
   "main": "expo-router/entry",
   "description": "Expo app. Routes under app/ stay thin; features live under src/features/<slice>/.",
@@ -21,6 +21,7 @@
     "@formatjs/intl-pluralrules": "6.3.15",
     "@kuutti/i18n": "workspace:*",
     "@kuutti/schema": "workspace:*",
+    "@noble/hashes": "2.4.0",
     "@rn-primitives/dialog": "1.5.2",
     "@rn-primitives/label": "1.5.2",
     "@rn-primitives/portal": "1.5.3",

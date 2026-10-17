@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -265,6 +266,61 @@ describe("the walk to the bank, when the API does not answer as it should", () =
     await expect(loginAs(persona, api.context)).rejects.toThrow(
       "the API's bank is auth, not the mock bank on this computer: nothing was sent",
     );
+  });
+});
+
+describe("the verifier each attempt is bound by (ADR-027)", () => {
+  /** The walk scripted, with each start's challenge and each exchange's body as it sent them. */
+  function watched() {
+    const challenges: (string | null)[] = [];
+    const api = scripted({
+      "GET /auth/start": (url) => {
+        challenges.push(url.searchParams.get("code_challenge"));
+        return redirect(`${BANK}?state=state-1`);
+      },
+    });
+    const exchanges = () =>
+      api.calls
+        .filter((c) => c.route === "POST /auth/exchange")
+        .map((c) => JSON.parse(String(c.init?.body)) as { code: string; verifier: string });
+    return { api, challenges, exchanges };
+  }
+
+  it("a start carries the SHA-256 of the verifier its exchange sends, both as 64 hex characters", async () => {
+    const { api, challenges, exchanges } = watched();
+    expect((await loginAs(persona, api.context)).kind).toBe("session");
+    const [body] = exchanges();
+    expect(body).toEqual({
+      code: "c".repeat(43),
+      verifier: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+    expect(challenges).toEqual([
+      createHash("sha256")
+        .update(body?.verifier ?? "")
+        .digest("hex"),
+    ]);
+  });
+
+  it("each login makes a verifier of its own", async () => {
+    const { api, challenges, exchanges } = watched();
+    await loginAs(persona, api.context);
+    await loginAs(persona, api.context);
+    const verifiers = exchanges().map((b) => b.verifier);
+    expect(verifiers).toHaveLength(2);
+    expect(verifiers[0]).not.toBe(verifiers[1]);
+    expect(new Set(challenges).size).toBe(2);
+  });
+
+  it("an exchange refused as not this attempt's says its status, and nothing of the verifier", async () => {
+    const api = scripted({
+      "POST /auth/exchange": () => json({ error: { code: "auth_code_used" } }, 401),
+    });
+    const refused = await loginAs(persona, api.context).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(DemoError);
+    expect((refused as DemoError).message).toBe("/auth/exchange: 401");
+    const sent = api.calls.find((c) => c.route === "POST /auth/exchange")?.init?.body;
+    const { verifier } = JSON.parse(String(sent)) as { verifier: string };
+    expect((refused as DemoError).message).not.toContain(verifier);
   });
 });
 

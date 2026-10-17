@@ -1,4 +1,4 @@
-import { SessionTokens } from "@kuutti/schema";
+import { AuthExchangeRequest, SessionTokens } from "@kuutti/schema";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { apiBaseUrl } from "./api-url";
@@ -121,15 +121,19 @@ export function refreshSession(): Promise<StoredSession | null> {
  * Only a login this device started may end in a session here: the browser's
  * return carries a one-time code, and a code an attacker minted with their
  * own bank login and sent as a link would otherwise sign this phone into
- * their account. The mark outlives the app process (Android may end it
- * while the browser is open) and a login attempt's ten minutes.
+ * their account. The mark keeps the attempt's verifier too, which the
+ * exchange sends and without which the API refuses the code, so a code that
+ * another app on the phone reads off the deep link is worth nothing to it
+ * (RFC 8252 §8.1, ADR-027). A new start replaces the mark: only the latest
+ * attempt's code can sign in. The mark outlives the app process (Android may
+ * end it while the browser is open) and a login attempt's ten minutes.
  */
 const PENDING_KEY = "kuutti.session.pending";
 const PENDING_TTL_MS = 10 * 60 * 1000;
 let pendingInMemory: string | null = null;
 
-export async function markLoginStarted(now = Date.now()): Promise<void> {
-  const value = String(now);
+export async function markLoginStarted(verifier: string, now = Date.now()): Promise<void> {
+  const value = JSON.stringify({ at: now, verifier });
   pendingInMemory = value;
   if (Platform.OS !== "web") {
     await SecureStore.deleteItemAsync(PENDING_KEY);
@@ -137,8 +141,8 @@ export async function markLoginStarted(now = Date.now()): Promise<void> {
   }
 }
 
-/** True once per started login: reading it clears it. */
-export async function takeLoginStarted(now = Date.now()): Promise<boolean> {
+/** The started login's verifier, once: reading the mark clears it. Null when there is none to take. */
+export async function takeLoginStarted(now = Date.now()): Promise<string | null> {
   let value = pendingInMemory;
   if (Platform.OS !== "web") {
     try {
@@ -149,6 +153,26 @@ export async function takeLoginStarted(now = Date.now()): Promise<boolean> {
     }
   }
   pendingInMemory = null;
-  const started = Number(value);
-  return Number.isFinite(started) && now - started >= 0 && now - started <= PENDING_TTL_MS;
+  return freshVerifier(value, now);
+}
+
+/** The verifier in the shape the exchange takes it. */
+const Verifier = AuthExchangeRequest.shape.verifier;
+
+/**
+ * The mark's verifier while the mark is within its ten minutes. A mark that
+ * does not parse, or holds the time alone as one from before ADR-027 did,
+ * counts as none, like a missing one.
+ */
+function freshVerifier(value: string | null, now: number): string | null {
+  let mark: { at?: unknown; verifier?: unknown } | null;
+  try {
+    mark = JSON.parse(value ?? "null");
+  } catch {
+    return null;
+  }
+  const at = mark?.at;
+  const age = typeof at === "number" ? now - at : Number.NaN;
+  const verifier = Verifier.safeParse(mark?.verifier);
+  return age >= 0 && age <= PENDING_TTL_MS && verifier.success ? verifier.data : null;
 }

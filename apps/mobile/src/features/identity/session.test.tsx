@@ -8,6 +8,8 @@ import { exportFileName, SessionProvider, useSession } from "./session";
 // export, and a store change from elsewhere (a refresh refused) followed.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
+// Any well-formed verifier of the attempt (ADR-027): 64 lowercase hex characters.
+const VERIFIER = "5a1e".repeat(16);
 const SESSION_ID = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
 const tokens = (seed = "a", sessionId = SESSION_ID) => ({
   sessionId,
@@ -74,18 +76,18 @@ describe("SessionProvider: starting", () => {
 });
 
 describe("SessionProvider: signing in", () => {
-  it("exchanges the code, stores the session and reports whether the account is new", async () => {
+  it("exchanges the code with its attempt's verifier, stores the session and reports whether the account is new", async () => {
     const seen = serve({ "POST /auth/exchange": () => json({ ...tokens(), outcome: "created" }) });
     const { result } = await session();
     let outcome: string | undefined;
     await act(async () => {
-      outcome = await result.current.signIn(token("code"));
+      outcome = await result.current.signIn(token("code"), VERIFIER);
     });
     expect(outcome).toBe("created");
     expect(seen[0]).toEqual({
       method: "POST",
       path: "/auth/exchange",
-      body: { code: token("code") },
+      body: { code: token("code"), verifier: VERIFIER },
     });
     expect(result.current).toMatchObject({
       status: "signed-in",
@@ -99,7 +101,7 @@ describe("SessionProvider: signing in", () => {
     serve({ "POST /auth/exchange": () => json({ ...tokens(), outcome: "resumed" }) });
     const { result } = await session();
     await act(async () => {
-      await result.current.signIn(token("code"));
+      await result.current.signIn(token("code"), VERIFIER);
     });
     // A refresh stores a new pair for the same session.
     await act(async () => saveSession(tokens("b")));
@@ -116,7 +118,9 @@ describe("SessionProvider: signing in", () => {
     const { result } = await session();
     let error: unknown;
     await act(async () => {
-      error = await result.current.signIn(token("code")).catch((caught: unknown) => caught);
+      error = await result.current
+        .signIn(token("code"), VERIFIER)
+        .catch((caught: unknown) => caught);
     });
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 400, code: "code_expired" });
@@ -270,7 +274,7 @@ describe("SessionProvider: the break (#170)", () => {
     const { result } = await session();
     let outcome: unknown;
     await act(async () => {
-      outcome = await result.current.signIn("c".repeat(43));
+      outcome = await result.current.signIn("c".repeat(43), VERIFIER);
     });
     expect(outcome).toBe("unpaused");
     expect(seen[0]?.path).toBe("/auth/exchange");

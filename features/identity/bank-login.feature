@@ -3,11 +3,12 @@ Feature: Bank login through the identification broker
   Every account is a person a Finnish bank has identified (TD-1). The API
   drives the login (the app holds no secret and no ID token), keeps of the
   bank's answer only what rules 1 and 3 allow, and hands the app a one-time
-  code for this device's session.
+  code for this device's session, which only the app that asked for the
+  login can exchange (ADR-027).
 
   Scenario: A login starts with the platform recorded and the browser sent to the bank chooser
-    Given the app asks for a login for its platform
-    Then the attempt is remembered with its state and nonce
+    Given the app asks for a login for its platform with the hash of its verifier
+    Then the attempt is remembered with its state, nonce and that hash
     And the browser is redirected to the broker
 
   Scenario: A first login creates the identity and the account and the code is exchanged once
@@ -64,8 +65,18 @@ Feature: Bank login through the identification broker
   Scenario: The exchange validates the code and refuses an unknown one
     When the app exchanges a malformed code
     Then the answer is a validation failure
+    When the app exchanges a code without its verifier
+    Then the answer is a validation failure
     When the app exchanges a well-formed code nobody issued
     Then the answer is auth_code_used
+
+  Scenario: A code is exchanged only with the verifier of the login that asked for it
+    Given the app asked for a login with the hash of a verifier it keeps, and the bank identified the person
+    When the one-time code is exchanged with another verifier
+    Then the answer is auth_code_used, as for a code nobody issued, and the code is not spent
+    When the app exchanges the code with its verifier
+    Then the session opens
+    And the same code exchanged again is refused
 
   Scenario: Without a broker the login answers 503
     Given no identification broker is configured

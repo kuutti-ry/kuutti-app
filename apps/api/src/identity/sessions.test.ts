@@ -6,6 +6,7 @@ import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { applySanction } from "../safety/index.ts";
 import { staffSession } from "../test/account.ts";
+import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
 import * as repo from "./repo.ts";
@@ -102,14 +103,14 @@ describe("sessions", () => {
       db: ctx.client,
       broker,
     });
-    const started = await app.request("/auth/start?platform=android");
+    const started = await app.request(`/auth/start?platform=android&code_challenge=${CHALLENGE}`);
     const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
     const back = await app.request(`/auth/callback?code=ok&state=${encodeURIComponent(state)}`);
     const code = new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "";
     const exchanged = await app.request("/auth/exchange", {
       method: "post",
       headers: { "content-type": "application/json", "user-agent": "Kuutti/1 (Android)" },
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, verifier: VERIFIER }),
     });
     expect(exchanged.status).toBe(200);
     const tokens = SessionTokens.parse(await exchanged.json());
@@ -543,7 +544,7 @@ describe("an exchange racing a ban (ADR-024 §4)", () => {
         db,
         broker,
       });
-      const started = await app.request("/auth/start?platform=android");
+      const started = await app.request(`/auth/start?platform=android&code_challenge=${CHALLENGE}`);
       const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
       const back = await app.request(`/auth/callback?code=ok&state=${encodeURIComponent(state)}`);
       const code = new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "";
@@ -557,7 +558,7 @@ describe("an exchange racing a ban (ADR-024 §4)", () => {
       const exchanged = await app.request("/auth/exchange", {
         method: "post",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, verifier: VERIFIER }),
       });
       expect(db.ran()).toBe(true);
       if (order === "before") {

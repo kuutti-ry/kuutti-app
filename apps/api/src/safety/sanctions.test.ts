@@ -20,6 +20,7 @@ import {
   staffSession,
   withMatchingConfig,
 } from "../test/account.ts";
+import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
@@ -111,7 +112,9 @@ async function appFor(ctx: TestContext, options: { db?: Queryable; media?: boole
 
 /** The bank login up to the redirect into the app: a one-time code, or the refusal and its date. */
 async function bankCallback(app: App): Promise<URL> {
-  const started = await app.request("/auth/start?platform=ios&locale=fi");
+  const started = await app.request(
+    `/auth/start?platform=ios&locale=fi&code_challenge=${CHALLENGE}`,
+  );
   expect(started.status).toBe(302);
   const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
   const back = await app.request(`/auth/callback?code=good&state=${encodeURIComponent(state)}`);
@@ -134,7 +137,7 @@ async function bankLogin(app: App): Promise<BankSignIn> {
   const exchanged = await app.request("/auth/exchange", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, verifier: VERIFIER }),
   });
   expect(exchanged.status).toBe(200);
   const body = AuthExchangeResponse.parse(await exchanged.json());

@@ -11,7 +11,9 @@ import { account, identity } from "./identity.ts";
  * insert itself checks (AUTH_REQUEST_CAP), at which the expired rows and then
  * the oldest attempts the bank has not answered are deleted there and then;
  * and the nightly sweep of expired rows. Nothing in them names the person, and
- * nothing records where a request came from.
+ * nothing records where a request came from. An app attempt carries the
+ * SHA-256 of the verifier its app holds, so that only that app can exchange
+ * the code (ADR-027).
  */
 export const authRequest = pgTable(
   "auth_request",
@@ -21,6 +23,9 @@ export const authRequest = pgTable(
     nonce: text("nonce").notNull(),
     platform: text("platform").notNull(),
     locale: text("locale"),
+    // SHA-256 (hex) of the app's verifier for this attempt, from /auth/start
+    // (ADR-027). NULL on a staff attempt, which the app's exchange can never spend.
+    codeChallenge: text("code_challenge"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     // Set by the callback: sha256 of the code, its own short lifetime, and the

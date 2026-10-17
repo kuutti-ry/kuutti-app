@@ -9,6 +9,7 @@ import {
 } from "@kuutti/tunnistus-oidc/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
+import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import { BrokerError } from "./broker.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
@@ -170,7 +171,9 @@ describe("a bank login through the Telia test double, end to end", () => {
         db: ctx.client,
         broker: await brokerFor(telia),
       });
-      const started = await app.request("/auth/start?platform=android&locale=sv");
+      const started = await app.request(
+        `/auth/start?platform=android&locale=sv&code_challenge=${CHALLENGE}`,
+      );
       expect(started.status).toBe(302);
       const back = await telia.authorize(new URL(started.headers.get("location") ?? ""));
       expect(telia.seen.requestObject).toMatchObject({ prompt: "login", ui_locales: "sv" });
@@ -180,9 +183,14 @@ describe("a bank login through the Telia test double, end to end", () => {
       const exchanged = await app.request("/auth/exchange", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, verifier: VERIFIER }),
       });
       expect(exchanged.status).toBe(200);
+      // The app's challenge binds our own one-time code (ADR-027), not Telia's:
+      // no PKCE in the request object, and nothing of the pair reaches the broker.
+      expect(telia.seen.requestObject).not.toHaveProperty("code_challenge");
+      expect(JSON.stringify(telia.seen)).not.toContain(CHALLENGE);
+      expect(JSON.stringify(telia.seen)).not.toContain(VERIFIER);
       const { accessToken } = (await exchanged.json()) as { accessToken: string };
       const me = (await (
         await app.request("/auth/session", { headers: { authorization: `Bearer ${accessToken}` } })
@@ -247,7 +255,9 @@ describe("a bank login through the Telia test double, end to end", () => {
       expect(res.status).toBe(302);
       return new URL(res.headers.get("location") ?? "").searchParams.get("error");
     };
-    const started = await app.request("/auth/start?platform=ios&locale=fi");
+    const started = await app.request(
+      `/auth/start?platform=ios&locale=fi&code_challenge=${CHALLENGE}`,
+    );
     const back = await telia.authorize(new URL(started.headers.get("location") ?? ""));
     // Whoever holds the state returns first, with a code Telia never issued.
     const forged = new URL(back);

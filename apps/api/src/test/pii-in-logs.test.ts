@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
+import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
+import type { IdentityBroker } from "../identity/index.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession } from "./account.ts";
 import {
@@ -12,12 +15,16 @@ import {
 } from "./harness.ts";
 import { testMediaDeps } from "./media.ts";
 
+/** The verifier of a sign-in attempt, as the app makes one (ADR-027): 256 bits as lowercase hex. */
+const VERIFIER_PROBE = "4711beef".repeat(8);
+
 /**
  * The enforcement behind "logs never carry hetu, message text or email"
  * (CLAUDE.md security defaults, rule 5, #11), nor the client's address
- * (ADR-026 §7). Every route the app registers is exercised with fixtures in
- * the body, the query string, the path and the headers, from an address in
- * every place an address can come from, and no fixture may reach a log line.
+ * (ADR-026 §7), nor what binds a sign-in code to its phone (ADR-027). Every
+ * route the app registers is exercised with fixtures in the body, the query
+ * string, the path and the headers, from an address in every place an
+ * address can come from, and no fixture may reach a log line.
  * Routes come from the router, so a new route is covered the day it is added.
  */
 const FIXTURES = {
@@ -30,6 +37,9 @@ const FIXTURES = {
   ipv6: "2001:db8:4711::47",
   // The /64 the limiter counts that address by, however a key would write it.
   ipv6Prefix: "2001:db8:4711",
+  verifier: VERIFIER_PROBE,
+  // Its SHA-256, which the start carries in the query.
+  challenge: createHash("sha256").update(VERIFIER_PROBE).digest("hex"),
 } as const;
 
 /**
@@ -244,6 +254,80 @@ describe("PII in logs", () => {
       expect(leakedFixtures(lines())).toEqual([]);
     },
   );
+
+  test("no fixture reaches a log line through a bank login, its verifier and its challenge refused and taken", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    let x = 4711;
+    const hetu = generateHetu(
+      () => {
+        x = (x * 1103515245 + 12345) % 2147483648;
+        return x / 2147483648;
+      },
+      { minAge: 25, maxAge: 40 },
+    );
+    const bank: IdentityBroker = {
+      issuer: "https://broker.test/uas",
+      async startLogin(input) {
+        const url = new URL("https://broker.test/uas/oauth2/authorization");
+        url.searchParams.set("state", input.state);
+        return url;
+      },
+      async completeLogin() {
+        return {
+          hetu,
+          subject: "PII-PROBE-SUBJECT",
+          sessionIndex: null,
+          tokenId: null,
+          authenticatedAt: new Date(),
+          acr: "http://ftn.ficora.fi/2017/loatest2",
+          amr: [],
+        };
+      },
+    };
+    const app = createApp({
+      config: testConfig({ HETU_HMAC_KEY: "47".repeat(32) }),
+      logger,
+      db: ctx.client,
+      broker: bank,
+    });
+    const start = (challenge: string) =>
+      app.request(`/auth/start?platform=ios&locale=fi&code_challenge=${challenge}`);
+    const exchange = (code: string, verifier: string) =>
+      app.request("/auth/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ code, verifier }),
+      });
+    const unknown = "A".repeat(43);
+
+    // Each malformed, with the fixture whole inside it: refused at the validation.
+    expect((await start(`${FIXTURES.challenge}0`)).status).toBe(400);
+    expect((await exchange(unknown, `${FIXTURES.verifier}0`)).status).toBe(400);
+    // A code nobody issued, with the verifier.
+    expect((await exchange(unknown, FIXTURES.verifier)).status).toBe(401);
+    // A login started with the challenge: a wrong verifier, its own, then its own again.
+    const started = await start(FIXTURES.challenge);
+    expect(started.status).toBe(302);
+    const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
+    const back = await app.request(`/auth/callback?code=good&state=${encodeURIComponent(state)}`);
+    const code = new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "";
+    expect(code).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect((await exchange(code, "0".repeat(64))).status).toBe(401);
+    const own = await exchange(code, FIXTURES.verifier);
+    expect(own.status).toBe(200);
+    const tokens = (await own.json()) as { accessToken: string; refreshToken: string };
+    expect((await exchange(code, FIXTURES.verifier)).status).toBe(401);
+
+    // The login left its line, so the absence below is not for want of lines.
+    expect(lines().some((l) => l.msg === "bank login")).toBe(true);
+    expect(leakedFixtures(lines())).toEqual([]);
+    const out = JSON.stringify(lines());
+    for (const secret of [hetu, code, tokens.accessToken, tokens.refreshToken]) {
+      expect(out).not.toContain(secret);
+    }
+  });
 
   it("would catch a route that logs its request body", async () => {
     const { logger, lines } = await captureLogger();

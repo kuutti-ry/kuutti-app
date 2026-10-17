@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { type BootOptions, boot } from "./boot.ts";
 import { type IdentityBroker, OidcBroker } from "./identity/index.ts";
 import { runNightly } from "./jobs/nightly.ts";
+import { CHALLENGE } from "./test/attempt.ts";
 import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./test/harness.ts";
 
 // The boot sequence (index.ts is only the process around it) against a
@@ -176,7 +177,7 @@ function stubBroker() {
 }
 
 const startLogin = (app: { request: (path: string) => Response | Promise<Response> }) =>
-  app.request("/auth/start?platform=ios");
+  app.request(`/auth/start?platform=ios&code_challenge=${CHALLENGE}`);
 
 describe("boot", () => {
   it("migrates, partitions, checks the audit boundary and sets up media, in that order, and the app answers", async () => {
