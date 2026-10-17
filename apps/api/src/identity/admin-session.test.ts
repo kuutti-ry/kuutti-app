@@ -25,6 +25,8 @@ function rngFrom(seed: number) {
   };
 }
 const STAFF_HETU = generateHetu(rngFrom(11), { at: NOW, minAge: 30, maxAge: 50 });
+/** Somebody else, who signs in to the app. */
+const OTHER_HETU = generateHetu(rngFrom(12), { at: NOW, minAge: 30, maxAge: 50 });
 
 /** Answers like a broker whose person is `hetu`; records the logins it was asked to start and to complete. */
 function fakeBroker(hetu: string): IdentityBroker & { started: string[]; completed: string[] } {
@@ -111,6 +113,29 @@ const exchange = (app: ReturnType<typeof createApp>, path: string, code: string)
 
 const errorCode = async (res: Response) => ErrorResponse.parse(await res.json()).error.code;
 
+/**
+ * The order of the moderator tool's `recent` (packages/db/src/cli/moderator.ts),
+ * whose own test runs on a database of its own: the same query, here inside
+ * this test's transaction, so it sees what the panel's login wrote.
+ */
+const recent = async (ctx: TestContext) =>
+  (
+    await ctx.client.query<{ hetu_hmac: string }>(
+      "SELECT hetu_hmac FROM identity ORDER BY authenticated_at DESC NULLS LAST LIMIT 5",
+    )
+  ).rows.map((r) => r.hetu_hmac);
+
+/** What the identity keeps of its last bank login (repo.ts `updateBrokerReference`). */
+const bankReference = async (ctx: TestContext, hetuHmac: string) =>
+  (
+    await ctx.client.query(
+      `SELECT broker_subject, broker_session_index, broker_token_id, acr, amr,
+              authenticated_at IS NOT NULL AS authenticated, refused_attempts
+       FROM identity WHERE hetu_hmac = $1`,
+      [hetuHmac],
+    )
+  ).rows;
+
 describe("staff sessions", () => {
   test("An allowlisted bank login yields an eight-hour admin session with the role", async ({
     ctx,
@@ -167,6 +192,108 @@ describe("staff sessions", () => {
     ).toBe(0);
   });
 
+  test("a staff bank login without a role inside the re-registration cooldown is recorded too: the panel never looks at accounts", async ({
+    ctx,
+  }) => {
+    // Erased a dating account three days ago (ADR-007): standing ok, a cooldown
+    // the app's door refuses, which the panel's does not read (roles outlive
+    // erasure, ADR-006 §5). The bank login is still this person's latest.
+    const { hetuHmac } = deriveIdentity(STAFF_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+    await ctx.client.query(
+      `INSERT INTO identity (hetu_hmac, deletion_count, reregister_after)
+       VALUES ($1, 1, $2)`,
+      [hetuHmac, new Date(Date.now() + 20 * 24 * 60 * 60_000)],
+    );
+    const { app } = await appWith(ctx);
+    const back = await callback(app, await start(app));
+    expect(new URLSearchParams(back.hash.slice(1))).toEqual(
+      new URLSearchParams({ error: "admin_not_allowed" }),
+    );
+    expect(await bankReference(ctx, hetuHmac)).toEqual([
+      expect.objectContaining({
+        broker_subject: "STAFFSUBJECT",
+        authenticated: true,
+        refused_attempts: 0,
+      }),
+    ]);
+    expect(await recent(ctx)).toEqual([hetuHmac]);
+  });
+
+  test("A staff bank login without a role is recorded on a known identity in good standing", async ({
+    ctx,
+  }) => {
+    // The person last signed in to the app two days ago; somebody else did a
+    // minute ago, so before the panel's login `recent` names the other first.
+    const { hetuHmac } = deriveIdentity(STAFF_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+    await ctx.client.query(
+      `INSERT INTO identity (hetu_hmac, broker_subject, broker_session_index, broker_token_id, authenticated_at, acr, amr)
+       VALUES ($1, 'APPSUBJECT', 'APPSESSION', 'APPTOKEN', $2, 'http://ftn.ficora.fi/2017/loa2', ARRAY['nordea'])`,
+      [hetuHmac, new Date(Date.now() - 2 * 24 * 60 * 60_000)],
+    );
+    const other = deriveIdentity(OTHER_HETU, hmacKeyFromHex(KEY_HEX), NOW).hetuHmac;
+    await ctx.client.query("INSERT INTO identity (hetu_hmac, authenticated_at) VALUES ($1, $2)", [
+      other,
+      new Date(Date.now() - 60_000),
+    ]);
+    expect(await recent(ctx)).toEqual([other, hetuHmac]);
+
+    const { app, logs } = await appWith(ctx);
+    const back = await callback(app, await start(app));
+    expect(back.origin).toBe(ADMIN_URL);
+    expect(new URLSearchParams(back.hash.slice(1))).toEqual(
+      new URLSearchParams({ error: "admin_not_allowed" }),
+    );
+    expect(logs().find((l) => l.code === "admin_not_allowed")).toMatchObject({
+      detail: { known: true, standing: "ok", platform: "admin" },
+    });
+    // The whole reference is this login's, none of the app login's left, and
+    // nothing is counted as refused: the bank vouched for this person.
+    expect(await bankReference(ctx, hetuHmac)).toEqual([
+      {
+        broker_subject: "STAFFSUBJECT",
+        broker_session_index: null,
+        broker_token_id: null,
+        acr: "http://ftn.ficora.fi/2017/loatest2",
+        amr: [],
+        authenticated: true,
+        refused_attempts: 0,
+      },
+    ]);
+    expect(await recent(ctx)).toEqual([hetuHmac, other]);
+    // Nothing is created by it.
+    for (const table of ["account", "admin_session", "moderator_roles"]) {
+      expect(
+        Number((await ctx.client.query(`SELECT count(*) AS n FROM ${table}`)).rows[0]?.n),
+      ).toBe(0);
+    }
+  });
+
+  test.for(["suspended", "banned"] as const)(
+    "A %s identity's staff bank login is refused and records nothing on it (#202)",
+    async (standing, { ctx }) => {
+      const { hetuHmac } = deriveIdentity(STAFF_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+      await ctx.client.query("INSERT INTO identity (hetu_hmac, standing) VALUES ($1, $2)", [
+        hetuHmac,
+        standing,
+      ]);
+      const { app } = await appWith(ctx);
+      const back = await callback(app, await start(app));
+      expect(back.origin).toBe(ADMIN_URL);
+      expect(new URLSearchParams(back.hash.slice(1)).get("error")).toBe("admin_not_allowed");
+      expect(await bankReference(ctx, hetuHmac)).toEqual([
+        {
+          broker_subject: null,
+          broker_session_index: null,
+          broker_token_id: null,
+          acr: null,
+          amr: null,
+          authenticated: false,
+          refused_attempts: 0,
+        },
+      ]);
+    },
+  );
+
   test("A moderator who cancels at the bank is sent back to the panel, not to the app", async ({
     ctx,
   }) => {
@@ -180,6 +307,38 @@ describe("staff sessions", () => {
     const back = new URL(res.headers.get("location") ?? "");
     expect(back.origin).toBe(ADMIN_URL);
     expect(new URLSearchParams(back.hash.slice(1)).get("error")).toBe("auth_cancelled");
+  });
+
+  describe("A staff attempt the callback no longer takes is sent back to the panel, not to the app", () => {
+    test.for([
+      ["completed with a code", "code"],
+      ["was refused for want of a role", "refused"],
+      ["expired before the bank answered", "expired"],
+    ] as const)("a staff login attempt that %s", async ([, attempt], { ctx }) => {
+      if (attempt !== "refused") await allowlisted(ctx);
+      const { app, broker, logs } = await appWith(ctx);
+      const state = await start(app);
+      if (attempt === "expired") {
+        await ctx.client.query(
+          "UPDATE auth_request SET expires_at = now() - interval '1 second' WHERE state = $1",
+          [state],
+        );
+      } else {
+        const first = new URLSearchParams((await callback(app, state)).hash.slice(1));
+        expect(first.has(attempt === "code" ? "code" : "error")).toBe(true);
+      }
+      const asked = broker.completed.length;
+      const again = await callback(app, state);
+      expect(again.origin).toBe(ADMIN_URL);
+      expect(again.search).toBe("");
+      expect(new URLSearchParams(again.hash.slice(1))).toEqual(
+        new URLSearchParams({ error: "auth_state_mismatch" }),
+      );
+      expect(broker.completed).toHaveLength(asked);
+      expect(logs().find((l) => l.code === "auth_state_mismatch")).toMatchObject({
+        detail: { platform: "admin" },
+      });
+    });
   });
 
   test("A staff code is exchanged once and never as a product code", async ({ ctx }) => {
@@ -348,6 +507,7 @@ describe("staff sessions: refusals, validation and the sweep", () => {
     // The attempt is spent: the same state cannot be completed again, and
     // the bank is not asked again (#324, ADR-026 §8).
     const again = await callback(app, state);
+    expect(again.origin).toBe(ADMIN_URL);
     expect(again.href).toContain("error=auth_state_mismatch");
     expect(again.href).not.toContain("code=");
     expect(broker.completed).toEqual([state]);

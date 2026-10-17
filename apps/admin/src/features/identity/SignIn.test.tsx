@@ -79,7 +79,8 @@ describe("SignIn", () => {
   });
 
   it("falls back to the generic message for a refusal it does not know", async () => {
-    window.history.replaceState(null, "", "/#error=state_mismatch");
+    // The callback's answer to a state it no longer takes (#250), which has no text of its own.
+    window.history.replaceState(null, "", "/#error=auth_state_mismatch");
     show();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Sign-in did not complete. Try again.",

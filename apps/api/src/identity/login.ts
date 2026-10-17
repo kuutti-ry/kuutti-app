@@ -92,8 +92,8 @@ export async function startLogin(
   return deps.broker.startLogin({ state, nonce, locale: input.locale });
 }
 
-const attemptGone = () =>
-  new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired");
+const attemptGone = (detail?: { platform: typeof ADMIN_PLATFORM }) =>
+  new AppError(400, "auth_state_mismatch", "This login attempt is unknown or has expired", detail);
 
 /**
  * /auth/callback: the bank has answered. The hetu exists inside this function
@@ -111,14 +111,20 @@ export async function completeLogin(
   // The attempt is spent in the statement that finds it, before the broker is
   // asked anything, so a replay of this return, at once or later, costs no
   // token call; the claim's deadline keeps the eviction and the sweep off it
-  // while the bank answers. The refusal comes before the platform is known,
-  // so a replayed staff state lands on the app's link, as any unknown one does.
+  // while the bank answers.
   const request = await repo.claimAuthRequest(deps.db, {
     state: input.query.state,
     now,
     until: new Date(now.getTime() + AUTH_REQUEST_TTL_MS),
   });
-  if (!request) throw attemptGone();
+  if (!request) {
+    // A state the claim did not take, used, under way or expired, is still
+    // its attempt's row, which says where the browser belongs: a staff
+    // attempt's goes back to the panel (#250). Only a state no row holds,
+    // never written, evicted or swept, lands on the app's link.
+    const platform = await repo.findAuthRequestPlatform(deps.db, input.query.state);
+    throw attemptGone(platform === ADMIN_PLATFORM ? { platform: ADMIN_PLATFORM } : undefined);
+  }
   try {
     return await finishLogin(deps, input, request, now);
   } catch (error) {

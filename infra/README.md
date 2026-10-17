@@ -311,7 +311,7 @@ The picture cache is the container's own (`/home/node/.cache`), so a deploy empt
 
 The instance role may call `rekognition:DetectModerationLabels`, `rekognition:DetectFaces` and `rekognition:DetectLabels` (`modules/compute`, statement `RekognitionDetect`), the parameter `moderation=rekognition` under `/kuutti/<env>/` switches the API's automatic check on, and the observability module counts the calls from the `photo moderated` log lines (`RekognitionCalls` in the `Kuutti/<env>` namespace). Without the parameter every photo goes to the human queue (and tip signals stay empty).
 
-Staff are identities with a role (rules/admin.md): the person signs in once through the bank (the app is enough), then the maintainer grants the role to the identity that just appeared, from a machine that reaches the database (the Session Manager tunnel of `db-app-role.sh`). The API never logs a `hetu_hmac`; `recent` lists the last five logins by it:
+Staff are identities with a role (rules/admin.md): the person signs in once through the bank, on the panel (refused, since there is no role yet, but the login is recorded, #202) or in the app; a person the database has never seen signs in to the app once first, since the panel creates nothing (ADR-006 §5). The maintainer then grants the role to the identity at the top of `recent`, from a machine that reaches the database (the Session Manager tunnel of `db-app-role.sh`). The API never logs a `hetu_hmac`; `recent` lists the last five bank logins by it, the app's and the panel's, newest first, with the time of each: check that the top one's is that sign-in's before granting.
 
 ```sh
 export DATABASE_URL=postgres://kuutti_app:...@127.0.0.1:15432/kuutti

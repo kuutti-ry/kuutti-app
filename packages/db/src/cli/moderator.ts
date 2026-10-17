@@ -2,8 +2,10 @@
  * Grants, changes or removes a staff role (#49, rules/admin.md): the allowlist
  * is a moderator_roles row on an identity, found by its hetu_hmac. The API
  * never logs that value; `recent` lists the identities that logged in last,
- * so the person signs in once and the maintainer grants the role to the row
- * that just appeared. Run by the maintainer against a database they can reach:
+ * in the app or on the panel, which records a known identity's login even
+ * while it refuses it for want of a role (#202), so the person signs in once
+ * and the maintainer grants the role to the row at the top. Run by the
+ * maintainer against a database they can reach:
  *
  *   pnpm --filter @kuutti/db moderator -- recent
  *   pnpm --filter @kuutti/db moderator -- grant <hetu_hmac> moderator --by "<your name>"

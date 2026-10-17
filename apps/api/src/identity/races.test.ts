@@ -19,6 +19,7 @@ import { eraseAccount } from "./erasure.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
 import { startLogin } from "./login.ts";
 import { CURRENT_CONSENT_VERSIONS } from "./onboarding.ts";
+import { sweepSessions } from "./sessions.ts";
 
 // What the slice answers when another request commits in the middle of one
 // (#33, #51, #146). Every statement runs on the real database; `interleaved`
@@ -810,6 +811,72 @@ describe("a bank login racing another request", () => {
     expect(await exchangedAs(app, back)).toBe("created");
     expect(errorLines(logs)).toEqual([]);
   });
+
+  test("two returns with one staff state at once ask the bank once: the second lands on the panel and the first's code opens it", async ({
+    ctx,
+  }) => {
+    await moderator(ctx);
+    let state = "";
+    let returned = false;
+    const again: URL[] = [];
+    const { app, logs, bankCalls } = await appOn(ctx.client, {
+      bank: true,
+      // The panel's tab sends the same return again while the bank answers the
+      // first; the claim refuses it before the attempt holds a code (#250).
+      whileTheBankAnswers: async () => {
+        if (returned) return;
+        returned = true;
+        again.push(await callbackTo(app, state));
+      },
+    });
+    state = await staffStart(app);
+    const back = await callbackTo(app, state);
+    expect(bankCalls()).toBe(1);
+    expect(again).toHaveLength(1);
+    expect(again[0]?.origin).toBe("http://localhost:5173");
+    expect(new URLSearchParams(again[0]?.hash.slice(1))).toEqual(
+      new URLSearchParams({ error: "auth_state_mismatch" }),
+    );
+    expect(await panelExchangedAs(app, back)).toBe("moderator");
+    expect(errorLines(logs)).toEqual([]);
+  });
+
+  // #250's "a login attempt swept mid-callback ends in a 500" (#235): the
+  // nightly sweep deleted an attempt past its expiry between the callback's
+  // read of it and its code, so the attach found no row, twice, and the
+  // callback answered 500 "account erased twice". The claim moves the
+  // deadline to ten minutes from the callback (ADR-026 §8), so a sweep after
+  // the attempt's own expiry, within that deadline, no longer reaches it.
+  test.for([
+    ["an app", /SET code_hash = \$2, code_expires_at = \$3, account_id = \$4/],
+    ["a staff", /SET code_hash = \$2, code_expires_at = \$3, identity_id = \$4/],
+  ] as const)(
+    "the nightly sweep past the expiry of %s attempt whose callback is under way keeps it, and the login gets its code",
+    async ([door, before], { ctx }) => {
+      if (door === "a staff") await moderator(ctx);
+      let swept: { authRequests: number } | undefined;
+      const db = interleaved(ctx.client, { before }, async () => {
+        swept = await sweepSessions({
+          db: ctx.client,
+          now: () => new Date(Date.now() + 2 * 60_000),
+        });
+      });
+      const { app, logs } = await appOn(db, { bank: true });
+      const state = door === "a staff" ? await staffStart(app) : await start(app);
+      // The attempt comes back in its last minute; the sweep runs a minute after it ends.
+      await ctx.client.query("UPDATE auth_request SET expires_at = $2 WHERE state = $1", [
+        state,
+        new Date(Date.now() + 60_000),
+      ]);
+      const back = await callbackTo(app, state);
+      expect(db.ran()).toBe(true);
+      expect(swept?.authRequests).toBe(0);
+      expect(await attemptRows(ctx, state)).toBe(1);
+      if (door === "a staff") expect(await panelExchangedAs(app, back)).toBe("moderator");
+      else expect(await exchangedAs(app, back)).toBe("created");
+      expect(errorLines(logs)).toEqual([]);
+    },
+  );
 });
 
 describe("an artificial registration racing another", () => {
