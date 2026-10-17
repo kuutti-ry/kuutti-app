@@ -35,7 +35,8 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 | `src/index.ts` | `createI18n`, `typedT`, `resolveLocale`, `parseAcceptLanguage`, `formatDate`, `formatNumber`, `formatPond` |
 | `src/react.tsx` (`@kuutti/i18n/react`) | `createReactI18n`, `I18nProvider`, `useT` for app and admin; the API never imports it |
 | `src/pseudo.ts` (`@kuutti/i18n/pseudo`) | the `en-XA` catalogue, a separate entry so only a dev build bundles it |
-| `scripts/` | `build`, `check` (`--release`), `check:ui-strings` (part of `pnpm lint`), `translate`, `review` |
+| `src/legal.ts` | `legalPageUrl`: the full text of a legal wording on the website, at the anchor of its version (#208) |
+| `scripts/` | `build`, `check` (`--release`), `check:ui-strings` (part of `pnpm lint`), `check-legal-versions` (`pnpm check:legal-versions`), `translate`, `review` |
 
 ## Runtimes
 
@@ -46,6 +47,8 @@ A native reviewer reads machine text and approves it; `docs/i18n/translation-rev
 ## Checks
 
 `pnpm i18n:check` (CI job `i18n`): the file validates, every key has `fi` (fail) and `sv` (warn), every locale is valid ICU with the source's arguments, every plural form its language needs (CLDR) and the English's exact cases and select options, no dynamic value is inflected, `max_length` holds, and every fi and sv text is machine text or carries a review that still matches it. `--release` (a `v*` tag, a production EAS build) also fails on machine text in a released language (`RELEASED_LOCALES`: en and fi) and on draft legal text. `pnpm lint` fails on a user-facing string literal in the clients' TSX.
+
+`pnpm check:legal-versions` (CI job `i18n`, #208, ADR-010 §4): each kind's version in `CONSENT_VERSIONS` is the one the website publishes in `https://kuutti.app/legal/versions.json`, the app's link to the full text (`legalPageUrl`) is the address the site gives for it, and the site's research and sensitive-answers text is this package's Finnish `legal.<kind>.title` and summary (by the site's fingerprint, `siteFingerprint`). The site's full Finnish page binds and leads: a new version is published there first, and the app follows with the same `consent_version`. `--file <path>` reads a local copy instead of the deployed file.
 
 `pnpm i18n:translate` sends message text (with approved translations from the same namespace as examples), the glossary and the tone guide to the Claude API (`claude-opus-5`), and nothing else; credentials come from the developer's environment (`ANTHROPIC_API_KEY` or an `ant auth login` profile) and are never committed. Every answer is validated and written as machine text.
 

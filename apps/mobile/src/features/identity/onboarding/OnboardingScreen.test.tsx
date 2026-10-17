@@ -219,7 +219,12 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
     expect(screen.getByText(/One round a day/)).toBeTruthy();
     expect(screen.getByText("Terms of use")).toBeTruthy();
-    expect(screen.getAllByText(`Version ${VERSION}`)).toHaveLength(2);
+    // Each summary's version links to the full text on the website (#208).
+    expect(
+      screen.getAllByRole("link", {
+        name: `Read the full text on kuutti.app (version ${VERSION})`,
+      }),
+    ).toHaveLength(2);
     checkA11y();
     await press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
     await flush();
@@ -247,6 +252,9 @@ describe("OnboardingScreen", () => {
       screen.getByRole("button", { name: "Continue" }).props.accessibilityState?.disabled,
     ).toBe(true);
     expect(screen.getByText(/special categories of personal data/)).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: `Read the full text on kuutti.app (version ${SPECIAL})` }),
+    ).toBeTruthy();
     await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
     await flush();
     expect(server.consents.at(-1)).toEqual(consented("special_category"));
@@ -295,6 +303,9 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await flush();
     await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
+    expect(
+      screen.getByRole("link", { name: `Read the full text on kuutti.app (version ${VERSION})` }),
+    ).toBeTruthy();
     checkA11y();
     await press(screen.getByRole("button", { name: "Not now" }));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));

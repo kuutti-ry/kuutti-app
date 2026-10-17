@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { LegalTextLink } from "./LegalTextLink";
 import { consentLocale, fetchConsents, giveConsent, withdrawConsent } from "./onboarding/client";
 import { useSession } from "./session";
 
@@ -99,7 +100,9 @@ const FAILED = {
  * One withdrawable consent on its own screen (#46, #146, #287): a choice
  * about the app, not an action on the account. It says when it is being read
  * and when it could not be read, with a way to read it again; nothing for a
- * signed-out device, whose screen says there is no session.
+ * signed-out device, whose screen says there is no session. A yes here is
+ * given to the version this app carries, so its text is a link away, as on
+ * the onboarding steps (#208, ADR-010 §4).
  */
 export function ConsentSwitch({ kind }: { kind: WithdrawableConsentKind }) {
   const { t, locale } = useT();
@@ -146,6 +149,7 @@ export function ConsentSwitch({ kind }: { kind: WithdrawableConsentKind }) {
       <Text variant="muted">
         {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : t(EXPLAIN[kind])}
       </Text>
+      <LegalTextLink kind={kind} />
       {consent.failed && <Text accessibilityLiveRegion="assertive">{t(FAILED[kind])}</Text>}
     </View>
   );

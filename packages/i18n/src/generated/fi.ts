@@ -156,6 +156,7 @@ export const fi: Readonly<Record<string, string>> = {
   "onboarding.changeFrom": "Seuraava muutos mahdollinen: {date}.",
   "onboarding.consents.binding": "Suomenkielinen teksti on sitova; tämä on käännös.",
   "onboarding.consents.explain": "Lue molemmat. Hyväksyt juuri tämän version kummastakin tekstistä; jos jompikumpi muuttuu, kysymme uudelleen.",
+  "onboarding.consents.fullText": "Lue koko teksti osoitteessa kuutti.app (versio {version})",
   "onboarding.consents.outdatedApp": "Tästä tekstistä on uudempi versio kuin sovellukseen sisältyvä. Päivitä sovellus jatkaaksesi.",
   "onboarding.consents.version": "Versio {version}",
   "onboarding.continue": "Jatka",

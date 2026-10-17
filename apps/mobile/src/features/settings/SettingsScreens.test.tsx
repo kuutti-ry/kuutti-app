@@ -1,6 +1,8 @@
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
+import { Linking } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -139,13 +141,22 @@ describe("the legal screens", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Back" }));
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/^DRAFT: Kuutti is a free dating service/)).toBeTruthy();
-    expect(screen.getByText(/^Version \S+$/)).toBeTruthy();
+    // The version, as the link to the full text on the website (#208).
+    expect(
+      screen.getByRole("link", { name: /^Read the full text on kuutti\.app \(version \S+\)$/ }),
+    ).toBeTruthy();
   });
 
-  it("show the privacy text", async () => {
+  it("show the privacy text, and lead to the full policy at its version", async () => {
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<LegalScreen kind="privacy" />);
     expectPinnedHeader("Privacy", "Back");
     expect(screen.getByText(/^DRAFT: Kuutti stores your year and month of birth/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole("link", { name: /^Read the full text/ }));
+    expect(open).toHaveBeenCalledWith(
+      `https://kuutti.app/legal/privacy/#privacy-${CONSENT_VERSIONS.privacy}`,
+    );
+    open.mockRestore();
   });
 
   it("read a link's kind, and take anything else as the terms", () => {

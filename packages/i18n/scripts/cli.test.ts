@@ -111,3 +111,18 @@ describe("pnpm i18n:check", () => {
     },
   );
 });
+
+describe("pnpm check:legal-versions", () => {
+  // Each refusal comes before the site is asked, so none of these reaches the network.
+  it.each<[string[], RegExp]>([
+    [["--file="], /--file takes a value/],
+    [["--file"], /Option '--file <value>' argument missing/],
+    [["--fiel", "x.json"], /Unknown option '--fiel'/],
+    [["x.json"], /Unexpected argument 'x\.json'/],
+  ])("refuses %j rather than checking the deployed file (#235)", (args, message) => {
+    const result = run("check-legal-versions.ts", args);
+    expect(result.code).toBe(1);
+    expect(result.out).toMatch(message);
+    expect(result.out).not.toMatch(/check:legal-versions: the app's consent versions/);
+  });
+});

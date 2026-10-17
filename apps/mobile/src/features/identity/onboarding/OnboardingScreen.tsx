@@ -34,6 +34,7 @@ import {
 } from "@/features/profile";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { LegalTextLink } from "../LegalTextLink";
 import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
 import { useOnboarding } from "./useOnboarding";
 
@@ -328,9 +329,7 @@ export function OnboardingScreen() {
                   <Text>
                     {t(kind === "terms" ? "legal.terms.summary" : "legal.privacy.summary")}
                   </Text>
-                  <Text variant="muted">
-                    {t("onboarding.consents.version", { version: bundledVersion(kind) })}
-                  </Text>
+                  <LegalTextLink kind={kind} />
                 </CardContent>
               </Card>
             ))}
@@ -490,11 +489,7 @@ export function OnboardingScreen() {
               <CardContent className="gap-2">
                 <Text>{t("legal.special_category.summary")}</Text>
                 {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
-                <Text variant="muted">
-                  {t("onboarding.consents.version", {
-                    version: bundledVersion("special_category"),
-                  })}
-                </Text>
+                <LegalTextLink kind="special_category" />
                 {specialOutdated ? (
                   <Text accessibilityLiveRegion="polite">
                     {t("onboarding.consents.outdatedApp")}
@@ -707,9 +702,7 @@ export function OnboardingScreen() {
               </CardHeader>
               <CardContent className="gap-2">
                 <Text>{t("legal.research.summary")}</Text>
-                <Text variant="muted">
-                  {t("onboarding.consents.version", { version: bundledVersion("research") })}
-                </Text>
+                <LegalTextLink kind="research" />
               </CardContent>
             </Card>
             <Text variant="muted">{t("onboarding.research.later")}</Text>

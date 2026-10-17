@@ -1,6 +1,7 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, renderHook, screen, waitFor } from "@testing-library/react-native";
 import type * as React from "react";
+import { Linking } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -153,6 +154,29 @@ describe("ConsentSwitch", () => {
       locale: "en",
     });
   });
+
+  it.each([
+    ["research", "Take part in research", "https://kuutti.app/legal/privacy/#research-"],
+    [
+      "special_category",
+      "Store my sensitive answers",
+      "https://kuutti.app/legal/privacy/#special_category-",
+    ],
+  ] as const)(
+    "links %s to its full text at the version a yes here is given to (#208)",
+    async (kind, label, page) => {
+      consentsApi({ research: false });
+      const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+      await show(<ConsentSwitch kind={kind} />);
+      await screen.findByLabelText(label);
+      const version = CONSENT_VERSIONS[kind];
+      await fireEvent.press(
+        screen.getByRole("link", { name: `Read the full text on kuutti.app (version ${version})` }),
+      );
+      expect(open).toHaveBeenCalledWith(`${page}${version}`);
+      open.mockRestore();
+    },
+  );
 
   it("says so when the research choice could not be saved, and leaves the switch as it was", async () => {
     consentsApi({ research: false, failGive: true });

@@ -397,6 +397,7 @@ export type MessageParams = {
   "onboarding.changeFrom": { "date": string };
   "onboarding.consents.binding": Record<never, never>;
   "onboarding.consents.explain": Record<never, never>;
+  "onboarding.consents.fullText": { "version": string };
   "onboarding.consents.outdatedApp": Record<never, never>;
   "onboarding.consents.version": { "version": string };
   "onboarding.continue": Record<never, never>;
