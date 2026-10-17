@@ -11,6 +11,7 @@ import { useT } from "@/lib/locale";
 import { markLoginStarted, takeLoginStarted } from "@/lib/session";
 import { useHapticTap } from "@/theme/haptics";
 import { useSession } from "./session";
+import { challengeOf, newVerifier } from "./verifier";
 
 /** What the deep link `kuutti://auth` may carry: a one-time code, or the refusal's code and date. */
 export type SignInParams = { code?: string; error?: string; until?: string };
@@ -50,6 +51,9 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
  * link lands here with a one-time code that becomes this device's session.
  * Only a code for a login this device started is exchanged, and never over a
  * session that exists: a link someone else minted is refused (login CSRF).
+ * The code is bound to this phone too: the start carries the SHA-256 of a
+ * verifier kept with the mark, and the exchange sends the verifier, so a code
+ * another app reads off the link is refused without it (ADR-027).
  * The API's language follows the browser's, which follows the phone.
  */
 export function SignInScreen({ code, error, until }: SignInParams) {
@@ -77,13 +81,13 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     exchanged.current = code;
     setPhase({ kind: "exchanging" });
     void (async () => {
-      const asked = await takeLoginStarted();
-      if (!asked || status === "signed-in") {
+      const verifier = await takeLoginStarted();
+      if (!verifier || status === "signed-in") {
         setPhase({ kind: "error", code: "unexpected_link" });
         return;
       }
       try {
-        await signIn(code);
+        await signIn(code, verifier);
         setPhase({ kind: "done" });
         router.replace("/");
       } catch (failure: unknown) {
@@ -102,12 +106,15 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     // when it says the same: the same refusal twice is two refusals.
     router.setParams({ code: undefined, error: undefined, until: undefined });
     try {
-      await markLoginStarted();
+      // A verifier for this attempt alone: a second tap replaces the first's,
+      // and a code from the first's browser tab is refused (ADR-027).
+      const verifier = newVerifier();
+      await markLoginStarted(verifier);
       // The bank's chooser in the app's language, which can differ from the
       // phone's and so from the browser's (#55); en-XA asks for English.
       const bankLocale = locale === "fi" || locale === "sv" ? locale : "en";
       await Linking.openURL(
-        `${apiBaseUrl()}/auth/start?platform=${Platform.OS}&locale=${bankLocale}`,
+        `${apiBaseUrl()}/auth/start?platform=${Platform.OS}&locale=${bankLocale}&code_challenge=${challengeOf(verifier)}`,
       );
     } catch {
       setPhase({ kind: "error", code: "generic" });

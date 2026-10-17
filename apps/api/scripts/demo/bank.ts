@@ -1,13 +1,16 @@
+import { createHash, randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { type DemoPersona, personaClaims } from "@kuutti/db/demo";
 import { AuthExchangeResponse, ErrorResponse, HealthResponse, Photo } from "@kuutti/schema";
 
 /**
  * A persona's way through the bank and back, as a browser and the app walk it
- * (#73, ADR-014 §12): /auth/start sends to the mock bank, the bank's page is
- * answered with the persona's name and claims, the bank sends back to
- * /auth/callback, and the one-time code of the deep link is exchanged for a
- * session. Nothing here knows how an identity is made: that is the API's.
+ * (#73, ADR-014 §12): /auth/start, with the hash of a verifier made for the
+ * attempt, sends to the mock bank, the bank's page is answered with the
+ * persona's name and claims, the bank sends back to /auth/callback, and the
+ * one-time code of the deep link is exchanged, with that verifier, for a
+ * session (ADR-027). Nothing here knows how an identity is made: that is the
+ * API's.
  */
 export type Fetch = (input: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -123,11 +126,21 @@ function locationOf(response: Response, what: string): URL {
 
 type Locale = "fi" | "sv" | "en";
 
+/**
+ * What the app makes for each attempt (ADR-027): a verifier it keeps, and the
+ * SHA-256 of it, which the start carries. The verifier goes to the exchange
+ * and nowhere else, never into a DemoError.
+ */
+function attemptKey(): { verifier: string; challenge: string } {
+  const verifier = randomBytes(32).toString("hex");
+  return { verifier, challenge: createHash("sha256").update(verifier).digest("hex") };
+}
+
 /** Where the API sends a login: the bank's page, which must be on this computer. */
-async function bankOf(context: BankContext, locale: Locale): Promise<URL> {
+async function bankOf(context: BankContext, locale: Locale, challenge: string): Promise<URL> {
   const start = await patient(
     context,
-    new URL(`/auth/start?platform=ios&locale=${locale}`, context.api),
+    new URL(`/auth/start?platform=ios&locale=${locale}&code_challenge=${challenge}`, context.api),
     { redirect: "manual" },
   );
   if (start.status === 503) {
@@ -184,7 +197,8 @@ export async function lookAtApi(
       `the API at ${context.api} is not ready: database ${answer.data.db}, migrations ${answer.data.migrations}`,
     );
   }
-  const bank = await bankOf(context, "fi");
+  // A login only to find its row: nobody exchanges its code, so its verifier is dropped.
+  const bank = await bankOf(context, "fi", attemptKey().challenge);
   const state = bank.searchParams.get("state");
   if (!state) {
     throw new DemoError(
@@ -206,7 +220,8 @@ export async function loginAs(
   locale: Locale = "fi",
 ): Promise<Login> {
   const { api } = context;
-  const bank = await bankOf(context, locale);
+  const { verifier, challenge } = attemptKey();
+  const bank = await bankOf(context, locale, challenge);
 
   const posted = await context.fetch(bank, {
     method: "POST",
@@ -236,7 +251,7 @@ export async function loginAs(
   const exchanged = await patient(context, new URL("/auth/exchange", api), {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, verifier }),
   });
   if (!exchanged.ok) throw new DemoError(`/auth/exchange: ${exchanged.status}`);
   const session = AuthExchangeResponse.parse(await exchanged.json());

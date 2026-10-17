@@ -9,7 +9,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 
 ## Auth and network
 
-- Backend-driven auth: open the system browser at `api/auth/start`, receive a one-time code by deep link, exchange it for a session. The app never holds a client secret, an ID token, or PKCE state.
+- Backend-driven auth: open the system browser at `api/auth/start`, receive a one-time code by deep link, exchange it for a session. The app never holds a client secret, an ID token, or Telia's PKCE state; it does hold its own verifier for each sign-in attempt, with the pending mark in `expo-secure-store`, whose SHA-256 `/auth/start` carries and `/auth/exchange` checks (RFC 8252 §8.1, ADR-027).
 - Session and refresh tokens live in `expo-secure-store`, never AsyncStorage.
 - API base URL comes from `Constants.expoConfig.hostUri` in dev and `EXPO_PUBLIC_API_URL` otherwise. `EXPO_PUBLIC_*` is public by definition; never put a secret there.
 - No analytics or tracking SDK in the app. Research events are emitted server-side only.

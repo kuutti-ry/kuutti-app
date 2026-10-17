@@ -144,7 +144,7 @@ describe("HomeRoute", () => {
     return function Returning() {
       const { status, signIn } = useSession();
       React.useEffect(() => {
-        if (status === "signed-out") void signIn("c".repeat(43));
+        if (status === "signed-out") void signIn("c".repeat(43), "5a1e".repeat(16));
       }, [status, signIn]);
       return <HomeRoute />;
     };

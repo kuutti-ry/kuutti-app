@@ -17,24 +17,52 @@ const codes = (schema: z.ZodType, input: unknown) =>
   schema.safeParse(input).error?.issues.map((issue) => issue.code) ?? [];
 
 const token = "Zz09_-".padEnd(43, "q");
+/** 256 bits as lowercase hex: the shape of the app's verifier and of its challenge (ADR-027). */
+const hex = "0123456789abcdef".repeat(4);
 const at = "2026-10-01T12:00:00.000Z";
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
 describe("the start of a login", () => {
   it.each(["ios", "android"])("sends the code back to the %s app", (platform) => {
-    expect(AuthStartQuery.parse({ platform })).toEqual({ platform });
+    expect(AuthStartQuery.parse({ platform, code_challenge: hex })).toEqual({
+      platform,
+      code_challenge: hex,
+    });
   });
 
   it("refuses a web platform, a missing one and an unknown language", () => {
     expect(codes(AuthPlatform, "web")).toEqual(["invalid_value"]);
-    expect(codes(AuthStartQuery, {})).toEqual(["invalid_value"]);
-    expect(codes(AuthStartQuery, { platform: "ios", locale: "et" })).toEqual(["invalid_value"]);
+    expect(codes(AuthStartQuery, { code_challenge: hex })).toEqual(["invalid_value"]);
+    expect(codes(AuthStartQuery, { platform: "ios", locale: "et", code_challenge: hex })).toEqual([
+      "invalid_value",
+    ]);
   });
 
   it.each(["fi", "sv", "en"])("passes the bank chooser the language %s", (locale) => {
-    expect(AuthStartQuery.parse({ platform: "android", locale })).toEqual({
+    expect(AuthStartQuery.parse({ platform: "android", locale, code_challenge: hex })).toEqual({
       platform: "android",
       locale,
+      code_challenge: hex,
+    });
+  });
+
+  it.each([
+    ["no challenge", undefined, "invalid_type"],
+    ["an empty one", "", "invalid_format"],
+    ["upper-case hex", hex.toUpperCase(), "invalid_format"],
+    ["63 characters", hex.slice(1), "invalid_format"],
+    ["65 characters", `${hex}0`, "invalid_format"],
+    ["a base64url SHA-256, as RFC 7636 would send it", token, "invalid_format"],
+    ["hex with a character that is not", `${hex.slice(1)}g`, "invalid_format"],
+    ["a number", 42, "invalid_type"],
+  ])("refuses a start with %s as its code challenge", (_, challenge, code) => {
+    expect(codes(AuthStartQuery, { platform: "ios", code_challenge: challenge })).toEqual([code]);
+  });
+
+  it("keeps of a start only what it knows, so a verifier sent with it goes no further", () => {
+    expect(AuthStartQuery.parse({ platform: "ios", code_challenge: hex, verifier: hex })).toEqual({
+      platform: "ios",
+      code_challenge: hex,
     });
   });
 });
@@ -75,12 +103,37 @@ describe("the one-time code and the session tokens", () => {
     [`${"A".repeat(42)}=`, false],
     [`${"A".repeat(42)} `, false],
   ])("takes %s as a one-time code and a refresh token: %s", (code, ok) => {
-    expect(AuthExchangeRequest.safeParse({ code }).success).toBe(ok);
+    expect(AuthExchangeRequest.safeParse({ code, verifier: hex }).success).toBe(ok);
     expect(AuthRefreshRequest.safeParse({ refreshToken: code }).success).toBe(ok);
   });
 
+  it.each([
+    ["no verifier", undefined, "invalid_type"],
+    ["an empty one", "", "invalid_format"],
+    ["upper-case hex", hex.toUpperCase(), "invalid_format"],
+    ["63 characters", hex.slice(1), "invalid_format"],
+    ["65 characters", `${hex}0`, "invalid_format"],
+    ["one in base64url", token, "invalid_format"],
+    ["hex with a character that is not", `${hex.slice(1)}g`, "invalid_format"],
+    ["a number", 42, "invalid_type"],
+  ])("refuses an exchange with %s as its verifier", (_, verifier, code) => {
+    expect(codes(AuthExchangeRequest, { code: token, verifier })).toEqual([code]);
+  });
+
+  it("takes the code with its verifier, and nothing else", () => {
+    expect(AuthExchangeRequest.parse({ code: token, verifier: hex })).toEqual({
+      code: token,
+      verifier: hex,
+    });
+  });
+
   it("refuses an exchange or a refresh with an extra field", () => {
+    expect(codes(AuthExchangeRequest, { code: token, verifier: hex, platform: "ios" })).toEqual([
+      "unrecognized_keys",
+    ]);
+    // The code alone, as before the binding (ADR-027), lacks its verifier too.
     expect(codes(AuthExchangeRequest, { code: token, platform: "ios" })).toEqual([
+      "invalid_type",
       "unrecognized_keys",
     ]);
     expect(codes(AuthRefreshRequest, { refreshToken: token, accessToken: token })).toEqual([

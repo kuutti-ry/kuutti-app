@@ -1,9 +1,11 @@
+import { createHash } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse } from "@kuutti/schema";
 import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig, testPool } from "../test/harness.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 import { AUTH_REQUEST_CAP, AUTH_REQUEST_TTL_MS } from "./codes.ts";
@@ -16,6 +18,10 @@ import * as repo from "./repo.ts";
 
 const KEY_HEX = "ab".repeat(32);
 const NOW = new Date("2026-10-01T12:00:00Z");
+
+/** A verifier well-formed and not the app's, with its challenge: another attempt's, or a guess (ADR-027). */
+const OTHER_VERIFIER = "0dd5".repeat(16);
+const OTHER_CHALLENGE = createHash("sha256").update(OTHER_VERIFIER).digest("hex");
 
 /** A deterministic generator: the same sequence every run, so the hetus repeat. */
 function rngFrom(seed: number) {
@@ -88,9 +94,9 @@ async function appWith(
   return { app, broker, logs: lines };
 }
 
-/** Runs /auth/start and returns the state the broker was given. */
-async function start(app: ReturnType<typeof createApp>) {
-  const res = await app.request("/auth/start?platform=ios&locale=fi");
+/** Runs /auth/start, with the app's challenge unless told another, and returns the state the broker was given. */
+async function start(app: ReturnType<typeof createApp>, challenge = CHALLENGE) {
+  const res = await app.request(`/auth/start?platform=ios&locale=fi&code_challenge=${challenge}`);
   expect(res.status).toBe(302);
   const location = new URL(res.headers.get("location") ?? "");
   expect(location.origin).toBe("https://broker.test");
@@ -110,17 +116,53 @@ async function codeFrom(res: Response): Promise<string> {
   return new URL(location).searchParams.get("code") ?? "";
 }
 
-async function exchange(app: ReturnType<typeof createApp>, code: string) {
+/** POST /auth/exchange with any body, as the app or anybody else may send it. */
+function exchangeWith(app: ReturnType<typeof createApp>, body: unknown) {
   return app.request("/auth/exchange", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify(body),
   });
+}
+
+/** The exchange of `code`, with the app's verifier unless told another. */
+async function exchange(app: ReturnType<typeof createApp>, code: string, verifier = VERIFIER) {
+  return exchangeWith(app, { code, verifier });
 }
 
 async function errorCode(res: Response): Promise<string> {
   return ErrorResponse.parse(await res.json()).error.code;
 }
+
+/** What a refusal tells the caller, all but its request id; a body that is no error reads as its status alone. */
+async function answerOf(res: Response) {
+  const error = ErrorResponse.safeParse(await res.json()).data?.error;
+  return { status: res.status, code: error?.code, message: error?.message };
+}
+
+/**
+ * The exchange's answer to a code nobody issued. Every refusal of a code is
+ * this one answer, so that the caller learns nothing of which it was
+ * (ADR-027): unknown, used, expired, a staff code, or a wrong verifier.
+ */
+async function unknownCodeAnswer(app: ReturnType<typeof createApp>) {
+  const answer = await answerOf(await exchange(app, "A".repeat(43)));
+  expect(answer).toMatchObject({ status: 401, code: "auth_code_used" });
+  return answer;
+}
+
+/** When the attempt's code was spent, or null while it was not. */
+async function codeUsedAt(ctx: { client: Queryable }, state: string) {
+  const { rows } = await ctx.client.query<{ code_used_at: Date | null }>(
+    "SELECT code_used_at FROM auth_request WHERE state = $1",
+    [state],
+  );
+  expect(rows).toHaveLength(1);
+  return rows[0]?.code_used_at ?? null;
+}
+
+const sessionCount = async (ctx: { client: Queryable }) =>
+  Number((await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM session")).rows[0]?.n);
 
 /** A refused callback sends the browser back into the app with the code. */
 function refusal(res: Response): { error: string | null; until: string | null } {
@@ -148,14 +190,17 @@ describe("bank login", () => {
   }) => {
     const { app, broker } = await appWith(ctx, ADULT_HETU);
     expect((await app.request("/auth/start")).status).toBe(400);
-    expect((await app.request("/auth/start?platform=web")).status).toBe(400);
+    expect((await app.request(`/auth/start?platform=web&code_challenge=${CHALLENGE}`)).status).toBe(
+      400,
+    );
     const state = await start(app);
     expect(broker.started).toEqual([state]);
     const rows = await ctx.client.query(
-      "SELECT platform, locale FROM auth_request WHERE state = $1",
+      "SELECT platform, locale, code_challenge FROM auth_request WHERE state = $1",
       [state],
     );
-    expect(rows.rows[0]).toEqual({ platform: "ios", locale: "fi" });
+    // The hash of the verifier the app keeps, which its exchange must present (ADR-027).
+    expect(rows.rows[0]).toEqual({ platform: "ios", locale: "fi", code_challenge: CHALLENGE });
   });
 
   test("An authentication that predates the login attempt is refused", async ({ ctx }) => {
@@ -372,15 +417,40 @@ describe("bank login", () => {
   test("The exchange validates the code and refuses an unknown one", async ({ ctx }) => {
     const { app } = await appWith(ctx, ADULT_HETU);
     expect((await exchange(app, "short")).status).toBe(400);
+    // A code without its verifier is refused before anything is looked up (ADR-027).
+    const bare = await exchangeWith(app, { code: "A".repeat(43) });
+    expect(bare.status).toBe(400);
+    expect(await errorCode(bare)).toBe("validation_failed");
     const unknown = await exchange(app, "A".repeat(43));
     expect(unknown.status).toBe(401);
     expect(await errorCode(unknown)).toBe("auth_code_used");
   });
 
+  test("A code is exchanged only with the verifier of the login that asked for it", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, ADULT_HETU);
+    const refused = await unknownCodeAnswer(app);
+    const state = await start(app);
+    const code = await codeFrom(await callback(app, state));
+    // Whoever else the link reached holds the code and not the app's verifier (RFC 8252 §8.1).
+    expect(await answerOf(await exchange(app, code, OTHER_VERIFIER))).toEqual(refused);
+    // Refused without being spent, and nothing opened.
+    expect(await codeUsedAt(ctx, state)).toBeNull();
+    expect(await sessionCount(ctx)).toBe(0);
+    // The app that asked for the login still exchanges it, once.
+    const own = await exchange(app, code);
+    expect(own.status).toBe(200);
+    expect((await own.json()).outcome).toBe("created");
+    expect(await codeUsedAt(ctx, state)).not.toBeNull();
+    expect(await sessionCount(ctx)).toBe(1);
+    expect(await answerOf(await exchange(app, code))).toEqual(refused);
+  });
+
   test("Without a broker the login answers 503", async ({ ctx }) => {
     const { logger } = await captureLogger();
     const app = createApp({ config: testConfig(), logger, db: ctx.client });
-    const res = await app.request("/auth/start?platform=android");
+    const res = await app.request(`/auth/start?platform=android&code_challenge=${CHALLENGE}`);
     expect(res.status).toBe(503);
     expect(await errorCode(res)).toBe("auth_provider_error");
   });
@@ -389,11 +459,13 @@ describe("bank login", () => {
     const { logger } = await captureLogger();
     const config = testConfig({ APP_ENV: "preview", PR_NUMBER: "125" });
     const app = createApp({ config, logger, db: ctx.client });
-    const res = await app.request("/auth/start?platform=android");
+    const res = await app.request(`/auth/start?platform=android&code_challenge=${CHALLENGE}`);
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("kuutti://auth?error=auth_unavailable");
     // A request the app could not have sent is still refused first.
-    expect((await app.request("/auth/start?platform=web")).status).toBe(400);
+    expect((await app.request(`/auth/start?platform=web&code_challenge=${CHALLENGE}`)).status).toBe(
+      400,
+    );
   });
 });
 
@@ -657,7 +729,7 @@ describe("the callback's refusals and failures", () => {
     const config = testConfig({ APP_ENV: "preview", PR_NUMBER: "125", HETU_HMAC_KEY: KEY_HEX });
     expect(config.HETU_HMAC_KEY).toBeUndefined();
     const app = createApp({ config, logger, db: ctx.client, broker });
-    const res = await app.request("/auth/start?platform=ios");
+    const res = await app.request(`/auth/start?platform=ios&code_challenge=${CHALLENGE}`);
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("kuutti://auth?error=auth_unavailable");
     expect(broker.started).toEqual([]);
@@ -665,7 +737,7 @@ describe("the callback's refusals and failures", () => {
 
   test("The start refuses a language the bank chooser does not have", async ({ ctx }) => {
     const { app, broker } = await appWith(ctx, ADULT_HETU);
-    const res = await app.request("/auth/start?platform=ios&locale=de");
+    const res = await app.request(`/auth/start?platform=ios&locale=de&code_challenge=${CHALLENGE}`);
     expect(res.status).toBe(400);
     expect(await errorCode(res)).toBe("validation_failed");
     expect(broker.started).toEqual([]);
@@ -702,18 +774,29 @@ describe("the exchange", () => {
     expect(attempt.rows).toEqual([{ code_used_at: null }]);
   });
 
-  test("The exchange takes exactly the code and nothing else", async ({ ctx }) => {
-    const { app, code } = await loggedIn(ctx);
-    for (const body of [{}, { code, extra: true }, { code: 42 }]) {
-      const res = await app.request("/auth/exchange", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
+  test("The exchange takes exactly the code and its verifier, and nothing else", async ({
+    ctx,
+  }) => {
+    const { app, state, code } = await loggedIn(ctx);
+    for (const body of [
+      {},
+      { code },
+      { verifier: VERIFIER },
+      { code, verifier: VERIFIER, extra: true },
+      { code: 42, verifier: VERIFIER },
+      { code, verifier: 42 },
+      { code, verifier: "short" },
+      // The right verifier, but not as the contract writes it (ADR-027): no other spelling is taken.
+      { code, verifier: VERIFIER.toUpperCase() },
+      { code, verifier: `${VERIFIER}0` },
+      { code, verifier: Buffer.from(VERIFIER, "hex").toString("base64url") },
+    ]) {
+      const res = await exchangeWith(app, body);
       expect(res.status, JSON.stringify(body)).toBe(400);
       expect(await errorCode(res)).toBe("validation_failed");
     }
     // None of the refused bodies spent the code.
+    expect(await codeUsedAt(ctx, state)).toBeNull();
     expect((await exchange(app, code)).status).toBe(200);
   });
 
@@ -724,7 +807,7 @@ describe("the exchange", () => {
     const res = await first.app.request("/auth/exchange", {
       method: "POST",
       headers: { "content-type": "application/json", "user-agent": `Kuutti/1 ${"x".repeat(300)}` },
-      body: JSON.stringify({ code: first.code }),
+      body: JSON.stringify({ code: first.code, verifier: VERIFIER }),
     });
     expect(res.status).toBe(200);
     const long = (await res.json()) as { sessionId: string };
@@ -732,7 +815,7 @@ describe("the exchange", () => {
     const bare = await second.app.request("/auth/exchange", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ code: second.code }),
+      body: JSON.stringify({ code: second.code, verifier: VERIFIER }),
     });
     expect(bare.status).toBe(200);
     const none = (await bare.json()) as { sessionId: string };
@@ -759,14 +842,17 @@ type Db = { client: Parameters<typeof createApp>[0]["db"] };
 
 const from = (address: string) => ({ "x-forwarded-for": address });
 
-const startFrom = (app: ReturnType<typeof createApp>, address: string, query = "platform=ios") =>
-  app.request(`/auth/start?${query}`, { headers: from(address) });
+const startFrom = (
+  app: ReturnType<typeof createApp>,
+  address: string,
+  query = `platform=ios&code_challenge=${CHALLENGE}`,
+) => app.request(`/auth/start?${query}`, { headers: from(address) });
 
 const exchangeFrom = (app: ReturnType<typeof createApp>, address: string, code: string) =>
   app.request("/auth/exchange", {
     method: "POST",
     headers: { ...from(address), "content-type": "application/json" },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({ code, verifier: VERIFIER }),
   });
 
 /** Where a start sent the browser: the broker's origin, or the app's link whole. */
@@ -820,11 +906,15 @@ describe("the sign-in doors (ADR-026 §4)", () => {
     ctx,
   }) => {
     const { app, broker } = await appWith(ctx, ADULT_HETU, { config: TWO_A_MINUTE });
-    expect((await startFrom(app, HERE, "platform=web")).status).toBe(400);
-    expect((await startFrom(app, HERE, "platform=ios&locale=de")).status).toBe(400);
+    expect((await startFrom(app, HERE, `platform=web&code_challenge=${CHALLENGE}`)).status).toBe(
+      400,
+    );
+    expect(
+      (await startFrom(app, HERE, `platform=ios&locale=de&code_challenge=${CHALLENGE}`)).status,
+    ).toBe(400);
     expect(sentTo(await startFrom(app, HERE))).toBe("kuutti://auth?error=auth_rate_limited");
     // The doors stand before the validation: past the window nothing is read.
-    expect(sentTo(await startFrom(app, HERE, "platform=web"))).toBe(
+    expect(sentTo(await startFrom(app, HERE, `platform=web&code_challenge=${CHALLENGE}`))).toBe(
       "kuutti://auth?error=auth_rate_limited",
     );
     expect(broker.started).toEqual([]);
@@ -960,7 +1050,8 @@ async function starter(db: Queryable) {
   return {
     broker,
     logs: lines,
-    start: () => startLogin(deps, { platform: "ios", locale: null }, SMALL_CAP),
+    start: () =>
+      startLogin(deps, { platform: "ios", locale: null, codeChallenge: CHALLENGE }, SMALL_CAP),
   };
 }
 
@@ -1022,6 +1113,13 @@ describe("the table's ceiling (ADR-026 §6)", () => {
     // Two go and one comes, so a table that concurrent starts left past its
     // cap drains back under it.
     expect(await states(ctx)).toEqual(["full-3", "full-4", "full-5", ...broker.started]);
+    // The evicting insert binds its attempt too (ADR-027 §2): a login started
+    // at the cap can still be exchanged with its verifier.
+    const bound = await ctx.client.query(
+      "SELECT code_challenge FROM auth_request WHERE state = $1",
+      broker.started,
+    );
+    expect(bound.rows).toEqual([{ code_challenge: CHALLENGE }]);
     // The table is counted once: the eviction and the insert are one
     // statement on the primary key, with no count of its own.
     expect(db.texts.filter((text) => COUNTS_THE_TABLE.test(text))).toHaveLength(1);
@@ -1141,7 +1239,7 @@ describe("the table's ceiling (ADR-026 §6)", () => {
        WHERE state = 'full-1'`,
     );
     const { app, broker, logs } = await appWith(ctx, ADULT_HETU);
-    const refused = await app.request("/auth/start?platform=ios");
+    const refused = await app.request(`/auth/start?platform=ios&code_challenge=${CHALLENGE}`);
     expect(sentTo(refused)).toBe("kuutti://auth?error=auth_rate_limited");
     expect(refused.headers.get("retry-after")).toBe("60");
     // A staff start goes back to the panel the same way.
@@ -1247,6 +1345,7 @@ describe("the table's ceiling (ADR-026 §6)", () => {
         platform: "ios",
         locale: null,
         expiresAt: new Date(Date.now() + AUTH_REQUEST_TTL_MS),
+        codeChallenge: null,
       });
       // Neither sees the other's row before it commits, so both take the last place.
       expect(await repo.insertAuthRequest(ctx.client, attempt("overlap-a"), cap)).toBe(true);
@@ -1258,5 +1357,162 @@ describe("the table's ceiling (ADR-026 §6)", () => {
       await second.query("ROLLBACK").catch(() => undefined);
       second.release();
     }
+  });
+});
+
+// The code bound to the attempt that asked for it (#186, ADR-027): the app
+// starts with the SHA-256 of a verifier it keeps, and only that verifier
+// exchanges the code, so another app the deep link reaches holds a code it
+// cannot spend.
+describe("the code bound to the attempt that asked for it (ADR-027)", () => {
+  test("a start without its code challenge, or with one that is not one lowercase hex SHA-256, is refused before anything is written", async ({
+    ctx,
+  }) => {
+    const { app, broker } = await appWith(ctx, ADULT_HETU);
+    for (const challenge of [
+      "",
+      "&code_challenge=",
+      `&code_challenge=${CHALLENGE.toUpperCase()}`,
+      `&code_challenge=${CHALLENGE.slice(1)}`,
+      `&code_challenge=${CHALLENGE}0`,
+      // RFC 7636's S256 as base64url: the same hash, not as the contract writes it.
+      `&code_challenge=${Buffer.from(CHALLENGE, "hex").toString("base64url")}`,
+      // Two of them, so that no attempt is bound to either.
+      `&code_challenge=${CHALLENGE}&code_challenge=${OTHER_CHALLENGE}`,
+    ]) {
+      const res = await app.request(`/auth/start?platform=ios&locale=fi${challenge}`);
+      expect(res.status, challenge).toBe(400);
+      expect(await errorCode(res), challenge).toBe("validation_failed");
+    }
+    expect(broker.started).toEqual([]);
+    expect(await attempts(ctx)).toBe(0);
+  });
+
+  test("of two starts each code goes only with its own attempt's verifier, so the app, which keeps the last start's, exchanges only the last one's code", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, ADULT_HETU);
+    const refused = await unknownCodeAnswer(app);
+    // The person tapped twice: the app kept the second start's verifier (ADR-027, the last start wins).
+    const older = await start(app, OTHER_CHALLENGE);
+    const newer = await start(app);
+    const olderCode = await codeFrom(await callback(app, older));
+    const newerCode = await codeFrom(await callback(app, newer));
+    // The older browser tab's code, with the verifier the app kept, and the other way round.
+    expect(await answerOf(await exchange(app, olderCode))).toEqual(refused);
+    expect(await answerOf(await exchange(app, newerCode, OTHER_VERIFIER))).toEqual(refused);
+    expect(await codeUsedAt(ctx, older)).toBeNull();
+    expect(await codeUsedAt(ctx, newer)).toBeNull();
+    expect((await exchange(app, newerCode)).status).toBe(200);
+    // Each attempt is bound to its own verifier, not to whichever start came last.
+    expect((await exchange(app, olderCode, OTHER_VERIFIER)).status).toBe(200);
+    expect(await sessionCount(ctx)).toBe(2);
+  });
+
+  test("an app attempt without a challenge, as one under way when the binding was deployed, is refused with any verifier", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx, ADULT_HETU);
+    const refused = await unknownCodeAnswer(app);
+    const state = await start(app);
+    const code = await codeFrom(await callback(app, state));
+    // As a row written before the column was: NULL, which no verifier's hash equals.
+    await ctx.client.query("UPDATE auth_request SET code_challenge = NULL WHERE state = $1", [
+      state,
+    ]);
+    for (const verifier of [VERIFIER, OTHER_VERIFIER]) {
+      expect(await answerOf(await exchange(app, code, verifier))).toEqual(refused);
+    }
+    expect(await codeUsedAt(ctx, state)).toBeNull();
+    expect(await sessionCount(ctx)).toBe(0);
+  });
+
+  test("a staff attempt carries no challenge: its code is refused at the app's exchange with any verifier, and the panel's exchange takes the code alone as before", async ({
+    ctx,
+  }) => {
+    const { hetuHmac } = deriveIdentity(ADULT_HETU, hmacKeyFromHex(KEY_HEX), NOW);
+    const identity = await ctx.client.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [hetuHmac],
+    );
+    await ctx.client.query(
+      "INSERT INTO moderator_roles (identity_id, role, granted_by) VALUES ($1, 'moderator', 'test')",
+      [identity.rows[0]?.id],
+    );
+    const { app } = await appWith(ctx, ADULT_HETU);
+    const refused = await unknownCodeAnswer(app);
+    const started = await app.request("/admin/auth/start");
+    const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
+    // The panel's code returns to its own https origin, so nothing binds it (ADR-027).
+    const attempt = await ctx.client.query(
+      "SELECT platform, code_challenge FROM auth_request WHERE state = $1",
+      [state],
+    );
+    expect(attempt.rows).toEqual([{ platform: "admin", code_challenge: null }]);
+    const back = await callback(app, state);
+    expect(back.status).toBe(302);
+    const code =
+      new URLSearchParams(new URL(back.headers.get("location") ?? "").hash.slice(1)).get("code") ??
+      "";
+    expect(code).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    for (const verifier of [VERIFIER, OTHER_VERIFIER]) {
+      expect(await answerOf(await exchange(app, code, verifier))).toEqual(refused);
+    }
+    expect(await codeUsedAt(ctx, state)).toBeNull();
+    const panel = (body: unknown) =>
+      app.request("/admin/auth/exchange", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    // The panel's contract has no verifier and takes none.
+    const withVerifier = await panel({ code, verifier: VERIFIER });
+    expect(withVerifier.status).toBe(400);
+    expect(await errorCode(withVerifier)).toBe("validation_failed");
+    expect((await panel({ code })).status).toBe(200);
+  });
+
+  // The app's exchange finds its code and spends it in one statement (repo.ts consumeAppCode).
+  const SPENDS = /^UPDATE auth_request SET code_used_at/;
+
+  test.for([
+    ["before", { before: SPENDS }],
+    ["after", { after: SPENDS }],
+  ] as const)(
+    "an exchange with a wrong verifier that runs whole just %s the app's own spends nothing: the app's opens the one session and the other is refused",
+    async ([, at], { ctx }) => {
+      let code = "";
+      const others: Response[] = [];
+      const db = interleaved(ctx.client, at, async () => {
+        others.push(await exchange(app, code, OTHER_VERIFIER));
+      });
+      const { app } = await appWith({ client: db }, ADULT_HETU);
+      const state = await start(app);
+      code = await codeFrom(await callback(app, state));
+      const own = await exchange(app, code);
+      expect(db.ran()).toBe(true);
+      expect(own.status).toBe(200);
+      expect(others).toHaveLength(1);
+      expect(await answerOf(others[0] as Response)).toEqual(await unknownCodeAnswer(app));
+      expect(await codeUsedAt(ctx, state)).not.toBeNull();
+      expect(await sessionCount(ctx)).toBe(1);
+    },
+  );
+
+  test("two exchanges of one code with its verifier at once open one session: the one that spends it first gets it, the other the answer of an unknown code", async ({
+    ctx,
+  }) => {
+    let code = "";
+    const others: Response[] = [];
+    const db = interleaved(ctx.client, { before: SPENDS }, async () => {
+      others.push(await exchange(app, code));
+    });
+    const { app } = await appWith({ client: db }, ADULT_HETU);
+    code = await codeFrom(await callback(app, await start(app)));
+    const late = await exchange(app, code);
+    expect(db.ran()).toBe(true);
+    expect(others.map((res) => res.status)).toEqual([200]);
+    expect(await answerOf(late)).toEqual(await unknownCodeAnswer(app));
+    expect(await sessionCount(ctx)).toBe(1);
   });
 });

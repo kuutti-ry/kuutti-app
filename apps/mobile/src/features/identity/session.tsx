@@ -12,8 +12,9 @@ import {
 /**
  * Whether this device is signed in (#35). "loading" until the stored session
  * has been read; the sign-in screen and the deep-link handler (#36) call
- * signIn with the one-time code; a refresh the API refuses flips the state to
- * signed-out on its own, wherever the app is.
+ * signIn with the one-time code and the verifier of the attempt it belongs to
+ * (ADR-027); a refresh the API refuses flips the state to signed-out on its
+ * own, wherever the app is.
  */
 type AuthOutcome = AuthExchangeResponse["outcome"];
 
@@ -40,7 +41,7 @@ export function exportFileName(disposition: string | null): string {
 }
 
 type SessionApi = SessionState & {
-  signIn: (code: string) => Promise<AuthOutcome>;
+  signIn: (code: string, verifier: string) => Promise<AuthOutcome>;
   signOut: () => Promise<void>;
   signOutEverywhere: () => Promise<void>;
   /** Everything Kuutti holds about the person (#51), as the API answers it: the zip and its name. */
@@ -74,8 +75,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signIn = React.useCallback(async (code: string) => {
-    const { data, error, response } = await api.POST("/auth/exchange", { body: { code } });
+  const signIn = React.useCallback(async (code: string, verifier: string) => {
+    const { data, error, response } = await api.POST("/auth/exchange", {
+      body: { code, verifier },
+    });
     if (!data) {
       throw new ApiError(`sign-in answered ${response.status}`, response.status, error?.error.code);
     }

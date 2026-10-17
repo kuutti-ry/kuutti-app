@@ -48,11 +48,16 @@ export type LoginDeps = {
  * callback under way, refuses a start, before the broker signs anything;
  * nobody keeps such a row without the bank, since a callback the bank does
  * not complete ends its attempt at once (ADR-026 §8). `cap` is the ceiling;
- * tests make it small.
+ * tests make it small. The app's attempt carries the SHA-256 of its verifier,
+ * which its exchange must present; it is null only for staff (ADR-027).
  */
 export async function startLogin(
   deps: LoginDeps,
-  input: { platform: AuthPlatform | typeof ADMIN_PLATFORM; locale: string | null },
+  input: {
+    platform: AuthPlatform | typeof ADMIN_PLATFORM;
+    locale: string | null;
+    codeChallenge: string | null;
+  },
   cap = AUTH_REQUEST_CAP,
 ): Promise<URL> {
   const state = randomBytes(24).toString("base64url");
@@ -64,6 +69,7 @@ export async function startLogin(
     platform: input.platform,
     locale: input.locale,
     expiresAt: new Date(now.getTime() + AUTH_REQUEST_TTL_MS),
+    codeChallenge: input.codeChallenge,
   };
   let written = await repo.insertAuthRequest(deps.db, attempt, cap);
   // The table is counted again only when the sweep freed something.
@@ -325,30 +331,26 @@ async function deriveFromBroker(
   };
 }
 
-/** /auth/exchange: the one-time code, once, within its minute. */
+/** /auth/exchange: the one-time code, once, within its minute, with its attempt's verifier (ADR-027). */
 export async function exchangeCode(
   deps: Pick<LoginDeps, "db" | "now">,
-  code: string,
+  input: { code: string; verifier: string },
 ): Promise<{
   accountId: string;
   platform: AuthPlatform;
   outcome: AuthExchangeResponse["outcome"];
 }> {
-  const now = deps.now();
-  const request = await repo.findAuthRequestByCodeHash(deps.db, hashOneTimeCode(code));
-  const valid =
-    request !== null &&
-    request.accountId !== null &&
-    request.codeExpiresAt !== null &&
-    request.codeExpiresAt.getTime() >= now.getTime() &&
-    (await repo.consumeCode(deps.db, request.id, now));
-  if (!valid || request === null || request.accountId === null) {
-    throw new AppError(401, "auth_code_used", "This code is unknown, used or expired");
-  }
+  const login = await repo.consumeAppCode(deps.db, {
+    codeHash: hashOneTimeCode(input.code),
+    // The challenge is the same SHA-256 hex as the code's hash (ADR-027).
+    codeChallenge: hashOneTimeCode(input.verifier),
+    at: deps.now(),
+  });
+  if (!login) throw new AppError(401, "auth_code_used", "This code is unknown, used or expired");
   return {
-    accountId: request.accountId,
-    platform: request.platform === "android" ? "android" : "ios",
+    accountId: login.accountId,
+    platform: login.platform === "android" ? "android" : "ios",
     outcome:
-      request.outcome === "resumed" || request.outcome === "unpaused" ? request.outcome : "created",
+      login.outcome === "resumed" || login.outcome === "unpaused" ? login.outcome : "created",
   };
 }

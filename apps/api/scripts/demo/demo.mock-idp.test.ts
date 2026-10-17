@@ -57,6 +57,10 @@ import { resetPersonas } from "./reset.ts";
 
 const ISSUER = process.env.MOCK_IDP_ISSUER ?? "http://127.0.0.1:8080/ftn";
 const API = "http://localhost:3000";
+/** A start as the walk sends it: the challenge is made anew for each attempt (ADR-027). */
+const A_START = expect.stringMatching(
+  /^http:\/\/localhost:3000\/auth\/start\?platform=ios&locale=fi&code_challenge=[0-9a-f]{64}$/,
+);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const reachable = await fetch(`${ISSUER}/.well-known/openid-configuration`, {
   signal: AbortSignal.timeout(1500),
@@ -150,7 +154,7 @@ describe("the walk to the bank and back", () => {
       /not the mock bank on this computer: nothing was sent/,
     );
     // The API was asked where the bank is, and nobody else was asked anything.
-    expect(asked).toEqual([`${API}/auth/start?platform=ios&locale=fi`]);
+    expect(asked).toEqual([A_START]);
   });
 
   test("follows the bank back to the callback and to nowhere else", async () => {
@@ -354,7 +358,7 @@ describe("the walk to the bank and back", () => {
       bank: "http://127.0.0.1:8080",
     });
     // Two questions each time, and nothing posted to anybody.
-    const questions = [`${API}/health`, `${API}/auth/start?platform=ios&locale=fi`];
+    const questions = [`${API}/health`, A_START];
     expect(asked).toEqual([...questions, ...questions]);
   });
 

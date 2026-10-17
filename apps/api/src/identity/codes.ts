@@ -24,6 +24,7 @@ export function newOneTimeCode(): { code: string; hash: string } {
   return { code, hash: hashOneTimeCode(code) };
 }
 
+/** SHA-256 as hex: how a one-time code is stored, and how the app's verifier becomes its challenge (ADR-027). */
 export function hashOneTimeCode(code: string): string {
   return createHash("sha256").update(code).digest("hex");
 }

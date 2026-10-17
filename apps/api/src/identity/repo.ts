@@ -13,7 +13,8 @@ import type { IdentityStanding, ModeratorRole } from "@kuutti/schema";
 // driver wants a Pool or Client, not that seam. Every statement here is keyed
 // by a primary or unique key; none reads user data by anything a request
 // controls except the state and the code hash, which are the keys of the
-// login attempt itself.
+// login attempt itself. The code challenge, also request-controlled, only
+// narrows the lookup by the code hash (ADR-027).
 
 type Row = Record<string, unknown>;
 
@@ -59,6 +60,7 @@ const authRequestFrom = (r: Row): AuthRequest => ({
   nonce: r.nonce as string,
   platform: r.platform as string,
   locale: (r.locale as string | null) ?? null,
+  codeChallenge: (r.code_challenge as string | null) ?? null,
   createdAt: r.created_at as Date,
   expiresAt: r.expires_at as Date,
   codeHash: (r.code_hash as string | null) ?? null,
@@ -84,6 +86,8 @@ type NewAuthRequest = {
   platform: string;
   locale: string | null;
   expiresAt: Date;
+  /** SHA-256 hex of the app's verifier (ADR-027); null only on a staff attempt. */
+  codeChallenge: string | null;
 };
 
 /**
@@ -99,10 +103,18 @@ export async function insertAuthRequest(
   cap: number,
 ): Promise<boolean> {
   const result = await db.query(
-    `INSERT INTO auth_request (state, nonce, platform, locale, expires_at)
-     SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz
-     WHERE (SELECT count(*) FROM auth_request) < $6`,
-    [input.state, input.nonce, input.platform, input.locale, input.expiresAt, cap],
+    `INSERT INTO auth_request (state, nonce, platform, locale, expires_at, code_challenge)
+     SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz, $6::text
+     WHERE (SELECT count(*) FROM auth_request) < $7`,
+    [
+      input.state,
+      input.nonce,
+      input.platform,
+      input.locale,
+      input.expiresAt,
+      input.codeChallenge,
+      cap,
+    ],
   );
   return result.rowCount === 1;
 }
@@ -129,11 +141,11 @@ export async function evictAndInsertAuthRequest(
          SELECT id FROM auth_request WHERE code_hash IS NULL AND outcome IS NULL
          ORDER BY expires_at LIMIT 2 FOR UPDATE SKIP LOCKED))
        RETURNING id)
-     INSERT INTO auth_request (state, nonce, platform, locale, expires_at)
-     SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz
+     INSERT INTO auth_request (state, nonce, platform, locale, expires_at, code_challenge)
+     SELECT $1::text, $2::text, $3::text, $4::text, $5::timestamptz, $6::text
      WHERE EXISTS (SELECT 1 FROM gone)
      RETURNING (SELECT count(*) FROM gone)::int AS evicted`,
-    [input.state, input.nonce, input.platform, input.locale, input.expiresAt],
+    [input.state, input.nonce, input.platform, input.locale, input.expiresAt, input.codeChallenge],
   );
   return rows[0]?.evicted ?? 0;
 }
@@ -200,7 +212,34 @@ export async function expireAuthRequest(db: Queryable, id: string, at: Date): Pr
   await db.query("UPDATE auth_request SET expires_at = $2 WHERE id = $1", [id, at]);
 }
 
-/** Marks the code used; the row count says whether this call was the first to. */
+/**
+ * The app's exchange (ADR-027): finds the code by its hash and spends it in
+ * the same statement, only with the challenge its attempt was started with,
+ * within its minute, and only for an account's code. An unknown, used,
+ * expired or staff code and a wrong verifier alike find nothing, and a wrong
+ * verifier leaves the code unspent. Two exchanges at once: the second waits
+ * on the row's lock and then reads the mark.
+ */
+export async function consumeAppCode(
+  db: Queryable,
+  input: { codeHash: string; codeChallenge: string; at: Date },
+): Promise<{ accountId: string; platform: string; outcome: string | null } | null> {
+  const { rows } = await db.query<{
+    account_id: string;
+    platform: string;
+    outcome: string | null;
+  }>(
+    `UPDATE auth_request SET code_used_at = $3
+     WHERE code_hash = $1 AND code_challenge = $2 AND account_id IS NOT NULL
+       AND code_used_at IS NULL AND code_expires_at >= $3
+     RETURNING account_id, platform, outcome`,
+    [input.codeHash, input.codeChallenge, input.at],
+  );
+  const row = rows[0];
+  return row ? { accountId: row.account_id, platform: row.platform, outcome: row.outcome } : null;
+}
+
+/** The staff exchange's spend; the row count says whether this call was the first to. */
 export async function consumeCode(db: Queryable, id: string, at: Date): Promise<boolean> {
   const result = await db.query(
     "UPDATE auth_request SET code_used_at = $2 WHERE id = $1 AND code_used_at IS NULL",

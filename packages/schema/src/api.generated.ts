@@ -59,7 +59,7 @@ export interface paths {
         };
         /**
          * Begin a bank login
-         * @description Opened in the system browser by the app. Redirects to the identification broker's bank chooser; the person comes back through /auth/callback and the app receives a one-time code by deep link.
+         * @description Opened in the system browser by the app, with the SHA-256 of the app's verifier for this attempt (code_challenge, ADR-027). Redirects to the identification broker's bank chooser; the person comes back through /auth/callback and the app receives a one-time code by deep link.
          */
         get: {
             parameters: {
@@ -68,6 +68,8 @@ export interface paths {
                     platform: "ios" | "android";
                     /** @description The language of the bank chooser (ui_locales); defaults to the request's. */
                     locale?: "fi" | "sv" | "en";
+                    /** @description SHA-256 of this attempt's verifier, lowercase hex (ADR-027): only the app holding the verifier can exchange the code. */
+                    code_challenge: string;
                 };
                 header?: never;
                 path?: never;
@@ -163,7 +165,7 @@ export interface paths {
         put?: never;
         /**
          * Exchange the one-time code for a session
-         * @description Single use, within 60 seconds of the callback. Answers with this device's access and refresh tokens; the app keeps both in secure storage.
+         * @description Single use, within 60 seconds of the callback, and only with the verifier whose SHA-256 the attempt's /auth/start carried (ADR-027); a wrong verifier leaves the code unspent. Answers with this device's access and refresh tokens; the app keeps both in secure storage.
          */
         post: {
             parameters: {
@@ -196,7 +198,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Unknown, used or expired code (auth_code_used). */
+                /** @description Unknown, used or expired code, or a verifier that is not its attempt's (auth_code_used). */
                 401: {
                     headers: {
                         [name: string]: unknown;
@@ -4233,6 +4235,8 @@ export interface components {
         AuthExchangeRequest: {
             /** @description The one-time code the deep link carried. */
             code: string;
+            /** @description The verifier whose SHA-256 /auth/start carried (ADR-027). */
+            verifier: string;
         };
         SessionTokens: {
             /**

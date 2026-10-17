@@ -3,6 +3,7 @@ import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { staffSession } from "../test/account.ts";
+import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { ADMIN_SESSION_TTL_MS, sweepAdminSessions } from "./admin-session.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
@@ -104,7 +105,8 @@ const exchange = (app: ReturnType<typeof createApp>, path: string, code: string)
   app.request(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ code }),
+    // The staff exchange is strict and unbound (ADR-027): its body is the code alone.
+    body: JSON.stringify(path === "/auth/exchange" ? { code, verifier: VERIFIER } : { code }),
   });
 
 const errorCode = async (res: Response) => ErrorResponse.parse(await res.json()).error.code;
@@ -300,7 +302,7 @@ describe("staff sessions: refusals, validation and the sweep", () => {
   }) => {
     await allowlisted(ctx);
     const { app } = await appWith(ctx);
-    const started = await app.request("/auth/start?platform=ios");
+    const started = await app.request(`/auth/start?platform=ios&code_challenge=${CHALLENGE}`);
     const state = new URL(started.headers.get("location") ?? "").searchParams.get("state") ?? "";
     const back = await app.request(`/auth/callback?code=good&state=${encodeURIComponent(state)}`);
     const code = new URL(back.headers.get("location") ?? "").searchParams.get("code") ?? "";

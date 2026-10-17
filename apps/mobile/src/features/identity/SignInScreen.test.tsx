@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as React from "react";
@@ -15,6 +16,10 @@ const { __router: router } = jest.requireMock("expo-router") as {
 };
 
 const CODE = "c".repeat(43);
+// Any well-formed verifier of the attempt (ADR-027): 64 lowercase hex characters.
+const VERIFIER = "5a1e".repeat(16);
+const HEX_64 = /^[0-9a-f]{64}$/;
+const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const tokens = {
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
@@ -28,6 +33,20 @@ const tokens = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const fetchMock = jest.fn<Promise<Response>, [Request | string]>();
+
+/** The /auth/start URL the button opened last, with its challenge taken apart (ADR-027). */
+function lastStart(openURL: jest.SpyInstance): { url: string; challenge: string | undefined } {
+  const [url = "", challenge] = String(openURL.mock.calls.at(-1)?.[0]).split("&code_challenge=");
+  return { url, challenge };
+}
+
+/** Presses the sign-in button and answers the challenge of the start it opened. */
+async function pressStart(openURL: jest.SpyInstance): Promise<string | undefined> {
+  const before = openURL.mock.calls.length;
+  await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
+  await waitFor(() => expect(openURL).toHaveBeenCalledTimes(before + 1));
+  return lastStart(openURL).challenge;
+}
 
 beforeEach(async () => {
   globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -77,18 +96,65 @@ describe("SignInScreen", () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
     await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
-    expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios&locale=en`);
+    expect(lastStart(openURL)).toEqual({
+      url: `${apiBaseUrl()}/auth/start?platform=ios&locale=en`,
+      challenge: expect.stringMatching(HEX_64),
+    });
     expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
   });
 
+  it("starts with the SHA-256 of a fresh verifier each time, and exchanges the code with the latest one", async () => {
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    fetchMock.mockResolvedValueOnce(json(tokens));
+    const view = await renderWithTheme(<SignInScreen />);
+    const first = await pressStart(openURL);
+    // A second tap, as when the first browser tab was lost: a new attempt.
+    const second = await pressStart(openURL);
+    expect(first).toMatch(HEX_64);
+    expect(second).toMatch(HEX_64);
+    expect(second).not.toBe(first);
+
+    await view.rerender(underProviders(<SignInScreen code={CODE} />));
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    const sent = fetchMock.mock.calls[0]?.[0] as Request;
+    const body = JSON.parse(await sent.text());
+    expect(body).toEqual({ code: CODE, verifier: expect.stringMatching(HEX_64) });
+    // The verifier is the one whose hash the latest start carried; the deep link never had it.
+    expect(sha256(body.verifier)).toBe(second);
+    expect(currentSession()?.sessionId).toBe(tokens.sessionId);
+  });
+
+  it("shows the words for a used code when the API refuses the code for its verifier", async () => {
+    // The API binds each code to its attempt's challenge: here the code came
+    // back from the first of two starts, so the latest verifier does not fit.
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    const view = await renderWithTheme(<SignInScreen />);
+    const first = await pressStart(openURL);
+    expect(first).toMatch(HEX_64);
+    await pressStart(openURL);
+    fetchMock.mockImplementationOnce(async (request) => {
+      const { verifier } = JSON.parse(await (request as Request).text());
+      return sha256(verifier) === first
+        ? json(tokens)
+        : json({ error: { code: "auth_code_used", message: "x", requestId: "r" } }, 401);
+    });
+
+    await view.rerender(underProviders(<SignInScreen code={CODE} />));
+    expect(await screen.findByText(/already used or has expired/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(currentSession()).toBeNull();
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
   it("exchanges the code the deep link carried, keeps the session and goes home", async () => {
-    await markLoginStarted();
+    await markLoginStarted(VERIFIER);
     fetchMock.mockResolvedValueOnce(json(tokens));
     await renderWithTheme(<SignInScreen code={CODE} />);
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     const sent = fetchMock.mock.calls[0]?.[0] as Request;
     expect(sent.url).toBe(`${apiBaseUrl()}/auth/exchange`);
-    expect(JSON.parse(await sent.text())).toEqual({ code: CODE });
+    expect(JSON.parse(await sent.text())).toEqual({ code: CODE, verifier: VERIFIER });
     expect(currentSession()?.sessionId).toBe(tokens.sessionId);
     expect(screen.queryByRole("button")).toBeNull();
   });
@@ -100,7 +166,7 @@ describe("SignInScreen", () => {
   });
 
   it("refuses a code that arrives while the phone is signed in", async () => {
-    await markLoginStarted();
+    await markLoginStarted(VERIFIER);
     const { outcome: _outcome, ...stored } = tokens;
     await saveSession(stored);
     await renderWithTheme(<SignInScreen code={CODE} />);
@@ -110,14 +176,14 @@ describe("SignInScreen", () => {
   });
 
   it("forgets a login it started after ten minutes", async () => {
-    await markLoginStarted(Date.now() - 11 * 60 * 1000);
+    await markLoginStarted(VERIFIER, Date.now() - 11 * 60 * 1000);
     await renderWithTheme(<SignInScreen code={CODE} />);
     expect(await screen.findByText(/was not requested from this phone/)).toBeTruthy();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("shows a used code as such and offers to start again", async () => {
-    await markLoginStarted();
+    await markLoginStarted(VERIFIER);
     fetchMock.mockResolvedValueOnce(
       json({ error: { code: "auth_code_used", message: "x", requestId: "r" } }, 401),
     );
@@ -151,7 +217,7 @@ describe("SignInScreen", () => {
   );
 
   it("says the same wait when the exchange is refused for the rate, and keeps no session", async () => {
-    await markLoginStarted();
+    await markLoginStarted(VERIFIER);
     fetchMock.mockResolvedValueOnce(
       new Response(
         JSON.stringify({ error: { code: "rate_limited", message: "x", requestId: "r" } }),
@@ -312,7 +378,7 @@ describe("SignInScreen", () => {
     expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
   });
 
-  it("marks the login as started when the button is pressed", async () => {
+  it("marks the login as started, with its verifier, when the button is pressed", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     await renderWithTheme(<SignInScreen />);
     await fireEvent.press(await screen.findByRole("button", { name: "Sign in with your bank" }));
@@ -321,12 +387,14 @@ describe("SignInScreen", () => {
     const { takeLoginStarted } = jest.requireActual(
       "@/lib/session",
     ) as typeof import("@/lib/session");
-    expect(await takeLoginStarted()).toBe(true);
-    expect(await takeLoginStarted()).toBe(false); // once
+    const verifier = await takeLoginStarted();
+    expect(verifier).toMatch(HEX_64);
+    expect(sha256(String(verifier))).toBe(lastStart(openURL).challenge);
+    expect(await takeLoginStarted()).toBeNull(); // once
   });
 
   it("says something went wrong when the exchange fails without a word from the API", async () => {
-    await markLoginStarted();
+    await markLoginStarted(VERIFIER);
     fetchMock.mockRejectedValueOnce(new TypeError("Network request failed"));
     await renderWithTheme(<SignInScreen code={CODE} />);
     expect(await screen.findByText("Something went wrong. Try again.")).toBeTruthy();
@@ -339,7 +407,10 @@ describe("SignInScreen", () => {
     try {
       await renderWithTheme(<SignInScreen />);
       await fireEvent.press(await screen.findByRole("button", { name: "Logga in med din bank" }));
-      expect(openURL).toHaveBeenCalledWith(`${apiBaseUrl()}/auth/start?platform=ios&locale=sv`);
+      expect(lastStart(openURL)).toEqual({
+        url: `${apiBaseUrl()}/auth/start?platform=ios&locale=sv`,
+        challenge: expect.stringMatching(HEX_64),
+      });
     } finally {
       (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
       openURL.mockRestore();
