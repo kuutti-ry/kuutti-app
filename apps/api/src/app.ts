@@ -3,7 +3,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Queryable } from "@kuutti/db";
 import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
-import { chatRoutes } from "./chat/index.ts";
+import { chatRoutes, chatSocketRoutes, createLive, type Live } from "./chat/index.ts";
 import { healthRoutes } from "./health/index.ts";
 import {
   accountRoutes,
@@ -65,6 +65,8 @@ export type Deps = {
   media?: MediaDeps;
   /** The photo routes' clock, which the fifteen minutes of a signed URL count from (#48); the wall clock when absent. Tests fix it. */
   now?: () => Date;
+  /** The chat's live sockets (#349): boot hands in the one its listener feeds; absent, the app makes its own. */
+  live?: Live;
 };
 
 const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
@@ -98,6 +100,9 @@ export const PUBLIC_ROUTES = new Set([
   "GET /.well-known/apple-app-site-association",
   "GET /admin/auth/start",
   "POST /admin/auth/exchange",
+  // The chat's socket (#349): its first frame carries the session's token, checked
+  // by the guard's own code (authenticate), so the token never sits in a URL.
+  "GET /ws",
 ]);
 
 export function createApp(deps: Deps) {
@@ -201,6 +206,29 @@ export function createApp(deps: Deps) {
   app.route("/", reportRoutes(deps, guard));
   // The conversations a match opens and their text messages (#348, ADR-031).
   app.route("/", chatRoutes(deps, guard));
+  // ...and what changes in them, live over one socket (#349, ADR-031 §5).
+  app.route(
+    "/",
+    chatSocketRoutes({
+      db: deps.db,
+      logger: deps.logger,
+      store: sessionStore,
+      live:
+        deps.live ??
+        createLive({
+          db: deps.db,
+          logger: deps.logger,
+          socketsPerAccount: deps.config.WS_SOCKETS_PER_ACCOUNT,
+        }),
+      now: deps.now ?? (() => new Date()),
+      allowedOrigins: deps.config.corsAllowedOrigins,
+      timing: {
+        authMs: deps.config.WS_AUTH_TIMEOUT_MS,
+        pingMs: deps.config.WS_PING_INTERVAL_MS,
+        pongMs: deps.config.WS_PONG_TIMEOUT_MS,
+      },
+    }),
+  );
   app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   app.route("/", configAdminRoutes(deps, admins));
   app.route("/", overviewAdminRoutes(deps, moderators));

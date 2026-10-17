@@ -143,6 +143,14 @@ const Env = z.object({
   // starts, with an IPv6 client counted by its /56 (ADR-026 §4-5); SSM
   // sign-in-rate-limit-per-minute.
   SIGN_IN_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).optional(),
+  // The chat's socket (#349, ADR-031 §5): open sockets per account (the next
+  // closes the oldest), the first frame's deadline, the ping's interval and
+  // the pong's wait. Operational settings, not product rules, so not
+  // matching_config; SSM ws-sockets-per-account and so on.
+  WS_SOCKETS_PER_ACCOUNT: z.coerce.number().int().min(1).max(50).default(5),
+  WS_AUTH_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(5_000),
+  WS_PING_INTERVAL_MS: z.coerce.number().int().min(1_000).max(300_000).default(30_000),
+  WS_PONG_TIMEOUT_MS: z.coerce.number().int().min(100).max(60_000).default(10_000),
   // Whose word the rate limiter takes for the client address (#52, F19,
   // lib/rate-limit.ts). Unset: the socket in development and test, Traefik on
   // a deployed box. /kuutti/<env>/trusted-proxy says cloudfront the day the

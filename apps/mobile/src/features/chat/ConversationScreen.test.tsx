@@ -6,23 +6,32 @@ import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
+import { FakeWebSocket } from "@/test/websocket";
 import { ConversationScreen } from "./ConversationScreen";
+import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
 
 // One conversation (#348): the header, the messages by day with who, when and
 // what, "Read", the read mark, the composer with its count, Send, the
 // optimistic row, the refusals in words with the words kept, the resend with
 // the same id, the archived banner, the closed states, earlier messages, and
-// the reads on focus.
+// the reads on focus; live (#349): what the socket brings, marked read only
+// in front, the read mark, Online, the state, the sending row swapped by its
+// id, the connection line.
 
 jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
   useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
 }));
 
-const { __router: router, __focus: focus } = jest.requireMock("expo-router") as {
+const {
+  __router: router,
+  __focus: focus,
+  __blur: blur,
+} = jest.requireMock("expo-router") as {
   __router: { back: jest.Mock };
   __focus: () => void;
+  __blur: () => void;
 };
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -59,6 +68,7 @@ const message = (
   kind: "text",
   body,
   createdAt,
+  clientId: null,
 });
 const detail = (over: Partial<ConversationDetail> = {}): ConversationDetail => ({
   id: ID,
@@ -426,5 +436,165 @@ describe("one conversation", () => {
     expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
+  });
+});
+
+describe("one conversation, live over the socket", () => {
+  const ONLINE = "Online";
+  const LOST = "Connection lost. Reconnecting…";
+  const mine = (seq: number, body: string, clientId: string): ChatMessage => ({
+    ...message(seq, "mine", body, DAY_2_LATER),
+    clientId,
+  });
+  /** The screen under the live provider, with its socket made. */
+  async function live(...args: Parameters<typeof conversation>): Promise<Call[]> {
+    const calls = conversation(...args);
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationScreen id={ID} />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    return calls;
+  }
+  const ready = () =>
+    act(async () => {
+      FakeWebSocket.latest().open();
+      FakeWebSocket.latest().receive({ type: "ready" });
+    });
+  const frame = (sent: unknown) => act(async () => FakeWebSocket.latest().receive(sent));
+
+  beforeEach(() => FakeWebSocket.install());
+  afterEach(() => jest.useRealTimers());
+
+  it("joins what the socket brings and marks it read, says Read and Online from its frames, and resumes from the newest it holds", async () => {
+    const calls = await live(detail(), [
+      [message(2, "mine", "Hei", DAY_2), message(1, "theirs", "Moi", DAY_1)],
+    ]);
+    await screen.findByLabelText(`Sanna, ${timeOf("en", DAY_1)}, Moi`);
+    await ready();
+    expect(FakeWebSocket.latest().sent.at(-1)).toEqual({
+      type: "resume",
+      conversations: [{ id: ID, seq: 2 }],
+    });
+    expect(screen.queryByText("Read")).toBeNull();
+    expect(screen.queryByText(ONLINE)).toBeNull();
+    await frame({ type: "read", conversationId: ID, upTo: 2 });
+    expect(screen.getByText("Read")).toBeTruthy();
+    await frame({ type: "presence", conversationId: ID, online: true });
+    expect(screen.getByText(ONLINE)).toBeTruthy();
+    noProblems();
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: message(3, "theirs", "Oletko siellä?", DAY_2_LATER),
+    });
+    expect(said("Sanna", DAY_2_LATER, "Oletko siellä?")).toBeTruthy();
+    await settle();
+    expect(calls.filter((c) => c.path.endsWith("/read")).map((c) => c.body)).toEqual([
+      { upTo: 2 },
+      { upTo: 3 },
+    ]);
+    await frame({ type: "presence", conversationId: ID, online: false });
+    expect(screen.queryByText(ONLINE)).toBeNull();
+  });
+
+  it("marks nothing read while another screen is over it, and reads up to the newest on coming back", async () => {
+    const calls = await live(detail(), [[message(1, "theirs", "Moi", DAY_1)], []]);
+    await screen.findByLabelText(`Sanna, ${timeOf("en", DAY_1)}, Moi`);
+    await ready();
+    await settle();
+    await act(async () => blur());
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: message(2, "theirs", "Oletko siellä?", DAY_2_LATER),
+    });
+    expect(said("Sanna", DAY_2_LATER, "Oletko siellä?")).toBeTruthy();
+    await settle();
+    const reads = () => calls.filter((c) => c.path.endsWith("/read")).map((c) => c.body);
+    expect(reads()).toEqual([{ upTo: 1 }]);
+    await act(async () => focus());
+    await settle();
+    expect(reads()).toEqual([{ upTo: 1 }, { upTo: 2 }]);
+  });
+
+  it("follows the conversation's state from the socket: archived, closed with no Online, and gone", async () => {
+    await live(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await screen.findByLabelText("Message");
+    await ready();
+    await frame({ type: "presence", conversationId: ID, online: true });
+    await frame({ type: "conversation", conversationId: ID, state: "archived", closedHow: null });
+    expect(
+      screen.getByText("This conversation was quiet for a week. Write to bring it back."),
+    ).toBeTruthy();
+    expect(screen.getByText(ONLINE)).toBeTruthy();
+    await frame({
+      type: "conversation",
+      conversationId: ID,
+      state: "closed",
+      closedHow: "unmatch",
+    });
+    expect(screen.getByText("This conversation has ended.")).toBeTruthy();
+    expect(screen.queryByLabelText("Message")).toBeNull();
+    expect(screen.queryByText(ONLINE)).toBeNull();
+    await frame({ type: "conversation", conversationId: ID, state: "gone", closedHow: null });
+    expect(screen.getByText("This conversation is no longer available.")).toBeTruthy();
+    expect(screen.queryByLabelText(`Sanna, ${timeOf("en", DAY_1)}, Moi`)).toBeNull();
+  });
+
+  it("swaps the sending row for the message the socket brought with its id, and counts a lost answer as sent when the socket brought it", async () => {
+    const answers: Array<{ resolve: (r: Response) => void; reject: (e: unknown) => void }> = [];
+    await live(
+      detail(),
+      [[message(1, "theirs", "Moi", DAY_1)]],
+      () =>
+        new Promise<Response>((resolve, reject) => {
+          answers.push({ resolve, reject });
+        }),
+    );
+    await screen.findByLabelText("Message");
+    await ready();
+    await type("Nähdään!");
+    await userEvent.setup().press(sendButton());
+    expect(screen.getByText("Sending…")).toBeTruthy();
+    const first = mine(2, "Nähdään!", "11111111-1111-4111-8111-111111111111");
+    await frame({ type: "message", conversationId: ID, message: first });
+    // Before the API's answer: the socket's copy carries the phone's id.
+    expect(screen.queryByText("Sending…")).toBeNull();
+    expect(screen.getAllByLabelText(`You, ${timeOf("en", DAY_2_LATER)}, Nähdään!`)).toHaveLength(1);
+    await act(async () => answers[0]?.resolve(json(first, 201)));
+    await settle();
+    expect(screen.getAllByLabelText(`You, ${timeOf("en", DAY_2_LATER)}, Nähdään!`)).toHaveLength(1);
+
+    await type("Huomenna");
+    await userEvent.setup().press(sendButton());
+    await frame({
+      type: "message",
+      conversationId: ID,
+      message: mine(3, "Huomenna", "22222222-2222-4222-8222-222222222222"),
+    });
+    await act(async () => answers[1]?.reject(new TypeError("Network request failed")));
+    await settle();
+    // The answer was lost, the message was not: no refusal, nothing put back.
+    expect(
+      screen.queryByText("The message was not sent. Check your connection and send it again."),
+    ).toBeNull();
+    expect(composer().props.value).toBe("");
+    expect(said("You", DAY_2_LATER, "Huomenna")).toBeTruthy();
+  });
+
+  it("says the connection is lost at the top, politely, until the socket is open again", async () => {
+    await live(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await screen.findByLabelText("Message");
+    await ready();
+    expect(screen.queryByText(LOST)).toBeNull();
+    jest.useFakeTimers();
+    await act(async () => FakeWebSocket.latest().drop());
+    expect(screen.getByText(LOST).props.accessibilityLiveRegion).toBe("polite");
+    await act(() => jest.advanceTimersByTimeAsync(1000));
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    await ready();
+    expect(screen.queryByText(LOST)).toBeNull();
   });
 });

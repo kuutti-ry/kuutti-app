@@ -7,13 +7,17 @@ import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
+import { FakeWebSocket } from "@/test/websocket";
 import { ChatsButton } from "./ChatsButton";
 import { ConversationsScreen } from "./ConversationsScreen";
+import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
 
 // The list of conversations and the home screen's way to it (#348): the two
 // groups, a row's name, age, last line, time and unread mark in words, the
-// empty state, a failure, and the reads on focus, on return and on a pull.
+// empty state, a failure, and the reads on focus, on return and on a pull;
+// live (#349): read again when the socket brings something, the cursors for
+// its resume, and the connection line.
 
 jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
@@ -49,7 +53,7 @@ function summary(id: string, over: Partial<ConversationSummary> = {}): Conversat
     state: "open",
     closedHow: null,
     counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
-    lastMessage: { at: NOW, kind: "text", preview: "Nähdäänkö huomenna?", side: "theirs" },
+    lastMessage: { seq: 7, at: NOW, kind: "text", preview: "Nähdäänkö huomenna?", side: "theirs" },
     unread: 2,
     ...over,
   };
@@ -81,20 +85,20 @@ const LIST: ConversationList = {
       state: "closed",
       closedHow: "erasure",
       counterpart: { deleted: true },
-      lastMessage: { at: OLD, kind: "text", preview: "Hei", side: "theirs" },
+      lastMessage: { seq: 3, at: OLD, kind: "text", preview: "Hei", side: "theirs" },
       unread: 0,
     }),
     summary(ID(4), {
       state: "closed",
       closedHow: "unmatch",
       counterpart: { deleted: false, name: "Leena", age: 40, thumb: null },
-      lastMessage: { at: OLD, kind: "text", preview: "Kiitos", side: "mine" },
+      lastMessage: { seq: 12, at: OLD, kind: "text", preview: "Kiitos", side: "mine" },
       unread: 0,
     }),
     summary(ID(5), {
       state: "archived",
       counterpart: { deleted: false, name: "Olli", age: 35, thumb: null },
-      lastMessage: { at: OLD, kind: "text", preview: "Moi", side: "mine" },
+      lastMessage: { seq: 1, at: OLD, kind: "text", preview: "Moi", side: "mine" },
       unread: 1,
     }),
   ],
@@ -311,5 +315,87 @@ describe("the thumbs of the list", () => {
       "?thumbs=false",
       "?thumbs=true",
     ]);
+  });
+});
+
+describe("the list, live over the socket", () => {
+  it("names every conversation's newest in the resume, applies a message without reading the list, reads again on a change of state or a new conversation, and says when the connection is lost", async () => {
+    FakeWebSocket.install();
+    const asked = api(() => json(LIST));
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ChatsButton />
+        <ConversationsScreen />
+      </ChatLiveProvider>,
+    );
+    await screen.findByRole("heading", { name: "Open" });
+    await screen.findByRole("button", { name: "Conversations, 3 unread messages" });
+    expect(asked.map((a) => a.query).sort()).toEqual(["?thumbs=false", "?thumbs=true"]);
+    const ws = FakeWebSocket.latest();
+    await act(async () => {
+      ws.open();
+      ws.receive({ type: "ready" });
+    });
+    expect(ws.sent.at(-1)).toEqual({
+      type: "resume",
+      conversations: [
+        { id: ID(1), seq: 7 },
+        { id: ID(2), seq: 0 },
+        { id: ID(3), seq: 3 },
+        { id: ID(4), seq: 12 },
+        { id: ID(5), seq: 1 },
+      ],
+    });
+    // Presence and a read mark change no row: nothing is read again.
+    await act(async () => {
+      ws.receive({ type: "presence", conversationId: ID(1), online: true });
+      ws.receive({ type: "read", conversationId: ID(1), upTo: 3 });
+    });
+    await settle();
+    expect(asked).toHaveLength(2);
+    const live = (id: string, seq: number, body: string) => ({
+      type: "message" as const,
+      conversationId: id,
+      message: {
+        id: `00000000-0000-4000-8000-00000000000${seq}`,
+        seq,
+        side: "theirs" as const,
+        kind: "text" as const,
+        body,
+        createdAt: NOW,
+        clientId: null,
+      },
+    });
+    // A message is applied where it lands: the row's last line, one more unread, and no read of the list.
+    await act(async () => ws.receive(live(ID(2), 1, "Moi!")));
+    await settle();
+    expect(asked).toHaveLength(2);
+    expect(
+      screen.getByRole("button", {
+        name: `Mikko, 29, 1 unread message, Moi!, ${timeOf("en", NOW)}`,
+      }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Conversations, 4 unread messages" })).toBeTruthy();
+    // A message in a conversation the list does not hold reads it again, quietly, once.
+    await act(async () => ws.receive(live(ID(9), 1, "Uusi")));
+    await settle();
+    expect(asked.slice(2).map((a) => a.query)).toEqual(["?thumbs=false", "?thumbs=false"]);
+    await act(async () => ws.receive(live(ID(9), 2, "Uusi taas")));
+    await settle();
+    expect(asked).toHaveLength(4);
+    // A change of state reads it again.
+    await act(async () =>
+      ws.receive({
+        type: "conversation",
+        conversationId: ID(1),
+        state: "archived",
+        closedHow: null,
+      }),
+    );
+    await settle();
+    expect(asked).toHaveLength(6);
+    expect(screen.queryByText("Connection lost. Reconnecting…")).toBeNull();
+    await act(async () => ws.drop());
+    expect(screen.getByText("Connection lost. Reconnecting…")).toBeTruthy();
   });
 });

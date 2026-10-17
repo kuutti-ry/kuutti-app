@@ -3400,6 +3400,10 @@
         "type": "object",
         "nullable": true,
         "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
           "at": {
             "type": "string",
             "format": "date-time"
@@ -3416,6 +3420,7 @@
           }
         },
         "required": [
+          "seq",
           "at",
           "kind",
           "preview",
@@ -3526,6 +3531,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "clientId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           }
         },
         "required": [
@@ -3534,7 +3544,8 @@
           "side",
           "kind",
           "body",
-          "createdAt"
+          "createdAt",
+          "clientId"
         ]
       },
       "SendMessageRequest": {

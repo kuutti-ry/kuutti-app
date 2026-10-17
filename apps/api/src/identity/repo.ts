@@ -468,6 +468,29 @@ const SESSION_ALIVE = `EXISTS (
   WHERE a.id = session.account_id AND i.standing = 'ok'
     AND a.state IN ('registered', 'active', 'paused', 'shadow_banned'))`;
 
+/**
+ * How a session stands for an open socket (#349), by the session's id, which
+ * a refresh keeps, never by the access hash, which it rotates: `ended` when
+ * the row is gone (erasure deletes it), revoked, or the account or identity
+ * is no longer in a live state; `expired` when its access token, or the
+ * session itself, is past its time. Scoped by the account (rule 6).
+ */
+export async function sessionStanding(
+  db: Queryable,
+  input: { sessionId: string; accountId: string; at: Date },
+): Promise<"live" | "expired" | "ended"> {
+  const { rows } = await db.query<{ expired: boolean }>(
+    `SELECT (session.access_expires_at <= $3 OR session.expires_at <= $3) AS expired
+     FROM session
+     WHERE session.id = $1 AND session.account_id = $2 AND session.revoked_at IS NULL
+       AND ${SESSION_ALIVE}`,
+    [input.sessionId, input.accountId, input.at],
+  );
+  const row = rows[0];
+  if (!row) return "ended";
+  return row.expired ? "expired" : "live";
+}
+
 export async function touchSession(db: Queryable, sessionId: string, at: Date): Promise<void> {
   await db.query("UPDATE session SET last_used_at = $2 WHERE id = $1 AND last_used_at < $2", [
     sessionId,

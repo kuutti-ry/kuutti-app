@@ -6713,6 +6713,20 @@ chat.composer.error.failed:
   sv: "Meddelandet skickades inte. Kontrollera anslutningen och skicka igen."
   machine: { fi: true, sv: true }
 
+chat.connection.lost:
+  en: "Connection lost. Reconnecting…"
+  description: "One line at the top of the conversations and of a conversation while the live connection is lost (#349): it was open and closed, or the tries keep failing. Goes when it is back."
+  fi: "Yhteys katkesi. Yhdistetään uudelleen…"
+  sv: "Anslutningen bröts. Ansluter igen…"
+  machine: { fi: true, sv: true }
+
+chat.presence.online:
+  en: "Online"
+  description: "Under a conversation's header while the other person has the app open (#349), beside a small dot. Short."
+  fi: "Paikalla"
+  sv: "Online"
+  machine: { fi: true, sv: true }
+
 # --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---
 home.title:
   en: "Kuutti"

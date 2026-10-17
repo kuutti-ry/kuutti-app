@@ -6,7 +6,7 @@ import {
   messageLength,
 } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Fragment, useCallback, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -19,8 +19,10 @@ import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
+import { ConnectionLine } from "./ConnectionLine";
 import { counterpartName } from "./ConversationsScreen";
 import { fetchConversation, fetchMessages, markRead, sendMessage } from "./client";
+import { type ConversationLive, merged, useChatLive } from "./store";
 import { dayOf, timeOf } from "./time";
 
 type Loaded = { detail: ConversationDetail; messages: ChatMessage[] };
@@ -38,9 +40,22 @@ const REFUSALS: Record<string, PlainMessageKey> = {
   message_budget_exceeded: "chat.composer.error.message_budget_exceeded",
 };
 
-/** Oldest first, each sequence once, the later answer winning. */
-const merged = (a: ChatMessage[], b: ChatMessage[]): ChatMessage[] =>
-  [...new Map([...a, ...b].map((m) => [m.seq, m])).values()].sort((x, y) => x.seq - y.seq);
+/** A message on its way: shown until the API's answer or the socket brings one with its id. */
+type Pending = { body: string; at: string; clientId: string };
+
+/** The detail as the socket has told it since it was read (#349): the state, and the read mark. */
+function withLive(
+  detail: ConversationDetail,
+  live: ConversationLive | undefined,
+): ConversationDetail {
+  if (!live) return detail;
+  const { state } = live;
+  return {
+    ...detail,
+    ...(state && state.state !== "gone" ? { state: state.state, closedHow: state.closedHow } : {}),
+    counterpartReadUpTo: Math.max(detail.counterpartReadUpTo, live.readUpTo),
+  };
+}
 
 /**
  * One conversation (#348): the counterpart in the header, the messages oldest
@@ -55,7 +70,10 @@ const merged = (a: ChatMessage[], b: ChatMessage[]): ChatMessage[] =>
  * An archived conversation says that writing brings it back; a closed one
  * says how it ended instead of the composer. Read again on focus, and marked
  * read up to the newest message while on the screen. No gesture: earlier
- * messages are a button.
+ * messages are a button. Live (#349): what the socket brings joins what was
+ * read, by sequence; the read mark and the state follow its frames; "Online"
+ * under the header while the counterpart is; a line at the top while the
+ * connection is lost.
  */
 export function ConversationScreen({ id }: { id: string }) {
   const { t } = useT();
@@ -63,7 +81,7 @@ export function ConversationScreen({ id }: { id: string }) {
   const tap = useHapticTap();
   const [view, setView] = useState<ScreenView>({ status: "loading" });
   const [text, setText] = useState("");
-  const [pending, setPending] = useState<{ body: string; at: string } | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [refusal, setRefusal] = useState<PlainMessageKey | null>(null);
   const scroll = useRef<ScrollView>(null);
   const loaded = useRef<ChatMessage[]>([]);
@@ -72,6 +90,12 @@ export function ConversationScreen({ id }: { id: string }) {
   // sequence: a message the caller may not read still has its place.
   const [more, setMore] = useState(false);
   const unsent = useRef<{ body: string; clientId: string } | null>(null);
+  // Only a screen in front marks read: one under another screen is not being read.
+  const focused = useRef(false);
+  const live = useChatLive();
+  const here = live.conversations[id];
+  const arrived = here?.messages;
+  const { report } = live;
 
   const show = useCallback(
     (detail: ConversationDetail, messages: ChatMessage[]) => {
@@ -79,7 +103,12 @@ export function ConversationScreen({ id }: { id: string }) {
       setView({ status: "ready", detail, messages });
       // The newest is on the screen now: read up to it, once per new message of theirs.
       const newest = messages.at(-1);
-      if (newest && newest.seq > marked.current && messages.some((m) => m.side === "theirs")) {
+      if (
+        focused.current &&
+        newest &&
+        newest.seq > marked.current &&
+        messages.some((m) => m.side === "theirs")
+      ) {
         marked.current = newest.seq;
         markRead(id, newest.seq).catch(() => {
           marked.current = 0;
@@ -111,9 +140,25 @@ export function ConversationScreen({ id }: { id: string }) {
 
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
       void load();
+      return () => {
+        focused.current = false;
+      };
     }, [load]),
   );
+
+  // What the socket brought joins what is shown, and is marked read while in front.
+  const shownDetail = view.status === "ready" ? view.detail : null;
+  useEffect(() => {
+    if (shownDetail && arrived) show(shownDetail, merged(loaded.current, arrived));
+  }, [shownDetail, arrived, show]);
+
+  // The newest held is what the socket's next resume names.
+  const newestSeq = view.status === "ready" ? (view.messages.at(-1)?.seq ?? 0) : null;
+  useEffect(() => {
+    if (newestSeq !== null) report({ [id]: newestSeq });
+  }, [id, newestSeq, report]);
 
   const earlier = async (detail: ConversationDetail, oldest: number) => {
     tap();
@@ -132,7 +177,7 @@ export function ConversationScreen({ id }: { id: string }) {
     const clientId =
       unsent.current?.body === body ? unsent.current.clientId : globalThis.expo.uuidv4();
     unsent.current = { body, clientId };
-    setPending({ body, at: new Date().toISOString() });
+    setPending({ body, at: new Date().toISOString(), clientId });
     setText("");
     setRefusal(null);
     try {
@@ -143,6 +188,11 @@ export function ConversationScreen({ id }: { id: string }) {
       show({ ...detail, state: "open" }, merged(loaded.current, [message]));
     } catch (error) {
       setPending(null);
+      // The socket brought it already: the answer was lost, not the message.
+      if (loaded.current.some((m) => m.clientId === clientId)) {
+        unsent.current = null;
+        return;
+      }
       setText(body);
       const code = error instanceof ApiError ? error.code : undefined;
       setRefusal((code && REFUSALS[code]) || "chat.composer.error.failed");
@@ -152,25 +202,38 @@ export function ConversationScreen({ id }: { id: string }) {
     }
   };
 
-  const title = view.status === "ready" ? counterpartName(t, view.detail) : t("chat.list.title");
+  // The one who blocked sees it gone at once (ADR-031 §4).
+  const shown: ScreenView = here?.state?.state === "gone" ? { status: "gone" } : view;
+  const messages = shown.status === "ready" ? shown.messages : [];
+  const detail = shown.status === "ready" ? withLive(shown.detail, here) : null;
+  const sending =
+    pending && !messages.some((m) => m.clientId === pending.clientId) ? pending : null;
+  const title = detail ? counterpartName(t, detail) : t("chat.list.title");
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader title={title} backLabel={t("chat.back")} onBack={() => router.back()} />
-      {view.status === "loading" && (
+      <ConnectionLine />
+      {detail && detail.state !== "closed" && live.status === "open" && here?.online && (
+        <View className="flex-row items-center gap-2 px-6 pt-2">
+          <View className="h-2.5 w-2.5 rounded-full bg-primary" {...DECORATIVE} />
+          <Text variant="muted">{t("chat.presence.online")}</Text>
+        </View>
+      )}
+      {shown.status === "loading" && (
         <Text accessibilityLiveRegion="polite" className="p-6">
           {t("chat.conversation.loading")}
         </Text>
       )}
-      {view.status === "gone" && (
+      {shown.status === "gone" && (
         <Text accessibilityLiveRegion="polite" className="p-6">
           {t("chat.conversation.gone")}
         </Text>
       )}
-      {view.status === "failed" && (
+      {shown.status === "failed" && (
         <View className="p-6">
           <LoadFailed
             headline={t("chat.conversation.failed")}
-            error={view.error}
+            error={shown.error}
             onRetry={() => {
               setView({ status: "loading" });
               void load();
@@ -178,37 +241,35 @@ export function ConversationScreen({ id }: { id: string }) {
           />
         </View>
       )}
-      {view.status === "ready" && (
+      {detail && (
         // Padding on Android too: the app draws edge to edge, so the window
         // no longer resizes for the keyboard, which then covered the composer.
         <KeyboardAvoidingView className="flex-1" behavior="padding">
           <Conversation
-            detail={view.detail}
-            messages={view.messages}
-            pending={pending}
+            detail={detail}
+            messages={messages}
+            pending={sending}
             more={more}
             scroll={scroll}
-            onEarlier={(oldest) => void earlier(view.detail, oldest)}
+            onEarlier={(oldest) => void earlier(detail, oldest)}
           />
           <View className="gap-2 border-t border-border p-4">
             {refusal && <Text accessibilityLiveRegion="assertive">{t(refusal)}</Text>}
-            {view.detail.state === "closed" ? (
+            {detail.state === "closed" ? (
               <Text accessibilityLiveRegion="polite">
-                {view.detail.closedHow === "erasure"
-                  ? t("chat.state.deleted")
-                  : t("chat.state.ended")}
+                {detail.closedHow === "erasure" ? t("chat.state.deleted") : t("chat.state.ended")}
               </Text>
             ) : (
               <Composer
                 text={text}
-                maxLength={view.detail.limits.maxLength}
-                archived={view.detail.state === "archived"}
+                maxLength={detail.limits.maxLength}
+                archived={detail.state === "archived"}
                 sending={pending !== null}
                 onChange={(value) => {
                   setText(value);
                   setRefusal(null);
                 }}
-                onSend={() => void send(view.detail)}
+                onSend={() => void send(detail)}
               />
             )}
           </View>
@@ -228,7 +289,7 @@ function Conversation({
 }: {
   detail: ConversationDetail;
   messages: ChatMessage[];
-  pending: { body: string; at: string } | null;
+  pending: Pending | null;
   more: boolean;
   scroll: React.RefObject<ScrollView | null>;
   onEarlier: (oldest: number) => void;

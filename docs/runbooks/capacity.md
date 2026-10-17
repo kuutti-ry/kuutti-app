@@ -66,7 +66,7 @@ Never put a phone's session in the file: rotating it would sign the phone out at
 
 ## The limit
 
-The script plans each stage against the budgets the API reports in `RateLimit-Limit`, taking at most 40 % of each window, and refuses a plan that would take more. The other 10 % up to half is for the sessions' opening requests and a persona's own phone, so a stage planned to the full ceiling does not trip the rest at half (below). The refusal names the most visits a second the sessions allow, and the `rate-limit-per-minute` a plan needs. With seven accounts and the default 120 a minute, that is about 0.7 visits a second.
+The script plans each stage against the budgets the API reports in `RateLimit-Limit`, taking at most 40 % of each window, and refuses a plan that would take more. The other 10 % up to half is for the sessions' opening requests and a persona's own phone, so a stage planned to the full ceiling does not trip the rest at half (below). The refusal names the most visits a second the sessions allow, and the `rate-limit-per-minute` a plan needs. With seven accounts and the default 120 a minute, that is about 0.7 visits a second. Each socket's upgrade counts on the address too, and is never given back (below): with the recipe's 28 sockets, the default allows about 0.09.
 
 To find where the box bends, the maintainer raises `/kuutti/staging/rate-limit-per-minute` for the hour. ADR-026 §5 makes the number his; it is read at boot, so a restart of the API applies it, and the value goes back, with another restart, after the run. The one number is both the address's limit and each person's, so for that hour staging's public routes are less protected. That is why a run is announced and short.
 
@@ -74,8 +74,10 @@ To find where the box bends, the maintainer raises `/kuutti/staging/rate-limit-p
 
 ```sh
 pnpm load:smoke -- --target https://api.staging.kuutti.app --confirm-staging \
-  --sessions ~/.kuutti-load-sessions-staging --rates 1,2,4,6,8 --stage 60
+  --sessions ~/.kuutti-load-sessions-staging --rates 1,2,4,6,8 --stage 60 --sockets 28
 ```
+
+The recipe's 28 sockets are four for each of the seven accounts, the most the script opens.
 
 | option | what it does | default | at most |
 |---|---|---|---|
@@ -84,6 +86,7 @@ pnpm load:smoke -- --target https://api.staging.kuutti.app --confirm-staging \
 | `--sessions` | the sessions file; without it, the public part of each visit alone | none | 50 sessions |
 | `--rates` | visits a second, one stage each | `0.5` | 8 stages, 20 a second each |
 | `--stage` | seconds per stage | 60 | 300, and 600 for the whole run (an access token lives fifteen minutes and is refreshed once, at the start) |
+| `--sockets` | the chat's sockets (`GET /ws`, #349) held idle through the run: opened round the accounts and their sessions, `--concurrency` at a time, before the first stage; each signs in with its first frame, resumes no conversation and answers every ping. Needs `--sessions` | none | 200, and 4 per account |
 | `--concurrency` | requests in flight | 16 | 64 |
 | `--stop-p95` | the p95 in ms past which a stage has bent | 1000 | 10,000 |
 | `--self-test` | the command line, the refusals, the sums, and runs against a stand-in on this computer of every guard below (CI's lint job) | | |
@@ -93,6 +96,7 @@ What it refuses before any load:
 - Production, by name (`api.kuutti.app`), and any other host but these two. That includes the previews: they share staging's box, and have no bank.
 - `APP_ENV=production` in its own environment, and an `APP_ENV` that disagrees with the target.
 - A sessions file it must not take (above).
+- `--sockets` without `--sessions`, and more sockets than four for each account the sessions are of. The API holds five an account and closes the oldest for a sixth (`too_many_sockets`), which must never be a persona's own phone.
 - An API that does not answer `/health` as ours and ready.
 - An API that does not serve `/openapi.json`, which production alone withholds (`app.ts`).
 - A plan over the budgets (above).
@@ -108,8 +112,9 @@ The run's whole rate comes from one address. What it does to each budget:
 | budget | on staging | what the run spends |
 |---|---|---|
 | the sign-in doors, `/auth/start` and `/admin/auth/start`, per address (ADR-026 §4) | 60 a minute | nothing. The run never starts a sign-in, so it cannot lock a persona out, and `auth_request`'s ceiling (§6) is untouched. The sessions were made by hand beforehand, one start each |
-| the address: every request until a guard admits it, given back once the person's limiter counts it (§1, §2) | `rate-limit-per-minute`, 120. The address is the CloudFront edge, which the team's phones share | the public requests (the waitlist, nobody's exchange, one refresh per session at the start), and the signed-in requests in flight, which hold the address's count until answered. Planned to 40 % of the window, with `--concurrency` counted in full |
+| the address: every request until a guard admits it, given back once the person's limiter counts it (§1, §2) | `rate-limit-per-minute`, 120. The address is the CloudFront edge, which the team's phones share | the public requests (the waitlist, nobody's exchange, one refresh per session at the start), the signed-in requests in flight, which hold the address's count until answered, and one upgrade per socket (`GET /ws`), at the start, never given back: a socket signs in by its first frame, so no guard admits it. Planned to 40 % of the window, with `--concurrency` and the sockets counted in full |
 | each person: every request a guard admits, per account across its sessions (§1, §3) | the same number | visits go round the accounts, planned to 40 % of each account's window, so a persona's own phone keeps more than half |
+| the chat's sockets per account, `WS_SOCKETS_PER_ACCOUNT` (#349) | 5, the sixth closing the oldest | at most 4 per account, so a persona's own phone keeps its socket. While they are open the persona shows as online to its matches, as the app would |
 | the exposure budget, per account per Finnish day (ADR-008 §1, `photo_fetches_per_day`) | thumb 600, card 300, full 60 | thumbnails only, at most 60 per account per run, spread over the run; card and full never |
 | the 5xx alarm, `kuutti-staging-api-5xx` | five in five minutes | the run stops sending at its third server error or unanswered request. The requests already in flight, up to `--concurrency`, still finish, and at the bend they tend to fail together (a full pool fails every waiting request). So the alarm may mail at the bend: that is expected, and announced |
 | the WAF rate rule of #41 | not in place on 17/10/2026 | once it is, the run's whole rate counts against it from one address. The maintainer scopes the rule down for the runner's address for the hour, or keeps the run under it |
@@ -119,6 +124,7 @@ The plan is backed by guards as the run goes:
 - An answer with less than half its window left (`RateLimit-Remaining`) rests that budget for a window: the person's on a signed-in route, the address's on a public one. The stage counts what it held back, and a stage that held back more than 1 % of its parts is not measured.
 - The first 429 of any kind stops the run with exit 2: `rate_limited`, or `photo_budget_exceeded`, whose alarm counts 100 a day.
 - So does the first 401 of a session.
+- So does a socket that does not open, or that the server closes during the run. The script names the socket by its number, with the close code and the error frame's code; a refused upgrade, a 429 from the address's limiter among them, shows only as a failed connection (Node's client sees no status).
 
 ## While it runs: what to watch
 
@@ -129,7 +135,8 @@ The script measures from outside: its p95 includes the network from the runner t
 - **Postgres connections:** RDS `DatabaseConnections`. The API's pool is `DB_POOL_MAX` (10 unless set), and each preview has its own. When the pool is what bends, the connections sit at the pool's size while p95 climbs and the database's CPU does not.
 - **The database:** RDS `CPUUtilization` and `CPUCreditBalance`. Staging's database is a db.t4g.micro and production's a db.t4g.small, so staging's ceiling there is a lower bound for production's.
 - **The box:** EC2 `CPUUtilization` and `CPUCreditBalance` (a t4g.small, two cores; see the event loop above), and the free memory of #77's metric.
-- **sharp and the WebSocket count:** not driven yet (below).
+- **The sockets:** they open just before the first stage. Each holds some memory on the box, and the API checks its session at every ping, every 30 s, so 28 sockets add about one session read a second to every stage.
+- **sharp:** not driven (below).
 
 ```sh
 from=2026-10-20T18:00:00Z; to=2026-10-20T18:06:00Z     # the first stage's start and the run's end
@@ -149,10 +156,10 @@ The same command with `--metric-name CPUUtilization` and `CPUCreditBalance` cove
 
 ## The table
 
-One row per milestone run. "held" is the last stage that held, and "bent" the first that did not, or the stage that was not measured, with why. A stage's cell is its visits a second, the requests answered a second, and the p95 in ms, all the script's; any parts held back or timeouts follow in brackets. "grid" is the photos screen's share: one visit in N, and the signed URLs a visit. The limit is `rate-limit-per-minute` during the run.
+One row per milestone run. "held" is the last stage that held, and "bent" the first that did not, or the stage that was not measured, with why. A stage's cell is its visits a second, the requests answered a second, and the p95 in ms, all the script's; any parts held back or timeouts follow in brackets. "grid" is the photos screen's share: one visit in N, and the signed URLs a visit. "sockets" is how many of the chat's sockets were open at the end of the run, of how many it held, or `-` for a run without `--sockets`; a socket lost stops the run without a row, so in a row the two agree. They are idle, at most four an account, so the count is a lower bound: the box held at least that many while it served the rate, where five thousand people with the app open would hold thousands. The limit is `rate-limit-per-minute` during the run.
 
-| date | milestone | version | target | accounts · sessions · limit | grid: 1 in N · URLs a visit | held: visits/s · req/s · p95 ms | bent: visits/s · req/s · p95 ms (why) | log p95 ms at the bend | first to bend | DB connections, max | box CPU % · free MB | DB CPU % · credits |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| date | milestone | version | target | accounts · sessions · limit | grid: 1 in N · URLs a visit | sockets: open of held | held: visits/s · req/s · p95 ms | bent: visits/s · req/s · p95 ms (why) | log p95 ms at the bend | first to bend | DB connections, max | box CPU % · free MB | DB CPU % · credits |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 
 ## What the run leaves out, and what would make it needed
 
@@ -160,6 +167,6 @@ One row per milestone run. "held" is the last stage that held, and "bent" the fi
 - **The refresh.** The app refreshes its access token when it has under thirty seconds of its fifteen minutes left, so in the bad hour nearly every opening sends `POST /auth/refresh` too. That is a public request, counted in full on the address, and an update that rewrites two uniquely indexed hashes of the session's row. The run refreshes each session once, at its start, and never mid-run: a rotation whose answer is lost, as at a bend, would leave the file with a retired token, and presenting that one ends the session (#35), which costs a sign-in at the bank. So the measured ceiling is optimistic by about one write a visit. This would be needed if the database is what bends first: then a refresh stage with sessions made for it alone.
 - **Uploads, sharp's concurrency.** The pool re-encodes `IMAGE_CONCURRENCY` pictures at once (the core count, two on staging's box) and refuses the next with 503 `media_busy` rather than queue it. So its ceiling is known by construction, and the time a picture takes is `POST /photos`'s `durationMs` in the log. A driven upload would add photos to the test persons, cost three Rekognition calls each on staging (two when the scene call fails), and count its refusals toward the 5xx alarm. This would be needed before a launch, when people onboarding upload three to six pictures each: then an upload stage with the alarm in mind.
 - **Writes** to the profile, the preferences or the consents. They would change the test persons' answers, which the demo shows.
-- **The round and the chat.** They have no routes yet (M4), and the WebSocket count comes with the chat.
+- **The round, and the chat's traffic.** The round has no routes yet (M4). The chat's sockets are held idle, at most four an account, so their count is a lower bound of what the box holds (above). No message is sent, read or pushed through them: sending would write the test persons' conversations, which the demo shows. This would be needed once people use the chat more than the profile: then a stage that sends and reads messages between test persons made for it, and sockets for many more of them.
 - **Many addresses.** The run comes from one, so the address limit it meets is the runner's, not five thousand people's.
 - **Many people.** The run is a handful of accounts and sessions. Their rows are hot: every signed-in request updates its session's row, and the URL route locks per account, so a few rows take all the writes and queue on each other as latency rises. Their data is a few pages the database keeps cached. Five thousand people spread the writes over five thousand rows and need a working set that may not fit. Where the run bends is then neither their best case nor their worst. More sessions per person (above) spread the session writes. The synthetic population (`demo:population`) makes the tables population-sized, but none of its people can sign in (no bank login maps to them), so the driven reads stay on the test persons' rows. This would be needed if the run's ceiling comes close to the claim: then sessions for many more test persons.

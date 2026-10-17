@@ -24,6 +24,8 @@ export type SessionLookup = {
 export type SessionStore = {
   findByAccessHash(db: Queryable, accessHash: string): Promise<SessionLookup | null>;
   touch(db: Queryable, sessionId: string, at: Date): Promise<void>;
+  /** How an authenticated session stands now, by its id: the chat's open socket asks on each ping (#349). */
+  standing(db: Queryable, caller: Caller, at: Date): Promise<"live" | "expired" | "ended">;
 };
 
 export const hashToken = (token: string): string =>
@@ -32,9 +34,38 @@ export const hashToken = (token: string): string =>
 /** Account states whose sessions still answer; a sanction on the identity ends them regardless. */
 const LIVE_STATES = new Set(["registered", "active", "paused", "shadow_banned"]);
 
+/**
+ * The access token's check, the one code path for the session guard and the
+ * chat socket's first frame (#349): hashed, looked up, the session not
+ * revoked, the account in a live state, the identity in good standing, the
+ * token not expired. Throws the guard's 401s; the session's lookup otherwise.
+ */
+export async function authenticate(
+  deps: { db: Queryable; store: Pick<SessionStore, "findByAccessHash"> },
+  token: string,
+  at: Date,
+): Promise<SessionLookup> {
+  if (!TOKEN.test(token)) {
+    throw new AppError(401, "unauthenticated", "No session token");
+  }
+  const found = await deps.store.findByAccessHash(deps.db, hashToken(token));
+  if (!found) throw new AppError(401, "unauthenticated", "Unknown session token");
+  if (
+    found.revokedAt !== null ||
+    !LIVE_STATES.has(found.accountState) ||
+    found.identityStanding !== "ok"
+  ) {
+    throw new AppError(401, "session_revoked", "The session was ended");
+  }
+  if (found.accessExpiresAt.getTime() < at.getTime()) {
+    throw new AppError(401, "session_expired", "The access token has expired");
+  }
+  return found;
+}
+
 export function requireSession(deps: {
   db: Queryable;
-  store: SessionStore;
+  store: Pick<SessionStore, "findByAccessHash" | "touch">;
   now?: () => Date;
   /** The person's limiter (ADR-026 §1), run once the account is known and before the touch. */
   limit?: MiddlewareHandler<AppEnv>;
@@ -44,22 +75,8 @@ export function requireSession(deps: {
   return async function requireSession(c, next) {
     const header = c.req.header("authorization") ?? "";
     const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-    if (!TOKEN.test(token)) {
-      throw new AppError(401, "unauthenticated", "No session token");
-    }
-    const found = await deps.store.findByAccessHash(deps.db, hashToken(token));
     const at = now();
-    if (!found) throw new AppError(401, "unauthenticated", "Unknown session token");
-    if (
-      found.revokedAt !== null ||
-      !LIVE_STATES.has(found.accountState) ||
-      found.identityStanding !== "ok"
-    ) {
-      throw new AppError(401, "session_revoked", "The session was ended");
-    }
-    if (found.accessExpiresAt.getTime() < at.getTime()) {
-      throw new AppError(401, "session_expired", "The access token has expired");
-    }
+    const found = await authenticate(deps, token, at);
     c.set("accountId", found.accountId);
     c.set("sessionId", found.sessionId);
     // A request the limiter refuses writes nothing, not even the touch.
