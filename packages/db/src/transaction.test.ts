@@ -62,7 +62,9 @@ describe("the pool", () => {
       connectionString: URL,
       max: 3,
       applicationName: "kuutti-probe",
-      connectionTimeoutMillis: 250,
+      // Distinct from the default's five seconds, and long enough that a busy
+      // machine still connects: 250 ms timed out under a full coverage run.
+      connectionTimeoutMillis: 2_500,
     });
     try {
       expect(plain.options).toMatchObject({
@@ -73,7 +75,7 @@ describe("the pool", () => {
       expect(tuned.options).toMatchObject({
         max: 3,
         application_name: "kuutti-probe",
-        connectionTimeoutMillis: 250,
+        connectionTimeoutMillis: 2_500,
       });
       const name = async (db: Queryable) =>
         (await db.query<{ name: string }>("SELECT current_setting('application_name') AS name"))
