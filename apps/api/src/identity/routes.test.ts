@@ -177,9 +177,12 @@ function refusal(res: Response): { error: string | null; until: string | null } 
  * has come (against the clock, since now() is the test transaction's start).
  */
 async function attemptOf(ctx: { client: Queryable }, state: string) {
+  // "Spent" against this process's clock, read after the callback, which is
+  // the clock the API wrote expires_at with: the database's clock_timestamp()
+  // can run a few milliseconds behind it and call a spent attempt live.
   const { rows } = await ctx.client.query<{ outcome: string | null; spent: boolean }>(
-    "SELECT outcome, expires_at <= clock_timestamp() AS spent FROM auth_request WHERE state = $1",
-    [state],
+    "SELECT outcome, expires_at <= $2 AS spent FROM auth_request WHERE state = $1",
+    [state, new Date()],
   );
   return rows[0];
 }
