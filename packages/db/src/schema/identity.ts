@@ -33,10 +33,11 @@ export const identity = pgTable(
     hetuHmac: text("hetu_hmac").notNull().unique(),
     standing: identityStanding("standing").notNull().default("ok"),
     standingChangedAt: timestamp("standing_changed_at", { withTimezone: true }),
-    // The registration event as the broker reported it (docs/vendors/telia.md):
-    // the broker's subject, its session index, the token id, when the person
-    // authenticated and how strongly. Kept for a police request that names one
-    // of them; never the claims themselves.
+    // The latest bank login as the broker reported it (docs/vendors/telia.md),
+    // rewritten at every login, the panel's included: the broker's subject, its
+    // session index, the token id, when the person authenticated and how
+    // strongly. Kept for a police request that names one of them
+    // (docs/runbooks/police-disclosure.md); never the claims themselves.
     brokerSubject: text("broker_subject"),
     brokerSessionIndex: text("broker_session_index"),
     brokerTokenId: text("broker_token_id"),
