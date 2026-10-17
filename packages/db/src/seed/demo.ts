@@ -17,6 +17,12 @@ export {
   parseDemoCommand,
 } from "./command.ts";
 export {
+  type ConversationsResult,
+  PERSONA_CONVERSATIONS,
+  type PersonaConversation,
+  writeConversations,
+} from "./conversations.ts";
+export {
   OLDER_TERMS_VERSION,
   PERSONA_HISTORIES,
   type PersonaHistory,

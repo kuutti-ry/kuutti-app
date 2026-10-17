@@ -1,0 +1,76 @@
+# A text message between the chat's pair (#348, ADR-031): Antti writes to
+# Ville; Ville signs in and reads it with its time; Antti signs in again and
+# sees "Read" under it. On the way, Antti's list holds the archived group
+# with his silent match with Sanna. The stories give both conversations
+# (packages/db/src/seed/conversations.ts). Each run adds a message in words of
+# its own, so the flow runs again without a reset; `pnpm demo:reset` takes the
+# conversation back to the stories' six messages.
+appId: fi.kuutti.app
+name: A message reaches the other person with its time, the writer then sees it read, and a silent match waits in the archive
+---
+# Letters only, unique to the run: the send refuses what looks like a phone
+# number or a handle, and an earlier run's message may be on the screen too.
+- evalScript: "${output.words = 'Lauantai sopii tuon pullaa ' + Date.now().toString(36).replace(/[0-9]/g, function (d) { return 'kmnprstvyz'.charAt(Number(d)); })}"
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Antti Nurmi
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Archived|Arkistoidut|Arkiverade"
+    timeout: 15000
+- waitForAnimationToEnd
+# A row is one element: the name with the age, what is unread, the last line, when.
+- assertVisible:
+    text: "Sanna, \\d+, (No messages yet|Ei vielä viestejä|Inga meddelanden än)"
+    below: "Archived|Arkistoidut|Arkiverade"
+- assertVisible: "A conversation quiet for a week moves here\\. Writing in it brings it back\\.|Viikon hiljaa ollut keskustelu siirtyy tänne\\. Kun kirjoitat siihen, se palaa\\.|Ett samtal som varit tyst en vecka flyttas hit\\. När du skriver i det kommer det tillbaka\\."
+- tapOn:
+    text: "Ville, \\d+, .*"
+    below: "Open|Avoimet|Öppna"
+# The field is its label, and on iOS its placeholder after it.
+- extendedWaitUntil:
+    visible: "(Message|Viesti|Meddelande)( .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+# The keyboard stays up (README): Send is above it, on the composer.
+- tapOn: "(Message|Viesti|Meddelande)( .*)?"
+- inputText: ${output.words}
+- tapOn: "Send|Lähetä|Skicka"
+- extendedWaitUntil:
+    notVisible: "Sending…|Lähetetään…|Skickar…"
+    timeout: 15000
+- assertVisible: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+
+# Ville: the row says a message is unread and what it says; the message says
+# who wrote it and when. Opening the conversation reads it.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Ville Rantanen
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), ${output.words}, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), ${output.words}, .*"
+- extendedWaitUntil:
+    visible: "Antti, \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+    timeout: 15000
+
+# Antti again: "Read" under the message he wrote, below every earlier one's.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Antti Nurmi
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Ville, \\d+, (You|Sinä|Du): ${output.words}, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Ville, \\d+, (You|Sinä|Du): ${output.words}, .*"
+- extendedWaitUntil:
+    visible:
+      text: "Read|Luettu|Läst"
+      below: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+    timeout: 15000

@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the seven personas "with a history" have done before the demo begins
+ * What the nine personas "with a history" have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -191,6 +191,55 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       bio: null,
       bioPreset: "ask_me_instead",
       fields: { intent: "long_term" },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  // The chat's pair (#348): in each other's pool both ways, and Antti in
+  // Sanna's, so the conversations of conversations.ts are matches the filters
+  // allow (a test says so). No photos: the release has no faces of them.
+  {
+    key: "antti",
+    locale: "fi",
+    onboarding: {
+      gender: "man",
+      seeks: ["woman", "man"],
+      ageWindow: { min: 40, max: 55 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Antti",
+      bio: "Kirjastonhoitaja, joka leipoo sunnuntaisin liikaa pullaa ja vie ylimääräiset naapureille. Metsässä kävelen hitaasti ja pysähdyn joka sienen kohdalla.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["baking", "forest_walks", "board_games"],
+      },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  {
+    key: "ville",
+    locale: "fi",
+    onboarding: {
+      gender: "man",
+      seeks: ["man"],
+      ageWindow: { min: 44, max: 56 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Ville",
+      bio: "Purjehdin kesät saaristossa ja talvet uin avannossa. Arkisin suunnittelen siltoja. Etsin jotakuta, jonka kanssa hiljaisuuskin on hyvää seuraa.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "sv", "en"],
+        intent: "long_term",
+        hobbies: ["sailing", "winter_swimming", "sauna"],
+      },
       prompts: [],
     },
     photos: 0,

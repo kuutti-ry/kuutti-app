@@ -1,10 +1,11 @@
 /**
- * Returns the twelve personas to where they begin (#73, ADR-014 §12; on
+ * Returns the fifteen personas to where they begin (#73, ADR-014 §12; on
  * staging #141, ADR-018): everybody erased through the erasure path and
- * forgotten, then the six with a history given it anew.
+ * forgotten, then the nine with a history given it anew, with their
+ * conversations (#348).
  *
  *   pnpm demo:reset                  reset, then the histories
- *   pnpm demo:reset -- --bare        reset only: all twelve are newcomers
+ *   pnpm demo:reset -- --bare        reset only: all fifteen are newcomers
  *   pnpm demo:reset -- --api http://localhost:3000
  *   pnpm demo:reset -- --objects-lost   although the store does not hold the photos
  *   node dist/demo-reset.js --env staging   inside the API's container on staging
@@ -44,7 +45,7 @@ import { loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger, type Logger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError, lookAtApi, onThisComputer, whyNotTheLocalStore } from "./demo/bank.ts";
-import { giveHistory, viaRoutes } from "./demo/histories.ts";
+import { giveConversations, giveHistory, type HistoryResult, viaRoutes } from "./demo/histories.ts";
 import { loadAssets } from "./demo/photos.ts";
 import { type ResetResult, resetPersonas } from "./demo/reset.ts";
 import { giveStories, personaHashes, viaServices } from "./demo/services.ts";
@@ -218,11 +219,15 @@ async function localReset(): Promise<void> {
         db: pool,
         ...(assets ? { assets } : {}),
       });
+      const results: HistoryResult[] = [];
       for (const history of PERSONA_HISTORIES) {
         if (reset.spared.includes(history.key)) continue;
         const given = await giveHistory(history, writer);
         console.log(JSON.stringify({ msg: "demo reset: history", ...given }));
+        results.push(given);
       }
+      const talked = await giveConversations(pool, results, now());
+      console.log(JSON.stringify({ msg: "demo reset: conversations", ...talked }));
     }
     await recount(pool, logger, now);
     sparedOrThrow(reset);
@@ -284,9 +289,12 @@ async function stagingReset(): Promise<void> {
         media: media.deps,
         ...(assets ? { assets } : {}),
       });
-      for (const given of await giveStories(writer, reset.spared)) {
+      const results = await giveStories(writer, reset.spared);
+      for (const given of results) {
         console.log(JSON.stringify({ msg: "demo reset: history", ...given }));
       }
+      const talked = await giveConversations(pool, results, now());
+      console.log(JSON.stringify({ msg: "demo reset: conversations", ...talked }));
     }
     await recount(pool, logger, now);
     sparedOrThrow(reset);

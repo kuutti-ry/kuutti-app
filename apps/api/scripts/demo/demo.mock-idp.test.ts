@@ -10,6 +10,7 @@ import {
   personaHetu,
 } from "@kuutti/db/demo";
 import {
+  ConversationList,
   Gender,
   OnboardingStatus,
   PreferencesUpdate,
@@ -41,7 +42,7 @@ import {
   ofThisComputer,
   whyNotTheLocalStore,
 } from "./bank.ts";
-import { giveHistory, viaRoutes } from "./histories.ts";
+import { giveConversations, giveHistory, type HistoryResult, viaRoutes } from "./histories.ts";
 import { resetPersonas } from "./reset.ts";
 
 // The personas' histories and the reset (#73, ADR-014 §12), against the real
@@ -687,9 +688,17 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
   test("the histories leave each persona where the mock bank's page says", async ({ ctx }) => {
     const { bank, context, lines } = await world(ctx);
     const began = Date.now();
+    const results: HistoryResult[] = [];
     for (const history of PERSONA_HISTORIES) {
-      expect(await giveHistory(history, viaRoutes(context))).toMatchObject({ key: history.key });
+      const given = await giveHistory(history, viaRoutes(context));
+      expect(given).toMatchObject({ key: history.key });
+      results.push(given);
     }
+    expect(await giveConversations(ctx.client, results, new Date())).toEqual({
+      written: 2,
+      already: 0,
+      missing: 0,
+    });
     const ended = Date.now();
 
     const as = async (key: string) => {
@@ -715,6 +724,8 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     expect(await stateOf("noa")).toEqual(["active"]);
     expect(await stateOf("kerttu")).toEqual(["active"]);
     expect(await stateOf("helmi")).toEqual(["active"]);
+    expect(await stateOf("antti")).toEqual(["active"]);
+    expect(await stateOf("ville")).toEqual(["active"]);
     expect(await stateOf("onni")).toEqual(["registered"]);
     expect(await stateOf("tapio")).toEqual(["banned"]);
     // His ban is a sanction row by nobody (ADR-024 §10): the panel lists it, an admin can lift it.
@@ -746,6 +757,39 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       "pond",
     ]);
     expect((await as("noa")).onboarding.gender).toBe("non_binary");
+
+    // The chat's pair, as each one's list says it (#348): Antti has Ville's
+    // last message to read and a silent match with Sanna in the archive.
+    const listOf = async (key: string) => {
+      const { login } = await as(key);
+      return ConversationList.parse(
+        await call(bank, login.accessToken, "GET", "/conversations?thumbs=false"),
+      );
+    };
+    const named = (list: ConversationList) =>
+      Object.fromEntries(
+        Object.entries(list).map(([group, rows]) => [
+          group,
+          rows.map((c) => ({
+            name: c.counterpart.deleted ? null : c.counterpart.name,
+            state: c.state,
+            unread: c.unread,
+            last: c.lastMessage?.side ?? null,
+          })),
+        ]),
+      );
+    expect(named(await listOf("antti"))).toEqual({
+      open: [{ name: "Ville", state: "open", unread: 1, last: "theirs" }],
+      archived: [{ name: "Sanna", state: "archived", unread: 0, last: null }],
+    });
+    expect(named(await listOf("ville"))).toEqual({
+      open: [{ name: "Antti", state: "open", unread: 0, last: "mine" }],
+      archived: [],
+    });
+    expect(named(await listOf("sanna"))).toEqual({
+      open: [],
+      archived: [{ name: "Antti", state: "archived", unread: 0, last: null }],
+    });
 
     // The wording moved on: an active account that is asked for the terms again, and only for them.
     const kerttu = await as("kerttu");
@@ -810,15 +854,15 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
     const count = async (sql: string) =>
       Number((await ctx.client.query<{ n: string }>(sql)).rows[0]?.n);
     const personas = `broker_subject = ANY(ARRAY[${DEMO_PERSONAS.map((p) => `'${p.key}'`).join(",")}])`;
-    // The seven with a history, Aino, and Aino's name at the other bank.
-    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(9);
+    // The nine with a history, Aino, and Aino's name at the other bank.
+    expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(11);
     // Tapio's ban, which his erasure keeps on the identity (ADR-024 §8).
     expect(await count("SELECT count(*) AS n FROM sanction")).toBe(1);
 
     const result = await resetPersonas({ db: ctx.client, logger, now });
-    // Eight identities of the mock bank; seven accounts were live (Ilona's was a tombstone
+    // Ten identities of the mock bank; nine accounts were live (Ilona's was a tombstone
     // already, Tapio's was banned and is taken as it is).
-    expect(result).toEqual({ identities: 8, erased: 7, objects: 0, spared: [] });
+    expect(result).toEqual({ identities: 10, erased: 9, objects: 0, spared: [] });
     expect(await count(`SELECT count(*) AS n FROM identity WHERE ${personas}`)).toBe(1);
     expect(
       await count(

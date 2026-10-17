@@ -40,6 +40,7 @@ import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError } from "./demo/bank.ts";
+import { giveConversations } from "./demo/histories.ts";
 import { loadAssets } from "./demo/photos.ts";
 import { giveStories, viaServices } from "./demo/services.ts";
 
@@ -102,9 +103,13 @@ try {
     media: media.deps,
     ...(assets ? { assets } : {}),
   });
-  for (const given of await giveStories(writer)) {
+  const results = await giveStories(writer);
+  for (const given of results) {
     console.log(JSON.stringify({ msg: "demo stories: history", ...given }));
   }
+  // Told before, a conversation is left as it is: a second run writes none.
+  const talked = await giveConversations(pool, results, now());
+  console.log(JSON.stringify({ msg: "demo stories: conversations", ...talked }));
   // The pond has other people in it now (ADR-018: nobody on staging is
   // anybody, so the counter of #54 is counted anew, as the population does).
   await pool.query("DELETE FROM waitlist_snapshot");
