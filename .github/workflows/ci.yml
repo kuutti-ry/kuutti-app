@@ -41,6 +41,11 @@ jobs:
         run: |
           node scripts/dev-env.ts --self-test
           node scripts/e2e.ts --self-test
+      # The load smoke refuses production and any host but this computer and
+      # staging, keeps to half of ADR-026's budgets, and runs against a stand-in
+      # on the runner, never an environment (#200).
+      - name: load:smoke refuses production and keeps its budgets
+        run: node scripts/load-smoke.ts --self-test
       # Every PEM stays out of git; .gitignore un-ignores exactly one public
       # certificate bundle. TruffleHog filters unverifiable keys, so this is
       # the backstop.
