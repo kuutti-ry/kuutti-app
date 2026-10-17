@@ -1,11 +1,6 @@
 import { resolve } from "node:path";
 import { createPool, migrate, type Pool, seed } from "@kuutti/db";
-import {
-  DiscoveryError,
-  discoverProvider,
-  isTeliaIssuer,
-  type ProviderMetadata,
-} from "@kuutti/tunnistus-oidc";
+import { discoverProvider, type ProviderMetadata } from "@kuutti/tunnistus-oidc";
 import { type App, createApp } from "./app.ts";
 import {
   brokerOptionsFromConfig,
@@ -67,8 +62,11 @@ export async function boot({
   // Bank identification (#32): the broker's endpoints and keys come from its
   // discovery document, read here so that a wrong issuer, a broker outage or a
   // misconfigured environment is a failed boot on staging and production, and
-  // a warning locally, never a failed login later. Telia offers private_key_jwt
-  // only; a broker that does not is the wrong one.
+  // a warning locally, never a failed login later. The kit's discovery refuses
+  // a document on Telia's host without private_key_jwt, the only client
+  // authentication Telia offers (guide 2.6), and the kit's client a Telia
+  // issuer without the level to ask for (Traficom 213/2023 S) or a key under
+  // 2048 bits (guide 2.1.1).
   let broker: IdentityBroker | undefined;
   if (config.OIDC_ISSUER) {
     // The step that failed names the cause in the local warning: the error's
@@ -79,10 +77,6 @@ export async function boot({
     let stage: "discovery" | "configuration" | "broker" = "discovery";
     try {
       const provider = await discover(config.OIDC_ISSUER);
-      const methods = provider.token_endpoint_auth_methods_supported ?? [];
-      if (isTeliaIssuer(config.OIDC_ISSUER) && !methods.includes("private_key_jwt")) {
-        throw new DiscoveryError(config.OIDC_ISSUER, "no private_key_jwt at the token endpoint");
-      }
       // The key ids below read our keys, which a mis-pasted PEM fails.
       stage = "configuration";
       logger.info(

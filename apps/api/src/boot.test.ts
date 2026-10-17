@@ -426,6 +426,11 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       TELIA_ENCRYPTION_KEY: telia.encryptionKeyPem,
       HETU_HMAC_KEY: HMAC_KEY,
     });
+    /** The kit's own discovery, of a document on Telia's host that the test writes. */
+    const documentOnTeliasHost = (overrides: Partial<ProviderMetadata>) => (issuer: string) =>
+      discoverProvider(issuer, async () =>
+        Response.json(metadata({ issuer: TELIA_ISSUER, ...overrides })),
+      );
     const viaDouble = () => ({
       discover: (issuer: string) =>
         discoverProvider(issuer, (url, init) =>
@@ -454,14 +459,12 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       expect(location.search).not.toBe("");
     });
 
-    it("an issuer on Telia's host without private_key_jwt is not the broker: a warning locally, a failed boot on staging", async () => {
+    it("an issuer on Telia's host without private_key_jwt is not the broker (the kit's discovery says so): a warning locally, a failed boot on staging", async () => {
       const stub = stubBroker();
       const notTelia = {
-        discover: async () =>
-          metadata({
-            issuer: TELIA_ISSUER,
-            token_endpoint_auth_methods_supported: ["client_secret_basic"],
-          }),
+        discover: documentOnTeliasHost({
+          token_endpoint_auth_methods_supported: ["client_secret_basic"],
+        }),
         createBroker: stub.createBroker,
       };
       const { app, lines } = await booted(teliaConfig(), notTelia);
@@ -530,10 +533,25 @@ describe("boot: bank identification (#32, ADR-017)", () => {
       expect(stub.made).toEqual([]);
     });
 
+    it("Telia's issuer without the level to ask for is no broker (Traficom 213/2023 S): a warning locally, a failed boot on staging", async () => {
+      const withoutLevel = { ...teliaConfig(), OIDC_ACR_VALUES: undefined };
+      const { app, lines } = await booted(withoutLevel, viaDouble());
+      // Making the client is where the level is required (the kit's Telia dialect).
+      expect(
+        line(lines, "bank identification unavailable; is the mock IdP running?"),
+      ).toMatchObject({ level: WARN, stage: "broker" });
+      expect((await startLogin(app)).status).toBe(503);
+
+      const staging = await refused({ ...withoutLevel, APP_ENV: "staging" }, viaDouble());
+      expect(staging.error).toMatchObject({
+        name: "TunnistusError",
+        reason: "the telia dialect needs acr_values (Traficom 213/2023 S)",
+      });
+    });
+
     it("an issuer on Telia's host whose document lists no client authentication is refused the same way", async () => {
       const { lines } = await booted(teliaConfig(), {
-        discover: async () =>
-          metadata({ issuer: TELIA_ISSUER, token_endpoint_auth_methods_supported: undefined }),
+        discover: documentOnTeliasHost({ token_endpoint_auth_methods_supported: undefined }),
         createBroker: stubBroker().createBroker,
       });
       expect(

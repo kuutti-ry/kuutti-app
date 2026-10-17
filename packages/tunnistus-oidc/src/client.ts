@@ -1,6 +1,6 @@
 import { importPKCS8 } from "jose";
 import * as client from "openid-client";
-import { isTeliaIssuer } from "./discovery.ts";
+import { isOnTeliaHost, isTeliaIssuer } from "./discovery.ts";
 import { keyIdOf } from "./keys.ts";
 
 /**
@@ -44,14 +44,16 @@ export type TunnistusClientOptions = {
   redirectUri: string;
   /**
    * `acr_values` of every request and the only `acr` accepted in the answer:
-   * ACR_LOA2 in production, ACR_LOATEST2 on the test bed. Null sends none
-   * and accepts any level, which only a mock deserves.
+   * ACR_LOA2 in production, ACR_LOATEST2 on the test bed; several are
+   * space-separated, and sent trimmed. Mandatory in the Telia dialect
+   * (Traficom 213/2023 S); in the plain one, null or blank sends none and
+   * accepts any level, which only a mock deserves.
    */
   acrValues: string | null;
-  /** PKCS#8 PEM, RSA 2048 or longer. Both required for the Telia dialect, ignored by the plain one. */
+  /** PKCS#8 PEM, RSA 2048 or longer (guide 2.1.1). Both required for the Telia dialect, ignored by the plain one. */
   signingKeyPem: string | null;
   encryptionKeyPem: string | null;
-  /** Default: `telia` for Telia's hosts, `plain` for anything else. */
+  /** Default: `telia` for Telia's hosts, `plain` for anything else; Telia's hosts are refused any other. */
   dialect?: TunnistusDialect;
   /**
    * The HTTP client for discovery, the JWKS and the token endpoint. Tests
@@ -126,9 +128,29 @@ export async function createTunnistusClient(
   const dialect: TunnistusDialect =
     options.dialect ?? (isTeliaIssuer(options.issuer) ? "telia" : "plain");
   const telia = dialect === "telia";
+  // The plain dialect would talk to Telia unsigned, without keys or a level,
+  // and over http if the issuer said so: on Telia's host only the Telia
+  // dialect, over https on the default port, rather than a broker's refusal.
+  if (isOnTeliaHost(options.issuer) && !(telia && isTeliaIssuer(options.issuer))) {
+    throw new TunnistusError(
+      "Telia's host takes the telia dialect only, over https on the default port",
+    );
+  }
   if (telia && (!options.signingKeyPem || !options.encryptionKeyPem)) {
     throw new TunnistusError("the telia dialect needs the signing and encryption keys");
   }
+  // Without a level asked for, any level the broker answers would be taken,
+  // the test emulator's included.
+  const expectedAcr = acrSet(options.acrValues);
+  if (telia && !expectedAcr) {
+    throw new TunnistusError("the telia dialect needs acr_values (Traficom 213/2023 S)");
+  }
+  // keyIdOf reads each key first and refuses one that is not RSA of 2048 bits
+  // or more (guide 2.1.1), before the broker is asked anything.
+  const keyIds =
+    telia && options.signingKeyPem && options.encryptionKeyPem
+      ? { signing: keyIdOf(options.signingKeyPem), encryption: keyIdOf(options.encryptionKeyPem) }
+      : null;
   const signingKey =
     telia && options.signingKeyPem
       ? await importPKCS8(options.signingKeyPem, "RS256", { extractable: false })
@@ -156,24 +178,24 @@ export async function createTunnistusClient(
       ...(options.fetch ? { [client.customFetch]: options.fetch } : {}),
     },
   );
+  // Guide 2.6: Telia authenticates clients with private_key_jwt only, and the
+  // library would not ask; a document without it is not the broker.
+  const methods = configuration.serverMetadata().token_endpoint_auth_methods_supported;
+  if (telia && !methods?.includes("private_key_jwt")) {
+    throw new TunnistusError("no private_key_jwt at the token endpoint");
+  }
   // The library trusts a token it fetched itself over TLS and skips the JWS
   // signature by default; the guide (2.6.3) wants it verified against the
   // issuer's JWKS, which is also what makes a rotated key visible.
   client.enableNonRepudiationChecks(configuration);
-  if (encryptionKey && options.encryptionKeyPem) {
+  if (encryptionKey && keyIds) {
     // The content encryptions Telia's metadata offers (both hosts, read
     // 2026-10-07): the guide's A128CBC-HS256 and A128GCM.
     client.enableDecryptingResponses(configuration, ["A128CBC-HS256", "A128GCM"], {
       key: encryptionKey,
-      kid: keyIdOf(options.encryptionKeyPem),
+      kid: keyIds.encryption,
     });
   }
-
-  const expectedAcr = acrSet(options.acrValues);
-  const keyIds =
-    telia && options.signingKeyPem && options.encryptionKeyPem
-      ? { signing: keyIdOf(options.signingKeyPem), encryption: keyIdOf(options.encryptionKeyPem) }
-      : null;
 
   return {
     issuer: options.issuer,
@@ -188,7 +210,7 @@ export async function createTunnistusClient(
         state: input.state,
         nonce: input.nonce,
       };
-      if (options.acrValues) parameters.acr_values = options.acrValues;
+      if (expectedAcr) parameters.acr_values = [...expectedAcr].join(" ");
       if (input.uiLocales) parameters.ui_locales = input.uiLocales;
       if (input.prompt) parameters.prompt = input.prompt;
       if (signingKey) {

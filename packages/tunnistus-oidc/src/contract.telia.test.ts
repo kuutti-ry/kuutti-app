@@ -289,6 +289,29 @@ describe("what we send is what Telia documents", () => {
       ).toMatch(refusal);
     });
 
+    it.each([
+      ["blank", "  ", "acr_values is mandatory (Traficom 213/2023 S)"],
+      [
+        "a level it does not offer",
+        "http://ftn.ficora.fi/2017/loa3",
+        "acr_values names a level the broker does not offer",
+      ],
+      [
+        "two levels two spaces apart",
+        `${LOATEST2}  ${LOATEST2}`,
+        "acr_values names a level the broker does not offer",
+      ],
+    ])(
+      "2.4.2: acr_values is a level the broker offers, and the double refuses one that is %s",
+      async (_name, acrValues, refusal) => {
+        expect(
+          await authorizationRefusal(
+            authorizationUrl(await requestObject({ acr_values: acrValues })),
+          ),
+        ).toBe(refusal);
+      },
+    );
+
     it("2.4.2: jti, a new one for every request", async () => {
       const again = decodeJwt(
         (await client.startLogin({ state: "s", nonce: "n" })).searchParams.get("request") ?? "",

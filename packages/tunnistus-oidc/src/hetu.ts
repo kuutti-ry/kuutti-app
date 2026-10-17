@@ -114,7 +114,8 @@ export type Rng = () => number;
 /**
  * A well-formed code for seeds and tests. Individual numbers stay in 002–899
  * (900+ are temporary identities). The century sign is chosen at random among
- * the signs valid for the century, so every separator gets exercised.
+ * the signs valid for the century, so every separator gets exercised. Throws
+ * a RangeError when the birth year falls outside 1800–2099.
  */
 export function generateHetu(
   rng: Rng,
@@ -137,7 +138,11 @@ export function generateHetu(
   const signs = Object.entries(CENTURY_SIGNS)
     .filter(([, c]) => c === century)
     .map(([s]) => s);
-  const sign = signs[Math.floor(rng() * signs.length)] ?? "-";
+  const sign = signs[Math.floor(rng() * signs.length)];
+  // The signs cover 1800–2099; any other year would be written in the wrong century.
+  if (sign === undefined) {
+    throw new RangeError(`no century sign carries the birth year ${birthYear} (1800–2099)`);
+  }
   const individual = String(2 + Math.floor(rng() * 898)).padStart(3, "0");
   const ddmmyy = `${String(birthDay).padStart(2, "0")}${String(birthMonth).padStart(2, "0")}${String(birthYear % 100).padStart(2, "0")}`;
   return `${ddmmyy}${sign}${individual}${checkCharacter(ddmmyy, individual)}`;

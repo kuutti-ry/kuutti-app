@@ -3,8 +3,15 @@ import { createHash, createPrivateKey, createPublicKey } from "node:crypto";
 export type KeyUse = "sig" | "enc";
 
 function rsaPublicJwk(privateKeyPem: string): { kty: "RSA"; n: string; e: string } {
-  const jwk = createPublicKey(createPrivateKey(privateKeyPem)).export({ format: "jwk" });
+  const key = createPrivateKey(privateKeyPem);
+  const jwk = createPublicKey(key).export({ format: "jwk" });
   if (jwk.kty !== "RSA" || !jwk.n || !jwk.e) throw new Error("a Telia key is RSA (guide 2.1.1)");
+  // Guide 2.1.1: 2048 bits or longer. Refused where the key is read, so a
+  // short one fails at registration or at boot, not at the first signature.
+  const bits = key.asymmetricKeyDetails?.modulusLength;
+  if (!bits || bits < 2048) {
+    throw new Error(`a Telia key is RSA of 2048 bits or more (guide 2.1.1), not ${bits}`);
+  }
   return { kty: "RSA", n: jwk.n, e: jwk.e };
 }
 

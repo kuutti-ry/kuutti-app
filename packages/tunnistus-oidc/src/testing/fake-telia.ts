@@ -30,6 +30,8 @@ export const TELIA_JWKS = `${TELIA_ISSUER}/oauth2/metadata.jwks`;
 export const LOATEST2 = "http://ftn.ficora.fi/2017/loatest2";
 export const AKTIA = "https://tunnistus-pp.telia.fi/uas/saml2/names/ac/oidc.aktia.1";
 export const CLIENT_ASSERTION_TYPE = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+/** The levels and methods the double takes in acr_values (Telia publishes no list). */
+const ACR_VALUES_SUPPORTED = [LOATEST2, "mpki.telia.emulator.1", "oidc.aktia.1"];
 
 /** Guide 2.6.4: what an FTN method returns for a Finnish person (a test code, not a real one). */
 export type Person = {
@@ -172,7 +174,7 @@ export async function fakeTelia(options: { person?: Person } = {}): Promise<Fake
       request_parameter_supported: true,
       request_object_signing_alg_values_supported: ["RS256"],
       require_signed_request_object: true,
-      acr_values_supported: [LOATEST2, "mpki.telia.emulator.1", "oidc.aktia.1"],
+      acr_values_supported: ACR_VALUES_SUPPORTED,
       ui_locales_supported: ["fi", "sv", "en"],
     }),
   );
@@ -215,8 +217,12 @@ export async function fakeTelia(options: { person?: Person } = {}): Promise<Fake
     if (payload.scope !== "openid") return refuse("scope must be openid");
     if (payload.client_id !== clientId) return refuse("client_id is not the registered client");
     if (payload.redirect_uri !== redirectUri) return refuse("redirect_uri is not registered");
-    if (typeof payload.acr_values !== "string" || payload.acr_values.length === 0) {
+    if (typeof payload.acr_values !== "string" || payload.acr_values.trim() === "") {
       return refuse("acr_values is mandatory (Traficom 213/2023 S)");
+    }
+    // Space-separated values (OpenID Connect Core 3.1.2.1), each one offered.
+    if (!payload.acr_values.split(" ").every((v) => ACR_VALUES_SUPPORTED.includes(v))) {
+      return refuse("acr_values names a level the broker does not offer");
     }
     if (typeof payload.state !== "string" || typeof payload.nonce !== "string") {
       return refuse("state and nonce are expected");
