@@ -7,6 +7,7 @@ import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
 import { Photo, PhotoCheckKind, PhotoRejectionReason, PhotoVariant } from "./media.ts";
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
+import { ExportedBlocks, ExportedReports } from "./report.ts";
 import { ResearchExport } from "./research.ts";
 import { ExportedSanction } from "./sanction.ts";
 
@@ -187,6 +188,10 @@ export const AccountExport = z
     feedback: z.array(ExportedFeedback).max(1000),
     /** The sanctions on the person (#307, ADR-024 §8), newest first, at most 1000; never who and never staff's note. */
     sanctions: z.array(ExportedSanction).max(1000),
+    /** The reports the person filed (#84, ADR-030 §8), with what came of them; never whom, and never a report about the person. */
+    reports: ExportedReports,
+    /** The blocks the person set (#84, ADR-030 §8), by date; never whom, and never a block set against the person. */
+    blocks: ExportedBlocks,
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

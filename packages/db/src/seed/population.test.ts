@@ -502,6 +502,74 @@ describe("writing the population", () => {
     });
   });
 
+  it("takes a person's reports and blocks with them, on either side of them, and nobody else's (#84)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      const accountOf = async (subject: string) => {
+        const { rows } = await pool.query<{ id: string; identity_id: string }>(
+          `SELECT a.id, a.identity_id FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject = $1`,
+          [subject],
+        );
+        const row = rows[0];
+        if (!row) throw new Error(`no account of ${subject}`);
+        return row;
+      };
+      type Person = { id: string; identity_id: string };
+      const reported = (from: Person, about: Person) =>
+        pool.query(
+          `INSERT INTO report (reporter_account_id, reported_account_id, source, reason)
+           VALUES ($1, $2, 'card', 'other')`,
+          [from.id, about.id],
+        );
+      const blocked = (from: Person, whom: Person) =>
+        pool.query("INSERT INTO block (blocker_identity_id, blocked_identity_id) VALUES ($1, $2)", [
+          from.identity_id,
+          whom.identity_id,
+        ]);
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        await writePopulation(pool, generatePopulation({ size: 40 }), VERSIONS);
+        // Somebody the seed made, and somebody who signed up: both stay.
+        const { rows: seeded } = await pool.query<Person>(
+          `SELECT a.id, a.identity_id FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject IS NULL OR i.broker_subject NOT LIKE $1 LIMIT 1`,
+          [`${DEMO_SUBJECT_PREFIX}%`],
+        );
+        const { rows: signedUp } = await pool.query<Person>(
+          `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ('kuutti test: signed up') RETURNING id)
+           INSERT INTO account (identity_id, state, birth_year, birth_month)
+           SELECT id, 'active', 1990, 6 FROM i RETURNING id, identity_id`,
+        );
+        const [kept, other] = [seeded[0], signedUp[0]] as [Person, Person];
+        const live = await accountOf(`${DEMO_SUBJECT_PREFIX}demo-0001`);
+        const gone = await accountOf(`${DEMO_SUBJECT_PREFIX}demo-0002`);
+        // Each way between a synthetic person and a kept one, and one between the kept two.
+        await reported(live, kept);
+        await reported(kept, gone);
+        await reported(kept, other);
+        await blocked(live, kept);
+        await blocked(kept, gone);
+        await blocked(other, kept);
+
+        expect(await removePopulation(pool)).toEqual({ removed: 40, spared: 0 });
+        const { rows: reports } = await pool.query(
+          "SELECT reporter_account_id, reported_account_id FROM report",
+        );
+        expect(reports).toEqual([{ reporter_account_id: kept.id, reported_account_id: other.id }]);
+        const { rows: blocks } = await pool.query(
+          "SELECT blocker_identity_id, blocked_identity_id FROM block",
+        );
+        expect(blocks).toEqual([
+          { blocker_identity_id: other.identity_id, blocked_identity_id: kept.identity_id },
+        ]);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   it("refuses anybody who is not synthetic, and a pond the seed has not made", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });

@@ -52,3 +52,4 @@ Reading the code for it (#307's map) turned up what a naive version breaks. The 
 ## History
 
 - 2026-10-16: written with #307.
+- 2026-10-17 (#84, ADR-030 §4 and §10): a person's report takes its reason from §3's list (the `sanction_reason` enum), so a moderator's decision in #312 leads to a sanction with the same reason and names it on the report; erasure's deletion of a lifted sanction (§8) leaves the report's outcome and drops the link (`ON DELETE SET NULL`).

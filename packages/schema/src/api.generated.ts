@@ -2434,6 +2434,151 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/blocks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Block the person of a card one was shown
+         * @description From then on neither is shown to the other, in either direction, in any round, card, photo or pool. Between the two identities, so it holds for a later account of either; final. Nobody is told.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BlockRequest"];
+                };
+            };
+            responses: {
+                /** @description The block stands: set now, set before, or set by the other first, alike. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed: a missing or malformed account id, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no card of that account was shown to the caller and no block stands between the two accounts (never shown, oneself, nobody, a later account of somebody blocked), or the caller was erased meanwhile; nothing is written. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report the person of a card one was shown, and block them
+         * @description A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Filed and blocked; or a report of the same person is still open, and nothing more is written. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no card of that account was shown to the caller and no block stands between the two accounts (never shown, oneself, nobody, a later account of somebody blocked), or the caller was erased meanwhile; nothing is written. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/accounts/{id}/sanctions": {
         parameters: {
             query?: never;
@@ -3932,6 +4077,8 @@ export interface components {
             }[];
             feedback: components["schemas"]["ExportedFeedback"][];
             sanctions: components["schemas"]["ExportedSanction"][];
+            reports: components["schemas"]["ExportedReports"];
+            blocks: components["schemas"]["ExportedBlocks"];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -4180,6 +4327,32 @@ export interface components {
         SanctionKind: "warn" | "shadow_ban" | "suspend" | "ban";
         /** @enum {string} */
         SanctionReason: "harassment" | "misrepresentation" | "under_age" | "commercial_use" | "scraping" | "other";
+        ExportedReports: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            items: components["schemas"]["ExportedReport"][];
+        };
+        ExportedReport: {
+            /** Format: date-time */
+            at: string;
+            reason: components["schemas"]["SanctionReason"];
+            reasonInWords: string;
+            note: string | null;
+            outcome: components["schemas"]["ReportOutcome"];
+            outcomeInWords: string;
+            /** Format: date-time */
+            decidedAt: string | null;
+        };
+        /** @enum {string|null} */
+        ReportOutcome: "dismissed" | "acted" | null;
+        ExportedBlocks: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            items: {
+                /** Format: date-time */
+                at: string;
+            }[];
+        };
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -4595,6 +4768,22 @@ export interface components {
             id: string;
             /** Format: date-time */
             handledAt: string;
+        };
+        BlockRequest: {
+            /**
+             * Format: uuid
+             * @description The account of the card the person was shown.
+             */
+            accountId: string;
+        };
+        ReportRequest: {
+            /**
+             * Format: uuid
+             * @description The account of the card the person was shown.
+             */
+            accountId: string;
+            reason: components["schemas"]["SanctionReason"];
+            note?: string;
         };
         SanctionList: {
             items: components["schemas"]["SanctionEntry"][];

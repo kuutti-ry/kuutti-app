@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.34.0",
+    "version": "0.35.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -297,6 +297,12 @@
               "$ref": "#/components/schemas/ExportedSanction"
             },
             "maxItems": 1000
+          },
+          "reports": {
+            "$ref": "#/components/schemas/ExportedReports"
+          },
+          "blocks": {
+            "$ref": "#/components/schemas/ExportedBlocks"
           }
         },
         "required": [
@@ -317,7 +323,9 @@
           "gate",
           "exports",
           "feedback",
-          "sanctions"
+          "sanctions",
+          "reports",
+          "blocks"
         ]
       },
       "Gender": {
@@ -1532,6 +1540,104 @@
           "commercial_use",
           "scraping",
           "other"
+        ]
+      },
+      "ExportedReports": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "What this part is, in the request's language."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedReport"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "about",
+          "items"
+        ]
+      },
+      "ExportedReport": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "reasonInWords": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReportOutcome"
+          },
+          "outcomeInWords": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "at",
+          "reason",
+          "reasonInWords",
+          "note",
+          "outcome",
+          "outcomeInWords",
+          "decidedAt"
+        ]
+      },
+      "ReportOutcome": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "dismissed",
+          "acted",
+          null
+        ]
+      },
+      "ExportedBlocks": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "What this part is, in the request's language."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "at"
+              ]
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "about",
+          "items"
         ]
       },
       "HealthResponse": {
@@ -3022,6 +3128,43 @@
           "id",
           "handledAt"
         ]
+      },
+      "BlockRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account of the card the person was shown."
+          }
+        },
+        "required": [
+          "accountId"
+        ],
+        "additionalProperties": false
+      },
+      "ReportRequest": {
+        "type": "object",
+        "properties": {
+          "accountId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account of the card the person was shown."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "accountId",
+          "reason"
+        ],
+        "additionalProperties": false
       },
       "SanctionList": {
         "type": "object",
@@ -6334,6 +6477,128 @@
           },
           "409": {
             "description": "feedback_handled: already marked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks": {
+      "post": {
+        "summary": "Block the person of a card one was shown",
+        "description": "From then on neither is shown to the other, in either direction, in any round, card, photo or pool. Between the two identities, so it holds for a later account of either; final. Nobody is told.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The block stands: set now, set before, or set by the other first, alike."
+          },
+          "400": {
+            "description": "Validation failed: a missing or malformed account id, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no card of that account was shown to the caller and no block stands between the two accounts (never shown, oneself, nobody, a later account of somebody blocked), or the caller was erased meanwhile; nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports": {
+      "post": {
+        "summary": "Report the person of a card one was shown, and block them",
+        "description": "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Filed and blocked; or a report of the same person is still open, and nothing more is written."
+          },
+          "400": {
+            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no card of that account was shown to the caller and no block stands between the two accounts (never shown, oneself, nobody, a later account of somebody blocked), or the caller was erased meanwhile; nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
             "content": {
               "application/json": {
                 "schema": {

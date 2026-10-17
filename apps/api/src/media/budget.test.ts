@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
-import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
+import { createPool, migrate, type Queryable, withTemporaryDatabase } from "@kuutti/db";
 import { Photo, type PhotoFetchBudget, type PhotoVariant } from "@kuutti/schema";
+import type { QueryResultRow } from "pg";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
@@ -153,10 +154,12 @@ describe("exposure", () => {
     expect(await showCard(ctx, a.accountId, b.accountId, [theirs.id])).toEqual({
       used: 0,
       recorded: true,
+      blocked: false,
     });
     expect(await showCard(ctx, a.accountId, b.accountId, [theirs.id])).toEqual({
       used: 1,
       recorded: true,
+      blocked: false,
     });
     const { rows } = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM card_shown WHERE account_id = $1",
@@ -280,7 +283,7 @@ describe("the card budget across days", () => {
       [viewer.accountId, theirs.id],
     );
     const again = await serve(b.accountId, theirs.id);
-    expect(again).toEqual({ used: 0, recorded: true });
+    expect(again).toEqual({ used: 0, recorded: true, blocked: false });
     const { rows } = await ctx.client.query<{ at: Date }>(
       "SELECT at FROM card_shown WHERE account_id = $1 AND photo_id = $2",
       [viewer.accountId, theirs.id],
@@ -289,7 +292,11 @@ describe("the card budget across days", () => {
     expect(rows[0]?.at.getTime()).toBeGreaterThanOrEqual(day.start.getTime());
     // It used today's one card: the next subject is over the budget, the same one is free.
     expect((await serve(c.accountId, others.id)).recorded).toBe(false);
-    expect(await serve(b.accountId, theirs.id)).toEqual({ used: 1, recorded: true });
+    expect(await serve(b.accountId, theirs.id)).toEqual({
+      used: 1,
+      recorded: true,
+      blocked: false,
+    });
   });
 });
 
@@ -411,5 +418,172 @@ describe("the Finnish year and month", () => {
     const newYearsEve = new Date("2026-12-31T22:30:00Z"); // 00:30 on 1 January in Helsinki
     expect(localYearMonth(newYearsEve)).toEqual({ year: 2027, month: 1 });
     expect(localYearMonth(newYearsEve, "UTC")).toEqual({ year: 2026, month: 12 });
+  });
+});
+
+describe("A block between the two (#84, ADR-030, features/safety/blocks.feature)", () => {
+  // findVisiblePhoto asks blocked_between: a card shown before the block is
+  // no way to the photos afterwards, in either direction, and the owner
+  // still reads their own. The shown records stay, the viewer's export trail.
+  test("A photo from a card shown before the block is refused both ways", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const mine = await upload(app, a.headers, await fixturePng(64, 64));
+    const theirs = await upload(app, b.headers, await fixturePng(72, 72));
+    await approve(ctx, mine.id);
+    await approve(ctx, theirs.id);
+    await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
+    await showCard(ctx, b.accountId, a.accountId, [mine.id]);
+    expect((await fetchUrl(app, a.headers, theirs.id, "thumb")).status).toBe(200);
+    expect((await fetchUrl(app, b.headers, mine.id, "thumb")).status).toBe(200);
+
+    const blocked = await app.request("/blocks", {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ accountId: b.accountId }),
+    });
+    expect(blocked.status).toBe(204);
+    for (const [viewer, photo] of [
+      [a, theirs],
+      [b, mine],
+    ] as const) {
+      for (const variant of ["thumb", "card", "full"] as const) {
+        const refused = await fetchUrl(app, viewer.headers, photo.id, variant);
+        expect(refused.status, variant).toBe(404);
+        expect(await errorCode(refused)).toBe("not_found");
+      }
+      expect(
+        logs().filter((l) => l.msg === "photo refused" && l.accountId === viewer.accountId),
+      ).toEqual(
+        Array(3).fill(expect.objectContaining({ photoId: photo.id, reason: "not_visible" })),
+      );
+      // One fetch from before the block, nothing after it.
+      expect(await accessRows(ctx, viewer.accountId)).toBe(1);
+    }
+    // Each owner still reads their own.
+    expect((await fetchUrl(app, a.headers, mine.id, "card")).status).toBe(200);
+    expect((await fetchUrl(app, b.headers, theirs.id, "card")).status).toBe(200);
+    const shown = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = ANY($1)", [
+      [a.accountId, b.accountId],
+    ]);
+    expect(shown.rowCount).toBe(2);
+  });
+
+  // features/safety/blocks.feature, "A block holds for a later account of
+  // either identity": the pool's half is in jobs/pond-gate.test.ts, the
+  // card's in profile/service.test.ts, the photos' here. Both readers ask by
+  // the accounts and the function answers by the identities, so a reader
+  // that asked by account ids alone would fail here.
+  test("a later account of either identity is recorded no card of the other and issued no photo of theirs", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const c = await signedInAccount(ctx.client);
+    // A blocked B (as POST /blocks writes it).
+    await ctx.client.query(
+      `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+       SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+      [a.accountId, b.accountId],
+    );
+    /** Erased, the cooldown passed, and back on the same identity: a new account with an approved photo. */
+    const later = async (accountId: string) => {
+      await ctx.client.query(
+        "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+        [accountId],
+      );
+      const again = await signedInAccount(ctx.client);
+      await ctx.client.query(
+        "UPDATE account SET identity_id = (SELECT identity_id FROM account WHERE id = $2) WHERE id = $1",
+        [again.accountId, accountId],
+      );
+      const photo = await upload(app, again.headers, await fixturePng(64, 64));
+      await approve(ctx, photo.id);
+      return { ...again, photo };
+    };
+    type Person = { accountId: string; headers: Record<string, string>; photo: Photo };
+    /** Neither is recorded a card of the other; a shown record written past the card opens no photo either. */
+    const apart = async (x: Person, y: Person) => {
+      for (const [viewer, subject] of [
+        [x, y],
+        [y, x],
+      ] as const) {
+        expect(
+          await showCard(ctx, viewer.accountId, subject.accountId, [subject.photo.id]),
+        ).toMatchObject({ recorded: false, blocked: true });
+        await ctx.client.query(
+          "INSERT INTO card_shown (account_id, photo_id, at) VALUES ($1, $2, now())",
+          [viewer.accountId, subject.photo.id],
+        );
+        expect((await fetchUrl(app, viewer.headers, subject.photo.id, "thumb")).status).toBe(404);
+      }
+    };
+    const aPhoto = await upload(app, a.headers, await fixturePng(72, 72));
+    await approve(ctx, aPhoto.id);
+
+    // The blocked person back: A and B' stay apart, both ways.
+    const bAgain = await later(b.accountId);
+    await apart({ ...a, photo: aPhoto }, bAgain);
+    // The blocker back as well: A' and B' stay apart.
+    const aAgain = await later(a.accountId);
+    await apart(aAgain, bAgain);
+    // Somebody else is shown B' as anybody is.
+    expect(await showCard(ctx, c.accountId, bAgain.accountId, [bAgain.photo.id])).toEqual({
+      used: 0,
+      recorded: true,
+      blocked: false,
+    });
+    expect((await fetchUrl(app, c.headers, bAgain.photo.id, "thumb")).status).toBe(200);
+  });
+
+  test("a block that lands after the photo's first look is asked again where the fetch is recorded", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { max_photos: 3, photo_fetches_per_day: BUDGET });
+    const { logger, lines } = await captureLogger();
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    // B blocks A while A's URL is being issued: after findVisiblePhoto looked,
+    // just before the fetch-log row takes the caller's lock.
+    let armed = false;
+    let ran = false;
+    const db: Queryable = {
+      async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+        if (armed && !ran && String(values?.[0]).startsWith("photo_access:")) {
+          ran = true;
+          await ctx.client.query(
+            `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+             SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+            [b.accountId, a.accountId],
+          );
+        }
+        return ctx.client.query<R>(text, values);
+      },
+    };
+    const media = testMediaDeps({ concurrency: 2 });
+    const app = createApp({ config: testConfig(), logger, db, media: media.deps });
+    const theirs = await upload(app, b.headers, await fixturePng(64, 64));
+    await approve(ctx, theirs.id);
+    await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
+
+    armed = true;
+    const refused = await fetchUrl(app, a.headers, theirs.id, "thumb");
+    expect(ran).toBe(true);
+    expect(refused.status).toBe(404);
+    expect(await errorCode(refused)).toBe("not_found");
+    // No row, so no budget spent, and no URL issued: the line of a photo never shown.
+    expect(await accessRows(ctx, a.accountId)).toBe(0);
+    expect(lines().filter((l) => l.msg === "photo refused")).toEqual([
+      expect.objectContaining({
+        accountId: a.accountId,
+        photoId: theirs.id,
+        reason: "not_visible",
+      }),
+    ]);
+    expect(lines().some((l) => l.msg === "photo url issued" && l.accountId === a.accountId)).toBe(
+      false,
+    );
   });
 });

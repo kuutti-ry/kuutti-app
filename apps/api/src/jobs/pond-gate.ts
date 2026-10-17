@@ -24,9 +24,9 @@ import type { NightlyJob } from "./nightly.ts";
  * The count behind the pond gate (#94, ADR-015; TD-10, TD-13): who of a pond
  * is let in, how large everybody's pool is, and for whom matching opens. It
  * lives here and not in a slice because it reads across several (accounts,
- * consents, profiles, photos, preferences, ponds) and none of them should
- * depend on the others for it (rules/layout.md), as the waitlist counter's
- * count does. The rules it applies are pure functions of the slices:
+ * consents, profiles, photos, preferences, ponds, blocks) and none of them
+ * should depend on the others for it (rules/layout.md), as the waitlist
+ * counter's count does. The rules it applies are pure functions of the slices:
  * `admit`, `sayPool` and `sayPlace` of the pond, `inEachOthersPool` of
  * matching, `completeness` of the profile.
  *
@@ -48,6 +48,7 @@ const MAJORITY_SHARE_KEY = "majority_share_max";
 
 type FactsRow = {
   id: string;
+  identity_id: string;
   gender: string | null;
   state: string;
   birth_year: number | null;
@@ -83,7 +84,7 @@ type Subject = Applicant & {
 // Who has a gate: live accounts in good standing. `registered` has none (no
 // consents yet), paused, suspended and banned accounts are hidden or gone.
 const FACTS = `
-  SELECT a.id, a.gender, a.state, a.birth_year, a.birth_month, a.registered_at,
+  SELECT a.id, a.identity_id, a.gender, a.state, a.birth_year, a.birth_month, a.registered_at,
          p.display_name, p.bio, p.bio_preset, p.prompts, p.fields->>'intent' AS intent,
          (SELECT count(*) FROM photo ph
            WHERE ph.account_id = a.id AND ph.state = 'approved') AS approved_photos,
@@ -106,13 +107,21 @@ const FACTS = `
     AND a.state IN ('active', 'shadow_banned')
     AND i.standing = 'ok'`;
 
+/** Somebody who blocked nobody of the count, or a question that is not about the pool. */
+const NO_BLOCKS: ReadonlySet<string> = new Set();
+
 /**
  * The row as a subject, or null while something is missing: the profile's
  * completeness (#47) and onboarding's (ADR-010 §6: a consent for an older
  * wording reads as none) are both asked, by the rules the person's own
- * screens are told by.
+ * screens are told by. `blocks` are the identities the person blocked (#84).
  */
-function subjectFrom(row: FactsRow, pondId: string, at: Date): Subject | null {
+function subjectFrom(
+  row: FactsRow,
+  pondId: string,
+  at: Date,
+  blocks: ReadonlySet<string>,
+): Subject | null {
   const preferences = preferencesFrom({ seeks: row.seeks, ageWindow: row.age_window });
   const gender = row.gender as Subject["gender"] | null;
   if (!gender || !preferences.seeks || !preferences.ageWindow) return null;
@@ -146,6 +155,8 @@ function subjectFrom(row: FactsRow, pondId: string, at: Date): Subject | null {
       ageWindow: preferences.ageWindow,
       age: ageInYears(row.birth_year, row.birth_month, at),
       intent,
+      identityId: row.identity_id,
+      blocks,
     },
     visible: row.state === "active",
     admittedAt: here ? row.admitted_at : null,
@@ -212,7 +223,13 @@ async function countPond(
       CURRENT_CONSENT_VERSIONS.special_category,
     ],
   );
-  const subjects = rows.flatMap((row) => subjectFrom(row, pondId, at) ?? []);
+  const blocks = await blocksWithin(
+    tx,
+    rows.map((row) => row.identity_id),
+  );
+  const subjects = rows.flatMap(
+    (row) => subjectFrom(row, pondId, at, blocks.get(row.identity_id) ?? NO_BLOCKS) ?? [],
+  );
   const admission = admit(subjects, config.shareMax);
   const newly = new Set(admission.admitted);
   // The night writes every row, so whoever it lets in is inside for
@@ -316,6 +333,32 @@ async function countPond(
     waiting: written.filter((w) => w.placeSaid !== null).length,
     opened,
   };
+}
+
+/**
+ * The blocks between the people of a count, by who set them (#84, ADR-030
+ * §3): a blocked pair is not in each other's pool, so neither counts toward
+ * the other's figure, as the rounds will not show them to each other. Read
+ * here, not through the safety slice: the count reads every slice's rows
+ * itself (§10). Nothing else of a block reaches the count: admission, the
+ * line and the share are about the pond, never about pairs.
+ */
+async function blocksWithin(
+  tx: Queryable,
+  identities: readonly string[],
+): Promise<Map<string, Set<string>>> {
+  const { rows } = await tx.query<{ blocker_identity_id: string; blocked_identity_id: string }>(
+    `SELECT blocker_identity_id, blocked_identity_id FROM block
+     WHERE blocker_identity_id = ANY($1::uuid[]) AND blocked_identity_id = ANY($1::uuid[])`,
+    [identities],
+  );
+  const byBlocker = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const set = byBlocker.get(row.blocker_identity_id) ?? new Set<string>();
+    set.add(row.blocked_identity_id);
+    byBlocker.set(row.blocker_identity_id, set);
+  }
+  return byBlocker;
 }
 
 async function readConfig(db: Queryable) {
@@ -459,7 +502,8 @@ export async function gateOf(deps: GateDeps, accountId: string): Promise<GateRes
     CURRENT_CONSENT_VERSIONS.special_category,
   ]);
   const row = rows[0];
-  if (!row || !subjectFrom(row, pondId, deps.now())) {
+  // Only whether the person is complete is asked here, so whom they blocked does not matter.
+  if (!row || !subjectFrom(row, pondId, deps.now(), NO_BLOCKS)) {
     return say({ state: "incomplete", ...nothing });
   }
 

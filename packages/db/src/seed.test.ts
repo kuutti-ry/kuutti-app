@@ -84,6 +84,7 @@ describe("seed", () => {
           exports_per_day: 3,
           feedback_per_day: 5,
           moderation_response_hours: 24,
+          reports_per_day: 5,
           waitlist_k: 10,
           default_pond: "suomi",
           change_cadence_days: 30,

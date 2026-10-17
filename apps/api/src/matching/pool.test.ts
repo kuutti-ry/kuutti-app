@@ -9,10 +9,12 @@ import {
   passesFiltersOf,
 } from "./pool.ts";
 
-// features/pond/gate.feature (#94, #147, ADR-015): who is in whose pool.
+// features/pond/gate.feature (#94, #147, ADR-015): who is in whose pool;
+// features/safety/blocks.feature (#84, ADR-030): a block, set by either.
 
 type Gender = PoolPerson["gender"];
 
+let identities = 0;
 const person = (
   gender: Gender,
   age: number,
@@ -26,6 +28,8 @@ const person = (
   seeks: seeks.split(",") as Gender[],
   ageWindow: { min, max },
   intent,
+  identityId: `identity-${++identities}`,
+  blocks: new Set(),
 });
 
 describe("Two people are in each other's pool only when each passes what the other asked for", () => {
@@ -244,6 +248,8 @@ describe("The sheet's examples of who is shown to whom, by gender and seek", () 
 
 const genderArb = fc.constantFrom(...GENDERS);
 const intentArb = fc.constantFrom(...PROFILE_FIELDS.intent.options);
+// A few identities, so that two people drawn at random often have blocked each other, or one the other.
+const identityArb = fc.constantFrom("identity-a", "identity-b", "identity-c", "identity-d");
 const personArb: fc.Arbitrary<PoolPerson> = fc
   .record({
     gender: genderArb,
@@ -252,13 +258,17 @@ const personArb: fc.Arbitrary<PoolPerson> = fc
     a: fc.integer({ min: AGE_MIN, max: AGE_MAX }),
     b: fc.integer({ min: AGE_MIN, max: AGE_MAX }),
     intent: intentArb,
+    identityId: identityArb,
+    blocks: fc.uniqueArray(identityArb, { maxLength: 3 }),
   })
-  .map(({ gender, age, seeks, a, b, intent }) => ({
+  .map(({ gender, age, seeks, a, b, intent, identityId, blocks }) => ({
     gender,
     age,
     seeks,
     ageWindow: { min: Math.min(a, b), max: Math.max(a, b) },
     intent,
+    identityId,
+    blocks: new Set(blocks),
   }));
 
 describe("the pool, for any two people", () => {
@@ -285,6 +295,9 @@ describe("the pool, for any two people", () => {
         // Intent fits both ways: two answers that differ are "open to either" beside
         // long-term or casual (#147), never beside a dance partner (#175).
         expect(intentsFit(a.intent, b.intent)).toBe(true);
+        // Nobody has blocked the other (#84).
+        expect(a.blocks.has(b.identityId)).toBe(false);
+        expect(b.blocks.has(a.identityId)).toBe(false);
         if (a.intent !== b.intent) {
           expect([a.intent, b.intent]).toContain("open_to_either");
           expect([a.intent, b.intent]).not.toContain("dance_partner");
@@ -305,11 +318,45 @@ describe("the pool, for any two people", () => {
     );
   });
 
+  it("leaves out two people a block stands between, whoever set it, asked from either side (#84)", () => {
+    fc.assert(
+      fc.property(personArb, personArb, (a, b) => {
+        if (a.blocks.has(b.identityId) || b.blocks.has(a.identityId)) {
+          expect(inEachOthersPool(a, b)).toBe(false);
+          expect(inEachOthersPool(b, a)).toBe(false);
+        }
+      }),
+    );
+  });
+
   it("holds everybody who passes both ways: nobody is left out for anything else", () => {
     fc.assert(
       fc.property(personArb, personArb, (a, b) => {
         expect(inEachOthersPool(a, b)).toBe(passesFiltersOf(a, b) && passesFiltersOf(b, a));
       }),
     );
+  });
+});
+
+describe("blocks", () => {
+  it("A block takes two people out of each other's pool, whoever set it", () => {
+    const fits = () =>
+      [person("woman", 30, "man", 25, 40), person("man", 35, "woman", 25, 40)] as const;
+    const [a, b] = fits();
+    expect(inEachOthersPool(a, b)).toBe(true);
+    // A blocks B: out of each other's pool, asked from either side.
+    const [c, d] = fits();
+    const blocker = { ...c, blocks: new Set([d.identityId]) };
+    expect(inEachOthersPool(blocker, d)).toBe(false);
+    expect(inEachOthersPool(d, blocker)).toBe(false);
+    // The other way round, and both, read the same.
+    const [e, f] = fits();
+    const blocked = { ...f, blocks: new Set([e.identityId]) };
+    expect(inEachOthersPool(e, blocked)).toBe(false);
+    expect(inEachOthersPool(blocked, e)).toBe(false);
+    expect(inEachOthersPool({ ...e, blocks: new Set([f.identityId]) }, blocked)).toBe(false);
+    // A block of somebody else leaves the two as they were.
+    const [g, h] = fits();
+    expect(inEachOthersPool({ ...g, blocks: new Set(["identity-elsewhere"]) }, h)).toBe(true);
   });
 });

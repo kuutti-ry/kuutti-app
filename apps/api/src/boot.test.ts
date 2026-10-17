@@ -202,7 +202,7 @@ describe("boot", () => {
     expect(await health.json()).toMatchObject({ db: "ok", migrations: "current" });
   });
 
-  it("arms the eight nightly jobs, each of which runs against the database it was given", async () => {
+  it("arms the nine nightly jobs, each of which runs against the database it was given", async () => {
     const { jobs } = await booted();
     expect(jobs.map((j) => j.name)).toEqual([
       "sweep-sessions",
@@ -213,6 +213,7 @@ describe("boot", () => {
       "waitlist-snapshot",
       "pond-gate",
       "prune-photo-check-notes",
+      "prune-reports",
     ]);
     const { logger, lines } = await captureLogger();
     await runNightly(jobs, logger);
@@ -222,14 +223,14 @@ describe("boot", () => {
     expect(lines().filter((l) => l.msg === "nightly job failed")).toEqual([]);
   });
 
-  it("with an object store, photos the automatic check missed get a nightly look as a ninth job", async () => {
+  it("with an object store, photos the automatic check missed get a nightly look as a tenth job", async () => {
     const { jobs, lines } = await booted({
       S3_ENDPOINT: "http://127.0.0.1:9000",
       S3_FORCE_PATH_STYLE: "true",
     });
     expect(line(lines, "media")).toMatchObject({ mode: "presigned", moderation: "queue" });
     expect(jobs.map((j) => j.name).at(-1)).toBe("moderate-pending-photos");
-    expect(jobs).toHaveLength(9);
+    expect(jobs).toHaveLength(10);
     // Nothing is pending in this database: the look finds nothing and asks the store nothing.
     const sweep = jobs.at(-1);
     expect(await sweep?.run()).toEqual({ rechecked: 0, failed: 0 });

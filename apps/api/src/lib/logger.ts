@@ -7,7 +7,7 @@ export type { Logger };
 
 /**
  * Fields that must never reach a log line: the personal identity code, message
- * text, email, credentials (CLAUDE.md security defaults, rule 5). Top level and
+ * text, email, credentials, a report's note (CLAUDE.md security defaults, rule 5). Top level and
  * one level nested; the PII-in-logs test (#11) is the backstop.
  */
 const REDACTED_PATHS = [
@@ -22,6 +22,8 @@ const REDACTED_PATHS = [
   // Whom a person seeks and how they describe themselves stay out of every line (rule 5, #46).
   "seeks",
   "gender",
+  // A person's own words to the moderators, a report's note (#84, ADR-030 §9).
+  "note",
   "*.hetu",
   "*.personal_identity_code",
   "*.email",
@@ -32,6 +34,7 @@ const REDACTED_PATHS = [
   "*.cookie",
   "*.seeks",
   "*.gender",
+  "*.note",
 ];
 
 type LogDestination = { write(line: string): void };

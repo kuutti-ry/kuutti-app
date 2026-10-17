@@ -255,12 +255,11 @@ export async function issuePhotoUrl(
   deps: PhotoServiceDeps,
   input: { accountId: string; photoId: string; variant: PhotoVariant },
 ): Promise<PhotoUrlResponse> {
-  const row = await repo.findVisiblePhoto(deps.db, input.accountId, input.photoId);
-  if (!row) {
-    // Every miss is one line: an unshown or unapproved photo of someone else
-    // and a guessed id look the same, and both are what enumeration looks
-    // like. The API never asks whether the photo exists outside the caller's
-    // scope (rule 6).
+  // Every miss is one line: an unshown or unapproved photo of someone else
+  // and a guessed id look the same, and both are what enumeration looks
+  // like. The API never asks whether the photo exists outside the caller's
+  // scope (rule 6).
+  const notVisible = () => {
     deps.logger.warn(
       {
         accountId: input.accountId,
@@ -270,8 +269,10 @@ export async function issuePhotoUrl(
       },
       "photo refused",
     );
-    throw new AppError(404, "not_found", "No such photo for this account");
-  }
+    return new AppError(404, "not_found", "No such photo for this account");
+  };
+  const row = await repo.findVisiblePhoto(deps.db, input.accountId, input.photoId);
+  if (!row) throw notVisible();
   const at = deps.now();
   const expiresAt = new Date(at.getTime() + URL_TTL_MS);
   // Signed first: signing has no side effect, so a failure there costs the
@@ -290,6 +291,9 @@ export async function issuePhotoUrl(
   });
   // No live account, no URL: the account was erased between the guard and here (#51).
   if (!access.live) throw new AppError(404, "not_found", "No such photo for this account");
+  // A block that landed after findVisiblePhoto looked (#84, ADR-030 §2): the
+  // same 404 and line as a photo never shown, and the signed URL goes nowhere.
+  if (access.blocked) throw notVisible();
   if (!access.recorded) {
     const retryAfterSeconds = secondsUntil(day.end, at);
     deps.logger.warn(

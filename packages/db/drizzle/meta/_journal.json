@@ -351,6 +351,27 @@
       "when": 1792211373983,
       "tag": "0049_auth_request_code_challenge",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1792235529264,
+      "tag": "0050_reports_and_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1792248764702,
+      "tag": "0051_blocked_between",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1792248775241,
+      "tag": "0052_reports_per_day",
+      "breakpoints": true
     }
   ]
 }

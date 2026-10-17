@@ -19,6 +19,7 @@ export {
   listPhotos,
   queueSummary,
   recordCardServed,
+  wasShown,
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";
 export { memoryMediaStore, objectKey } from "./store.ts";

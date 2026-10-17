@@ -24,3 +24,12 @@ pass:
 
 standing:
   definition: Whether a verified person is in good standing, suspended or banned. Used in moderation and account notices; formal, factual register.
+
+block:
+  definition: One person's choice that they and another person are never shown to each other again, in either direction, even if either deletes their account and comes back (#84, ADR-030). Final; the other person is not told. A noun and a verb; a private choice, never an accusation or a punishment, so not a word for banning or rejecting.
+
+report:
+  definition: Telling the moderators that something about another person is wrong, with a reason from a closed list (#84, ADR-030). Sending one also blocks that person. The reported person is never told who sent it. A noun and a verb; the same word wherever a person reports, from a card now and from a conversation later (#101), and the word staff use for it in the panel.
+
+moderator:
+  definition: A person of the association who reads reports and checks photos, and may warn, suspend or ban (ADR-024). A person, never "the system" or an algorithm; plain register, not a legal or police word.

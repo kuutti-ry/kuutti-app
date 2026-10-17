@@ -1,7 +1,8 @@
 import type { ProfileCard } from "@kuutti/schema";
-import { act, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import { saveSession } from "@/lib/session";
+import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { ProfileCardView } from "./ProfileCardView";
 
@@ -205,5 +206,50 @@ describe("ProfileCardView", () => {
       expect(screen.getByText(words, { includeHiddenElements: true })).toBeTruthy();
       expect(screen.queryByText(words)).toBeNull();
     }
+  });
+  it("has no block or report on the owner's own card", async () => {
+    await renderWithTheme(<ProfileCardView card={bare} />);
+    expect(screen.queryByRole("button", { name: "Block or report" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Aino, 36" }).props.accessibilityActions).toBe(
+      undefined,
+    );
+  });
+
+  it("offers block or report on someone else's card, as a button beside the name and as an action on it, and hands the card back after a block (#84)", async () => {
+    globalThis.fetch = jest.fn(async (input: Request | string) => {
+      const request = input instanceof Request ? input : new Request(input);
+      return new URL(request.url).pathname === "/blocks"
+        ? new Response(null, { status: 204 })
+        : json({ error: { code: "not_found", message: "x", requestId: "r" } }, 404);
+    }) as unknown as typeof fetch;
+    const gone = jest.fn();
+    await renderWithTheme(<ProfileCardView card={bare} onGone={gone} />);
+    expect(screen.getByRole("button", { name: "Block or report" })).toBeTruthy();
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+    const name = screen.getByRole("heading", { name: "Aino, 36" });
+    expect(name.props.accessibilityActions).toEqual([
+      { name: "blockOrReport", label: "Block or report" },
+    ]);
+    // Another action reaching the name opens nothing.
+    await act(async () => {
+      fireEvent(name, "accessibilityAction", { nativeEvent: { actionName: "activate" } });
+    });
+    expect(screen.queryByRole("button", { name: "Report and block" })).toBeNull();
+    await act(async () => {
+      fireEvent(name, "accessibilityAction", { nativeEvent: { actionName: "blockOrReport" } });
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Block" }));
+    });
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Block" }));
+    });
+    await screen.findByText("Blocked. You will not see each other again.");
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Done" }));
+    });
+    await waitFor(() => expect(gone).toHaveBeenCalledWith(bare.accountId));
   });
 });

@@ -24,8 +24,10 @@ import {
   deleteFeedbackOfAccount,
   deletePhotoCheckNotesOfAccount,
   deleteSanctionsOfAccount,
+  listBlocksOfAccount,
   listFeedbackOfAccount,
   listPhotoCheckNotes,
+  listReportsOfAccount,
   listSanctionsOfAccount,
 } from "../safety/index.ts";
 import { currentConsent, exportConsents } from "./onboarding.ts";
@@ -48,6 +50,13 @@ import { visibleState } from "./standing.ts";
 // The feedback goes (#171, ADR-023): the person's own words, listed in the export.
 // The sanctions go (#307, ADR-024 §8), except the open bans and suspensions,
 // which carry the identity's standing; listed in the export without who or why in staff's words.
+// Reports and blocks stay (#84, ADR-030 §8), whoever of the two is erased: a
+// report, its note with it, for twelve months from filing (TD-7's report
+// snapshots; the night prunes them), a block on the two identities for as
+// long as they are kept, so that neither a later account of the blocked
+// person nor of the blocker meets the other. The export lists the reports
+// the person filed and the blocks they set, from this account or an earlier
+// one of their identity, since both are kept on it; never whom.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -114,6 +123,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const exports = await repo.deleteExportsOfAccount(tx, accountId);
     const feedback = await deleteFeedbackOfAccount(tx, accountId);
     const sanctions = await deleteSanctionsOfAccount(tx, accountId);
+    // Kept: the reports either way and the blocks on the identity (ADR-030 §8).
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
     await deleteGateOfAccount(tx, accountId);
     const researchSubjects = await removeResearchSubject(tx, accountId);
@@ -226,6 +236,8 @@ export async function exportAccount(
     exports,
     feedback,
     sanctions,
+    reports,
+    blocks,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
@@ -237,6 +249,8 @@ export async function exportAccount(
     repo.listExportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     listFeedbackOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     listSanctionsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    listReportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    listBlocksOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -296,6 +310,24 @@ export async function exportAccount(
       kindInWords: t(`account.export.sanction.kind.${sanction.kind}`),
       reasonInWords: t(`account.export.sanction.reason.${sanction.reason}`),
     })),
+    // What the person filed and set (ADR-030 §8), in words too; never whom.
+    reports: {
+      about: t("account.export.report.about"),
+      items: reports.map((report) => ({
+        at: report.at.toISOString(),
+        reason: report.reason,
+        // The words the person chose in the app, not the sanction's, which state a finding.
+        reasonInWords: t(`safety.report.reason.${report.reason}`),
+        note: report.note,
+        outcome: report.outcome,
+        outcomeInWords: t(`account.export.report.outcome.${report.outcome ?? "open"}`),
+        decidedAt: report.decidedAt?.toISOString() ?? null,
+      })),
+    },
+    blocks: {
+      about: t("account.export.block.about"),
+      items: blocks.map((block) => ({ at: block.at.toISOString() })),
+    },
   };
   return { document, files: photos.files };
 }
