@@ -1,6 +1,6 @@
 # ADR-007: Account erasure and data export in M3
 
-- Status: accepted
+- Status: accepted, amended 2026-10-12 to 2026-10-16 (what erasure deletes and the export carries, as later changes add rows, #51, #171, #253, #296, #307; 2026-10-13: the export is a zip with the photos, the alternative once rejected, #237; see History)
 - Date: 2026-09-26
 - Follows: TD-7 (erasure and re-registration), TD-1 (identity apart from account), `.claude/rules/db.md` (the erasure table), issue #34 (the identity half), issue #51
 

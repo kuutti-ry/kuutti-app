@@ -1,6 +1,8 @@
 # ADR-020: End-to-end flows with Maestro
 
-Date: 2026-10-10. Status: accepted. Refs #164.
+- Status: accepted, amended 2026-10-11 (§6: Android in CI, on `main` and on a pull request when asked; §7: four jobs, in an order, #226)
+- Date: 2026-10-10
+- Follows: issue #164
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR-018: Staging is the demo environment, and the stories are written inside the API
 
-- Status: proposed (the maintainer's acceptance closes #141)
+- Status: accepted 2026-10-17 (#203, as #250 asks: the decision shipped, and #141, whose closing was to be the maintainer's acceptance, was closed as done on 2026-10-13), amended 2026-10-16 (§5: the story's ban is a sanction row, #307, ADR-024 §10; see History)
 - Date: 2026-10-08
 - Follows: ADR-014 (demo mode: the personas, the population, the histories; §9, §10, §11 and §12 amended here), ADR-010 §10 (one pond), ADR-013 (the counter never recounted in a deployed environment, excepted here for staging), ADR-016, `docs/vendors/telia.md` 1.4 (the test persons of the bed), TD-1, TD-7, TD-19, CLAUDE.md rules 1, 2 and 6, `docs/security-checklist.md`; issue #141 (replaces the staging part of #73)
 
@@ -31,3 +31,4 @@ Locally the personas get their stories by logging in at the mock bank and sendin
 ## History
 
 - 2026-10-16 (#307, ADR-024 §10): §5's direct write of a ban is a sanction row by nobody (`created_by` null) beside the standing and the state, so the panel lists it and an admin can lift it on staging; the staging reset deletes it with the persona's identity.
+- 2026-10-17 (#203, #250): proposed becomes accepted. The status waited on the maintainer's acceptance, which was to close #141; #141 was closed as done on 2026-10-13, with this line left to #203's pass. What the decision names shipped: the job and its guard (#160: `apps/api/scripts/demo-stories.ts`, `assertStagingProcess`, `deriveArtificialIdentity`), the pictures through the pipeline (#161), and the demo commands ran on staging on 2026-10-12 (#48's verification). No point of this record waits on him.

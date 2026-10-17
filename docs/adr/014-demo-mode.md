@@ -1,6 +1,6 @@
 # ADR-014: Demo mode: the shortcut lives in the mock bank
 
-- Status: accepted Amended by ADR-018 on 2026-10-08: staging is the demo environment, the demo commands are in the image as files of their own (§10), the personas' stories are written on staging by a job inside the API's container that derives the hash with the container's own key (§12), and `--env staging` is accepted from inside that container (§11).
+- Status: accepted; amended by ADR-018 on 2026-10-08 (staging is the demo environment; the demo commands are in the image as files of their own, §10; the personas' stories are written on staging by a job inside the API's container that derives the hash with the container's own key, §12; `--env staging` is accepted from inside that container, §11); amended 2026-10-08 (§4: the fixed personas carry the codes of Telia's test persons, #140), 2026-10-13 (§4: a ninth fixed persona, #170) and 2026-10-16 (§12: the story's ban is a sanction row, #307; the Consequences: a reset's calls are counted per person, #41)
 - Date: 2026-09-27
 - Follows: TD-1 (every account is bank-verified), TD-7 (re-registration), TD-14 (age from year and month), TD-19 (seeded environments), CLAUDE.md rules 1, 3 and 8 and the Testing section, `.claude/rules/infra.md` (the mock IdP is local), `docs/vendors/telia.md`; issue #73
 

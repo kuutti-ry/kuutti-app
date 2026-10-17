@@ -1,6 +1,6 @@
 # ADR-006: Photo moderation with Rekognition and a human queue
 
-- Status: accepted
+- Status: accepted, amended 2026-10-12 (§2 rewritten, #206, #253; the appeal and the repeated rejections, #253), 2026-10-15 (§1 and §3: the automatic description, #296) 2026-10-16 (§7: the panel's host, #313, ADR-025; §5: the staff's last sign-in, #310) and 2026-10-17 (a refused staff login of a known identity is recorded, #202; see History)
 - Date: 2026-09-25
 - Follows: TD-8 (photos are moderated before anyone else sees them), TD-5 (audit), TD-17 (the panel is English), TD-4 (one vendor), `.claude/rules/api.md` Media and Identity, `.claude/rules/admin.md`, `.claude/rules/db.md` (audit retention), security checklist lines 10, 54 and 67, ADR-005; issue #49
 

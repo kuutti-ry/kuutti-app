@@ -1,6 +1,6 @@
 # ADR-022: Taking a break
 
-- Status: accepted, amended 2026-10-14 (§6 and the Consequences: Settings as four sections of rows, #287; see History)
+- Status: accepted, amended 2026-10-14 (§6 and the Consequences: Settings as four sections of rows, #287) and 2026-10-16 (a sanction keeps a break, #307, ADR-024 §2 and §4; see History)
 - Date: 2026-10-13
 - Follows: TD-7 (erasure and re-registration), ADR-007 (erasure), ADR-010 §6 (activation), ADR-013 §2 and ADR-015 §3 (who counts), issue #170; #83 shares the state
 

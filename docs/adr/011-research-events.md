@@ -1,6 +1,6 @@
 # ADR-011: The research_id mapping, server-side track(), and the partitioned events table
 
-- Status: accepted, amended 2026-10-15 (§7 and §10: the events leave the person's export, #51; see History)
+- Status: accepted, amended 2026-10-13 (§9: what makes the block anonymous, #51) and 2026-10-15 (§7 and §10: the events leave the person's export, #51; see History)
 - Date: 2026-09-26
 - Follows: TD-5 (research use of events needs its own yes), TD-7 (the erasure table names the `research_id` mapping), CLAUDE.md rules 5, 6 and 10, `.claude/rules/db.md` (`events`: append-only, monthly partitions, 90-day retention, keyed by `research_id`), `.claude/rules/schema.md` (the event registry), `.claude/rules/api.md` (events and logs; nightly jobs), ADR-007 §4, ADR-009 §2, ADR-010 §4 and its consequences; issue #50
 
