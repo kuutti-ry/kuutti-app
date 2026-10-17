@@ -174,6 +174,23 @@ export async function claimAuthRequest(
   return rows[0] ? authRequestFrom(rows[0]) : null;
 }
 
+/**
+ * The platform of the attempt with this state, whatever its mark or expiry:
+ * where the browser of a callback the claim refused belongs, so a staff
+ * attempt's replay goes back to the panel (#250, ADR-026 §8). Null when no
+ * row holds the state, never written, evicted or swept.
+ */
+export async function findAuthRequestPlatform(
+  db: Queryable,
+  state: string,
+): Promise<string | null> {
+  const { rows } = await db.query<{ platform: string }>(
+    "SELECT platform FROM auth_request WHERE state = $1",
+    [state],
+  );
+  return rows[0]?.platform ?? null;
+}
+
 export async function findAuthRequestByCodeHash(
   db: Queryable,
   codeHash: string,

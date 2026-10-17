@@ -10,9 +10,12 @@ import * as repo from "./repo.ts";
 // login as everyone's, on the same callback, but the request is marked
 // "admin" and resolves to an identity with a moderator_roles row rather than
 // to an account. Nothing is created: a person without a role is refused and
-// no identity or account appears. The session is eight hours, one bearer
-// token kept as a hash, no refresh; the browser is sent back to the admin
-// panel with a one-time code in the URL fragment, which no server ever sees.
+// no identity or account appears. A known identity in good standing has its
+// bank login recorded, role or not, as the app's login records it (#202), so
+// the moderator tool's `recent` shows the person about to be granted first.
+// The session is eight hours, one bearer token kept as a hash, no refresh;
+// the browser is sent back to the admin panel with a one-time code in the URL
+// fragment, which no server ever sees.
 
 export const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 export const ADMIN_PLATFORM = "admin";
@@ -35,9 +38,15 @@ export function adminErrorUrl(adminAppUrl: string, code: string): URL {
 /**
  * The admin half of the callback, after the bank has answered and the hetu
  * has become hetu_hmac (login.ts owns that part). A known identity in good
- * standing with a role gets a one-time code; anyone else is refused with
- * admin_not_allowed and the attempt is spent, as every refusal's is
- * (completeLogin, ADR-026 §8).
+ * standing gets this login's broker reference first, whether or not it has a
+ * role (#202): the whole reference, so the time, the level and the token's
+ * ids stay one event (the export's last bank login, ADR-007). A banned or
+ * suspended identity records nothing, as at the app's door, and a person the
+ * database has never seen gets nothing created (ADR-006 §5). A known identity
+ * in good standing with a role gets a one-time code; anyone else is refused
+ * with admin_not_allowed and the attempt is spent, as every refusal's is
+ * (completeLogin, ADR-026 §8). The reference, written in its own statement,
+ * stays with the refusal.
  */
 export async function completeAdminLogin(
   deps: AdminLoginDeps,
@@ -49,6 +58,9 @@ export async function completeAdminLogin(
   },
 ): Promise<URL> {
   const identity = await repo.findIdentityByHmac(deps.db, input.hetuHmac);
+  if (identity?.standing === "ok") {
+    await repo.updateBrokerReference(deps.db, identity.id, input.reference);
+  }
   const role = identity ? await repo.findModeratorRole(deps.db, identity.id) : null;
   if (!identity || !role || identity.standing !== "ok") {
     throw new AppError(403, "admin_not_allowed", "This bank login has no moderator role", {
@@ -56,7 +68,6 @@ export async function completeAdminLogin(
       standing: identity?.standing ?? null,
     });
   }
-  await repo.updateBrokerReference(deps.db, identity.id, input.reference);
   const { code, hash } = newOneTimeCode();
   await repo.attachAdminCode(deps.db, {
     id: input.request.id,

@@ -16,10 +16,28 @@ Feature: Staff sessions
     Then the browser is sent to the panel with admin_not_allowed
     And no identity, account or session is created
 
+  Scenario: A staff bank login without a role is recorded on a known identity in good standing
+    Given an identity in good standing without a role, and another that signed in to the app since its own last login
+    When they complete a staff bank login
+    Then the browser is sent to the panel with admin_not_allowed
+    And the identity carries that login's bank reference and is the newest sign-in
+
   Scenario: A moderator who cancels at the bank is sent back to the panel, not to the app
     Given a staff login attempt
     When the broker answers access_denied
     Then the browser is sent to the panel with auth_cancelled
+
+  Scenario Outline: A staff attempt the callback no longer takes is sent back to the panel, not to the app
+    Given a staff login attempt that <attempt>
+    When the browser comes back to the callback with its state
+    Then the browser is sent to the panel with auth_state_mismatch
+    And the bank is not asked again
+
+    Examples:
+      | attempt                          |
+      | completed with a code            |
+      | was refused for want of a role   |
+      | expired before the bank answered |
 
   Scenario: A staff code is exchanged once and never as a product code
     Given a staff login has left a one-time code
