@@ -1,7 +1,7 @@
 {
   "name": "kuutti",
   "private": true,
-  "version": "0.33.12",
+  "version": "0.33.13",
   "type": "module",
   "description": "Kuutti monorepo root. Workspace members arrive with the M1 scaffold (#2).",
   "license": "SEE LICENSE IN LICENSE-EXCEPTION",
@@ -26,6 +26,7 @@
     "test:coverage": "pnpm -r run test:coverage",
     "check:scenarios": "node scripts/check-scenarios.ts",
     "e2e": "node scripts/e2e.ts",
+    "load:smoke": "node scripts/load-smoke.ts",
     "i18n:build": "pnpm --filter @kuutti/i18n run build",
     "i18n:check": "pnpm --filter @kuutti/i18n run check",
     "i18n:translate": "pnpm --filter @kuutti/i18n translate",
