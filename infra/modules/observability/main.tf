@@ -8,10 +8,11 @@
 # confirmed by hand from the mailbox, like the billing one.
 #
 # Cost: standard alarms at 0.10 USD and custom metrics at 0.30 USD each (the
-# 5xx and Rekognition metrics, and the exposure-budget one of #52), so about
-# 1.60 USD a month per environment; query definitions and the topic are free. The probe from outside the box, which is what catches a stopped
-# container, is probe.tf (#29): a Route 53 health check with its alarm and
-# topic in us-east-1.
+# 5xx and Rekognition metrics, the exposure-budget one of #52 and the
+# nightly-failure one of #194), so about 2.00 USD a month per environment;
+# query definitions and the topic are free. The probe from outside the box,
+# which is what catches a stopped container, is probe.tf (#29): a Route 53
+# health check with its alarm and topic in us-east-1.
 # ---------------------------------------------------------------------------
 
 data "aws_caller_identity" "current" {}
@@ -239,6 +240,43 @@ resource "aws_cloudwatch_metric_alarm" "photo_budget_refusals" {
   threshold           = var.budget_refusals_per_day
   comparison_operator = "GreaterThanOrEqualToThreshold"
   treat_missing_data  = "notBreaching" # no refusals is the normal day
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
+# Every nightly job ends in one line (apps/api/src/jobs/nightly.ts), and a
+# failure is {"msg":"nightly job failed","job":...}; the prune that had to drop
+# days of research events the copy does not have says so in a line of its own
+# (#194, ADR-029 §6). Either is worth a mail the same morning: a research
+# export left failing loses its days at the prune about sixty days later, and
+# the other jobs keep promises with dates in them (the ninety days of the
+# research events, the sweep of sessions, the end of suspensions). A preview's
+# container logs to the same group and runs the same jobs; the line's stream,
+# named after the container, tells which.
+resource "aws_cloudwatch_log_metric_filter" "nightly_failures" {
+  name           = "${local.name}-nightly-failures"
+  log_group_name = var.log_group_name
+  pattern        = "{ ($.msg = \"nightly job failed\") || ($.msg = \"research events dropped without their copy\") }"
+
+  metric_transformation {
+    name          = "NightlyFailures"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "nightly_failures" {
+  alarm_name          = "${local.name}-nightly-job-failed"
+  alarm_description   = "A nightly job failed, or the prune dropped research events without their copy (#194, ADR-029). First steps: docs/runbooks/alerts.md."
+  namespace           = local.namespace
+  metric_name         = "NightlyFailures"
+  statistic           = "Sum"
+  period              = 86400
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching" # a night without failures logs none
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
 }

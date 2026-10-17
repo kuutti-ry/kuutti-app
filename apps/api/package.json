@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/api",
-  "version": "0.35.0",
+  "version": "0.36.0",
   "private": true,
   "type": "module",
   "description": "Hono on Node. One process: HTTP routes, WebSockets, nightly jobs.",
@@ -34,6 +34,8 @@
     "blurhash": "^2.0.5",
     "fflate": "^0.8.3",
     "hono": "^4.13.13",
+    "hyparquet": "1.31.4",
+    "hyparquet-writer": "0.16.12",
     "p-limit": "^7.3.3",
     "pg": "^8.23.1",
     "pino": "^10.4.0",

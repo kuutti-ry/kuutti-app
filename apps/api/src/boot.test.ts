@@ -20,6 +20,7 @@ import { type IdentityBroker, OidcBroker } from "./identity/index.ts";
 import { runNightly } from "./jobs/nightly.ts";
 import { CHALLENGE } from "./test/attempt.ts";
 import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./test/harness.ts";
+import { testSigningKeys } from "./test/media.ts";
 
 // The boot sequence (index.ts is only the process around it) against a
 // database of its own: a boot migrates, counts the waitlist and, for a
@@ -202,6 +203,7 @@ describe("boot", () => {
     expect(await health.json()).toMatchObject({ db: "ok", migrations: "current" });
   });
 
+  // Without an object store there is no research copy either (#194).
   it("arms the nine nightly jobs, each of which runs against the database it was given", async () => {
     const { jobs } = await booted();
     expect(jobs.map((j) => j.name)).toEqual([
@@ -223,14 +225,22 @@ describe("boot", () => {
     expect(lines().filter((l) => l.msg === "nightly job failed")).toEqual([]);
   });
 
-  it("with an object store, photos the automatic check missed get a nightly look as a tenth job", async () => {
+  it("with an object store, photos the automatic check missed get a nightly look, and the research copy is written", async () => {
     const { jobs, lines } = await booted({
       S3_ENDPOINT: "http://127.0.0.1:9000",
       S3_FORCE_PATH_STYLE: "true",
     });
     expect(line(lines, "media")).toMatchObject({ mode: "presigned", moderation: "queue" });
     expect(jobs.map((j) => j.name).at(-1)).toBe("moderate-pending-photos");
-    expect(jobs).toHaveLength(10);
+    // And the research copy, to the same bucket, right before the prune that checks it (#194).
+    expect(jobs.map((j) => j.name).slice(2, 4)).toEqual([
+      "research-export",
+      "research-events-partitions",
+    ]);
+    expect(jobs).toHaveLength(11);
+    // The prune asks the copy first; tonight no month is due, so the bucket is asked nothing.
+    const partitions = jobs.find((j) => j.name === "research-events-partitions");
+    expect(await partitions?.run()).toMatchObject({ dropped: 0, uncopied: 0 });
     // Nothing is pending in this database: the look finds nothing and asks the store nothing.
     const sweep = jobs.at(-1);
     expect(await sweep?.run()).toEqual({ rechecked: 0, failed: 0 });
@@ -632,6 +642,30 @@ describe("boot: a deployed box", () => {
       expect((await app.request("/health")).status).toBe(200);
     },
   );
+
+  it("with its photos on CloudFront, staging writes the research copy and production does not", async () => {
+    const media = {
+      S3_BUCKET: "kuutti-media-test",
+      MEDIA_URL_BASE: "https://api.test",
+      CLOUDFRONT_KEY_PAIR_ID: "K2JCJMDEHXQW5F",
+      CLOUDFRONT_SIGNING_KEY: testSigningKeys().privateKey,
+    };
+    const staging = await booted({ APP_ENV: "staging", ...media });
+    expect(line(staging.lines, "media")).toMatchObject({ mode: "cloudfront" });
+    expect(staging.jobs.map((j) => j.name)).toContain("research-export");
+
+    // Not before the maintainer has answered the ninety days of the research
+    // text (ADR-029, Open): no copy, and the prune is as it was without one.
+    const production = await booted({
+      APP_ENV: "production",
+      ADMIN_APP_URL: "https://admin.kuutti.app",
+      ...media,
+    });
+    expect(line(production.lines, "media")).toMatchObject({ mode: "cloudfront" });
+    expect(production.jobs.map((j) => j.name)).not.toContain("research-export");
+    const partitions = production.jobs.find((j) => j.name === "research-events-partitions");
+    expect(await partitions?.run()).not.toHaveProperty("uncopied");
+  });
 });
 
 describe("boot: a pull-request preview (#9)", () => {
@@ -658,7 +692,17 @@ describe("boot: a pull-request preview (#9)", () => {
   });
 
   it("creates its own database on first boot, migrates and seeds it, and finds it the second time", async () => {
-    const preview = { APP_ENV: "preview", PR_NUMBER: prNumber, DATABASE_URL: TEST_DATABASE_URL };
+    const preview = {
+      APP_ENV: "preview",
+      PR_NUMBER: prNumber,
+      DATABASE_URL: TEST_DATABASE_URL,
+      // Staging's bucket and distribution, which a preview reads from the
+      // shared prefix and drops before media is set up (lib/config.ts).
+      S3_BUCKET: "kuutti-media-staging",
+      MEDIA_URL_BASE: "https://api.staging.kuutti.app",
+      CLOUDFRONT_KEY_PAIR_ID: "K2JCJMDEHXQW5F",
+      CLOUDFRONT_SIGNING_KEY: "staging's key, which a preview never holds",
+    };
     const first = await booted(preview);
     expect(steps(first.lines)).toEqual([
       "error reporting",
@@ -672,6 +716,8 @@ describe("boot: a pull-request preview (#9)", () => {
       "photos off: media delivery is not configured (infra/modules/media)",
     ]);
     expect(line(first.lines, "preview database")).toMatchObject({ database, state: "created" });
+    // Nor a research copy, which would write into staging's bucket (ADR-029 §12).
+    expect(first.jobs.map((j) => j.name)).not.toContain("research-export");
     expect(line(first.lines, "migrations")).toMatchObject({ state: "applied" });
     const { rows } = await first.pool.query<{ db: string; ponds: string; config: string }>(
       `SELECT current_database() AS db, (SELECT count(*) FROM ponds) AS ponds,

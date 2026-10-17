@@ -15,11 +15,16 @@ locals {
   bucket_name = "${var.project}-media-${var.environment}-${local.account_id}"
   # The API writes media/<sha256 of the full variant>/<variant>.webp (apps/api/src/media/store.ts).
   media_prefix = "media/"
+  # The research copy, research/YYYY/MM/YYYY-MM-DD.parquet (#194, ADR-029;
+  # COPY_PREFIX in apps/api/src/research/copy-store.ts). modules/research holds
+  # who may read and write it; the lifecycle rule is here, since a bucket has one.
+  research_prefix = "research/"
 }
 
 # ---------------------------------------------------------------------------
-# The bucket. Private; the only readers are the API (instance role) and the
-# distribution (origin access control). Versioning stays off on purpose: a
+# The bucket. Private; the only readers are the API (instance role), the
+# distribution (origin access control, media/ only) and the researcher's
+# role (research/ only, modules/research). Versioning stays off on purpose: a
 # deleted photo must be gone (TD-7 erasure), not retained as a version.
 # ---------------------------------------------------------------------------
 
@@ -68,6 +73,14 @@ resource "aws_s3_bucket_versioning" "media" {
 resource "aws_s3_bucket_lifecycle_configuration" "media" {
   bucket = aws_s3_bucket.media.id
 
+  # S3's default since September 2024, spelled out for the research rule
+  # below: an object under 128 KB transitions nowhere. Glacier Instant
+  # Retrieval bills every object as at least 128 KB and each transition is a
+  # request, so a small day file costs more there than it does in Standard.
+  # ("varies_by_storage_class" would not change that: it lets small objects
+  # reach Glacier Flexible Retrieval and Deep Archive only.)
+  transition_default_minimum_object_size = "all_storage_classes_128K"
+
   # The API uploads whole objects; a multipart upload left behind by a crash is garbage after a day.
   rule {
     id     = "abort-incomplete-multipart"
@@ -81,10 +94,29 @@ resource "aws_s3_bucket_lifecycle_configuration" "media" {
       days_after_initiation = 1
     }
   }
+
+  # The research copy (#194, ADR-029 §8): a day's file of 128 KB or more
+  # moves to Glacier Instant Retrieval after a year, read the same way and at
+  # once, cheaper to keep and dearer to read. No expiry: how long the copy
+  # lives is the maintainer's decision, not a default.
+  rule {
+    id     = "research-to-glacier-ir"
+    status = "Enabled"
+
+    filter {
+      prefix = local.research_prefix
+    }
+
+    transition {
+      days          = 365
+      storage_class = "GLACIER_IR"
+    }
+  }
 }
 
-# The instance role writes and removes variants under media/ and nothing else
-# in the bucket (rules/infra.md: the role is scoped to its bucket).
+# The instance role writes and removes variants under media/ (rules/infra.md:
+# the role is scoped to its bucket); its rights under research/, write once
+# and never remove, are modules/research's.
 data "aws_iam_policy_document" "api_media" {
   statement {
     sid       = "MediaObjects"

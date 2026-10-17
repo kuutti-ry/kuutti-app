@@ -40,6 +40,7 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 ## Events and logs
 
 - `track(name, props)` server-side only, against the zod registry in `packages/schema`. Keyed by `research_id`; carries `consent_version`, pond, and the coarse snapshot. Never message text, never raw `seeks`, never email.
+- The research copy (#194, ADR-029): `research-export` writes each closed UTC day once to `research/` in the media bucket (put-if-absent, never rewritten), before the partitions job, and only where media has a bucket, never in a preview, and not in production until the maintainer has answered ADR-029's ninety days (a `shortcut:` in `boot.ts`). A file of a day not yet closed stops the night. A value is released only when the copy carries it for k pseudonyms whose research consent is live that night, one per person (ADR-029 §4); a file never carries the account, the event's id, the stored snapshot or text. The prune checks the copy before dropping a month and drops it anyway (§6).
 - Structured logs with `account_id` (on the panel's requests the staff identity, `staffIdentityId`) and request id; never hetu, message text, email, or a client address: a refusal's line names which limit refused, never its key (ADR-026 §7). Errors: generic response body, detail to logs and Sentry, no empty catch.
 
 ## Config and jobs
