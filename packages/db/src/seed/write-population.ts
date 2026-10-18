@@ -50,6 +50,9 @@ const ACCOUNT_TABLES = [
   // Tapio's ban, and any staff put on a synthetic person (ADR-024 §10); an open
   // ban or suspension outlives the erasure on the tombstone and goes here too.
   "sanction",
+  // A warning's notice and the notification choices (#176), had a story or staff written any.
+  "notice",
+  "notification_preference",
   "photo",
   "research_subject",
   "consent",

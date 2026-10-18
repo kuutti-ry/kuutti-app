@@ -213,6 +213,15 @@ function anExport(): Record<string, unknown> {
     ],
     // The contacts the person keeps to share (#103).
     contacts: [{ kind: "phone", value: "+358401234567", updatedAt: at }],
+    notifications: {
+      choices: [
+        { kind: "round", enabled: true },
+        { kind: "message", enabled: false },
+        { kind: "match", enabled: true },
+        { kind: "moderation", enabled: true },
+      ],
+      notices: [{ kind: "warning", at, readAt: null }],
+    },
   };
 }
 

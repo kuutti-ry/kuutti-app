@@ -17,6 +17,7 @@ import {
   type MediaDeps,
   type PhotoErasure,
 } from "../media/index.ts";
+import { eraseNotificationsOf, exportNotifications } from "../notifications/index.ts";
 import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
@@ -68,6 +69,8 @@ import { visibleState } from "./standing.ts";
 // The stored contacts go (#103, ADR-031 §11); the shares, ended by the
 // close, stay as the record with no value in them. The export carries the
 // stored pieces, and in each conversation the person's own shares.
+// The notification choices and the notices go (#176, ADR-032); the export
+// carries both.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -104,6 +107,9 @@ export type ErasureSummary = {
   emptiedConversations: number;
   /** The stored contacts (#103); their shares stay, ended, as the record. */
   contacts: number;
+  /** The notification choices the person switched, and the notices in the app (#176). */
+  notificationChoices: number;
+  notices: number;
   photos: number;
   accessRows: number;
   shownRows: number;
@@ -148,6 +154,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       { db: tx, logger: deps.logger, now: () => at },
       accountId,
     );
+    // Before the sanctions: a warning's notice points at its warning (#176).
+    const notifications = await eraseNotificationsOf(tx, accountId);
     const sanctions = await deleteSanctionsOfAccount(tx, accountId);
     // Kept: the reports either way and the blocks on the identity (ADR-030 §8).
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
@@ -170,6 +178,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       exports,
       feedback,
       sanctions,
+      notifications,
       researchSubjects,
       chat,
       reregisterAfter: deletion.reregisterAfter,
@@ -196,6 +205,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     withheldMessages: result.chat.withheld,
     emptiedConversations: result.chat.emptied,
     contacts: result.chat.contacts,
+    notificationChoices: result.notifications.choices,
+    notices: result.notifications.notices,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
     shownRows: result.photos.shownRows,
@@ -271,6 +282,7 @@ export async function exportAccount(
     blocks,
     conversations,
     contacts,
+    notifications,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
@@ -294,6 +306,7 @@ export async function exportAccount(
       };
     }),
     exportContacts(deps, accountId),
+    exportNotifications(deps.db, accountId),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -375,6 +388,8 @@ export async function exportAccount(
     conversations,
     // What the person keeps to share (#103); never what the other person shared.
     contacts,
+    // What the person chose to be notified of, and the notices they were shown (#176).
+    notifications,
   };
   return { document, files: photos.files };
 }

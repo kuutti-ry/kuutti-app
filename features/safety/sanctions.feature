@@ -75,3 +75,10 @@ Feature: Sanctions
   Scenario: The note reaches no log line and no error
     Given a moderator suspends "A" with a note
     Then no log line of the request carries the note
+
+  Scenario: A warning shows the person a notice in the app until it is read, and none once lifted
+    Given a moderator warned "A" for harassment, and "A" is also hidden for a while
+    When "A" opens the app
+    Then the home screen's notices hold one warning with its reason, and nothing of the hiding
+    When "A" marks it read
+    Then it is read for good, and a second warning lifted since shows no notice

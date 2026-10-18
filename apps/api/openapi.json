@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.41.0",
+    "version": "0.42.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -317,6 +317,9 @@
               "$ref": "#/components/schemas/StoredContact"
             },
             "maxItems": 4
+          },
+          "notifications": {
+            "$ref": "#/components/schemas/ExportedNotifications"
           }
         },
         "required": [
@@ -341,7 +344,8 @@
           "reports",
           "blocks",
           "conversations",
-          "contacts"
+          "contacts",
+          "notifications"
         ]
       },
       "Gender": {
@@ -1923,6 +1927,78 @@
           "updatedAt"
         ]
       },
+      "ExportedNotifications": {
+        "type": "object",
+        "properties": {
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChoice"
+            },
+            "maxItems": 4
+          },
+          "notices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/NoticeKind"
+                },
+                "at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "readAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "kind",
+                "at",
+                "readAt"
+              ]
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "choices",
+          "notices"
+        ]
+      },
+      "NotificationChoice": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/NotificationKind"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "enabled"
+        ]
+      },
+      "NotificationKind": {
+        "type": "string",
+        "enum": [
+          "round",
+          "message",
+          "match",
+          "moderation"
+        ]
+      },
+      "NoticeKind": {
+        "type": "string",
+        "enum": [
+          "warning"
+        ]
+      },
       "HealthResponse": {
         "type": "object",
         "properties": {
@@ -3402,6 +3478,79 @@
           "reason"
         ],
         "additionalProperties": false
+      },
+      "NotificationChoices": {
+        "type": "object",
+        "properties": {
+          "choices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChoice"
+            },
+            "maxItems": 4
+          }
+        },
+        "required": [
+          "choices"
+        ]
+      },
+      "PutNotificationChoice": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "Notices": {
+        "type": "object",
+        "properties": {
+          "notices": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "notices"
+        ]
+      },
+      "Notice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/NoticeKind"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "at",
+          "readAt",
+          "reason"
+        ]
       },
       "ConversationList": {
         "type": "object",
@@ -7472,6 +7621,200 @@
           },
           "429": {
             "description": "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/notifications": {
+      "get": {
+        "summary": "What the caller may be notified of",
+        "description": "Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The senders read it when they exist (#102 the message).",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every kind and whether it is on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChoices"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/notifications/{kind}": {
+      "put": {
+        "summary": "Switch one kind of notification on or off",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "$ref": "#/components/schemas/NotificationKind"
+            },
+            "required": true,
+            "name": "kind",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutNotificationChoice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Every kind as it now stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationChoices"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed: an unknown kind, enabled not a boolean, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: the account was erased while the request was on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notices": {
+      "get": {
+        "summary": "The caller's notices in the app",
+        "description": "What must reach the person even without a push, newest first, at most 20: today a moderator's warning, with its reason, until it is lifted. A notice holds no text of its own; the app says it.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The notices.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notices"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notices/{id}/read": {
+      "post": {
+        "summary": "Mark one of the caller's notices read",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Read, now or before."
+          },
+          "400": {
+            "description": "validation_failed: the id is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such notice of the caller's.",
             "content": {
               "application/json": {
                 "schema": {

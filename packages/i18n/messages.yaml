@@ -7421,6 +7421,139 @@ settings.contacts.summary:
   sv: "Delas bara där du själv väljer"
   machine: { fi: true, sv: true }
 
+settings.notifications.label:
+  en: "Notifications"
+  description: "Title of the row under Account in Settings and of the screen it opens (#176): which kinds of notification the person allows. Short."
+  fi: "Ilmoitukset"
+  sv: "Aviseringar"
+  machine: { fi: true, sv: true }
+
+settings.notifications.summary:
+  en: "What Kuutti may tell you about"
+  description: "Summary of the Notifications row in Settings (#176). The app name stays in the nominative."
+  fi: "Mistä Kuutti saa kertoa sinulle"
+  sv: "Vad Kuutti får berätta för dig om"
+  machine: { fi: true, sv: true }
+
+notifications.intro:
+  en: "Nothing is sent to this phone yet. What you choose here is kept, and decides what is sent once it is. Each kind is on until you switch it off."
+  description: "The Notifications screen (#176, ADR-032), its opening line: no push exists yet (#102 comes with a native update), the choices are stored and honoured by whatever sends later; a kind never touched is on. Plain and true; no promise of a date."
+  fi: "Tähän puhelimeen ei vielä lähetetä mitään. Valintasi tallennetaan, ja ne ratkaisevat, mitä lähetetään, kun lähettäminen alkaa. Jokainen laji on päällä, kunnes kytket sen pois."
+  sv: "Inget skickas till den här telefonen än. Det du väljer här sparas och avgör vad som skickas när det börjar. Varje slag är på tills du stänger av det."
+  machine: { fi: true, sv: true }
+
+notifications.loading:
+  en: "Loading your choices…"
+  description: "The Notifications screen (#176) while the choices load."
+  fi: "Ladataan valintojasi…"
+  sv: "Laddar dina val…"
+  machine: { fi: true, sv: true }
+
+notifications.failed:
+  en: "Your choices could not be loaded."
+  description: "The Notifications screen (#176) when the choices did not load; the reason and a retry follow."
+  fi: "Valintojasi ei voitu ladata."
+  sv: "Dina val kunde inte laddas."
+  machine: { fi: true, sv: true }
+
+notifications.saveFailed:
+  en: "The change was not saved. Try again."
+  description: "The Notifications screen (#176), a switch the API did not take (no connection, a server error); the switch shows the state as it was."
+  fi: "Muutosta ei tallennettu. Yritä uudelleen."
+  sv: "Ändringen sparades inte. Försök igen."
+  machine: { fi: true, sv: true }
+
+notifications.kind.round.label:
+  en: "A new round"
+  description: "The Notifications screen (#176), the switch of the round: each day the people matching opens for the person. A switch label; its state is read by the switch."
+  fi: "Uusi kierros"
+  sv: "En ny omgång"
+  machine: { fi: true, sv: true }
+
+notifications.kind.round.hint:
+  en: "When the day's people are ready for you."
+  description: "The Notifications screen (#176), the line under A new round."
+  fi: "Kun päivän ihmiset ovat valmiina sinulle."
+  sv: "När dagens personer är redo för dig."
+  machine: { fi: true, sv: true }
+
+notifications.kind.message.label:
+  en: "Messages"
+  description: "The Notifications screen (#176), the switch of a new message in a conversation (#102 sends it)."
+  fi: "Viestit"
+  sv: "Meddelanden"
+  machine: { fi: true, sv: true }
+
+notifications.kind.message.hint:
+  en: "That there is a new message, never what it says or who sent it."
+  description: "The Notifications screen (#176), the line under Messages: a message push carries no text and no name (#102, rule 5)."
+  fi: "Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti."
+  sv: "Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det."
+  machine: { fi: true, sv: true }
+
+notifications.kind.match.label:
+  en: "Matches"
+  description: "The Notifications screen (#176), the switch of a new match (M5 sends it)."
+  fi: "Mätsit"
+  sv: "Matchningar"
+  machine: { fi: true, sv: true }
+
+notifications.kind.match.hint:
+  en: "When someone you liked likes you back."
+  description: "The Notifications screen (#176), the line under Matches."
+  fi: "Kun joku, josta tykkäsit, tykkää sinusta takaisin."
+  sv: "När någon du gillade gillar dig tillbaka."
+  machine: { fi: true, sv: true }
+
+notifications.kind.moderation.label:
+  en: "Moderators' decisions"
+  description: "The Notifications screen (#176), the switch of a moderator's decision about the person's photos or reports (#312 sends it)."
+  fi: "Moderaattorien päätökset"
+  sv: "Moderatorernas beslut"
+  machine: { fi: true, sv: true }
+
+notifications.kind.moderation.hint:
+  en: "About your photos and the reports you made. A warning to you is shown in the app whatever you choose here."
+  description: "The Notifications screen (#176), the line under Moderators' decisions: the switch governs a push only; a warning always appears among the notices on the home screen (ADR-024 §7)."
+  fi: "Kuvistasi ja tekemistäsi ilmoituksista. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa."
+  sv: "Om dina foton och de anmälningar du gjort. En varning till dig visas i appen vad du än väljer här."
+  machine: { fi: true, sv: true }
+
+notices.title:
+  en: "Notices"
+  description: "The home screen (#176), the heading over the notices the person has not read yet; absent when there are none. Short."
+  fi: "Tiedotteet"
+  sv: "Notiser"
+  machine: { fi: true, sv: true }
+
+notices.warning.title:
+  en: "A warning from a moderator"
+  description: "The home screen's notices (#176, ADR-024 §7): a moderator warned the person. Calm, no blame."
+  fi: "Varoitus moderaattorilta"
+  sv: "En varning från en moderator"
+  machine: { fi: true, sv: true }
+
+notices.warning.body:
+  en: "Reason: {reason}. A warning by itself changes nothing in how you use the app."
+  description: "The home screen's notices (#176, ADR-024 §7), under the warning's title: reason is the sanction's reason in words (account.export.sanction.reason.*), in a nominative position after the colon. Never the app's name in an inflected position."
+  fi: "Syy: {reason}. Varoitus ei sellaisenaan muuta mitään siinä, miten käytät sovellusta."
+  sv: "Skäl: {reason}. En varning ändrar i sig ingenting i hur du använder appen."
+  machine: { fi: true, sv: true }
+
+notices.read:
+  en: "Got it"
+  description: "The home screen's notices (#176), the button under a notice that marks it read; the notice then leaves the home screen. A button, never a swipe."
+  fi: "Selvä"
+  sv: "Uppfattat"
+  machine: { fi: true, sv: true }
+
+notices.readFailed:
+  en: "The notice could not be marked as read. Try again."
+  description: "The home screen's notices (#176), a mark the API did not take; the notice stays."
+  fi: "Tiedotetta ei voitu merkitä luetuksi. Yritä uudelleen."
+  sv: "Notisen kunde inte markeras som läst. Försök igen."
+  machine: { fi: true, sv: true }
+
 settings.contacts.intro:
   en: "Keep the ways to reach you outside the app here. Nobody sees them until you share one in a conversation, with the button at its top. A change or a removal shows at once wherever you shared it."
   description: "Your contacts screen, the line above the four cards (#103): stored first, seen by nobody, shared one at a time from a conversation's header."

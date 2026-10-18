@@ -434,6 +434,8 @@ describe("migrate", () => {
           "matching_config",
           "message",
           "moderator_roles",
+          "notice",
+          "notification_preference",
           "photo",
           "photo_access",
           "photo_check_note",

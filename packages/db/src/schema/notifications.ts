@@ -1,0 +1,77 @@
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  check,
+  index,
+  pgEnum,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { account } from "./identity.ts";
+import { sanction } from "./safety.ts";
+
+/**
+ * What a person may be notified of (#176, ADR-032): a new round, a message,
+ * a match, a moderator's decision. Each kind can be switched off; a kind the
+ * person never touched is on, so no row means on. Whoever sends later reads
+ * the switch (#102 the message, #95 the round, #100 the match, #312 the
+ * decision). Erased with the account; in the export.
+ */
+export const notificationKind = pgEnum("notification_kind", [
+  "round",
+  "message",
+  "match",
+  "moderation",
+]);
+
+export const notificationPreference = pgTable(
+  "notification_preference",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id),
+    kind: notificationKind("kind").notNull(),
+    enabled: boolean("enabled").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("notification_preference_kind_idx").on(table.accountId, table.kind)],
+);
+
+/**
+ * What a notice in the app is about (#176, ADR-032): a moderator's warning
+ * (ADR-024 §7). #312's decisions and M5's matches add their kinds when they
+ * write one.
+ */
+export const noticeKind = pgEnum("notice_kind", ["warning"]);
+
+/**
+ * A notice in the app (#176, ADR-032): what must reach a person even without
+ * a push, shown on the home screen until it is read. It holds no text of its
+ * own: the words are the app's, from the kind and what it points at, so a
+ * warning's reason is its sanction's. It goes with what it points at, and
+ * with the account at erasure.
+ */
+export const notice = pgTable(
+  "notice",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id),
+    kind: noticeKind("kind").notNull(),
+    sanctionId: uuid("sanction_id").references(() => sanction.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    // The person's notices, newest first.
+    index("notice_account_created_idx").on(table.accountId, table.createdAt),
+    check(
+      "notice_warning_check",
+      sql`(${table.kind} = 'warning') = (${table.sanctionId} IS NOT NULL)`,
+    ),
+  ],
+);

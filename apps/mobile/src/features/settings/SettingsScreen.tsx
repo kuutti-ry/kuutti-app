@@ -195,6 +195,12 @@ export function SettingsScreen() {
                     onPress: open("/settings/contacts"),
                   },
                   {
+                    key: "notifications",
+                    title: t("settings.notifications.label"),
+                    summary: t("settings.notifications.summary"),
+                    onPress: open("/settings/notifications"),
+                  },
+                  {
                     key: "feedback",
                     title: t("feedback.title"),
                     summary: t("settings.feedback.summary"),

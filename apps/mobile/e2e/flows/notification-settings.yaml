@@ -1,0 +1,69 @@
+# Notification choices (#176, ADR-032): a row under Account in Settings whose
+# screen says that nothing is sent to the phone yet and holds a switch per
+# kind, each on until switched off and kept on the server. Sanna switches
+# Messages off, leaves, finds it kept when she comes back by way of home,
+# and switches it on again, so the flow leaves her as it found her. The
+# other kinds work alike (the jest tests and the API's).
+appId: fi.kuutti.app
+name: The messages switch in Settings, Notifications, goes off, is kept on the server, and goes on again
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# The row sits under Account, below the fold on a phone; it is read by its title and summary.
+- scrollUntilVisible:
+    element: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+- extendedWaitUntil:
+    visible: "Nothing is sent to this phone yet\\..*|Tähän puhelimeen ei vielä lähetetä mitään\\..*|Inget skickas till den här telefonen än\\..*"
+    timeout: 15000
+# A switch's text, to Maestro, is its value ("0" off, "1" on) on iOS, and its
+# words with its state on Android. Every switch sits at the right edge, so the
+# Messages switch is found between the round's line and its own, not by
+# rightOf, which compares x alone and would take any switch.
+- extendedWaitUntil:
+    visible:
+      text: "1|(Messages|Viestit|Meddelanden), on"
+      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+    timeout: 15000
+- tapOn: "Messages|Viestit|Meddelanden"
+- extendedWaitUntil:
+    visible:
+      text: "0|(Messages|Viestit|Meddelanden), off"
+      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+    timeout: 15000
+- assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
+
+# Kept on the server: home first, so the screen is read again rather than shown as it was.
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000
+- openLink: kuutti://settings
+- scrollUntilVisible:
+    element: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+- extendedWaitUntil:
+    visible:
+      text: "0|(Messages|Viestit|Meddelanden), off"
+      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+    timeout: 15000
+- tapOn: "Messages|Viestit|Meddelanden"
+- extendedWaitUntil:
+    visible:
+      text: "1|(Messages|Viestit|Meddelanden), on"
+      below: "When the day's people are ready for you\\.|Kun päivän ihmiset ovat valmiina sinulle\\.|När dagens personer är redo för dig\\."
+      above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
+    timeout: 15000
+- assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."

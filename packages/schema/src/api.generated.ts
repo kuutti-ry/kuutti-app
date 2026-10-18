@@ -2733,6 +2733,234 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the caller may be notified of
+         * @description Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The senders read it when they exist (#102 the message).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Every kind and whether it is on. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotificationChoices"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/notifications/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Switch one kind of notification on or off */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    kind: components["schemas"]["NotificationKind"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PutNotificationChoice"];
+                };
+            };
+            responses: {
+                /** @description Every kind as it now stands. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotificationChoices"];
+                    };
+                };
+                /** @description validation_failed: an unknown kind, enabled not a boolean, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: the account was erased while the request was on its way. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's notices in the app
+         * @description What must reach the person even without a push, newest first, at most 20: today a moderator's warning, with its reason, until it is lifted. A notice holds no text of its own; the app says it.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The notices. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Notices"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notices/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark one of the caller's notices read */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Read, now or before. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: the id is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such notice of the caller's. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations": {
         parameters: {
             query?: never;
@@ -5193,6 +5421,7 @@ export interface components {
             blocks: components["schemas"]["ExportedBlocks"];
             conversations: components["schemas"]["ExportedConversation"][];
             contacts: components["schemas"]["StoredContact"][];
+            notifications: components["schemas"]["ExportedNotifications"];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -5537,6 +5766,24 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        ExportedNotifications: {
+            choices: components["schemas"]["NotificationChoice"][];
+            notices: {
+                kind: components["schemas"]["NoticeKind"];
+                /** Format: date-time */
+                at: string;
+                /** Format: date-time */
+                readAt: string | null;
+            }[];
+        };
+        NotificationChoice: {
+            kind: components["schemas"]["NotificationKind"];
+            enabled: boolean;
+        };
+        /** @enum {string} */
+        NotificationKind: "round" | "message" | "match" | "moderation";
+        /** @enum {string} */
+        NoticeKind: "warning";
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -5950,6 +6197,25 @@ export interface components {
         ConversationReportRequest: {
             reason: components["schemas"]["SanctionReason"];
             note?: string;
+        };
+        NotificationChoices: {
+            choices: components["schemas"]["NotificationChoice"][];
+        };
+        PutNotificationChoice: {
+            enabled: boolean;
+        };
+        Notices: {
+            notices: components["schemas"]["Notice"][];
+        };
+        Notice: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["NoticeKind"];
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            reason: components["schemas"]["SanctionReason"];
         };
         ConversationList: {
             open: components["schemas"]["ConversationSummary"][];

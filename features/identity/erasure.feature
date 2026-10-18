@@ -159,3 +159,9 @@ Feature: Account deletion per the erasure table
     Given "A" reported "B" from a conversation where both sent a photo
     When "A" deletes the account
     Then "A"'s photo and its objects stay for the copy, and "B" reads "A"'s photo message as removed
+
+  Scenario: The notification choices and the notices are exported and erased
+    Given "A" switched messages off, and a moderator warned "A"
+    When "A" exports the account, and then deletes it
+    Then the export carries every kind with its state and the notice with when it was read
+    And the erasure takes the choices and the notices
