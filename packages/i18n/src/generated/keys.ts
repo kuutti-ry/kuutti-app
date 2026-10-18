@@ -322,6 +322,7 @@ export type MessageParams = {
   "chat.composer.placeholder": Record<never, never>;
   "chat.composer.remaining": { "characters": number };
   "chat.composer.send": Record<never, never>;
+  "chat.connection.lost": Record<never, never>;
   "chat.conversation.failed": Record<never, never>;
   "chat.conversation.gone": Record<never, never>;
   "chat.conversation.loading": Record<never, never>;
@@ -338,6 +339,7 @@ export type MessageParams = {
   "chat.message.read": Record<never, never>;
   "chat.message.sending": Record<never, never>;
   "chat.message.you": Record<never, never>;
+  "chat.presence.online": Record<never, never>;
   "chat.row.mine": { "preview": string };
   "chat.row.noMessages": Record<never, never>;
   "chat.row.unread": { "unread": number };

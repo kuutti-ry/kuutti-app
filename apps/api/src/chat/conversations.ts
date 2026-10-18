@@ -42,7 +42,7 @@ export type ChatDeps = {
  * the moment between, the block alone closes it), or when the counterpart is
  * erased. Erasure reads as such; everything else as an ended conversation.
  */
-function stateOf(row: {
+export function stateOf(row: {
   archivedAt: Date | null;
   closedAt: Date | null;
   closedHow: ConversationCloseKind | null;
@@ -116,6 +116,7 @@ async function summaryOf(
       : { deleted: true },
     lastMessage: row.last
       ? {
+          seq: row.last.seq,
           at: row.last.createdAt.toISOString(),
           kind: row.last.kind,
           preview: preview(row.last.body),

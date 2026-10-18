@@ -159,6 +159,7 @@ export type MessageRow = {
   kind: MessageKind;
   body: string | null;
   createdAt: Date;
+  clientId: string;
 };
 
 const messageFrom = (r: Row): MessageRow => ({
@@ -168,6 +169,7 @@ const messageFrom = (r: Row): MessageRow => ({
   kind: r.kind as MessageKind,
   body: (r.body as string | null) ?? null,
   createdAt: r.created_at as Date,
+  clientId: r.client_id as string,
 });
 
 /**
@@ -187,7 +189,7 @@ export async function listMessages(
 ): Promise<MessageRow[]> {
   const onward = input.after !== undefined;
   const { rows } = await db.query<Row>(
-    `SELECT m.id, m.seq, m.side, m.kind, m.body, m.created_at
+    `SELECT m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id
      ${FROM_CALLER}
      JOIN message m ON m.conversation_id = c.id
      WHERE me.account_id = $1 AND me.conversation_id = $2 AND ${VISIBLE_TO_CALLER}
@@ -304,7 +306,7 @@ export async function findByClientId(
   input: { accountId: string; conversationId: string; clientId: string },
 ): Promise<MessageRow | null> {
   const { rows } = await db.query<Row>(
-    `SELECT m.id, m.seq, m.side, m.kind, m.body, m.created_at
+    `SELECT m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id
      FROM conversation_participant me
      JOIN message m ON m.conversation_id = me.conversation_id
      WHERE me.account_id = $1 AND me.conversation_id = $2 AND m.client_id = $3`,
@@ -340,7 +342,7 @@ export async function insertMessage(
        RETURNING next_seq - 1 AS seq)
      INSERT INTO message (conversation_id, seq, side, client_id, kind, body, created_at)
      SELECT $1, bumped.seq, $2::conversation_side, $3, 'text', $4, $5 FROM bumped
-     RETURNING id, seq, side, kind, body, created_at`,
+     RETURNING id, seq, side, kind, body, created_at, client_id`,
     [input.conversationId, input.side, input.clientId, input.body, input.at, input.accountId],
   );
   const row = rows[0];
@@ -548,4 +550,58 @@ export async function exportConversationsOf(
       length: line.length ?? 0,
     })),
   }));
+}
+
+// The socket's fan-out (#349, ADR-031 §5). A notification names a
+// conversation, a session or a block, never a person's text; the listener
+// finds whom it concerns with the two routing reads below, and then reads
+// what each of them may see through their own participant row (rule 6), with
+// every rule of the reads above: the block, the close, the shadow ban.
+
+/** The accounts still linked to a conversation, with their sides: whom a notification about it concerns. */
+export async function participantsOf(
+  db: Queryable,
+  conversationId: string,
+): Promise<Array<{ accountId: string; side: Side }>> {
+  const { rows } = await db.query<{ account_id: string; side: Side }>(
+    `SELECT account_id, side FROM conversation_participant
+     WHERE conversation_id = $1 AND account_id IS NOT NULL ORDER BY side`,
+    [conversationId],
+  );
+  return rows.map((r) => ({ accountId: r.account_id, side: r.side }));
+}
+
+/** The conversations between the accounts of two identities: what a block between them ends. */
+export async function conversationsBetweenIdentities(
+  db: Queryable,
+  a: string,
+  b: string,
+): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT DISTINCT p.conversation_id AS id
+     FROM conversation_participant p
+     JOIN account pa ON pa.id = p.account_id
+     JOIN conversation_participant q ON q.conversation_id = p.conversation_id AND q.side <> p.side
+     JOIN account qa ON qa.id = q.account_id
+     WHERE pa.identity_id = $1 AND qa.identity_id = $2`,
+    [a, b],
+  );
+  return rows.map((r) => r.id);
+}
+
+/** One message as the caller reads it, with the caller's side, or null when it is not theirs to read. */
+export async function messageFor(
+  db: Queryable,
+  input: { accountId: string; conversationId: string; seq: number },
+): Promise<{ side: Side; row: MessageRow } | null> {
+  const { rows } = await db.query<Row>(
+    `SELECT me.side AS my_side, m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id
+     ${FROM_CALLER}
+     JOIN message m ON m.conversation_id = c.id
+     WHERE me.account_id = $1 AND me.conversation_id = $2 AND m.seq = $3
+       AND ${VISIBLE_TO_CALLER} AND ${MESSAGE_VISIBLE}`,
+    [input.accountId, input.conversationId, input.seq],
+  );
+  const row = rows[0];
+  return row ? { side: row.my_side as Side, row: messageFrom(row) } : null;
 }

@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/api",
-  "version": "0.37.1",
+  "version": "0.38.0",
   "private": true,
   "type": "module",
   "description": "Hono on Node. One process: HTTP routes, WebSockets, nightly jobs.",
@@ -40,11 +40,13 @@
     "pg": "^8.23.1",
     "pino": "^10.4.0",
     "sharp": "^0.35.5",
+    "ws": "8.21.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
+    "@types/ws": "8.18.2",
     "@vitest/coverage-v8": "catalog:",
     "fast-check": "^4.10.2",
     "openapi-typescript": "^7.13.0",

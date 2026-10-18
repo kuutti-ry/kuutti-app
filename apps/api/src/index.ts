@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { boot } from "./boot.ts";
+import { createSocketServer, startChatListener } from "./chat/index.ts";
 import { scheduleNightly } from "./jobs/nightly.ts";
 import { type Config, ConfigError, loadConfig } from "./lib/config.ts";
 import { createLogger } from "./lib/logger.ts";
@@ -29,8 +30,12 @@ async function main(): Promise<void> {
 
   // Everything from the configuration to the app, the pool and the jobs is
   // boot.ts, where the tests run it; this file is the process around it.
-  const { app, pool, jobs } = await boot({ config, logger });
+  const { app, pool, jobs, live } = await boot({ config, logger });
   scheduleNightly(jobs, logger);
+  // The chat's sockets (#349): upgrades on the same server, a frame bounded
+  // before it is parsed, and the committed changes from Postgres's channel.
+  const wss = createSocketServer();
+  const listener = startChatListener({ pool, logger, live });
 
   const server = serve(
     {
@@ -43,6 +48,7 @@ async function main(): Promise<void> {
       // previous call went out on a closed socket and failed before reaching us. The
       // headers timeout stays above it, as Node's documentation asks.
       serverOptions: { keepAliveTimeout: 65_000, headersTimeout: 66_000 },
+      websocket: { server: wss },
     },
     (address) => {
       logger.info(
@@ -61,16 +67,28 @@ async function main(): Promise<void> {
     } else {
       logger.fatal({ err: error }, "server error");
     }
+    // The listener holds one of the pool's connections: let it go first, or the pool's end waits for it.
     flushSentry()
+      .then(() => listener.stop())
       .then(() => pool.end())
       .finally(() => process.exit(1));
   });
 
-  // Drain in-flight requests within 10 s so a redeploy drops nothing.
+  // Drain in-flight requests within 10 s so a redeploy drops nothing. An
+  // open socket would hold the server open: each is told `restarting` and
+  // closed, so the phones reconnect to the next process and resume, and one
+  // that does not finish its closing handshake in a second is cut.
   const shutdown = (signal: string) => {
     logger.info({ signal }, "shutting down");
+    live.closeAll(1012, "restarting");
+    setTimeout(() => {
+      for (const client of wss.clients) client.terminate();
+    }, 1_000).unref();
     server.close(() => {
-      pool.end().finally(() => process.exit(0));
+      listener
+        .stop()
+        .then(() => pool.end())
+        .finally(() => process.exit(0));
     });
     setTimeout(() => process.exit(1), 10_000).unref();
   };

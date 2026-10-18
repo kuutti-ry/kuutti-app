@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { createPool, migrate, type Pool, seed } from "@kuutti/db";
 import { discoverProvider, type ProviderMetadata } from "@kuutti/tunnistus-oidc";
 import { type App, createApp } from "./app.ts";
-import { archiveJob } from "./chat/index.ts";
+import { archiveJob, createLive, type Live } from "./chat/index.ts";
 import {
   brokerOptionsFromConfig,
   type IdentityBroker,
@@ -44,7 +44,7 @@ export type BootOptions = {
   createBroker?: (options: Parameters<typeof OidcBroker.create>[0]) => Promise<IdentityBroker>;
 };
 
-export type Booted = { app: App; pool: Pool; jobs: NightlyJob[] };
+export type Booted = { app: App; pool: Pool; jobs: NightlyJob[]; live: Live };
 
 /**
  * Everything between a validated configuration and a server that may listen:
@@ -196,7 +196,14 @@ export async function boot({
     logger.info(media.setup, "media");
   }
 
+  // The chat's sockets (#349): the app serves them, index.ts feeds them from the listener.
+  const live = createLive({
+    db: pool,
+    logger,
+    socketsPerAccount: config.WS_SOCKETS_PER_ACCOUNT,
+  });
   const app = createApp({
+    live,
     config,
     logger,
     db: pool,
@@ -264,5 +271,5 @@ export async function boot({
     logger.error({ job: "waitlist-snapshot", err }, "first waitlist snapshot failed"),
   );
 
-  return { app, pool, jobs };
+  return { app, pool, jobs, live };
 }

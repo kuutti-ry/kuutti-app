@@ -5,7 +5,7 @@ paths:
 
 # API (Hono on Node) rules
 
-One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (round builder at 04:00, events to Parquet, retention pruning) as cron inside the same container. Consult `https://hono.dev/llms.txt` for framework specifics.
+One process: HTTP routes, WebSockets through `@hono/node-server`'s own upgrade over `ws` (`@hono/node-ws` is deprecated; ADR-031 §9), and the nightly jobs (round builder at 04:00, events to Parquet, retention pruning) as cron inside the same container. Consult `https://hono.dev/llms.txt` for framework specifics.
 
 ## Routes
 
@@ -47,7 +47,7 @@ One process: HTTP routes, WebSockets via `@hono/node-ws`, and the nightly jobs (
 
 - Environment validated with zod at boot; a missing key fails the start. Deployed config comes from SSM through the instance role; the local `.env` is read by the runtime only, never by tooling or agents.
 - Migrations run in the entrypoint under an advisory lock before the server listens.
-- WebSockets: application-level ping/pong (CloudFront documents no idle timeout). Fan-out across instances, if ever, via Postgres LISTEN/NOTIFY.
+- WebSockets: application-level ping/pong (CloudFront documents no idle timeout). The chat's socket (`chat/ws.ts`, ADR-031 §9) authenticates by its first frame, validates every frame against `packages/schema/src/chat-frames.ts`, and is told what changed by Postgres's LISTEN/NOTIFY on commit (migration 0055's triggers, `chat/listen.ts`), which also serves a second instance if one ever exists. A notification carries ids and numbers, never text; what a person may see is read through their own participant row.
 
 ## Tests
 

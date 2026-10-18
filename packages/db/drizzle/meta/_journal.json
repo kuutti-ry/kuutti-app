@@ -386,6 +386,13 @@
       "when": 1792254819240,
       "tag": "0054_chat_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1792261632222,
+      "tag": "0055_chat_notify",
+      "breakpoints": true
     }
   ]
 }

@@ -31,7 +31,9 @@ jest.mock("@sentry/react-native", () => ({
 // Expo Router's navigation is native-backed; tests see one router object they
 // can assert on (src/features/identity/SignInScreen.test.tsx) and no params.
 // A screen in a test has the focus from the start, and `__focus()` gives it
-// the focus again, as coming back to it does (src/features/pond/GateCard.test.tsx).
+// the focus again, as coming back to it does (src/features/pond/GateCard.test.tsx);
+// `__blur()` takes it away, as another screen opening over it does
+// (src/features/chat/ConversationScreen.test.tsx).
 // The navigation object a screen listens on; `__navigation.emit("beforeRemove", event)`
 // is a test leaving the screen (the profile section saves on it, #238), and
 // `setOptions` records what a screen sets on its route (the swipe, off while unsaved).
@@ -59,22 +61,29 @@ jest.mock("expo-router", () => {
     dismissTo: jest.fn(),
     setParams: jest.fn(),
   };
-  const focused = new Set();
+  // Each focus effect with the cleanup of its latest run.
+  const focused = new Map();
   return {
     __router: router,
     __navigation: mockNavigation,
     __navigationListeners: mockNavigationListeners,
     useNavigation: () => mockNavigation,
     __focus: () => {
-      for (const effect of focused) effect();
+      for (const effect of focused.keys()) focused.set(effect, effect());
+    },
+    __blur: () => {
+      for (const [effect, cleanup] of focused) {
+        if (typeof cleanup === "function") cleanup();
+        focused.set(effect, undefined);
+      }
     },
     useRouter: () => router,
     useLocalSearchParams: () => ({}),
     useFocusEffect: (effect) =>
       useEffect(() => {
-        focused.add(effect);
-        const cleanup = effect();
+        focused.set(effect, effect());
         return () => {
+          const cleanup = focused.get(effect);
           focused.delete(effect);
           if (typeof cleanup === "function") cleanup();
         };

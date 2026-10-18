@@ -413,6 +413,67 @@ describe("sessions", () => {
   });
 });
 
+describe("how a session stands for an open socket (#349)", () => {
+  test("live to its last instant as the guard reads it, still live under a shadow ban which it names, then expired by the access token or the session's own end", async ({
+    ctx,
+  }) => {
+    const account = await accountRow(ctx, "a");
+    const a = await device(ctx, account);
+    const accessEnd = new Date(a.accessExpiresAt);
+    const standing = (at: Date, over: { sessionId?: string; accountId?: string } = {}) =>
+      repo.sessionStanding(ctx.client, { sessionId: a.sessionId, accountId: account, at, ...over });
+    expect(await standing(accessEnd)).toEqual({ standing: "live", shadowBanned: false });
+    expect(await standing(new Date(accessEnd.getTime() + 1))).toEqual({
+      standing: "expired",
+      shadowBanned: false,
+    });
+    // A shadow ban leaves the session live (ADR-024 §6) and is named.
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [account]);
+    expect(await standing(accessEnd)).toEqual({ standing: "live", shadowBanned: true });
+    // The session's own end, with an access token that would outlive it.
+    const end = new Date(accessEnd.getTime() + 60_000);
+    await ctx.client.query(
+      "UPDATE session SET expires_at = $2::timestamptz, access_expires_at = $2::timestamptz + interval '1 hour' WHERE id = $1",
+      [a.sessionId, end],
+    );
+    expect(await standing(end)).toMatchObject({ standing: "live" });
+    expect(await standing(new Date(end.getTime() + 1))).toMatchObject({ standing: "expired" });
+  });
+
+  test("ended by a revoke, an account or identity no longer live, another account's id, or no row at all (rule 6)", async ({
+    ctx,
+  }) => {
+    const ended = { standing: "ended", shadowBanned: false };
+    const at = new Date();
+    const account = await accountRow(ctx, "a");
+    const other = await accountRow(ctx, "b");
+    const [revoked, suspended, banned] = [
+      await device(ctx, account),
+      await device(ctx, other),
+      await device(ctx, account),
+    ];
+    const standing = (session: { sessionId: string }, accountId: string) =>
+      repo.sessionStanding(ctx.client, { sessionId: session.sessionId, accountId, at });
+    // Another account's id never finds the session (rule 6).
+    expect(await standing(revoked, other)).toEqual(ended);
+    expect(await standing({ sessionId: "00000000-0000-4000-8000-000000000000" }, account)).toEqual(
+      ended,
+    );
+    await ctx.client.query("UPDATE session SET revoked_at = now() WHERE id = $1", [
+      revoked.sessionId,
+    ]);
+    expect(await standing(revoked, account)).toEqual(ended);
+    expect(await standing(banned, account)).toMatchObject({ standing: "live" });
+    await ctx.client.query("UPDATE account SET state = 'suspended' WHERE id = $1", [other]);
+    expect(await standing(suspended, other)).toEqual(ended);
+    await ctx.client.query(
+      "UPDATE identity SET standing = 'banned' WHERE id = (SELECT identity_id FROM account WHERE id = $1)",
+      [account],
+    );
+    expect(await standing(banned, account)).toEqual(ended);
+  });
+});
+
 describe("a session only for an account the guard lets in (ADR-024 §4)", () => {
   test.for([
     ["a suspended account", "suspended", "ok", false],

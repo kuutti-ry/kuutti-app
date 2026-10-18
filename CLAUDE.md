@@ -9,7 +9,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | path | what | rules |
 |---|---|---|
 | `apps/mobile` | Expo SDK 57, RN 0.86, React 19, TypeScript, dev client, web preview target | `.claude/rules/mobile.md` |
-| `apps/api` | Hono on Node, WebSockets via `@hono/node-ws`, nightly jobs | `.claude/rules/api.md` |
+| `apps/api` | Hono on Node, WebSockets through `@hono/node-server`'s own upgrade over `ws` (ADR-031 §9), nightly jobs | `.claude/rules/api.md` |
 | `apps/admin` | Vite + React moderation panel, static behind CloudFront | `.claude/rules/admin.md` |
 | `packages/schema` | zod contracts shared by all apps; research event registry | `.claude/rules/schema.md` |
 | `packages/db` | Drizzle schema, generated migrations, seed | `.claude/rules/db.md` |

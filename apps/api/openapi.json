@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.37.1",
+    "version": "0.38.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3400,6 +3400,10 @@
         "type": "object",
         "nullable": true,
         "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
           "at": {
             "type": "string",
             "format": "date-time"
@@ -3416,6 +3420,7 @@
           }
         },
         "required": [
+          "seq",
           "at",
           "kind",
           "preview",
@@ -3526,6 +3531,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "clientId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
           }
         },
         "required": [
@@ -3534,7 +3544,8 @@
           "side",
           "kind",
           "body",
-          "createdAt"
+          "createdAt",
+          "clientId"
         ]
       },
       "SendMessageRequest": {
