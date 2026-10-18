@@ -89,3 +89,16 @@ auditConfig:
   ignoreGhsas:
     - GHSA-86w9-cpqp-85rv
     - GHSA-vfj7-8cjw-p6xm
+
+# Fixes taken from a newer release onto the version Expo's SDK pins, each with
+# its reason. Remove an entry once the pinned version carries the fix (pnpm
+# refuses to install while a patch goes unused).
+#
+# react-native-screens: on Android a cold start or a reload registers the
+# screen-removal listener from two threads at once, and 4.26.2 makes it lazily
+# without a lock; React Native can keep a freed one and crashes natively in
+# MountingCoordinator::pullTransaction at the first render (#360). The patch is
+# 4.28.0's code (software-mansion/react-native-screens#4413) on 4.26.2; Expo
+# SDK 57 pins ~4.26. Patching the package moves the dev client's fingerprint.
+patchedDependencies:
+  react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
