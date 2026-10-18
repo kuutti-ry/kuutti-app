@@ -262,6 +262,19 @@ const markRead = (headers: Record<string, string>, id: string, upTo: number) =>
     body: JSON.stringify({ upTo }),
   });
 
+const keepContact = (headers: Record<string, string>, kind: string, value: string) =>
+  ctx.app.request(`/contacts/${kind}`, {
+    method: "PUT",
+    headers: json(headers),
+    body: JSON.stringify({ value }),
+  });
+const removeContact = (headers: Record<string, string>, kind: string) =>
+  ctx.app.request(`/contacts/${kind}`, { method: "DELETE", headers });
+const shareContact = (headers: Record<string, string>, id: string, kind: string) =>
+  ctx.app.request(`/conversations/${id}/contacts/${kind}`, { method: "POST", headers });
+const isContacts = (id: string) => (f: ServerFrame) =>
+  f.type === "contacts" && f.conversationId === id;
+
 async function pair() {
   const a = await signedInAccount(ctx.pool);
   const b = await signedInAccount(ctx.pool);
@@ -551,6 +564,28 @@ describe("what the socket carries", () => {
     expect(pa.frames.filter((f) => f.type === "presence")).toHaveLength(3);
   });
 
+  it("A change of what is shared reaches both phones as a contacts frame with no value", async () => {
+    const { a, b, id } = await pair();
+    const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
+    const pb = await signedIn(b.accessToken, [{ id, seq: 0 }]);
+    const frame = { type: "contacts", conversationId: id };
+    // Kept and not shared: nothing to tell anybody.
+    expect((await keepContact(a.headers, "instagram", MARK)).status).toBe(200);
+    expect((await shareContact(a.headers, id, "instagram")).status).toBe(200);
+    for (const p of [pa, pb]) expect(await p.next(isContacts(id))).toEqual(frame);
+    // Ordered delivery: a frame of the keep would have come before the share's.
+    for (const p of [pa, pb]) expect(p.frames.filter(isContacts(id))).toHaveLength(1);
+    expect((await keepContact(a.headers, "instagram", `${MARK}.uusi`)).status).toBe(200);
+    for (const p of [pa, pb]) expect(await p.next(isContacts(id))).toEqual(frame);
+    // The same value kept again changes nothing to tell.
+    expect((await keepContact(a.headers, "instagram", `${MARK}.uusi`)).status).toBe(200);
+    expect((await removeContact(a.headers, "instagram")).status).toBe(204);
+    for (const p of [pa, pb]) expect(await p.next(isContacts(id))).toEqual(frame);
+    for (const p of [pa, pb]) expect(p.frames.filter(isContacts(id))).toHaveLength(3);
+    expect(JSON.stringify([...pa.frames, ...pb.frames])).not.toContain(MARK);
+    expect(ctx.log.text()).not.toContain(MARK);
+  });
+
   it("The sixth socket of an account closes the oldest", async () => {
     const a = await signedInAccount(ctx.pool);
     const sockets = [];
@@ -612,6 +647,91 @@ describe("what the socket withholds", () => {
     expect(
       pb.frames.slice(sinceBlock).filter((f) => "conversationId" in f && f.conversationId === id),
     ).toEqual([]);
+  });
+
+  it("A change of what is shared reaches no phone across a block, a close or a shadow ban", async () => {
+    // A shadow ban: A's own phone hears A's share, and a change of a piece
+    // shared before the ban, B's hears nothing of either (both withheld from B).
+    const banned = await pair();
+    expect((await keepContact(banned.a.headers, "phone", "040 123 4567")).status).toBe(200);
+    expect((await keepContact(banned.a.headers, "telegram", "aino_k")).status).toBe(200);
+    expect((await shareContact(banned.a.headers, banned.id, "telegram")).status).toBe(200);
+    await applySanction(ctx.pool, {
+      accountId: banned.a.accountId,
+      kind: "shadow_ban",
+      reason: "commercial_use",
+      note: "Sends the same link to everybody.",
+      actor: null,
+      at: new Date(Date.now() - 1000),
+    });
+    const pa = await signedIn(banned.a.accessToken, [{ id: banned.id, seq: 0 }]);
+    const pb = await signedIn(banned.b.accessToken, [{ id: banned.id, seq: 0 }]);
+    expect((await shareContact(banned.a.headers, banned.id, "phone")).status).toBe(200);
+    expect(await pa.next(isContacts(banned.id))).toEqual({
+      type: "contacts",
+      conversationId: banned.id,
+    });
+    expect((await keepContact(banned.a.headers, "telegram", "aino_k_uusi")).status).toBe(200);
+    expect(await pa.next(isContacts(banned.id))).toEqual({
+      type: "contacts",
+      conversationId: banned.id,
+    });
+
+    // A block: both shared before it; A's change and B's removal afterwards reach nobody.
+    const blocked = await pair();
+    expect((await keepContact(blocked.a.headers, "phone", "040 123 4567")).status).toBe(200);
+    expect((await keepContact(blocked.b.headers, "telegram", "bea_b_b")).status).toBe(200);
+    expect((await shareContact(blocked.a.headers, blocked.id, "phone")).status).toBe(200);
+    expect((await shareContact(blocked.b.headers, blocked.id, "telegram")).status).toBe(200);
+    const qa = await signedIn(blocked.a.accessToken, [{ id: blocked.id, seq: 0 }]);
+    const qb = await signedIn(blocked.b.accessToken, [{ id: blocked.id, seq: 0 }]);
+    await cardShown(ctx.pool, blocked.b.accountId, blocked.a.accountId);
+    const blocking = await ctx.app.request("/blocks", {
+      method: "POST",
+      headers: json(blocked.b.headers),
+      body: JSON.stringify({ accountId: blocked.a.accountId }),
+    });
+    expect(blocking.status).toBe(204);
+    await qa.next((f) => f.type === "conversation" && f.conversationId === blocked.id);
+    await qb.next((f) => f.type === "conversation" && f.conversationId === blocked.id);
+    const sinceBlock = { qa: qa.frames.length, qb: qb.frames.length };
+    expect((await keepContact(blocked.a.headers, "phone", "050 765 4321")).status).toBe(200);
+    expect((await removeContact(blocked.b.headers, "telegram")).status).toBe(204);
+
+    // A close by any hand (as #351's unmatch will write one): A's change reaches nobody.
+    const closed = await pair();
+    expect((await keepContact(closed.a.headers, "phone", "040 123 4567")).status).toBe(200);
+    expect((await shareContact(closed.a.headers, closed.id, "phone")).status).toBe(200);
+    const ra = await signedIn(closed.a.accessToken, [{ id: closed.id, seq: 0 }]);
+    const rb = await signedIn(closed.b.accessToken, [{ id: closed.id, seq: 0 }]);
+    await ctx.pool.query(
+      "UPDATE conversation SET closed_at = now(), closed_how = 'unmatch', closed_by = 'b' WHERE id = $1",
+      [closed.id],
+    );
+    for (const p of [ra, rb]) {
+      await p.next((f) => f.type === "conversation" && f.conversationId === closed.id);
+    }
+    const sinceClose = { ra: ra.frames.length, rb: rb.frames.length };
+    expect((await keepContact(closed.a.headers, "phone", "050 765 4321")).status).toBe(200);
+
+    // A later frame for each phone, after which any of those would have come.
+    for (const [p, accountId] of [
+      [pb, banned.b.accountId],
+      [qa, blocked.a.accountId],
+      [qb, blocked.b.accountId],
+      [ra, closed.a.accountId],
+      [rb, closed.b.accountId],
+    ] as const) {
+      const other = await signedInAccount(ctx.pool);
+      const later = await conversationBetween(ctx.pool, other.accountId, accountId);
+      expect((await send(other.headers, later, "Moi")).status).toBe(201);
+      await p.next(isMessage(later, 1));
+    }
+    expect(pb.frames.filter(isContacts(banned.id))).toEqual([]);
+    expect(qa.frames.slice(sinceBlock.qa).filter(isContacts(blocked.id))).toEqual([]);
+    expect(qb.frames.slice(sinceBlock.qb).filter(isContacts(blocked.id))).toEqual([]);
+    expect(ra.frames.slice(sinceClose.ra).filter(isContacts(closed.id))).toEqual([]);
+    expect(rb.frames.slice(sinceClose.rb).filter(isContacts(closed.id))).toEqual([]);
   });
 
   it("A shadow-banned sender's message reaches no counterpart, and the sender is never online", async () => {

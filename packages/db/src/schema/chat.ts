@@ -127,3 +127,68 @@ export const message = pgTable(
     check("message_photo_check", sql`${table.photoId} IS NULL OR ${table.kind} <> 'text'`),
   ],
 );
+
+/**
+ * The kinds of contact a person may keep and share in a conversation (#103,
+ * the maintainer's decision of 18/10/2026): a phone number, WhatsApp (a
+ * number), Telegram and Instagram (a username).
+ */
+export const contactKind = pgEnum("contact_kind", ["phone", "whatsapp", "telegram", "instagram"]);
+/** How a share ended: its owner stopped it, the stored piece was removed, or the conversation closed. */
+export const contactShareEnd = pgEnum("contact_share_end", ["stopped", "removed", "closed"]);
+
+/**
+ * A person's own contacts (#103, ADR-031 §11), one per kind, normalised by
+ * kind (packages/schema contact.ts). Seen by nobody until the person shares
+ * one in a conversation; never in a log line, an event, or anyone else's
+ * export. Erasure deletes them.
+ */
+export const contact = pgTable(
+  "contact",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => account.id),
+    kind: contactKind("kind").notNull(),
+    value: text("value").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("contact_account_kind_idx").on(table.accountId, table.kind),
+    check("contact_value_check", sql`length(${table.value}) BETWEEN 1 AND 64`),
+  ],
+);
+
+/**
+ * One stored piece shared in a conversation (#103, ADR-031 §11): a press of
+ * Share, seen by the other person at once, until its owner stops it, the
+ * piece is removed, or the conversation closes. The row holds no value: the
+ * conversation shows the stored piece while the share stands, so what stays
+ * after it ends is the record (who, in which conversation, which kind, when,
+ * and how it ended) and never the contact.
+ */
+export const contactShare = pgTable(
+  "contact_share",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    side: conversationSide("side").notNull(),
+    kind: contactKind("kind").notNull(),
+    sharedAt: timestamp("shared_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    endedHow: contactShareEnd("ended_how"),
+  },
+  (table) => [
+    // One standing share per side and kind; an ended one may be shared again.
+    uniqueIndex("contact_share_standing_idx")
+      .on(table.conversationId, table.side, table.kind)
+      .where(sql`${table.endedAt} IS NULL`),
+    check(
+      "contact_share_ended_check",
+      sql`(${table.endedAt} IS NULL) = (${table.endedHow} IS NULL)`,
+    ),
+  ],
+);

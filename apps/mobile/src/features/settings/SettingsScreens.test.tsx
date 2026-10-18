@@ -9,6 +9,7 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { AccountScreen } from "./AccountScreen";
 import { ConsentScreen, consentKindOf } from "./ConsentScreen";
+import { ContactsSettingsScreen } from "./ContactsSettingsScreen";
 import { DeviceScreen } from "./DeviceScreen";
 import { EmailSettingsScreen } from "./EmailSettingsScreen";
 import { LanguageScreen } from "./LanguageScreen";
@@ -65,6 +66,7 @@ beforeEach(async () => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/health") return json(ok);
     if (url.pathname === "/account/email") return json({ email: null });
+    if (url.pathname === "/contacts") return json({ contacts: [] });
     if (url.pathname === "/consents") {
       return json({
         consents: [],
@@ -278,6 +280,22 @@ describe("the e-mail and the account screens", () => {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
     noProblems();
+  });
+
+  it("hold the contacts for a person (#103)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<ContactsSettingsScreen />);
+    expect(await screen.findByText("Phone number")).toBeTruthy();
+    expectPinnedHeader("Your contacts", "Back");
+    expect(screen.getByLabelText("Your Instagram username")).toBeTruthy();
+    noProblems();
+  });
+
+  it("say there is no session on the contacts screen of a signed-out device (#103)", async () => {
+    await renderWithTheme(<ContactsSettingsScreen />);
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByText("Phone number")).toBeNull();
   });
 
   it("say there is no session on a signed-out device, the e-mail screen and the account screen alike", async () => {

@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
+import type { Queryable } from "@kuutti/db";
 import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
+import type { QueryResultRow } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import type { IdentityBroker } from "../identity/index.ts";
@@ -185,6 +187,85 @@ describe("PII in logs", () => {
     expect((await send(`${FIXTURES.message} ${FIXTURES.email}`)).status).toBe(400);
     expect(lines().length).toBeGreaterThan(0);
     expect(leakedFixtures(lines())).toEqual([]);
+  });
+
+  // A stored contact (#103, ADR-031 §11): a phone number and a username, kept,
+  // refused by their kind's rule and by the contract, shared, read on both
+  // sides (the detail and the contacts alone), stopped and removed, and a
+  // keep interrupted by a fault.
+  test("No contact reaches a log line, an error detail or an error report", async ({ ctx }) => {
+    const PHONE = { typed: "040 471 1047", stored: "+358404711047" };
+    const HANDLE = { typed: "@piiprobe_4711", stored: "piiprobe_4711" };
+    const REFUSED = "piiprobe..4711";
+    const reports: unknown[] = [];
+    const { logger, lines } = await captureLogger();
+    let failed = false;
+    const db: Queryable = {
+      async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+        if (!failed && /INSERT INTO contact \(/.test(text)) {
+          failed = true;
+          throw new Error("Connection terminated unexpectedly");
+        }
+        return ctx.client.query<R>(text, values);
+      },
+    };
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db,
+      report: (error, context) => reports.push({ error: String(error), context }),
+    });
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    const json = { ...a.headers, "content-type": "application/json" };
+    const keep = (kind: string, value: string) =>
+      app.request(`/contacts/${kind}`, {
+        method: "PUT",
+        headers: json,
+        body: JSON.stringify({ value }),
+      });
+    const statuses = [
+      (await keep("phone", PHONE.typed)).status,
+      (await keep("phone", PHONE.typed)).status,
+      (await keep("telegram", HANDLE.typed)).status,
+      (await keep("instagram", REFUSED)).status,
+      (await keep("instagram", HANDLE.stored.repeat(5))).status,
+      (
+        await app.request(`/conversations/${id}/contacts/phone`, {
+          method: "POST",
+          headers: a.headers,
+        })
+      ).status,
+      (
+        await app.request(`/conversations/${id}/contacts/telegram`, {
+          method: "POST",
+          headers: a.headers,
+        })
+      ).status,
+      (await app.request(`/conversations/${id}`, { headers: b.headers })).status,
+      (await app.request(`/conversations/${id}/contacts`, { headers: b.headers })).status,
+      (await app.request("/contacts", { headers: a.headers })).status,
+      (
+        await app.request(`/conversations/${id}/contacts/telegram`, {
+          method: "DELETE",
+          headers: a.headers,
+        })
+      ).status,
+      (await app.request("/contacts/phone", { method: "DELETE", headers: a.headers })).status,
+    ];
+    expect(statuses).toEqual([500, 200, 200, 400, 400, 200, 200, 200, 200, 200, 200, 204]);
+    expect(reports).toHaveLength(1);
+    const out = JSON.stringify(lines());
+    for (const value of [PHONE.typed, PHONE.stored, "4711047", HANDLE.stored, REFUSED]) {
+      expect(out).not.toContain(value);
+      expect(JSON.stringify(reports)).not.toContain(value);
+    }
+    // The refusal names the kind, and the request lines name the routes.
+    expect(lines().find((l) => l.code === "contact_invalid")?.detail).toEqual({
+      kind: "instagram",
+    });
+    expect(lines().filter((l) => l.msg === "request")).toHaveLength(statuses.length);
   });
 
   it.each(MODES_AND_CLIENTS)(

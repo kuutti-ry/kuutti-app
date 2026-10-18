@@ -1,11 +1,22 @@
 import { clearSession, saveSession } from "@/lib/session";
 import { FakeXhr, partsOf } from "@/test/xhr";
-import { fetchMessages, sendPhoto } from "./client";
+import {
+  fetchContacts,
+  fetchMessages,
+  fetchSharedContacts,
+  removeContact,
+  saveContact,
+  sendPhoto,
+  shareContact,
+  stopSharing,
+} from "./client";
 import { messageWithKnownDescription } from "./known";
 
 // The chat's client for a photo (#350): the send through the media slice's
 // upload, its multipart parts and its route; its answers and the pages read
-// with a description key this build cannot say left out, never failing.
+// with a description key this build cannot say left out, never failing. The
+// contacts' routes (#103): methods, paths, the value in the body only, the
+// answers parsed, and each refusal's code.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const ID = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
@@ -135,5 +146,160 @@ describe("reading a page with photos", () => {
     for (const value of [null, "text", 3, [sent()], { id: "x" }]) {
       expect(messageWithKnownDescription(value)).toBe(value);
     }
+  });
+});
+
+describe("the contacts' routes (#103)", () => {
+  type Seen = { method: string; path: string; body: unknown };
+  /** Every request recorded, each answered in turn. */
+  function answering(...answers: Response[]): Seen[] {
+    const seen: Seen[] = [];
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const text = request.method === "GET" ? "" : await request.text();
+      seen.push({
+        method: request.method,
+        path: new URL(request.url).pathname,
+        body: text ? JSON.parse(text) : null,
+      });
+      return answers.shift() ?? json({ error: { code: "x", message: "x", requestId: "r" } }, 500);
+    }) as unknown as typeof fetch;
+    return seen;
+  }
+  const refusal = (code: string, status: number) =>
+    json({ error: { code, message: "x", requestId: "r" } }, status);
+  const AT = "2026-10-18T09:00:00.000Z";
+  const detail = {
+    id: ID,
+    state: "open",
+    closedHow: null,
+    counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null },
+    lastMessage: null,
+    unread: 0,
+    limits: { maxLength: 30 },
+    counterpartReadUpTo: 0,
+    contacts: { mine: [{ kind: "instagram", value: "aino.k", shared: true }], theirs: [] },
+  };
+
+  it("reads the stored pieces, and refuses an answer outside the contract", async () => {
+    const pieces = [
+      { kind: "phone", value: "+358401234567", updatedAt: AT },
+      { kind: "instagram", value: "aino.k", updatedAt: AT },
+    ];
+    const seen = answering(json({ contacts: pieces }), json({ contacts: [{ kind: "fax" }] }));
+    expect(await fetchContacts()).toEqual(pieces);
+    expect(seen).toEqual([{ method: "GET", path: "/contacts", body: null }]);
+    await expect(fetchContacts()).rejects.toThrow();
+  });
+
+  it("keeps a piece with its value in the body, never in the path, and hands back its stored form", async () => {
+    const seen = answering(json({ kind: "phone", value: "+358401234567", updatedAt: AT }));
+    expect(await saveContact("phone", "040 123 4567")).toEqual({
+      kind: "phone",
+      value: "+358401234567",
+      updatedAt: AT,
+    });
+    expect(seen).toEqual([
+      { method: "PUT", path: "/contacts/phone", body: { value: "040 123 4567" } },
+    ]);
+  });
+
+  it("removes a piece, alike when none was kept", async () => {
+    const seen = answering(new Response(null, { status: 204 }));
+    await expect(removeContact("telegram")).resolves.toBeUndefined();
+    expect(seen).toEqual([{ method: "DELETE", path: "/contacts/telegram", body: null }]);
+  });
+
+  it("shares and stops sharing in a conversation, each answering the fresh view", async () => {
+    const stopped = {
+      ...detail,
+      contacts: { mine: [{ ...detail.contacts.mine[0], shared: false }], theirs: [] },
+    };
+    const seen = answering(json(detail), json(stopped));
+    expect((await shareContact(ID, "instagram")).contacts.mine[0]?.shared).toBe(true);
+    expect((await stopSharing(ID, "instagram")).contacts.mine[0]?.shared).toBe(false);
+    expect(seen).toEqual([
+      { method: "POST", path: `/conversations/${ID}/contacts/instagram`, body: null },
+      { method: "DELETE", path: `/conversations/${ID}/contacts/instagram`, body: null },
+    ]);
+  });
+
+  it("reads what is shared in a conversation alone, and refuses an answer outside the contract", async () => {
+    const shared = {
+      mine: [{ kind: "phone", value: "+358401234567", shared: false }],
+      theirs: [{ kind: "instagram", value: "ville.k" }],
+    };
+    const seen = answering(json(shared), json({ mine: [], theirs: [{ kind: "fax", value: "1" }] }));
+    expect(await fetchSharedContacts(ID)).toEqual(shared);
+    expect(seen).toEqual([{ method: "GET", path: `/conversations/${ID}/contacts`, body: null }]);
+    await expect(fetchSharedContacts(ID)).rejects.toThrow();
+  });
+
+  it.each<[string, () => Promise<unknown>, Response, number, string]>([
+    ["a read", () => fetchContacts(), refusal("rate_limited", 429), 429, "rate_limited"],
+    [
+      "a read of what is shared in a conversation gone",
+      () => fetchSharedContacts(ID),
+      refusal("not_found", 404),
+      404,
+      "not_found",
+    ],
+    [
+      "a keep past the messages of a minute",
+      () => saveContact("telegram", "aino_k"),
+      refusal("message_budget_exceeded", 429),
+      429,
+      "message_budget_exceeded",
+    ],
+    [
+      "a piece not of its kind",
+      () => saveContact("instagram", "a..b"),
+      refusal("contact_invalid", 400),
+      400,
+      "contact_invalid",
+    ],
+    [
+      "a piece of an account deleted meanwhile",
+      () => saveContact("phone", "0401234567"),
+      refusal("not_found", 404),
+      404,
+      "not_found",
+    ],
+    [
+      "a removal",
+      () => removeContact("phone"),
+      refusal("internal_error", 500),
+      500,
+      "internal_error",
+    ],
+    [
+      "a share of a piece removed meanwhile",
+      () => shareContact(ID, "phone"),
+      refusal("contact_not_stored", 409),
+      409,
+      "contact_not_stored",
+    ],
+    [
+      "a share too fast",
+      () => shareContact(ID, "phone"),
+      refusal("message_budget_exceeded", 429),
+      429,
+      "message_budget_exceeded",
+    ],
+    [
+      "a stop in a conversation gone",
+      () => stopSharing(ID, "phone"),
+      refusal("not_found", 404),
+      404,
+      "not_found",
+    ],
+  ])("fails %s with the API's status and code", async (_what, call, answer, status, code) => {
+    answering(answer);
+    await expect(call()).rejects.toMatchObject({ status, code });
+  });
+
+  it("fails an answer without the error envelope with its status and no code", async () => {
+    answering(new Response("upstream", { status: 502 }));
+    await expect(stopSharing(ID, "phone")).rejects.toMatchObject({ status: 502, code: undefined });
   });
 });

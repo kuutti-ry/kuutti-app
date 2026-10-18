@@ -1,11 +1,15 @@
 import {
   ChatMessage,
+  type ContactKind,
+  ConversationContacts,
   ConversationDetail,
   ConversationList,
   ErrorResponse,
   MessagePage,
   type MessagesQuery,
   type SendMessageRequest,
+  StoredContact,
+  StoredContacts,
 } from "@kuutti/schema";
 import { type PickedPhoto, uploadPicture, uploadRefusal } from "@/features/media";
 import { ApiError, api } from "@/lib/api";
@@ -100,4 +104,63 @@ export async function markRead(id: string, upTo: number): Promise<void> {
     body: { upTo },
   });
   if (!response.ok) throw failed(response, error, "read");
+}
+
+// The contacts a person keeps and shares (#103, ADR-031 §11). A value goes in
+// a body only, never in a path, so nothing logs it on the way.
+
+/** The person's stored pieces, in the API's order (CONTACT_KINDS). */
+export async function fetchContacts(): Promise<StoredContact[]> {
+  const { data, error, response } = await api.GET("/contacts");
+  if (!data) throw failed(response, error, "contacts");
+  return StoredContacts.parse(data).contacts;
+}
+
+/** Keeps a piece; the answer is its one stored form (a number in E.164, a username without its @). */
+export async function saveContact(kind: ContactKind, value: string): Promise<StoredContact> {
+  const { data, error, response } = await api.PUT("/contacts/{kind}", {
+    params: { path: { kind } },
+    body: { value },
+  });
+  if (!data) throw failed(response, error, "contact save");
+  return StoredContact.parse(data);
+}
+
+/** Removes a piece, and with it every share of it; alike when none was kept. */
+export async function removeContact(kind: ContactKind): Promise<void> {
+  const { error, response } = await api.DELETE("/contacts/{kind}", {
+    params: { path: { kind } },
+  });
+  if (!response.ok) throw failed(response, error, "contact removal");
+}
+
+/**
+ * What is shared in one conversation, the detail's contacts alone: what the
+ * screen reads on a contacts frame and on a resume, which signs no thumb and
+ * writes nothing.
+ */
+export async function fetchSharedContacts(id: string): Promise<ConversationContacts> {
+  const { data, error, response } = await api.GET("/conversations/{id}/contacts", {
+    params: { path: { id } },
+  });
+  if (!data) throw failed(response, error, "conversation contacts");
+  return ConversationContacts.parse(data);
+}
+
+/** Shares a stored piece in the conversation; the answer is the person's fresh view of it. */
+export async function shareContact(id: string, kind: ContactKind): Promise<ConversationDetail> {
+  const { data, error, response } = await api.POST("/conversations/{id}/contacts/{kind}", {
+    params: { path: { id, kind } },
+  });
+  if (!data) throw failed(response, error, "contact share");
+  return ConversationDetail.parse(data);
+}
+
+/** Stops sharing a piece there; the answer is the person's fresh view of the conversation. */
+export async function stopSharing(id: string, kind: ContactKind): Promise<ConversationDetail> {
+  const { data, error, response } = await api.DELETE("/conversations/{id}/contacts/{kind}", {
+    params: { path: { id, kind } },
+  });
+  if (!data) throw failed(response, error, "contact unshare");
+  return ConversationDetail.parse(data);
 }

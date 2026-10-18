@@ -54,6 +54,27 @@ describe("the stories' conversations", () => {
     }
   });
 
+  it("leave the contact share's pair in each other's pool and in no other persona's (#103)", () => {
+    const pair = ["elina", "jussi"];
+    // Everybody a pool can hold: an answered intent, as onboarding leaves it.
+    const others = PERSONA_HISTORIES.filter(
+      (h) => h.onboarding && h.profile?.fields.intent && !pair.includes(h.key),
+    ).map((h) => h.key);
+    expect(others.length).toBeGreaterThan(0);
+    for (const at of DAYS) {
+      const day = at.toISOString().slice(0, 10);
+      expect(inEachOthersPool(poolPerson("elina", at), poolPerson("jussi", at)), day).toBe(true);
+      for (const key of pair) {
+        for (const other of others) {
+          expect(
+            inEachOthersPool(poolPerson(key, at), poolPerson(other, at)),
+            `${key} and ${other} on ${day}`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
   it("carry no contact details, which the send would refuse", () => {
     for (const told of PERSONA_CONVERSATIONS) {
       for (const message of told.messages) {

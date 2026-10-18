@@ -116,11 +116,11 @@ describe("writing the conversations", () => {
       try {
         await migrate(pool, MIGRATIONS);
         const accounts = new Map<string, string>();
-        for (const key of ["antti", "ville", "sanna"]) {
+        for (const key of ["antti", "ville", "sanna", "elina", "jussi"]) {
           accounts.set(key, await account(pool, `hash-${key}`));
         }
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
-          written: 2,
+          written: 3,
           already: 0,
           missing: 0,
         });
@@ -147,6 +147,18 @@ describe("writing the conversations", () => {
         expect(conversations).toEqual([
           {
             id: expect.any(String),
+            a: accounts.get("elina"),
+            b: accounts.get("jussi"),
+            opened_at: ago(60),
+            last_message_at: ago(6),
+            next_seq: 6,
+            archived_at: null,
+            closed_at: null,
+            read_a: 4,
+            read_b: 5,
+          },
+          {
+            id: expect.any(String),
             a: accounts.get("antti"),
             b: accounts.get("ville"),
             opened_at: ago(100),
@@ -170,52 +182,51 @@ describe("writing the conversations", () => {
             read_b: 0,
           },
         ]);
-        const { rows: messages } = await pool.query<{
-          seq: number;
-          side: string;
-          body: string;
-          created_at: Date;
-        }>(
-          "SELECT seq, side, body, created_at FROM message WHERE conversation_id = $1 ORDER BY seq",
-          [conversations[0]?.id],
-        );
-        const told = PERSONA_CONVERSATIONS[0];
-        expect(messages).toEqual(
-          told?.messages.map((m, i) => ({
-            seq: i + 1,
-            side: m.from,
-            body: m.body,
-            created_at: ago(m.hoursAgo),
-          })),
-        );
-        const { rows: silent } = await pool.query(
-          "SELECT 1 FROM message WHERE conversation_id = $1",
-          [conversations[1]?.id],
-        );
-        expect(silent).toEqual([]);
+        // Each one's messages, as told, the silent one's none.
+        for (const told of PERSONA_CONVERSATIONS) {
+          const [a, b] = told.between.map((key) => accounts.get(key));
+          const written = conversations.find((c) => c.a === a && c.b === b);
+          const { rows: messages } = await pool.query<{
+            seq: number;
+            side: string;
+            body: string;
+            created_at: Date;
+          }>(
+            "SELECT seq, side, body, created_at FROM message WHERE conversation_id = $1 ORDER BY seq",
+            [written?.id],
+          );
+          expect(messages, told.between.join("+")).toEqual(
+            told.messages.map((m, i) => ({
+              seq: i + 1,
+              side: m.from,
+              body: m.body,
+              created_at: ago(m.hoursAgo),
+            })),
+          );
+        }
 
         // Told before, between the same two accounts: left as it is.
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
           written: 0,
-          already: 2,
+          already: 3,
           missing: 0,
         });
         // A persona with no account this time (spared, or refused): nothing to talk in.
         accounts.delete("sanna");
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
           written: 0,
-          already: 1,
+          already: 2,
           missing: 1,
         });
         // Another account of the same persona is another person to Kuutti.
         accounts.set("sanna", await account(pool, "hash-sanna-again"));
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
           written: 1,
-          already: 1,
+          already: 2,
           missing: 0,
         });
         const count = await pool.query<{ n: string }>("SELECT count(*) AS n FROM conversation");
-        expect(Number(count.rows[0]?.n)).toBe(3);
+        expect(Number(count.rows[0]?.n)).toBe(4);
       } finally {
         await pool.end();
       }
