@@ -460,6 +460,14 @@ describe("what the socket carries", () => {
         body: `Viesti ${i + 1}`,
       })),
     });
+    // Each row written notified the hub; a later message elsewhere, delivered
+    // in the same order, says it is through them, so none reaches A's phone live.
+    const x = await signedInAccount(ctx.pool);
+    const y = await signedInAccount(ctx.pool);
+    const elsewhere = await conversationBetween(ctx.pool, x.accountId, y.accountId);
+    const px = await signedIn(x.accessToken, [{ id: elsewhere, seq: 0 }]);
+    expect((await send(y.headers, elsewhere, "Valmis")).status).toBe(201);
+    await px.next(isMessage(elsewhere, 1));
     const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
     const seqs = pa.frames.flatMap((f) => (f.type === "message" ? [f.message.seq] : []));
     expect(seqs).toEqual(Array.from({ length: MESSAGES_PAGE_MAX }, (_, i) => i + 1));
@@ -467,7 +475,7 @@ describe("what the socket carries", () => {
     // Holding the newest, the resume sends no message at all.
     const current = await signedIn(a.accessToken, [{ id, seq: MESSAGES_PAGE_MAX + 1 }]);
     expect(current.frames.some((f) => f.type === "message")).toBe(false);
-    for (const p of [pa, current]) p.close();
+    for (const p of [pa, current, px]) p.close();
   });
 
   it("The other side's read mark reaches the writer", async () => {
