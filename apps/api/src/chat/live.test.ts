@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { createPool, migrate, type Pool, withTemporaryDatabase } from "@kuutti/db";
-import { FRAME_BYTES_MAX, MESSAGES_PAGE_MAX, ServerFrame } from "@kuutti/schema";
+import { FRAME_BYTES_MAX, MESSAGES_PAGE_MAX, MessagePage, ServerFrame } from "@kuutti/schema";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket, { WebSocketServer } from "ws";
 import { createApp } from "../app.ts";
@@ -14,6 +14,7 @@ import { signedInAccount, staffSession } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
 import { conversationBetween } from "../test/chat.ts";
 import { testConfig } from "../test/harness.ts";
+import { fixturePng, testMediaDeps } from "../test/media.ts";
 import { archiveSilentConversations } from "./archive.ts";
 import { startChatListener } from "./listen.ts";
 import { createLive, type Live, type Schedule } from "./live.ts";
@@ -122,7 +123,14 @@ beforeAll(async () => {
           socketsPerAccount: 5,
           schedule: timers.schedule,
         });
-        const app = createApp({ config: testConfig(), logger: log.logger, db: pool, live });
+        // Object storage too, so a photo can be sent (#350); no check, so it is delivered.
+        const app = createApp({
+          config: testConfig(),
+          logger: log.logger,
+          db: pool,
+          live,
+          media: testMediaDeps().deps,
+        });
         const server = serve({
           fetch: app.fetch,
           port: 0,
@@ -476,6 +484,35 @@ describe("what the socket carries", () => {
     const current = await signedIn(a.accessToken, [{ id, seq: MESSAGES_PAGE_MAX + 1 }]);
     expect(current.frames.some((f) => f.type === "message")).toBe(false);
     for (const p of [pa, current, px]) p.close();
+  });
+
+  it("A photo arrives over the socket without its URLs, and the page signs them", async () => {
+    const { a, b, id } = await pair();
+    const pb = await signedIn(b.accessToken, [{ id, seq: 0 }]);
+    const body = new FormData();
+    const bytes = await fixturePng(320, 240);
+    body.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "p.png");
+    body.append("clientId", randomUUID());
+    body.append("caption", "Kuva");
+    const sent = await ctx.app.request(`/conversations/${id}/photos`, {
+      method: "POST",
+      headers: a.headers,
+      body,
+    });
+    expect(sent.status).toBe(201);
+    // The frame tells, and carries no URL: they are issued only inside a page's answer.
+    expect(await pb.next(isMessage(id, 1))).toMatchObject({
+      message: { kind: "photo", body: "Kuva", photo: { urls: null } },
+    });
+    const page = MessagePage.parse(
+      await (
+        await ctx.app.request(`/conversations/${id}/messages?after=0&limit=1`, {
+          headers: b.headers,
+        })
+      ).json(),
+    );
+    expect(page.messages[0]?.photo?.urls?.thumb).toContain("/thumb.webp");
+    pb.close();
   });
 
   it("The other side's read mark reaches the writer", async () => {

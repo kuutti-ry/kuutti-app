@@ -24,13 +24,15 @@ const REDACTED_PATHS = [
   "gender",
   // A person's own words to the moderators, a report's note (#84, ADR-030 §9).
   "note",
-  // A message's text (#348, ADR-031 §7): the request line only.
+  // A message's text (#348, ADR-031 §7): the request line only; a photo's caption too (#350).
   "body",
+  "caption",
   "*.hetu",
   "*.personal_identity_code",
   "*.email",
   "*.message",
   "*.text",
+  "*.caption",
   "*.password",
   "*.authorization",
   "*.cookie",

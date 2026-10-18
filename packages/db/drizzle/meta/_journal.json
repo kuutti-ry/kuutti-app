@@ -393,6 +393,20 @@
       "when": 1792261632222,
       "tag": "0055_chat_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792309490424,
+      "tag": "0056_message_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1792309500768,
+      "tag": "0057_message_photos_per_day",
+      "breakpoints": true
     }
   ]
 }

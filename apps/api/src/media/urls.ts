@@ -5,7 +5,10 @@ import { getSignedUrl as presignS3Url } from "@aws-sdk/s3-request-presigner";
 // Signed URL issuance, the fourth of the four security surfaces (security
 // checklist). A URL names one object for fifteen minutes and nothing else; the
 // route that hands it out is behind the session guard, is rate limited, and
-// writes a photo_access row per issuance. On AWS the URL is a CloudFront signed
+// writes a photo_access row per issuance. A photo sent in a conversation
+// (#350, ADR-031 §10) is signed to the next five-minute mark plus fifteen
+// minutes, and logged once per viewer, photo and variant in that window,
+// two reads at the same instant aside. On AWS the URL is a CloudFront signed
 // URL (TD-8): the distribution refuses the object without a valid signature
 // from the key pair whose private half lives in SSM and is read at boot.
 // Locally the stand-in is a presigned GET on the compose S3 stand-in, refused outside development

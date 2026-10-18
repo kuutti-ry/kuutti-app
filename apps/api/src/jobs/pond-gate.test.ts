@@ -282,6 +282,24 @@ describe("the gate", () => {
     }
   });
 
+  test("photos sent in conversations finish no profile: a person whose approved photos are all of messages is not counted (#350)", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-message-photos");
+    const [whole, messagesOnly] = await people(ctx.client, pond, 2, ALIKE);
+    // The same three approved photos, sent in conversations instead.
+    await ctx.client.query(
+      "UPDATE photo SET purpose = 'message', position = NULL WHERE account_id = $1",
+      [messagesOnly],
+    );
+
+    const { result } = await counted(ctx, NIGHT_1);
+    expect(result).toMatchObject({ ponds: 1, counted: 1 });
+    expect(await rowOf(ctx, whole)).toMatchObject({ admitted_at: NIGHT_1 });
+    expect(await rowOf(ctx, messagesOnly)).toBeUndefined();
+    expect((await askedBy(ctx, messagesOnly)).gate.state).toBe("incomplete");
+  });
+
   test("a ready line in place of a bio counts as a finished profile, and neither does not (#239)", async ({
     ctx,
   }) => {

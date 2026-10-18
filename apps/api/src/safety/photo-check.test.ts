@@ -153,6 +153,23 @@ describe("the notes themselves", () => {
     expect(left.rows).toEqual([{ photo_id: null, kind: "hate" }]);
   });
 
+  test("are not written for an erased account, whose notes its erasure deleted", async ({
+    ctx,
+  }) => {
+    const me = await signedInAccount(ctx.client);
+    await ctx.client.query(
+      "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+      [me.accountId],
+    );
+    await recordPhotoCheckNote(ctx.client, {
+      accountId: me.accountId,
+      photoId: null,
+      kind: "nudity",
+      at: T,
+    });
+    expect(await listPhotoCheckNotes(ctx.client, me.accountId)).toEqual([]);
+  });
+
   test("are pruned at twelve months to the day, and deleted per account", async ({ ctx }) => {
     const me = await signedInAccount(ctx.client);
     const other = await signedInAccount(ctx.client);

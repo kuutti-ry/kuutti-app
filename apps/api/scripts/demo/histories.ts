@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Queryable } from "@kuutti/db";
 import {
   type DemoPersona,
   MOCK_BANK_AMR,
   OLDER_TERMS_VERSION,
+  PERSONA_CONVERSATIONS,
   type PersonaHistory,
   personaOf,
   writeConversations,
@@ -17,6 +20,9 @@ import {
   type ProfileUpdate,
   SessionResponse,
 } from "@kuutti/schema";
+import { sendPhoto } from "../../src/chat/index.ts";
+import type { Logger } from "../../src/lib/logger.ts";
+import type { MediaDeps } from "../../src/media/index.ts";
 import { applySanction } from "../../src/safety/index.ts";
 import { type BankContext, call, DemoError, loginAs, upload } from "./bank.ts";
 import { approveLocally, type PhotoAssets, picturesOf } from "./photos.ts";
@@ -309,4 +315,64 @@ export function giveConversations(db: Queryable, results: readonly HistoryResult
   const accounts = new Map<string, string>();
   for (const { key, accountId } of results) if (accountId) accounts.set(key, accountId);
   return writeConversations(db, accounts, at);
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/** `skipped`: a persona of the pair has no account this time, or there is no object storage or no pictures. */
+export type PhotoMessagesResult = { sent: number; already: number; skipped: number };
+
+/**
+ * The stories' photos in their conversations (#350), after the conversations
+ * are written: each through the chat's own send, the pipeline and the check
+ * included, from the release's pictures, hours before the run as the story
+ * says, with the story's fixed id, so a second run (staging's stories job)
+ * is answered with the stored message and writes nothing. Without object
+ * storage or the release's pictures, none: the conversation stands without it.
+ */
+export async function givePhotoMessages(
+  deps: { db: Queryable; logger: Logger; media?: MediaDeps; assets?: PhotoAssets | null },
+  results: readonly HistoryResult[],
+  at: Date,
+): Promise<PhotoMessagesResult> {
+  const accounts = new Map<string, string>();
+  for (const { key, accountId } of results) if (accountId) accounts.set(key, accountId);
+  const done: PhotoMessagesResult = { sent: 0, already: 0, skipped: 0 };
+  for (const told of PERSONA_CONVERSATIONS) {
+    const photo = told.photo;
+    if (!photo) continue;
+    const a = accounts.get(told.between[0]);
+    const b = accounts.get(told.between[1]);
+    const { media, assets } = deps;
+    if (!a || !b || !media || !assets) {
+      done.skipped += 1;
+      continue;
+    }
+    const asset = assets.manifest.find((candidate) => candidate.path === photo.asset);
+    if (!asset) throw new DemoError(`the release has no ${photo.asset}: run pnpm demo:assets`);
+    const { rows } = await deps.db.query<{ id: string }>(
+      `SELECT c.id FROM conversation c
+       JOIN conversation_participant pa ON pa.conversation_id = c.id AND pa.side = 'a'
+       JOIN conversation_participant pb ON pb.conversation_id = c.id AND pb.side = 'b'
+       WHERE pa.account_id = $1 AND pb.account_id = $2
+       ORDER BY c.opened_at DESC LIMIT 1`,
+      [a, b],
+    );
+    const conversationId = rows[0]?.id;
+    if (!conversationId) throw new DemoError(`no conversation of ${told.between.join(" and ")}`);
+    const sentAt = new Date(at.getTime() - photo.hoursAgo * HOUR_MS);
+    const sent = await sendPhoto(
+      { db: deps.db, logger: deps.logger, now: () => sentAt, media },
+      {
+        accountId: photo.from === "a" ? a : b,
+        conversationId,
+        clientId: photo.clientId,
+        caption: photo.caption,
+        bytes: new Uint8Array(readFileSync(join(assets.dir, asset.path))),
+      },
+    );
+    if (sent.created) done.sent += 1;
+    else done.already += 1;
+  }
+  return done;
 }

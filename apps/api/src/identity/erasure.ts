@@ -274,7 +274,15 @@ export async function exportAccount(
     listSanctionsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     listReportsOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
     listBlocksOfAccount(deps.db, accountId, EXPORT_HISTORY_LIMIT),
-    exportConversations(deps.db, accountId),
+    // A line's photo with the check's description in words, as a profile photo's (#296, #350).
+    exportConversations(deps.db, accountId, (photoId) => {
+      const sent = photos.sent.get(photoId);
+      if (!sent) return null;
+      return {
+        ...sent,
+        descriptionText: sent.description ? describePhoto(t, sent.description) : null,
+      };
+    }),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),

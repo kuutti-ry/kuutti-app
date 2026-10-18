@@ -18,14 +18,14 @@ export const PHOTOS_REPO = "kuutti-ry/kuutti-app-demo-photos";
 export const PHOTOS_RELEASE = "v2";
 
 /** `persona:<key>` the persona's own set, `pool` a face of the population, `negative:<name>` a picture the check refuses. */
-export type PhotoPurpose = `persona:${string}` | "pool" | `negative:${string}`;
+export type AssetPurpose = `persona:${string}` | "pool" | `negative:${string}`;
 
 export type PhotoAsset = {
   /** Relative to the release's root, with forward slashes: `faces/sanna/1.jpg`. */
   path: string;
   /** Hex SHA-256 of the file's bytes. */
   sha256: string;
-  purpose: PhotoPurpose;
+  purpose: AssetPurpose;
 };
 
 /** Where a release is cached: `~/.cache/kuutti-demo-photos/<tag>`. */
@@ -36,7 +36,7 @@ export function demoAssetsDir(tag: string = PHOTOS_RELEASE, home: string = homed
 const PICTURE = /\.(jpe?g|png|webp)$/i;
 
 /** What a path in the release says the picture is for; null for a file the layout does not know. */
-export function purposeOf(path: string): PhotoPurpose | null {
+export function purposeOf(path: string): AssetPurpose | null {
   const parts = path.split("/");
   if (!PICTURE.test(path)) return null;
   if (parts.length === 3 && parts[0] === "faces") {
@@ -110,7 +110,7 @@ export function verifyAssets(dir: string, manifest: readonly PhotoAsset[]): Asse
 }
 
 /** The pictures of one purpose, in the order of their paths. */
-export function assetsFor(manifest: readonly PhotoAsset[], purpose: PhotoPurpose): PhotoAsset[] {
+export function assetsFor(manifest: readonly PhotoAsset[], purpose: AssetPurpose): PhotoAsset[] {
   return manifest.filter((a) => a.purpose === purpose).sort((a, b) => a.path.localeCompare(b.path));
 }
 

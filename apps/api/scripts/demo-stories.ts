@@ -40,7 +40,7 @@ import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError } from "./demo/bank.ts";
-import { giveConversations } from "./demo/histories.ts";
+import { giveConversations, givePhotoMessages } from "./demo/histories.ts";
 import { loadAssets } from "./demo/photos.ts";
 import { giveStories, viaServices } from "./demo/services.ts";
 
@@ -110,6 +110,12 @@ try {
   // Told before, a conversation is left as it is: a second run writes none.
   const talked = await giveConversations(pool, results, now());
   console.log(JSON.stringify({ msg: "demo stories: conversations", ...talked }));
+  const photos = await givePhotoMessages(
+    { db: pool, logger, ...(media.deps ? { media: media.deps } : {}), assets },
+    results,
+    now(),
+  );
+  console.log(JSON.stringify({ msg: "demo stories: photos in conversations", ...photos }));
   // The pond has other people in it now (ADR-018: nobody on staging is
   // anybody, so the counter of #54 is counted anew, as the population does).
   await pool.query("DELETE FROM waitlist_snapshot");

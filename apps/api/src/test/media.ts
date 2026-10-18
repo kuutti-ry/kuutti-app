@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import pLimit from "p-limit";
 import sharp from "sharp";
+import type { Inspection, Moderator } from "../media/index.ts";
 import { cloudFrontSigner, type MediaDeps, memoryMediaStore } from "../media/index.ts";
 
 /**
@@ -125,7 +126,7 @@ export const TEST_KEY_PAIR_ID = "K2JCJMDEHXQW5F";
 export const TEST_MEDIA_BASE = "https://api.test";
 
 /** A memory store, a CloudFront signer over a fresh test key, and a limit of `concurrency`. */
-export function testMediaDeps(options: { concurrency?: number } = {}) {
+export function testMediaDeps(options: { concurrency?: number; deliverUnchecked?: boolean } = {}) {
   const store = memoryMediaStore();
   const keys = testSigningKeys();
   const deps: MediaDeps = {
@@ -136,6 +137,45 @@ export function testMediaDeps(options: { concurrency?: number } = {}) {
       privateKey: keys.privateKey,
     }),
     limit: pLimit(options.concurrency ?? 2),
+    // A test is a developer's machine: a photo no check saw is delivered (#350).
+    deliverUnchecked: options.deliverUnchecked ?? true,
   };
   return { deps, store, keys };
+}
+
+/**
+ * What the check answers, written short: labels as `[name, confidence]`,
+ * faces as confidences; `null` labels is a look that never ran.
+ */
+export function checked(
+  labels: ReadonlyArray<readonly [string, number]> | null,
+  faces: readonly number[] = [99],
+): Inspection {
+  return {
+    checked: labels !== null,
+    labels: (labels ?? []).map(([name, confidence]) => ({ name, parentName: "", confidence })),
+    tipLabels: [],
+    faceConfidences: [...faces],
+    seen: { scene: [], face: null },
+    modelVersion: labels === null ? null : "7.0",
+    calls: labels === null ? 0 : 3,
+  };
+}
+
+/** A moderator that answers each look with the next answer (the last again), or throws it; `seen` counts the bytes it was shown. */
+export function scriptedModerator(...answers: Array<Inspection | Error>): Moderator & {
+  seen: number[];
+} {
+  const seen: number[] = [];
+  return {
+    kind: "rekognition",
+    seen,
+    async inspect(image) {
+      seen.push(image.length);
+      const answer = answers[Math.min(seen.length - 1, answers.length - 1)];
+      if (!answer) throw new Error("no answer scripted");
+      if (answer instanceof Error) throw answer;
+      return answer;
+    },
+  };
 }

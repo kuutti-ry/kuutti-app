@@ -2960,7 +2960,7 @@ errors.photo_not_appealable:
 
 errors.media_busy:
   en: Many photos are being processed right now. Try again in a moment.
-  description: Photo upload (503 with Retry-After), image processing is at its concurrency limit.
+  description: "Photo upload or a photo in a conversation (503 with Retry-After): image processing is at its concurrency limit, or the photo check cannot run just now (#350)."
   fi: Kuvia käsitellään juuri nyt paljon. Yritä hetken kuluttua uudelleen.
   sv: Många foton bearbetas just nu. Försök igen om en stund.
   machine: { fi: true, sv: true }
@@ -3026,6 +3026,34 @@ errors.message_budget_exceeded:
   description: "Send (429 with Retry-After, #348, ADR-026): over matching_config messages_per_minute for the account. Calm, never a number."
   fi: "Lähetät viestejä hyvin nopeasti. Odota hetki ja lähetä uudelleen."
   sv: "Du skickar meddelanden väldigt snabbt. Vänta en stund och skicka igen."
+  machine: { fi: true, sv: true }
+
+errors.photo_rejected_nudity:
+  en: Not sent. Photos with nudity cannot be sent on Kuutti.
+  description: "Photo in a conversation (400, #350): the automatic check was sure the photo shows nudity; nothing was stored. The sender's words keep the field."
+  fi: Ei lähetetty. Alastomuutta sisältäviä kuvia ei voi lähettää Kuutissa.
+  sv: Inte skickat. Foton med nakenhet kan inte skickas på Kuutti.
+  machine: { fi: true, sv: true }
+
+errors.photo_rejected_violence:
+  en: Not sent. Photos with violence or weapons cannot be sent on Kuutti.
+  description: "Photo in a conversation (400, #350): the automatic check was sure the photo shows violence or weapons; nothing was stored."
+  fi: Ei lähetetty. Kuvia, joissa on väkivaltaa tai aseita, ei voi lähettää Kuutissa.
+  sv: Inte skickat. Foton med våld eller vapen kan inte skickas på Kuutti.
+  machine: { fi: true, sv: true }
+
+errors.photo_rejected_other:
+  en: Not sent. This photo cannot be sent on Kuutti; try another one.
+  description: "Photo in a conversation (400, #350): the automatic check was sure the photo shows something disturbing or hateful; nothing was stored. Names no label."
+  fi: Ei lähetetty. Tätä kuvaa ei voi lähettää Kuutissa; kokeile toista.
+  sv: Inte skickat. Det här fotot kan inte skickas på Kuutti; prova ett annat.
+  machine: { fi: true, sv: true }
+
+errors.message_photo_budget_exceeded:
+  en: You have tried to send many photos today. You can send photos again after midnight.
+  description: "Photo in a conversation (429 with Retry-After, #350): over matching_config message_photos_per_day (the photos sent) or message_photo_attempts_per_day (the sends tried, refused ones included) for the account; both days roll at midnight in Finland. Never a number."
+  fi: Olet yrittänyt lähettää tänään paljon kuvia. Voit lähettää kuvia taas keskiyön jälkeen.
+  sv: Du har försökt skicka många foton i dag. Du kan skicka foton igen efter midnatt.
   machine: { fi: true, sv: true }
 
 errors.text_contact_details:
@@ -6725,6 +6753,111 @@ chat.presence.online:
   description: "Under a conversation's header while the other person has the app open (#349), beside a small dot. Short."
   fi: "Paikalla"
   sv: "Online"
+  machine: { fi: true, sv: true }
+
+chat.composer.photo:
+  en: "Add photo"
+  description: "What a screen reader says for the picture button beside the composer's field (#350): opens the phone's photo library to send a photo in the conversation. Short."
+  fi: "Lisää kuva"
+  sv: "Lägg till foto"
+  machine: { fi: true, sv: true }
+
+chat.composer.photoAttached:
+  en: "Photo attached. The words in the field go under it."
+  description: "Beside the small picture above the composer's field once a photo is picked (#350), said politely when it appears: Send sends the photo, with the field's words, if any, as its caption."
+  fi: "Kuva liitetty. Kentän sanat tulevat sen alle."
+  sv: "Foto bifogat. Orden i fältet hamnar under det."
+  machine: { fi: true, sv: true }
+
+chat.composer.removePhoto:
+  en: "Remove photo"
+  description: "Button beside the attached photo above the composer (#350): takes the photo off the message before it is sent; the words stay."
+  fi: "Poista kuva"
+  sv: "Ta bort foto"
+  machine: { fi: true, sv: true }
+
+chat.photo.photo:
+  en: "Photo"
+  description: "A photo sent in a conversation (#350): what a screen reader says for it when it has no caption, and the title of its full-size screen. Short."
+  fi: "Kuva"
+  sv: "Foto"
+  machine: { fi: true, sv: true }
+
+chat.photo.removed:
+  en: "Photo removed"
+  description: "In a conversation where a photo was (#350): its sender deleted their account, so the photo went with them. Says nothing more."
+  fi: "Kuva poistettu"
+  sv: "Fotot har tagits bort"
+  machine: { fi: true, sv: true }
+
+chat.photo.removedCaption:
+  en: "Photo removed. {caption}"
+  description: "A screen reader's words for a removed photo that had a caption (#350): chat.photo.removed, then the caption the sender wrote, in nominative."
+  fi: "Kuva poistettu. {caption}"
+  sv: "Fotot har tagits bort. {caption}"
+  machine: { fi: true, sv: true }
+
+chat.photo.open:
+  en: "Opens the photo full size"
+  description: "Screen-reader hint on a photo in a conversation (#350): a tap opens it full size."
+  fi: "Avaa kuvan täysikokoisena"
+  sv: "Öppnar fotot i full storlek"
+  machine: { fi: true, sv: true }
+
+chat.photo.uploading:
+  en: "Sending… {percent, number} %"
+  description: "Under a photo on its way in a conversation (#350), said politely as it goes. {percent} is a whole number 0 to 100."
+  fi: "Lähetetään… {percent, number} %"
+  sv: "Skickar… {percent, number} %"
+  machine: { fi: true, sv: true }
+
+chat.photo.back:
+  en: "Back to the conversation"
+  description: "What a screen reader says for the arrow at the top of a conversation's photo shown full size (#350)."
+  fi: "Takaisin keskusteluun"
+  sv: "Tillbaka till samtalet"
+  machine: { fi: true, sv: true }
+
+chat.photo.loading:
+  en: "Loading the photo…"
+  description: "A conversation's photo full size, while it loads (#350)."
+  fi: "Ladataan kuvaa…"
+  sv: "Laddar fotot…"
+  machine: { fi: true, sv: true }
+
+chat.photo.failed:
+  en: "The photo could not be loaded."
+  description: "A conversation's photo full size when it did not load (#350); the reason and a retry follow."
+  fi: "Kuvaa ei voitu ladata."
+  sv: "Fotot kunde inte laddas."
+  machine: { fi: true, sv: true }
+
+chat.photo.gone:
+  en: "This photo is no longer available."
+  description: "A conversation's photo full size when the API no longer gives it (#350): its sender deleted their account, or the conversation is gone."
+  fi: "Tämä kuva ei ole enää saatavilla."
+  sv: "Det här fotot är inte längre tillgängligt."
+  machine: { fi: true, sv: true }
+
+chat.photo.full:
+  en: "Photo, full size"
+  description: "Screen-reader label of a conversation's photo shown full size, without a caption (#350)."
+  fi: "Kuva, täysikokoinen"
+  sv: "Foto, full storlek"
+  machine: { fi: true, sv: true }
+
+chat.photo.fullCaption:
+  en: "Photo, full size. {caption}"
+  description: "Screen-reader label of a conversation's photo shown full size, with its caption (#350); {caption} is what the sender wrote, in nominative."
+  fi: "Kuva, täysikokoinen. {caption}"
+  sv: "Foto, full storlek. {caption}"
+  machine: { fi: true, sv: true }
+
+chat.row.photo:
+  en: "Photo"
+  description: "A row of the list when the last message is a photo without a caption (#350); after chat.row.mine's \"You:\" when it is the person's own. Short."
+  fi: "Kuva"
+  sv: "Foto"
   machine: { fi: true, sv: true }
 
 # --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---

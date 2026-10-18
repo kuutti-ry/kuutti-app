@@ -17,7 +17,8 @@ import type { PickedPhoto } from "./pick";
 // The photo routes as the app calls them (#48). Reads and small writes go
 // through the typed client; the upload is an XMLHttpRequest, the one transport
 // on React Native that reports upload progress and streams a file from disk
-// without loading it into JavaScript.
+// without loading it into JavaScript; the chat sends its photos through the
+// same one (#350).
 
 function failed(response: Response, error: unknown, what: string): ApiError {
   const parsed = ErrorResponse.safeParse(error);
@@ -94,9 +95,17 @@ export async function fetchPhotoUrl(id: string, variant: PhotoVariant): Promise<
   return PhotoUrlResponse.parse(data);
 }
 
-/** The multipart body: on the phone a file reference the runtime streams; on the web preview the blob itself. */
-async function formFor(photo: PickedPhoto): Promise<FormData> {
+/**
+ * The multipart body: the string fields first, then the picture; on the phone
+ * the picture is a file reference the runtime streams, on the web preview the
+ * blob itself.
+ */
+async function formFor(
+  photo: PickedPhoto,
+  fields: Readonly<Record<string, string>>,
+): Promise<FormData> {
   const form = new FormData();
+  for (const [name, value] of Object.entries(fields)) form.append(name, value);
   if (Platform.OS === "web") {
     const blob = await (await fetch(photo.uri)).blob();
     form.append("photo", blob, "photo.jpg");
@@ -115,13 +124,14 @@ async function formFor(photo: PickedPhoto): Promise<FormData> {
 type Sent = { status: number; body: string };
 
 function send(
+  path: string,
   token: string,
   form: FormData,
   onProgress?: (fraction: number) => void,
 ): Promise<Sent> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${apiBaseUrl()}/photos`);
+    xhr.open("POST", `${apiBaseUrl()}${path}`);
     xhr.setRequestHeader("authorization", `Bearer ${token}`);
     xhr.setRequestHeader("accept", "application/json");
     xhr.upload.onprogress = (event) => {
@@ -134,36 +144,58 @@ function send(
   });
 }
 
+/** What an upload answered: its status, and its body as JSON, or null when it was empty or not JSON. */
+export type UploadAnswer = { status: number; body: unknown };
+
 /**
- * Uploads a prepared picture with this device's session (#35): the access
+ * Posts a prepared picture to one of the API's upload routes with this
+ * device's session (#35): the profile's photos, or a photo sent in a
+ * conversation (#350), with the route's string fields beside it. The access
  * token is refreshed ahead of its expiry, and one 401 is answered by one
  * refresh and one retry, as the typed client does for every other request.
+ * The caller reads the answer; `uploadRefusal` makes an error of one it does
+ * not take.
  */
+export async function uploadPicture(
+  path: string,
+  photo: PickedPhoto,
+  fields: Readonly<Record<string, string>> = {},
+  onProgress?: (fraction: number) => void,
+): Promise<UploadAnswer> {
+  let session = currentSession();
+  if (session && accessTokenIsStale(session)) session = await refreshSession();
+  if (!session) throw new ApiError("no session", 401, "unauthenticated");
+  let sent = await send(path, session.accessToken, await formFor(photo, fields), onProgress);
+  if (sent.status === 401) {
+    const next = await refreshSession();
+    if (!next) throw new ApiError("signed out", 401, "session_revoked");
+    sent = await send(path, next.accessToken, await formFor(photo, fields), onProgress);
+  }
+  let body: unknown = null;
+  try {
+    body = sent.body ? JSON.parse(sent.body) : null;
+  } catch {
+    body = null;
+  }
+  return { status: sent.status, body };
+}
+
+/** An upload's answer the caller does not take, as an error with the API's code when it sent the envelope. */
+export function uploadRefusal(answer: UploadAnswer): ApiError {
+  const envelope = ErrorResponse.safeParse(answer.body);
+  return new ApiError(
+    `photo upload answered ${answer.status}`,
+    answer.status,
+    envelope.success ? envelope.data.error.code : undefined,
+  );
+}
+
+/** Uploads a prepared picture as one of the person's photos (#48). */
 export async function uploadPhoto(
   photo: PickedPhoto,
   onProgress?: (fraction: number) => void,
 ): Promise<Photo> {
-  let session = currentSession();
-  if (session && accessTokenIsStale(session)) session = await refreshSession();
-  if (!session) throw new ApiError("no session", 401, "unauthenticated");
-  const form = await formFor(photo);
-  let sent = await send(session.accessToken, form, onProgress);
-  if (sent.status === 401) {
-    const next = await refreshSession();
-    if (!next) throw new ApiError("signed out", 401, "session_revoked");
-    sent = await send(next.accessToken, await formFor(photo), onProgress);
-  }
-  let parsed: unknown = null;
-  try {
-    parsed = sent.body ? JSON.parse(sent.body) : null;
-  } catch {
-    parsed = null;
-  }
-  if (sent.status === 201) return readPhoto(parsed);
-  const envelope = ErrorResponse.safeParse(parsed);
-  throw new ApiError(
-    `photo upload answered ${sent.status}`,
-    sent.status,
-    envelope.success ? envelope.data.error.code : undefined,
-  );
+  const answer = await uploadPicture("/photos", photo, {}, onProgress);
+  if (answer.status === 201) return readPhoto(answer.body);
+  throw uploadRefusal(answer);
 }

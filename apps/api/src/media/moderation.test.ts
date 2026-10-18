@@ -24,6 +24,7 @@ import {
 } from "./description.ts";
 import {
   closerLines,
+  decideMessagePhoto,
   decideModeration,
   type Inspection,
   type Moderator,
@@ -108,6 +109,29 @@ const LAKESIDE_DESCRIPTION: PhotoDescription = {
   sunglasses: true,
   facialHair: false,
 };
+
+// A photo sent in a conversation (#350): the hard groups decide as for a
+// profile photo, the face rules not at all, and nothing the check is sure
+// of is appealable, since nothing of it is stored.
+describe("Automatic decision on a photo sent in a conversation", () => {
+  it.each([
+    ["none", "none", "approved", "nothing", "none"],
+    ["none", "99, 98, 95", "approved", "nothing", "none"],
+    ["none", "70", "approved", "nothing", "none"],
+    ["Female Swimwear or Underwear 99", "99", "approved", "nothing", "none"],
+    ["Explicit Nudity 97", "99", "rejected", "Explicit Nudity", "nudity"],
+    ["Explicit Nudity 75", "none", "queued", "Explicit Nudity", "none"],
+    ["Weapons 93", "none", "rejected", "Weapons", "violence"],
+    ["Corpses 95", "none", "rejected", "Corpses", "other"],
+    ["unchecked", "none", "queued", NOT_CHECKED, "none"],
+  ])("labels %s, faces %s → %s (%s, %s)", (labels, faces, outcome, flagged, reason) => {
+    const decided = decideMessagePhoto(inspection(labels, faces), lines(60, 90));
+    expect(decided.decision).toBe(outcome);
+    expect(decided.flagged).toEqual(flagged === "nothing" ? [] : flagged.split(", "));
+    expect(decided.reason).toBe(reason === "none" ? undefined : reason);
+    expect(decided.appealable).toBeUndefined();
+  });
+});
 
 describe("Automatic moderation decision", () => {
   it.each([
@@ -316,6 +340,30 @@ describe("The Rekognition adapter", () => {
       calls: 3,
     });
   });
+
+  it.each([
+    { picture: [60, 40], sent: [80, 80] },
+    { picture: [1600, 30], sent: [1600, 80] },
+    { picture: [80, 80], sent: [80, 80] },
+  ])(
+    "pads a $picture.0×$picture.1 picture to $sent.0×$sent.1, since Rekognition refuses a side under 80 px (#350)",
+    async ({ picture, sent }) => {
+      // A message photo's full size keeps a small picture small; padding,
+      // not scaling, so a long thin one does not grow.
+      const sizes: number[][] = [];
+      const client = {
+        async send(command: DetectModerationLabelsCommand) {
+          const metadata = await sharp(command.input.Image?.Bytes).metadata();
+          sizes.push([metadata.width ?? 0, metadata.height ?? 0]);
+          return {};
+        },
+      };
+      await rekognitionModerator(client as unknown as RekognitionClient).inspect(
+        await fixtureWebp(picture[0] ?? 0, picture[1] ?? 0),
+      );
+      expect(sizes).toEqual([sent, sent, sent]);
+    },
+  );
 
   it("decides without the scene when DetectLabels fails, and never asks the scene for sunglasses", async () => {
     let filters: string[] | undefined;

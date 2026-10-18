@@ -75,6 +75,7 @@ describe("what the API answers", () => {
     body: "Moi",
     createdAt: "2026-10-17T11:03:00.000Z",
     clientId: null,
+    photo: null,
   };
 
   it("is one of its seven frames, each strict", () => {

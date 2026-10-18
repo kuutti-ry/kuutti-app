@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.38.2",
+    "version": "0.39.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1136,37 +1136,7 @@
             "maxLength": 60
           },
           "review": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "decision": {
-                "type": "string",
-                "enum": [
-                  "approved",
-                  "queued",
-                  "rejected"
-                ]
-              },
-              "reason": {
-                "$ref": "#/components/schemas/PhotoRejectionReason"
-              },
-              "decidedByStaff": {
-                "type": "boolean",
-                "description": "True when a person decided, false when the automatic check did."
-              },
-              "decidedAt": {
-                "type": "string",
-                "nullable": true,
-                "format": "date-time"
-              }
-            },
-            "required": [
-              "decision",
-              "reason",
-              "decidedByStaff",
-              "decidedAt"
-            ],
-            "description": "The moderation outcome; label names are not part of it."
+            "$ref": "#/components/schemas/ExportedPhotoReview"
           },
           "descriptionText": {
             "type": "string",
@@ -1283,6 +1253,39 @@
           "flowers",
           "bonfire"
         ]
+      },
+      "ExportedPhotoReview": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "queued",
+              "rejected"
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PhotoRejectionReason"
+          },
+          "decidedByStaff": {
+            "type": "boolean",
+            "description": "True when a person decided, false when the automatic check did."
+          },
+          "decidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "decision",
+          "reason",
+          "decidedByStaff",
+          "decidedAt"
+        ],
+        "description": "The moderation outcome; label names are not part of it."
       },
       "PhotoRejectionReason": {
         "type": "string",
@@ -1670,14 +1673,22 @@
                   "type": "string",
                   "format": "date-time"
                 },
+                "kind": {
+                  "$ref": "#/components/schemas/MessageKind"
+                },
                 "body": {
                   "type": "string",
                   "maxLength": 10000
+                },
+                "photo": {
+                  "$ref": "#/components/schemas/ExportedSentPhoto"
                 }
               },
               "required": [
                 "at",
-                "body"
+                "kind",
+                "body",
+                "photo"
               ]
             },
             "maxItems": 1000000
@@ -1691,6 +1702,9 @@
                   "type": "string",
                   "format": "date-time"
                 },
+                "kind": {
+                  "$ref": "#/components/schemas/MessageKind"
+                },
                 "length": {
                   "type": "integer",
                   "minimum": 0
@@ -1698,6 +1712,7 @@
               },
               "required": [
                 "at",
+                "kind",
                 "length"
               ]
             },
@@ -1728,6 +1743,103 @@
           "erasure",
           null
         ]
+      },
+      "MessageKind": {
+        "type": "string",
+        "enum": [
+          "text",
+          "photo"
+        ]
+      },
+      "ExportedSentPhoto": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "file": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "review": {
+            "$ref": "#/components/schemas/ExportedPhotoReview"
+          },
+          "description": {
+            "$ref": "#/components/schemas/PhotoDescription"
+          },
+          "descriptionText": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 600
+          }
+        },
+        "required": [
+          "file",
+          "review",
+          "description",
+          "descriptionText"
+        ]
+      },
+      "PhotoDescription": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "people": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 50,
+            "description": "Faces the check counted as people present (the face threshold of ADR-006 §2)."
+          },
+          "setting": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "indoors",
+              "outdoors",
+              null
+            ],
+            "description": "Indoors or outdoors when the check is sure enough of one; null otherwise."
+          },
+          "scene": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoScene"
+            },
+            "maxItems": 3,
+            "description": "Where, the surest first; each a key of photos.description.scene."
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PhotoObject"
+            },
+            "maxItems": 4,
+            "description": "Activities, animals and objects, the surest first; each a key of photos.description.object."
+          },
+          "smile": {
+            "type": "boolean"
+          },
+          "glasses": {
+            "type": "boolean"
+          },
+          "sunglasses": {
+            "type": "boolean"
+          },
+          "facialHair": {
+            "type": "boolean",
+            "description": "A beard or a moustache."
+          }
+        },
+        "required": [
+          "people",
+          "setting",
+          "scene",
+          "objects",
+          "smile",
+          "glasses",
+          "sunglasses",
+          "facialHair"
+        ],
+        "description": "What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks."
       },
       "HealthResponse": {
         "type": "object",
@@ -2803,69 +2915,6 @@
           "height"
         ]
       },
-      "PhotoDescription": {
-        "type": "object",
-        "nullable": true,
-        "properties": {
-          "people": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 50,
-            "description": "Faces the check counted as people present (the face threshold of ADR-006 §2)."
-          },
-          "setting": {
-            "type": "string",
-            "nullable": true,
-            "enum": [
-              "indoors",
-              "outdoors",
-              null
-            ],
-            "description": "Indoors or outdoors when the check is sure enough of one; null otherwise."
-          },
-          "scene": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PhotoScene"
-            },
-            "maxItems": 3,
-            "description": "Where, the surest first; each a key of photos.description.scene."
-          },
-          "objects": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PhotoObject"
-            },
-            "maxItems": 4,
-            "description": "Activities, animals and objects, the surest first; each a key of photos.description.object."
-          },
-          "smile": {
-            "type": "boolean"
-          },
-          "glasses": {
-            "type": "boolean"
-          },
-          "sunglasses": {
-            "type": "boolean"
-          },
-          "facialHair": {
-            "type": "boolean",
-            "description": "A beard or a moustache."
-          }
-        },
-        "default": null,
-        "required": [
-          "people",
-          "setting",
-          "scene",
-          "objects",
-          "smile",
-          "glasses",
-          "sunglasses",
-          "facialHair"
-        ],
-        "description": "What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks."
-      },
       "OnboardingStatus": {
         "type": "object",
         "properties": {
@@ -3427,12 +3476,6 @@
           "side"
         ]
       },
-      "MessageKind": {
-        "type": "string",
-        "enum": [
-          "text"
-        ]
-      },
       "MessageSide": {
         "type": "string",
         "enum": [
@@ -3536,6 +3579,9 @@
             "type": "string",
             "nullable": true,
             "format": "uuid"
+          },
+          "photo": {
+            "$ref": "#/components/schemas/ChatPhoto"
           }
         },
         "required": [
@@ -3545,7 +3591,64 @@
           "kind",
           "body",
           "createdAt",
-          "clientId"
+          "clientId",
+          "photo"
+        ]
+      },
+      "ChatPhoto": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "photoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "blurhash": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "height": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "description": {
+            "$ref": "#/components/schemas/PhotoDescription"
+          },
+          "urls": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "thumb": {
+                "type": "string",
+                "format": "uri"
+              },
+              "full": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "thumb",
+              "full",
+              "expiresAt"
+            ]
+          }
+        },
+        "required": [
+          "photoId",
+          "blurhash",
+          "width",
+          "height",
+          "description",
+          "urls"
         ]
       },
       "SendMessageRequest": {
@@ -3564,6 +3667,29 @@
         "required": [
           "clientId",
           "body"
+        ],
+        "additionalProperties": false
+      },
+      "SendPhotoRequest": {
+        "type": "object",
+        "properties": {
+          "photo": {
+            "type": "string",
+            "format": "binary",
+            "description": "The picture, pre-resized to 1600 px by the app; JPEG, PNG or WebP."
+          },
+          "clientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "caption": {
+            "type": "string",
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "photo",
+          "clientId"
         ],
         "additionalProperties": false
       },
@@ -5501,7 +5627,7 @@
     "/account/export": {
       "get": {
         "summary": "Everything Kuutti holds about this account",
-        "description": "One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every photo whose object the store holds. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant.",
+        "description": "One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every profile photo whose object the store holds and of the newest hundred photos the person sent in conversations, whose lines carry each one's moderation outcome and description. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant, a sent photo's with the purpose message, never counted.",
         "security": [
           {
             "session": []
@@ -7335,6 +7461,150 @@
           },
           "429": {
             "description": "message_budget_exceeded: the minute's messages are sent; Retry-After is the wait.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}/photos": {
+      "post": {
+        "summary": "Send a photo",
+        "description": "One request uploads and sends (#350): the picture through the photo pipeline (validated, EXIF stripped, re-encoded, the variants, the original never stored), the automatic check before anything is stored, then the photo and its message in one transaction, as a text is sent. A clientId already stored answers 200 with that message and writes nothing. The caption follows the text's rules. At most matching_config message_photos_per_day a Finnish day, and the send counts against messages_per_minute. A Finnish day also counts the sends tried, refused ones included (matching_config message_photo_attempts_per_day). The answer carries the photo's thumb and full size, signed until the next five-minute mark plus fifteen minutes.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/SendPhotoRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sent before: the stored message, nothing written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed (no picture, a type other than JPEG, PNG or WebP, a malformed client id, an unknown field, a client id the other side used); message_too_long and contact_details for the caption; photo_rejected_nudity, photo_rejected_violence or photo_rejected_other: the check was sure, and nothing was stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conversation_closed: closed, a block stands between the two, or the counterpart deleted their account; nothing was stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "payload_too_large: over 10 MB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "photo_unsupported: not a picture the pipeline reads.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "photo_invalid or photo_too_many_pixels.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "message_budget_exceeded (the minute's messages) or message_photo_budget_exceeded (the day's photos, or the day's tries, matching_config message_photo_attempts_per_day, both until midnight in Finland); Retry-After is the wait.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "media_busy (the pipeline at capacity, or the check unavailable; Retry-After) or media_unavailable (no object storage here).",
             "content": {
               "application/json": {
                 "schema": {

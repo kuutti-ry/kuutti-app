@@ -458,7 +458,7 @@ describe("photo review queue, the remaining branches", () => {
       async query(text: string, values?: unknown[]) {
         const result = await ctx.client.query(text, values);
         // Right after this moderator's read of the photo, the other's decision commits.
-        if (!landed && text.endsWith(", account_id FROM photo WHERE id = $1")) {
+        if (!landed && text.includes(", account_id FROM photo WHERE id = $1")) {
           landed = true;
           await ctx.client.query("UPDATE photo SET state = 'approved' WHERE id = $1", [id]);
         }

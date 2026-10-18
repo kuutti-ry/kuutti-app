@@ -5,6 +5,7 @@ import type {
   PhotoCaption,
   PhotoDescription,
   PhotoId,
+  PhotoPurpose,
   PhotoRejectionReason,
   PhotoReviewItem,
   PhotoState,
@@ -44,7 +45,8 @@ const COLUMNS = `id, key, blurhash, width, height, state, rejection_reason, appe
 
 export async function listPhotos(db: Queryable, accountId: string): Promise<PhotoRow[]> {
   const { rows } = await db.query<Row>(
-    `SELECT ${COLUMNS} FROM photo WHERE account_id = $1 ORDER BY position, created_at`,
+    `SELECT ${COLUMNS} FROM photo WHERE account_id = $1 AND purpose = 'profile'
+     ORDER BY position, created_at`,
     [accountId],
   );
   return rows.map(photoFrom);
@@ -53,7 +55,8 @@ export async function listPhotos(db: Queryable, accountId: string): Promise<Phot
 /** The photos a card may carry (#47): approved only, in the owner's order. */
 export async function listApprovedPhotos(db: Queryable, accountId: string): Promise<PhotoRow[]> {
   const { rows } = await db.query<Row>(
-    `SELECT ${COLUMNS} FROM photo WHERE account_id = $1 AND state = 'approved' ORDER BY position, created_at`,
+    `SELECT ${COLUMNS} FROM photo WHERE account_id = $1 AND purpose = 'profile' AND state = 'approved'
+     ORDER BY position, created_at`,
     [accountId],
   );
   return rows.map(photoFrom);
@@ -79,7 +82,7 @@ export async function listPhotoTipInputs(
     `SELECT p.state, coalesce(r.labels, '[]'::jsonb) AS labels, coalesce(r.faces, 0) AS faces
      FROM photo p
      LEFT JOIN photo_review r ON r.photo_id = p.id
-     WHERE p.account_id = $1 AND p.state <> 'rejected'
+     WHERE p.account_id = $1 AND p.purpose = 'profile' AND p.state <> 'rejected'
      ORDER BY p.position, p.created_at`,
     [accountId],
   );
@@ -92,7 +95,7 @@ export async function listPhotoTipInputs(
 
 export async function countPhotos(db: Queryable, accountId: string): Promise<number> {
   const { rows } = await db.query<{ n: string }>(
-    "SELECT count(*) AS n FROM photo WHERE account_id = $1",
+    "SELECT count(*) AS n FROM photo WHERE account_id = $1 AND purpose = 'profile'",
     [accountId],
   );
   return Number(rows[0]?.n ?? 0);
@@ -125,7 +128,8 @@ export async function insertPhoto(
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `INSERT INTO photo (account_id, key, blurhash, width, height, position)
-     SELECT $1, $2, $3, $4, $5, coalesce(max(position) + 1, 0) FROM photo WHERE account_id = $1
+     SELECT $1, $2, $3, $4, $5, coalesce(max(position) + 1, 0) FROM photo
+     WHERE account_id = $1 AND purpose = 'profile'
      HAVING count(*) < $6
         AND EXISTS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted')
      RETURNING ${COLUMNS}`,
@@ -160,7 +164,7 @@ export async function findVisiblePhoto(
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `SELECT ${COLUMNS} FROM photo
-     WHERE id = $2
+     WHERE id = $2 AND purpose = 'profile'
        AND (account_id = $1
          OR (state = 'approved'
            AND EXISTS (SELECT 1 FROM card_shown WHERE account_id = $1 AND photo_id = photo.id)
@@ -185,7 +189,7 @@ export async function findMainPhotoOf(
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `SELECT ${COLUMNS} FROM photo
-     WHERE account_id = $2 AND state = 'approved'
+     WHERE account_id = $2 AND purpose = 'profile' AND state = 'approved'
        AND EXISTS (SELECT 1 FROM conversation_participant me
                    JOIN conversation_participant them
                      ON them.conversation_id = me.conversation_id AND them.side <> me.side
@@ -305,7 +309,7 @@ export async function deletePhoto(
   photoId: string,
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
-    `DELETE FROM photo WHERE id = $1 AND account_id = $2 RETURNING ${COLUMNS}`,
+    `DELETE FROM photo WHERE id = $1 AND account_id = $2 AND purpose = 'profile' RETURNING ${COLUMNS}`,
     [photoId, accountId],
   );
   return rows[0] ? photoFrom(rows[0]) : null;
@@ -329,7 +333,7 @@ export async function setPositions(
     `UPDATE photo SET position = o.position
      FROM (SELECT id::uuid, (ordinality - 1)::smallint AS position
            FROM unnest($2::text[]) WITH ORDINALITY AS u(id, ordinality)) AS o
-     WHERE photo.id = o.id AND photo.account_id = $1`,
+     WHERE photo.id = o.id AND photo.account_id = $1 AND photo.purpose = 'profile'`,
     [accountId, order],
   );
 }
@@ -339,8 +343,8 @@ export async function compactPositions(db: Queryable, accountId: string): Promis
   await db.query(
     `UPDATE photo SET position = o.position
      FROM (SELECT id, (row_number() OVER (ORDER BY position, created_at) - 1)::smallint AS position
-           FROM photo WHERE account_id = $1) AS o
-     WHERE photo.id = o.id AND photo.account_id = $1`,
+           FROM photo WHERE account_id = $1 AND purpose = 'profile') AS o
+     WHERE photo.id = o.id AND photo.account_id = $1 AND photo.purpose = 'profile'`,
     [accountId],
   );
 }
@@ -393,7 +397,7 @@ export async function insertPhotoAccess(
     }>(
       `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
           used AS (SELECT count(*)::int AS n FROM photo_access
-                   WHERE account_id = $1 AND variant = $3 AND at >= $5),
+                   WHERE account_id = $1 AND variant = $3 AND at >= $5 AND purpose = 'profile'),
           blocked AS (SELECT EXISTS (SELECT 1 FROM photo
                                      WHERE id = $2 AND account_id <> $1
                                        AND blocked_between($1, account_id)) AS b),
@@ -426,13 +430,94 @@ export async function insertPhotoAccess(
  */
 export async function logPhotoAccess(
   db: Queryable,
-  input: { accountId: string; photoId: string; variant: PhotoVariant; at: Date },
+  input: {
+    accountId: string;
+    photoId: string;
+    variant: PhotoVariant;
+    at: Date;
+    /** A message photo's fetch (#350) is logged and never counted against the day's budget. */
+    purpose?: PhotoPurpose;
+  },
 ): Promise<void> {
   await db.query(
-    `INSERT INTO photo_access (account_id, photo_id, variant, at)
-     SELECT $1, $2, $3, $4 FROM account WHERE id = $1 AND state <> 'deleted'`,
-    [input.accountId, input.photoId, input.variant, input.at],
+    `INSERT INTO photo_access (account_id, photo_id, variant, at, purpose)
+     SELECT $1, $2, $3, $4, $5 FROM account WHERE id = $1 AND state <> 'deleted'`,
+    [input.accountId, input.photoId, input.variant, input.at, input.purpose ?? "profile"],
   );
+}
+
+/**
+ * The fetch log of an answer's message photos (#350), one statement: a row
+ * per photo and variant the reader was not handed since `since` (the URL's
+ * window, so a repeated read writes nothing), with the purpose `message`.
+ * `live` false for a reader erased meanwhile (#51), who gets no row.
+ */
+export async function logMessagePhotoAccess(
+  db: Queryable,
+  input: { accountId: string; photoIds: readonly string[]; at: Date; since: Date },
+): Promise<{ live: boolean; written: number }> {
+  const { rows } = await db.query<{ live: boolean; written: number }>(
+    `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted'),
+          ins AS (
+            INSERT INTO photo_access (account_id, photo_id, variant, at, purpose)
+            SELECT $1, u.photo_id, v.variant, $3, 'message'
+            FROM unnest($2::uuid[]) AS u(photo_id)
+            CROSS JOIN (VALUES ('thumb'::photo_variant), ('full'::photo_variant)) AS v(variant)
+            CROSS JOIN live
+            WHERE NOT EXISTS (
+              SELECT 1 FROM photo_access a
+              WHERE a.account_id = $1 AND a.photo_id = u.photo_id AND a.variant = v.variant
+                AND a.purpose = 'message' AND a.at >= $4)
+            RETURNING 1)
+     SELECT EXISTS (SELECT 1 FROM live) AS live, (SELECT count(*)::int FROM ins) AS written`,
+    [input.accountId, input.photoIds, input.at, input.since],
+  );
+  return { live: rows[0]?.live === true, written: rows[0]?.written ?? 0 };
+}
+
+/**
+ * The account's photos sent in conversations since the day began (#350),
+ * read under the sender's lock in the transaction that then writes the next,
+ * so the day's cap holds against a burst (rule 6: the caller's account).
+ */
+export async function countMessagePhotosSince(
+  db: Queryable,
+  accountId: string,
+  since: Date,
+): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM photo
+     WHERE account_id = $1 AND purpose = 'message' AND created_at >= $2`,
+    [accountId, since],
+  );
+  return rows[0]?.n ?? 0;
+}
+
+/**
+ * A photo sent in a conversation (#350): no position, the check's decision
+ * as its state, and only for a live account, as a profile photo's insert
+ * asks. Null when the account is a tombstone (#51).
+ */
+export async function insertMessagePhoto(
+  db: Queryable,
+  input: {
+    accountId: string;
+    key: string;
+    blurhash: string;
+    width: number;
+    height: number;
+    state: "approved" | "queued";
+    at: Date;
+  },
+): Promise<string | null> {
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO photo (account_id, key, blurhash, width, height, state, purpose, position, created_at)
+     SELECT $1, $2, $3, $4, $5, $6, 'message', NULL, $7
+     FROM account WHERE id = $1 AND state <> 'deleted'
+     RETURNING id`,
+    [input.accountId, input.key, input.blurhash, input.width, input.height, input.state, input.at],
+  );
+  return rows[0]?.id ?? null;
 }
 
 // Moderation (#49). The automatic check and the staff routes read photos
@@ -510,7 +595,8 @@ export async function findPendingUnchecked(
   const { rows } = await db.query<Row>(
     `SELECT p.id, p.account_id, p.key FROM photo p
      LEFT JOIN photo_review r ON r.photo_id = p.id
-     WHERE p.state = 'pending' AND (r.photo_id IS NULL OR r.decided_by IS NULL) AND p.created_at < $1
+     WHERE p.purpose = 'profile' AND p.state = 'pending' AND (r.photo_id IS NULL OR r.decided_by IS NULL)
+       AND p.created_at < $1
      ORDER BY p.created_at LIMIT $2`,
     [olderThan, limit],
   );
@@ -550,7 +636,7 @@ export async function appealPhoto(
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE photo SET state = 'queued', rejection_reason = NULL, appealable = false
-     WHERE id = $1 AND account_id = $2 AND state = 'rejected' AND appealable
+     WHERE id = $1 AND account_id = $2 AND purpose = 'profile' AND state = 'rejected' AND appealable
      RETURNING ${COLUMNS}`,
     [input.photoId, input.accountId],
   );
@@ -574,7 +660,8 @@ export async function setCaption(
   input: { accountId: string; photoId: string; caption: PhotoCaption | null },
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
-    `UPDATE photo SET caption = $3 WHERE id = $1 AND account_id = $2 RETURNING ${COLUMNS}`,
+    `UPDATE photo SET caption = $3 WHERE id = $1 AND account_id = $2 AND purpose = 'profile'
+     RETURNING ${COLUMNS}`,
     [input.photoId, input.accountId, input.caption],
   );
   const row = rows[0];
@@ -588,7 +675,7 @@ const QUEUE_COLUMNS = `p.id, p.account_id, p.state, p.blurhash, p.width, p.heigh
 export async function listQueue(db: Queryable, limit: number): Promise<PhotoReviewItem[]> {
   const { rows } = await db.query<Row>(
     `SELECT ${QUEUE_COLUMNS} FROM photo p LEFT JOIN photo_review r ON r.photo_id = p.id
-     WHERE p.state = 'queued'
+     WHERE p.purpose = 'profile' AND p.state = 'queued'
      -- Longest waiting first: an appealed photo waits from its appeal, as the front page counts it (#303).
      ORDER BY coalesce(r.appealed_at, p.created_at), p.id LIMIT $1`,
     [limit],
@@ -606,14 +693,14 @@ export async function queueSummary(
   const { rows } = await db.query<{ n: number; oldest: Date | null }>(
     `SELECT count(*)::int AS n, min(coalesce(r.appealed_at, p.created_at)) AS oldest
      FROM photo p LEFT JOIN photo_review r ON r.photo_id = p.id
-     WHERE p.state = 'queued'`,
+     WHERE p.purpose = 'profile' AND p.state = 'queued'`,
   );
   return { waiting: rows[0]?.n ?? 0, oldestSince: rows[0]?.oldest ?? null };
 }
 
 export async function countQueue(db: Queryable): Promise<number> {
   const { rows } = await db.query<{ n: string }>(
-    "SELECT count(*) AS n FROM photo WHERE state = 'queued'",
+    "SELECT count(*) AS n FROM photo WHERE purpose = 'profile' AND state = 'queued'",
   );
   return Number(rows[0]?.n ?? 0);
 }
@@ -623,9 +710,10 @@ export async function findPhotoForStaff(
   db: Queryable,
   photoId: string,
 ): Promise<(PhotoRow & { accountId: string }) | null> {
-  const { rows } = await db.query<Row>(`SELECT ${COLUMNS}, account_id FROM photo WHERE id = $1`, [
-    photoId,
-  ]);
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS}, account_id FROM photo WHERE id = $1 AND purpose = 'profile'`,
+    [photoId],
+  );
   const r = rows[0];
   return r ? { ...photoFrom(r), accountId: r.account_id as string } : null;
 }
@@ -647,7 +735,8 @@ export async function decidePhoto(
   },
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
-    `UPDATE photo SET state = $2, rejection_reason = $3 WHERE id = $1 AND state = 'queued' RETURNING ${COLUMNS}`,
+    `UPDATE photo SET state = $2, rejection_reason = $3
+     WHERE id = $1 AND purpose = 'profile' AND state = 'queued' RETURNING ${COLUMNS}`,
     [input.photoId, input.decision, input.reason],
   );
   const row = rows[0];
@@ -668,12 +757,39 @@ export async function decidePhoto(
 // the content, decided by the caller after the transaction.
 
 /** Deletes every photo row of the account; returns their content keys. */
-export async function deletePhotosOfAccount(db: Queryable, accountId: string): Promise<string[]> {
+export async function deletePhotosOfAccount(
+  db: Queryable,
+  accountId: string,
+  keep: readonly string[] = [],
+): Promise<string[]> {
   const { rows } = await db.query<{ key: string }>(
-    "DELETE FROM photo WHERE account_id = $1 RETURNING key",
-    [accountId],
+    "DELETE FROM photo WHERE account_id = $1 AND NOT (id = ANY($2::uuid[])) RETURNING key",
+    [accountId, keep],
   );
   return rows.map((r) => r.key);
+}
+
+/**
+ * The person's photos sent in conversations, the newest first, for the
+ * export (#350): the id, the content key and the check's description. A
+ * person sends ten a day at most, and these are rows, not files.
+ */
+export async function listMessagePhotosOfAccount(
+  db: Queryable,
+  accountId: string,
+): Promise<Array<{ id: string; key: string; description: PhotoDescription | null }>> {
+  const { rows } = await db.query<Row>(
+    `SELECT id, key,
+       (SELECT r.description FROM photo_review r WHERE r.photo_id = photo.id) AS description
+     FROM photo WHERE account_id = $1 AND purpose = 'message'
+     ORDER BY created_at DESC, id`,
+    [accountId],
+  );
+  return rows.map((r) => ({
+    id: r.id as string,
+    key: r.key as string,
+    description: (r.description as PhotoDescription | null) ?? null,
+  }));
 }
 
 export async function deletePhotoAccessOfAccount(

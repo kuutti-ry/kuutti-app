@@ -8,6 +8,7 @@ import EmailRoute from "../app/account/email";
 import AuthReturnRoute from "../app/auth";
 import ConversationRoute from "../app/chats/[id]";
 import ConversationsRoute from "../app/chats/index";
+import ChatPhotoRoute from "../app/chats/photo/[messageId]";
 import IndexRoute from "../app/index";
 import OnboardingRoute from "../app/onboarding";
 import PhotoZoomRoute from "../app/photos/[id]";
@@ -67,6 +68,7 @@ jest.mock("@/features/chat", () => {
   return {
     ChatLiveProvider: ({ children }: { children: React.ReactNode }) =>
       createElement(Fragment, null, children),
+    ChatPhotoScreen: probe("ChatPhotoScreen"),
     ConversationScreen: probe("ConversationScreen"),
     ConversationsScreen: probe("ConversationsScreen"),
   };
@@ -201,6 +203,51 @@ describe("one conversation, /chats/[id]", () => {
     params(given);
     await render(<ConversationRoute />);
     expect(propsOf("ConversationScreen")).toEqual({ id });
+  });
+});
+
+describe("a conversation's photo full size, /chats/photo/[messageId] (#350)", () => {
+  const MESSAGE = "00000000-0000-4000-8000-000000000004";
+  const CONVERSATION = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
+
+  it("hands the screen the message, its conversation, its place as a number and its placeholder", async () => {
+    params({ messageId: MESSAGE, conversation: CONVERSATION, seq: "4", blurhash: "LEHV6n" });
+    await render(<ChatPhotoRoute />);
+    expect(propsOf("ChatPhotoScreen")).toEqual({
+      messageId: MESSAGE,
+      conversation: CONVERSATION,
+      seq: 4,
+      blurhash: "LEHV6n",
+    });
+  });
+
+  it("takes the first of a param that came twice", async () => {
+    params({ messageId: [MESSAGE, "b"], conversation: [CONVERSATION, "d"], seq: ["7", "8"] });
+    await render(<ChatPhotoRoute />);
+    expect(propsOf("ChatPhotoScreen")).toEqual({
+      messageId: MESSAGE,
+      conversation: CONVERSATION,
+      seq: 7,
+      blurhash: "",
+    });
+  });
+
+  it.each<Record<string, string | readonly string[]>>([
+    {},
+    { seq: "" },
+    { seq: "four" },
+    { seq: "1.5" },
+    { seq: "0" },
+    { seq: "-3" },
+  ])("hands nothing and no place for %j, which no bubble sends", async (value) => {
+    params(value);
+    await render(<ChatPhotoRoute />);
+    expect(propsOf("ChatPhotoScreen")).toEqual({
+      messageId: "",
+      conversation: "",
+      seq: 0,
+      blurhash: "",
+    });
   });
 });
 

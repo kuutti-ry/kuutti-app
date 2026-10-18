@@ -11,6 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { account } from "./identity.ts";
+import { photo } from "./media.ts";
 
 /**
  * The chat (#348, ADR-031): a conversation is the record of a match (#100
@@ -28,8 +29,8 @@ export const conversationClose = pgEnum("conversation_close", [
   "sanction",
 ]);
 export const conversationSide = pgEnum("conversation_side", ["a", "b"]);
-/** `text` now; #350 adds `photo` with its photo's id. */
-export const messageKind = pgEnum("message_kind", ["text"]);
+/** A text, or a photo (#350) with its photo's id and the body as its caption. */
+export const messageKind = pgEnum("message_kind", ["text", "photo"]);
 
 /**
  * `next_seq` is the sequence the next message takes, assigned in the send's
@@ -109,12 +110,20 @@ export const message = pgTable(
     clientId: uuid("client_id").notNull(),
     kind: messageKind("kind").notNull(),
     body: text("body"),
+    // A photo message's photo; null once the sender's erasure took it, which
+    // reads "Photo removed" (#350).
+    photoId: uuid("photo_id").references(() => photo.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     uniqueIndex("message_seq_idx").on(table.conversationId, table.seq),
     uniqueIndex("message_client_idx").on(table.conversationId, table.clientId),
+    // One message per photo; the photo's deletion finds its message by it.
+    uniqueIndex("message_photo_idx").on(table.photoId),
     check("message_text_body_check", sql`${table.kind} <> 'text' OR ${table.body} IS NOT NULL`),
     check("message_seq_check", sql`${table.seq} >= 1`),
+    // Only a photo message has a photo. Written without naming the new kind:
+    // the value added in this migration cannot be used in its transaction.
+    check("message_photo_check", sql`${table.photoId} IS NULL OR ${table.kind} <> 'text'`),
   ],
 );

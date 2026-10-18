@@ -31,6 +31,7 @@ export {
   photo,
   photoAccess,
   photoDecision,
+  photoPurpose,
   photoRejectionReason,
   photoReview,
   photoState,

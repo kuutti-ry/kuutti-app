@@ -41,6 +41,7 @@ export {
 } from "./personas.ts";
 export {
   type AssetProblem,
+  type AssetPurpose,
   assetsFor,
   demoAssetsDir,
   facesForPopulation,
@@ -49,7 +50,6 @@ export {
   PHOTOS_RELEASE,
   PHOTOS_REPO,
   type PhotoAsset,
-  type PhotoPurpose,
   purposeOf,
   renderManifest,
   verifyAssets,

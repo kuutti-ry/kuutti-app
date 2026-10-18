@@ -1,6 +1,6 @@
 # ADR-005: Photo pipeline and delivery
 
-- Status: accepted
+- Status: accepted, amended 2026-10-18 (a second purpose: a photo sent in a conversation, #350; see History)
 - Date: 2026-09-25
 - Follows: TD-2 (S3 and CloudFront as the media path), TD-8 (photos are moderated, metadata-free, signed and time-limited), TD-4 (one vendor), TD-6 (exposure is counted), CLAUDE.md rule 4, `.claude/rules/api.md` Media, `.claude/rules/infra.md` CloudFront, audit F141; issue #48
 
@@ -39,3 +39,4 @@ A photo is the most identifying thing in the product and the easiest to scrape. 
 ## History
 
 - 2026-10-09: staging cut over with `media_enabled` alone (`infra/envs/staging`): the key pair of §3 created, its public half committed, the `origin.api.staging` domain given to the `api` application. The ingress switch of §7 stays off, so until Dokploy and the previews are behind the distribution the rate limiter keys on the CloudFront edge that forwarded the request (ADR-008 §5 and History, `infra/README.md` Media): one sender near an edge can exhaust the anonymous buckets for every phone behind it for the window. The maintainer accepts that for staging, where those phones are the team's; production keeps the order of §7.
+- 2026-10-18 (#350, ADR-031 §10): a second purpose. A photo sent in a conversation goes through the same pipeline, as a row of `photo` with `purpose = message` and no position (migration 0056), checked before anything is stored (ADR-006), its row and its message one transaction. Its thumb and full size are signed for the conversation's two people only, in a page of the conversation, the read of one message and the send's answer to its sender (201, and 200 for a resend), never in a socket frame. The URLs end at the next five-minute mark plus fifteen minutes, so they live 15 to 20 minutes rather than §3's fifteen, and on CloudFront a repeated read inside the five minutes gets the same URL (the stand-in of §5 presigns afresh). The fetch log has one row per viewer, photo and variant in each five-minute window, with the purpose `message` and never counted (ADR-008); two reads at the same instant, in two transactions, may each write theirs. The profile's reads ask for `profile`: a message photo is never on a card, a photos screen, the moderators' queue or a conversation's thumb, and the photo routes answer 404 for it.

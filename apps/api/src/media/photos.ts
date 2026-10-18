@@ -12,8 +12,16 @@ import type { LimitFunction } from "p-limit";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { recordPhotoCheckNote } from "../safety/index.ts";
 import { dayWindow, readPhotoFetchBudget, secondsUntil } from "./budget.ts";
-import { type Moderator, moderatePhoto } from "./moderation.ts";
+import {
+  CheckUnavailableError,
+  checkMessagePhoto,
+  type MessagePhotoCheck,
+  type Moderator,
+  moderatePhoto,
+  recordMessagePhotoCheck,
+} from "./moderation.ts";
 import { PipelineError, processPhoto } from "./pipeline.ts";
 import * as repo from "./repo.ts";
 import { type MediaStore, objectKey, WEBP } from "./store.ts";
@@ -28,6 +36,13 @@ export type MediaDeps = {
   limit: LimitFunction;
   /** The automatic check (#49); absent in a bare test app, and the photo stays pending. */
   moderator?: Moderator;
+  /**
+   * Whether a photo sent in a conversation may be delivered where no check
+   * ran (#350): on a developer's machine and in tests, whose stack has no
+   * Rekognition. Anywhere else such a photo is refused, so a missing or
+   * misnamed moderation parameter never lets one through unchecked.
+   */
+  deliverUnchecked?: boolean;
 };
 
 export type PhotoServiceDeps = MediaDeps & { db: Queryable; logger: Logger; now: () => Date };
@@ -66,43 +81,12 @@ export async function uploadPhoto(
       maxPhotos,
     });
   }
-  // Fail closed above the limit rather than queue: a queue is unbounded work
-  // on one box (security checklist, "Mishandling of exceptional conditions").
-  // p-limit counts a call as pending until it starts, so both counts matter.
-  if (deps.limit.activeCount + deps.limit.pendingCount >= deps.limit.concurrency) {
-    throw new AppError(503, "media_busy", "Image processing is at capacity", {
-      active: deps.limit.activeCount,
-    });
-  }
-  let processed: Awaited<ReturnType<typeof processPhoto>>;
-  try {
-    processed = await deps.limit(() => processPhoto(input.bytes));
-  } catch (error) {
-    if (error instanceof PipelineError) {
-      const status = error.reason === "unsupported" ? 415 : 422;
-      const code = error.reason === "unsupported" ? "photo_unsupported" : "photo_invalid";
-      throw new AppError(
-        status,
-        error.reason === "too_many_pixels" ? "photo_too_many_pixels" : code,
-        error.message,
-      );
-    }
-    throw error;
-  }
+  const processed = await processUnderLimit(deps, input.bytes);
   // The objects first, then the row that owns them. Whatever fails in
   // between, the objects do not stay behind without a row: a picture nobody
   // can reach is still a picture kept (TD-7), so the failure path removes
   // them unless another row already shares the content.
-  const keys = PHOTO_VARIANTS.map((variant) => objectKey(processed.key, variant));
-  const dropOrphans = async () => {
-    try {
-      if ((await repo.countRowsForKey(deps.db, processed.key)) === 0) {
-        await deps.store.delete(keys);
-      }
-    } catch (error) {
-      deps.logger.error({ accountId: input.accountId, err: error }, "photo orphan cleanup failed");
-    }
-  };
+  const dropOrphans = () => dropOrphansOf(deps, processed.key, input.accountId);
   let row: repo.PhotoRow | null;
   try {
     await Promise.all(
@@ -157,6 +141,226 @@ export async function uploadPhoto(
     }
   }
   return toPhoto(row);
+}
+
+/**
+ * The pipeline under the concurrency limit (rules/api.md Media), its
+ * failures as the routes say them. Fail closed above the limit rather than
+ * queue: a queue is unbounded work on one box (security checklist,
+ * "Mishandling of exceptional conditions"). p-limit counts a call as pending
+ * until it starts, so both counts matter.
+ */
+async function processUnderLimit(deps: PhotoServiceDeps, bytes: Uint8Array) {
+  if (deps.limit.activeCount + deps.limit.pendingCount >= deps.limit.concurrency) {
+    throw new AppError(503, "media_busy", "Image processing is at capacity", {
+      active: deps.limit.activeCount,
+    });
+  }
+  try {
+    return await deps.limit(() => processPhoto(bytes));
+  } catch (error) {
+    if (error instanceof PipelineError) {
+      const status = error.reason === "unsupported" ? 415 : 422;
+      const code = error.reason === "unsupported" ? "photo_unsupported" : "photo_invalid";
+      throw new AppError(
+        status,
+        error.reason === "too_many_pixels" ? "photo_too_many_pixels" : code,
+        error.message,
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * The objects of a content key nothing refers to any more go: a picture
+ * nobody can reach is still a picture kept (TD-7). Another row sharing the
+ * content keeps them.
+ */
+// shortcut: erasure's `deleteOrphanedObjects` window is here too: a send of
+// the same picture that stored its objects and has not committed its row
+// yet loses them to a refused one's cleanup. A per-content-key ownership
+// protocol lifts it, noted for the M4 orphan sweep.
+async function dropOrphansOf(deps: PhotoServiceDeps, key: string, accountId: string) {
+  try {
+    if ((await repo.countRowsForKey(deps.db, key)) === 0) {
+      await deps.store.delete(PHOTO_VARIANTS.map((variant) => objectKey(key, variant)));
+    }
+  } catch (error) {
+    deps.logger.error({ accountId, err: error }, "photo orphan cleanup failed");
+  }
+}
+
+/** A message photo through the pipeline and the check, its objects stored, its row not yet written. */
+export type PreparedMessagePhoto = {
+  key: string;
+  blurhash: string;
+  width: number;
+  height: number;
+  check: MessagePhotoCheck;
+  /** Removes the objects unless a row refers to them: for every path that writes no row. */
+  dropOrphans: () => Promise<void>;
+};
+
+/** The words a refused message photo is told in: one code per reason, since the envelope carries a code. */
+const MESSAGE_PHOTO_REFUSAL: Record<string, string> = {
+  nudity: "photo_rejected_nudity",
+  violence: "photo_rejected_violence",
+};
+
+/**
+ * A photo sent in a conversation (#350), as far as it goes without the
+ * conversation: the pipeline (rule 4: validated, EXIF stripped, re-encoded,
+ * the variants, the original referenced by nothing after), then the check on
+ * the full size before anything is stored, then the objects. What the check
+ * is sure of is refused here and nothing is stored but the check's note
+ * (#253); a check that cannot run refuses as busy, so no photo is delivered
+ * unchecked. The caller writes
+ * the row and the message in one transaction (storeMessagePhoto), and calls
+ * dropOrphans on every path that writes no row.
+ */
+export async function prepareMessagePhoto(
+  deps: PhotoServiceDeps,
+  input: { accountId: string; bytes: Uint8Array },
+): Promise<PreparedMessagePhoto> {
+  const processed = await processUnderLimit(deps, input.bytes);
+  let check: MessagePhotoCheck;
+  try {
+    check = await checkMessagePhoto(
+      {
+        db: deps.db,
+        logger: deps.logger,
+        moderator: deps.moderator,
+        deliverUnchecked: deps.deliverUnchecked,
+        now: deps.now,
+      },
+      { accountId: input.accountId, image: processed.variants.full },
+    );
+  } catch (error) {
+    // Busy, in the words the app already has: try again in a moment.
+    if (error instanceof CheckUnavailableError) {
+      throw new AppError(503, "media_busy", "The photo check is not available", {
+        retryAfterSeconds: CHECK_RETRY_AFTER_SECONDS,
+      });
+    }
+    throw error;
+  }
+  if (check.decided.decision === "rejected") {
+    const reason = check.decided.reason ?? "other";
+    if (check.noted) {
+      await recordPhotoCheckNote(deps.db, {
+        accountId: input.accountId,
+        photoId: null,
+        kind: check.noted,
+        at: check.checkedAt,
+      });
+    }
+    throw new AppError(
+      400,
+      MESSAGE_PHOTO_REFUSAL[reason] ?? "photo_rejected_other",
+      "The check refused the photo",
+      { reason },
+    );
+  }
+  const dropOrphans = () => dropOrphansOf(deps, processed.key, input.accountId);
+  try {
+    await Promise.all(
+      PHOTO_VARIANTS.map((variant) =>
+        deps.store.put(objectKey(processed.key, variant), processed.variants[variant], WEBP),
+      ),
+    );
+  } catch (error) {
+    await dropOrphans();
+    throw error;
+  }
+  return {
+    key: processed.key,
+    blurhash: processed.blurhash,
+    width: processed.width,
+    height: processed.height,
+    check,
+    dropOrphans,
+  };
+}
+
+/** A message photo is refused this long when the check cannot run: long enough for a blip to pass. */
+const CHECK_RETRY_AFTER_SECONDS = 30;
+
+/**
+ * The prepared photo's row and its review row, in the caller's transaction
+ * (#350): the check's decision as its state, no position, nobody's queue.
+ * The id, or null when the account was erased meanwhile (#51).
+ */
+export async function storeMessagePhoto(
+  tx: Queryable,
+  input: { accountId: string; photo: PreparedMessagePhoto; at: Date },
+): Promise<string | null> {
+  const decision = input.photo.check.decided.decision;
+  const id = await repo.insertMessagePhoto(tx, {
+    accountId: input.accountId,
+    key: input.photo.key,
+    blurhash: input.photo.blurhash,
+    width: input.photo.width,
+    height: input.photo.height,
+    state: decision === "approved" ? "approved" : "queued",
+    at: input.at,
+  });
+  if (id) await recordMessagePhotoCheck(tx, id, input.photo.check);
+  return id;
+}
+
+/** The account's message photos of the day, under the lock the caller holds (#350). */
+export const countMessagePhotosSince = repo.countMessagePhotosSince;
+
+/**
+ * A message photo's URLs end at the next five-minute mark plus the usual
+ * fifteen minutes (ADR-005 §3): asked for again within the five minutes, a
+ * photo is handed the same URL on CloudFront (the local stand-in signs
+ * afresh each second), and the fetch log has it once, two reads at the
+ * same instant aside.
+ */
+const MESSAGE_URL_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * Signed URLs of the message photos of one answer, for one of their
+ * conversations' two people (#350): each photo's thumb and full size, ending
+ * at the window's end plus fifteen minutes. One statement writes the fetch
+ * log for the lot, a row per photo and variant the reader was not handed in
+ * this window already, with the purpose `message`, which the day's budget
+ * never counts. Null for a reader erased meanwhile (#51): no row, no URL.
+ * The caller has asked, through the reader's own participant row, that they
+ * may read each message; the key never leaves the API.
+ */
+export async function issueMessagePhotoUrls(
+  deps: PhotoServiceDeps,
+  input: { viewerAccountId: string; photos: ReadonlyArray<{ id: string; key: string }> },
+): Promise<Map<string, { thumb: string; full: string; expiresAt: string }> | null> {
+  const urls = new Map<string, { thumb: string; full: string; expiresAt: string }>();
+  if (input.photos.length === 0) return urls;
+  const at = deps.now();
+  const windowStart = new Date(
+    Math.floor(at.getTime() / MESSAGE_URL_WINDOW_MS) * MESSAGE_URL_WINDOW_MS,
+  );
+  const expiresAt = new Date(windowStart.getTime() + MESSAGE_URL_WINDOW_MS + URL_TTL_MS);
+  for (const photo of input.photos) {
+    const [thumb, full] = await Promise.all([
+      deps.signer.sign(objectKey(photo.key, "thumb"), expiresAt),
+      deps.signer.sign(objectKey(photo.key, "full"), expiresAt),
+    ]);
+    urls.set(photo.id, { thumb, full, expiresAt: expiresAt.toISOString() });
+  }
+  const logged = await repo.logMessagePhotoAccess(deps.db, {
+    accountId: input.viewerAccountId,
+    photoIds: [...urls.keys()],
+    at,
+    since: windowStart,
+  });
+  if (!logged.live) return null;
+  deps.logger.info(
+    { accountId: input.viewerAccountId, photos: urls.size, logged: logged.written, at },
+    "message photo urls issued",
+  );
+  return urls;
 }
 
 /** Removes the row; the objects too, when no other row shares the content. */

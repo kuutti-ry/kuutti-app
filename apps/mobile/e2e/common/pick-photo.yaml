@@ -1,13 +1,17 @@
-# On the photos screen, add a picture of the camera roll through the system
-# picker and wait until the screen counts COUNT (the photos.count text, a regex
-# in three languages). INDEX (0, 1, 2) is the cell of the picker's top row,
-# where addMedia puts the flow's pictures. iOS's grid has no names to tap by,
-# so its cell is tapped by position; Android's names each cell by when the
-# photo was taken (in the phone's language, English on the emulators), newest
-# first. The upload runs through the API's pipeline (rule 4).
+# Add a picture of the camera roll through the system picker: tap BUTTON, the
+# photos screen's "Add a photo" unless the caller names another (the chat's
+# Add photo, #350), and wait until the screen shows COUNT: on the photos
+# screen its count (the photos.count text), in a conversation the line that
+# says a photo is attached; each a regex in three languages. INDEX (0, 1, 2)
+# is the cell of the picker's top row, where addMedia puts the flow's
+# pictures. iOS's grid has no names to tap by, so its cell is tapped by
+# position; Android's names each cell by when the photo was taken (in the
+# phone's language, English on the emulators), newest first. The upload runs
+# through the API's pipeline (rule 4). BUTTON's default is a fallback, not an
+# env header, which would override what the caller passes (sign-in.yaml).
 appId: fi.kuutti.app
 ---
-- tapOn: "Add a photo|Lisää kuva|Lägg till ett foto"
+- tapOn: ${BUTTON || "Add a photo|Lisää kuva|Lägg till ett foto"}
 - extendedWaitUntil:
     visible: "Photos|Kuvat|Bilder"
     timeout: 15000

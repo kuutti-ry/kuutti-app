@@ -15,11 +15,13 @@ export async function cardShown(
   at: Date = new Date(),
 ): Promise<string> {
   const { rows } = await db.query<{ photo_id: string }>(
-    `WITH existing AS (SELECT id FROM photo WHERE account_id = $1 AND state = 'approved'
+    `WITH existing AS (SELECT id FROM photo
+                       WHERE account_id = $1 AND purpose = 'profile' AND state = 'approved'
                        ORDER BY position LIMIT 1),
           made AS (INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
                    SELECT $1, md5($1::text), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved',
-                          (SELECT coalesce(max(position) + 1, 0) FROM photo WHERE account_id = $1)
+                          (SELECT coalesce(max(position) + 1, 0) FROM photo
+                           WHERE account_id = $1 AND purpose = 'profile')
                    WHERE NOT EXISTS (SELECT 1 FROM existing)
                    RETURNING id),
           chosen AS (SELECT id FROM existing UNION ALL SELECT id FROM made)

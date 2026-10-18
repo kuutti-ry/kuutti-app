@@ -37,7 +37,9 @@ export type MediaSetup =
  * The automatic check (#49): Rekognition through the instance role where the
  * configuration says so, otherwise everything goes to a person. A deployed
  * environment without MODERATION=rekognition therefore fills the queue rather
- * than approving anything; it is loud, not unsafe.
+ * than approving anything; it is loud, not unsafe. A photo sent in a
+ * conversation has no queue (#350): there it is refused, unless
+ * `deliverUnchecked` says this is a developer's machine or a test.
  */
 function moderatorFor(config: Config): Moderator {
   if (config.MODERATION === "rekognition") {
@@ -88,6 +90,7 @@ export function createMediaDeps(config: Config): { deps?: MediaDeps; setup: Medi
         }),
         limit,
         moderator,
+        deliverUnchecked: config.APP_ENV === "development" || config.APP_ENV === "test",
       },
       setup: {
         mode: "cloudfront",
@@ -113,6 +116,8 @@ export function createMediaDeps(config: Config): { deps?: MediaDeps; setup: Medi
         signer: presignedS3Signer(client, config.S3_BUCKET),
         limit,
         moderator,
+        // The compose stand-in is a developer's or CI's (checked above): no Rekognition there.
+        deliverUnchecked: true,
       },
       setup: {
         mode: "presigned",

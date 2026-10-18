@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ChatMessage,
   ConversationDetail,
   Counterpart,
   type DaysBand,
@@ -17,6 +18,7 @@ import {
   messageLengthBand,
   ReadRequest,
   SendMessageRequest,
+  SendPhotoRequest,
 } from "./chat.ts";
 
 // The chat's contracts (#348, ADR-031): what a send, a page and a read mark
@@ -115,23 +117,54 @@ describe("the counterpart and the conversation", () => {
     }
   });
 
-  it("exports the person's own words and the other's as time and length only", () => {
+  it("exports the person's own words and photos, and the other's as a kind, a time and a length only", () => {
     const at = "2026-10-17T10:00:00.000Z";
+    const exported = {
+      openedAt: at,
+      state: "open",
+      closedHow: null,
+      mine: [
+        { at, kind: "text", body: "Moi", photo: null },
+        {
+          at,
+          kind: "photo",
+          body: "",
+          photo: {
+            file: "photos/6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b.webp",
+            review: { decision: "queued", reason: null, decidedByStaff: false, decidedAt: null },
+            description: null,
+            descriptionText: null,
+          },
+        },
+      ],
+      theirs: [
+        { at, kind: "text", length: 12 },
+        { at, kind: "photo", length: 0 },
+      ],
+    };
+    expect(ExportedConversation.safeParse(exported).success).toBe(true);
+    // A sent photo is an entry, as a profile photo's is, not a bare path.
     expect(
       ExportedConversation.safeParse({
-        openedAt: at,
-        state: "open",
-        closedHow: null,
-        mine: [{ at, body: "Moi" }],
-        theirs: [{ at, length: 12 }],
+        ...exported,
+        mine: [{ at, kind: "photo", body: "", photo: "photos/x.webp" }],
       }).success,
-    ).toBe(true);
+    ).toBe(false);
+    // Never the other's words.
+    expect(
+      ExportedConversation.parse({
+        ...exported,
+        theirs: [{ at, kind: "text", length: 3, body: "Moi" }],
+      }).theirs,
+    ).toEqual([{ at, kind: "text", length: 3 }]);
   });
 });
 
 describe("the research events' bands", () => {
   it("band a length at each edge", () => {
     const cases: Array<[number, MessageLengthBand]> = [
+      // A photo sent without a caption (#350); a text is never empty.
+      [0, "0"],
       [1, "1-20"],
       [20, "1-20"],
       [21, "21-80"],
@@ -190,5 +223,66 @@ describe("the research events' bands", () => {
       [90, "90+"],
     ];
     for (const [n, band] of days) expect(daysBand(n), String(n)).toBe(band);
+  });
+});
+
+describe("a photo in a message (#350)", () => {
+  const CLIENT = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+  // Node's File, which this package's types do not declare (it imports nothing but zod).
+  const NodeFile = (
+    globalThis as unknown as {
+      File: new (parts: Uint8Array[], name: string, options: { type: string }) => unknown;
+    }
+  ).File;
+  const picture = (type = "image/jpeg") =>
+    new NodeFile([new Uint8Array([1, 2, 3])], "p.jpg", { type });
+
+  it("sends a picture with the phone's id and an optional caption, trimmed", () => {
+    const sent = SendPhotoRequest.parse({ photo: picture(), clientId: CLIENT, caption: "  Moi  " });
+    expect(sent.caption).toBe("Moi");
+    expect(SendPhotoRequest.parse({ photo: picture(), clientId: CLIENT }).caption).toBeUndefined();
+  });
+
+  it("refuses no picture, another type, a malformed id, a caption with NUL or past the ceiling, an unknown field", () => {
+    const refused = [
+      { clientId: CLIENT },
+      { photo: picture("image/gif"), clientId: CLIENT },
+      { photo: picture(), clientId: "nope" },
+      { photo: picture(), clientId: CLIENT, caption: "a\u0000b" },
+      { photo: picture(), clientId: CLIENT, caption: "x".repeat(MESSAGE_BODY_CEILING + 1) },
+      { photo: picture(), clientId: CLIENT, note: "x" },
+    ];
+    for (const input of refused) expect(SendPhotoRequest.safeParse(input).success).toBe(false);
+  });
+
+  it("carries a photo message's photo, with or without its URLs, and none on a text or a removed photo", () => {
+    const base = {
+      id: CLIENT,
+      seq: 1,
+      side: "theirs",
+      kind: "photo",
+      body: null,
+      createdAt: "2026-10-17T10:00:00.000Z",
+      clientId: null,
+    };
+    const photo = {
+      photoId: CLIENT,
+      blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+      width: 1600,
+      height: 1200,
+      description: null,
+    };
+    const urls = {
+      thumb: "https://api.test/media/x/thumb.webp",
+      full: "https://api.test/media/x/full.webp",
+      expiresAt: "2026-10-17T10:15:00.000Z",
+    };
+    expect(ChatMessage.safeParse({ ...base, photo: { ...photo, urls } }).success).toBe(true);
+    expect(ChatMessage.safeParse({ ...base, photo: { ...photo, urls: null } }).success).toBe(true);
+    expect(ChatMessage.safeParse({ ...base, photo: null }).success).toBe(true);
+    expect(ChatMessage.safeParse(base).success).toBe(false);
+    expect(
+      ChatMessage.safeParse({ ...base, photo: { ...photo, width: 0, urls: null } }).success,
+    ).toBe(false);
   });
 });

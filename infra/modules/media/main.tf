@@ -1,10 +1,11 @@
 # Photo storage and delivery (#48, ADR-005, TD-2, TD-8): a private bucket the
 # API writes variants into through the instance role, and one CloudFront
 # distribution on api.<env>.<domain> with two origins: /media/* is the bucket,
-# reachable only with a URL the API signed (fifteen minutes, one object),
-# everything else is the API on the box. TLS terminates at CloudFront with an
-# ACM certificate from us-east-1; the hop to the box is HTTPS to
-# origin.api.<env>.<domain>, whose certificate Traefik holds.
+# reachable only with a URL the API signed (one object, fifteen minutes, or up
+# to twenty for a photo sent in a conversation, ADR-031 §10), everything else
+# is the API on the box. TLS terminates at CloudFront with an ACM certificate
+# from us-east-1; the hop to the box is HTTPS to origin.api.<env>.<domain>,
+# whose certificate Traefik holds.
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -149,7 +150,8 @@ resource "aws_iam_role_policy" "api_media" {
 # Signed URLs. The public halves of the key pairs are CloudFront public keys
 # in one key group the media behaviour trusts; the private half of the current
 # key is read by the API from SSM at boot (rules/infra.md Secrets) and signs
-# each URL for fifteen minutes. Every key is named by a hash of its PEM, so a
+# each URL for fifteen minutes, or up to twenty for a photo sent in a
+# conversation (ADR-031 §10). Every key is named by a hash of its PEM, so a
 # changed key is a new resource next to the old one, never a replacement
 # fighting over a name. Rotation: commit the new public half as an additional
 # key (both trusted), switch the SSM value and the current file, restart the

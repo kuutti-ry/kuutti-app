@@ -37,7 +37,8 @@ import * as repo from "./repo.ts";
 import { type MediaStore, objectKey } from "./store.ts";
 
 // Moderation of every uploaded photo before anyone else sees it (#49, TD-8,
-// ADR-006). Rekognition sees the card variant only, re-encoded as JPEG for
+// ADR-006). Rekognition sees the card variant only (a photo sent in a
+// conversation, its full size, #350), re-encoded as JPEG for
 // the call, from the API, through the instance role; what comes back is a bounded list of labels with confidences
 // and a face count, never the image. Three outcomes: approved (one sure face,
 // nothing flagged), rejected by the check itself where it is sure (no face at
@@ -92,6 +93,8 @@ const DESCRIPTION_CONFIDENCE_KEY = "photo_description_confidence_min";
 const MAX_LABELS = 50;
 /** Ask Rekognition for everything it is at least this sure of, so #56's tips see the low ones too. */
 const REKOGNITION_MIN_CONFIDENCE = 30;
+/** The least side Rekognition's image calls accept, in pixels (its quotas page). */
+const REKOGNITION_MIN_SIDE = 80;
 /**
  * Scene labels tips care about; DetectLabels is filtered to these, and to the
  * species the fish tip may name (label-groups.ts). Sunglasses come from the
@@ -206,21 +209,7 @@ export function storedLabels(inspection: Inspection): ModerationLabel[] {
 export function decideModeration(inspection: Inspection, thresholds: Thresholds): Decision {
   const faces = inspection.faceConfidences.filter((c) => c >= thresholds.faceThreshold).length;
   if (!inspection.checked) return { decision: "queued", flagged: [NOT_CHECKED], faces };
-  let sure: LabelGroup | undefined;
-  const flagged: string[] = [];
-  for (const label of inspection.labels) {
-    const group = groupOf(label.name);
-    if (group === "allowed") continue;
-    const lines = group ? thresholds.groups[group] : undefined;
-    if (lines && label.confidence >= lines.reject) {
-      // The first sure group found names the reason; LABEL_GROUPS ranks a tie.
-      if (!sure || LABEL_GROUPS.indexOf(group as LabelGroup) < LABEL_GROUPS.indexOf(sure)) {
-        sure = group as LabelGroup;
-      }
-    }
-    const askAt = lines ? lines.review : thresholds.labelThreshold;
-    if (label.confidence >= askAt && !flagged.includes(label.name)) flagged.push(label.name);
-  }
+  const { sure, flagged } = labelVerdict(inspection, thresholds);
   // Every rejection of the check may be appealed, but not over a nudity label this sure (#253).
   const appealable = !inspection.labels.some(
     (label) => groupOf(label.name) === "nudity" && label.confidence >= thresholds.noAppealNudity,
@@ -257,7 +246,50 @@ export function decideModeration(inspection: Inspection, thresholds: Thresholds)
   return { decision: flagged.length > 0 ? "queued" : "approved", flagged, faces };
 }
 
-/** Rekognition through the instance role: three calls per photo, the card variant as JPEG, nothing stored there. */
+/**
+ * The decision for a photo sent in a conversation (#350), pure: the hard
+ * groups as for a profile photo, and none of the face rules, since a photo of
+ * anything may be sent. What the check is sure of is refused and nothing is
+ * stored, so there is no appeal; what it is unsure of, or never saw, is
+ * delivered, and no person is asked about a private photo (#101).
+ */
+export function decideMessagePhoto(inspection: Inspection, thresholds: Thresholds): Decision {
+  const faces = inspection.faceConfidences.filter((c) => c >= thresholds.faceThreshold).length;
+  if (!inspection.checked) return { decision: "queued", flagged: [NOT_CHECKED], faces };
+  const { sure, flagged } = labelVerdict(inspection, thresholds);
+  if (sure) {
+    return { decision: "rejected", flagged, faces, reason: GROUP_REASON[sure], group: sure };
+  }
+  return { decision: flagged.length > 0 ? "queued" : "approved", flagged, faces };
+}
+
+/**
+ * The labels' part of both decisions: the hard group the check is sure of,
+ * the first by LABEL_GROUPS' rank on a tie, and every label a person would be
+ * asked about. Allowed labels and tip signals never count.
+ */
+function labelVerdict(
+  inspection: Inspection,
+  thresholds: Thresholds,
+): { sure?: LabelGroup; flagged: string[] } {
+  let sure: LabelGroup | undefined;
+  const flagged: string[] = [];
+  for (const label of inspection.labels) {
+    const group = groupOf(label.name);
+    if (group === "allowed") continue;
+    const lines = group ? thresholds.groups[group] : undefined;
+    if (lines && label.confidence >= lines.reject) {
+      if (!sure || LABEL_GROUPS.indexOf(group as LabelGroup) < LABEL_GROUPS.indexOf(sure)) {
+        sure = group as LabelGroup;
+      }
+    }
+    const askAt = lines ? lines.review : thresholds.labelThreshold;
+    if (label.confidence >= askAt && !flagged.includes(label.name)) flagged.push(label.name);
+  }
+  return sure ? { sure, flagged } : { flagged };
+}
+
+/** Rekognition through the instance role: three calls per photo, the card variant (a sent photo's full size) as JPEG, nothing stored there. */
 export function rekognitionModerator(client: RekognitionClient): Moderator {
   return {
     kind: "rekognition",
@@ -266,12 +298,29 @@ export function rekognitionModerator(client: RekognitionClient): Moderator {
       // and PNG only: the first upload on staging (09/10/2026) came back as
       // InvalidImageFormatException and stayed pending. One re-encode per
       // check, in memory; what is stored and what the queue sees stays WebP.
-      const bytes = await sharp(card, {
-        // The card is the API's own, PHOTO_VARIANT_SIZES.card at most (pipeline.ts).
-        limitInputPixels: PHOTO_VARIANT_SIZES.card.width * PHOTO_VARIANT_SIZES.card.height,
-      })
-        .jpeg({ quality: 90 })
-        .toBuffer();
+      const input = sharp(card, {
+        // The API's own variant: a profile photo's card, or a message
+        // photo's full size (#350), 1600 px on the long edge at most (pipeline.ts).
+        limitInputPixels: PHOTO_VARIANT_SIZES.full.longEdge ** 2,
+      });
+      // Rekognition refuses a side under 80 px, and a message photo's full
+      // size keeps a small picture small (a card is always 800×1067): padded
+      // rather than scaled, so a long thin one does not grow, and the check
+      // never answers busy over the size alone.
+      const { width = 0, height = 0 } = await input.metadata();
+      const padX = Math.max(0, REKOGNITION_MIN_SIDE - width);
+      const padY = Math.max(0, REKOGNITION_MIN_SIDE - height);
+      const sized =
+        padX + padY === 0
+          ? input
+          : input.extend({
+              top: Math.floor(padY / 2),
+              bottom: Math.ceil(padY / 2),
+              left: Math.floor(padX / 2),
+              right: Math.ceil(padX / 2),
+              background: "#ffffff",
+            });
+      const bytes = await sized.jpeg({ quality: 90 }).toBuffer();
       const image = { Bytes: bytes };
       const [moderation, faces, scene] = await Promise.all([
         client.send(
@@ -480,6 +529,125 @@ export async function moderatePhoto(
     "photo moderated",
   );
   return { ...decided, description };
+}
+
+/** What the check made of a message photo, held until its row exists. */
+export type MessagePhotoCheck = {
+  decided: Decision;
+  /** The hard group the usual lines were sure of, which leaves a note as a profile photo's does (#253). */
+  noted?: LabelGroup;
+  labels: ModerationLabel[];
+  description: PhotoDescription | null;
+  modelVersion: string | null;
+  checkedAt: Date;
+};
+
+/** The check could not run: a message photo is then refused, never delivered unchecked. */
+export class CheckUnavailableError extends Error {}
+
+const UNCHECKED: Inspection = {
+  checked: false,
+  labels: [],
+  tipLabels: [],
+  faceConfidences: [],
+  seen: NOTHING_SEEN,
+  modelVersion: null,
+  calls: 0,
+};
+
+/**
+ * The check of a photo sent in a conversation (#350), before anything is
+ * stored: the full size, since that is what the recipient sees and the
+ * card is a crop of it (a profile photo's check reads the card, ADR-006 §1),
+ * the closer look's lines for an account under it (#253), and the decision of
+ * decideMessagePhoto. Nothing is written here: a refused photo leaves no row,
+ * and an accepted one is recorded with its row (recordMessagePhotoCheck). No
+ * moderator is no check, as MODERATION=queue's is, and only `deliverUnchecked`
+ * (a developer's machine, a test) delivers what no check saw. A check that
+ * fails, or one that cannot run here, throws CheckUnavailableError: the
+ * sender tries again, and a photo nobody checked is never delivered. The log line carries counts
+ * only, as moderatePhoto's does.
+ */
+export async function checkMessagePhoto(
+  deps: Omit<ModerationDeps, "moderator"> & { moderator?: Moderator; deliverUnchecked?: boolean },
+  input: { accountId: string; image: Uint8Array },
+): Promise<MessagePhotoCheck> {
+  const thresholds = await readThresholds(deps.db);
+  let inspection: Inspection;
+  try {
+    inspection = deps.moderator ? await deps.moderator.inspect(input.image) : UNCHECKED;
+  } catch (error) {
+    deps.logger.error(
+      { accountId: input.accountId, err: error, purpose: "message" },
+      "photo moderation failed; the message photo is refused",
+    );
+    throw new CheckUnavailableError("photo check unavailable");
+  }
+  // No check ran, and none will: a message photo has no queue. Only a
+  // developer's machine or a test delivers it (#350); elsewhere the
+  // configuration is wrong, and the photo is refused, never let through.
+  if (!inspection.checked && deps.deliverUnchecked !== true) {
+    deps.logger.error(
+      { accountId: input.accountId, moderator: deps.moderator?.kind ?? "none", purpose: "message" },
+      "no photo check here; the message photo is refused",
+    );
+    throw new CheckUnavailableError("no photo check configured");
+  }
+  const checkedAt = deps.now();
+  const closer = inspection.checked
+    ? await closerLookOf(deps.db, input.accountId, checkedAt)
+    : null;
+  const usual = decideMessagePhoto(inspection, thresholds);
+  const decided = closer?.until
+    ? decideMessagePhoto(inspection, closerLines(thresholds, closer.reject))
+    : usual;
+  // As moderatePhoto notes: only what the usual lines are sure of, so a closer
+  // look never prolongs itself on what it alone refused.
+  const noted = usual.group ? decided.group : undefined;
+  const labels = storedLabels(inspection);
+  const description = inspection.checked
+    ? photoDescriptionOf(inspection.seen, decided.faces, thresholds.descriptionConfidenceMin)
+    : null;
+  deps.logger.info(
+    {
+      accountId: input.accountId,
+      moderator: deps.moderator?.kind ?? "none",
+      purpose: "message",
+      decision: decided.decision,
+      labels: labels.length,
+      flagged: decided.flagged.length,
+      faces: decided.faces,
+      rekognitionCalls: inspection.calls,
+    },
+    "photo moderated",
+  );
+  return {
+    decided,
+    ...(noted ? { noted } : {}),
+    labels,
+    description,
+    modelVersion: inspection.modelVersion,
+    checkedAt,
+  };
+}
+
+/** The review row of a delivered message photo, in the transaction that writes its row. */
+export async function recordMessagePhotoCheck(
+  tx: Queryable,
+  photoId: string,
+  check: MessagePhotoCheck,
+): Promise<void> {
+  await repo.upsertAutomaticReview(tx, {
+    photoId,
+    labels: check.labels,
+    faces: check.decided.faces,
+    flagged: check.decided.flagged,
+    modelVersion: check.modelVersion,
+    checkedAt: check.checkedAt,
+    decision: check.decided.decision,
+    reason: check.decided.reason ?? null,
+    description: check.description,
+  });
 }
 
 /** A photo pending this long with no check recorded was missed (a crash, a failed call): retry it. */
