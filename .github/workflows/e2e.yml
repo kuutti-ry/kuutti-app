@@ -171,9 +171,14 @@ jobs:
           "$tools/sdkmanager" emulator platform-tools "$image" > /dev/null
           echo no | "$tools/avdmanager" create avd --name e2e --package "$image" --device pixel_7 \
             || { "$tools/avdmanager" list device --compact; exit 1; }
+          # 4 GB, not the 2560 MB the emulator gives this image by itself: with
+          # Chrome on board and a 100 MB debug build installed, the guest ran
+          # out (#364): the low-memory killer emptied it under the first flow
+          # and Maestro's driver died, and once Android itself restarted just
+          # after the install. The runner has 16 GB.
           nohup "$ANDROID_HOME/emulator/emulator" -avd e2e -no-window -no-audio -no-boot-anim \
             -no-snapshot -no-metrics -gpu swiftshader_indirect -camera-back none -camera-front none \
-            > emulator.log 2>&1 &
+            -memory 4096 > emulator.log 2>&1 &
 
       - name: Start the stack
         run: |
@@ -339,6 +344,13 @@ jobs:
           trap 'kill "$watcher" 2> /dev/null || true' EXIT
           node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
 
+      # Maestro keeps a flow's device log only once a flow runs; a failure
+      # before the first (Android restarting as Maestro installed its driver,
+      # #364) left nothing to read. The whole log goes with the artifact.
+      - name: The device log on failure
+        if: failure()
+        run: adb logcat -d -b all > device-logcat.txt 2>&1 || true
+
       - name: Keep what the run saw
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -349,6 +361,7 @@ jobs:
             api.log
             metro.log
             emulator.log
+            device-logcat.txt
             ~/.maestro/tests
           retention-days: 7
           if-no-files-found: ignore
