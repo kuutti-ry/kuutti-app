@@ -11,7 +11,12 @@ name: A message reaches the other person with its time, the writer then sees it 
 ---
 # Letters only, unique to the run: the send refuses what looks like a phone
 # number or a handle, and an earlier run's message may be on the screen too.
-- evalScript: "${output.words = 'Lauantai sopii tuon pullaa ' + Date.now().toString(36).replace(/[0-9]/g, function (d) { return 'kmnprstvyz'.charAt(Number(d)); })}"
+# The message is found by the run's own letters at its end: the keyboard may
+# correct the words before them as it types (Android's Gboard made "tuon"
+# "turn", #364), and it corrects a word on the space after it, which the
+# last one never gets.
+- evalScript: "${output.token = Date.now().toString(36).replace(/[0-9]/g, function (d) { return 'kmnprstvyz'.charAt(Number(d)); })}"
+- evalScript: "${output.words = 'Lauantai sopii tuon pullaa ' + output.token}"
 - runFlow:
     file: ../common/sign-in.yaml
     env:
@@ -41,7 +46,7 @@ name: A message reaches the other person with its time, the writer then sees it 
 - extendedWaitUntil:
     notVisible: "Sending…|Lähetetään…|Skickar…"
     timeout: 15000
-- assertVisible: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+- assertVisible: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, (.* )?${output.token}"
 # The live socket (#349) connected on the phone: by now, after the typing
 # and the send, a socket that could not connect would have said so at the
 # top. Two phones talking live are the API's socket tests; Maestro drives one.
@@ -55,12 +60,12 @@ name: A message reaches the other person with its time, the writer then sees it 
       PERSONA: Ville Rantanen
 - openLink: kuutti://chats
 - extendedWaitUntil:
-    visible: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), ${output.words}, .*"
+    visible: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), (.* )?${output.token}, .*"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), ${output.words}, .*"
+- tapOn: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), (.* )?${output.token}, .*"
 - extendedWaitUntil:
-    visible: "Antti, \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+    visible: "Antti, \\d{1,2}[.:]\\d{2}[^,]*, (.* )?${output.token}"
     timeout: 15000
 
 # Antti again: "Read" under the message he wrote, below every earlier one's.
@@ -70,12 +75,12 @@ name: A message reaches the other person with its time, the writer then sees it 
       PERSONA: Antti Nurmi
 - openLink: kuutti://chats
 - extendedWaitUntil:
-    visible: "Ville, \\d+, (You|Sinä|Du): ${output.words}, .*"
+    visible: "Ville, \\d+, (You|Sinä|Du): (.* )?${output.token}, .*"
     timeout: 15000
 - waitForAnimationToEnd
-- tapOn: "Ville, \\d+, (You|Sinä|Du): ${output.words}, .*"
+- tapOn: "Ville, \\d+, (You|Sinä|Du): (.* )?${output.token}, .*"
 - extendedWaitUntil:
     visible:
       text: "Read|Luettu|Läst"
-      below: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, ${output.words}"
+      below: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, (.* )?${output.token}"
     timeout: 15000

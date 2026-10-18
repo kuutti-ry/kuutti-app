@@ -172,10 +172,9 @@ jobs:
           echo no | "$tools/avdmanager" create avd --name e2e --package "$image" --device pixel_7 \
             || { "$tools/avdmanager" list device --compact; exit 1; }
           # 4 GB, not the 2560 MB the emulator gives this image by itself: with
-          # Chrome on board and a 100 MB debug build installed, the guest ran
-          # out (#364): the low-memory killer emptied it under the first flow
-          # and Maestro's driver died, and once Android itself restarted just
-          # after the install. The runner has 16 GB.
+          # Chrome on board and a 100 MB debug build installed, the low-memory
+          # killer emptied the guest under a shard's first flow as Maestro's
+          # driver died (#364). The runner has 16 GB.
           nohup "$ANDROID_HOME/emulator/emulator" -avd e2e -no-window -no-audio -no-boot-anim \
             -no-snapshot -no-metrics -gpu swiftshader_indirect -camera-back none -camera-front none \
             -memory 4096 > emulator.log 2>&1 &
@@ -252,13 +251,6 @@ jobs:
       # every screen, where a header's own buttons sit (Share contact, #103):
       # a tap on one opened the dev menu instead. Its preference, `showFab`,
       # written before the app first starts, keeps it off for the run.
-      #
-      # Gboard corrects what a flow types, now and then, as its timing
-      # allows, and the chat flows assert the words they sent: "tuon" came
-      # out as "turn" and "mokilta" as "Mokilta" (#364). Auto-correction and
-      # auto-capitalisation go off in Gboard's own preferences, which root
-      # may write on a google_apis image; `adb root` restarts adbd, so it
-      # comes before the forwards.
       - name: Wait for the emulator
         timeout-minutes: 14
         run: |
@@ -277,33 +269,6 @@ jobs:
             adb shell settings put global "$scale" 0
           done
           adb shell settings put secure stylus_handwriting_enabled 0
-          adb root
-          adb wait-for-device
-          for _ in $(seq 1 30); do [ "$(adb shell id -u | tr -d '\r')" = 0 ] && break; sleep 1; done
-          gboard=com.google.android.inputmethod.latin
-          prefs_dir="/data/user_de/0/$gboard/shared_prefs"
-          prefs="$prefs_dir/${gboard}_preferences.xml"
-          owner="$(adb shell stat -c %u:%g "/data/user_de/0/$gboard" | tr -d '\r')"
-          adb shell am force-stop "$gboard"
-          if adb shell "[ -f $prefs ]"; then
-            adb pull "$prefs" "$RUNNER_TEMP/gboard-before.xml" > /dev/null
-          else
-            printf '%s\n' "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>" '<map>' '</map>' > "$RUNNER_TEMP/gboard-before.xml"
-          fi
-          awk '
-            function off() {
-              print "    <boolean name=\"pref_key_auto_correction\" value=\"false\" />"
-              print "    <boolean name=\"enable_auto_capitalization\" value=\"false\" />"
-            }
-            /name="pref_key_auto_correction"|name="enable_auto_capitalization"/ { next }
-            /<map \/>/ { print "<map>"; off(); print "</map>"; next }
-            /<\/map>/ { off() }
-            { print }' "$RUNNER_TEMP/gboard-before.xml" > "$RUNNER_TEMP/gboard.xml"
-          adb push "$RUNNER_TEMP/gboard.xml" /data/local/tmp/gboard.xml > /dev/null
-          adb shell "mkdir -p $prefs_dir && cat /data/local/tmp/gboard.xml > $prefs && chown $owner $prefs_dir $prefs && chmod 771 $prefs_dir && chmod 660 $prefs && restorecon -R $prefs_dir"
-          adb shell am force-stop "$gboard"
-          adb shell cat "$prefs" | grep -q 'name="pref_key_auto_correction" value="false"'
-          adb shell cat "$prefs" | grep -q 'name="enable_auto_capitalization" value="false"'
           for port in 3000 8080 8081 9000; do adb reverse "tcp:$port" "tcp:$port"; done
           for attempt in 1 2 3; do
             adb install -r dev-client/app-debug.apk && break
