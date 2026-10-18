@@ -8,10 +8,11 @@
 # the emulator's 127.0.0.1 is the host's through adb reverse.
 appId: fi.kuutti.app
 ---
-# Opened once more if the app never shows: reloading the bundle can crash React
-# Native natively (CI, 11/10/2026: SIGSEGV in Fabric's MountingCoordinator while
-# the dev client restarted itself), and the browser of the last sign-in then
-# lies in front. A second openLink starts a new process.
+# Opened once more if the app never shows, and the browser of the last sign-in
+# then lies in front; a second openLink starts a new process. Added for a native
+# crash on Android at the first render after a launch or a reload (CI, 11/10 and
+# 18/10/2026: SIGSEGV in Fabric's MountingCoordinator), which was
+# react-native-screens' listener race, patched since (#360).
 - retry:
     maxRetries: 1
     commands:
