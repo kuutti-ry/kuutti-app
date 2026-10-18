@@ -33,3 +33,6 @@ report:
 
 moderator:
   definition: A person of the association who reads reports and checks photos, and may warn, suspend or ban (ADR-024). A person, never "the system" or an algorithm; plain register, not a legal or police word.
+
+contact:
+  definition: A way to reach a person outside the app that they keep in Settings, under Your contacts (#103) - a phone number, WhatsApp, Telegram or Instagram. Nobody sees one until its owner shares it in one conversation, and it disappears there when they stop sharing it, change or remove it, or the conversation ends. Not an address-book entry and not a social "connection"; sharing asks nothing back. The brand names stay as they are in every language.

@@ -30,10 +30,21 @@ export type ConversationLive = {
   state: { state: ConversationState | "gone"; closedHow: ConversationClosedHow | null } | null;
   /** The newest sequence the phone knows: what the next resume names. */
   cursor: number;
+  /**
+   * How many times the socket said the contacts shared here changed (#103):
+   * the frame carries no value, so the screen reads the contacts again.
+   */
+  contacts: number;
 };
 
 export type ChatLive = {
   status: SocketStatus;
+  /**
+   * How many times the socket became open, each with a resume: what changed
+   * while it was not (a contact shared or taken back, #103) the screen reads
+   * again over HTTP.
+   */
+  opened: number;
   conversations: Record<string, ConversationLive>;
 };
 
@@ -44,7 +55,7 @@ type ChatLiveAction =
   | { type: "cursors"; cursors: Record<string, number> }
   | { type: "clear" };
 
-export const EMPTY: ChatLive = { status: "connecting", conversations: {} };
+export const EMPTY: ChatLive = { status: "connecting", opened: 0, conversations: {} };
 
 const BLANK: ConversationLive = {
   messages: [],
@@ -52,6 +63,7 @@ const BLANK: ConversationLive = {
   online: false,
   state: null,
   cursor: 0,
+  contacts: 0,
 };
 
 /**
@@ -91,7 +103,12 @@ export function reduce(live: ChatLive, action: ChatLiveAction): ChatLive {
     case "clear":
       return EMPTY;
     case "status":
-      return action.status === live.status ? live : { ...live, status: action.status };
+      if (action.status === live.status) return live;
+      return {
+        ...live,
+        status: action.status,
+        opened: action.status === "open" ? live.opened + 1 : live.opened,
+      };
     case "cursors":
       return Object.entries(action.cursors).reduce(
         (next, [id, seq]) =>
@@ -118,6 +135,8 @@ export function reduce(live: ChatLive, action: ChatLiveAction): ChatLive {
       return changed(live, frame.conversationId, () => ({
         state: { state: frame.state, closedHow: frame.closedHow },
       }));
+    case "contacts":
+      return changed(live, frame.conversationId, (c) => ({ contacts: c.contacts + 1 }));
     default:
       // ready, ping and error are the socket's own.
       return live;

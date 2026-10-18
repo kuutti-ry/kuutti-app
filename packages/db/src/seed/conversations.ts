@@ -3,8 +3,8 @@ import { type Queryable, transaction } from "../pool.ts";
 
 /**
  * The conversations of the personas' stories (#348, ADR-031): the chat's pair
- * talking for a few days, and a match nobody wrote in, which the night has
- * archived (TD-13). Written as rows, as the match's record: no route opens a
+ * talking for a few days, a match nobody wrote in, which the night has
+ * archived (TD-13), and the contact share's pair, two days into theirs (#103). Written as rows, as the match's record: no route opens a
  * conversation until #100 writes one from the second like, and the stories
  * will then like instead. The demo commands call the writer after the
  * histories, with the accounts the histories were given to.
@@ -81,6 +81,41 @@ export const PERSONA_CONVERSATIONS: readonly PersonaConversation[] = [
     archivedHoursAgo: 70,
     messages: [],
     readUpTo: { a: 0, b: 0 },
+  },
+  {
+    // The contact share's flow (#103): open, everything read on both sides,
+    // and Elina's last line says what she does next, from the header. The
+    // words carry no way to reach either of them, as the send would refuse.
+    between: ["elina", "jussi"],
+    openedHoursAgo: 60,
+    messages: [
+      {
+        from: "a",
+        hoursAgo: 58,
+        body: "Hei Jussi! Lukupiiri kuulostaa hyvältä. Mitä siellä luetaan nyt?",
+      },
+      {
+        from: "b",
+        hoursAgo: 55,
+        body: "Moi Elina! Pohjoismaisia dekkareita, joissa sataa koko ajan.",
+      },
+      {
+        from: "a",
+        hoursAgo: 30,
+        body: "Ne ovat minun bussikirjojani. Pääsisikö piiriin vieraaksi?",
+      },
+      {
+        from: "b",
+        hoursAgo: 26,
+        body: "Pääsee. Sovitaan päivä, kun tiedän ensi viikon menot.",
+      },
+      {
+        from: "a",
+        hoursAgo: 6,
+        body: "Hyvä. Jaan sinulle yhteystietoni täältä, niin sovitaan loput siellä.",
+      },
+    ],
+    readUpTo: { a: 4, b: 5 },
   },
 ];
 

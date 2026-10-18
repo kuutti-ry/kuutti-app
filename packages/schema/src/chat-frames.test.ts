@@ -78,7 +78,7 @@ describe("what the API answers", () => {
     photo: null,
   };
 
-  it("is one of its seven frames, each strict", () => {
+  it("is one of its eight frames, each strict", () => {
     const frames = [
       { type: "ready" },
       { type: "ping" },
@@ -87,6 +87,7 @@ describe("what the API answers", () => {
       { type: "presence", conversationId: ID, online: true },
       { type: "conversation", conversationId: ID, state: "closed", closedHow: "erasure" },
       { type: "conversation", conversationId: ID, state: "gone", closedHow: null },
+      { type: "contacts", conversationId: ID },
       { type: "error", code: "restarting" },
     ];
     for (const frame of frames) expect(ServerFrame.parse(frame)).toEqual(frame);
@@ -98,6 +99,8 @@ describe("what the API answers", () => {
       { type: "conversation", conversationId: ID, state: "blocked", closedHow: null },
       { type: "error", code: "blocked" },
       { type: "typing", conversationId: ID },
+      // A share's change says which conversation, never the contact (#103).
+      { type: "contacts", conversationId: ID, value: "+358401234567" },
     ];
     for (const frame of refused) {
       expect(ServerFrame.safeParse(frame).success, JSON.stringify(frame)).toBe(false);

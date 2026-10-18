@@ -98,6 +98,8 @@ export const ERROR_MESSAGE_KEYS = {
   conversation_closed: "errors.conversation_closed",
   message_too_long: "errors.message_too_long",
   contact_details: "errors.contact_details",
+  contact_invalid: "errors.contact_invalid",
+  contact_not_stored: "errors.contact_not_stored",
   message_budget_exceeded: "errors.message_budget_exceeded",
   photo_rejected_nudity: "errors.photo_rejected_nudity",
   photo_rejected_violence: "errors.photo_rejected_violence",

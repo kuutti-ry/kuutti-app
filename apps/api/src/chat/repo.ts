@@ -1,5 +1,11 @@
 import type { Queryable } from "@kuutti/db";
-import type { ConversationCloseKind, MessageKind, PhotoDescription } from "@kuutti/schema";
+import type {
+  ContactKind,
+  ContactShareEnd,
+  ConversationCloseKind,
+  MessageKind,
+  PhotoDescription,
+} from "@kuutti/schema";
 
 // The chat's statements (#348, ADR-031). Raw parameterised SQL, as in the
 // other slices: Deps.db is the Queryable seam the tests hand a rolled-back
@@ -297,6 +303,8 @@ export type SendState = {
   side: Side;
   openedAt: Date;
   lastMessageAt: Date | null;
+  /** The conversation's messages so far, either side's. */
+  messages: number;
   /** Hidden from the caller: they blocked the other. */
   hidden: boolean;
   /** Closed for writing: a close, a block either way, or the counterpart erased. */
@@ -310,7 +318,7 @@ export async function readSendState(
   conversationId: string,
 ): Promise<SendState | null> {
   const { rows } = await db.query<Row>(
-    `SELECT me.side, c.opened_at, c.last_message_at,
+    `SELECT me.side, c.opened_at, c.last_message_at, c.next_seq - 1 AS messages,
             NOT (${VISIBLE_TO_CALLER}) AS hidden,
             (c.closed_at IS NOT NULL OR them.account_id IS NULL
               OR blocked_between(me.account_id, them.account_id)) AS closed
@@ -324,6 +332,7 @@ export async function readSendState(
     side: row.side as Side,
     openedAt: row.opened_at as Date,
     lastMessageAt: (row.last_message_at as Date | null) ?? null,
+    messages: row.messages as number,
     hidden: row.hidden === true,
     closed: row.closed === true,
   };
@@ -449,13 +458,24 @@ export async function closeConversationsOf(
      RETURNING c.id, c.closed_how, c.next_seq - 1 AS messages, touched.counterpart_id, touched.was_open`,
     [input.accountIds, input.at, input.how],
   );
-  return rows.map((r) => ({
+  const closed = rows.map((r) => ({
     conversationId: r.id as string,
     how: r.closed_how as ConversationCloseKind,
     messages: r.messages as number,
     counterpartId: (r.counterpart_id as string | null) ?? null,
     closedNow: r.was_open === true,
   }));
+  // What either person shared there ends with the close (#103), in a
+  // statement of its own: one after the close's, so a share that held the
+  // conversation's lock while the close waited for it is ended too.
+  if (closed.length > 0) {
+    await db.query(
+      `UPDATE contact_share SET ended_at = $2, ended_how = 'closed'
+       WHERE conversation_id = ANY($1::uuid[]) AND ended_at IS NULL`,
+      [closed.map((close) => close.conversationId), input.at],
+    );
+  }
+  return closed;
 }
 
 /**
@@ -513,22 +533,51 @@ export type Archived = {
 };
 
 /**
- * The night's archive (TD-13): every conversation neither archived nor
- * closed whose last message, or opening, is older than the window. A break
- * stops no clock (ADR-022 §4).
+ * Silent since $1, the window's start (TD-13): neither archived nor closed,
+ * and its last message, or opening, and newest share of a contact (#103)
+ * older: a share brings a conversation back as a message does, and keeps it
+ * out as a message does. The newest share as an anti-join: none at or after
+ * the window's start. A break stops no clock (ADR-022 §4).
+ */
+const SILENT = `c.archived_at IS NULL AND c.closed_at IS NULL
+  AND coalesce(c.last_message_at, c.opened_at) < $1
+  AND NOT EXISTS (SELECT 1 FROM contact_share s
+                  WHERE s.conversation_id = c.id AND s.shared_at >= $1)`;
+
+/**
+ * The night's candidates, their rows locked until the archive commits: a send
+ * or a share in flight holds its conversation's row (lockConversation) until
+ * it commits, and this waits for it. A share writes only its own row, and a
+ * statement that waited for a row re-checks at most that row, never the
+ * shares, so the archive that follows (archiveSilent, in the same
+ * transaction) reads them afresh.
+ */
+export async function lockSilent(db: Queryable, olderThan: Date): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT c.id FROM conversation c WHERE ${SILENT} ORDER BY c.id FOR UPDATE`,
+    [olderThan],
+  );
+  return rows.map((r) => r.id);
+}
+
+/**
+ * The night's archive (TD-13) of the conversations lockSilent locked that
+ * are still silent: a statement of its own, so under READ COMMITTED it sees
+ * a share that committed while lockSilent waited for it, and leaves that
+ * conversation out.
  */
 export async function archiveSilent(
   db: Queryable,
-  input: { at: Date; olderThan: Date },
+  input: { ids: string[]; at: Date; olderThan: Date },
 ): Promise<Archived[]> {
+  if (input.ids.length === 0) return [];
   const { rows } = await db.query<Row>(
-    `UPDATE conversation c SET archived_at = $1
-     WHERE c.archived_at IS NULL AND c.closed_at IS NULL
-       AND coalesce(c.last_message_at, c.opened_at) < $2
+    `UPDATE conversation c SET archived_at = $2
+     WHERE c.id = ANY($3::uuid[]) AND ${SILENT}
      RETURNING c.id, c.opened_at, c.next_seq - 1 AS messages,
        ARRAY(SELECT p.account_id FROM conversation_participant p
              WHERE p.conversation_id = c.id AND p.account_id IS NOT NULL ORDER BY p.side) AS account_ids`,
-    [input.at, input.olderThan],
+    [input.olderThan, input.at, input.ids],
   );
   return rows.map((r) => ({
     conversationId: r.id as string,
@@ -546,6 +595,13 @@ export type ExportedRow = {
   closedHow: ConversationCloseKind | null;
   counterpartLinked: boolean;
   blocked: boolean;
+  /** The person's own shares of a contact there (#103), oldest first: the record, never a value. */
+  shares: Array<{
+    kind: ContactKind;
+    sharedAt: Date;
+    endedAt: Date | null;
+    endedHow: ContactShareEnd | null;
+  }>;
   /** The person's own messages and the counterpart's readable ones, in order; the counterpart's without words. */
   lines: Array<{
     mine: boolean;
@@ -581,7 +637,14 @@ export async function exportConversationsOf(
                        'photoId', CASE WHEN m.side = me.side THEN m.photo_id END)
                      ORDER BY m.seq)
               FROM message m
-              WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}), '[]'::json) AS lines
+              WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}), '[]'::json) AS lines,
+            coalesce((
+              SELECT json_agg(json_build_object(
+                       'kind', s.kind, 'sharedAt', s.shared_at,
+                       'endedAt', s.ended_at, 'endedHow', s.ended_how)
+                     ORDER BY s.shared_at, s.id)
+              FROM contact_share s
+              WHERE s.conversation_id = c.id AND s.side = me.side), '[]'::json) AS shares
      ${FROM_CALLER}
      WHERE me.account_id = $1
      ORDER BY c.opened_at, c.id`,
@@ -595,6 +658,19 @@ export async function exportConversationsOf(
     closedHow: (r.closed_how as ConversationCloseKind | null) ?? null,
     counterpartLinked: r.counterpart_linked === true,
     blocked: r.blocked === true,
+    shares: (
+      r.shares as Array<{
+        kind: ContactKind;
+        sharedAt: string;
+        endedAt: string | null;
+        endedHow: ContactShareEnd | null;
+      }>
+    ).map((share) => ({
+      kind: share.kind,
+      sharedAt: new Date(share.sharedAt),
+      endedAt: share.endedAt === null ? null : new Date(share.endedAt),
+      endedHow: share.endedHow,
+    })),
     lines: (
       r.lines as Array<{
         mine: boolean;
@@ -668,4 +744,240 @@ export async function messageFor(
   );
   const row = rows[0];
   return row ? { side: row.my_side as Side, row: messageFrom(row) } : null;
+}
+
+// Contacts (#103, ADR-031 §11): a person's own stored pieces, and their
+// shares in a conversation. A piece is read by its owner (`account_id = $1`),
+// and by the other person of a conversation only through the caller's own
+// participant row, while it is shared there, the conversation open between
+// the two, no block between them, and neither the share begun nor the piece
+// changed under a shadow ban of its owner's that is still open. A share's row
+// holds no value: the conversation shows the stored piece while the share
+// stands.
+
+export type ContactRow = { kind: ContactKind; value: string; updatedAt: Date };
+
+const contactFrom = (r: Row): ContactRow => ({
+  kind: r.kind as ContactKind,
+  value: r.value as string,
+  updatedAt: r.updated_at as Date,
+});
+
+/** Open between the two for the caller: not closed, the counterpart linked, no block either way. */
+const OPEN_BETWEEN = `c.closed_at IS NULL AND them.account_id IS NOT NULL
+  AND NOT blocked_between(me.account_id, them.account_id)`;
+
+/**
+ * A shadow ban of the counterpart's still open (ADR-024 §6); with `since`, an
+ * SQL expression, only one begun at or before it. The one rule of what the
+ * ban withholds of the contacts, for the reads and for the frame alike.
+ */
+const counterpartShadowBanned = (since?: string) => `EXISTS (
+  SELECT 1 FROM sanction x
+  WHERE x.account_id = them.account_id AND x.kind = 'shadow_ban'
+    AND x.lifted_at IS NULL${since ? ` AND x.created_at <= ${since}` : ""})`;
+
+/**
+ * A share of the counterpart's that the caller may see (`s` the share, `k`
+ * its piece): none begun, and none whose piece was changed, during a shadow
+ * ban of its owner's still open, as MESSAGE_VISIBLE withholds a message; it
+ * shows once the ban is lifted. A share begun before the ban and left as it
+ * was stays shown.
+ */
+const SHARE_VISIBLE = `NOT ${counterpartShadowBanned("greatest(s.shared_at, k.updated_at)")}`;
+
+/** The caller's stored pieces, in the kinds' order (the enum's, CONTACT_KINDS). */
+export async function listContacts(db: Queryable, accountId: string): Promise<ContactRow[]> {
+  const { rows } = await db.query<Row>(
+    "SELECT kind, value, updated_at FROM contact WHERE account_id = $1 ORDER BY kind",
+    [accountId],
+  );
+  return rows.map(contactFrom);
+}
+
+/**
+ * Keeps the caller's piece of that kind, the one stored before replaced
+ * (migration 0059 announces a shared one's change). `updated_at` is when the
+ * value last changed: the same value kept again leaves it, so it changes
+ * nothing that SHARE_VISIBLE reads under a shadow ban.
+ */
+export async function upsertContact(
+  db: Queryable,
+  input: { accountId: string; kind: ContactKind; value: string; at: Date },
+): Promise<ContactRow> {
+  const { rows } = await db.query<Row>(
+    `INSERT INTO contact (account_id, kind, value, updated_at) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (account_id, kind)
+       DO UPDATE SET value = EXCLUDED.value,
+         updated_at = CASE WHEN contact.value = EXCLUDED.value THEN contact.updated_at
+                           ELSE EXCLUDED.updated_at END
+     RETURNING kind, value, updated_at`,
+    [input.accountId, input.kind, input.value, input.at],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("contact upsert returned no row");
+  return contactFrom(row);
+}
+
+/** Removes the caller's piece of that kind; false when there was none. */
+export async function deleteContact(
+  db: Queryable,
+  input: { accountId: string; kind: ContactKind },
+): Promise<boolean> {
+  const result = await db.query("DELETE FROM contact WHERE account_id = $1 AND kind = $2", [
+    input.accountId,
+    input.kind,
+  ]);
+  return (result.rowCount ?? 0) > 0;
+}
+
+/** Every stored piece of the person's: what erasure deletes (ADR-007 §4). */
+export async function deleteContactsOf(db: Queryable, accountId: string): Promise<number> {
+  const result = await db.query("DELETE FROM contact WHERE account_id = $1", [accountId]);
+  return result.rowCount ?? 0;
+}
+
+/**
+ * The caller's piece of that kind, held until the share commits: a removal
+ * waits for it, and then ends the share it begins. False when none is kept.
+ */
+export async function holdContact(
+  db: Queryable,
+  accountId: string,
+  kind: ContactKind,
+): Promise<boolean> {
+  const { rows } = await db.query(
+    "SELECT 1 FROM contact k WHERE k.account_id = $1 AND k.kind = $2 FOR SHARE OF k",
+    [accountId, kind],
+  );
+  return rows.length > 0;
+}
+
+/** A share begun on the caller's side; false when one of that kind stands already. */
+export async function beginShare(
+  db: Queryable,
+  input: { accountId: string; conversationId: string; kind: ContactKind; at: Date },
+): Promise<boolean> {
+  const { rows } = await db.query(
+    `INSERT INTO contact_share (conversation_id, side, kind, shared_at)
+     SELECT me.conversation_id, me.side, $3, $4 FROM conversation_participant me
+     WHERE me.account_id = $1 AND me.conversation_id = $2
+     ON CONFLICT (conversation_id, side, kind) WHERE ended_at IS NULL DO NOTHING
+     RETURNING id`,
+    [input.accountId, input.conversationId, input.kind, input.at],
+  );
+  return rows.length > 0;
+}
+
+/** Out of the archive, as a message brings it (TD-13); a conversation not archived is left as it is. */
+export async function leaveArchive(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<void> {
+  await db.query(
+    `UPDATE conversation c SET archived_at = NULL
+     WHERE c.id = $2 AND c.archived_at IS NOT NULL
+       AND EXISTS (SELECT 1 FROM conversation_participant me
+                   WHERE me.conversation_id = c.id AND me.account_id = $1)`,
+    [accountId, conversationId],
+  );
+}
+
+/**
+ * Ends the caller's standing shares of that kind: in one conversation when
+ * it names one (its owner stopped it), else in every conversation (the piece
+ * was removed). The number ended.
+ */
+export async function endShares(
+  db: Queryable,
+  input: {
+    accountId: string;
+    conversationId?: string;
+    kind: ContactKind;
+    how: Exclude<ContactShareEnd, "closed">;
+    at: Date;
+  },
+): Promise<number> {
+  const result = await db.query(
+    `UPDATE contact_share s SET ended_at = $4, ended_how = $5::contact_share_end
+     FROM conversation_participant me
+     WHERE me.account_id = $1 AND ($2::uuid IS NULL OR me.conversation_id = $2)
+       AND s.conversation_id = me.conversation_id AND s.side = me.side
+       AND s.kind = $3 AND s.ended_at IS NULL`,
+    [input.accountId, input.conversationId ?? null, input.kind, input.at, input.how],
+  );
+  return result.rowCount ?? 0;
+}
+
+export type ConversationContactRows = {
+  mine: Array<{ kind: ContactKind; value: string; shared: boolean }>;
+  theirs: Array<{ kind: ContactKind; value: string }>;
+};
+
+/**
+ * The contacts of one conversation for the caller: their own stored pieces,
+ * each shared here or not (never in a closed one), and the counterpart's
+ * pieces the caller may see now. Empty for a conversation the caller may not
+ * see; the route has asked first.
+ */
+export async function readConversationContacts(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<ConversationContactRows> {
+  const mine = await db.query<Row>(
+    `SELECT k.kind, k.value,
+            (${OPEN_BETWEEN} AND EXISTS (
+              SELECT 1 FROM contact_share s
+              WHERE s.conversation_id = c.id AND s.side = me.side AND s.kind = k.kind
+                AND s.ended_at IS NULL)) AS shared
+     ${FROM_CALLER}
+     JOIN contact k ON k.account_id = me.account_id
+     WHERE me.account_id = $1 AND me.conversation_id = $2 AND ${VISIBLE_TO_CALLER}
+     ORDER BY k.kind`,
+    [accountId, conversationId],
+  );
+  const theirs = await db.query<Row>(
+    `SELECT k.kind, k.value
+     ${FROM_CALLER}
+     JOIN contact_share s ON s.conversation_id = c.id AND s.side = them.side AND s.ended_at IS NULL
+     JOIN contact k ON k.account_id = them.account_id AND k.kind = s.kind
+     WHERE me.account_id = $1 AND me.conversation_id = $2 AND ${VISIBLE_TO_CALLER}
+       AND ${OPEN_BETWEEN} AND ${SHARE_VISIBLE}
+     ORDER BY k.kind`,
+    [accountId, conversationId],
+  );
+  return {
+    mine: mine.rows.map((r) => ({
+      kind: r.kind as ContactKind,
+      value: r.value as string,
+      shared: r.shared === true,
+    })),
+    theirs: theirs.rows.map((r) => ({ kind: r.kind as ContactKind, value: r.value as string })),
+  };
+}
+
+/**
+ * Whether a change of the conversation's contacts is told to the caller's
+ * sockets: only while it is open between the two (a closed or hidden one has
+ * its own frame, and a block is never a signal, ADR-030 §7), and never while
+ * the counterpart is under a shadow ban still open (SHARE_VISIBLE's ban). What
+ * the counterpart begins or changes meanwhile is withheld from the caller, so
+ * a frame for it would have nothing new to read and would tell them of the
+ * ban (ADR-024 §6); a piece taken back meanwhile goes at the caller's next
+ * read (ADR-031 Open 18).
+ */
+export async function contactsFrameReaches(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<boolean> {
+  const { rows } = await db.query(
+    `SELECT 1 ${FROM_CALLER}
+     WHERE me.account_id = $1 AND me.conversation_id = $2 AND ${OPEN_BETWEEN}
+       AND NOT ${counterpartShadowBanned()}`,
+    [accountId, conversationId],
+  );
+  return rows.length > 0;
 }

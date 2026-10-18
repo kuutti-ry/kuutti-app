@@ -23,7 +23,10 @@ import { dayOf, timeOf } from "./time";
 // in front, the read mark, Online, the state, the sending row swapped by its
 // id, the connection line; a photo (#350): attached, sent with its caption and
 // its progress, refused in words, sent again with its id, the picker's
-// outcomes, the bubble's three states and the reads again for its URLs.
+// outcomes, the bubble's three states and the reads again for its URLs;
+// contacts (#103): Share contact offered, the dialog's share and stop, its
+// refusals and the reads again they ask for, what the other person shares
+// under the header, and the reads again on a contacts frame and a resume.
 
 jest.mock("nativewind", () => ({
   ...jest.requireActual("nativewind"),
@@ -92,6 +95,7 @@ const detail = (over: Partial<ConversationDetail> = {}): ConversationDetail => (
   unread: 0,
   limits: { maxLength: 30 },
   counterpartReadUpTo: 0,
+  contacts: { mine: [], theirs: [] },
   ...over,
 });
 
@@ -136,6 +140,9 @@ const sourceOf = (testID: string) =>
     }
   ).source?.[0];
 const ATTACHED = "Photo attached. The words in the field go under it.";
+/** The plain-text rule's refusal, with the way through it (#103). */
+const CONTACT_DETAILS =
+  "A message cannot carry an e-mail address, a link, a phone number or a social media handle. To give your number or a username, keep it in Settings, under Your contacts, and share it from the top of the conversation.";
 const attached = () => screen.queryByText(ATTACHED);
 
 /** An upload the test answers itself, so the sending row can be seen on the way. */
@@ -196,6 +203,9 @@ function conversation(
   let page = 0;
   return api((call) => {
     if (call.method === "GET" && call.path === `/conversations/${ID}`) return json(shown);
+    if (call.method === "GET" && call.path === `/conversations/${ID}/contacts`) {
+      return json(shown.contacts);
+    }
     if (call.method === "GET" && call.path === `/conversations/${ID}/messages`) {
       const messages = pages[Math.min(page, pages.length - 1)] ?? [];
       page += 1;
@@ -209,6 +219,100 @@ function conversation(
     return refusal("not_found", 404);
   });
 }
+const INSTAGRAM = { kind: "instagram", value: "aino.k", shared: false } as const;
+const VILLE_SHARES = { mine: [], theirs: [{ kind: "instagram" as const, value: "ville.k" }] };
+const PHONE = { kind: "phone", value: "+358401234567", shared: false } as const;
+/** The answers a test may hold back: a read of the detail, of its contacts or of messages, a send, a share. */
+type Held = "detail" | "contacts" | "messages" | "send" | "share";
+const heldKind = ({ method, path }: Call): Held | null => {
+  if (/\/contacts\/\w+$/.test(path)) return "share";
+  if (method === "GET" && path === `/conversations/${ID}`) return "detail";
+  if (method === "GET" && path === `/conversations/${ID}/contacts`) return "contacts";
+  if (path === `/conversations/${ID}/messages`) return method === "GET" ? "messages" : "send";
+  return null;
+};
+/**
+ * A conversation whose contacts the share routes change as the API does (a
+ * share brings an archived one back), and whose detail the test may change or
+ * take away (404); `refusals` answer the next shares or stops instead, an
+ * Error failing the request. `pages` are the newest page and the one before
+ * it; a send answers its words as message 90. `hold` keeps the next answer of
+ * a kind back until the test releases it, and that answer says what was there
+ * when it was asked, as a read begun earlier does.
+ */
+function contactsApi(
+  start: ConversationDetail,
+  refusals: Array<Response | Error> = [],
+  pages: { newest?: ChatMessage[]; before?: ChatMessage[] } = {},
+) {
+  let shown: ConversationDetail | null = start;
+  const gates = new Map<Held, Array<Promise<void>>>();
+  const answer = (call: Call): Response => {
+    if (call.method === "GET" && call.path === `/conversations/${ID}`) {
+      return shown ? json(shown) : refusal("not_found", 404);
+    }
+    if (call.method === "GET" && call.path === `/conversations/${ID}/contacts`) {
+      return shown ? json(shown.contacts) : refusal("not_found", 404);
+    }
+    if (call.method === "GET" && call.path === `/conversations/${ID}/messages`) {
+      return json({
+        messages: (call.query.includes("before=") ? pages.before : pages.newest) ?? [],
+      });
+    }
+    if (call.method === "POST" && call.path === `/conversations/${ID}/messages`) {
+      const { clientId, body } = call.body as { clientId: string; body: string };
+      return json({ ...message(90, "mine", body), clientId });
+    }
+    const share = /^\/conversations\/[^/]+\/contacts\/(\w+)$/.exec(call.path);
+    if (share && shown) {
+      const next = refusals.shift();
+      if (next instanceof Error) throw next;
+      if (next) return next;
+      const [, kind] = share;
+      const sharing = call.method === "POST";
+      shown = {
+        ...shown,
+        state: sharing && shown.state === "archived" ? "open" : shown.state,
+        contacts: {
+          ...shown.contacts,
+          mine: shown.contacts.mine.map((p) => (p.kind === kind ? { ...p, shared: sharing } : p)),
+        },
+      };
+      return json(shown);
+    }
+    if (call.path.endsWith("/read")) return new Response(null, { status: 204 });
+    return refusal("not_found", 404);
+  };
+  const calls = api(async (call) => {
+    const answered = answer(call);
+    const kind = heldKind(call);
+    const gate = kind ? gates.get(kind)?.shift() : undefined;
+    if (gate) await gate;
+    return answered;
+  });
+  const reads = (path: string) => calls.filter((c) => c.method === "GET" && c.path === path).length;
+  return {
+    calls,
+    detailReads: () => reads(`/conversations/${ID}`),
+    contactsReads: () => reads(`/conversations/${ID}/contacts`),
+    set: (next: ConversationDetail | null) => {
+      shown = next;
+    },
+    /** Holds the next answer of this kind back; the function returned releases it. */
+    hold: (kind: Held) => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      gates.set(kind, [...(gates.get(kind) ?? []), gate]);
+      return async () => {
+        await act(async () => release());
+        await settle();
+      };
+    },
+  };
+}
+
 const composer = () => screen.getByLabelText("Message");
 const type = (words: string) =>
   act(async () => {
@@ -323,10 +427,7 @@ describe("one conversation", () => {
     await renderWithTheme(<ConversationScreen id={ID} />);
     await screen.findByLabelText("Message");
     for (const [words, text] of [
-      [
-        "Soita 040 123 4567",
-        "A message cannot carry an e-mail address, a link, a phone number or a social media handle.",
-      ],
+      ["Soita 040 123 4567", CONTACT_DETAILS],
       ["Pitkä viesti", "The message is too long. Make it shorter and send it again."],
       ["Taas", "You are sending messages very fast. Wait a moment and send again."],
     ] as const) {
@@ -532,6 +633,267 @@ describe("one conversation", () => {
     await press("Try again");
     expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
   });
+});
+
+describe("contacts in a conversation (#103)", () => {
+  const BODY =
+    "Sanna sees what you share at once, at the top of this conversation. You can stop sharing at any time, but what Sanna already wrote down stays with them.";
+  const announced = () =>
+    (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
+  /** The labels of everything a finger can press: a value never stands in one. */
+  const pressedLabels = () =>
+    pressables(screen.toJSON() as HostNode).map((node) => String(node.props.accessibilityLabel));
+  const shareOffered = () => screen.queryByRole("button", { name: "Share contact" }) !== null;
+
+  beforeEach(() => {
+    (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+    (AccessibilityInfo.sendAccessibilityEvent as jest.Mock).mockClear();
+  });
+
+  it.each<[string, Partial<ConversationDetail>, boolean]>([
+    ["nothing kept, in an open conversation", {}, false],
+    [
+      "a kept contact, in a conversation that ended",
+      { state: "closed", closedHow: "unmatch", contacts: { mine: [INSTAGRAM], theirs: [] } },
+      false,
+    ],
+    [
+      "a kept contact, in an open conversation",
+      { contacts: { mine: [INSTAGRAM], theirs: [] } },
+      true,
+    ],
+    [
+      "a kept contact, in an archived conversation",
+      { state: "archived", contacts: { mine: [INSTAGRAM], theirs: [] } },
+      true,
+    ],
+  ])("offers Share contact in the header for %s: %s", async (_what, over, offered) => {
+    contactsApi(detail(over));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByText("Sanna, 31");
+    await settle();
+    expect(shareOffered()).toBe(offered);
+    noProblems();
+  });
+
+  it("shares a contact from the dialog in one press, says so, and stops sharing it; a value is shown, never in a label", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    const { calls } = contactsApi(detail({ contacts: { mine: [PHONE, INSTAGRAM], theirs: [] } }));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    expect(screen.getByText("Share a contact")).toBeTruthy();
+    expect(AccessibilityInfo.sendAccessibilityEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      "focus",
+    );
+    expect(screen.getByText(BODY)).toBeTruthy();
+    expect(screen.getByText("Phone: +358401234567")).toBeTruthy();
+    expect(screen.getByText("Instagram: aino.k")).toBeTruthy();
+    expect(screen.queryByText("Shared in this conversation")).toBeNull();
+    noProblems();
+    await press("Share your Instagram");
+    const sharing = () => calls.filter((c) => c.path.includes("/contacts/"));
+    expect(sharing()).toEqual([
+      { method: "POST", path: `/conversations/${ID}/contacts/instagram`, query: "", body: null },
+    ]);
+    expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+    expect(screen.getByText("Shared. Sanna sees it now.").props.accessibilityLiveRegion).toBe(
+      "polite",
+    );
+    expect(screen.getByRole("button", { name: "Stop sharing your Instagram" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Share your phone number" })).toBeTruthy();
+    expect(pressedLabels().filter((label) => /aino|358/.test(label))).toEqual([]);
+    noProblems();
+    await press("Stop sharing your Instagram");
+    expect(sharing().at(-1)).toEqual({
+      method: "DELETE",
+      path: `/conversations/${ID}/contacts/instagram`,
+      query: "",
+      body: null,
+    });
+    expect(screen.getByText("No longer shared here.")).toBeTruthy();
+    expect(screen.queryByText("Shared in this conversation")).toBeNull();
+    expect(screen.getByRole("button", { name: "Share your Instagram" })).toBeTruthy();
+    // What was said belongs to that time the dialog was open.
+    await press("Close");
+    expect(screen.queryByText("Share a contact")).toBeNull();
+    await press("Share contact");
+    expect(screen.queryByText("No longer shared here.")).toBeNull();
+    // Android reads its live regions; nothing is announced.
+    expect(announced()).toEqual([]);
+  });
+
+  it("brings an archived conversation back with a share, as a message does", async () => {
+    contactsApi(detail({ state: "archived", contacts: { mine: [INSTAGRAM], theirs: [] } }));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    const BANNER = "This conversation was quiet for a week. Write to bring it back.";
+    expect(await screen.findByText(BANNER)).toBeTruthy();
+    await press("Share contact");
+    await press("Share your Instagram");
+    expect(screen.queryByText(BANNER)).toBeNull();
+  });
+
+  it("tells VoiceOver how a share went, iOS having no live regions", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }), [
+      refusal("message_budget_exceeded", 429),
+    ]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    await press("Share your Instagram");
+    await press("Share your Instagram");
+    await press("Stop sharing your Instagram");
+    expect(announced()).toEqual([
+      "That was a lot in a short time. Wait a moment and try again.",
+      "Shared. Sanna sees it now.",
+      "No longer shared here.",
+    ]);
+  });
+
+  it("says each refusal in the dialog, and reads the conversation again when the refusal says it is out of date", async () => {
+    const { calls, detailReads, set } = contactsApi(
+      detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }),
+      [
+        refusal("message_budget_exceeded", 429),
+        new TypeError("Network request failed"),
+        refusal("validation_failed", 400),
+        refusal("contact_not_stored", 409),
+      ],
+    );
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    const before = detailReads();
+    await press("Share your Instagram");
+    expect(
+      screen.getByText("That was a lot in a short time. Wait a moment and try again.").props
+        .accessibilityLiveRegion,
+    ).toBe("assertive");
+    // The button is the same one, for the next try.
+    expect(screen.getByRole("button", { name: "Share your Instagram" })).toBeTruthy();
+    for (let i = 0; i < 2; i += 1) {
+      await press("Share your Instagram");
+      expect(
+        screen.getByText("Nothing changed. Check your connection and try again."),
+      ).toBeTruthy();
+    }
+    expect(detailReads()).toBe(before);
+    // Removed on another phone meanwhile: said, read again, and gone from the dialog and the header.
+    set(detail({ contacts: { mine: [], theirs: [] } }));
+    await press("Share your Instagram");
+    expect(
+      screen.getByText("Save this contact under Settings, Your contacts, first."),
+    ).toBeTruthy();
+    expect(detailReads()).toBe(before + 1);
+    expect(screen.queryByText("Instagram: aino.k")).toBeNull();
+    expect(shareOffered()).toBe(false);
+    expect(calls.filter((c) => c.path.includes("/contacts/"))).toHaveLength(4);
+  });
+
+  it("says a share refused by an ending, and the ending in the dialog instead of the buttons", async () => {
+    const { set } = contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }), [
+      refusal("conversation_closed", 409),
+    ]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    set(
+      detail({
+        state: "closed",
+        closedHow: "unmatch",
+        contacts: { mine: [INSTAGRAM], theirs: [] },
+      }),
+    );
+    await press("Share your Instagram");
+    expect(screen.getByText("This conversation has ended, so nothing was shared.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Share your Instagram" })).toBeNull();
+    // Once in the dialog, once instead of the composer.
+    expect(screen.getAllByText("This conversation has ended.")).toHaveLength(2);
+    expect(screen.queryByLabelText("Message")).toBeNull();
+    expect(shareOffered()).toBe(false);
+  });
+
+  it("says a conversation gone when a share finds it gone", async () => {
+    const { set } = contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }), [
+      refusal("not_found", 404),
+    ]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    set(null);
+    await press("Share your Instagram");
+    expect(screen.getByText("This conversation is no longer available.")).toBeTruthy();
+    expect(screen.queryByText("Share a contact")).toBeNull();
+  });
+
+  it("says nothing of an outcome that came after the dialog closed; opened again, it shows what the press changed", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const { hold } = contactsApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("Share contact");
+    const answer = hold("share");
+    await press("Share your Instagram");
+    await press("Close");
+    await answer();
+    expect(announced()).toEqual([]);
+    await press("Share contact");
+    expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+    expect(screen.queryByText("Shared. Sanna sees it now.")).toBeNull();
+    // Open, it says the next one.
+    await press("Stop sharing your Instagram");
+    expect(screen.getByText("No longer shared here.")).toBeTruthy();
+    expect(announced()).toEqual(["No longer shared here."]);
+  });
+
+  it.each([
+    [
+      "en-US",
+      "Sanna shares Instagram: ville.k",
+      "Sanna shares a phone number: +358401234568",
+      "Phone: +358401234568",
+    ],
+    [
+      "fi-FI",
+      "Sanna jakaa yhteystiedon. Instagram: ville.k",
+      "Sanna jakaa yhteystiedon. Puhelin: +358401234568",
+      "Puhelin: +358401234568",
+    ],
+    [
+      "sv-FI",
+      "Sanna delar en kontaktuppgift. Instagram: ville.k",
+      "Sanna delar en kontaktuppgift. Telefon: +358401234568",
+      "Telefon: +358401234568",
+    ],
+  ])(
+    "shows what the other person shares under the header, as text to select, heard as who shares what (%s)",
+    async (language, instagram, phone, phoneLine) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: language }]);
+      contactsApi(
+        detail({
+          contacts: {
+            mine: [],
+            theirs: [
+              { kind: "instagram", value: "ville.k" },
+              { kind: "phone", value: "+358401234568" },
+            ],
+          },
+        }),
+      );
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      const line = await screen.findByText("Instagram: ville.k");
+      expect(line.props.selectable).toBe(true);
+      expect(line.props.accessibilityLabel).toBe(instagram);
+      expect(screen.getByText(phoneLine).props.accessibilityLabel).toBe(phone);
+      // Text, never a link or a button: nothing more to press than without them.
+      expect(pressedLabels().filter((label) => /ville|358/.test(label))).toEqual([]);
+      noProblems();
+      // What was there when the screen opened is not announced.
+      expect(announced()).toEqual([]);
+    },
+  );
 });
 
 describe("one conversation, live over the socket", () => {
@@ -980,6 +1342,380 @@ describe("one conversation, live over the socket", () => {
     expect(screen.queryByText(FAILED)).toBeNull();
     expect(sourceOf("photo-attached")?.uri).toBe("file:///roll/3.jpg#resized");
   });
+
+  it("reads the contacts alone again when the socket says they changed here, and after a resume, and shows none once it closes the conversation (#103)", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+    const { calls, contactsReads, detailReads, set } = contactsApi(detail());
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationScreen id={ID} />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    await screen.findByLabelText("Message");
+    await ready();
+    await settle();
+    const pages = () => calls.filter((c) => c.path.endsWith("/messages")).length;
+    const [reads, details, paged] = [contactsReads(), detailReads(), pages()];
+    set(detail({ contacts: VILLE_SHARES }));
+    // Another conversation's contacts: nothing to read here.
+    await frame({ type: "contacts", conversationId: "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a71" });
+    await settle();
+    expect(contactsReads()).toBe(reads);
+    await frame({ type: "contacts", conversationId: ID });
+    await settle();
+    expect(contactsReads()).toBe(reads + 1);
+    expect(pages()).toBe(paged);
+    expect(screen.getByLabelText("Sanna shares Instagram: ville.k")).toBeTruthy();
+    const shares = () => announced().filter((words: string) => words.startsWith("Sanna shares"));
+    expect(shares()).toEqual(["Sanna shares Instagram: ville.k"]);
+    // Taken back while the socket was away: the resume reads it again.
+    set(detail());
+    jest.useFakeTimers();
+    await act(async () => FakeWebSocket.latest().drop());
+    await act(() => jest.advanceTimersByTimeAsync(1000));
+    await ready();
+    jest.useRealTimers();
+    await settle();
+    expect(contactsReads()).toBe(reads + 2);
+    expect(screen.queryByText("Instagram: ville.k")).toBeNull();
+    // Shared again, then the conversation closes: no contacts frame follows a close.
+    set(detail({ contacts: VILLE_SHARES }));
+    await frame({ type: "contacts", conversationId: ID });
+    await settle();
+    expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+    await frame({
+      type: "conversation",
+      conversationId: ID,
+      state: "closed",
+      closedHow: "unmatch",
+    });
+    expect(screen.queryByText("Instagram: ville.k")).toBeNull();
+    expect(shares()).toEqual([
+      "Sanna shares Instagram: ville.k",
+      "Sanna shares Instagram: ville.k",
+    ]);
+    // The detail itself was never read again: the contacts route signs no thumb.
+    expect(detailReads()).toBe(details);
+  });
+
+  it("keeps what is shown when a read for the contacts fails, and says a conversation gone when it finds one (#103)", async () => {
+    const { contactsReads, set } = contactsApi(detail());
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationScreen id={ID} />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    await screen.findByLabelText("Message");
+    await ready();
+    await settle();
+    const reads = contactsReads();
+    const failing = globalThis.fetch;
+    globalThis.fetch = jest.fn(async () => {
+      throw new TypeError("Network request failed");
+    }) as unknown as typeof fetch;
+    await frame({ type: "contacts", conversationId: ID });
+    await settle();
+    expect(screen.getByLabelText("Message")).toBeTruthy();
+    globalThis.fetch = failing;
+    set(null);
+    await frame({ type: "contacts", conversationId: ID });
+    await settle();
+    expect(contactsReads()).toBe(reads + 1);
+    expect(screen.getByText("This conversation is no longer available.")).toBeTruthy();
+  });
+
+  it("leaves a conversation that never loaded to Try again when the contacts change, which then shows them (#103)", async () => {
+    let fails = true;
+    const { contactsReads, detailReads } = contactsApi(detail({ contacts: VILLE_SHARES }), [], {
+      newest: [message(1, "theirs", "Moi", DAY_1)],
+    });
+    const answering = globalThis.fetch;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      if (fails) throw new TypeError("Network request failed");
+      return answering(input, init);
+    }) as unknown as typeof fetch;
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationScreen id={ID} />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    expect(await screen.findByText("The conversation could not be loaded.")).toBeTruthy();
+    fails = false;
+    await ready();
+    await frame({ type: "contacts", conversationId: ID });
+    await settle();
+    expect([contactsReads(), detailReads()]).toEqual([2, 0]);
+    // Read, but not shown over the failure: the messages were never read.
+    expect(screen.getByText("The conversation could not be loaded.")).toBeTruthy();
+    expect(screen.queryByText("Instagram: ville.k")).toBeNull();
+    await press("Try again");
+    expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
+    expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+  });
+
+  it("takes the share dialog's buttons and the header's offer away when the socket closes the conversation (#103)", async () => {
+    contactsApi(detail({ contacts: { mine: [{ ...INSTAGRAM, shared: true }], theirs: [] } }));
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationScreen id={ID} />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    await screen.findByLabelText("Message");
+    await ready();
+    await settle();
+    await press("Share contact");
+    expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+    await frame({
+      type: "conversation",
+      conversationId: ID,
+      state: "closed",
+      closedHow: "unmatch",
+    });
+    expect(screen.queryByRole("button", { name: "Share contact" })).toBeNull();
+    expect(screen.queryByText("Shared in this conversation")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Stop sharing your Instagram" })).toBeNull();
+    expect(screen.getAllByText("This conversation has ended.")).toHaveLength(2);
+  });
+
+  describe("the contacts read alone, and the newest detail kept (#103)", () => {
+    const BANNER = "This conversation was quiet for a week. Write to bring it back.";
+    const contactsFrame = () => frame({ type: "contacts", conversationId: ID });
+    /** The screen under the live provider, loaded, its socket open and its resume's read done. */
+    async function openLive(): Promise<void> {
+      await renderWithTheme(
+        <ChatLiveProvider>
+          <ConversationScreen id={ID} />
+        </ChatLiveProvider>,
+      );
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+      await screen.findByLabelText("Message");
+      await ready();
+      await settle();
+    }
+
+    it("reads them once for a burst of frames and once more after it, and merges them into the detail shown, keeping the rest of it", async () => {
+      const { contactsReads, detailReads, hold, set } = contactsApi(
+        detail({ state: "archived" }),
+        [],
+        { newest: [message(1, "theirs", "Moi", DAY_1)] },
+      );
+      await openLive();
+      const [reads, details] = [contactsReads(), detailReads()];
+      // What a read of the whole detail would bring now; only its contacts are read.
+      set(
+        detail({
+          state: "open",
+          counterpart: { deleted: false, name: "Ville", age: 40, thumb: null },
+          contacts: VILLE_SHARES,
+        }),
+      );
+      const release = hold("contacts");
+      for (let i = 0; i < 5; i += 1) await contactsFrame();
+      await settle();
+      expect(contactsReads()).toBe(reads + 1);
+      await release();
+      expect(contactsReads()).toBe(reads + 2);
+      expect(detailReads()).toBe(details);
+      expect(screen.getByLabelText("Sanna shares Instagram: ville.k")).toBeTruthy();
+      expect(screen.getByText("Sanna, 31")).toBeTruthy();
+      expect(screen.getByText(BANNER)).toBeTruthy();
+      expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
+      // Done: the next frame reads again.
+      await contactsFrame();
+      await settle();
+      expect(contactsReads()).toBe(reads + 3);
+    });
+
+    it.each(["words", "a photo"])(
+      "keeps what a read brought while a send of %s was on its way, and the conversation the send brought back",
+      async (what) => {
+        const { hold, set } = contactsApi(detail({ state: "archived" }));
+        await openLive();
+        const sent = what === "words" ? hold("send") : null;
+        if (sent) await type("Hei");
+        else {
+          picks();
+          await press("Add photo");
+        }
+        await userEvent.setup().press(sendButton());
+        set(detail({ contacts: VILLE_SHARES }));
+        await contactsFrame();
+        await settle();
+        expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+        if (sent) await sent();
+        else {
+          await act(async () =>
+            uploads()[0]?.answer(201, {
+              ...photoMessage(90, "mine", null),
+              clientId: "11111111-1111-4111-8111-111111111111",
+            }),
+          );
+          await settle();
+        }
+        expect(screen.queryByText(/^Sending/)).toBeNull();
+        expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+        expect(screen.queryByText(BANNER)).toBeNull();
+      },
+    );
+
+    it("keeps what a read brought while a page of earlier messages was on its way", async () => {
+      const full = Array.from({ length: 50 }, (_, i) =>
+        message(51 - i, "theirs", `Viesti ${51 - i}`),
+      );
+      const { hold, set } = contactsApi(detail(), [], {
+        newest: full,
+        before: [message(1, "theirs", "Yksi")],
+      });
+      await openLive();
+      const page = hold("messages");
+      await press("Earlier messages");
+      set(detail({ contacts: VILLE_SHARES }));
+      await contactsFrame();
+      await settle();
+      expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+      await page();
+      expect(said("Sanna", DAY_2, "Yksi")).toBeTruthy();
+      expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+    });
+
+    it("keeps the conversation a send brought back when a reload begun before the send answers after it", async () => {
+      const { hold } = contactsApi(detail({ state: "archived" }));
+      await openLive();
+      const reload = hold("detail");
+      await act(async () => focus());
+      await settle();
+      await type("Hei");
+      await userEvent.setup().press(sendButton());
+      await settle();
+      expect(said("You", DAY_2, "Hei")).toBeTruthy();
+      expect(screen.queryByText(BANNER)).toBeNull();
+      await reload();
+      expect(screen.queryByText(BANNER)).toBeNull();
+    });
+
+    it("shows what the resume read while the first page was on its way, not the older detail read before it", async () => {
+      const { hold, set } = contactsApi(detail());
+      const page = hold("messages");
+      await renderWithTheme(
+        <ChatLiveProvider>
+          <ConversationScreen id={ID} />
+        </ChatLiveProvider>,
+      );
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+      await settle();
+      set(detail({ contacts: VILLE_SHARES }));
+      await ready();
+      await settle();
+      expect(screen.getByText("Loading the conversation…")).toBeTruthy();
+      await page();
+      expect(screen.getByLabelText("Message")).toBeTruthy();
+      expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+    });
+
+    it.each<[string, "detail" | "messages"]>([
+      ["its detail", "detail"],
+      ["its page", "messages"],
+    ])(
+      "keeps what a read brought while a reload on focus waited for %s, the reload's detail being older",
+      async (_what, held) => {
+        const { hold, set } = contactsApi(detail());
+        await openLive();
+        const page = hold(held);
+        await act(async () => focus());
+        await settle();
+        set(detail({ contacts: VILLE_SHARES }));
+        await contactsFrame();
+        await settle();
+        expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+        await page();
+        expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+      },
+    );
+
+    it("never lets a read begun earlier take the place of a reload's detail or a share's answer that came first", async () => {
+      const { hold, set } = contactsApi(
+        detail({ contacts: { mine: [INSTAGRAM], theirs: VILLE_SHARES.theirs } }),
+      );
+      await openLive();
+      expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+      // Begun while Sanna still shared it; she stops, and a reload on focus says so first.
+      const older = hold("contacts");
+      await contactsFrame();
+      await settle();
+      set(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }));
+      await act(async () => focus());
+      await settle();
+      expect(screen.queryByText("Instagram: ville.k")).toBeNull();
+      await older();
+      expect(screen.queryByText("Instagram: ville.k")).toBeNull();
+      // Begun before the person shared: the share's answer is newer.
+      const before = hold("contacts");
+      await contactsFrame();
+      await settle();
+      await press("Share contact");
+      await press("Share your Instagram");
+      expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+      await before();
+      expect(screen.getByText("Shared in this conversation")).toBeTruthy();
+    });
+
+    it.each<["share" | "stop", "the answer" | "her frame's read"]>([
+      ["share", "the answer"],
+      ["share", "her frame's read"],
+      ["stop", "the answer"],
+      ["stop", "her frame's read"],
+    ])(
+      "shows what Sanna shared at the same moment as the person's %s, %s landing first",
+      async (what, first) => {
+        const wasShared = what === "stop";
+        const { contactsReads, hold, set } = contactsApi(
+          detail({ contacts: { mine: [{ ...INSTAGRAM, shared: wasShared }], theirs: [] } }),
+        );
+        await openLive();
+        const reads = contactsReads();
+        await press("Share contact");
+        // The API reads the person's fresh view before Sanna's share commits...
+        const answer = hold("share");
+        await press(wasShared ? "Stop sharing your Instagram" : "Share your Instagram");
+        set(
+          detail({
+            contacts: { mine: [{ ...INSTAGRAM, shared: !wasShared }], theirs: VILLE_SHARES.theirs },
+          }),
+        );
+        // ...and her commit's frame begins a read before that answer arrives.
+        const read = hold("contacts");
+        await contactsFrame();
+        await settle();
+        expect(contactsReads()).toBe(reads + 1);
+        if (first === "the answer") {
+          await answer();
+          await read();
+        } else {
+          await read();
+          await answer();
+        }
+        // The answer is newer than the read begun before it, its contacts no
+        // fresher: a read after it brings hers.
+        expect(contactsReads()).toBe(reads + 2);
+        expect(screen.getByText("Instagram: ville.k")).toBeTruthy();
+        expect(
+          screen.getByText(
+            what === "share" ? "Shared. Sanna sees it now." : "No longer shared here.",
+          ),
+        ).toBeTruthy();
+        expect(
+          screen.getByRole("button", {
+            name: wasShared ? "Share your Instagram" : "Stop sharing your Instagram",
+          }),
+        ).toBeTruthy();
+      },
+    );
+  });
 });
 
 describe("a photo in a conversation (#350)", () => {
@@ -1112,12 +1848,7 @@ describe("a photo in a conversation (#350)", () => {
       ["photo_too_many_pixels", 422, "The photo is too large. Choose a smaller picture.", false],
       ["payload_too_large", 413, "The photo is too large. Choose a smaller picture.", false],
       ["media_unavailable", 503, "Photos are not available right now.", false],
-      [
-        "contact_details",
-        400,
-        "A message cannot carry an e-mail address, a link, a phone number or a social media handle.",
-        true,
-      ],
+      ["contact_details", 400, CONTACT_DETAILS, true],
       [
         "message_too_long",
         400,

@@ -3015,10 +3015,24 @@ errors.message_too_long:
   machine: { fi: true, sv: true }
 
 errors.contact_details:
-  en: "A message cannot carry an e-mail address, a link, a phone number or a social media handle."
-  description: "Send (400, #348, the plain-text rule of #47 for messages): the text carried a way to reach the person outside Kuutti. The API logs the kind found, never the text."
-  fi: "Viestissä ei voi olla sähköpostiosoitetta, linkkiä, puhelinnumeroa tai somekäyttäjänimeä."
-  sv: "Ett meddelande kan inte innehålla en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier."
+  en: "A message cannot carry an e-mail address, a link, a phone number or a social media handle. To give your number or a username, keep it in Settings, under Your contacts, and share it from the top of the conversation."
+  description: "Send (400, #348, the plain-text rule of #47 for messages), a photo's caption too (#350): the text carried a way to reach the person outside Kuutti. The API logs the kind found, never the text. Its second sentence is the way through (#103), in the words of chat.composer.error.contact_details."
+  fi: "Viestissä ei voi olla sähköpostiosoitetta, linkkiä, puhelinnumeroa tai somekäyttäjänimeä. Jos haluat antaa numerosi tai käyttäjänimesi, tallenna se kohtaan Asetukset, Yhteystietosi, ja jaa se keskustelun yläosasta."
+  sv: "Ett meddelande kan inte innehålla en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier. Vill du ge ditt nummer eller ett användarnamn, spara det under Inställningar, Dina kontaktuppgifter, och dela det högst upp i samtalet."
+  machine: { fi: true, sv: true }
+
+errors.contact_invalid:
+  en: "Check what you typed: it does not look like a phone number or a username of this kind."
+  description: "Settings, Your contacts (400, #103): the value is not one of its kind (normaliseContact in packages/schema). The detail names the kind, never the value."
+  fi: "Tarkista, mitä kirjoitit: se ei näytä tämänlaiselta puhelinnumerolta tai käyttäjänimeltä."
+  sv: "Kontrollera vad du skrev: det ser inte ut som ett telefonnummer eller ett användarnamn av det här slaget."
+  machine: { fi: true, sv: true }
+
+errors.contact_not_stored:
+  en: "Save this contact under Settings, Your contacts, first."
+  description: "Conversation, Share contact (409, #103): the person keeps no contact of that kind, removed meanwhile on another phone. Settings and Your contacts are the screens' own names."
+  fi: "Tallenna tämä yhteystieto ensin kohtaan Asetukset, Yhteystietosi."
+  sv: "Spara först den här kontaktuppgiften under Inställningar, Dina kontaktuppgifter."
   machine: { fi: true, sv: true }
 
 errors.message_budget_exceeded:
@@ -6714,10 +6728,10 @@ chat.composer.error.message_too_long:
   machine: { fi: true, sv: true }
 
 chat.composer.error.contact_details:
-  en: "A message cannot carry an e-mail address, a link, a phone number or a social media handle."
-  description: "Under the composer when the API found contact details (#348, the plain-text rule). The words stay in the field."
-  fi: "Viestissä ei voi olla sähköpostiosoitetta, linkkiä, puhelinnumeroa tai somekäyttäjänimeä."
-  sv: "Ett meddelande kan inte innehålla en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier."
+  en: "A message cannot carry an e-mail address, a link, a phone number or a social media handle. To give your number or a username, keep it in Settings, under Your contacts, and share it from the top of the conversation."
+  description: "Under the composer when the API found contact details (#348, the plain-text rule), a caption's too (#350). The words stay in the field. Its second sentence is the way through (#103): Settings and Your contacts are the screens' own names, and the conversation's header has the share button."
+  fi: "Viestissä ei voi olla sähköpostiosoitetta, linkkiä, puhelinnumeroa tai somekäyttäjänimeä. Jos haluat antaa numerosi tai käyttäjänimesi, tallenna se kohtaan Asetukset, Yhteystietosi, ja jaa se keskustelun yläosasta."
+  sv: "Ett meddelande kan inte innehålla en e-postadress, en länk, ett telefonnummer eller ett användarnamn på sociala medier. Vill du ge ditt nummer eller ett användarnamn, spara det under Inställningar, Dina kontaktuppgifter, och dela det högst upp i samtalet."
   machine: { fi: true, sv: true }
 
 chat.composer.error.conversation_closed:
@@ -6858,6 +6872,118 @@ chat.row.photo:
   description: "A row of the list when the last message is a photo without a caption (#350); after chat.row.mine's \"You:\" when it is the person's own. Short."
   fi: "Kuva"
   sv: "Foto"
+  machine: { fi: true, sv: true }
+
+chat.contact.piece:
+  en: "{kind, select, phone {Phone: {value}} whatsapp {WhatsApp: {value}} telegram {Telegram: {value}} instagram {Instagram: {value}} other {{value}}}"
+  description: "One contact as a line (#103): in the share dialog, the person's own; under a conversation's header, what the other person shares. {value} is the number (+358401234567) or the username as stored, after the colon. The brand names stay as they are."
+  fi: "{kind, select, phone {Puhelin: {value}} whatsapp {WhatsApp: {value}} telegram {Telegram: {value}} instagram {Instagram: {value}} other {{value}}}"
+  sv: "{kind, select, phone {Telefon: {value}} whatsapp {WhatsApp: {value}} telegram {Telegram: {value}} instagram {Instagram: {value}} other {{value}}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.theirs:
+  en: "{kind, select, phone {{name} shares a phone number: {value}} whatsapp {{name} shares WhatsApp: {value}} telegram {{name} shares Telegram: {value}} instagram {{name} shares Instagram: {value}} other {{name} shares: {value}}}"
+  description: "What a screen reader says for a line under a conversation's header (#103): the other person, by name in nominative, shares a contact with the reader, its value after the colon. The line itself shows chat.contact.piece; the value can be selected and copied, never a link."
+  fi: "{kind, select, phone {{name} jakaa yhteystiedon. Puhelin: {value}} whatsapp {{name} jakaa yhteystiedon. WhatsApp: {value}} telegram {{name} jakaa yhteystiedon. Telegram: {value}} instagram {{name} jakaa yhteystiedon. Instagram: {value}} other {{name} jakaa yhteystiedon: {value}}}"
+  sv: "{kind, select, phone {{name} delar en kontaktuppgift. Telefon: {value}} whatsapp {{name} delar en kontaktuppgift. WhatsApp: {value}} telegram {{name} delar en kontaktuppgift. Telegram: {value}} instagram {{name} delar en kontaktuppgift. Instagram: {value}} other {{name} delar en kontaktuppgift: {value}}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.open:
+  en: "Share contact"
+  description: "What a screen reader says for the icon button in a conversation's header (#103), there only while the person keeps a contact in Settings and the conversation has not ended: opens the share dialog. Short."
+  fi: "Jaa yhteystieto"
+  sv: "Dela kontaktuppgift"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.title:
+  en: "Share a contact"
+  description: "Title of the share dialog of a conversation (#103), which lists the contacts the person keeps, each with Share or Stop sharing."
+  fi: "Jaa yhteystieto"
+  sv: "Dela en kontaktuppgift"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.body:
+  en: "{name} sees what you share at once, at the top of this conversation. You can stop sharing at any time, but what {name} already wrote down stays with them."
+  description: "The share dialog's sentence under its title (#103): no agreement step, nothing asked back; stopping takes the contact off the screen, not out of the other person's notes. {name} is the other person's name, in nominative, as a subject."
+  fi: "{name} näkee jakamasi heti tämän keskustelun yläosassa. Voit lopettaa jakamisen milloin tahansa, mutta minkä {name} on jo kirjoittanut muistiin, jää hänelle."
+  sv: "{name} ser det du delar direkt, högst upp i det här samtalet. Du kan sluta dela när som helst, men det som {name} redan har skrivit ner finns kvar."
+  machine: { fi: true, sv: true }
+
+chat.contact.share.share:
+  en: "Share"
+  description: "The share dialog's button beside a contact that is not shared in this conversation (#103). Short; its screen-reader name is chat.contact.share.shareLabel, which starts with these words."
+  fi: "Jaa"
+  sv: "Dela"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.stop:
+  en: "Stop sharing"
+  description: "The share dialog's button beside a contact shared in this conversation (#103): the other person no longer sees it. Short; its screen-reader name is chat.contact.share.stopLabel, which starts with these words."
+  fi: "Lopeta jakaminen"
+  sv: "Sluta dela"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.shareLabel:
+  en: "{kind, select, phone {Share your phone number} whatsapp {Share your WhatsApp} telegram {Share your Telegram} instagram {Share your Instagram} other {Share}}"
+  description: "What a screen reader says for the share dialog's Share button of one contact (#103). Must start with the words of chat.contact.share.share, which is what the button shows. The brand names stay as they are."
+  fi: "{kind, select, phone {Jaa: puhelin} whatsapp {Jaa: WhatsApp} telegram {Jaa: Telegram} instagram {Jaa: Instagram} other {Jaa}}"
+  sv: "{kind, select, phone {Dela: telefon} whatsapp {Dela: WhatsApp} telegram {Dela: Telegram} instagram {Dela: Instagram} other {Dela}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.stopLabel:
+  en: "{kind, select, phone {Stop sharing your phone number} whatsapp {Stop sharing your WhatsApp} telegram {Stop sharing your Telegram} instagram {Stop sharing your Instagram} other {Stop sharing}}"
+  description: "What a screen reader says for the share dialog's Stop sharing button of one contact (#103). Must start with the words of chat.contact.share.stop, which is what the button shows."
+  fi: "{kind, select, phone {Lopeta jakaminen: puhelin} whatsapp {Lopeta jakaminen: WhatsApp} telegram {Lopeta jakaminen: Telegram} instagram {Lopeta jakaminen: Instagram} other {Lopeta jakaminen}}"
+  sv: "{kind, select, phone {Sluta dela: telefon} whatsapp {Sluta dela: WhatsApp} telegram {Sluta dela: Telegram} instagram {Sluta dela: Instagram} other {Sluta dela}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.sharedHere:
+  en: "Shared in this conversation"
+  description: "Under a contact in the share dialog while it is shared here (#103), so the state is said in words, not only by the button."
+  fi: "Jaettu tässä keskustelussa"
+  sv: "Delas i det här samtalet"
+  machine: { fi: true, sv: true }
+
+chat.contact.share.shared:
+  en: "Shared. {name} sees it now."
+  description: "Said in the share dialog after a share went through (#103), without interrupting. {name} is the other person's name, in nominative, as a subject."
+  fi: "Jaettu. {name} näkee sen nyt."
+  sv: "Delat. {name} ser det nu."
+  machine: { fi: true, sv: true }
+
+chat.contact.share.stopped:
+  en: "No longer shared here."
+  description: "Said in the share dialog after Stop sharing went through (#103), without interrupting: the other person no longer sees it."
+  fi: "Ei enää jaettu tässä."
+  sv: "Delas inte längre här."
+  machine: { fi: true, sv: true }
+
+chat.contact.share.close:
+  en: "Close"
+  description: "The share dialog (#103): the label of its corner close control (heard, never seen: the control is an icon)."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
+chat.contact.error.conversation_closed:
+  en: "This conversation has ended, so nothing was shared."
+  description: "In the share dialog when the conversation ended before the share (409, #103). Never says why."
+  fi: "Tämä keskustelu on päättynyt, joten mitään ei jaettu."
+  sv: "Det här samtalet har avslutats, så inget delades."
+  machine: { fi: true, sv: true }
+
+chat.contact.error.message_budget_exceeded:
+  en: "That was a lot in a short time. Wait a moment and try again."
+  description: "In the share dialog, and on a card of the Your contacts screen, over matching_config messages_per_minute (429, #103): shares, keeps and removals of a contact count with the messages. Calm, never a number."
+  fi: "Tämä oli paljon lyhyessä ajassa. Odota hetki ja yritä uudelleen."
+  sv: "Det blev mycket på kort tid. Vänta en stund och försök igen."
+  machine: { fi: true, sv: true }
+
+chat.contact.error.failed:
+  en: "Nothing changed. Check your connection and try again."
+  description: "In the share dialog when a share or a stop failed for any other reason (#103)."
+  fi: "Mikään ei muuttunut. Tarkista yhteys ja yritä uudelleen."
+  sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
   machine: { fi: true, sv: true }
 
 # --- The home screen, the settings and the tech config (#143): one button to sign in, the person's own settings after it, the technical view outside production ---
@@ -7174,6 +7300,118 @@ settings.email.summary:
   description: "Summary of the row that opens the e-mail screen (#287)."
   fi: "Paluutie, jos puhelin katoaa"
   sv: "En väg tillbaka, om en telefon tappas bort"
+  machine: { fi: true, sv: true }
+
+settings.contacts.label:
+  en: "Your contacts"
+  description: "Title of the row under Account in Settings and of the screen it opens (#103): the phone number and the usernames a person keeps to share in a conversation."
+  fi: "Yhteystietosi"
+  sv: "Dina kontaktuppgifter"
+  machine: { fi: true, sv: true }
+
+settings.contacts.summary:
+  en: "Shared only where you choose"
+  description: "Summary of the Your contacts row in Settings (#103): nobody sees them until the person shares one in a conversation."
+  fi: "Jaetaan vain, missä itse valitset"
+  sv: "Delas bara där du själv väljer"
+  machine: { fi: true, sv: true }
+
+settings.contacts.intro:
+  en: "Keep the ways to reach you outside the app here. Nobody sees them until you share one in a conversation, with the button at its top. A change or a removal shows at once wherever you shared it."
+  description: "Your contacts screen, the line above the four cards (#103): stored first, seen by nobody, shared one at a time from a conversation's header."
+  fi: "Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella. Kukaan ei näe niitä, ennen kuin jaat jonkin niistä keskustelussa sen yläosan painikkeella. Muutos tai poisto näkyy heti kaikkialla, missä olet sen jakanut."
+  sv: "Spara här hur man når dig utanför appen. Ingen ser dem förrän du delar en av dem i ett samtal, med knappen högst upp. En ändring eller borttagning syns direkt överallt där du har delat den."
+  machine: { fi: true, sv: true }
+
+settings.contacts.loading:
+  en: "Loading your contacts…"
+  description: "Your contacts screen while the stored contacts are read (#103)."
+  fi: "Ladataan yhteystietojasi…"
+  sv: "Laddar dina kontaktuppgifter…"
+  machine: { fi: true, sv: true }
+
+settings.contacts.loadFailed:
+  en: "Your contacts could not be loaded."
+  description: "Your contacts screen when the read failed (#103); the reason and Try again follow."
+  fi: "Yhteystietojasi ei voitu ladata."
+  sv: "Dina kontaktuppgifter kunde inte laddas."
+  machine: { fi: true, sv: true }
+
+settings.contacts.title:
+  en: "{kind, select, phone {Phone number} whatsapp {WhatsApp} telegram {Telegram} instagram {Instagram} other {Contact}}"
+  description: "Title of one card on the Your contacts screen (#103). The brand names stay as they are."
+  fi: "{kind, select, phone {Puhelinnumero} whatsapp {WhatsApp} telegram {Telegram} instagram {Instagram} other {Yhteystieto}}"
+  sv: "{kind, select, phone {Telefonnummer} whatsapp {WhatsApp} telegram {Telegram} instagram {Instagram} other {Kontaktuppgift}}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.hint:
+  en: "{kind, select, phone {A number with its country code, or a Finnish one starting with 0.} whatsapp {The number your WhatsApp uses, with its country code or starting with 0.} telegram {Your username, with or without the @ before it.} instagram {Your username, with or without the @ before it.} other {A way to reach you.}}"
+  description: "Under the title of one card on the Your contacts screen (#103): what to type. The app stores a number as +358…, a username without its @ (an Instagram one in lower case)."
+  fi: "{kind, select, phone {Numero maatunnuksen kanssa tai suomalainen numero, joka alkaa nollalla.} whatsapp {Numero, jota WhatsApp käyttää, maatunnuksen kanssa tai nollalla alkavana.} telegram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} instagram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} other {Tapa tavoittaa sinut.}}"
+  sv: "{kind, select, phone {Ett nummer med landsnummer, eller ett finskt nummer som börjar med 0.} whatsapp {Numret som WhatsApp använder, med landsnummer eller med 0 först.} telegram {Ditt användarnamn, med eller utan @ före.} instagram {Ditt användarnamn, med eller utan @ före.} other {Ett sätt att nå dig.}}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.input:
+  en: "{kind, select, phone {Your phone number} whatsapp {Your WhatsApp number} telegram {Your Telegram username} instagram {Your Instagram username} other {Your contact}}"
+  description: "Accessible name of the text field of one card on the Your contacts screen (#103)."
+  fi: "{kind, select, phone {Puhelinnumerosi} whatsapp {WhatsApp-numerosi} telegram {Telegram-käyttäjänimesi} instagram {Instagram-käyttäjänimesi} other {Yhteystietosi}}"
+  sv: "{kind, select, phone {Ditt telefonnummer} whatsapp {Ditt WhatsApp-nummer} telegram {Ditt användarnamn på Telegram} instagram {Ditt användarnamn på Instagram} other {Din kontaktuppgift}}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.save:
+  en: "Save"
+  description: "The button of one card on the Your contacts screen that keeps what was typed (#103). Short; its screen-reader name is settings.contacts.saveLabel, which starts with these words."
+  fi: "Tallenna"
+  sv: "Spara"
+  machine: { fi: true, sv: true }
+
+settings.contacts.saveLabel:
+  en: "{kind, select, phone {Save your phone number} whatsapp {Save your WhatsApp number} telegram {Save your Telegram username} instagram {Save your Instagram username} other {Save}}"
+  description: "What a screen reader says for the Save button of one card on the Your contacts screen (#103). Must start with the words of settings.contacts.save."
+  fi: "{kind, select, phone {Tallenna puhelinnumerosi} whatsapp {Tallenna WhatsApp-numerosi} telegram {Tallenna Telegram-käyttäjänimesi} instagram {Tallenna Instagram-käyttäjänimesi} other {Tallenna}}"
+  sv: "{kind, select, phone {Spara ditt telefonnummer} whatsapp {Spara ditt WhatsApp-nummer} telegram {Spara ditt användarnamn på Telegram} instagram {Spara ditt användarnamn på Instagram} other {Spara}}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.remove:
+  en: "Remove"
+  description: "The button of one card on the Your contacts screen, there only while one is kept (#103): removes it, and takes it out of every conversation where it is shared. Short; its screen-reader name is settings.contacts.removeLabel, which starts with these words."
+  fi: "Poista"
+  sv: "Ta bort"
+  machine: { fi: true, sv: true }
+
+settings.contacts.removeLabel:
+  en: "{kind, select, phone {Remove your phone number} whatsapp {Remove your WhatsApp number} telegram {Remove your Telegram username} instagram {Remove your Instagram username} other {Remove}}"
+  description: "What a screen reader says for the Remove button of one card on the Your contacts screen (#103). Must start with the words of settings.contacts.remove."
+  fi: "{kind, select, phone {Poista puhelinnumerosi} whatsapp {Poista WhatsApp-numerosi} telegram {Poista Telegram-käyttäjänimesi} instagram {Poista Instagram-käyttäjänimesi} other {Poista}}"
+  sv: "{kind, select, phone {Ta bort ditt telefonnummer} whatsapp {Ta bort ditt WhatsApp-nummer} telegram {Ta bort ditt användarnamn på Telegram} instagram {Ta bort ditt användarnamn på Instagram} other {Ta bort}}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.saved:
+  en: "Saved."
+  description: "Said on a card of the Your contacts screen once it was kept (#103); the field shows it as stored (a number as +358…). Where it is shared, the new one shows at once."
+  fi: "Tallennettu."
+  sv: "Sparat."
+  machine: { fi: true, sv: true }
+
+settings.contacts.removed:
+  en: "Removed. Wherever you shared it, it is gone now."
+  description: "Said on a card of the Your contacts screen once it was removed (#103): every share of it ended with it."
+  fi: "Poistettu. Se on poistunut myös sieltä, missä jaoit sen."
+  sv: "Borttaget. Det är borta även där du delade det."
+  machine: { fi: true, sv: true }
+
+settings.contacts.invalid:
+  en: "{kind, select, phone {That does not look like a phone number. Write it with its country code (+358…) or as a Finnish number starting with 0.} whatsapp {That does not look like a phone number. Write it with its country code (+358…) or as a Finnish number starting with 0.} telegram {That does not look like a Telegram username: 5 to 32 letters, digits and underscores, starting with a letter.} instagram {That does not look like an Instagram username: up to 30 letters, digits, dots and underscores, never a dot first, last or two in a row.} other {Check what you typed.}}"
+  description: "Said on a card of the Your contacts screen when what was typed is not one of its kind (#103): the phone checks first, the API's contact_invalid says the same. Nothing was saved; the words stay in the field."
+  fi: "{kind, select, phone {Tämä ei näytä puhelinnumerolta. Kirjoita se maatunnuksen kanssa (+358…) tai suomalaisena numerona, joka alkaa nollalla.} whatsapp {Tämä ei näytä puhelinnumerolta. Kirjoita se maatunnuksen kanssa (+358…) tai suomalaisena numerona, joka alkaa nollalla.} telegram {Tämä ei näytä Telegram-käyttäjänimeltä: 5–32 kirjainta, numeroa tai alaviivaa, ensimmäisenä kirjain.} instagram {Tämä ei näytä Instagram-käyttäjänimeltä: enintään 30 kirjainta, numeroa, pistettä tai alaviivaa. Piste ei voi olla ensimmäisenä, viimeisenä eikä kahdesti peräkkäin.} other {Tarkista, mitä kirjoitit.}}"
+  sv: "{kind, select, phone {Det ser inte ut som ett telefonnummer. Skriv det med landsnummer (+358…) eller som ett finskt nummer som börjar med 0.} whatsapp {Det ser inte ut som ett telefonnummer. Skriv det med landsnummer (+358…) eller som ett finskt nummer som börjar med 0.} telegram {Det ser inte ut som ett användarnamn på Telegram: 5–32 bokstäver, siffror och understreck, först en bokstav.} instagram {Det ser inte ut som ett användarnamn på Instagram: högst 30 bokstäver, siffror, punkter och understreck, aldrig en punkt först, sist eller två i rad.} other {Kontrollera vad du skrev.}}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.failed:
+  en: "Nothing changed. Check your connection and try again."
+  description: "Said on a card of the Your contacts screen when a save or a removal failed for any other reason (#103); the words stay in the field."
+  fi: "Mikään ei muuttunut. Tarkista yhteys ja yritä uudelleen."
+  sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
   machine: { fi: true, sv: true }
 
 settings.account.summary:

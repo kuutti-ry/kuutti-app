@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AccountState } from "./account-state.ts";
 import { CONVERSATIONS_MAX, ExportedConversation } from "./chat.ts";
+import { StoredContact } from "./contact.ts";
 import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
 import { ExportedGate } from "./gate.ts";
@@ -187,6 +188,8 @@ export const AccountExport = z
     blocks: ExportedBlocks,
     /** The person's conversations (#348, ADR-031 §5), oldest first: their own messages with the words, the counterpart's as time and length; never whom. */
     conversations: z.array(ExportedConversation).max(CONVERSATIONS_MAX * 2),
+    /** The contacts the person keeps to share in a conversation (#103, ADR-031 §11). */
+    contacts: z.array(StoredContact).max(4),
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

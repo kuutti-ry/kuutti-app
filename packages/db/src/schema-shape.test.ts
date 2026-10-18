@@ -41,6 +41,8 @@ describe("the tables", () => {
       "block",
       "card_shown",
       "consent",
+      "contact",
+      "contact_share",
       "conversation",
       "conversation_participant",
       "feedback",
@@ -115,7 +117,9 @@ describe("the foreign keys", () => {
   it("cascade only from a photo to what describes it, and from a conversation to its people and messages; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
-      // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5).
+      // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
+      // and the record of its shares with it (#103).
+      "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
       "photo_review.photo_id -> photo.id cascade",
@@ -131,6 +135,8 @@ describe("the foreign keys", () => {
       "auth_request",
       "card_shown",
       "consent",
+      // The contacts the person keeps to share, deleted at erasure (#103).
+      "contact",
       // The person's place in a conversation, cut to null at erasure (#348).
       "conversation_participant",
       "feedback",

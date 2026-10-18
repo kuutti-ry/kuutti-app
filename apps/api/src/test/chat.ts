@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
+import type { QueryResultRow } from "pg";
 
 /**
  * A conversation between two accounts, as the match's record will write it
@@ -49,4 +50,27 @@ export async function conversationBetween(
     last,
   ]);
   return id;
+}
+
+/**
+ * The test's transaction with another request's work slipped in once, just
+ * before the first statement matching the pattern, as if a concurrent request
+ * had committed at that point (identity/races.test.ts does the same).
+ */
+export function interleaved(
+  db: Queryable,
+  before: RegExp,
+  other: () => Promise<unknown>,
+): Queryable & { ran: () => boolean } {
+  let ran = false;
+  return {
+    ran: () => ran,
+    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+      if (!ran && before.test(text)) {
+        ran = true;
+        await other();
+      }
+      return db.query<R>(text, values);
+    },
+  };
 }

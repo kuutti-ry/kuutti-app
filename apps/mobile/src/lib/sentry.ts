@@ -10,12 +10,32 @@ export const sentryEnvironment = (channel: string | null | undefined): SentryEnv
 type Breadcrumb =
   NonNullable<ReactNativeOptions["beforeBreadcrumb"]> extends (b: infer B) => unknown ? B : never;
 
+/** One component a touch passed through, as the SDK names it, without the label or the text it read there. */
+type Touched = { name?: unknown; element?: unknown; file?: unknown };
+const namesOnly = (path: unknown): Touched[] =>
+  Array.isArray(path)
+    ? path.map(({ name, element, file }: Touched) => ({ name, element, file }))
+    : [];
+
 /**
  * Navigation breadcrumbs carry route params (a profile id, a chat id); http
  * ones carry URLs with query strings. Category and route name are enough to
- * read a crash, the payloads are not ours to ship.
+ * read a crash, the payloads are not ours to ship. A touch's (and a rage
+ * tap's) label is the accessibility label or the text the SDK read from the
+ * touched component and every one around it: a message, a name, a shared
+ * contact (#103). The components' names stay, nothing they say.
  */
 export function stripBreadcrumb(crumb: Breadcrumb): Breadcrumb {
+  if (crumb.category === "touch" || crumb.category === "ui.multiClick") {
+    const { path, clickCount } = (crumb.data ?? {}) as { path?: unknown; clickCount?: unknown };
+    const names = namesOnly(path);
+    const root = names[0]?.name;
+    return {
+      ...crumb,
+      message: typeof root === "string" ? root : undefined,
+      data: crumb.category === "touch" ? { path: names } : { path: names, clickCount },
+    };
+  }
   if (crumb.category === "navigation" && crumb.data) {
     const { from, to } = crumb.data as { from?: unknown; to?: unknown };
     return { ...crumb, data: { from, to } };

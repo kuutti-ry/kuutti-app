@@ -15,7 +15,7 @@ import { ageInYears } from "../profile/index.ts";
 import { applySanction } from "../safety/index.ts";
 import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
-import { conversationBetween } from "../test/chat.ts";
+import { conversationBetween, interleaved } from "../test/chat.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { type PeopleOptions, people } from "../test/people.ts";
@@ -123,29 +123,6 @@ async function appWithMedia(ctx: TestContext, db: Queryable = ctx.client) {
   return {
     app: createApp({ config: testConfig(), logger, db, media: testMediaDeps().deps }),
     lines,
-  };
-}
-
-/**
- * The test's transaction with another request's work slipped in once, just
- * before the first statement matching the pattern, as if a concurrent request
- * had committed at that point (identity/races.test.ts does the same).
- */
-function interleaved(
-  db: Queryable,
-  before: RegExp,
-  other: () => Promise<unknown>,
-): Queryable & { ran: () => boolean } {
-  let ran = false;
-  return {
-    ran: () => ran,
-    async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-      if (!ran && before.test(text)) {
-        ran = true;
-        await other();
-      }
-      return db.query<R>(text, values);
-    },
   };
 }
 

@@ -2647,7 +2647,7 @@ export interface paths {
         };
         /**
          * One conversation
-         * @description The summary, the longest message the composer may send, and the highest sequence the counterpart has read.
+         * @description The summary, the longest message the composer may send, the highest sequence the counterpart has read, and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.
          */
         get: {
             parameters: {
@@ -2991,6 +2991,411 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's stored contacts
+         * @description Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The stored pieces. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StoredContacts"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/contacts/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Keep a contact
+         * @description Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    kind: components["schemas"]["ContactKind"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PutContactRequest"];
+                };
+            };
+            responses: {
+                /** @description Kept. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["StoredContact"];
+                    };
+                };
+                /** @description validation_failed (an unknown kind, an empty value or one over 64 characters, an unknown key); contact_invalid: not one of its kind (the detail names the kind, never the value). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: the account was deleted while the request was on its way. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description message_budget_exceeded: the minute's messages, shares and contact changes are spent; Retry-After is the wait. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        /**
+         * Remove a contact
+         * @description Deletes the piece of that kind and, in the same transaction, ends every share of it: it disappears from those conversations at once. Answered alike when none was kept. Counts against matching_config messages_per_minute.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    kind: components["schemas"]["ContactKind"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed, or none was kept. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: an unknown kind. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: the account was deleted, or taken out of the live states, while the request was on its way; nothing was written. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description message_budget_exceeded: the minute's messages, shares and contact changes are spent; Retry-After is the wait. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What is shared in one conversation
+         * @description The detail's contacts alone, by the same rule: the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. What the phone reads on a contacts frame and on a resume: it signs no thumb and writes nothing.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The contacts. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationContacts"];
+                    };
+                };
+                /** @description validation_failed: the id is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/contacts/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Share a contact in the conversation
+         * @description The other person sees the caller's stored piece of that kind at once, in the conversation's detail, until the caller stops sharing it, removes or changes it, or the conversation closes. In one transaction, as a send: the conversation's row locked, its state read afresh. A share standing already writes nothing. A share brings an archived conversation back. Counts against matching_config messages_per_minute. The answer is the caller's fresh view of the conversation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    kind: components["schemas"]["ContactKind"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Shared, or shared already. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationDetail"];
+                    };
+                };
+                /** @description validation_failed: the id is not a uuid, or an unknown kind. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description conversation_closed (closed, a block stands between the two, or the counterpart deleted their account) or contact_not_stored (no piece of that kind is kept); nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description message_budget_exceeded: the minute's messages, shares and contact changes are spent; Retry-After is the wait. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        /**
+         * Stop sharing a contact in the conversation
+         * @description The caller's share of that kind there ends, and the other person no longer sees it. Nothing standing answers alike, a closed conversation too. Counts against matching_config messages_per_minute. The answer is the caller's fresh view of the conversation.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    kind: components["schemas"]["ContactKind"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Stopped, or nothing was shared. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConversationDetail"];
+                    };
+                };
+                /** @description validation_failed: the id is not a uuid, or an unknown kind. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description message_budget_exceeded: the minute's messages, shares and contact changes are spent; Retry-After is the wait. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -4567,6 +4972,7 @@ export interface components {
             reports: components["schemas"]["ExportedReports"];
             blocks: components["schemas"]["ExportedBlocks"];
             conversations: components["schemas"]["ExportedConversation"][];
+            contacts: components["schemas"]["StoredContact"][];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -4854,6 +5260,7 @@ export interface components {
                 body: string;
                 photo: components["schemas"]["ExportedSentPhoto"];
             }[];
+            shares: components["schemas"]["ExportedContactShare"][];
             theirs: {
                 /** Format: date-time */
                 at: string;
@@ -4892,6 +5299,24 @@ export interface components {
             /** @description A beard or a moustache. */
             facialHair: boolean;
         } | null;
+        ExportedContactShare: {
+            kind: components["schemas"]["ContactKind"];
+            /** Format: date-time */
+            sharedAt: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            endedHow: components["schemas"]["ContactShareEnd"];
+        };
+        /** @enum {string} */
+        ContactKind: "phone" | "whatsapp" | "telegram" | "instagram";
+        /** @enum {string|null} */
+        ContactShareEnd: "stopped" | "removed" | "closed" | null;
+        StoredContact: {
+            kind: components["schemas"]["ContactKind"];
+            value: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -5364,6 +5789,18 @@ export interface components {
                 maxLength: number;
             };
             counterpartReadUpTo: number;
+            contacts: components["schemas"]["ConversationContacts"];
+        };
+        ConversationContacts: {
+            mine: {
+                kind: components["schemas"]["ContactKind"];
+                value: string;
+                shared: boolean;
+            }[];
+            theirs: {
+                kind: components["schemas"]["ContactKind"];
+                value: string;
+            }[];
         };
         MessagePage: {
             messages: components["schemas"]["ChatMessage"][];
@@ -5411,6 +5848,12 @@ export interface components {
             /** Format: uuid */
             clientId: string;
             caption?: string;
+        };
+        StoredContacts: {
+            contacts: components["schemas"]["StoredContact"][];
+        };
+        PutContactRequest: {
+            value: string;
         };
         ReadRequest: {
             upTo: number;

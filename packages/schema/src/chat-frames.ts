@@ -95,6 +95,12 @@ export const ServerFrame = z
         closedHow: ConversationClosedHow.nullable(),
       })
       .strict(),
+    /**
+     * What is shared in the conversation changed (#103): a share began or
+     * ended, or a shared piece changed. Never a value: the phone reads the
+     * conversation again over HTTP.
+     */
+    z.object({ type: z.literal("contacts"), conversationId }).strict(),
     z.object({ type: z.literal("ping") }).strict(),
     /** Just before the API closes the socket. */
     z.object({ type: z.literal("error"), code: FrameErrorCode }).strict(),

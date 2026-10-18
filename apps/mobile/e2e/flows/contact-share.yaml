@@ -1,0 +1,160 @@
+# Contacts shared in a conversation (#103, ADR-031): Elina keeps her
+# Instagram username in Settings, Your contacts, where nobody sees it; she
+# opens her conversation with Jussi, shares it with the header's Share contact
+# and sees it marked shared. Jussi signs in and finds it under the
+# conversation's header. Elina signs in again, stops sharing it and removes it
+# in Settings, so the flow runs again without a reset. The stories give the
+# pair their conversation (packages/db/src/seed/conversations.ts), which no
+# other flow reads. A run that stops half-way leaves the username kept, or
+# shared: `pnpm demo:reset` forgets it.
+appId: fi.kuutti.app
+name: A contact kept in Settings is shared from a conversation's header and shows under the other person's header, then sharing stops and it is removed
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Elina Järvinen
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# The row sits under Account, below the fold on a phone: scrolled to, then tapped.
+- scrollUntilVisible:
+    element: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+# The cards come once what is kept has been read, the phone number's first;
+# Instagram's is the last of four, below the fold. A field is its label.
+- extendedWaitUntil:
+    visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Your Instagram username|Instagram-käyttäjänimesi|Ditt användarnamn på Instagram"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible:
+    text: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
+    enabled: false
+- tapOn: "Your Instagram username|Instagram-käyttäjänimesi|Ditt användarnamn på Instagram"
+- inputText: "elina.lukupiiri"
+# The page keeps the focused field in sight just above the keyboard, with the
+# card's title above it (the hint between them is Telegram's too); Save stays
+# under the keyboard. A tap on the title, which is no button and the brand's
+# name in every language, closes it (README, the keyboard).
+- tapOn: "Instagram"
+- tapOn: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
+- extendedWaitUntil:
+    visible: "Saved\\.|Tallennettu\\.|Sparat\\."
+    timeout: 15000
+- assertVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+
+# The conversation by its row (the name with the age, the last line, when),
+# in either group: the nightly sweep archives one quiet for a week, and a
+# share brings it back.
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Jussi, \\d+, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Jussi, \\d+, .*"
+# Share contact is in the header once the conversation is read, since she keeps one now.
+- extendedWaitUntil:
+    visible: "Share contact|Jaa yhteystieto|Dela kontaktuppgift"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Share contact|Jaa yhteystieto|Dela kontaktuppgift"
+# In Finnish the dialog's title says the header button's words: the dialog is
+# known by its Share, whose label names the kind (the button shows "Share").
+- extendedWaitUntil:
+    visible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
+    timeout: 15000
+- assertVisible: "Instagram: elina\\.lukupiiri"
+- assertVisible: "Jussi sees what you share at once, at the top of this conversation\\. You can stop sharing at any time, but what Jussi already wrote down stays with them\\.|Jussi näkee jakamasi heti tämän keskustelun yläosassa\\. Voit lopettaa jakamisen milloin tahansa, mutta minkä Jussi on jo kirjoittanut muistiin, jää hänelle\\.|Jussi ser det du delar direkt, högst upp i det här samtalet\\. Du kan sluta dela när som helst, men det som Jussi redan har skrivit ner finns kvar\\."
+- tapOn: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
+- extendedWaitUntil:
+    visible: "Shared\\. Jussi sees it now\\.|Jaettu\\. Jussi näkee sen nyt\\.|Delat\\. Jussi ser det nu\\."
+    timeout: 15000
+# Marked shared in words, and the button beside it stops it.
+- assertVisible: "Shared in this conversation|Jaettu tässä keskustelussa|Delas i det här samtalet"
+- assertVisible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+- tapOn: "Close|Sulje|Stäng"
+- extendedWaitUntil:
+    notVisible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+    timeout: 15000
+
+# Jussi: the line under the header shows "Instagram: elina.lukupiiri" and is
+# heard as who shares what; Maestro reads the heard words on both platforms
+# (on iOS only those). He keeps no contact, so he has no Share contact.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Jussi Lehtonen
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Elina, \\d+, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Elina, \\d+, .*"
+- extendedWaitUntil:
+    visible: "Elina shares Instagram: elina\\.lukupiiri|Elina jakaa yhteystiedon\\. Instagram: elina\\.lukupiiri|Elina delar en kontaktuppgift\\. Instagram: elina\\.lukupiiri"
+    timeout: 15000
+- assertNotVisible: "Share contact|Jaa yhteystieto|Dela kontaktuppgift"
+
+# Elina again: still marked shared. She stops sharing it, then removes it in
+# Settings, which leaves her as the stories have her.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Elina Järvinen
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Jussi, \\d+, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Jussi, \\d+, .*"
+- extendedWaitUntil:
+    visible: "Share contact|Jaa yhteystieto|Dela kontaktuppgift"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Share contact|Jaa yhteystieto|Dela kontaktuppgift"
+- extendedWaitUntil:
+    visible: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+    timeout: 15000
+- assertVisible: "Shared in this conversation|Jaettu tässä keskustelussa|Delas i det här samtalet"
+- tapOn: "Stop sharing your Instagram|Lopeta jakaminen: Instagram|Sluta dela: Instagram"
+- extendedWaitUntil:
+    visible: "No longer shared here\\.|Ei enää jaettu tässä\\.|Delas inte längre här\\."
+    timeout: 15000
+- assertVisible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
+- assertNotVisible: "Shared in this conversation|Jaettu tässä keskustelussa|Delas i det här samtalet"
+# Closed before Settings: the dialog lies over the app, not inside the conversation.
+- tapOn: "Close|Sulje|Stäng"
+- extendedWaitUntil:
+    notVisible: "Share your Instagram|Jaa: Instagram|Dela: Instagram"
+    timeout: 15000
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+- extendedWaitUntil:
+    visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+- extendedWaitUntil:
+    visible: "Removed\\. Wherever you shared it, it is gone now\\.|Poistettu\\. Se on poistunut myös sieltä, missä jaoit sen\\.|Borttaget\\. Det är borta även där du delade det\\."
+    timeout: 15000
+- assertNotVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
