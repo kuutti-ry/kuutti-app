@@ -20,6 +20,8 @@ The same flows, the same command; what differs is the device. Once: a dev client
 - `adb reverse tcp:3000 tcp:3000`, and the same for 8080, 8081 and 9000: the emulator's 127.0.0.1 is then the host's API, mock bank, Metro and S3 stand-in, so nothing in the flows names another host;
 - `adb shell settings put secure stylus_handwriting_enabled 0`: on Android 14 and later Gboard answers a synthesized tap on a field with its stylus tutorial, and the text goes nowhere.
 
+Once per emulator, Gboard's auto-correction and auto-capitalisation off (Gboard's settings, Text correction): now and then it corrects what a flow types ("tuon" became "turn"), and the chat flows assert the words they sent (#364). CI writes the two preferences as root before the flows (`.github/workflows/e2e.yml`, "Wait for the emulator").
+
 Then `pnpm e2e -- --device emulator-5554`. A dev client takes its bundle only from a Metro whose fingerprint matches its build, and the generated `android/` folder is part of the fingerprint: a dev client built in a worktree wants that worktree's Metro, started on another port, named with `METRO_PORT=8082 pnpm e2e -- --device emulator-5554`.
 
 ### In CI
