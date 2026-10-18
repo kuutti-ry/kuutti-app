@@ -267,10 +267,32 @@ jobs:
             sleep 10
           done
 
+      # An adb server that restarts during the run drops every `adb reverse`,
+      # and each flow after it reaches neither the API nor Metro (#359). A
+      # loop keeps the four forwards while the flows run, puts back one that
+      # had gone and says so in the log; it stops with the step.
       - name: The flows on the emulator
         env:
           SHARD: ${{ matrix.shard }}
-        run: node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
+        run: |
+          keep_forwards() {
+            while sleep 5; do
+              forwards="$(adb reverse --list 2> /dev/null || true)"
+              for port in 3000 8080 8081 9000; do
+                case "$forwards" in
+                  *"tcp:$port tcp:$port"*) ;;
+                  *)
+                    echo "e2e: the forward of port $port had gone (#359); putting it back"
+                    adb reverse "tcp:$port" "tcp:$port" > /dev/null 2>&1 || true
+                    ;;
+                esac
+              done
+            done
+          }
+          keep_forwards &
+          watcher=$!
+          trap 'kill "$watcher" 2> /dev/null || true' EXIT
+          node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
 
       - name: Keep what the run saw
         if: always()
