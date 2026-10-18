@@ -1,6 +1,7 @@
 # features/safety/blocks.feature
-Feature: Blocking somebody from a card
-  A person blocks somebody whose card they were shown (#84, ADR-030). From
+Feature: Blocking somebody from a card or a conversation
+  A person blocks somebody whose card they were shown (#84, ADR-030), or
+  the other person of a conversation (#351), which ends it for both. From
   then on neither is shown to the other, in either direction, anywhere a
   person is shown to a person: the pool, the gate's count, the card and its
   photos, and the rounds, likes and matches when they come (rule 7). The
@@ -43,6 +44,17 @@ Feature: Blocking somebody from a card
     Given "A" blocked "B"
     When "B" deletes the account and comes back after the cooldown
     Then "A" and the new account of "B" are still out of each other's pool, and their cards and photos stay refused
+
+  Scenario: A block from a conversation ends it for both and hides it from the blocker
+    Given "A" and "B" are in a conversation
+    When "A" blocks "B" from it, and again
+    Then both answers are 204, a block stands between the two, and the conversation is closed as the block's
+    And "A" gets 404 for it from every route, and "B" reads it ended and cannot write
+
+  Scenario: A block from a card ends the conversation between the two as well
+    Given "A" and "B" are in a conversation and "A" was shown "B"'s card
+    When "A" blocks "B" from the card
+    Then the conversation is closed as the block's, in the block's transaction
 
   Scenario: Nothing but the filters reads a block
     Then only the pool's count, the card, the photos, the conversation, the block itself and the demo's removal name the block table or its test

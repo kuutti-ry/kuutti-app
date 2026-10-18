@@ -154,3 +154,8 @@ Feature: Account deletion per the erasure table
     Given "A" keeps a phone number, shared it with "B" and stopped, and "B" shares an Instagram username with "A"
     When "A" exports the account
     Then the export lists A's stored contacts, and in the conversation A's own share with when and how it ended, and nothing of B's
+
+  Scenario: The photos a report's copy holds outlive their sender's erasure, and leave the conversation
+    Given "A" reported "B" from a conversation where both sent a photo
+    When "A" deletes the account
+    Then "A"'s photo and its objects stay for the copy, and "B" reads "A"'s photo message as removed

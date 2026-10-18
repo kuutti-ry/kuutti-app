@@ -4,7 +4,7 @@ import { useState } from "react";
 import { AccessibilityInfo, Platform } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { SafetyActions } from "./SafetyActions";
+import { ConversationActions, SafetyActions, type SafetyOutcome } from "./SafetyActions";
 
 // Block or report from someone else's card (#84, ADR-030 §11): a labelled
 // button, one dialog, a block only after words that say it is final, a report
@@ -471,5 +471,191 @@ describe("SafetyActions", () => {
     expect(screen.getByRole("button", { name: "Ilmoita ja estä" })).toBeTruthy();
     await press("Estä");
     expect(screen.getByText("Estetäänkö tämä henkilö?")).toBeTruthy();
+  });
+});
+
+// The conversation's door (#351, ADR-030 §12): "More" in the header, the
+// same dialog with Report and block, Block and End conversation, each behind
+// its confirmation in words, the copy said with the report, and the outcome
+// handed to the screen at once; in an ended conversation the report alone,
+// while the window holds.
+
+const CONVERSATION = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
+const COPY =
+  "The moderators get a copy of this conversation, your messages and theirs, and keep it for twelve months. The conversation ends.";
+
+/** The conversation's API: every block and report on it recorded, answered as told. */
+function conversationApi(answer: (path: string) => Response | Promise<Response>) {
+  const sent: Sent[] = [];
+  globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (request.method === "POST" && path.startsWith(`/conversations/${CONVERSATION}/`)) {
+      const text = await request.text();
+      sent.push({ path, body: text ? JSON.parse(text) : null });
+      return answer(path);
+    }
+    return refusal("not_found", 404);
+  }) as unknown as typeof fetch;
+  return sent;
+}
+
+function ConversationHost({
+  ended = false,
+  reportable = true,
+  unmatch = jest.fn(async () => undefined),
+  onDone,
+}: {
+  ended?: boolean;
+  reportable?: boolean;
+  unmatch?: () => Promise<void>;
+  onDone: (outcome: SafetyOutcome) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <ConversationActions
+      conversationId={CONVERSATION}
+      ended={ended}
+      reportable={reportable}
+      unmatch={unmatch}
+      open={open}
+      onOpenChange={setOpen}
+      onDone={onDone}
+    />
+  );
+}
+
+describe("ConversationActions", () => {
+  it("opens from More with Block, Report and block and End conversation, each said in words", async () => {
+    const sent = conversationApi(done);
+    const onDone = jest.fn();
+    await renderWithTheme(<ConversationHost onDone={onDone} />);
+    noProblems();
+    await press("More");
+    expect(screen.getByText("Report, block or end")).toBeTruthy();
+    for (const name of ["Block", "Report and block", "End conversation"]) {
+      expect(screen.getByRole("button", { name })).toBeTruthy();
+    }
+    expect(
+      screen.getByText("Neither of you can write in it any more. Nobody is blocked."),
+    ).toBeTruthy();
+    noProblems();
+    await press("Cancel");
+    expect(screen.queryByText("Report, block or end")).toBeNull();
+    expect(sent).toEqual([]);
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("reports with the copy said and the reason and note sent, and hands the outcome on at once", async () => {
+    const sent = conversationApi(done);
+    const onDone = jest.fn();
+    await renderWithTheme(<ConversationHost onDone={onDone} />);
+    await press("More");
+    await press("Report and block");
+    expect(screen.getByText(COPY)).toBeTruthy();
+    expect(screen.getByText(ALSO_BLOCKS)).toBeTruthy();
+    await press("Harassing, threatening or hateful", "radio");
+    await type("  Uhkaili.  ");
+    noProblems();
+    await press("Send report");
+    expect(sent).toEqual([
+      {
+        path: `/conversations/${CONVERSATION}/report`,
+        body: { reason: "harassment", note: "Uhkaili." },
+      },
+    ]);
+    expect(onDone).toHaveBeenCalledWith("reported");
+    // No Done step: the screen says it.
+    expect(screen.queryByText("Report, block or end")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+  });
+
+  it("blocks after words that say the conversation ends for both, and hands the outcome on", async () => {
+    const sent = conversationApi(done);
+    const onDone = jest.fn();
+    await renderWithTheme(<ConversationHost onDone={onDone} />);
+    await press("More");
+    await press("Block");
+    expect(screen.getByText("Block this person?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The conversation ends for both of you, and you will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told.",
+      ),
+    ).toBeTruthy();
+    expect(sent).toEqual([]);
+    await press("Block");
+    expect(sent).toEqual([{ path: `/conversations/${CONVERSATION}/block`, body: null }]);
+    expect(onDone).toHaveBeenCalledWith("blocked");
+  });
+
+  it("ends the conversation after its confirmation, and keeps the dialog open with words when it fails", async () => {
+    conversationApi(done);
+    const onDone = jest.fn();
+    const unmatch = jest
+      .fn<Promise<void>, []>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(undefined);
+    await renderWithTheme(<ConversationHost unmatch={unmatch} onDone={onDone} />);
+    await press("More");
+    await press("End conversation");
+    expect(screen.getByText("End this conversation?")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Neither of you can write in it any more. It stays in the archive for both of you, and nobody is told who ended it. Nobody is blocked.",
+      ),
+    ).toBeTruthy();
+    expect(unmatch).not.toHaveBeenCalled();
+    await press("End conversation");
+    expect(screen.getByText("The conversation could not be ended. Try again.")).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
+    await press("End conversation");
+    expect(unmatch).toHaveBeenCalledTimes(2);
+    expect(onDone).toHaveBeenCalledWith("unmatched");
+  });
+
+  it("hands a conversation gone meanwhile on as gone, and says a report past the window in words", async () => {
+    const onDone = jest.fn();
+    conversationApi((path) =>
+      path.endsWith("/block") ? refusal("not_found", 404) : refusal("report_window_closed", 409),
+    );
+    await renderWithTheme(<ConversationHost onDone={onDone} />);
+    await press("More");
+    await press("Report and block");
+    await press("Something else", "radio");
+    await press("Send report");
+    expect(screen.getByText("This conversation can no longer be reported.")).toBeTruthy();
+    // Trying again cannot help: Send waits for nothing.
+    expect(disabled("Send report")).toBe(true);
+    expect(onDone).not.toHaveBeenCalled();
+    await press("Cancel");
+    await press("More");
+    await press("Block");
+    await press("Block");
+    expect(onDone).toHaveBeenCalledWith("gone");
+  });
+
+  it("offers only the report in an ended conversation while the window holds, and nothing after it", async () => {
+    conversationApi(done);
+    const onDone = jest.fn();
+    await renderWithTheme(<ConversationHost ended reportable onDone={onDone} />);
+    await press("More");
+    expect(screen.getByRole("button", { name: "Report and block" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "End conversation" })).toBeNull();
+    // The day's cap points to tomorrow: no Block is offered here to take its place.
+    conversationApi(() => refusal("report_budget_exceeded", 429));
+    await press("Report and block");
+    await press("Something else", "radio");
+    await press("Send report");
+    expect(
+      screen.getByText("That is enough reports for today. You can try again after midnight."),
+    ).toBeTruthy();
+    expect(screen.queryByText(CAP)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+  });
+
+  it("has no More at all when nothing is left to offer", async () => {
+    await renderWithTheme(<ConversationHost ended reportable={false} onDone={jest.fn()} />);
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
   });
 });

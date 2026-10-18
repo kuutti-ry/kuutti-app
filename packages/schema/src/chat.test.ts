@@ -110,8 +110,15 @@ describe("the counterpart and the conversation", () => {
       limits: { maxLength: 2000 },
       counterpartReadUpTo: 4,
       contacts: { mine: [], theirs: [] },
+      reportable: false,
     });
     expect(detail.limits.maxLength).toBe(2000);
+    // Whether Report is offered is the API's to say (#351).
+    expect(ConversationDetail.safeParse({ ...detail, reportable: undefined }).success).toBe(false);
+    // An ended conversation names nobody (#351, ADR-031 Open 10).
+    expect(
+      ConversationDetail.parse({ ...detail, closedHow: "unmatch", counterpart: null }).counterpart,
+    ).toBeNull();
     // A block or a sanction never reaches a client as such (ADR-030 §6, ADR-024 §6).
     for (const closedHow of ["block", "sanction"]) {
       expect(ConversationDetail.safeParse({ ...detail, closedHow }).success, closedHow).toBe(false);

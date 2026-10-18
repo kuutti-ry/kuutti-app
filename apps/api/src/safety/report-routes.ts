@@ -1,18 +1,26 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { BlockRequest, ErrorResponse, ReportRequest } from "@kuutti/schema";
+import {
+  BlockRequest,
+  ConversationParams,
+  ConversationReportRequest,
+  ErrorResponse,
+  ReportRequest,
+} from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
+import { REPORT_AFTER_CLOSE_DAYS_KEY } from "../chat/index.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
-import { recordBlock } from "./blocks.ts";
-import { REPORTS_PER_DAY_KEY, recordReport } from "./reports.ts";
+import { recordBlock, recordConversationBlock } from "./blocks.ts";
+import { REPORTS_PER_DAY_KEY, recordConversationReport, recordReport } from "./reports.ts";
 
-// A block and a report from a card (#84, ADR-030). Both answer 204 whatever
-// stood before, so neither tells the caller anything about the other person,
-// and both answer the same 404 for a card never shown, oneself and nobody.
+// A block and a report from a card (#84, ADR-030), and from a conversation
+// (#351, ADR-030 §12). Both answer 204 whatever stood before, so neither
+// tells the caller anything about the other person, and from a card both
+// answer the same 404 for a card never shown, oneself and nobody.
 // What a request names (the other account, the reason, the note) reaches no
 // log line, no error detail and no research event (rule 5): the request line
 // says that the caller did it, a refusal its code, and the cap's refusal how
@@ -71,11 +79,96 @@ const reportRoute = createRoute({
   },
 });
 
+const conversationNotFound = errorContent(
+  "not_found: no such conversation for the caller (not theirs, nobody's, or hidden from the one who blocked the other), or the caller was erased meanwhile; nothing is written.",
+);
+
+const conversationBlockRoute = createRoute({
+  method: "post",
+  path: "/conversations/{id}/block",
+  summary: "Block the other person of a conversation",
+  description:
+    "The block both ways and the conversation's close in one transaction (#351): from then on the conversation is gone for the caller, who gets 404 for it from every other route, and ended for the other person, who is not told why. The block holds everywhere a card's does, between the identities, and is final. Blocking again answers the same, the conversation then hidden from the caller.",
+  ...bearer,
+  request: { params: ConversationParams },
+  responses: {
+    204: {
+      description:
+        "The block stands: set now, or set before; alike when the other person deleted their account meanwhile, and nothing is written.",
+    },
+    400: errorContent("validation_failed: the id is not a uuid."),
+    401: unauthenticated,
+    404: errorContent(
+      "not_found: no such conversation for the caller (not theirs, or nobody's), or the caller was erased meanwhile; nothing is written.",
+    ),
+  },
+});
+
+const conversationReportRoute = createRoute({
+  method: "post",
+  path: "/conversations/{id}/report",
+  summary: "Report the other person of a conversation, with a copy of it, and block them",
+  description:
+    "The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
+  ...bearer,
+  request: {
+    params: ConversationParams,
+    body: { required: true, ...json(ConversationReportRequest) },
+  },
+  responses: {
+    204: {
+      description:
+        "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written.",
+    },
+    400: errorContent(
+      "Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid.",
+    ),
+    401: unauthenticated,
+    404: conversationNotFound,
+    409: errorContent(
+      "report_window_closed: the conversation closed longer ago than report_after_close_days, or the other person deleted their account; nothing is written.",
+    ),
+    429: errorContent(
+      "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
+    ),
+  },
+});
+
 export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const now = () => (deps.now ?? (() => new Date()))();
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
-  for (const route of [blockRoute, reportRoute]) app.use(route.getRoutingPath(), guard);
+  for (const route of [blockRoute, reportRoute, conversationBlockRoute, conversationReportRoute]) {
+    app.use(route.getRoutingPath(), guard);
+  }
+
+  /**
+   * The cap's refusal, from a card or a conversation alike, logged with how
+   * many and until when, never whom or why; the wait, for Retry-After.
+   */
+  const overBudget = (input: {
+    accountId: string;
+    used: number;
+    limit: number;
+    at: Date;
+    end: Date;
+  }): { retryAfterSeconds: number; error: AppError } => {
+    const retryAfterSeconds = secondsUntil(input.end, input.at);
+    deps.logger.warn(
+      {
+        accountId: input.accountId,
+        used: input.used,
+        limit: input.limit,
+        retryAfterSeconds,
+        refusal: "budget",
+      },
+      "report refused",
+    );
+    const error = new AppError(429, "report_budget_exceeded", "The day's reports are filed", {
+      retryAfterSeconds,
+    });
+    return { retryAfterSeconds, error };
+  };
 
   app.openapi(blockRoute, async (c) => {
     const { accountId } = callerOf(c);
@@ -106,16 +199,52 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
     });
     if (record.outcome === "not_found") throw new AppError(404, "not_found", "No such card");
     if (record.outcome === "over_budget") {
-      const retryAfterSeconds = secondsUntil(day.end, at);
-      // How many and until when, never whom or why.
-      deps.logger.warn(
-        { accountId, used: record.used, limit, retryAfterSeconds, refusal: "budget" },
-        "report refused",
-      );
-      c.header("Retry-After", String(retryAfterSeconds));
-      throw new AppError(429, "report_budget_exceeded", "The day's reports are filed", {
-        retryAfterSeconds,
-      });
+      const refused = overBudget({ accountId, used: record.used, limit, at, end: day.end });
+      c.header("Retry-After", String(refused.retryAfterSeconds));
+      throw refused.error;
+    }
+    return c.body(null, 204);
+  });
+
+  app.openapi(conversationBlockRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { id } = c.req.valid("param");
+    const set = await recordConversationBlock(deps.db, {
+      accountId,
+      conversationId: id,
+      at: now(),
+    });
+    if (set === "not_found") throw new AppError(404, "not_found", "No such conversation");
+    return c.body(null, 204);
+  });
+
+  app.openapi(conversationReportRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { id } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const at = now();
+    const day = dayWindow(at);
+    const limit = await matchingConfigNumber(deps.db, REPORTS_PER_DAY_KEY);
+    const record = await recordConversationReport(deps.db, {
+      reporterAccountId: accountId,
+      conversationId: id,
+      reason: body.reason,
+      note: body.note ?? null,
+      at,
+      since: day.start,
+      limit,
+      afterCloseDays: await matchingConfigNumber(deps.db, REPORT_AFTER_CLOSE_DAYS_KEY),
+    });
+    if (record.outcome === "not_found") {
+      throw new AppError(404, "not_found", "No such conversation");
+    }
+    if (record.outcome === "window_closed") {
+      throw new AppError(409, "report_window_closed", "The conversation can no longer be reported");
+    }
+    if (record.outcome === "over_budget") {
+      const refused = overBudget({ accountId, used: record.used, limit, at, end: day.end });
+      c.header("Retry-After", String(refused.retryAfterSeconds));
+      throw refused.error;
     }
     return c.body(null, 204);
   });

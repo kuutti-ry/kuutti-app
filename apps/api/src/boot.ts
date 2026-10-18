@@ -251,8 +251,16 @@ export async function boot({
       name: "prune-photo-check-notes",
       run: async () => ({ pruned: await prunePhotoCheckNotes(pool, now()) }),
     },
-    // Reports keep twelve months from filing, whoever was erased meanwhile (#84, ADR-030 §8).
-    { name: "prune-reports", run: async () => ({ pruned: await pruneReports(pool, now()) }) },
+    // Reports keep twelve months from filing, whoever was erased meanwhile (#84, ADR-030 §8),
+    // and the photos of erased senders their copies held go with them (#351).
+    {
+      name: "prune-reports",
+      run: () =>
+        pruneReports(
+          { db: pool, logger, ...(media.deps ? { store: media.deps.store } : {}) },
+          now(),
+        ),
+    },
     // Conversations silent for silent_match_archive_days are put away (#348, TD-13).
     archiveJob({ db: pool, logger, now }),
   ];

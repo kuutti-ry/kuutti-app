@@ -1,16 +1,25 @@
 import type { ConversationSummary } from "@kuutti/schema";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import {
+  AccessibilityInfo,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
+import type { SafetyOutcome } from "@/features/safety";
 import { useT } from "@/lib/locale";
 import { DECORATIVE, TOUCH_TARGET } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { ConnectionLine } from "./ConnectionLine";
+import { NOTICES, takeNotice } from "./notice";
 import { whenOf } from "./time";
 import { UnreadBadge } from "./UnreadBadge";
 import { useConversations } from "./useConversations";
@@ -20,21 +29,27 @@ type T = ReturnType<typeof useT>["t"];
 /** A row is at least the touch target, whatever its text (CLAUDE.md Accessibility). */
 const ROW_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 
-/** Who the counterpart is, as a row and the conversation's header say it. */
+/**
+ * Who the counterpart is, as a row and the conversation's header say it; an
+ * ended conversation names nobody (#351, ADR-031 Open 10) and says that it ended.
+ */
 export function counterpartName(t: T, conversation: ConversationSummary): string {
   const { counterpart } = conversation;
+  if (!counterpart) return t("chat.closed.title");
   return counterpart.deleted
     ? t("chat.deletedUser")
     : t("profile.card.nameAge", { name: counterpart.name, years: counterpart.age });
 }
 
 /**
- * The line under the name: how a closed one ended, else the last message (a
- * photo's caption, or "Photo" without one, #350), else that there is none.
+ * The line under the name: that the other deleted their account, else the
+ * last message (a photo's caption, or "Photo" without one, #350), else that
+ * there is none. An ended conversation's name says it ended, so its line is
+ * its last message, which tells it from another.
  */
 function lineOf(t: T, conversation: ConversationSummary): string {
-  if (conversation.state === "closed") {
-    return conversation.closedHow === "erasure" ? t("chat.state.deleted") : t("chat.state.ended");
+  if (conversation.state === "closed" && conversation.closedHow === "erasure") {
+    return t("chat.state.deleted");
   }
   const last = conversation.lastMessage;
   if (!last) return t("chat.row.noMessages");
@@ -49,7 +64,8 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
   const name = counterpartName(t, conversation);
   const line = lineOf(t, conversation);
   const when = conversation.lastMessage ? whenOf(locale, conversation.lastMessage.at) : null;
-  const thumb = conversation.counterpart.deleted ? null : conversation.counterpart.thumb;
+  const { counterpart } = conversation;
+  const thumb = counterpart && !counterpart.deleted ? counterpart.thumb : null;
   // One element for a screen reader: who, what is unread, the last line and when.
   const label = [
     name,
@@ -102,13 +118,26 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
  * closed ones under a heading of their own, each newest first, as the API
  * orders them. Read again on focus, by pulling down, and when the socket
  * brings something new (#349), with a line at the top while it is lost. A
- * row opens the conversation.
+ * row opens the conversation. Back from a report, a block or an end in a
+ * conversation (#351), the top says what happened, once, to a screen reader
+ * too.
  */
 export function ConversationsScreen() {
   const { t } = useT();
   const router = useRouter();
   const view = useConversations();
   const [refreshing, setRefreshing] = useState(false);
+  const [notice, setNotice] = useState<SafetyOutcome | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      const left = takeNotice();
+      setNotice(left);
+      // Android's live region speaks it; iOS has none.
+      if (left && Platform.OS === "ios")
+        AccessibilityInfo.announceForAccessibility(t(NOTICES[left]));
+    }, [t]),
+  );
 
   const pull = async () => {
     setRefreshing(true);
@@ -129,6 +158,11 @@ export function ConversationsScreen() {
         contentContainerClassName="gap-4 p-6"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void pull()} />}
       >
+        {notice && (
+          <Text testID="notice" accessibilityLiveRegion="polite">
+            {t(NOTICES[notice])}
+          </Text>
+        )}
         {view.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("chat.list.loading")}</Text>
         )}

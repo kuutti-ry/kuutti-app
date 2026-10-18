@@ -36,7 +36,12 @@ import {
   shareContact,
   stopSharing,
 } from "./contacts.ts";
-import { type ChatDeps, listConversations, readConversation } from "./conversations.ts";
+import {
+  type ChatDeps,
+  listConversations,
+  readConversation,
+  unmatchConversation,
+} from "./conversations.ts";
 import { MESSAGES_PER_MINUTE_KEY, markRead, readMessages, sendMessage } from "./messages.ts";
 import { MESSAGE_PHOTO_ATTEMPTS_PER_DAY_KEY, sendPhoto } from "./photos.ts";
 
@@ -44,7 +49,7 @@ import { MESSAGE_PHOTO_ATTEMPTS_PER_DAY_KEY, sendPhoto } from "./photos.ts";
 const MEDIA_BUSY_RETRY_AFTER_SECONDS = 5;
 
 // The chat's routes (#348, ADR-031): the list, one conversation, its pages,
-// the send and the read mark; the person's own contacts and their shares in
+// the send, the read mark and the unmatch (#351); the person's own contacts and their shares in
 // a conversation (#103, ADR-031 §11). All behind the session guard; every
 // statement goes through the caller's participant row (rule 6), and a
 // conversation the caller is not in, or one hidden from its blocker, is a
@@ -192,6 +197,22 @@ const markRoute = createRoute({
   },
 });
 
+const unmatchRoute = createRoute({
+  method: "post",
+  path: "/conversations/{id}/unmatch",
+  summary: "End the conversation for both, blocking nobody",
+  description:
+    "The conversation closes for both people (#351): neither can write in it, both read it as ended, with nothing saying who ended it or how, and both may still report it for matching_config report_after_close_days. What either shared there ends with it. One closed already is left as it is.",
+  ...bearer,
+  request: { params: ConversationParams },
+  responses: {
+    204: { description: "Ended, or ended before." },
+    400: errorContent("validation_failed: the id is not a uuid."),
+    401: unauthenticated,
+    404: notFound,
+  },
+});
+
 // Contacts (#103, ADR-031 §11). A value is never in a log line, an error
 // detail or a validation message: a refusal names the kind.
 
@@ -313,7 +334,14 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
     ...(deps.media ? { media: deps.media } : {}),
   });
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
-  for (const route of [listRoute, readRoute, markRoute, contactsRoute, conversationContactsRoute]) {
+  for (const route of [
+    listRoute,
+    readRoute,
+    markRoute,
+    unmatchRoute,
+    contactsRoute,
+    conversationContactsRoute,
+  ]) {
     app.use(route.getRoutingPath(), guard);
   }
   // The send's own limit, after the guard, keyed by the account (ADR-026),
@@ -468,6 +496,13 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
     const { accountId } = callerOf(c);
     const { id, kind } = c.req.valid("param");
     return c.json(await stopSharing(chat(), { accountId, conversationId: id, kind }), 200);
+  });
+
+  app.openapi(unmatchRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { id } = c.req.valid("param");
+    await unmatchConversation(chat(), accountId, id);
+    return c.body(null, 204);
   });
 
   app.openapi(markRoute, async (c) => {

@@ -4,11 +4,18 @@
 export { archiveJob } from "./archive.ts";
 // The person's stored contacts for their export (#103, ADR-031 §11).
 export { exportContacts } from "./contacts.ts";
-// The ban's close, and the halves erasure and the export call (ADR-007 §4).
+// The ban's close, and the halves erasure and the export call (ADR-007 §4);
+// a block's close, and what a report from a conversation reads and copies
+// (#351, ADR-030 §12).
 export {
+  closeConversationsBetween,
   closeConversationsOf,
   eraseConversationsOf,
   exportConversations,
+  lockReportedConversation,
+  REPORT_AFTER_CLOSE_DAYS_KEY,
+  reportWindowHolds,
+  threadForReport,
 } from "./conversations.ts";
 export { startChatListener } from "./listen.ts";
 // The live half (#349): the registry and hub, the listener, the socket's route.

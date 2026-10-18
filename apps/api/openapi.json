@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.40.1",
+    "version": "0.41.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3386,6 +3386,23 @@
         ],
         "additionalProperties": false
       },
+      "ConversationReportRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
       "ConversationList": {
         "type": "object",
         "properties": {
@@ -3449,12 +3466,11 @@
           },
           {
             "$ref": "#/components/schemas/CounterpartDeleted"
+          },
+          {
+            "type": "null"
           }
-        ],
-        "discriminator": {
-          "propertyName": "deleted",
-          "mapping": {}
-        }
+        ]
       },
       "CounterpartPerson": {
         "type": "object",
@@ -3606,6 +3622,9 @@
           },
           "contacts": {
             "$ref": "#/components/schemas/ConversationContacts"
+          },
+          "reportable": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -3617,7 +3636,8 @@
           "unread",
           "limits",
           "counterpartReadUpTo",
-          "contacts"
+          "contacts",
+          "reportable"
         ]
       },
       "ConversationContacts": {
@@ -4652,7 +4672,7 @@
                   "type": "boolean"
                 },
                 {
-                  "nullable": true
+                  "type": "null"
                 }
               ]
             }
@@ -4726,7 +4746,7 @@
                   "type": "boolean"
                 },
                 {
-                  "nullable": true
+                  "type": "null"
                 }
               ]
             }
@@ -7319,6 +7339,150 @@
         }
       }
     },
+    "/conversations/{id}/block": {
+      "post": {
+        "summary": "Block the other person of a conversation",
+        "description": "The block both ways and the conversation's close in one transaction (#351): from then on the conversation is gone for the caller, who gets 404 for it from every other route, and ended for the other person, who is not told why. The block holds everywhere a card's does, between the identities, and is final. Blocking again answers the same, the conversation then hidden from the caller.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The block stands: set now, or set before; alike when the other person deleted their account meanwhile, and nothing is written."
+          },
+          "400": {
+            "description": "validation_failed: the id is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller (not theirs, or nobody's), or the caller was erased meanwhile; nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}/report": {
+      "post": {
+        "summary": "Report the other person of a conversation, with a copy of it, and block them",
+        "description": "The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConversationReportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written."
+          },
+          "400": {
+            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller (not theirs, nobody's, or hidden from the one who blocked the other), or the caller was erased meanwhile; nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "report_window_closed: the conversation closed longer ago than report_after_close_days, or the other person deleted their account; nothing is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/conversations": {
       "get": {
         "summary": "The caller's conversations",
@@ -8189,6 +8353,63 @@
           },
           "429": {
             "description": "message_budget_exceeded: the minute's messages, shares and contact changes are spent; Retry-After is the wait.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/conversations/{id}/unmatch": {
+      "post": {
+        "summary": "End the conversation for both, blocking nobody",
+        "description": "The conversation closes for both people (#351): neither can write in it, both read it as ended, with nothing saying who ended it or how, and both may still report it for matching_config report_after_close_days. What either shared there ends with it. One closed already is left as it is.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Ended, or ended before."
+          },
+          "400": {
+            "description": "validation_failed: the id is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
             "content": {
               "application/json": {
                 "schema": {

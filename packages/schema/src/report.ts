@@ -38,6 +38,16 @@ export const ReportRequest = z
 export type ReportRequest = z.infer<typeof ReportRequest>;
 
 /**
+ * Report the other person of a conversation (#351, ADR-030 §12), whom the
+ * conversation names: the card's reason and note. The report freezes a copy
+ * of the conversation for the moderators, blocks both ways and closes it.
+ */
+export const ConversationReportRequest = ReportRequest.omit({ accountId: true })
+  .strict()
+  .meta({ id: "ConversationReportRequest" });
+export type ConversationReportRequest = z.infer<typeof ConversationReportRequest>;
+
+/**
  * A report in the reporter's own export (ADR-007, ADR-030 §8): when, why, their
  * own words and what came of it, in words in the request's language too;
  * never whom it was about.

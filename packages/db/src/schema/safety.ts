@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -10,6 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import { conversation, messageKind } from "./chat.ts";
 import { account, identity } from "./identity.ts";
 import { photo } from "./media.ts";
 
@@ -182,9 +184,12 @@ export const block = pgTable(
  * (#307), by whom and when; the export says the outcome. Kept twelve months
  * from filing (a nightly prune), whoever of the two is erased in between
  * (TD-7's "report snapshots for 12 months"). `source` says where it was
- * made; #101 adds the conversation and its frozen copy.
+ * made: a card, or a conversation (#351), whose id it keeps while the
+ * conversation exists (a conversation goes once both its people are erased,
+ * ADR-031 §5; the report stays its twelve months) and whose messages it
+ * copies at filing into `report_message`.
  */
-export const reportSource = pgEnum("report_source", ["card"]);
+export const reportSource = pgEnum("report_source", ["card", "conversation"]);
 export const reportOutcome = pgEnum("report_outcome", ["dismissed", "acted"]);
 
 export const report = pgTable(
@@ -206,6 +211,11 @@ export const report = pgTable(
     decidedBy: uuid("decided_by").references(() => identity.id),
     // Erasure deletes a lifted sanction (ADR-024 §8); the report keeps its outcome.
     sanctionId: uuid("sanction_id").references(() => sanction.id, { onDelete: "set null" }),
+    // The conversation a report was made from (#351), null once it is gone;
+    // its copy is in report_message either way.
+    conversationId: uuid("conversation_id").references(() => conversation.id, {
+      onDelete: "set null",
+    }),
   },
   (table) => [
     // The day's count and the export: the reporter's rows by time.
@@ -225,5 +235,47 @@ export const report = pgTable(
         AND (${table.decidedBy} IS NULL) = (${table.decidedAt} IS NULL)
         AND (${table.sanctionId} IS NULL OR ${table.outcome} = 'acted')`,
     ),
+    // A card's report names no conversation. Written without naming the new
+    // source: a value added in this migration cannot be used in its transaction.
+    check(
+      "report_conversation_check",
+      sql`${table.conversationId} IS NULL OR ${table.source} <> 'card'`,
+    ),
+  ],
+);
+
+/** Whose line a copied message was, seen from the report: the reporter's own, or the reported person's. */
+export const reportMessageSide = pgEnum("report_message_side", ["reporter", "reported"]);
+
+/**
+ * The frozen copy of a conversation (#351, ADR-030 §12): every message it
+ * held when the report was filed, both people's, copied in the report's
+ * transaction under the conversation's lock, with its place, whose it was,
+ * its kind, its words and its photo. The moderators read it in the panel
+ * (#312, behind the audit row `conversation.view`); nobody else does, and its
+ * words reach no log line, error detail or event (rule 5). It goes with its
+ * report (twelve months from filing, the night's `prune-reports`). A photo it
+ * names outlives its sender's erasure while a copy holds it, and goes with
+ * the last copy that does (no ON DELETE: a path that forgot the hold fails
+ * rather than empties the copy).
+ */
+export const reportMessage = pgTable(
+  "report_message",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reportId: uuid("report_id")
+      .notNull()
+      .references(() => report.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    side: reportMessageSide("side").notNull(),
+    kind: messageKind("kind").notNull(),
+    body: text("body"),
+    photoId: uuid("photo_id").references(() => photo.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("report_message_seq_idx").on(table.reportId, table.seq),
+    // The hold at erasure and the prune's release look copies up by photo.
+    index("report_message_photo_idx").on(table.photoId).where(sql`${table.photoId} IS NOT NULL`),
   ],
 );

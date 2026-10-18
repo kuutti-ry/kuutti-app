@@ -420,15 +420,23 @@ export type Closed = {
 
 /**
  * Closes every open or archived conversation of the accounts, for `how` (an
- * erasure, a sanction), or for the block where one stands. Where a block
- * stands, a conversation closed earlier for another reason is written as the
- * block's too, so that its blocker never sees it again once the link a live
- * block test needs is cut (a ban, then a block from an earlier card, then the
- * erasure: ADR-031 §2).
+ * erasure, a sanction, an unmatch), or for the block where one stands. Where
+ * a block stands, a conversation closed earlier for another reason is written
+ * as the block's too, so that its blocker never sees it again once the link a
+ * live block test needs is cut (a ban, then a block from an earlier card,
+ * then the erasure: ADR-031 §2). `conversationId` keeps it to one
+ * conversation (an unmatch, #351), `counterpartId` to those with one other
+ * account (a block, #351).
  */
 export async function closeConversationsOf(
   db: Queryable,
-  input: { accountIds: string[]; how: ConversationCloseKind; at: Date },
+  input: {
+    accountIds: string[];
+    how: ConversationCloseKind;
+    at: Date;
+    conversationId?: string;
+    counterpartId?: string;
+  },
 ): Promise<Closed[]> {
   if (input.accountIds.length === 0) return [];
   const blockedBy = (blocker: string, blocked: string) => `EXISTS (
@@ -443,7 +451,8 @@ export async function closeConversationsOf(
               (them.account_id IS NOT NULL AND ${blockedBy("them.account_id", "me.account_id")}) AS they_blocked,
               (them.account_id IS NOT NULL AND ${blockedBy("me.account_id", "them.account_id")}) AS i_blocked
        ${FROM_CALLER}
-       WHERE me.account_id = ANY($1::uuid[])),
+       WHERE me.account_id = ANY($1::uuid[])
+         AND ($4::uuid IS NULL OR c.id = $4) AND ($5::uuid IS NULL OR them.account_id = $5)),
      touched AS (
        SELECT * FROM closing
        WHERE was_open OR they_blocked OR i_blocked)
@@ -456,7 +465,13 @@ export async function closeConversationsOf(
      FROM touched
      WHERE c.id = touched.id
      RETURNING c.id, c.closed_how, c.next_seq - 1 AS messages, touched.counterpart_id, touched.was_open`,
-    [input.accountIds, input.at, input.how],
+    [
+      input.accountIds,
+      input.at,
+      input.how,
+      input.conversationId ?? null,
+      input.counterpartId ?? null,
+    ],
   );
   const closed = rows.map((r) => ({
     conversationId: r.id as string,
@@ -476,6 +491,23 @@ export async function closeConversationsOf(
     );
   }
   return closed;
+}
+
+/**
+ * The erased person's photos that a report's frozen copy still holds (#351):
+ * erasure keeps their rows (`erasePhotosOfAccount`'s `keep`), and they leave
+ * the person's messages here, which read "Photo removed" as a photo that
+ * went does (#350). Only the copy names them now, until the night's prune
+ * lets them go. The person's own rows, by the photo's account (rule 6).
+ */
+export async function detachPhotosOf(db: Queryable, accountId: string): Promise<number> {
+  const result = await db.query(
+    `UPDATE message m SET photo_id = NULL
+     FROM photo p
+     WHERE p.id = m.photo_id AND p.account_id = $1`,
+    [accountId],
+  );
+  return result.rowCount ?? 0;
 }
 
 /**
@@ -688,6 +720,103 @@ export async function exportConversationsOf(
       length: line.length ?? 0,
       photoId: line.photoId ?? null,
     })),
+  }));
+}
+
+// A report or a block from a conversation (#351, ADR-030 §12): the safety
+// slice writes the report, its copy and the block; these read the
+// conversation it names, through the caller's own participant row (rule 6),
+// after its row is locked, so the copy is the thread as it stood when the
+// report was filed: a send either committed before the lock and is copied,
+// or waits for the report's close and is refused.
+
+export type ReportedConversation = {
+  /** The caller blocked the other person: the conversation is hidden from them. */
+  hidden: boolean;
+  /** The other person's account; null once they are erased. */
+  counterpartId: string | null;
+  closedAt: Date | null;
+};
+
+/**
+ * The conversation the caller names, its row locked until the caller's
+ * transaction ends; null when it is not theirs. The two people's account and
+ * identity rows are held first (FOR KEY SHARE, what the report's and the
+ * block's foreign keys take anyway), and only then the conversation: an
+ * erasure and a ban take a person's rows before the conversations they close,
+ * so taking the conversation first and the other person's rows after would
+ * deadlock with them. Who the other person is is read once without a lock and
+ * afresh after it, which decides.
+ */
+export async function lockForReport(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<ReportedConversation | null> {
+  const other = await db.query<{ account_id: string | null }>(
+    `SELECT them.account_id FROM conversation_participant me
+     JOIN conversation_participant them
+       ON them.conversation_id = me.conversation_id AND them.side <> me.side
+     WHERE me.account_id = $1 AND me.conversation_id = $2`,
+    [accountId, conversationId],
+  );
+  const counterpart = other.rows[0]?.account_id ?? null;
+  await db.query(
+    `SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
+     WHERE a.id = ANY($1::uuid[]) FOR KEY SHARE OF a, i`,
+    [counterpart ? [accountId, counterpart] : [accountId]],
+  );
+  if (!(await lockConversation(db, accountId, conversationId))) return null;
+  const { rows } = await db.query<Row>(
+    `SELECT NOT (${VISIBLE_TO_CALLER}) AS hidden, them.account_id AS counterpart_id, c.closed_at
+     ${FROM_CALLER}
+     WHERE me.account_id = $1 AND me.conversation_id = $2`,
+    [accountId, conversationId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    hidden: row.hidden === true,
+    counterpartId: (row.counterpart_id as string | null) ?? null,
+    closedAt: (row.closed_at as Date | null) ?? null,
+  };
+}
+
+export type CopiedMessage = {
+  seq: number;
+  mine: boolean;
+  kind: MessageKind;
+  body: string | null;
+  photoId: string | null;
+  createdAt: Date;
+};
+
+/**
+ * Every message of the conversation, oldest first, both people's, those a
+ * shadow ban withholds from the caller included: the moderators read the
+ * thread as it is, not as one side was shown it. Through the caller's own
+ * participant row; the caller has locked the conversation.
+ */
+export async function threadOf(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<CopiedMessage[]> {
+  const { rows } = await db.query<Row>(
+    `SELECT m.seq, m.side = me.side AS mine, m.kind, m.body, m.photo_id, m.created_at
+     FROM conversation_participant me
+     JOIN message m ON m.conversation_id = me.conversation_id
+     WHERE me.account_id = $1 AND me.conversation_id = $2
+     ORDER BY m.seq`,
+    [accountId, conversationId],
+  );
+  return rows.map((r) => ({
+    seq: r.seq as number,
+    mine: r.mine === true,
+    kind: r.kind as MessageKind,
+    body: (r.body as string | null) ?? null,
+    photoId: (r.photo_id as string | null) ?? null,
+    createdAt: r.created_at as Date,
   }));
 }
 

@@ -6,8 +6,10 @@ export { accountAdminRoutes } from "./account-routes.ts";
 export { auditBoundary, recordAudit } from "./audit.ts";
 // The audit log's reader and the staff list (#309, #310), admins only.
 export { auditAdminRoutes } from "./audit-routes.ts";
-// Blocks and reports from a card (#84, ADR-030): the routes, the halves the
-// export calls, and the night's prune. Erasure keeps both (TD-7's kept side).
+// Blocks and reports from a card (#84, ADR-030) and from a conversation
+// (#351): the routes, the halves the export and erasure call, and the night's
+// prune. Erasure keeps both (TD-7's kept side), and the photos a report's
+// frozen copy holds.
 export { listBlocksOfAccount } from "./blocks.ts";
 // The tunables in the panel (#304, #305).
 export { configAdminRoutes } from "./config-routes.ts";
@@ -26,7 +28,7 @@ export {
   withdrawPhotoCheckNote,
 } from "./photo-check.ts";
 export { reportRoutes } from "./report-routes.ts";
-export { listReportsOfAccount, pruneReports } from "./reports.ts";
+export { listReportsOfAccount, photosHeldByReports, pruneReports } from "./reports.ts";
 // Sanctions (#307, ADR-024): the panel's routes, the night's end of
 // suspensions, and the halves erasure and the export call.
 export { sanctionAdminRoutes } from "./sanction-routes.ts";

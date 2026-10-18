@@ -59,6 +59,7 @@ describe("the tables", () => {
       "preferences",
       "profile",
       "report",
+      "report_message",
       "research_subject",
       "sanction",
       "session",
@@ -114,7 +115,7 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it, and from a conversation to its people and messages; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, from a conversation to its people and messages, and from a report to its copy; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
       // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
@@ -123,6 +124,8 @@ describe("the foreign keys", () => {
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
       "photo_review.photo_id -> photo.id cascade",
+      // A report's frozen copy goes with the report, twelve months from filing (#351).
+      "report_message.report_id -> report.id cascade",
     ]);
   });
 
@@ -208,10 +211,18 @@ describe("the foreign keys", () => {
       "block.blocker_identity_id -> identity.id no action",
     ]);
     expect(references.filter((reference) => reference.startsWith("report.")).sort()).toEqual([
+      "report.conversation_id -> conversation.id set null",
       "report.decided_by -> identity.id no action",
       "report.reported_account_id -> account.id no action",
       "report.reporter_account_id -> account.id no action",
       "report.sanction_id -> sanction.id set null",
+    ]);
+    // The frozen copy goes with its report, and holds its photos (#351, ADR-030 §12).
+    expect(
+      references.filter((reference) => reference.startsWith("report_message.")).sort(),
+    ).toEqual([
+      "report_message.photo_id -> photo.id no action",
+      "report_message.report_id -> report.id cascade",
     ]);
   });
 
@@ -239,6 +250,7 @@ describe("the indexes", () => {
     ["card_shown", "card_shown_account_photo_idx", ["account_id", "photo_id"]],
     ["block", "block_pair_idx", ["blocker_identity_id", "blocked_identity_id"]],
     ["report", "report_open_pair_idx", ["reporter_account_id", "reported_account_id"]],
+    ["report_message", "report_message_seq_idx", ["report_id", "seq"]],
   ])("keep %s unique by %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(true);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -258,6 +270,7 @@ describe("the indexes", () => {
     ["sanction", "sanction_identity_open_idx", ["identity_id"]],
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
+    ["report_message", "report_message_photo_idx", ["photo_id"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -301,6 +314,7 @@ describe("the checks", () => {
         .sort();
     expect(checks("block")).toEqual(["block_not_self_check"]);
     expect(checks("report")).toEqual([
+      "report_conversation_check",
       "report_decision_check",
       "report_not_self_check",
       "report_note_check",
@@ -359,8 +373,10 @@ describe("the enums", () => {
     expect(enums.sanction_kind).toEqual(SanctionKind.options);
     expect(enums.sanction_reason).toEqual(SanctionReason.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
-    // Where a report was made: a card, until the chat of #101 adds the conversation.
-    expect(enums.report_source).toEqual(["card"]);
+    // Where a report was made: a card, or a conversation (#351).
+    expect(enums.report_source).toEqual(["card", "conversation"]);
+    // Whose line a report's copy holds, seen from the report (#351).
+    expect(enums.report_message_side).toEqual(["reporter", "reported"]);
     expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
     expect(enums.conversation_side).toEqual(["a", "b"]);
     expect(enums.message_kind).toEqual(MessageKind.options);

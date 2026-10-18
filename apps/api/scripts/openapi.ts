@@ -11,7 +11,7 @@ import openapiTS, { astToString } from "openapi-typescript";
 import { pino } from "pino";
 import { createApp } from "../src/app.ts";
 import { parseConfig } from "../src/lib/config.ts";
-import { openApiDocument } from "../src/lib/openapi.ts";
+import { servedDocument } from "../src/lib/openapi.ts";
 
 const here = resolve(import.meta.dirname, "..");
 const version = (
@@ -33,7 +33,7 @@ const app = createApp({
   },
 });
 
-const document = app.getOpenAPIDocument(openApiDocument(version));
+const document = servedDocument(app, version);
 const jsonPath = resolve(here, "openapi.json");
 writeFileSync(jsonPath, `${JSON.stringify(document, null, 2)}\n`);
 

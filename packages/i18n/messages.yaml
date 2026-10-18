@@ -3000,6 +3000,13 @@ errors.report_budget_exceeded:
   sv: Det räcker med anmälningar för i dag. Du kan ändå blockera den här personen, men då kan du inte anmäla hen senare.
   machine: { fi: true, sv: true }
 
+errors.report_window_closed:
+  en: "This conversation can no longer be reported."
+  description: "Report from a conversation (409, #351, ADR-030 §12): the conversation closed longer ago than matching_config report_after_close_days, or the other person deleted their account. Must not say which, nor how it closed. Never a number, the window is a tunable."
+  fi: "Tästä keskustelusta ei voi enää ilmoittaa."
+  sv: "Det går inte längre att anmäla det här samtalet."
+  machine: { fi: true, sv: true }
+
 errors.conversation_closed:
   en: "This conversation has ended, so the message was not sent."
   description: "Send (409, #348, ADR-031 §3): the conversation is closed, a block stands between the two, or the other person deleted their account. Must not say which: a block reads as an ended conversation (ADR-030 §6)."
@@ -6617,7 +6624,7 @@ chat.unread.badge:
 
 chat.state.ended:
   en: "This conversation has ended."
-  description: "A closed conversation, in its row and instead of the composer (#348, #351): an ended one, however it ended. Never says blocked or removed (ADR-030 §6)."
+  description: "A closed conversation, instead of the composer and in the row of one ended before the conversation named nobody (#348, #351): an ended one, however it ended. Never says blocked or removed (ADR-030 §6)."
   fi: "Tämä keskustelu on päättynyt."
   sv: "Det här samtalet har avslutats."
   machine: { fi: true, sv: true }
@@ -6627,6 +6634,104 @@ chat.state.deleted:
   description: "A closed conversation whose counterpart deleted their account (#348, TD-7), in its row and instead of the composer."
   fi: "Tämä henkilö poisti tilinsä."
   sv: "Den här personen har raderat sitt konto."
+  machine: { fi: true, sv: true }
+
+chat.closed.title:
+  en: "Conversation ended"
+  description: "An ended conversation (#351, ADR-031 Open 10): its heading on the conversation screen and its name in the list, in place of the other person's name, which an ended conversation never shows, so nobody learns from a name turning into Deleted user that the other left. However it ended: never says blocked, removed or by whom. Short, a heading."
+  fi: "Keskustelu päättynyt"
+  sv: "Samtalet har avslutats"
+  machine: { fi: true, sv: true }
+
+chat.closed.them:
+  en: "The other person"
+  description: "An ended conversation (#351): who wrote the other side's messages, heard by a screen reader before each of them and used where the name would stand, since an ended conversation shows no name."
+  fi: "Keskustelukumppani"
+  sv: "Den andra personen"
+  machine: { fi: true, sv: true }
+
+chat.actions.open:
+  en: "More"
+  description: "The conversation's header (#351): the label of the icon button that opens report, block and end (heard, never seen: the icon is decorative). Short."
+  fi: "Lisää"
+  sv: "Mer"
+  machine: { fi: true, sv: true }
+
+chat.actions.title:
+  en: "Report, block or end"
+  description: "The conversation's dialog of actions (#351): its title, over the buttons Report and block, Block and End conversation. In an ended conversation only the report is offered, under the same title."
+  fi: "Ilmoita, estä tai lopeta"
+  sv: "Anmäl, blockera eller avsluta"
+  machine: { fi: true, sv: true }
+
+chat.actions.unmatch:
+  en: "End conversation"
+  description: "The conversation's dialog of actions (#351): the button that chooses to end the conversation for both without blocking (the unmatch), and the button that confirms it on the next step. A verb phrase, a button."
+  fi: "Lopeta keskustelu"
+  sv: "Avsluta samtalet"
+  machine: { fi: true, sv: true }
+
+chat.actions.unmatchHint:
+  en: "Neither of you can write in it any more. Nobody is blocked."
+  description: "The conversation's dialog of actions (#351), the line under End conversation: what an unmatch does, and that it is not a block."
+  fi: "Kumpikaan teistä ei voi enää kirjoittaa siihen. Ketään ei estetä."
+  sv: "Ingen av er kan skriva i det längre. Ingen blockeras."
+  machine: { fi: true, sv: true }
+
+chat.unmatch.title:
+  en: "End this conversation?"
+  description: "The conversation's dialog of actions (#351), the title of the step that confirms ending the conversation."
+  fi: "Lopetetaanko tämä keskustelu?"
+  sv: "Avsluta det här samtalet?"
+  machine: { fi: true, sv: true }
+
+chat.unmatch.body:
+  en: "Neither of you can write in it any more. It stays in the archive for both of you, and nobody is told who ended it. Nobody is blocked."
+  description: "The conversation's dialog of actions (#351), under the confirmation's title: an unmatch closes the conversation for both, keeps it read-only in both archives, says nothing of who ended it, and blocks nobody. Plain, calm."
+  fi: "Kumpikaan teistä ei voi enää kirjoittaa siihen. Se jää teidän molempien arkistoon, eikä kenellekään kerrota, kuka sen lopetti. Ketään ei estetä."
+  sv: "Ingen av er kan skriva i det längre. Det stannar i arkivet för er båda, och ingen får veta vem som avslutade det. Ingen blockeras."
+  machine: { fi: true, sv: true }
+
+chat.unmatch.done:
+  en: "The conversation has ended."
+  description: "Said after the conversation was ended from its dialog of actions (#351), on the list of conversations the person is taken back to."
+  fi: "Keskustelu on päättynyt."
+  sv: "Samtalet har avslutats."
+  machine: { fi: true, sv: true }
+
+chat.unmatch.failed:
+  en: "The conversation could not be ended. Try again."
+  description: "The conversation's dialog of actions (#351), an unmatch the API did not take (no connection, a server error); the dialog stays open."
+  fi: "Keskustelun lopettaminen ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte att avsluta samtalet. Försök igen."
+  machine: { fi: true, sv: true }
+
+chat.block.body:
+  en: "The conversation ends for both of you, and you will not see each other here again, even if either of you deletes their account and comes back. A block cannot be undone. They are not told."
+  description: "The conversation's dialog of actions (#351, ADR-030 §1 and §2), under Block this person?: a block from a conversation ends it for both, holds both ways and through either person's deletion, for good, and the other person is not told. Plain, calm, no blame."
+  fi: "Keskustelu päättyy teiltä molemmilta, ettekä näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä ja palaisi. Estoa ei voi perua. Hänelle ei kerrota."
+  sv: "Samtalet avslutas för er båda, och ni ser inte varandra här igen, även om någon av er raderar sitt konto och kommer tillbaka. En blockering kan inte ångras. Personen får inte veta det."
+  machine: { fi: true, sv: true }
+
+chat.report.copy:
+  en: "The moderators get a copy of this conversation, your messages and theirs, and keep it for twelve months. The conversation ends."
+  description: "The report step of the conversation's dialog of actions (#351, ADR-030 §12), above what the report's block means: a report from a conversation freezes a copy of every message, both people's, for the moderators, kept twelve months from filing, and closes the conversation."
+  fi: "Moderaattorit saavat kopion tästä keskustelusta, sinun ja hänen viesteistään, ja säilyttävät sen kaksitoista kuukautta. Keskustelu päättyy."
+  sv: "Moderatorerna får en kopia av det här samtalet, dina och personens meddelanden, och sparar den i tolv månader. Samtalet avslutas."
+  machine: { fi: true, sv: true }
+
+chat.report.limited:
+  en: "That is enough reports for today. You can try again after midnight."
+  description: "The report step in an ended conversation (#351), the day's reports filed (429 report_budget_exceeded, matching_config reports_per_day): nothing was written. No block is offered there, so unlike errors.report_budget_exceeded it points to tomorrow, while the conversation can still be reported. Never a number, the cap is a tunable."
+  fi: "Tältä päivältä ilmoituksia on jo tarpeeksi. Voit yrittää uudelleen keskiyön jälkeen."
+  sv: "Det räcker med anmälningar för i dag. Du kan försöka igen efter midnatt."
+  machine: { fi: true, sv: true }
+
+chat.notice.gone:
+  en: "That conversation is no longer available."
+  description: "Said on the list of conversations when an action from a conversation found it gone meanwhile (#351): nothing was reported, blocked or ended."
+  fi: "Keskustelu ei ole enää saatavilla."
+  sv: "Samtalet är inte längre tillgängligt."
   machine: { fi: true, sv: true }
 
 chat.conversation.loading:

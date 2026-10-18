@@ -421,6 +421,20 @@
       "when": 1792317303152,
       "tag": "0059_contact_share_notify",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1792342013748,
+      "tag": "0060_report_conversation",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1792342027681,
+      "tag": "0061_report_after_close_days",
+      "breakpoints": true
     }
   ]
 }

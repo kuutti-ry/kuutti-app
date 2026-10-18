@@ -769,6 +769,21 @@ export async function deletePhotosOfAccount(
   return rows.map((r) => r.key);
 }
 
+/** The photos of erased accounts among these; the rows go, their content keys come back. */
+export async function deleteReleasedPhotos(
+  db: Queryable,
+  photoIds: readonly string[],
+): Promise<string[]> {
+  if (photoIds.length === 0) return [];
+  const { rows } = await db.query<{ key: string }>(
+    `DELETE FROM photo p USING account a
+     WHERE p.id = ANY($1::uuid[]) AND a.id = p.account_id AND a.state = 'deleted'
+     RETURNING p.key`,
+    [photoIds],
+  );
+  return rows.map((r) => r.key);
+}
+
 /**
  * The person's photos sent in conversations, the newest first, for the
  * export (#350): the id, the content key and the check's description. A

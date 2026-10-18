@@ -532,13 +532,18 @@ describe("the twelve months", () => {
         [viewer.accountId, subject, new Date(at)],
       );
     }
-    expect(await pruneReports(ctx.client, now)).toBe(2);
+    const { logger } = await captureLogger();
+    expect(await pruneReports({ db: ctx.client, logger }, now)).toEqual({
+      pruned: 2,
+      photos: 0,
+      objects: 0,
+    });
     expect((await reportsOf(ctx, viewer.accountId)).map((row) => row.reported_account_id)).toEqual([
       subjects[2],
       subjects[3],
     ]);
     // The blocks stay: they are not the report's.
     expect(await count(ctx, "SELECT count(*) AS n FROM block")).toBe(4);
-    expect(await pruneReports(ctx.client, now)).toBe(0);
+    expect((await pruneReports({ db: ctx.client, logger }, now)).pruned).toBe(0);
   });
 });

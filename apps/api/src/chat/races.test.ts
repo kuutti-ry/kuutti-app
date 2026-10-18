@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { createPool, migrate, type Queryable, withTemporaryDatabase } from "@kuutti/db";
+import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
 import { describe, expect, it } from "vitest";
 import { eraseAccount } from "../identity/index.ts";
-import { interleaved } from "../test/chat.ts";
+import { interleaved, twoInAConversation } from "../test/chat.ts";
 import { captureLogger } from "../test/harness.ts";
+import { codeOf, pidOf, type Watched, waitsFor, watched } from "../test/races.ts";
 import { archiveSilentConversations } from "./archive.ts";
 import { removeContact, shareContact } from "./contacts.ts";
 import { sendMessage } from "./messages.ts";
@@ -19,77 +20,6 @@ import { sendMessage } from "./messages.ts";
 // let go on only once the other waits for it (pg_blocking_pids, never a sleep).
 
 const MIGRATIONS = resolve(import.meta.dirname, "../../../../packages/db/drizzle");
-
-const codeOf = (error: unknown) => (error as { code?: string }).code ?? String(error);
-
-type Watched<T> = { outcome: Promise<T | string>; settled: () => boolean };
-
-/** The work's outcome as a value, a failure as its code, and whether it has settled yet. */
-function watched<T>(work: Promise<T>): Watched<T> {
-  let settled = false;
-  const outcome = work.then(
-    (value): T | string => {
-      settled = true;
-      return value;
-    },
-    (error: unknown) => {
-      settled = true;
-      return codeOf(error);
-    },
-  );
-  return { outcome, settled: () => settled };
-}
-
-async function pidOf(connection: Queryable): Promise<number> {
-  const { rows } = await connection.query<{ pid: number }>("SELECT pg_backend_pid() AS pid");
-  return rows[0]?.pid as number;
-}
-
-/**
- * Asks Postgres until the waiter waits for a lock the holder holds (true),
- * or the waiter's work has settled without (false).
- */
-async function waitsFor(
-  db: Queryable,
-  waiter: number,
-  holder: number,
-  settled: () => boolean,
-): Promise<boolean> {
-  for (;;) {
-    const { rows } = await db.query<{ waits: boolean }>(
-      "SELECT $2::int = ANY(pg_blocking_pids($1)) AS waits",
-      [waiter, holder],
-    );
-    if (rows[0]?.waits === true) return true;
-    if (settled()) return false;
-  }
-}
-
-/** Two active accounts with their identities, and a conversation between them, side a and side b. */
-async function twoInAConversation(db: Queryable, label: string) {
-  const accounts: string[] = [];
-  for (const side of ["a", "b"]) {
-    const identity = await db.query<{ id: string }>(
-      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
-      [`${label} ${side} ${randomUUID()}`],
-    );
-    const account = await db.query<{ id: string }>(
-      "INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, 'active', 1990, 6) RETURNING id",
-      [identity.rows[0]?.id],
-    );
-    accounts.push(account.rows[0]?.id as string);
-  }
-  const conversation = await db.query<{ id: string }>(
-    "INSERT INTO conversation DEFAULT VALUES RETURNING id",
-  );
-  const id = conversation.rows[0]?.id as string;
-  await db.query(
-    `INSERT INTO conversation_participant (conversation_id, account_id, side)
-     VALUES ($1, $2, 'a'), ($1, $3, 'b')`,
-    [id, accounts[0], accounts[1]],
-  );
-  return { a: accounts[0] as string, b: accounts[1] as string, id };
-}
 
 describe("sends on a pool", () => {
   it("ten sends at once from both sides take the sequences one to ten, each once", async () => {

@@ -1,10 +1,12 @@
 import { type Queryable, transaction } from "@kuutti/db";
+import { closeConversationsBetween, lockReportedConversation } from "../chat/index.ts";
 import { wasShown } from "../media/index.ts";
 
 /**
  * Blocks (#84, ADR-030, features/safety/blocks.feature): a person blocks
- * somebody whose card they were shown, and from then on neither is shown to
- * the other, anywhere a person is shown to a person (rule 7). The row is
+ * somebody whose card they were shown, or the other person of a conversation
+ * (#351), and from then on neither is shown to the other, anywhere a person
+ * is shown to a person (rule 7), and their conversations are over. The row is
  * between the two identities, so it holds for a later account of either, and
  * it is final: no list, no unblock. Nobody is told, and nothing counts
  * blocks: the filters read them (`inEachOthersPool`, `blocked_between` of
@@ -15,10 +17,22 @@ import { wasShown } from "../media/index.ts";
  * The block from the caller's identity to the subject's; a second one, or
  * one the other set first, changes nothing that anybody can tell. The caller
  * is named in the statement and must be live (rule 6, #51). Inside the
- * caller's transaction: a report writes it with the report. False when the
- * caller is erased.
+ * caller's transaction: a report writes it with the report. Every
+ * conversation between the two accounts closes as the block's in the same
+ * transaction (#351, ADR-030 §2), whichever door the block came through, so a
+ * send in flight is in one order with it and its blocker never sees them
+ * again. False when the caller is erased.
  */
 export async function insertBlock(
+  db: Queryable,
+  input: { blockerAccountId: string; blockedAccountId: string; at: Date },
+): Promise<boolean> {
+  const live = await writeBlock(db, input);
+  if (live) await closeConversationsBetween(db, input);
+  return live;
+}
+
+async function writeBlock(
   db: Queryable,
   input: { blockerAccountId: string; blockedAccountId: string; at: Date },
 ): Promise<boolean> {
@@ -85,6 +99,41 @@ export async function recordBlock(
         subjectAccountId: input.blockedAccountId,
       }));
     return proven && (await insertBlock(tx, input));
+  });
+}
+
+/**
+ * A block from a conversation (#351): of its other person, whom the
+ * conversation names, so it is its own proof of contact. The block and the
+ * close in one transaction; afterwards the conversation is hidden from the
+ * caller, who gets 404 from every route for it, and ended for the other, who
+ * learns nothing more. Blocking again answers the same (`blocked`): the
+ * block stands. So does a block of somebody erased meanwhile, with nothing
+ * written, since their link is cut: a block back answers 204 whoever is
+ * still there (ADR-030 §6). `not_found`, and nothing written, for a
+ * conversation that is not the caller's and a caller erased meanwhile.
+ */
+export async function recordConversationBlock(
+  db: Queryable,
+  input: { accountId: string; conversationId: string; at: Date },
+): Promise<"blocked" | "not_found"> {
+  return transaction(db, async (tx) => {
+    // The caller first, as every writer holds it: an erasure finishes first, or waits.
+    const live = await tx.query(
+      "SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE",
+      [input.accountId],
+    );
+    if (live.rows.length === 0) return "not_found";
+    const found = await lockReportedConversation(tx, input.accountId, input.conversationId);
+    if (!found) return "not_found";
+    if (found.hidden || found.counterpartId === null) return "blocked";
+    // The caller's row is held above, so the block finds them live.
+    await insertBlock(tx, {
+      blockerAccountId: input.accountId,
+      blockedAccountId: found.counterpartId,
+      at: input.at,
+    });
+    return "blocked";
   });
 }
 

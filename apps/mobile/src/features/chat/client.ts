@@ -98,6 +98,14 @@ export async function sendPhoto(
   throw uploadRefusal(answer);
 }
 
+/** Ends the conversation for both, blocking nobody (#351); one ended before answers alike. */
+export async function unmatchConversation(id: string): Promise<void> {
+  const { error, response } = await api.POST("/conversations/{id}/unmatch", {
+    params: { path: { id } },
+  });
+  if (!response.ok) throw failed(response, error, "unmatch");
+}
+
 export async function markRead(id: string, upTo: number): Promise<void> {
   const { error, response } = await api.POST("/conversations/{id}/read", {
     params: { path: { id } },

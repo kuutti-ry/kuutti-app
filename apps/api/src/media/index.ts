@@ -10,6 +10,7 @@ export {
   EXPORT_MESSAGE_PHOTOS_MAX,
   type ExportedPhotoFile,
   erasePhotosOfAccount,
+  eraseReleasedPhotos,
   exportPhotos,
   type PhotoErasure,
 } from "./erasure.ts";
@@ -32,6 +33,6 @@ export {
   wasShown,
 } from "./repo.ts";
 export { photoRoutes, UPLOAD_ROUTE } from "./routes.ts";
-export { memoryMediaStore, objectKey } from "./store.ts";
+export { type MediaStore, memoryMediaStore, objectKey } from "./store.ts";
 export { cloudFrontSigner } from "./urls.ts";
 export { createMediaDeps } from "./wiring.ts";

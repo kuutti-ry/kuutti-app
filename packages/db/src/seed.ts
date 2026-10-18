@@ -102,6 +102,10 @@ export const MATCHING_CONFIG_V1 = {
   // day, counted from report in the statement that writes the row; the sixth
   // is refused in words, and nothing is written, the block included.
   reports_per_day: 5,
+  // #351 (ADR-030 §12, migration 0061): the days after a conversation closed
+  // during which either person may still report it, so a block cannot be
+  // used to dodge a report.
+  report_after_close_days: 30,
   // #348 (ADR-031 §6, migration 0054): the longest message, in characters
   // after trimming, and the messages one account may send in a minute; the
   // send reads both on each request.

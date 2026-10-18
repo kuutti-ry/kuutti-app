@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the eleven personas "with a history" have done before the demo begins
+ * What the thirteen personas "with a history" have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -289,6 +289,56 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
         languages: ["fi", "sv"],
         intent: "long_term",
         hobbies: ["cottage", "reading", "fishing"],
+      },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  // The report's pair (#351): in each other's pool both ways and in no other
+  // persona's, so their conversation is a match the filters allow (a test
+  // says so) and the flow that reports and blocks there changes nothing
+  // another flow reads. No photos: the release has no faces of them.
+  {
+    key: "laura",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 26, max: 35 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Laura",
+      bio: "Graafikko, joka piirtää työkseen ja kiipeilee vapaa-ajallaan. Kotona odottaa kissa ja liian monta kasvia. Etsin jotakuta, jonka kanssa käydä museoissa ja syödä liikaa jäätelöä.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["drawing", "climbing", "museums"],
+      },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  {
+    key: "emmi",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 27, max: 35 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Emmi",
+      bio: "Sairaanhoitaja, joka viettää vapaapäivänsä metsässä tai lautapelien ääressä. Leivon sunnuntaisin ja kutsun ystävät syömään. Etsin jotakuta, joka nauttii hitaista aamuista.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "sv"],
+        intent: "long_term",
+        hobbies: ["forest_walks", "board_games", "baking"],
       },
       prompts: [],
     },
