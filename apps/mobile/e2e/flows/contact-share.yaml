@@ -40,8 +40,10 @@ name: A contact kept in Settings is shared from a conversation's header and show
     enabled: false
 - tapOn: "Your Instagram username|Instagram-käyttäjänimesi|Ditt användarnamn på Instagram"
 - inputText: "elina.lukupiiri"
-# Save lies under the keyboard: a tap on the card's title, which is no button,
-# closes it (README, the keyboard).
+# The page keeps the focused field in sight just above the keyboard, with the
+# card's title above it (the hint between them is Telegram's too); Save stays
+# under the keyboard. A tap on the title, which is no button and the brand's
+# name in every language, closes it (README, the keyboard).
 - tapOn: "Instagram"
 - tapOn: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
 - extendedWaitUntil:
