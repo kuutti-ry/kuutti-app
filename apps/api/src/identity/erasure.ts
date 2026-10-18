@@ -1,7 +1,7 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { describePhoto, type TFunction } from "@kuutti/i18n";
 import type { AccountExport, ExportedPhotoCheck } from "@kuutti/schema";
-import { eraseConversationsOf, exportConversations } from "../chat/index.ts";
+import { eraseConversationsOf, exportContacts, exportConversations } from "../chat/index.ts";
 import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
@@ -64,6 +64,9 @@ import { visibleState } from "./standing.ts";
 // received (sent under a shadow ban still open), which go; a conversation
 // whose other person was erased before goes whole. The export carries the
 // person's own messages and the counterpart's as a time and a length.
+// The stored contacts go (#103, ADR-031 §11); the shares, ended by the
+// close, stay as the record with no value in them. The export carries the
+// stored pieces, and in each conversation the person's own shares.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -98,6 +101,8 @@ export type ErasureSummary = {
   withheldMessages: number;
   /** Conversations whose other person was erased before: nobody is left to keep them for (#348). */
   emptiedConversations: number;
+  /** The stored contacts (#103); their shares stay, ended, as the record. */
+  contacts: number;
   photos: number;
   accessRows: number;
   shownRows: number;
@@ -187,6 +192,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     conversations: result.chat.conversations,
     withheldMessages: result.chat.withheld,
     emptiedConversations: result.chat.emptied,
+    contacts: result.chat.contacts,
     photos: result.photos.photos,
     accessRows: result.photos.accessRows,
     shownRows: result.photos.shownRows,
@@ -261,6 +267,7 @@ export async function exportAccount(
     reports,
     blocks,
     conversations,
+    contacts,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
@@ -283,6 +290,7 @@ export async function exportAccount(
         descriptionText: sent.description ? describePhoto(t, sent.description) : null,
       };
     }),
+    exportContacts(deps, accountId),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -362,6 +370,8 @@ export async function exportAccount(
     },
     // The person's own words, and the counterpart's as a time and a length (ADR-031 §5); never whom.
     conversations,
+    // What the person keeps to share (#103); never what the other person shared.
+    contacts,
   };
   return { document, files: photos.files };
 }

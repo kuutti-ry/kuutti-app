@@ -6,6 +6,10 @@ export {
 } from "./admin.ts";
 export { type AuthRequest, authRequest } from "./auth-request.ts";
 export {
+  contact,
+  contactKind,
+  contactShare,
+  contactShareEnd,
   conversation,
   conversationClose,
   conversationParticipant,

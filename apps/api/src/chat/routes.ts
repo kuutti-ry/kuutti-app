@@ -1,6 +1,8 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   ChatMessage,
+  ContactKindParams,
+  ConversationContacts,
   ConversationDetail,
   ConversationList,
   ConversationListQuery,
@@ -9,12 +11,16 @@ import {
   MessagePage,
   MessagesQuery,
   PHOTO_MAX_BYTES,
+  PutContactRequest,
   ReadRequest,
   SendMessageRequest,
   SendPhotoRequest,
+  StoredContact,
+  StoredContacts,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { z } from "zod";
 import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
@@ -22,6 +28,14 @@ import { AppError, localisedEnvelope } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { personOf, rateLimit } from "../lib/rate-limit.ts";
 import { dayWindow } from "../media/index.ts";
+import {
+  keepContact,
+  listContacts,
+  readContacts,
+  removeContact,
+  shareContact,
+  stopSharing,
+} from "./contacts.ts";
 import { type ChatDeps, listConversations, readConversation } from "./conversations.ts";
 import { MESSAGES_PER_MINUTE_KEY, markRead, readMessages, sendMessage } from "./messages.ts";
 import { MESSAGE_PHOTO_ATTEMPTS_PER_DAY_KEY, sendPhoto } from "./photos.ts";
@@ -30,11 +44,12 @@ import { MESSAGE_PHOTO_ATTEMPTS_PER_DAY_KEY, sendPhoto } from "./photos.ts";
 const MEDIA_BUSY_RETRY_AFTER_SECONDS = 5;
 
 // The chat's routes (#348, ADR-031): the list, one conversation, its pages,
-// the send and the read mark. All behind the session guard; every statement
-// goes through the caller's participant row (rule 6), and a conversation the
-// caller is not in, or one hidden from its blocker, is a 404, never a 403.
-// What a message says reaches no log line (rule 5): the request line names
-// the route and the status.
+// the send and the read mark; the person's own contacts and their shares in
+// a conversation (#103, ADR-031 §11). All behind the session guard; every
+// statement goes through the caller's participant row (rule 6), and a
+// conversation the caller is not in, or one hidden from its blocker, is a
+// 404, never a 403. What a message says, and a contact, reach no log line
+// (rule 5): the request line names the route and the status.
 
 const errorContent = (description: string) => ({
   description,
@@ -45,6 +60,9 @@ const bearer = { security: [{ session: [] }] };
 const unauthenticated = errorContent("unauthenticated, session_expired or session_revoked.");
 const notFound = errorContent(
   "not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other.",
+);
+const budgetSpent = errorContent(
+  "message_budget_exceeded: the minute's messages, shares and contact changes are spent; Retry-After is the wait.",
 );
 
 const listRoute = createRoute({
@@ -67,7 +85,7 @@ const readRoute = createRoute({
   path: "/conversations/{id}",
   summary: "One conversation",
   description:
-    "The summary, the longest message the composer may send, and the highest sequence the counterpart has read.",
+    "The summary, the longest message the composer may send, the highest sequence the counterpart has read, and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
   ...bearer,
   request: { params: ConversationParams },
   responses: {
@@ -174,6 +192,118 @@ const markRoute = createRoute({
   },
 });
 
+// Contacts (#103, ADR-031 §11). A value is never in a log line, an error
+// detail or a validation message: a refusal names the kind.
+
+const contactsRoute = createRoute({
+  method: "get",
+  path: "/contacts",
+  summary: "The caller's stored contacts",
+  description:
+    "Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
+  ...bearer,
+  responses: {
+    200: { description: "The stored pieces.", ...json(StoredContacts) },
+    401: unauthenticated,
+  },
+});
+
+const keepContactRoute = createRoute({
+  method: "put",
+  path: "/contacts/{kind}",
+  summary: "Keep a contact",
+  description:
+    "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
+  ...bearer,
+  request: {
+    params: ContactKindParams,
+    body: { required: true, ...json(PutContactRequest) },
+  },
+  responses: {
+    200: { description: "Kept.", ...json(StoredContact) },
+    400: errorContent(
+      "validation_failed (an unknown kind, an empty value or one over 64 characters, an unknown key); contact_invalid: not one of its kind (the detail names the kind, never the value).",
+    ),
+    401: unauthenticated,
+    404: errorContent("not_found: the account was deleted while the request was on its way."),
+    429: budgetSpent,
+  },
+});
+
+const removeContactRoute = createRoute({
+  method: "delete",
+  path: "/contacts/{kind}",
+  summary: "Remove a contact",
+  description:
+    "Deletes the piece of that kind and, in the same transaction, ends every share of it: it disappears from those conversations at once. Answered alike when none was kept. Counts against matching_config messages_per_minute.",
+  ...bearer,
+  request: { params: ContactKindParams },
+  responses: {
+    204: { description: "Removed, or none was kept." },
+    400: errorContent("validation_failed: an unknown kind."),
+    401: unauthenticated,
+    404: errorContent(
+      "not_found: the account was deleted, or taken out of the live states, while the request was on its way; nothing was written.",
+    ),
+    429: budgetSpent,
+  },
+});
+
+const conversationContactsRoute = createRoute({
+  method: "get",
+  path: "/conversations/{id}/contacts",
+  summary: "What is shared in one conversation",
+  description:
+    "The detail's contacts alone, by the same rule: the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. What the phone reads on a contacts frame and on a resume: it signs no thumb and writes nothing.",
+  ...bearer,
+  request: { params: ConversationParams },
+  responses: {
+    200: { description: "The contacts.", ...json(ConversationContacts) },
+    400: errorContent("validation_failed: the id is not a uuid."),
+    401: unauthenticated,
+    404: notFound,
+  },
+});
+
+const ShareParams = z.object({ ...ConversationParams.shape, ...ContactKindParams.shape });
+
+const shareRoute = createRoute({
+  method: "post",
+  path: "/conversations/{id}/contacts/{kind}",
+  summary: "Share a contact in the conversation",
+  description:
+    "The other person sees the caller's stored piece of that kind at once, in the conversation's detail, until the caller stops sharing it, removes or changes it, or the conversation closes. In one transaction, as a send: the conversation's row locked, its state read afresh. A share standing already writes nothing. A share brings an archived conversation back. Counts against matching_config messages_per_minute. The answer is the caller's fresh view of the conversation.",
+  ...bearer,
+  request: { params: ShareParams },
+  responses: {
+    200: { description: "Shared, or shared already.", ...json(ConversationDetail) },
+    400: errorContent("validation_failed: the id is not a uuid, or an unknown kind."),
+    401: unauthenticated,
+    404: notFound,
+    409: errorContent(
+      "conversation_closed (closed, a block stands between the two, or the counterpart deleted their account) or contact_not_stored (no piece of that kind is kept); nothing was written.",
+    ),
+    429: budgetSpent,
+  },
+});
+
+const stopShareRoute = createRoute({
+  method: "delete",
+  path: "/conversations/{id}/contacts/{kind}",
+  summary: "Stop sharing a contact in the conversation",
+  description:
+    "The caller's share of that kind there ends, and the other person no longer sees it. Nothing standing answers alike, a closed conversation too. Counts against matching_config messages_per_minute. The answer is the caller's fresh view of the conversation.",
+  ...bearer,
+  request: { params: ShareParams },
+  responses: {
+    200: { description: "Stopped, or nothing was shared.", ...json(ConversationDetail) },
+    400: errorContent("validation_failed: the id is not a uuid, or an unknown kind."),
+    401: unauthenticated,
+    404: notFound,
+    429: budgetSpent,
+  },
+});
+
 export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const chat = (): ChatDeps => ({
@@ -183,7 +313,9 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
     ...(deps.media ? { media: deps.media } : {}),
   });
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
-  for (const route of [listRoute, readRoute, markRoute]) app.use(route.getRoutingPath(), guard);
+  for (const route of [listRoute, readRoute, markRoute, contactsRoute, conversationContactsRoute]) {
+    app.use(route.getRoutingPath(), guard);
+  }
   // The send's own limit, after the guard, keyed by the account (ADR-026),
   // its number the matching_config row read on each request. The page and
   // the send share the path: one guard for both, and only the send is counted.
@@ -203,6 +335,13 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
   app.use(sendRoute.getRoutingPath(), guard, (c, next) =>
     c.req.method === "POST" ? perMinute(c, next) : next(),
   );
+  // A share and its end, and the keep and the removal of a piece, spend the
+  // same minute (#103): one press each, as a message is, and each reaches
+  // the other person's phone as a frame, so a script can neither flicker a
+  // contact on and off nor rewrite a shared one faster than it could write.
+  // The keep and the removal share one path, the share and the stop another.
+  app.use(shareRoute.getRoutingPath(), guard, perMinute);
+  app.use(keepContactRoute.getRoutingPath(), guard, perMinute);
   // The day's tries (#350): a refused photo is stored nowhere and counts
   // toward no cap, yet costs the pipeline and the check; these count every
   // send a person tries, whatever its answer. The day is the day's photos'
@@ -292,6 +431,43 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       if (wait !== null) c.header("Retry-After", String(wait));
       throw error;
     }
+  });
+
+  app.openapi(contactsRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    return c.json(await listContacts(chat(), accountId), 200);
+  });
+
+  app.openapi(keepContactRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { kind } = c.req.valid("param");
+    const typed = c.req.valid("json").value;
+    return c.json(await keepContact(chat(), { accountId, kind, typed }), 200);
+  });
+
+  app.openapi(removeContactRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { kind } = c.req.valid("param");
+    await removeContact(chat(), { accountId, kind });
+    return c.body(null, 204);
+  });
+
+  app.openapi(conversationContactsRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { id } = c.req.valid("param");
+    return c.json(await readContacts(chat(), accountId, id), 200);
+  });
+
+  app.openapi(shareRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { id, kind } = c.req.valid("param");
+    return c.json(await shareContact(chat(), { accountId, conversationId: id, kind }), 200);
+  });
+
+  app.openapi(stopShareRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    const { id, kind } = c.req.valid("param");
+    return c.json(await stopSharing(chat(), { accountId, conversationId: id, kind }), 200);
   });
 
   app.openapi(markRoute, async (c) => {

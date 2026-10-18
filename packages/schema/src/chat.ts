@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ConversationContacts, ExportedContactShare } from "./contact.ts";
 import {
   EXPORT_DESCRIPTION_TEXT_MAX,
   EXPORT_PHOTO_PATH_MAX,
@@ -152,6 +153,8 @@ export const ConversationDetail = ConversationSummary.extend({
   limits: z.object({ maxLength: z.int().min(1) }),
   /** The highest sequence the counterpart has read: "Read" goes under the caller's last message at or below it. */
   counterpartReadUpTo: z.int().min(0),
+  /** What the caller may share here and what is shared with them (#103); the detail only, never the list. */
+  contacts: ConversationContacts,
 }).meta({ id: "ConversationDetail" });
 export type ConversationDetail = z.infer<typeof ConversationDetail>;
 
@@ -318,6 +321,8 @@ export const ExportedConversation = z
         }),
       )
       .max(1_000_000),
+    /** The person's own shares of a contact here (#103), oldest first: the record, never the value. */
+    shares: z.array(ExportedContactShare).max(10_000),
     /** The counterpart's: when, what kind and how long, never the words (the caption's length for a photo). */
     theirs: z
       .array(z.object({ at: z.iso.datetime(), kind: MessageKind, length: z.int().min(0) }))

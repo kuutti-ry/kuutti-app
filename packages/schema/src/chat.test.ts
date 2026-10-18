@@ -109,6 +109,7 @@ describe("the counterpart and the conversation", () => {
       unread: 0,
       limits: { maxLength: 2000 },
       counterpartReadUpTo: 4,
+      contacts: { mine: [], theirs: [] },
     });
     expect(detail.limits.maxLength).toBe(2000);
     // A block or a sanction never reaches a client as such (ADR-030 §6, ADR-024 §6).
@@ -137,6 +138,7 @@ describe("the counterpart and the conversation", () => {
           },
         },
       ],
+      shares: [{ kind: "telegram", sharedAt: at, endedAt: null, endedHow: null }],
       theirs: [
         { at, kind: "text", length: 12 },
         { at, kind: "photo", length: 0 },

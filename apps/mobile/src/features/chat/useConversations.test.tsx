@@ -124,6 +124,7 @@ describe("the list as the socket moved it", () => {
     online: false,
     state: null,
     cursor: 0,
+    contacts: 0,
   });
   const A = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a71";
   const B = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a72";

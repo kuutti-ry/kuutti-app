@@ -82,6 +82,22 @@ export const RESEARCH_EVENTS = {
       days: DaysBand,
     }),
   },
+  // Contacts shared in a conversation (#103, ADR-031 §11): that a share
+  // began and how far into the conversation, never the kind or the value.
+  contact_shared: {
+    question:
+      "How far into a conversation do people share a contact of their own, to meet outside Kuutti (#103)?",
+    props: props({
+      /** From the match's opening to the share. */
+      sinceOpened: ElapsedBand,
+      /** The conversation's messages by then, either side's. */
+      messages: MessageCountBand,
+    }),
+  },
+  contact_unshared: {
+    question: "How often does a person take back a contact they shared (#103)?",
+    props: props({}),
+  },
   conversation_closed: {
     question:
       "How do conversations end that the person did not end themselves by a block: an unmatch or an erasure, after how many messages (#348)?",

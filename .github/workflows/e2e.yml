@@ -242,6 +242,11 @@ jobs:
       # little later, and an install meanwhile fails with "Failure calling
       # service package: Broken pipe" (#355). So the step waits for it to
       # answer, and tries the install three times.
+      #
+      # The dev client draws a floating Tools button over the top right of
+      # every screen, where a header's own buttons sit (Share contact, #103):
+      # a tap on one opened the dev menu instead. Its preference, `showFab`,
+      # written before the app first starts, keeps it off for the run.
       - name: Wait for the emulator
         timeout-minutes: 14
         run: |
@@ -266,6 +271,12 @@ jobs:
             [ "$attempt" = 3 ] && { tail -50 emulator.log; exit 1; }
             sleep 10
           done
+          printf '%s\n' "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>" \
+            '<map><boolean name="showFab" value="false" /></map>' > devmenu.xml
+          adb push devmenu.xml /data/local/tmp/devmenu.xml
+          adb shell chmod 644 /data/local/tmp/devmenu.xml
+          adb shell "run-as fi.kuutti.app sh -c 'mkdir -p shared_prefs && cat /data/local/tmp/devmenu.xml > shared_prefs/expo.modules.devmenu.sharedpreferences.xml'"
+          adb shell run-as fi.kuutti.app cat shared_prefs/expo.modules.devmenu.sharedpreferences.xml | grep -q 'name="showFab" value="false"'
 
       # An adb server that restarts during the run drops every `adb reverse`,
       # and each flow after it reaches neither the API nor Metro (#359). A

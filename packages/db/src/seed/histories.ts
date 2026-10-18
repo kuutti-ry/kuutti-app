@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the nine personas "with a history" have done before the demo begins
+ * What the eleven personas "with a history" have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -239,6 +239,56 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
         languages: ["fi", "sv", "en"],
         intent: "long_term",
         hobbies: ["sailing", "winter_swimming", "sauna"],
+      },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  // The contact share's pair (#103): in each other's pool both ways and in no
+  // other persona's, so their conversation is a match the filters allow (a
+  // test says so) and the flow that shares a contact there changes nothing
+  // the chat's flows read. No photos: the release has no faces of them.
+  {
+    key: "elina",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["man"],
+      ageWindow: { min: 35, max: 48 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Elina",
+      bio: "Fysioterapeutti, joka korjaa työkseen muiden selkiä ja omansa kuntosalilla. Luen dekkareita bussissa ja kasvatan parvekkeella liikaa tomaatteja.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["reading", "gardening", "gym"],
+      },
+      prompts: [],
+    },
+    photos: 0,
+    afterwards: "nothing",
+  },
+  {
+    key: "jussi",
+    locale: "fi",
+    onboarding: {
+      gender: "man",
+      seeks: ["woman"],
+      ageWindow: { min: 33, max: 45 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Jussi",
+      bio: "Opettaja, joka viettää kesät mökillä ja talvet lukupiirissä. Teen hyvää kalakeittoa ja huonoja sanaleikkejä. Etsin jotakuta, joka nauraa niille silti.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "sv"],
+        intent: "long_term",
+        hobbies: ["cottage", "reading", "fishing"],
       },
       prompts: [],
     },

@@ -26,6 +26,7 @@ import LaterFieldRoute from "../app/profile/later/[field]";
 import ProfileSectionRoute from "../app/profile/section/[id]";
 import AccountSettingsRoute from "../app/settings/account";
 import ConsentRoute from "../app/settings/consent/[kind]";
+import ContactsSettingsRoute from "../app/settings/contacts";
 import DeviceRoute from "../app/settings/device";
 import EmailSettingsRoute from "../app/settings/email";
 import FeedbackRoute from "../app/settings/feedback";
@@ -111,6 +112,7 @@ jest.mock("@/features/settings", () => {
     AccountScreen: probe("AccountScreen"),
     ConsentScreen: probe("ConsentScreen"),
     consentKindOf: (value: unknown) => (value === "special_category" ? value : "research"),
+    ContactsSettingsScreen: probe("ContactsSettingsScreen"),
     DeviceScreen: probe("DeviceScreen"),
     EmailSettingsScreen: probe("EmailSettingsScreen"),
     FeedbackScreen: probe("FeedbackScreen"),
@@ -165,6 +167,7 @@ describe("the screens without params", () => {
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/account", AccountSettingsRoute, "AccountScreen"],
+    ["/settings/contacts", ContactsSettingsRoute, "ContactsSettingsScreen"],
     ["/settings/device", DeviceRoute, "DeviceScreen"],
     ["/settings/email", EmailSettingsRoute, "EmailSettingsScreen"],
     ["/settings/feedback", FeedbackRoute, "FeedbackScreen"],

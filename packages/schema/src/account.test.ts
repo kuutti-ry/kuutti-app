@@ -207,9 +207,12 @@ function anExport(): Record<string, unknown> {
         state: "open",
         closedHow: null,
         mine: [{ at, kind: "text", body: "Hei", photo: null }],
+        shares: [{ kind: "instagram", sharedAt: at, endedAt: at, endedHow: "stopped" }],
         theirs: [{ at, kind: "text", length: 12 }],
       },
     ],
+    // The contacts the person keeps to share (#103).
+    contacts: [{ kind: "phone", value: "+358401234567", updatedAt: at }],
   };
 }
 

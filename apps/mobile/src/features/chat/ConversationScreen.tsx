@@ -1,12 +1,14 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import {
   type ChatMessage,
+  type ConversationContacts,
   type ConversationDetail,
   MESSAGES_PAGE_DEFAULT,
   messageLength,
 } from "@kuutti/schema";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
+import ContactRound from "lucide-react-native/icons/contact-round";
 import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
@@ -24,9 +26,18 @@ import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { TextBubble } from "./Bubble";
 import { ConnectionLine } from "./ConnectionLine";
+import { ContactShare } from "./ContactShare";
 import { counterpartName } from "./ConversationsScreen";
-import { fetchConversation, fetchMessages, markRead, sendMessage, sendPhoto } from "./client";
+import {
+  fetchConversation,
+  fetchMessages,
+  fetchSharedContacts,
+  markRead,
+  sendMessage,
+  sendPhoto,
+} from "./client";
 import { PhotoBubble, SendingPhotoBubble } from "./PhotoBubble";
+import { SharedContacts } from "./SharedContacts";
 import { type ConversationLive, merged, useChatLive } from "./store";
 import { dayOf } from "./time";
 
@@ -72,20 +83,45 @@ const KEEPS_PHOTO: ReadonlySet<string> = new Set([
   "media_busy",
 ]);
 
+/**
+ * The newest the screen knows of the detail: the rest of it and its contacts,
+ * each with the number of the read it came from. The contacts are also read
+ * alone (#103), so the two parts move apart, and a read begun earlier never
+ * takes the place of one begun later, part by part. An answer to the person's
+ * own act (a share, a send that brought the conversation back) takes its
+ * number as it arrives: what they did is the newest they know. The other
+ * person's part of a share's answer is not, so the contacts are read again
+ * after it. Nothing is shown before a detail was read, whose contacts are the
+ * first read's.
+ */
+type Held = {
+  detail: ConversationDetail | null;
+  detailRead: number;
+  contacts: ConversationContacts;
+  contactsRead: number;
+};
+
 /** A message on its way: shown until the API's answer or the socket brings one with its id. */
 type Pending = { body: string; at: string; clientId: string; photo: PickedPhoto | null };
 
-/** The detail as the socket has told it since it was read (#349): the state, and the read mark. */
+/**
+ * The detail as the socket has told it since it was read (#349): the state,
+ * and the read mark. A close ends every share (#103) and no contacts frame
+ * follows it, so a conversation the socket closed shows nothing shared with
+ * the person (their own are no longer offered).
+ */
 function withLive(
   detail: ConversationDetail,
   live: ConversationLive | undefined,
 ): ConversationDetail {
   if (!live) return detail;
   const { state } = live;
+  const closed = state?.state === "closed";
   return {
     ...detail,
     ...(state && state.state !== "gone" ? { state: state.state, closedHow: state.closedHow } : {}),
     counterpartReadUpTo: Math.max(detail.counterpartReadUpTo, live.readUpTo),
+    ...(closed ? { contacts: { ...detail.contacts, theirs: [] } } : {}),
   };
 }
 
@@ -111,6 +147,12 @@ function withLive(
  * progress in the sending row. A refusal of the picture takes it off; a
  * failure keeps it and its id for the next try. A photo that came without
  * URLs (the socket's) or whose URL expired is read again over HTTP, once.
+ * Contacts (#103): Share contact in the header, while the person keeps one
+ * and the conversation has not ended, opens the share dialog; what the other
+ * person shares is under the header. The contacts alone are read again when
+ * the socket says they changed here, after every resume, for what changed
+ * while it was away, and after the answer to a share or a stop: one read at
+ * a time, and one more after it for whatever asked meanwhile.
  */
 export function ConversationScreen({ id }: { id: string }) {
   const { t } = useT();
@@ -123,8 +165,17 @@ export function ConversationScreen({ id }: { id: string }) {
   const [attached, setAttached] = useState<PickedPhoto | null>(null);
   const [picking, setPicking] = useState(false);
   const [refusal, setRefusal] = useState<PlainMessageKey | null>(null);
+  const [sharing, setSharing] = useState(false);
   const scroll = useRef<ScrollView>(null);
   const loaded = useRef<ChatMessage[]>([]);
+  const held = useRef<Held>({
+    detail: null,
+    detailRead: 0,
+    contacts: { mine: [], theirs: [] },
+    contactsRead: 0,
+  });
+  // The reads of the detail or of its contacts begun so far: each takes the next number.
+  const begun = useRef(0);
   const marked = useRef(0);
   // Whether a page back may hold more: the last one came full. Not the first
   // sequence: a message the caller may not read still has its place.
@@ -141,9 +192,50 @@ export function ConversationScreen({ id }: { id: string }) {
   const here = live.conversations[id];
   const arrived = here?.messages;
   const { report } = live;
+  const contactsChanged = here?.contacts ?? 0;
+  const { opened } = live;
 
+  /** The newest detail, with the newest contacts read; null until a detail was read. */
+  const heldDetail = useCallback((): ConversationDetail | null => {
+    const { detail, contacts } = held.current;
+    return detail && { ...detail, contacts };
+  }, []);
+
+  /** The newest detail on a screen that shows one. */
+  const reshow = useCallback(() => {
+    const detail = heldDetail();
+    if (detail) setView((was) => (was.status === "ready" ? { ...was, detail } : was));
+  }, [heldDetail]);
+
+  /** What read number `read` answered: each part kept, unless a read begun later gave it already. */
+  const takeDetail = useCallback(
+    (read: number, detail: ConversationDetail) => {
+      const was = held.current;
+      held.current = {
+        detail: read > was.detailRead ? detail : was.detail,
+        detailRead: Math.max(read, was.detailRead),
+        contacts: read > was.contactsRead ? detail.contacts : was.contacts,
+        contactsRead: Math.max(read, was.contactsRead),
+      };
+      reshow();
+    },
+    [reshow],
+  );
+  const takeContacts = useCallback(
+    (read: number, contacts: ConversationContacts) => {
+      const was = held.current;
+      if (read <= was.contactsRead) return;
+      held.current = { ...was, contacts, contactsRead: read };
+      reshow();
+    },
+    [reshow],
+  );
+
+  /** These messages, under the newest detail. */
   const show = useCallback(
-    (detail: ConversationDetail, messages: ChatMessage[]) => {
+    (messages: ChatMessage[]) => {
+      const detail = heldDetail();
+      if (!detail) return;
       loaded.current = messages;
       setView({ status: "ready", detail, messages });
       // A send whose answer was lost and whose words came back with a
@@ -169,28 +261,30 @@ export function ConversationScreen({ id }: { id: string }) {
         });
       }
     },
-    [id],
+    [id, heldDetail],
   );
 
   const load = useCallback(async () => {
+    const read = ++begun.current;
     try {
-      const detail = await fetchConversation(id);
-      const newest = loaded.current.at(-1);
+      takeDetail(read, await fetchConversation(id));
+      const last = loaded.current.at(-1);
       // What is held is taken once the page is here, not before: what came
-      // meanwhile (the socket's, a photo's URLs read again) is kept.
-      if (newest) {
-        const page = await fetchMessages(id, { after: newest.seq, limit: 100 });
-        show(detail, merged(loaded.current, page));
+      // meanwhile (the socket's, a photo's URLs read again) is kept, and so
+      // is a detail or contacts read since.
+      if (last) {
+        const page = await fetchMessages(id, { after: last.seq, limit: 100 });
+        show(merged(loaded.current, page));
       } else {
         const page = await fetchMessages(id, {});
         setMore(page.length === MESSAGES_PAGE_DEFAULT);
-        show(detail, merged(loaded.current, page.reverse()));
+        show(merged(loaded.current, page.reverse()));
       }
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) setView({ status: "gone" });
       else if (loaded.current.length === 0) setView({ status: "failed", error });
     }
-  }, [id, show]);
+  }, [id, show, takeDetail]);
 
   useFocusEffect(
     useCallback(() => {
@@ -201,6 +295,43 @@ export function ConversationScreen({ id }: { id: string }) {
       };
     }, [load]),
   );
+
+  // The contacts alone, again (#103): the socket said they changed here, or
+  // came back and may have missed that they did; the messages the resume
+  // brings. Or a share's answer outranked a read begun before it. One read at
+  // a time, and one more after it for whatever asked for one meanwhile, so a
+  // burst of frames costs two reads at most. Held while
+  // nothing is shown, for the detail a read in flight brings.
+  const contactsReading = useRef({ busy: false, again: false });
+  const readContacts = useCallback(async () => {
+    const reading = contactsReading.current;
+    if (reading.busy) {
+      reading.again = true;
+      return;
+    }
+    reading.busy = true;
+    do {
+      reading.again = false;
+      const read = ++begun.current;
+      try {
+        takeContacts(read, await fetchSharedContacts(id));
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          setView({ status: "gone" });
+          break;
+        }
+        // Anything else waits for the next frame, resume or focus.
+      }
+    } while (reading.again);
+    reading.busy = false;
+  }, [id, takeContacts]);
+  const told = useRef({ contactsChanged, opened });
+  useEffect(() => {
+    const before = told.current;
+    if (before.contactsChanged === contactsChanged && before.opened === opened) return;
+    told.current = { contactsChanged, opened };
+    void readContacts();
+  }, [contactsChanged, opened, readContacts]);
 
   // Back from the app switcher or the control centre: what came meanwhile is read now.
   useEffect(() => {
@@ -213,18 +344,17 @@ export function ConversationScreen({ id }: { id: string }) {
   // What the socket brought joins what is shown, and is marked read while in
   // front; only from the oldest shown on, so a message held from long before
   // the page leaves no gap that Earlier messages would step over.
-  const shownDetail = view.status === "ready" ? view.detail : null;
+  const ready = view.status === "ready";
   useEffect(() => {
-    if (!shownDetail || !arrived) return;
+    if (!ready || !arrived) return;
     const oldest = loaded.current[0]?.seq ?? 0;
     show(
-      shownDetail,
       merged(
         loaded.current,
         arrived.filter((m) => m.seq >= oldest),
       ),
     );
-  }, [shownDetail, arrived, show]);
+  }, [ready, arrived, show]);
 
   // The newest held is what the socket's next resume names.
   const newestSeq = view.status === "ready" ? (view.messages.at(-1)?.seq ?? 0) : null;
@@ -263,12 +393,12 @@ export function ConversationScreen({ id }: { id: string }) {
     }
   }, [shownMessages, sendingId, readAgain]);
 
-  const earlier = async (detail: ConversationDetail, oldest: number) => {
+  const earlier = async (oldest: number) => {
     tap();
     try {
       const page = await fetchMessages(id, { before: oldest });
       setMore(page.length === MESSAGES_PAGE_DEFAULT);
-      show(detail, merged(page, loaded.current));
+      show(merged(page, loaded.current));
     } catch {
       setRefusal("chat.conversation.failed");
     }
@@ -291,7 +421,7 @@ export function ConversationScreen({ id }: { id: string }) {
     }
   };
 
-  const send = async (detail: ConversationDetail) => {
+  const send = async () => {
     const body = text.trim();
     const photo = attached;
     tap();
@@ -315,8 +445,17 @@ export function ConversationScreen({ id }: { id: string }) {
         : await sendMessage(id, { clientId, body });
       unsent.current = null;
       setPending(null);
-      // A message brings an archived conversation back (TD-13).
-      show({ ...detail, state: "open" }, merged(loaded.current, [message]));
+      // A message brings an archived conversation back (TD-13); the rest of
+      // the detail, and its contacts, as they are now.
+      const was = held.current;
+      if (was.detail?.state === "archived") {
+        held.current = {
+          ...was,
+          detail: { ...was.detail, state: "open" },
+          detailRead: ++begun.current,
+        };
+      }
+      show(merged(loaded.current, [message]));
     } catch (error) {
       setPending(null);
       // The socket brought it already: the answer was lost, not the message.
@@ -342,15 +481,55 @@ export function ConversationScreen({ id }: { id: string }) {
   const sending =
     pending && !messages.some((m) => m.clientId === pending.clientId) ? pending : null;
   const title = detail ? counterpartName(t, detail) : t("chat.list.title");
+  const name = !detail
+    ? ""
+    : detail.counterpart.deleted
+      ? t("chat.deletedUser")
+      : detail.counterpart.name;
+  // Offered while there is something to share and someone to share it with.
+  const offered = detail !== null && detail.state !== "closed" && detail.contacts.mine.length > 0;
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader title={title} backLabel={t("chat.back")} onBack={() => router.back()} />
+      <ScreenHeader title={title} backLabel={t("chat.back")} onBack={() => router.back()}>
+        {offered && (
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel={t("chat.contact.share.open")}
+            onPress={() => {
+              tap();
+              setSharing(true);
+            }}
+          >
+            <Icon as={ContactRound} />
+          </Button>
+        )}
+      </ScreenHeader>
       <ConnectionLine />
       {detail && detail.state !== "closed" && live.status === "open" && here?.online && (
         <View className="flex-row items-center gap-2 px-6 pt-2">
           <View className="h-2.5 w-2.5 rounded-full bg-primary" {...DECORATIVE} />
           <Text variant="muted">{t("chat.presence.online")}</Text>
         </View>
+      )}
+      {detail && <SharedContacts name={name} theirs={detail.contacts.theirs} />}
+      {detail && (
+        <ContactShare
+          conversationId={detail.id}
+          contacts={detail.contacts}
+          closed={detail.state === "closed"}
+          name={name}
+          open={sharing}
+          onClose={() => setSharing(false)}
+          onDetail={(fresh) => {
+            takeDetail(++begun.current, fresh);
+            // Its contacts were read with the press; the other person's may
+            // have changed since, their frame's read (begun before this
+            // answer's number) being dropped. A read begun now outranks it.
+            void readContacts();
+          }}
+          onStale={() => void load()}
+        />
       )}
       {shown.status === "loading" && (
         <Text accessibilityLiveRegion="polite" className="p-6">
@@ -385,7 +564,7 @@ export function ConversationScreen({ id }: { id: string }) {
             percent={percent}
             more={more}
             scroll={scroll}
-            onEarlier={(oldest) => void earlier(detail, oldest)}
+            onEarlier={(oldest) => void earlier(oldest)}
             onExpired={(message) => void readAgain(message, "expired")}
           />
           <View className="gap-2 border-t border-border p-4">
@@ -411,7 +590,7 @@ export function ConversationScreen({ id }: { id: string }) {
                   tap();
                   setAttached(null);
                 }}
-                onSend={() => void send(detail)}
+                onSend={() => void send()}
               />
             )}
           </View>

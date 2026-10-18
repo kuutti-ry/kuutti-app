@@ -422,6 +422,8 @@ describe("migrate", () => {
           "block",
           "card_shown",
           "consent",
+          "contact",
+          "contact_share",
           "conversation",
           "conversation_participant",
           "events",

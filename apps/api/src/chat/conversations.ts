@@ -149,7 +149,11 @@ export async function listConversations(
 
 const notFound = () => new AppError(404, "not_found", "No such conversation");
 
-/** One conversation, with what the composer needs and how far the other side has read. */
+/**
+ * One conversation, with what the composer needs, how far the other side has
+ * read, and the contacts (#103): the caller's stored pieces, each shared here
+ * or not, and what the other person shares with them now.
+ */
 export async function readConversation(
   deps: ChatDeps,
   accountId: string,
@@ -159,7 +163,13 @@ export async function readConversation(
   if (!row) throw notFound();
   const summary = await summaryOf(deps, accountId, row);
   const maxLength = await matchingConfigNumber(deps.db, MESSAGE_MAX_LENGTH_KEY);
-  return { ...summary, limits: { maxLength }, counterpartReadUpTo: row.counterpartReadUpTo };
+  const contacts = await repo.readConversationContacts(deps.db, accountId, conversationId);
+  return {
+    ...summary,
+    limits: { maxLength },
+    counterpartReadUpTo: row.counterpartReadUpTo,
+    contacts,
+  };
 }
 
 /** Whether the caller may read the conversation: theirs, and not hidden from them by their own block. */
@@ -197,9 +207,10 @@ async function trackClosed(
 
 /**
  * A ban closes the person's conversations (ADR-024, ADR-031 §2), called in
- * the ban's transaction for every live account of the identity. A suspension
- * closes nothing: its sessions are ended, and the conversations wait. No
- * research event (ADR-024).
+ * the ban's transaction for every live account of the identity, and ends
+ * what either person shared in them (#103). A suspension closes nothing: its
+ * sessions are ended, and the conversations wait. No research event
+ * (ADR-024).
  */
 export async function closeConversationsOf(
   db: Queryable,
@@ -215,15 +226,19 @@ export type ConversationErasure = {
   withheld: number;
   /** Conversations nobody is linked to any more, the other person erased before, deleted. */
   emptied: number;
+  /** The person's stored contacts (#103), deleted; their shares stay as the record, ended by the close. */
+  contacts: number;
 };
 
 /**
  * The chat's part of an erasure (ADR-007 §4, ADR-031 §5), inside its
  * transaction: what the counterpart never received goes while the shadow ban
  * that withheld it is still on record; the person's open and archived
- * conversations close; the person's link is cut. The messages stay for the
- * counterpart, under "Deleted user" (TD-7); a conversation whose counterpart
- * was erased before keeps them for nobody, and goes.
+ * conversations close, which ends what either person shared there (#103);
+ * the person's stored contacts go; the person's link is cut. The messages
+ * stay for the counterpart, under "Deleted user" (TD-7), and the shares as
+ * the record, with no value in them; a conversation whose counterpart was
+ * erased before keeps them for nobody, and goes, its shares with it.
  */
 export async function eraseConversationsOf(
   deps: { db: Queryable; logger: Logger; now: () => Date },
@@ -235,16 +250,18 @@ export async function eraseConversationsOf(
     how: "erasure",
     at: deps.now(),
   });
+  const contacts = await repo.deleteContactsOf(deps.db, accountId);
   const unlinked = await repo.unlinkParticipant(deps.db, accountId);
   const emptied = await repo.deleteUnlinkedConversations(deps.db, unlinked);
   await trackClosed(deps, closed);
-  return { conversations: unlinked.length, withheld, emptied };
+  return { conversations: unlinked.length, withheld, emptied, contacts };
 }
 
 /**
  * The person's conversations for their export (ADR-031 §5): when each opened
  * and how it stands, their own messages with the words, the counterpart's as
- * a time and a length. Nothing names the counterpart.
+ * a time and a length, and the person's own shares of a contact (#103) as
+ * the record, never a value. Nothing names the counterpart.
  */
 export async function exportConversations(
   db: Queryable,
@@ -273,6 +290,12 @@ export async function exportConversations(
           body: line.body ?? "",
           photo: line.photoId ? sentPhoto(line.photoId) : null,
         })),
+      shares: row.shares.map((share) => ({
+        kind: share.kind,
+        sharedAt: share.sharedAt.toISOString(),
+        endedAt: share.endedAt?.toISOString() ?? null,
+        endedHow: share.endedHow,
+      })),
       theirs: row.lines
         .filter((line) => !line.mine)
         .map((line) => ({ at: line.at.toISOString(), kind: line.kind, length: line.length })),

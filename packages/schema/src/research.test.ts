@@ -96,6 +96,10 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
       return { messages: "1-5", days: "7-13" };
     case "conversation_closed":
       return { how: "erasure", messages: "6-20" };
+    case "contact_shared":
+      return { sinceOpened: "1d_7d", messages: "6-20" };
+    case "contact_unshared":
+      return {};
   }
 }
 

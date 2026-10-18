@@ -407,6 +407,20 @@
       "when": 1792309500768,
       "tag": "0057_message_photos_per_day",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792317302582,
+      "tag": "0058_contact_share",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1792317303152,
+      "tag": "0059_contact_share_notify",
+      "breakpoints": true
     }
   ]
 }

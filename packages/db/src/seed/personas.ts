@@ -1,7 +1,7 @@
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, #140, ADR-014): fifteen named persons the
+ * The people of the mock bank (#73, #140, ADR-014): seventeen named persons the
  * local identity provider can log in as with one tap, so that a demo or a
  * test of the first ten minutes does not start with typing claims into a
  * form. The whole product path runs for them as for anybody: the OIDC
@@ -16,12 +16,14 @@ import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
  * broker sends it, and is stored nowhere; what the app calls the persona is
  * the display name the story gives.
  *
- * Two more are born on a fixed day and exist at the mock bank only: Antti
- * and Ville, the pair of the chat's flows (#348, #101). Every test user of
- * the bed whose code the product's parser accepts is a persona already
+ * Four more are born on a fixed day and exist at the mock bank only: Antti
+ * and Ville, the pair of the chat's flows (#348, #101), and Elina and Jussi,
+ * the pair of the contact share's flow (#103), a conversation of their own so
+ * that neither flow changes what the other reads. Every test user of the bed
+ * whose code the product's parser accepts is a persona already
  * (docs/vendors/telia.md 1.4), so nobody signs in as them on staging (the
- * maintainer's choice of 17/10/2026, ADR-014 §4); their stories are given
- * there as anywhere.
+ * maintainer's choices of 17/10/2026 and 18/10/2026, ADR-014 §4); their
+ * stories are given there as anywhere.
  *
  * Their codes are artificial: the individual number is in 900 to 999, which
  * the population register does not give to a person (rule 1 is about real
@@ -70,7 +72,7 @@ export type DemoPersona = {
   group: "walkthrough" | "history" | "ages";
   /** What the persona is for, shown under the name. */
   note: string;
-  /** Where the same person is on Telia's bed; absent for the ages and the chat's pair, who exist at the mock bank only. */
+  /** Where the same person is on Telia's bed; absent for the ages and the two pairs of the conversations, who exist at the mock bank only. */
   bank?: TestBank;
 };
 
@@ -191,6 +193,25 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     individual: 963,
     group: "history",
     note: "Onboarded without photos: a few days of messages with Antti, and the chat's flow reads as him (#348).",
+  },
+  // The contact share's pair (#103): a conversation of their own, apart from the chat's.
+  {
+    key: "elina",
+    given: "Elina",
+    family: "Järvinen",
+    born: { year: 1989, month: 9, day: 21 },
+    individual: 964,
+    group: "history",
+    note: "Onboarded without photos: a conversation with Jussi. The contact share's flow shares a contact as her (#103).",
+  },
+  {
+    key: "jussi",
+    given: "Jussi",
+    family: "Lehtonen",
+    born: { year: 1986, month: 11, day: 2 },
+    individual: 965,
+    group: "history",
+    note: "Onboarded without photos: a conversation with Elina, and the contact share's flow sees her contact as him (#103).",
   },
   {
     key: "eetu",

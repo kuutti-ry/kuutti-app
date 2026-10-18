@@ -100,6 +100,16 @@ describe("the chat's live store", () => {
     expect(live.conversations[B]?.state).toEqual({ state: "gone", closedHow: null });
   });
 
+  it("counts the socket's word that the contacts of a conversation changed, per conversation (#103)", () => {
+    const live = frames(
+      { type: "contacts", conversationId: A },
+      { type: "contacts", conversationId: A },
+      { type: "contacts", conversationId: B },
+    );
+    expect(live.conversations[A]?.contacts).toBe(2);
+    expect(live.conversations[B]).toMatchObject({ contacts: 1, messages: [], cursor: 0 });
+  });
+
   it("leaves ready, ping and error to the socket", () => {
     for (const frame of [
       { type: "ready" },
@@ -127,6 +137,16 @@ describe("the chat's live store", () => {
     expect(reduce(lost, { type: "status", status: "lost" })).toBe(lost);
     const held = reduce(lost, { type: "cursors", cursors: { [A]: 1 } });
     expect(reduce(held, { type: "clear" })).toBe(EMPTY);
+  });
+
+  it("counts each time the socket became open, each a resume, and nothing else (#103)", () => {
+    const statuses = (...all: Array<"connecting" | "open" | "lost">) =>
+      all.reduce((live, status) => reduce(live, { type: "status", status }), EMPTY);
+    expect(EMPTY.opened).toBe(0);
+    expect(statuses("open").opened).toBe(1);
+    // Open again is no new resume; lost and connecting are none.
+    expect(statuses("open", "open", "lost", "connecting").opened).toBe(1);
+    expect(statuses("open", "lost", "open", "connecting", "open").opened).toBe(3);
   });
 
   it("is inert without its provider: nothing live, a report goes nowhere", async () => {

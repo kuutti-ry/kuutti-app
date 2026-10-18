@@ -2,13 +2,14 @@ import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { Linking } from "react-native";
+import { DeviceEventEmitter, Linking, Platform, StyleSheet } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { AccountScreen } from "./AccountScreen";
 import { ConsentScreen, consentKindOf } from "./ConsentScreen";
+import { ContactsSettingsScreen } from "./ContactsSettingsScreen";
 import { DeviceScreen } from "./DeviceScreen";
 import { EmailSettingsScreen } from "./EmailSettingsScreen";
 import { LanguageScreen } from "./LanguageScreen";
@@ -65,6 +66,7 @@ beforeEach(async () => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/health") return json(ok);
     if (url.pathname === "/account/email") return json({ email: null });
+    if (url.pathname === "/contacts") return json({ contacts: [] });
     if (url.pathname === "/consents") {
       return json({
         consents: [],
@@ -278,6 +280,79 @@ describe("the e-mail and the account screens", () => {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
     noProblems();
+  });
+
+  it("hold the contacts for a person (#103)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<ContactsSettingsScreen />);
+    expect(await screen.findByText("Phone number")).toBeTruthy();
+    expectPinnedHeader("Your contacts", "Back");
+    expect(screen.getByLabelText("Your Instagram username")).toBeTruthy();
+    noProblems();
+  });
+
+  it("say there is no session on the contacts screen of a signed-out device (#103)", async () => {
+    await renderWithTheme(<ContactsSettingsScreen />);
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByText("Phone number")).toBeNull();
+  });
+
+  describe("keep a field low on the page above the keyboard (#103)", () => {
+    // The page's scroll view, and the view around it that gives way to the keyboard.
+    const page = () => {
+      const scroll = screen.container.queryAll((node) => node.type === "RCTScrollView")[0];
+      let around = scroll?.parent ?? null;
+      while (around && typeof around.type !== "string") around = around.parent;
+      if (!scroll || !around) throw new Error("no scroll view on the page");
+      return { scroll, around, padding: StyleSheet.flatten(around.props.style).paddingBottom };
+    };
+    // The page from y 100 to 800; the keyboard's top at 500.
+    const keyboard = (event: string) =>
+      act(async () => {
+        DeviceEventEmitter.emit(event, {
+          endCoordinates: { screenX: 0, screenY: 500, width: 400, height: 300 },
+        });
+      });
+    const open = async () => {
+      await saveSession(tokens);
+      await renderWithTheme(<ContactsSettingsScreen />);
+      expect(await screen.findByLabelText("Your Instagram username")).toBeTruthy();
+      // The view reads its place from the layout event, which it keeps (persist).
+      await act(async () => {
+        fireEvent(page().around, "layout", {
+          persist: () => undefined,
+          nativeEvent: { layout: { x: 0, y: 100, width: 400, height: 700 } },
+        });
+      });
+    };
+
+    it("on Android, by ending the scroll view at the keyboard's top, and no longer once it goes", async () => {
+      const os = jest.replaceProperty(Platform, "OS", "android");
+      try {
+        await open();
+        expect(page().padding).toBe(0);
+        await keyboard("keyboardDidShow");
+        expect(page().padding).toBe(300);
+        await keyboard("keyboardDidHide");
+        expect(page().padding).toBe(0);
+      } finally {
+        os.restore();
+      }
+    });
+
+    it("on iOS, by the scroll view's own inset, without the padding too", async () => {
+      const os = jest.replaceProperty(Platform, "OS", "ios");
+      try {
+        await open();
+        expect(page().scroll.props.automaticallyAdjustKeyboardInsets).toBe(true);
+        await keyboard("keyboardWillShow");
+        expect(page().padding).toBe(0);
+        await keyboard("keyboardWillHide");
+      } finally {
+        os.restore();
+      }
+    });
   });
 
   it("say there is no session on a signed-out device, the e-mail screen and the account screen alike", async () => {

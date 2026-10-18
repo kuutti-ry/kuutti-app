@@ -2,6 +2,8 @@
 
 // The night's archive of silent conversations (TD-13).
 export { archiveJob } from "./archive.ts";
+// The person's stored contacts for their export (#103, ADR-031 §11).
+export { exportContacts } from "./contacts.ts";
 // The ban's close, and the halves erasure and the export call (ADR-007 §4).
 export {
   closeConversationsOf,

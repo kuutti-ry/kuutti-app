@@ -77,6 +77,58 @@ describe("sentry options", () => {
     });
   });
 
+  it("keeps a touch's component names and drops what it read there: a label, a message, a shared contact (#103)", () => {
+    const path = [
+      { name: "Text", label: "Sanna shares Instagram: ville.k" },
+      { name: "SharedContacts", file: "SharedContacts.tsx", label: "Instagram: ville.k" },
+      { name: "View", element: "RCTView", label: "Sanna, 31 Moi, nähdään huomenna" },
+    ];
+    const touch = stripBreadcrumb({
+      category: "touch",
+      type: "user",
+      level: "info",
+      message: "Touch event within element: Sanna shares Instagram: ville.k",
+      data: { path },
+    });
+    expect(touch).toEqual({
+      category: "touch",
+      type: "user",
+      level: "info",
+      message: "Text",
+      data: {
+        path: [
+          { name: "Text", element: undefined, file: undefined },
+          { name: "SharedContacts", element: undefined, file: "SharedContacts.tsx" },
+          { name: "View", element: "RCTView", file: undefined },
+        ],
+      },
+    });
+    const rage = stripBreadcrumb({
+      category: "ui.multiClick",
+      message: "Sanna shares Instagram: ville.k",
+      data: {
+        clickCount: 3,
+        route: "/chats/3f9a2c1e",
+        node: { attributes: { "sentry-label": "ville.k" } },
+        path,
+      },
+    });
+    expect(rage.message).toBe("Text");
+    expect(rage.data).toMatchObject({ clickCount: 3 });
+    expect(JSON.stringify([touch, rage])).not.toMatch(/ville|Sanna|nähdään|3f9a2c1e/);
+    // A touch without a path, or with a root the SDK could not name, says nothing.
+    expect(
+      stripBreadcrumb({ category: "touch", message: "Touch event within element: x" }),
+    ).toEqual({
+      category: "touch",
+      message: undefined,
+      data: { path: [] },
+    });
+    expect(stripBreadcrumb({ category: "touch", data: { path: [{ label: "x" }] } }).message).toBe(
+      undefined,
+    );
+  });
+
   it("leaves a navigation breadcrumb without data, and any other category, as it was", () => {
     const bare = { category: "navigation", message: "opened" };
     expect(stripBreadcrumb(bare)).toBe(bare);

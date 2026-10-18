@@ -144,3 +144,13 @@ Feature: Account deletion per the erasure table
     When "A" exports the account
     Then each conversation has its opening, its state, "A"'s messages with their words and "B"'s with a time and a length
     And nothing in it is "B"'s account id or "B"'s words
+
+  Scenario: Erasure deletes the person's contacts and ends their shares, keeping the record without a value
+    Given "A" keeps two contacts and shares one with "B", and "B" shares one with "A"
+    When "A" deletes the account
+    Then A's contacts are gone, both shares are ended as closed and kept with no value, and B's own contact stays B's
+
+  Scenario: The export carries the person's stored contacts and their own shares, never the other's
+    Given "A" keeps a phone number, shared it with "B" and stopped, and "B" shares an Instagram username with "A"
+    When "A" exports the account
+    Then the export lists A's stored contacts, and in the conversation A's own share with when and how it ended, and nothing of B's

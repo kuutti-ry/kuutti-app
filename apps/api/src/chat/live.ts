@@ -19,14 +19,17 @@ import * as repo from "./repo.ts";
 // person may see, read through that person's own participant row with every
 // rule of #348's reads: nothing crosses a block, a conversation hidden from
 // its blocker says it is gone, a shadow-banned sender's message reaches only
-// the sender.
+// the sender, and a change of what is shared (#103) reaches the two only
+// while the conversation is open between them.
 
 export const CHAT_CHANNEL = "kuutti_chat";
 
-/** What the triggers send (packages/db/drizzle/0055_chat_notify.sql). */
+/** What the triggers send (packages/db/drizzle/0055_chat_notify.sql, 0059_contact_share_notify.sql). */
 const Notification = z.discriminatedUnion("t", [
   z.object({ t: z.literal("message"), c: z.uuid(), s: z.int().min(1) }),
   z.object({ t: z.literal("conversation"), c: z.uuid() }),
+  // What is shared in the conversation changed (#103): never a value.
+  z.object({ t: z.literal("contact"), c: z.uuid() }),
   z.object({ t: z.literal("read"), c: z.uuid(), side: z.enum(["a", "b"]), u: z.int().min(0) }),
   z.object({ t: z.literal("session"), id: z.uuid() }),
   z.object({ t: z.literal("block"), a: z.uuid(), b: z.uuid() }),
@@ -102,6 +105,16 @@ function createChatHub(deps: { db: Queryable; logger: Logger; presence: Presence
           return;
         case "conversation":
           return announceStates([note.c]);
+        case "contact":
+          // Each phone reads the conversation again over HTTP, through its own
+          // row; the frame names the conversation only (#103).
+          for (const { accountId } of await repo.participantsOf(db, note.c)) {
+            if (!listening(accountId)) continue;
+            if (await repo.contactsFrameReaches(db, accountId, note.c)) {
+              sendTo(accountId, { type: "contacts", conversationId: note.c });
+            }
+          }
+          return;
         case "read": {
           const reader = note.side;
           for (const { accountId, side } of await repo.participantsOf(db, note.c)) {

@@ -5,6 +5,7 @@ export type { components as ApiComponents, paths as ApiPaths } from "./api.gener
 export * from "./chat.ts";
 export * from "./chat-frames.ts";
 export * from "./config.ts";
+export * from "./contact.ts";
 export * from "./deal-breakers.ts";
 export { ErrorResponse } from "./errors.ts";
 export * from "./feedback.ts";

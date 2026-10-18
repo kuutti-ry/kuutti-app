@@ -7,7 +7,7 @@ export type { Logger };
 
 /**
  * Fields that must never reach a log line: the personal identity code, message
- * text, email, credentials, a report's note, a message's body (CLAUDE.md security defaults, rule 5). Top level and
+ * text, email, credentials, a report's note, a message's body, a stored contact (CLAUDE.md security defaults, rule 5). Top level and
  * one level nested; the PII-in-logs test (#11) is the backstop.
  */
 const REDACTED_PATHS = [
@@ -27,6 +27,8 @@ const REDACTED_PATHS = [
   // A message's text (#348, ADR-031 §7): the request line only; a photo's caption too (#350).
   "body",
   "caption",
+  // A stored contact (#103, ADR-031 §11): the request's body names it so.
+  "value",
   "*.hetu",
   "*.personal_identity_code",
   "*.email",
@@ -40,6 +42,7 @@ const REDACTED_PATHS = [
   "*.gender",
   "*.note",
   "*.body",
+  "*.value",
 ];
 
 type LogDestination = { write(line: string): void };
