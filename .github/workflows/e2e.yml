@@ -237,8 +237,13 @@ jobs:
       # The emulator's loopback ports reach the runner's API, mock bank, Metro
       # and S3 stand-in; on Android 14 and later Gboard answers a synthesized tap
       # on a field with its stylus tutorial, so handwriting is off (README).
+      #
+      # Booted is not yet ready to install: the package manager can answer a
+      # little later, and an install meanwhile fails with "Failure calling
+      # service package: Broken pipe" (#355). So the step waits for it to
+      # answer, and tries the install three times.
       - name: Wait for the emulator
-        timeout-minutes: 10
+        timeout-minutes: 14
         run: |
           timeout 300 adb wait-for-device || { cat emulator.log; exit 1; }
           for _ in $(seq 1 150); do
@@ -246,17 +251,48 @@ jobs:
             sleep 2
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ] || { tail -50 emulator.log; exit 1; }
+          for _ in $(seq 1 60); do
+            adb shell pm path android 2> /dev/null | grep -q '^package:' && break
+            sleep 2
+          done
+          adb shell pm path android | grep -q '^package:' || { tail -50 emulator.log; exit 1; }
           for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
             adb shell settings put global "$scale" 0
           done
           adb shell settings put secure stylus_handwriting_enabled 0
           for port in 3000 8080 8081 9000; do adb reverse "tcp:$port" "tcp:$port"; done
-          adb install -r dev-client/app-debug.apk
+          for attempt in 1 2 3; do
+            adb install -r dev-client/app-debug.apk && break
+            [ "$attempt" = 3 ] && { tail -50 emulator.log; exit 1; }
+            sleep 10
+          done
 
+      # An adb server that restarts during the run drops every `adb reverse`,
+      # and each flow after it reaches neither the API nor Metro (#359). A
+      # loop keeps the four forwards while the flows run, puts back one that
+      # had gone and says so in the log; it stops with the step.
       - name: The flows on the emulator
         env:
           SHARD: ${{ matrix.shard }}
-        run: node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
+        run: |
+          keep_forwards() {
+            while sleep 5; do
+              forwards="$(adb reverse --list 2> /dev/null || true)"
+              for port in 3000 8080 8081 9000; do
+                case "$forwards" in
+                  *"tcp:$port tcp:$port"*) ;;
+                  *)
+                    echo "e2e: the forward of port $port had gone (#359); putting it back"
+                    adb reverse "tcp:$port" "tcp:$port" > /dev/null 2>&1 || true
+                    ;;
+                esac
+              done
+            done
+          }
+          keep_forwards &
+          watcher=$!
+          trap 'kill "$watcher" 2> /dev/null || true' EXIT
+          node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
 
       - name: Keep what the run saw
         if: always()
