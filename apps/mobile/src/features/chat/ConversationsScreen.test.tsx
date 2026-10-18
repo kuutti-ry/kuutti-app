@@ -2,7 +2,7 @@ import type { ConversationList, ConversationSummary } from "@kuutti/schema";
 import { act, screen, userEvent } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AppState } from "react-native";
+import { AccessibilityInfo, AppState, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -10,6 +10,7 @@ import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
 import { ChatsButton } from "./ChatsButton";
 import { ConversationsScreen } from "./ConversationsScreen";
+import { leaveNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
 
@@ -88,10 +89,11 @@ const LIST: ConversationList = {
       lastMessage: { seq: 3, at: OLD, kind: "text", preview: "Hei", side: "theirs" },
       unread: 0,
     }),
+    // Ended: it names nobody (#351, ADR-031 Open 10).
     summary(ID(4), {
       state: "closed",
       closedHow: "unmatch",
-      counterpart: { deleted: false, name: "Leena", age: 40, thumb: null },
+      counterpart: null,
       lastMessage: { seq: 12, at: OLD, kind: "text", preview: "Kiitos", side: "mine" },
       unread: 0,
     }),
@@ -151,7 +153,7 @@ describe("the list of conversations", () => {
       `Sanna, 31, 2 unread messages, Nähdäänkö huomenna?, ${today}`,
       "Mikko, 29, No messages yet",
       `Deleted user, This person deleted their account., ${old}`,
-      `Leena, 40, This conversation has ended., ${old}`,
+      `Conversation ended, You: Kiitos, ${old}`,
       `Olli, 35, 1 unread message, You: Moi, ${old}`,
     ]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
@@ -165,6 +167,31 @@ describe("the list of conversations", () => {
     expect(router.push).toHaveBeenCalledWith(`/chats/${ID(1)}`);
     await userEvent.setup().press(screen.getByRole("button", { name: "Back" }));
     expect(router.back).toHaveBeenCalled();
+  });
+
+  it("says once, on coming back, what a report, a block or an end left to say, aloud on iOS (#351)", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const announce = AccessibilityInfo.announceForAccessibility as jest.Mock;
+    announce.mockClear();
+    api(() => json(LIST));
+    leaveNotice("reported");
+    await renderWithTheme(<ConversationsScreen />);
+    const words = "Thank you. A moderator will look at it, and you will not see each other again.";
+    expect(await screen.findByText(words)).toBeTruthy();
+    expect(screen.getByTestId("notice").props.accessibilityLiveRegion).toBe("polite");
+    expect(announce.mock.calls).toEqual([[words]]);
+    // Back again with nothing left to say: the words are gone.
+    await act(async () => focus());
+    expect(screen.queryByText(words)).toBeNull();
+    for (const [outcome, said] of [
+      ["blocked", "Blocked. You will not see each other again."],
+      ["unmatched", "The conversation has ended."],
+      ["gone", "That conversation is no longer available."],
+    ] as const) {
+      leaveNotice(outcome);
+      await act(async () => focus());
+      expect(screen.getByText(said)).toBeTruthy();
+    }
   });
 
   it("says a photo's caption as the row's line, else Photo, with You: before one's own (#350)", async () => {

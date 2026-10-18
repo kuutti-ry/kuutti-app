@@ -555,9 +555,17 @@ describe("who may reach a conversation", () => {
     const theirs = ConversationList.parse(JSON.parse(raw));
     expect(theirs.open).toEqual([]);
     expect(theirs.archived).toEqual([
-      expect.objectContaining({ id, state: "closed", closedHow: "unmatch" }),
+      expect.objectContaining({ id, state: "closed", closedHow: "unmatch", counterpart: null }),
     ]);
     expect(raw).not.toMatch(/block/i);
+    // The block wrote the close as the blocker's (#351), so it holds past an erasure.
+    const closed = await ctx.client.query(
+      `SELECT c.closed_how, c.closed_by = p.side AS by_a FROM conversation c
+       JOIN conversation_participant p ON p.conversation_id = c.id AND p.account_id = $2
+       WHERE c.id = $1`,
+      [id, a.accountId],
+    );
+    expect(closed.rows).toEqual([{ closed_how: "block", by_a: true }]);
     const refused = await send(ctx.app, b, id, "Miksi?");
     expect(refused.status).toBe(409);
     expect(await errorCode(refused)).toBe("conversation_closed");
@@ -799,7 +807,7 @@ describe("the thumb", () => {
     const thumbOf = async (query = "") => {
       const list = await listOf(app, a, query);
       const [row] = [...list.open, ...list.archived];
-      return row?.counterpart.deleted === false ? row.counterpart.thumb : undefined;
+      return row?.counterpart?.deleted === false ? row.counterpart.thumb : null;
     };
     const main = await ctx.client.query<{ id: string }>(
       "SELECT id FROM photo WHERE account_id = $1 AND position = 0",
@@ -849,15 +857,12 @@ describe("the thumb", () => {
       actor: null,
       at: new Date(),
     });
+    // An ended conversation names nobody, and shows no photo (#351, ADR-031 Open 10).
     const list = await listOf(app, other);
-    expect(list.archived[0]?.counterpart).toMatchObject({
-      deleted: false,
-      name: "Cia",
-      thumb: null,
-    });
+    expect(list.archived[0]).toMatchObject({ state: "closed", counterpart: null });
     // Lifted, C is active again; the ended conversation still shows no photo (ADR-024 §6).
     await ctx.client.query("UPDATE account SET state = 'active' WHERE id = $1", [c.accountId]);
-    expect((await listOf(app, other)).archived[0]?.counterpart).toMatchObject({ thumb: null });
+    expect((await listOf(app, other)).archived[0]?.counterpart).toBeNull();
   });
 });
 

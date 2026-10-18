@@ -1,8 +1,12 @@
 # features/safety/reports.feature
-Feature: Reporting somebody from a card
-  A person reports somebody whose card they were shown, with a reason of
+Feature: Reporting somebody from a card or a conversation
+  A person reports somebody whose card they were shown, or the other person
+  of a conversation (#351, ADR-030 §12), with a reason of
   #106's list and, if they like, a few lines for the moderators (#84,
-  ADR-030). The report blocks both ways in the same transaction. The
+  ADR-030). The report blocks both ways in the same transaction; from a
+  conversation it also freezes a copy of every message for the moderators
+  and closes the conversation, and the person blocked can still report it
+  for matching_config.report_after_close_days. The
   moderators read it in the panel (#311, #312); the reported person learns
   nothing. The note reaches no log line, error detail or research event. At
   most matching_config.reports_per_day a day per account, the Finnish
@@ -59,3 +63,30 @@ Feature: Reporting somebody from a card
   Scenario: Reporting refuses without a session
     When nobody, a token nobody issued, a staff token, an ended session or an expired one reports
     Then the answer is 401 with its code, and nothing is written
+
+  Scenario: A report from a conversation copies every message, blocks both ways and closes it
+    Given "A" and "B" are in a conversation where each wrote and sent a photo
+    When "A" reports "B" from the conversation
+    Then the report names the conversation, and its copy is the thread as it stood, both sides' lines and photos, each marked whose
+    And a block stands between the two, "A" no longer has the conversation, and "B" reads it ended
+
+  Scenario: The person blocked can still report the conversation within the window, and not after it
+    Given report_after_close_days is thirty and "A" blocked "B" from their conversation
+    When "B" reports "A" from it on the thirtieth day, and "C" a conversation closed thirty-one days ago
+    Then the first is filed with its copy, and the second is refused with 409 report_window_closed and writes nothing
+
+  Scenario: A report from a conversation counts toward the day's cap and one open report per pair
+    Given matching_config allows five a day, and "A" reported "B" from their conversation
+    When "A" sends the same report again, files four more, and reports "G" from another conversation
+    Then the repeat answers 204 and writes nothing, and the last is refused with 429 report_budget_exceeded, without a report, a copy, a block or a close
+
+  Scenario: Only the conversation's two people can report or block from it
+    Given "A" and "B" are in a conversation and "C" is not
+    When "C" reports or blocks from it, or anybody names a conversation that does not exist
+    Then each is refused with 404 and nothing is written
+    And without a session the answer is 401
+
+  Scenario: The night prunes a report's copy, and the photos only it held of an erased sender
+    Given "A" reported "B" from a conversation where both sent a photo, and "B" deleted the account since
+    When the night prunes the report after twelve months
+    Then the copy is gone, "B"'s photo and its objects go with it, and "A"'s photo stays "A"'s

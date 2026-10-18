@@ -12,6 +12,7 @@ import { renderWithTheme } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
 import { FakeXhr, partsOf } from "@/test/xhr";
 import { ConversationScreen } from "./ConversationScreen";
+import { takeNotice } from "./notice";
 import { ChatLiveProvider } from "./store";
 import { dayOf, timeOf } from "./time";
 
@@ -44,7 +45,7 @@ const {
   __focus: focus,
   __blur: blur,
 } = jest.requireMock("expo-router") as {
-  __router: { back: jest.Mock; push: jest.Mock };
+  __router: { back: jest.Mock; push: jest.Mock; dismissTo: jest.Mock };
   __focus: () => void;
   __blur: () => void;
 };
@@ -96,6 +97,7 @@ const detail = (over: Partial<ConversationDetail> = {}): ConversationDetail => (
   limits: { maxLength: 30 },
   counterpartReadUpTo: 0,
   contacts: { mine: [], theirs: [] },
+  reportable: true,
   ...over,
 });
 
@@ -542,6 +544,89 @@ describe("one conversation", () => {
     expect(screen.queryByLabelText("Message")).toBeNull();
     expect(screen.queryByRole("button", { name: "Add photo" })).toBeNull();
     noProblems();
+  });
+
+  it("heads an ended conversation Conversation ended, names nobody, and offers Report in More while the window holds (#351)", async () => {
+    conversation(detail({ state: "closed", closedHow: "unmatch", counterpart: null }), [
+      [message(2, "mine", "Kiitos", DAY_1_LATER), message(1, "theirs", "Moi", DAY_1)],
+    ]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    expect(await screen.findByText("This conversation has ended.")).toBeTruthy();
+    expectPinnedHeader("Conversation ended", "Back");
+    expect(said("The other person", DAY_1, "Moi")).toBeTruthy();
+    expect(said("You", DAY_1_LATER, "Kiitos")).toBeTruthy();
+    expect(screen.queryByLabelText("Message")).toBeNull();
+    noProblems();
+    await press("More");
+    expect(screen.getByRole("button", { name: "Report and block" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "End conversation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+  });
+
+  it("offers no More in an ended conversation past the window (#351)", async () => {
+    conversation(
+      detail({ state: "closed", closedHow: "unmatch", counterpart: null, reportable: false }),
+      [[message(1, "theirs", "Moi", DAY_1)]],
+    );
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    expect(await screen.findByText("This conversation has ended.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+  });
+
+  it("ends the conversation from More and goes back to the list, leaving it the words (#351)", async () => {
+    conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    const answered = globalThis.fetch;
+    const ended: string[] = [];
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const path = new URL(request.url).pathname;
+      if (request.method === "POST" && path === `/conversations/${ID}/unmatch`) {
+        ended.push(path);
+        return new Response(null, { status: 204 });
+      }
+      return answered(input, init);
+    }) as unknown as typeof fetch;
+    router.dismissTo.mockReset();
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
+    await press("More");
+    expect(screen.getByText("Report, block or end")).toBeTruthy();
+    await press("End conversation");
+    expect(screen.getByText("End this conversation?")).toBeTruthy();
+    await press("End conversation");
+    expect(ended).toEqual([`/conversations/${ID}/unmatch`]);
+    expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expect(takeNotice()).toBe("unmatched");
+    expect(takeNotice()).toBeNull();
+  });
+
+  it("moves nobody when an end lands after the person left the screen, and says it aloud instead (#351)", async () => {
+    conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    const answered = globalThis.fetch;
+    let answer: (response: Response) => void = () => undefined;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      if (new URL(request.url).pathname === `/conversations/${ID}/unmatch`) {
+        return new Promise<Response>((resolve) => {
+          answer = resolve;
+        });
+      }
+      return answered(input, init);
+    }) as unknown as typeof fetch;
+    router.dismissTo.mockReset();
+    const announce = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    expect(said("Sanna", DAY_1, "Moi")).toBeTruthy();
+    await press("More");
+    await press("End conversation");
+    await press("End conversation");
+    // The person goes elsewhere while the answer is on its way.
+    await act(async () => blur());
+    await act(async () => answer(new Response(null, { status: 204 })));
+    await settle();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(takeNotice()).toBeNull();
+    expect(announce).toHaveBeenCalledWith("The conversation has ended.");
   });
 
   it("loads earlier messages with a button while a page back came full, and says when it cannot", async () => {
@@ -1396,8 +1481,11 @@ describe("one conversation, live over the socket", () => {
       "Sanna shares Instagram: ville.k",
       "Sanna shares Instagram: ville.k",
     ]);
-    // The detail itself was never read again: the contacts route signs no thumb.
-    expect(detailReads()).toBe(details);
+    // The detail itself was read again only for the close, so the ended view names
+    // nobody (#351): the contacts frames read the contacts alone, which sign no thumb.
+    await settle();
+    expect(detailReads()).toBe(details + 1);
+    expect(screen.queryByText("Instagram: ville.k")).toBeNull();
   });
 
   it("keeps what is shown when a read for the contacts fails, and says a conversation gone when it finds one (#103)", async () => {

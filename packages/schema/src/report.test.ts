@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
   BlockRequest,
+  ConversationReportRequest,
   ExportedBlocks,
   ExportedReport,
   ExportedReports,
@@ -69,6 +70,34 @@ describe("a report", () => {
     expect(codes(ReportRequest, { accountId: id, reason: "other", source: "card" })).toEqual([
       "unrecognized_keys",
     ]);
+  });
+});
+
+describe("a report from a conversation (#351)", () => {
+  it("takes the card's reason and note, the conversation naming whom", () => {
+    expect(ConversationReportRequest.parse({ reason: "harassment" })).toEqual({
+      reason: "harassment",
+    });
+    expect(ConversationReportRequest.parse({ reason: "other", note: "  Kysyi rahaa.  " })).toEqual({
+      reason: "other",
+      note: "Kysyi rahaa.",
+    });
+    expect(
+      ConversationReportRequest.safeParse({ reason: "other", note: "x".repeat(REPORT_NOTE_MAX) })
+        .success,
+    ).toBe(true);
+  });
+
+  it("refuses an account, a missing or unknown reason, a note out of bounds and an unknown key", () => {
+    expect(codes(ConversationReportRequest, { accountId: id, reason: "other" })).toEqual([
+      "unrecognized_keys",
+    ]);
+    expect(codes(ConversationReportRequest, {})).toEqual(["invalid_value"]);
+    expect(codes(ConversationReportRequest, { reason: "rude" })).toEqual(["invalid_value"]);
+    expect(codes(ConversationReportRequest, { reason: "other", note: " " })).toEqual(["too_small"]);
+    expect(
+      codes(ConversationReportRequest, { reason: "other", note: "x".repeat(REPORT_NOTE_MAX + 1) }),
+    ).toEqual(["too_big"]);
   });
 });
 

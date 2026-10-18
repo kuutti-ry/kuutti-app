@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app.ts";
+import { nullMembers } from "./lib/openapi.ts";
 import { captureLogger, test, testConfig } from "./test/harness.ts";
 
 describe("OpenAPI document", () => {
@@ -19,6 +20,21 @@ describe("OpenAPI document", () => {
       info: { ...committed.info, version: "x" },
     });
     expect(Object.keys(served.paths)).toContain("/health");
+  });
+
+  it("writes a nullable union's null member as 3.1's null type, so the generated type is null and not unknown", () => {
+    expect(
+      nullMembers({
+        a: { oneOf: [{ $ref: "#/x" }, { nullable: true }] },
+        b: [{ anyOf: [{ type: "string" }, { nullable: true }] }, null, 1],
+        // A nullable member with more in it is a schema of its own, and stays.
+        c: { oneOf: [{ type: "object", nullable: true }] },
+      }),
+    ).toEqual({
+      a: { oneOf: [{ $ref: "#/x" }, { type: "null" }] },
+      b: [{ anyOf: [{ type: "string" }, { type: "null" }] }, null, 1],
+      c: { oneOf: [{ type: "object", nullable: true }] },
+    });
   });
 
   it("is absent in production", async () => {

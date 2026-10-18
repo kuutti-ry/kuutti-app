@@ -85,6 +85,7 @@ describe("seed", () => {
           feedback_per_day: 5,
           moderation_response_hours: 24,
           reports_per_day: 5,
+          report_after_close_days: 30,
           message_max_length: 2000,
           message_photo_attempts_per_day: 30,
           message_photos_per_day: 10,

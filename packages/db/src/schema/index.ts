@@ -54,6 +54,8 @@ export {
   photoCheckKind,
   photoCheckNote,
   report,
+  reportMessage,
+  reportMessageSide,
   reportOutcome,
   reportSource,
   sanction,

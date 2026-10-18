@@ -37,7 +37,7 @@ import {
 } from "./lib/errors.ts";
 import { requestLocale, servedLocales } from "./lib/i18n.ts";
 import { type Logger, requestLogger } from "./lib/logger.ts";
-import { openApiDocument } from "./lib/openapi.ts";
+import { servedDocument } from "./lib/openapi.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes } from "./matching/index.ts";
@@ -269,7 +269,7 @@ export function createApp(deps: Deps) {
     description: "The access token from /auth/exchange or /auth/refresh.",
   });
   if (deps.config.APP_ENV !== "production") {
-    app.doc("/openapi.json", openApiDocument(deps.config.APP_VERSION));
+    app.get("/openapi.json", (c) => c.json(servedDocument(app, deps.config.APP_VERSION)));
   }
   // Swagger UI over the same document, on a developer's machine only: the page
   // pulls swagger-ui-dist from jsDelivr, and no deployed environment of this

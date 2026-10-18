@@ -25,7 +25,7 @@ import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { blockPerson, reportPerson } from "./client";
+import { blockConversation, blockPerson, reportConversation, reportPerson } from "./client";
 
 /** #106's six reasons in the order a person reads them; the values are the contract's. */
 const REASONS: ReadonlyArray<{ value: SanctionReason; label: PlainMessageKey }> = [
@@ -39,10 +39,17 @@ const REASONS: ReadonlyArray<{ value: SanctionReason; label: PlainMessageKey }> 
 
 /**
  * Where the dialog stands: the choice, the block's confirmation, the report,
- * what went through, or a card the API no longer has.
+ * the end of a conversation's confirmation, what went through, or a card the
+ * API no longer has.
  */
-type Step = "choose" | "block" | "report" | "blocked" | "reported" | "gone";
-type Notice = "failed" | "limited" | null;
+type Step = "choose" | "block" | "report" | "unmatch" | "blocked" | "reported" | "gone";
+type Notice = "failed" | "limited" | "late" | null;
+
+/** What went through, for the screen: a block, a report, an ended conversation, or nothing to act on any more. */
+export type SafetyOutcome = "blocked" | "reported" | "unmatched" | "gone";
+
+/** A report's reason and, if the person wrote one, the note. */
+type ReportBody = { reason: SanctionReason; note?: string };
 
 /** The steps after which the card leaves the screen. */
 const FINAL: ReadonlySet<Step> = new Set(["blocked", "reported", "gone"]);
@@ -79,6 +86,141 @@ export function SafetyActions({
   onOpenChange: (open: boolean) => void;
   /** A block or a report went through, or the card is gone: the screen takes it away. */
   onGone: (accountId: string) => void;
+}) {
+  const { t } = useT();
+  const tap = useHapticTap();
+  return (
+    <>
+      {/* Top right of the card's header, as far from like and pass as the card allows (D19). */}
+      <Button
+        variant="ghost"
+        size="icon"
+        accessibilityLabel={t("safety.actions.title")}
+        onPress={() => {
+          tap();
+          onOpenChange(true);
+        }}
+      >
+        <Icon as={Ellipsis} />
+      </Button>
+      <SafetyDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        offers={{ report: true, block: true, unmatch: false }}
+        words={{
+          title: "safety.actions.title",
+          blockBody: "safety.block.body",
+          reportLead: null,
+        }}
+        requests={{
+          block: () => blockPerson(accountId),
+          report: (body) => reportPerson({ accountId, ...body }),
+        }}
+        settle="dialog"
+        onOutcome={() => onGone(accountId)}
+      />
+    </>
+  );
+}
+
+/**
+ * Report, block or end a conversation (#351, ADR-030 §12): "More" in the
+ * conversation's header, labelled and at least 44 points, opens the card's
+ * dialog with the conversation's three choices, each behind its confirmation
+ * in words: a report (the card's reasons and note, which also says that the
+ * moderators get a copy of the conversation and that it blocks), a block
+ * (which ends the conversation for both), and End conversation (an unmatch,
+ * which blocks nobody). In an ended conversation the report alone is
+ * offered, while `reportable` says the window holds; with nothing to offer
+ * there is no button. Once one went through, the dialog closes and
+ * `onDone` takes the person back to the list, which says what happened; a
+ * conversation the API no longer has is handed back as `gone`. A report
+ * refused because the window closed meanwhile is said in words.
+ */
+export function ConversationActions({
+  conversationId,
+  ended,
+  reportable,
+  unmatch,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  conversationId: string;
+  /** The conversation is closed: only a report may be offered. */
+  ended: boolean;
+  /** The API takes a report from it now (the window after a close). */
+  reportable: boolean;
+  /** Ends the conversation for both, the chat slice's route. */
+  unmatch: () => Promise<void>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDone: (outcome: SafetyOutcome) => void;
+}) {
+  const { t } = useT();
+  const tap = useHapticTap();
+  const offers = { report: reportable, block: !ended, unmatch: !ended };
+  if (!offers.report && !offers.block && !offers.unmatch) return null;
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        accessibilityLabel={t("chat.actions.open")}
+        onPress={() => {
+          tap();
+          onOpenChange(true);
+        }}
+      >
+        <Icon as={Ellipsis} />
+      </Button>
+      <SafetyDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        offers={offers}
+        words={{
+          title: "chat.actions.title",
+          blockBody: "chat.block.body",
+          reportLead: "chat.report.copy",
+        }}
+        requests={{
+          block: () => blockConversation(conversationId),
+          report: (body) => reportConversation(conversationId, body),
+          unmatch,
+        }}
+        settle="screen"
+        onOutcome={onDone}
+      />
+    </>
+  );
+}
+
+/**
+ * The one dialog of both doors. `settle` says where an outcome is said: in
+ * the dialog, whose Done hands it on (a card, which stays on the screen
+ * until then), or by the screen it is handed to at once (a conversation,
+ * which the person leaves for the list).
+ */
+function SafetyDialog({
+  open,
+  onOpenChange,
+  offers,
+  words: texts,
+  requests,
+  settle,
+  onOutcome,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  offers: { report: boolean; block: boolean; unmatch: boolean };
+  words: { title: PlainMessageKey; blockBody: PlainMessageKey; reportLead: PlainMessageKey | null };
+  requests: {
+    block: () => Promise<void>;
+    report: (body: ReportBody) => Promise<void>;
+    unmatch?: () => Promise<void>;
+  };
+  settle: "dialog" | "screen";
+  onOutcome: (outcome: SafetyOutcome) => void;
 }) {
   const { t } = useT();
   const tap = useHapticTap();
@@ -132,13 +274,21 @@ export function SafetyActions({
   const dismiss = () => {
     onOpenChange(false);
     if (FINAL.has(step)) {
+      const outcome = step as Exclude<SafetyOutcome, "unmatched">;
       forget();
-      onGone(accountId);
+      onOutcome(outcome);
     }
   };
 
+  /** Handed to the screen at once: the dialog closes, and the screen says what happened. */
+  const handOver = (outcome: SafetyOutcome) => {
+    onOpenChange(false);
+    forget();
+    onOutcome(outcome);
+  };
+
   const send = async (
-    outcome: "blocked" | "reported",
+    outcome: "blocked" | "reported" | "unmatched",
     request: () => Promise<void>,
     failed: PlainMessageKey,
   ) => {
@@ -148,6 +298,10 @@ export function SafetyActions({
     say(t("safety.sending"));
     try {
       await request();
+      if (settle === "screen" || outcome === "unmatched") {
+        handOver(outcome);
+        return;
+      }
       const words = t(outcome === "blocked" ? "safety.block.done" : "safety.report.done");
       if (shown.current) {
         setStep(outcome);
@@ -157,17 +311,25 @@ export function SafetyActions({
         // why, so the words are announced on both platforms.
         AccessibilityInfo.announceForAccessibility(words);
         forget();
-        onGone(accountId);
+        onOutcome(outcome);
       }
     } catch (error) {
       const code = error instanceof ApiError ? error.code : null;
       if (code === "not_found") {
-        // The card's person, or the photos it showed, are gone meanwhile: trying again cannot help.
+        // The card's person, the photos it showed, or the conversation are
+        // gone meanwhile: trying again cannot help.
+        if (settle === "screen") {
+          handOver("gone");
+          return;
+        }
         setStep("gone");
         say(t("safety.gone"));
       } else if (code === "report_budget_exceeded") {
         setNotice("limited");
-        say(t("errors.report_budget_exceeded"));
+        say(t(limitedWords));
+      } else if (code === "report_window_closed") {
+        setNotice("late");
+        say(t("errors.report_window_closed"));
       } else {
         setNotice("failed");
         say(t(failed));
@@ -178,200 +340,233 @@ export function SafetyActions({
     }
   };
 
-  const block = () => send("blocked", () => blockPerson(accountId), "safety.block.failed");
+  const block = () => send("blocked", requests.block, "safety.block.failed");
   const report = (chosen: SanctionReason) => {
     // A blank note is left out; the contract refuses an empty one.
     const words = note.trim();
     return send(
       "reported",
-      () => reportPerson({ accountId, reason: chosen, ...(words ? { note: words } : {}) }),
+      () => requests.report({ reason: chosen, ...(words ? { note: words } : {}) }),
       "safety.report.failed",
     );
   };
+  const { unmatch: unmatchRequest } = requests;
+  const unmatch = () => unmatchRequest && send("unmatched", unmatchRequest, "chat.unmatch.failed");
 
+  // The day's cap with a Block in its place where one is offered; in an
+  // ended conversation, which offers none, tomorrow (#351).
+  const limitedWords: PlainMessageKey = offers.block
+    ? "errors.report_budget_exceeded"
+    : "chat.report.limited";
   const working = sending && <Text accessibilityLiveRegion="polite">{t("safety.sending")}</Text>;
   const noteLabel = t("safety.report.noteLabel", { max: REPORT_NOTE_MAX });
 
   return (
-    <>
-      {/* Top right of the card's header, as far from like and pass as the card allows (D19). */}
-      <Button
-        variant="ghost"
-        size="icon"
-        accessibilityLabel={t("safety.actions.title")}
-        onPress={() => {
-          tap();
-          onOpenChange(true);
-        }}
+    /* Nothing but its own controls opens it, so a change is always a close. */
+    <Dialog open={open} onOpenChange={dismiss}>
+      <DialogContent
+        closeLabel={t("safety.actions.close")}
+        style={{ maxHeight: height * WINDOW_SHARE }}
       >
-        <Icon as={Ellipsis} />
-      </Button>
-
-      {/* Nothing but its own controls opens it, so a change is always a close. */}
-      <Dialog open={open} onOpenChange={dismiss}>
-        <DialogContent
-          closeLabel={t("safety.actions.close")}
-          style={{ maxHeight: height * WINDOW_SHARE }}
-        >
-          {step === "choose" && (
-            <>
-              <DialogHeader>
-                <DialogTitle ref={focusTitle}>{t("safety.actions.title")}</DialogTitle>
-              </DialogHeader>
-              <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
+        {step === "choose" && (
+          <>
+            <DialogHeader>
+              <DialogTitle ref={focusTitle}>{t(texts.title)}</DialogTitle>
+            </DialogHeader>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
+              {offers.block && (
                 <View className="gap-1">
                   <Button variant="outline" onPress={() => go("block")}>
                     {t("safety.actions.block")}
                   </Button>
                   <Text variant="muted">{t("safety.actions.blockHint")}</Text>
                 </View>
+              )}
+              {offers.report && (
                 <View className="gap-1">
                   <Button variant="outline" onPress={() => go("report")}>
                     {t("safety.actions.report")}
                   </Button>
                   <Text variant="muted">{t("safety.actions.reportHint")}</Text>
                 </View>
-              </ScrollView>
-              <DialogFooter>
-                <Button variant="ghost" onPress={cancel}>
-                  {t("safety.actions.cancel")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {step === "block" && (
-            <>
-              <DialogHeader>
-                <DialogTitle ref={focusTitle}>{t("safety.block.title")}</DialogTitle>
-              </DialogHeader>
-              <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
-                <DialogDescription>{t("safety.block.body")}</DialogDescription>
-                {notice && (
-                  <Text accessibilityLiveRegion="assertive">{t("safety.block.failed")}</Text>
-                )}
-                {working}
-              </ScrollView>
-              <DialogFooter>
-                <Button variant="outline" disabled={sending} onPress={cancel}>
-                  {t("safety.actions.cancel")}
-                </Button>
-                {/* The word carries the meaning; the colour only repeats it. */}
-                <Button variant="destructive" disabled={sending} onPress={() => void block()}>
-                  {t("safety.actions.block")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {step === "report" && (
-            <>
-              <DialogHeader>
-                <DialogTitle ref={focusTitle}>{t("safety.actions.report")}</DialogTitle>
-              </DialogHeader>
-              {/* What it does, six reasons and a text field outgrow a phone's screen at a large
-                  text size, and the keyboard covers the dialog's lower half: they scroll, a drag
-                  puts the keyboard away, and the field scrolls into view above it. */}
-              <ScrollView
-                style={{ flexShrink: 1 }}
-                contentContainerClassName="gap-3"
-                keyboardShouldPersistTaps="handled"
-                keyboardDismissMode="on-drag"
-                automaticallyAdjustKeyboardInsets
-              >
-                <DialogDescription>{t("safety.report.alsoBlocks")}</DialogDescription>
-                {/* role, not accessibilityRole: the primitive sets role from its variant, and small has none. */}
-                <Text variant="small" role="heading" aria-level="3">
-                  {t("safety.report.reasonLabel")}
-                </Text>
-                <View
-                  accessibilityRole="radiogroup"
-                  accessibilityLabel={t("safety.report.reasonLabel")}
-                  className="gap-2"
-                >
-                  {REASONS.map(({ value, label }) => {
-                    const chosen = reason === value;
-                    const name = chosen ? t("settings.selected", { option: t(label) }) : t(label);
-                    return (
-                      <Button
-                        key={value}
-                        variant={chosen ? "default" : "outline"}
-                        accessibilityRole="radio"
-                        accessibilityState={{ checked: chosen }}
-                        // react-native-web reads the ARIA prop, not accessibilityState.
-                        aria-checked={chosen}
-                        accessibilityLabel={name}
-                        disabled={sending}
-                        onPress={() => {
-                          tap();
-                          setReason(value);
-                        }}
-                      >
-                        {name}
-                      </Button>
-                    );
-                  })}
+              )}
+              {offers.unmatch && (
+                <View className="gap-1">
+                  <Button variant="outline" onPress={() => go("unmatch")}>
+                    {t("chat.actions.unmatch")}
+                  </Button>
+                  <Text variant="muted">{t("chat.actions.unmatchHint")}</Text>
                 </View>
-                <Text variant="small">{noteLabel}</Text>
-                <Input
-                  accessibilityLabel={noteLabel}
-                  value={note}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                  maxLength={REPORT_NOTE_MAX}
-                  // A multiline field's return key would only add a line; here it puts the keyboard away.
-                  submitBehavior="blurAndSubmit"
-                  returnKeyType="done"
-                  editable={!sending}
-                  className="min-h-24"
-                  onChangeText={setNote}
-                />
-              </ScrollView>
-              {notice === "limited" && (
-                <View className="gap-2" accessibilityLiveRegion="assertive">
-                  <Text>{t("errors.report_budget_exceeded")}</Text>
+              )}
+            </ScrollView>
+            <DialogFooter>
+              <Button variant="ghost" onPress={cancel}>
+                {t("safety.actions.cancel")}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {step === "block" && (
+          <>
+            <DialogHeader>
+              <DialogTitle ref={focusTitle}>{t("safety.block.title")}</DialogTitle>
+            </DialogHeader>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
+              <DialogDescription>{t(texts.blockBody)}</DialogDescription>
+              {notice && (
+                <Text accessibilityLiveRegion="assertive">{t("safety.block.failed")}</Text>
+              )}
+              {working}
+            </ScrollView>
+            <DialogFooter>
+              <Button variant="outline" disabled={sending} onPress={cancel}>
+                {t("safety.actions.cancel")}
+              </Button>
+              {/* The word carries the meaning; the colour only repeats it. */}
+              <Button variant="destructive" disabled={sending} onPress={() => void block()}>
+                {t("safety.actions.block")}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {step === "unmatch" && (
+          <>
+            <DialogHeader>
+              <DialogTitle ref={focusTitle}>{t("chat.unmatch.title")}</DialogTitle>
+            </DialogHeader>
+            <ScrollView style={{ flexShrink: 1 }} contentContainerClassName="gap-4">
+              <DialogDescription>{t("chat.unmatch.body")}</DialogDescription>
+              {notice && (
+                <Text accessibilityLiveRegion="assertive">{t("chat.unmatch.failed")}</Text>
+              )}
+              {working}
+            </ScrollView>
+            <DialogFooter>
+              <Button variant="outline" disabled={sending} onPress={cancel}>
+                {t("safety.actions.cancel")}
+              </Button>
+              <Button disabled={sending} onPress={() => void unmatch()}>
+                {t("chat.actions.unmatch")}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+
+        {step === "report" && (
+          <>
+            <DialogHeader>
+              <DialogTitle ref={focusTitle}>{t("safety.actions.report")}</DialogTitle>
+            </DialogHeader>
+            {/* What it does, six reasons and a text field outgrow a phone's screen at a large
+                text size, and the keyboard covers the dialog's lower half: they scroll, a drag
+                puts the keyboard away, and the field scrolls into view above it. */}
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              contentContainerClassName="gap-3"
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              automaticallyAdjustKeyboardInsets
+            >
+              {texts.reportLead && <DialogDescription>{t(texts.reportLead)}</DialogDescription>}
+              <DialogDescription>{t("safety.report.alsoBlocks")}</DialogDescription>
+              {/* role, not accessibilityRole: the primitive sets role from its variant, and small has none. */}
+              <Text variant="small" role="heading" aria-level="3">
+                {t("safety.report.reasonLabel")}
+              </Text>
+              <View
+                accessibilityRole="radiogroup"
+                accessibilityLabel={t("safety.report.reasonLabel")}
+                className="gap-2"
+              >
+                {REASONS.map(({ value, label }) => {
+                  const chosen = reason === value;
+                  const name = chosen ? t("settings.selected", { option: t(label) }) : t(label);
+                  return (
+                    <Button
+                      key={value}
+                      variant={chosen ? "default" : "outline"}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: chosen }}
+                      // react-native-web reads the ARIA prop, not accessibilityState.
+                      aria-checked={chosen}
+                      accessibilityLabel={name}
+                      disabled={sending}
+                      onPress={() => {
+                        tap();
+                        setReason(value);
+                      }}
+                    >
+                      {name}
+                    </Button>
+                  );
+                })}
+              </View>
+              <Text variant="small">{noteLabel}</Text>
+              <Input
+                accessibilityLabel={noteLabel}
+                value={note}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                maxLength={REPORT_NOTE_MAX}
+                // A multiline field's return key would only add a line; here it puts the keyboard away.
+                submitBehavior="blurAndSubmit"
+                returnKeyType="done"
+                editable={!sending}
+                className="min-h-24"
+                onChangeText={setNote}
+              />
+            </ScrollView>
+            {notice === "limited" && (
+              <View className="gap-2" accessibilityLiveRegion="assertive">
+                <Text>{t(limitedWords)}</Text>
+                {offers.block && (
                   <Button variant="outline" onPress={() => go("block")}>
                     {t("safety.actions.block")}
                   </Button>
-                </View>
-              )}
-              {notice === "failed" && (
-                <Text accessibilityLiveRegion="assertive">{t("safety.report.failed")}</Text>
-              )}
-              {working}
-              <DialogFooter>
-                <Button variant="outline" disabled={sending} onPress={cancel}>
-                  {t("safety.actions.cancel")}
-                </Button>
-                <Button
-                  disabled={reason === null || sending}
-                  onPress={() => reason && void report(reason)}
-                >
-                  {t("safety.report.send")}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
+                )}
+              </View>
+            )}
+            {notice === "late" && (
+              <Text accessibilityLiveRegion="assertive">{t("errors.report_window_closed")}</Text>
+            )}
+            {notice === "failed" && (
+              <Text accessibilityLiveRegion="assertive">{t("safety.report.failed")}</Text>
+            )}
+            {working}
+            <DialogFooter>
+              <Button variant="outline" disabled={sending} onPress={cancel}>
+                {t("safety.actions.cancel")}
+              </Button>
+              <Button
+                disabled={reason === null || sending || notice === "late"}
+                onPress={() => reason && void report(reason)}
+              >
+                {t("safety.report.send")}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
 
-          {FINAL.has(step) && (
-            <>
-              <DialogHeader accessibilityLiveRegion="polite">
-                <DialogTitle ref={focusTitle}>
-                  {step === "blocked"
-                    ? t("safety.block.done")
-                    : step === "reported"
-                      ? t("safety.report.done")
-                      : t("safety.gone")}
-                </DialogTitle>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onPress={dismiss}>{t("safety.done")}</Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </>
+        {FINAL.has(step) && (
+          <>
+            <DialogHeader accessibilityLiveRegion="polite">
+              <DialogTitle ref={focusTitle}>
+                {step === "blocked"
+                  ? t("safety.block.done")
+                  : step === "reported"
+                    ? t("safety.report.done")
+                    : t("safety.gone")}
+              </DialogTitle>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onPress={dismiss}>{t("safety.done")}</Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

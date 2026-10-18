@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import ContactRound from "lucide-react-native/icons/contact-round";
 import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
+import { AccessibilityInfo, AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -20,6 +20,7 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { type PickedPhoto, pickPrepared } from "@/features/media";
+import { ConversationActions, type SafetyOutcome } from "@/features/safety";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { DECORATIVE } from "@/theme/a11y";
@@ -35,7 +36,9 @@ import {
   markRead,
   sendMessage,
   sendPhoto,
+  unmatchConversation,
 } from "./client";
+import { leaveNotice, NOTICES } from "./notice";
 import { PhotoBubble, SendingPhotoBubble } from "./PhotoBubble";
 import { SharedContacts } from "./SharedContacts";
 import { type ConversationLive, merged, useChatLive } from "./store";
@@ -166,6 +169,7 @@ export function ConversationScreen({ id }: { id: string }) {
   const [picking, setPicking] = useState(false);
   const [refusal, setRefusal] = useState<PlainMessageKey | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [acting, setActing] = useState(false);
   const scroll = useRef<ScrollView>(null);
   const loaded = useRef<ChatMessage[]>([]);
   const held = useRef<Held>({
@@ -474,6 +478,30 @@ export function ConversationScreen({ id }: { id: string }) {
     }
   };
 
+  // Closed by the socket while on the screen: read again, so the name goes
+  // (an ended conversation names nobody, #351) and Report says the window.
+  const closedLive = here?.state?.state === "closed";
+  const closedHeld = view.status === "ready" && view.detail.state === "closed";
+  useEffect(() => {
+    if (closedLive && !closedHeld) void load();
+  }, [closedLive, closedHeld, load]);
+
+  /**
+   * A report, a block or an end went through, or the conversation was gone:
+   * back to the list, which says so. One that lands after the person left the
+   * screen moves nobody (a dismissTo from elsewhere would replace the screen
+   * they are on) and is announced instead, on both platforms, since nothing
+   * on their screen says it.
+   */
+  const done = (outcome: SafetyOutcome) => {
+    if (!focused.current) {
+      AccessibilityInfo.announceForAccessibility(t(NOTICES[outcome]));
+      return;
+    }
+    leaveNotice(outcome);
+    router.dismissTo("/chats");
+  };
+
   // The one who blocked sees it gone at once (ADR-031 §4).
   const shown: ScreenView = here?.state?.state === "gone" ? { status: "gone" } : view;
   const messages = shown.status === "ready" ? shown.messages : [];
@@ -481,11 +509,7 @@ export function ConversationScreen({ id }: { id: string }) {
   const sending =
     pending && !messages.some((m) => m.clientId === pending.clientId) ? pending : null;
   const title = detail ? counterpartName(t, detail) : t("chat.list.title");
-  const name = !detail
-    ? ""
-    : detail.counterpart.deleted
-      ? t("chat.deletedUser")
-      : detail.counterpart.name;
+  const name = theirName(t, detail);
   // Offered while there is something to share and someone to share it with.
   const offered = detail !== null && detail.state !== "closed" && detail.contacts.mine.length > 0;
   return (
@@ -503,6 +527,17 @@ export function ConversationScreen({ id }: { id: string }) {
           >
             <Icon as={ContactRound} />
           </Button>
+        )}
+        {detail && (
+          <ConversationActions
+            conversationId={detail.id}
+            ended={detail.state === "closed"}
+            reportable={detail.reportable}
+            unmatch={() => unmatchConversation(detail.id)}
+            open={acting}
+            onOpenChange={setActing}
+            onDone={done}
+          />
         )}
       </ScreenHeader>
       <ConnectionLine />
@@ -620,7 +655,7 @@ function Conversation({
   onExpired: (message: ChatMessage) => void;
 }) {
   const { t, locale } = useT();
-  const theirName = detail.counterpart.deleted ? t("chat.deletedUser") : detail.counterpart.name;
+  const them = theirName(t, detail);
   const readSeq = messages
     .filter((m) => m.side === "mine" && m.seq <= detail.counterpartReadUpTo)
     .reduce((top, m) => Math.max(top, m.seq), 0);
@@ -651,14 +686,14 @@ function Conversation({
             <PhotoBubble
               message={message}
               conversationId={detail.id}
-              who={message.side === "mine" ? t("chat.message.you") : theirName}
+              who={message.side === "mine" ? t("chat.message.you") : them}
               note={message.seq === readSeq ? t("chat.message.read") : null}
               onExpired={onExpired}
             />
           ) : (
             <TextBubble
               mine={message.side === "mine"}
-              who={message.side === "mine" ? t("chat.message.you") : theirName}
+              who={message.side === "mine" ? t("chat.message.you") : them}
               body={message.body ?? ""}
               at={message.createdAt}
               note={message.seq === readSeq ? t("chat.message.read") : null}
@@ -686,6 +721,17 @@ function Conversation({
       )}
     </ScrollView>
   );
+}
+
+/**
+ * Who wrote the other side's messages: their name, "Deleted user", or, in an
+ * ended conversation, which names nobody (#351), "The other person".
+ */
+function theirName(t: ReturnType<typeof useT>["t"], detail: ConversationDetail | null): string {
+  if (!detail) return "";
+  const { counterpart } = detail;
+  if (!counterpart) return t("chat.closed.them");
+  return counterpart.deleted ? t("chat.deletedUser") : counterpart.name;
 }
 
 /** The attached photo's edge above the field, in points. */

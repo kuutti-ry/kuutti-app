@@ -518,7 +518,7 @@ describe("a share in a conversation", () => {
     });
     expect(raw).not.toMatch(/block/i);
     expect(raw).not.toContain("bea.b");
-    // B no longer has it: every route answers 404, and B's share in it stays as B left it.
+    // B no longer has it: every route answers 404, and both shares ended with the block's close (#351).
     for (const refused of [
       await ctx.app.request(`/conversations/${id}`, { headers: b.headers }),
       await readContacts(ctx.app, b, id),
@@ -528,7 +528,7 @@ describe("a share in a conversation", () => {
       expect(refused.status).toBe(404);
       expect(await errorCode(refused)).toBe("not_found");
     }
-    expect((await sharesIn(ctx, id)).find((s) => s.side === "b")?.ended_how).toBeNull();
+    expect((await sharesIn(ctx, id)).map((s) => s.ended_how)).toEqual(["closed", "closed"]);
   });
 
   test("A shadow-banned person's share is withheld from the other until the ban is lifted", async ({

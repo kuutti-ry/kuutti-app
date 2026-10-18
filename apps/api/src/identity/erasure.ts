@@ -30,6 +30,7 @@ import {
   listPhotoCheckNotes,
   listReportsOfAccount,
   listSanctionsOfAccount,
+  photosHeldByReports,
 } from "../safety/index.ts";
 import { currentConsent, exportConsents } from "./onboarding.ts";
 import { recordDeletion } from "./registration.ts";
@@ -128,7 +129,9 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     if (!identity) throw new Error("account without identity");
     const sessions = await repo.deleteAccountSessions(tx, accountId);
     const authRequests = await repo.deleteAuthRequestsOfAccount(tx, accountId);
-    const photos: PhotoErasure = await erasePhotosOfAccount(tx, accountId);
+    // A photo a report's frozen copy holds stays its twelve months (#351, ADR-030 §12).
+    const held = await photosHeldByReports(tx, accountId);
+    const photos: PhotoErasure = await erasePhotosOfAccount(tx, accountId, held);
     // Not in the summary: the line that logs it carries the account id.
     await deletePhotoCheckNotesOfAccount(tx, accountId);
     const profileRows = await eraseProfileOfAccount(tx, accountId);

@@ -1,0 +1,84 @@
+# A report from a conversation (#351, ADR-030 §12): Laura opens her
+# conversation with Emmi, reports Emmi from the header's More with a reason,
+# and is taken back to the list, which thanks her and no longer has the
+# conversation (the report blocked Emmi). Emmi signs in and finds it among the
+# archived, ended and naming nobody; inside it, the composer is gone, More
+# offers only the report, and her report goes through too. The stories give
+# the pair their conversation (packages/db/src/seed/conversations.ts), which
+# no other flow reads. A block is final, so the flow runs once after each
+# `pnpm demo:reset`. That Emmi's card is out of Laura's reach is the API's
+# tests until the round (#96) shows a card.
+appId: fi.kuutti.app
+name: A report from a conversation takes it from the reporter's list, and the other finds it ended and can still report it
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Laura Saarinen
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Emmi, \\d+, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Emmi, \\d+, .*"
+# More is in the header once the conversation is read.
+- extendedWaitUntil:
+    visible: "More|Lisää|Mer"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "More|Lisää|Mer"
+- extendedWaitUntil:
+    visible: "Report, block or end|Ilmoita, estä tai lopeta|Anmäl, blockera eller avsluta"
+    timeout: 15000
+- assertVisible: "End conversation|Lopeta keskustelu|Avsluta samtalet"
+- tapOn: "Report and block|Ilmoita ja estä|Anmäl och blockera"
+# The report says the moderators get a copy of the conversation.
+- extendedWaitUntil:
+    visible: "The moderators get a copy of this conversation, your messages and theirs, and keep it for twelve months\\. The conversation ends\\.|Moderaattorit saavat kopion tästä keskustelusta, sinun ja hänen viesteistään, ja säilyttävät sen kaksitoista kuukautta\\. Keskustelu päättyy\\.|Moderatorerna får en kopia av det här samtalet, dina och personens meddelanden, och sparar den i tolv månader\\. Samtalet avslutas\\."
+    timeout: 15000
+- tapOn: "Harassing, threatening or hateful|Häiritsevä, uhkaava tai vihamielinen|Trakasserande, hotfull eller hatisk"
+- tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
+# Back on the list: thanked, and the conversation is gone from it.
+- extendedWaitUntil:
+    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    timeout: 15000
+- assertVisible: "No conversations yet\\. A conversation opens here when you match with someone\\.|Ei vielä keskusteluja\\. Keskustelu avautuu tänne, kun saat mätsin\\.|Inga samtal än\\. Ett samtal öppnas här när du får en match\\."
+- assertNotVisible: "Emmi, \\d+, .*"
+
+# Emmi: the conversation is among the archived, ended, under no name; its
+# last line is Laura's last message.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Emmi Kallio
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- assertVisible:
+    text: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
+    below: "Archived|Arkistoidut|Arkiverade"
+- assertNotVisible: "Laura, \\d+, .*"
+- tapOn: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
+# Ended in words in place of the composer, which is gone.
+- extendedWaitUntil:
+    visible: "This conversation has ended\\.|Tämä keskustelu on päättynyt\\.|Det här samtalet har avslutats\\."
+    timeout: 15000
+- assertNotVisible: "(Message|Viesti|Meddelande)( .*)?"
+- waitForAnimationToEnd
+- tapOn: "More|Lisää|Mer"
+- extendedWaitUntil:
+    visible: "Report and block|Ilmoita ja estä|Anmäl och blockera"
+    timeout: 15000
+- assertNotVisible: "End conversation|Lopeta keskustelu|Avsluta samtalet"
+- tapOn: "Report and block|Ilmoita ja estä|Anmäl och blockera"
+- extendedWaitUntil:
+    visible: "A fake profile, or someone else's photos|Valeprofiili tai jonkun muun kuvat|Falsk profil eller någon annans bilder"
+    timeout: 15000
+- tapOn: "A fake profile, or someone else's photos|Valeprofiili tai jonkun muun kuvat|Falsk profil eller någon annans bilder"
+- tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
+- extendedWaitUntil:
+    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    timeout: 15000
+- assertVisible: "No conversations yet\\. A conversation opens here when you match with someone\\.|Ei vielä keskusteluja\\. Keskustelu avautuu tänne, kun saat mätsin\\.|Inga samtal än\\. Ett samtal öppnas här när du får en match\\."

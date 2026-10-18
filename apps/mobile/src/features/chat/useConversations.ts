@@ -23,11 +23,13 @@ export type ConversationsView =
 function withEarlierThumbs(earlier: ConversationList, list: ConversationList): ConversationList {
   const thumbs = new Map(
     [...earlier.open, ...earlier.archived].flatMap((c) =>
-      c.counterpart.deleted || !c.counterpart.thumb ? [] : [[c.id, c.counterpart.thumb] as const],
+      !c.counterpart || c.counterpart.deleted || !c.counterpart.thumb
+        ? []
+        : [[c.id, c.counterpart.thumb] as const],
     ),
   );
   const carry = (c: ConversationSummary): ConversationSummary =>
-    c.counterpart.deleted || c.state === "closed"
+    !c.counterpart || c.counterpart.deleted || c.state === "closed"
       ? c
       : { ...c, counterpart: { ...c.counterpart, thumb: thumbs.get(c.id) ?? null } };
   return { open: list.open.map(carry), archived: list.archived.map(carry) };

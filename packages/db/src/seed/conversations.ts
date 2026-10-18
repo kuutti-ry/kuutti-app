@@ -4,7 +4,9 @@ import { type Queryable, transaction } from "../pool.ts";
 /**
  * The conversations of the personas' stories (#348, ADR-031): the chat's pair
  * talking for a few days, a match nobody wrote in, which the night has
- * archived (TD-13), and the contact share's pair, two days into theirs (#103). Written as rows, as the match's record: no route opens a
+ * archived (TD-13), the contact share's pair, two days into theirs (#103),
+ * and the report's pair, a day into theirs (#351). Written as rows, as the
+ * match's record: no route opens a
  * conversation until #100 writes one from the second like, and the stories
  * will then like instead. The demo commands call the writer after the
  * histories, with the accounts the histories were given to.
@@ -116,6 +118,27 @@ export const PERSONA_CONVERSATIONS: readonly PersonaConversation[] = [
       },
     ],
     readUpTo: { a: 4, b: 5 },
+  },
+  {
+    // The report's flow (#351): Laura reports Emmi from here, which blocks and
+    // ends it; Emmi then finds it ended and can still report it. Everything
+    // read on both sides; the words carry no way to reach either of them.
+    between: ["laura", "emmi"],
+    openedHoursAgo: 30,
+    messages: [
+      {
+        from: "a",
+        hoursAgo: 28,
+        body: "Hei Emmi! Lautapelit ja leipominen, kuulostaa hyvältä sunnuntailta.",
+      },
+      {
+        from: "b",
+        hoursAgo: 26,
+        body: "Moi Laura! Niin onkin. Mitä sinä piirrät nykyään?",
+      },
+      { from: "a", hoursAgo: 8, body: "Enimmäkseen kissaani. Se ei pidä siitä." },
+    ],
+    readUpTo: { a: 3, b: 3 },
   },
 ];
 

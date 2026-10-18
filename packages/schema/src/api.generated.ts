@@ -2579,6 +2579,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations/{id}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Block the other person of a conversation
+         * @description The block both ways and the conversation's close in one transaction (#351): from then on the conversation is gone for the caller, who gets 404 for it from every other route, and ended for the other person, who is not told why. The block holds everywhere a card's does, between the identities, and is final. Blocking again answers the same, the conversation then hidden from the caller.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The block stands: set now, or set before; alike when the other person deleted their account meanwhile, and nothing is written. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: the id is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller (not theirs, or nobody's), or the caller was erased meanwhile; nothing is written. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report the other person of a conversation, with a copy of it, and block them
+         * @description The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ConversationReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller (not theirs, nobody's, or hidden from the one who blocked the other), or the caller was erased meanwhile; nothing is written. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description report_window_closed: the conversation closed longer ago than report_after_close_days, or the other person deleted their account; nothing is written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description report_budget_exceeded: the day's reports are filed and nothing was written, the block neither; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations": {
         parameters: {
             query?: never;
@@ -3396,6 +3550,72 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/conversations/{id}/unmatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End the conversation for both, blocking nobody
+         * @description The conversation closes for both people (#351): neither can write in it, both read it as ended, with nothing saying who ended it or how, and both may still report it for matching_config report_after_close_days. What either shared there ends with it. One closed already is left as it is.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Ended, or ended before. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: the id is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5727,6 +5947,10 @@ export interface components {
             reason: components["schemas"]["SanctionReason"];
             note?: string;
         };
+        ConversationReportRequest: {
+            reason: components["schemas"]["SanctionReason"];
+            note?: string;
+        };
         ConversationList: {
             open: components["schemas"]["ConversationSummary"][];
             archived: components["schemas"]["ConversationSummary"][];
@@ -5740,13 +5964,10 @@ export interface components {
             lastMessage: components["schemas"]["LastMessage"];
             unread: number;
         };
-        Counterpart: components["schemas"]["CounterpartPerson"] | components["schemas"]["CounterpartDeleted"];
+        Counterpart: components["schemas"]["CounterpartPerson"] | components["schemas"]["CounterpartDeleted"] | null;
         CounterpartPerson: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            deleted: "CounterpartPerson";
+            /** @enum {boolean} */
+            deleted: false;
             name: string;
             age: number;
             thumb: components["schemas"]["ConversationThumb"];
@@ -5761,11 +5982,8 @@ export interface components {
             expiresAt: string;
         } | null;
         CounterpartDeleted: {
-            /**
-             * @description discriminator enum property added by openapi-typescript
-             * @enum {string}
-             */
-            deleted: "CounterpartDeleted";
+            /** @enum {boolean} */
+            deleted: true;
         };
         LastMessage: {
             seq: number;
@@ -5790,6 +6008,7 @@ export interface components {
             };
             counterpartReadUpTo: number;
             contacts: components["schemas"]["ConversationContacts"];
+            reportable: boolean;
         };
         ConversationContacts: {
             mine: {
@@ -6043,7 +6262,7 @@ export interface components {
             /** Format: uuid */
             subjectId: string;
             detail: {
-                [key: string]: string | number | boolean | unknown;
+                [key: string]: string | number | boolean | null;
             } | null;
         };
         AuditPage: {
@@ -6060,7 +6279,7 @@ export interface components {
             /** Format: uuid */
             subjectId: string;
             detail: {
-                [key: string]: string | number | boolean | unknown;
+                [key: string]: string | number | boolean | null;
             } | null;
             actorRole: components["schemas"]["ModeratorRole"] & unknown;
             /** Format: uuid */

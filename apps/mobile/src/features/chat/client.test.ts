@@ -9,6 +9,7 @@ import {
   sendPhoto,
   shareContact,
   stopSharing,
+  unmatchConversation,
 } from "./client";
 import { messageWithKnownDescription } from "./known";
 
@@ -179,6 +180,7 @@ describe("the contacts' routes (#103)", () => {
     limits: { maxLength: 30 },
     counterpartReadUpTo: 0,
     contacts: { mine: [{ kind: "instagram", value: "aino.k", shared: true }], theirs: [] },
+    reportable: true,
   };
 
   it("reads the stored pieces, and refuses an answer outside the contract", async () => {
@@ -202,6 +204,13 @@ describe("the contacts' routes (#103)", () => {
     expect(seen).toEqual([
       { method: "PUT", path: "/contacts/phone", body: { value: "040 123 4567" } },
     ]);
+  });
+
+  it("ends a conversation by its id alone (#351), and fails a refusal with its code", async () => {
+    const seen = answering(new Response(null, { status: 204 }), refusal("not_found", 404));
+    await expect(unmatchConversation(ID)).resolves.toBeUndefined();
+    expect(seen).toEqual([{ method: "POST", path: `/conversations/${ID}/unmatch`, body: null }]);
+    await expect(unmatchConversation(ID)).rejects.toMatchObject({ status: 404, code: "not_found" });
   });
 
   it("removes a piece, alike when none was kept", async () => {

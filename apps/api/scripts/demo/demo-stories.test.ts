@@ -166,7 +166,7 @@ describe("the stories through the services", () => {
       PERSONA_HISTORIES.map((h) => [h.key, "created"]),
     );
     expect(await giveConversations(ctx.client, first, now())).toEqual({
-      written: 3,
+      written: 4,
       already: 0,
       missing: 0,
     });
@@ -238,13 +238,15 @@ describe("the stories through the services", () => {
       ["ville", "resumed"],
       ["elina", "resumed"],
       ["jussi", "resumed"],
+      ["laura", "resumed"],
+      ["emmi", "resumed"],
     ]);
     const after = await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM account");
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
     // Nor a second conversation: the resumed accounts have theirs.
     expect(await giveConversations(ctx.client, second, now())).toEqual({
       written: 0,
-      already: 3,
+      already: 4,
       missing: 0,
     });
     // Nor a second ban: Tapio was told already.

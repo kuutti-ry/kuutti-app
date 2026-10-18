@@ -643,9 +643,13 @@ describe("what the socket withholds", () => {
     const later = await conversationBetween(ctx.pool, other.accountId, b.accountId);
     expect((await send(other.headers, later, "Tässä")).status).toBe(201);
     await pb.next(isMessage(later, 1));
-    // Since the block, nothing of the conversation has reached B.
+    // Since the block, nothing of the conversation has reached B but that it is gone: the
+    // block and the close it writes (#351) are each a notification, and each says the same.
     expect(
-      pb.frames.slice(sinceBlock).filter((f) => "conversationId" in f && f.conversationId === id),
+      pb.frames
+        .slice(sinceBlock)
+        .filter((f) => "conversationId" in f && f.conversationId === id)
+        .filter((f) => !(f.type === "conversation" && f.state === "gone")),
     ).toEqual([]);
   });
 

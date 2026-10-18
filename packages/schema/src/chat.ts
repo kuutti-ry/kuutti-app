@@ -120,7 +120,14 @@ export const ConversationSummary = z
     state: ConversationState,
     /** Set when the state is closed, null otherwise. */
     closedHow: ConversationClosedHow.nullable(),
-    counterpart: Counterpart,
+    /**
+     * Null once the conversation has ended for any reason but the other
+     * person's erasure (#351, ADR-031 Open 10): no name, no age, no thumb,
+     * before and after either person leaves, so the person blocked never
+     * learns of the blocker's erasure; the app heads it "This conversation
+     * has ended".
+     */
+    counterpart: Counterpart.nullable(),
     /** The newest message the caller may see; null before the first. */
     lastMessage: LastMessage.nullable(),
     /** The counterpart's messages the caller has not read. */
@@ -155,6 +162,13 @@ export const ConversationDetail = ConversationSummary.extend({
   counterpartReadUpTo: z.int().min(0),
   /** What the caller may share here and what is shared with them (#103); the detail only, never the list. */
   contacts: ConversationContacts,
+  /**
+   * Whether a report from the conversation is taken now (#351): while it is
+   * open or archived, and for matching_config report_after_close_days after
+   * it closed, while the other person still has an account. The app offers
+   * Report only then.
+   */
+  reportable: z.boolean(),
 }).meta({ id: "ConversationDetail" });
 export type ConversationDetail = z.infer<typeof ConversationDetail>;
 

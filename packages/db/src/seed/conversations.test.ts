@@ -116,11 +116,11 @@ describe("writing the conversations", () => {
       try {
         await migrate(pool, MIGRATIONS);
         const accounts = new Map<string, string>();
-        for (const key of ["antti", "ville", "sanna", "elina", "jussi"]) {
+        for (const key of ["antti", "ville", "sanna", "elina", "jussi", "laura", "emmi"]) {
           accounts.set(key, await account(pool, `hash-${key}`));
         }
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
-          written: 3,
+          written: 4,
           already: 0,
           missing: 0,
         });
@@ -145,6 +145,18 @@ describe("writing the conversations", () => {
            ORDER BY c.opened_at DESC`,
         );
         expect(conversations).toEqual([
+          {
+            id: expect.any(String),
+            a: accounts.get("laura"),
+            b: accounts.get("emmi"),
+            opened_at: ago(30),
+            last_message_at: ago(8),
+            next_seq: 4,
+            archived_at: null,
+            closed_at: null,
+            read_a: 3,
+            read_b: 3,
+          },
           {
             id: expect.any(String),
             a: accounts.get("elina"),
@@ -208,25 +220,25 @@ describe("writing the conversations", () => {
         // Told before, between the same two accounts: left as it is.
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
           written: 0,
-          already: 3,
+          already: 4,
           missing: 0,
         });
         // A persona with no account this time (spared, or refused): nothing to talk in.
         accounts.delete("sanna");
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
           written: 0,
-          already: 2,
+          already: 3,
           missing: 1,
         });
         // Another account of the same persona is another person to Kuutti.
         accounts.set("sanna", await account(pool, "hash-sanna-again"));
         expect(await writeConversations(pool, accounts, NOW)).toEqual({
           written: 1,
-          already: 2,
+          already: 3,
           missing: 0,
         });
         const count = await pool.query<{ n: string }>("SELECT count(*) AS n FROM conversation");
-        expect(Number(count.rows[0]?.n)).toBe(4);
+        expect(Number(count.rows[0]?.n)).toBe(5);
       } finally {
         await pool.end();
       }

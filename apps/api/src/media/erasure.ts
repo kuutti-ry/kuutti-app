@@ -26,9 +26,11 @@ export type PhotoErasure = {
 /**
  * The person's photos, every purpose, their fetch log and the cards shown to
  * them, in the caller's transaction. `keep` names photos that outlive the
- * erasure: #351 fills it with the photos a report's frozen copy holds for its
- * twelve months; nothing does yet (#350). A message photo that goes leaves
- * its message reading "Photo removed" (message.photo_id on delete set null).
+ * erasure: the photos a report's frozen copy holds for its twelve months
+ * (#351), which the night's prune lets go (`eraseReleasedPhotos`). A message
+ * photo that goes leaves its message reading "Photo removed"
+ * (message.photo_id on delete set null); one kept is taken off its message by
+ * the chat's half of the erasure, and reads the same.
  */
 export async function erasePhotosOfAccount(
   tx: Queryable,
@@ -39,6 +41,20 @@ export async function erasePhotosOfAccount(
   const accessRows = await repo.deletePhotoAccessOfAccount(tx, accountId);
   const shownRows = await repo.deleteCardShownOfAccount(tx, accountId);
   return { photos: keys.length, accessRows, shownRows, keys };
+}
+
+/**
+ * The photos a report's frozen copy held and holds no more (#351), of
+ * senders since erased: their rows go, in the caller's transaction, as the
+ * erasure would have taken them; the content keys, for `deleteOrphanedObjects`
+ * after the commit. A photo whose owner still has an account is theirs and
+ * stays. The caller has made sure no copy names them.
+ */
+export async function eraseReleasedPhotos(
+  tx: Queryable,
+  photoIds: readonly string[],
+): Promise<string[]> {
+  return repo.deleteReleasedPhotos(tx, photoIds);
 }
 
 /**
@@ -55,7 +71,8 @@ export async function erasePhotosOfAccount(
 export async function deleteOrphanedObjects(
   deps: { db: Queryable; store: MediaStore; logger: Logger },
   keys: string[],
-  context: { accountId: string },
+  /** Who or what let them go, for the log line of a failure: an account's erasure, or a night's job. */
+  context: { accountId: string } | { job: string },
 ): Promise<number> {
   if (keys.length === 0) return 0;
   let objectKeys: string[] = [];
@@ -69,7 +86,7 @@ export async function deleteOrphanedObjects(
     return objectKeys.length;
   } catch (error) {
     deps.logger.error(
-      { err: error, accountId: context.accountId, keys, objects: objectKeys.length },
+      { err: error, ...context, keys, objects: objectKeys.length },
       "erasure: deleting photo objects failed",
     );
     return 0;

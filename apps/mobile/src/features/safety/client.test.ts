@@ -1,5 +1,5 @@
 import { saveSession } from "@/lib/session";
-import { blockPerson, reportPerson } from "./client";
+import { blockConversation, blockPerson, reportConversation, reportPerson } from "./client";
 
 // The block and report routes as the app calls them (#84, ADR-030): what each
 // sends, with the session, and a refusal as an ApiError with the envelope's
@@ -64,6 +64,35 @@ describe("the safety client", () => {
       status: 429,
       code: "report_budget_exceeded",
       message: "report answered 429",
+    });
+  });
+
+  it("blocks and reports from a conversation by its id, the report with the reason and the note alone (#351)", async () => {
+    const seen = answering(
+      new Response(null, { status: 204 }),
+      new Response(null, { status: 204 }),
+      refusal("report_window_closed", 409),
+    );
+    await expect(blockConversation(SUBJECT)).resolves.toBeUndefined();
+    expect(seen[0]?.method).toBe("POST");
+    expect(new URL(seen[0]?.url ?? "").pathname).toBe(`/conversations/${SUBJECT}/block`);
+    const body = { reason: "other" as const, note: "Kysyi rahaa." };
+    await expect(reportConversation(SUBJECT, body)).resolves.toBeUndefined();
+    expect(new URL(seen[1]?.url ?? "").pathname).toBe(`/conversations/${SUBJECT}/report`);
+    expect(await seen[1]?.json()).toEqual(body);
+    await expect(reportConversation(SUBJECT, body)).rejects.toMatchObject({
+      status: 409,
+      code: "report_window_closed",
+      message: "report answered 409",
+    });
+  });
+
+  it("fails a block from a conversation with its code", async () => {
+    answering(refusal("not_found", 404));
+    await expect(blockConversation(SUBJECT)).rejects.toMatchObject({
+      status: 404,
+      code: "not_found",
+      message: "block answered 404",
     });
   });
 

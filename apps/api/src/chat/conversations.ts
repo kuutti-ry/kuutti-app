@@ -1,4 +1,4 @@
-import type { Queryable } from "@kuutti/db";
+import { type Queryable, transaction } from "@kuutti/db";
 import {
   CONVERSATIONS_MAX,
   type ConversationClosedHow,
@@ -28,6 +28,19 @@ import * as repo from "./repo.ts";
 // ADR-024 §6): it ended, or the other deleted their account.
 
 export const MESSAGE_MAX_LENGTH_KEY = "message_max_length";
+/** The days after a close during which either person may still report the conversation (#351, ADR-030 §12). */
+export const REPORT_AFTER_CLOSE_DAYS_KEY = "report_after_close_days";
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Whether a report from the conversation is taken at `at` (#351): while it is
+ * open, and for `days` after it closed, so a block cannot be used to dodge a
+ * report (ADR-030 §2). A day is 24 hours, as for the reports' own retention.
+ */
+export function reportWindowHolds(closedAt: Date | null, at: Date, days: number): boolean {
+  return closedAt === null || at.getTime() - closedAt.getTime() <= days * DAY_MS;
+}
 
 export type ChatDeps = {
   db: Queryable;
@@ -93,28 +106,34 @@ async function summaryOf(
           age: ageInYears(row.counterpartBirthYear, row.counterpartBirthMonth, deps.now()),
         }
       : null;
+  // An ended conversation names nobody, before and after either person
+  // leaves (ADR-031 Open 10): the person blocked never learns of the
+  // blocker's erasure from a name that turned into "Deleted user".
+  const ended = state === "closed" && closedHow === "unmatch";
   return {
     id: row.id,
     state,
     closedHow,
-    counterpart: person
-      ? {
-          deleted: false,
-          name: row.counterpartName ?? "",
-          age: person.age,
-          // The thumb is the card's rule (findMainPhotoOf): none across a block or for
-          // somebody not active, and none once the conversation has ended, so a lifted
-          // ban never shows as an ended conversation with a photo (ADR-024 §6).
-          thumb:
-            withThumb && state !== "closed"
-              ? await thumbOf(deps, {
-                  viewerAccountId: accountId,
-                  ownerAccountId: person.id,
-                  conversationId: row.id,
-                })
-              : null,
-        }
-      : { deleted: true },
+    counterpart: ended
+      ? null
+      : person
+        ? {
+            deleted: false,
+            name: row.counterpartName ?? "",
+            age: person.age,
+            // The thumb is the card's rule (findMainPhotoOf): none across a block or for
+            // somebody not active, and none once the conversation has ended, so a lifted
+            // ban never shows as an ended conversation with a photo (ADR-024 §6).
+            thumb:
+              withThumb && state !== "closed"
+                ? await thumbOf(deps, {
+                    viewerAccountId: accountId,
+                    ownerAccountId: person.id,
+                    conversationId: row.id,
+                  })
+                : null,
+          }
+        : { deleted: true },
     lastMessage: row.last
       ? {
           seq: row.last.seq,
@@ -164,11 +183,14 @@ export async function readConversation(
   const summary = await summaryOf(deps, accountId, row);
   const maxLength = await matchingConfigNumber(deps.db, MESSAGE_MAX_LENGTH_KEY);
   const contacts = await repo.readConversationContacts(deps.db, accountId, conversationId);
+  const days = await matchingConfigNumber(deps.db, REPORT_AFTER_CLOSE_DAYS_KEY);
   return {
     ...summary,
     limits: { maxLength },
     counterpartReadUpTo: row.counterpartReadUpTo,
     contacts,
+    // Somebody to report, and the window open (ADR-030 §12).
+    reportable: row.counterpartId !== null && reportWindowHolds(row.closedAt, deps.now(), days),
   };
 }
 
@@ -219,6 +241,80 @@ export async function closeConversationsOf(
   return (await repo.closeConversationsOf(db, input)).filter((close) => close.closedNow).length;
 }
 
+/**
+ * An unmatch (#351): the caller ends the conversation for both, blocking
+ * nobody. Both read it as ended, "This conversation has ended", with nothing
+ * saying who ended it or how, and both may still report it for
+ * report_after_close_days. What either shared there ends with it (#103); the
+ * other person is told by the socket (#349, migration 0055's trigger). One
+ * already closed stays as it is, and the answer is the same. Not the caller's,
+ * or hidden from them as its blocker: 404.
+ */
+export async function unmatchConversation(
+  deps: { db: Queryable; logger: Logger; now: () => Date },
+  accountId: string,
+  conversationId: string,
+): Promise<void> {
+  await transaction(deps.db, async (tx) => {
+    // The send's order (ADR-031 §3): the account held in a live state, the
+    // conversation locked through the caller's row, then what it decides on.
+    if (!(await repo.holdLiveAccount(tx, accountId))) throw notFound();
+    if (!(await repo.lockConversation(tx, accountId, conversationId))) throw notFound();
+    const state = await repo.readSendState(tx, accountId, conversationId);
+    if (!state || state.hidden) throw notFound();
+    const closed = await repo.closeConversationsOf(tx, {
+      accountIds: [accountId],
+      how: "unmatch",
+      at: deps.now(),
+      conversationId,
+    });
+    await trackClosed({ ...deps, db: tx }, closed);
+  });
+}
+
+/**
+ * A block's close (#351, ADR-030 §2): every conversation between the two
+ * accounts closes as the block's, written by the safety slice in the block's
+ * transaction, so the row's lock puts it in one order with a send in flight,
+ * and its blocker never sees them again, even after the other's erasure. One
+ * closed before for another reason is written as the block's too. No research
+ * event (ADR-030 §9). The number closed now.
+ */
+export async function closeConversationsBetween(
+  db: Queryable,
+  input: { blockerAccountId: string; blockedAccountId: string; at: Date },
+): Promise<number> {
+  const closed = await repo.closeConversationsOf(db, {
+    accountIds: [input.blockerAccountId],
+    how: "block",
+    at: input.at,
+    counterpartId: input.blockedAccountId,
+  });
+  return closed.filter((close) => close.closedNow).length;
+}
+
+/**
+ * The conversation a report or a block names (#351), its row locked until the
+ * caller's transaction ends, read through the caller's own participant row:
+ * null when it is not theirs.
+ */
+export async function lockReportedConversation(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<repo.ReportedConversation | null> {
+  return repo.lockForReport(db, accountId, conversationId);
+}
+
+/** The whole thread of a conversation the caller locked, for a report's copy (#351). */
+export async function threadForReport(
+  db: Queryable,
+  accountId: string,
+  conversationId: string,
+): Promise<repo.CopiedMessage[]> {
+  return repo.threadOf(db, accountId, conversationId);
+}
+
 export type ConversationErasure = {
   /** The participant rows whose link was cut. */
   conversations: number;
@@ -245,6 +341,9 @@ export async function eraseConversationsOf(
   accountId: string,
 ): Promise<ConversationErasure> {
   const withheld = await repo.deleteWithheldMessagesOf(deps.db, accountId);
+  // A photo a report's copy holds outlives the erasure (#351), but not in the
+  // conversation: it reads "Photo removed" there, as any of the person's photos.
+  await repo.detachPhotosOf(deps.db, accountId);
   const closed = await repo.closeConversationsOf(deps.db, {
     accountIds: [accountId],
     how: "erasure",

@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import type { IdentityBroker } from "../identity/index.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
-import { signedInAccount, staffSession } from "./account.ts";
+import { signedInAccount, staffSession, withMatchingConfig } from "./account.ts";
 import { conversationBetween } from "./chat.ts";
 import {
   captureLogger,
@@ -187,6 +187,65 @@ describe("PII in logs", () => {
     expect((await send(`${FIXTURES.message} ${FIXTURES.email}`)).status).toBe(400);
     expect(lines().length).toBeGreaterThan(0);
     expect(leakedFixtures(lines())).toEqual([]);
+  });
+
+  // A report from a conversation (#351, ADR-030 §12): a thread whose words are
+  // the fixture, copied into the report with a note that quotes it, then the
+  // same report again, one the contract refuses, one past the window and one
+  // over the day's cap. The words reach no log line, answer or research event.
+  test("No message text reaches a log line, an answer or an event through a report's frozen copy", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client });
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const c = await signedInAccount(ctx.client);
+    const words = [
+      { from: "a" as const, body: FIXTURES.message },
+      { from: "b" as const, body: FIXTURES.message },
+    ];
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId, { messages: words });
+    const late = await conversationBetween(ctx.client, c.accountId, b.accountId, {
+      messages: words,
+    });
+    const full = await conversationBetween(ctx.client, b.accountId, c.accountId, {
+      messages: words,
+    });
+    const report = (who: { headers: Record<string, string> }, at: string, note: string) =>
+      app.request(`/conversations/${at}/report`, {
+        method: "POST",
+        headers: { ...who.headers, "content-type": "application/json" },
+        body: JSON.stringify({ reason: "harassment", note }),
+      });
+    const answers: Response[] = [];
+    answers.push(await report(a, id, `${FIXTURES.message} ${"x".repeat(500)}`));
+    answers.push(await report(a, id, `He wrote: ${FIXTURES.message}`));
+    answers.push(await report(a, id, `Again: ${FIXTURES.message}`));
+    await ctx.client.query(
+      "UPDATE conversation SET closed_at = now() - interval '400 days', closed_how = 'unmatch', closed_by = 'a' WHERE id = $1",
+      [late],
+    );
+    answers.push(await report(c, late, FIXTURES.message));
+    await withMatchingConfig(ctx.client, { reports_per_day: 0 });
+    answers.push(await report(b, full, FIXTURES.message));
+    expect(answers.map((answer) => answer.status)).toEqual([400, 204, 204, 409, 429]);
+    for (const answer of answers) expect(await answer.text()).not.toContain(FIXTURES.message);
+    // The copy holds the words: the moderators' to read, nobody's log.
+    expect(
+      Number(
+        (
+          await ctx.client.query<{ n: string }>(
+            "SELECT count(*) AS n FROM report_message WHERE body = $1",
+            [FIXTURES.message],
+          )
+        ).rows[0]?.n,
+      ),
+    ).toBe(2);
+    expect(lines().length).toBeGreaterThan(0);
+    expect(leakedFixtures(lines())).toEqual([]);
+    const events = await ctx.client.query("SELECT props FROM events");
+    expect(JSON.stringify(events.rows)).not.toContain(FIXTURES.message);
   });
 
   // A stored contact (#103, ADR-031 §11): a phone number and a username, kept,

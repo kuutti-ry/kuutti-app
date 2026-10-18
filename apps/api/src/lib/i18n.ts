@@ -95,6 +95,7 @@ export const ERROR_MESSAGE_KEYS = {
   export_budget_exceeded: "errors.export_budget_exceeded",
   feedback_budget_exceeded: "errors.feedback_budget_exceeded",
   report_budget_exceeded: "errors.report_budget_exceeded",
+  report_window_closed: "errors.report_window_closed",
   conversation_closed: "errors.conversation_closed",
   message_too_long: "errors.message_too_long",
   contact_details: "errors.contact_details",

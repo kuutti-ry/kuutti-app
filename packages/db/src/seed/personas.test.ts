@@ -34,14 +34,14 @@ const persona = (key: string) => {
 };
 
 describe("the personas of the mock bank", () => {
-  it("are seventeen, each with a name of its own and an artificial code", () => {
-    expect(DEMO_PERSONAS).toHaveLength(17);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(17);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(17);
+  it("are nineteen, each with a name of its own and an artificial code", () => {
+    expect(DEMO_PERSONAS).toHaveLength(19);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(19);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(19);
     // A name of its own: a flow finds the persona's button by the name, and
     // the chat's flows find the counterpart by the given name.
-    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(17);
-    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(17);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(19);
+    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(19);
     for (const p of DEMO_PERSONAS) {
       expect(p.key).toMatch(/^[a-z]+$/);
       // 900 to 999: never given to a person.
@@ -86,21 +86,23 @@ describe("the personas of the mock bank", () => {
       expect(p.bank, key).toBeDefined();
       for (const at of DAYS) expect(personaHetu(p, at), key).toBe(code);
     }
-    // The rest are the mock bank's alone: the ages, and the two pairs of the
-    // conversations, the chat's (#348) and the contact share's (#103), for
-    // whom the bed has no test user left.
+    // The rest are the mock bank's alone: the ages, and the three pairs of
+    // the conversations, the chat's (#348), the contact share's (#103) and
+    // the report's (#351), for whom the bed has no test user left.
     const mockOnly = DEMO_PERSONAS.filter((p) => p.bank === undefined).map((p) => p.key);
     expect(mockOnly).toEqual([
       "antti",
       "ville",
       "elina",
       "jussi",
+      "laura",
+      "emmi",
       "eetu",
       "venla",
       "lauri",
       "siiri",
     ]);
-    for (const key of ["antti", "ville", "elina", "jussi"]) {
+    for (const key of ["antti", "ville", "elina", "jussi", "laura", "emmi"]) {
       expect(hasFixedIdentity(persona(key)), key).toBe(true);
       expect(Object.values(bed), key).not.toContain(personaHetu(persona(key), DAYS[0] as Date));
     }

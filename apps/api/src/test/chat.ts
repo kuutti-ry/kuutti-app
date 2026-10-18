@@ -74,3 +74,29 @@ export function interleaved(
     },
   };
 }
+
+/** Two active accounts with their identities, and a conversation between them, side a and side b. */
+export async function twoInAConversation(db: Queryable, label: string) {
+  const accounts: string[] = [];
+  for (const side of ["a", "b"]) {
+    const identity = await db.query<{ id: string }>(
+      "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+      [`${label} ${side} ${randomUUID()}`],
+    );
+    const account = await db.query<{ id: string }>(
+      "INSERT INTO account (identity_id, state, birth_year, birth_month) VALUES ($1, 'active', 1990, 6) RETURNING id",
+      [identity.rows[0]?.id],
+    );
+    accounts.push(account.rows[0]?.id as string);
+  }
+  const conversation = await db.query<{ id: string }>(
+    "INSERT INTO conversation DEFAULT VALUES RETURNING id",
+  );
+  const id = conversation.rows[0]?.id as string;
+  await db.query(
+    `INSERT INTO conversation_participant (conversation_id, account_id, side)
+     VALUES ($1, $2, 'a'), ($1, $3, 'b')`,
+    [id, accounts[0], accounts[1]],
+  );
+  return { a: accounts[0] as string, b: accounts[1] as string, id };
+}

@@ -1,11 +1,11 @@
 /**
- * Returns the seventeen personas to where they begin (#73, ADR-014 §12; on
+ * Returns the nineteen personas to where they begin (#73, ADR-014 §12; on
  * staging #141, ADR-018): everybody erased through the erasure path and
- * forgotten, then the eleven with a history given it anew, with their
+ * forgotten, then the thirteen with a history given it anew, with their
  * conversations (#348).
  *
  *   pnpm demo:reset                  reset, then the histories
- *   pnpm demo:reset -- --bare        reset only: all seventeen are newcomers
+ *   pnpm demo:reset -- --bare        reset only: all nineteen are newcomers
  *   pnpm demo:reset -- --api http://localhost:3000
  *   pnpm demo:reset -- --objects-lost   although the store does not hold the photos
  *   node dist/demo-reset.js --env staging   inside the API's container on staging
