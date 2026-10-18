@@ -6,6 +6,9 @@ WORKDIR /repo
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+# pnpm reads every patch pnpm-workspace.yaml names, the app's ones too, before a
+# filtered install (#360): without the files it refuses.
+COPY patches patches
 COPY apps/api/package.json apps/api/
 COPY packages/schema/package.json packages/schema/
 COPY packages/db/package.json packages/db/
