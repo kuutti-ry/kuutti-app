@@ -5,7 +5,14 @@ import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
 import { ExportedGate } from "./gate.ts";
 import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
-import { Photo, PhotoCheckKind, PhotoRejectionReason, PhotoVariant } from "./media.ts";
+import {
+  EXPORT_DESCRIPTION_TEXT_MAX,
+  EXPORT_PHOTO_PATH_MAX,
+  ExportedPhotoReview,
+  Photo,
+  PhotoCheckKind,
+  PhotoVariant,
+} from "./media.ts";
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ExportedBlocks, ExportedReports } from "./report.ts";
@@ -57,25 +64,10 @@ export const AccountPauseRequest = z
   .meta({ id: "AccountPauseRequest" });
 export type AccountPauseRequest = z.infer<typeof AccountPauseRequest>;
 
-/** `photos/<photo id>.webp`: where a photo's file sits inside the export's zip (#237). */
-export const EXPORT_PHOTO_PATH_MAX = 60;
-/** The description in words is a few short sentences; Finnish runs a third longer than English. */
-export const EXPORT_DESCRIPTION_TEXT_MAX = 600;
-
 export const ExportedPhoto = Photo.extend({
   /** The path of the photo's full-size file inside the zip; null when its object is gone, or the API has no object storage (development without the stand-in). */
   file: z.string().max(EXPORT_PHOTO_PATH_MAX).nullable(),
-  review: z
-    .object({
-      decision: z.enum(["approved", "queued", "rejected"]),
-      reason: PhotoRejectionReason.nullable(),
-      decidedByStaff: z
-        .boolean()
-        .meta({ description: "True when a person decided, false when the automatic check did." }),
-      decidedAt: z.iso.datetime().nullable(),
-    })
-    .nullable()
-    .meta({ description: "The moderation outcome; label names are not part of it." }),
+  review: ExportedPhotoReview.nullable(),
   /** The automatic description in words, in the request's language (#296); null where there is none. The keys it was made from are `description`. */
   descriptionText: z.string().max(EXPORT_DESCRIPTION_TEXT_MAX).nullable(),
 }).meta({ id: "ExportedPhoto" });

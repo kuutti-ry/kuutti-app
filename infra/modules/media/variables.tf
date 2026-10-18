@@ -43,7 +43,7 @@ variable "signing_public_key_pem" {
 }
 
 variable "additional_signing_public_keys_pem" {
-  description = "Public halves the key group trusts besides the current one, PEM: the next key during a rotation, the previous key for the fifteen minutes its URLs are still valid (infra/envs/<env>/cloudfront-signing-key.*.pub.pem)."
+  description = "Public halves the key group trusts besides the current one, PEM: the next key during a rotation, the previous key for the twenty minutes its URLs may still be valid, a photo sent in a conversation's the longest (infra/envs/<env>/cloudfront-signing-key.*.pub.pem; ADR-031 §10)."
   type        = list(string)
   default     = []
 }

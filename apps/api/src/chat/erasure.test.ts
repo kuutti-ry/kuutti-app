@@ -6,7 +6,7 @@ import { eraseAccount } from "../identity/index.ts";
 import { applySanction } from "../safety/index.ts";
 import { signInAs } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
-import { exportOf } from "../test/export.ts";
+import { openExport } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { people } from "../test/people.ts";
 
@@ -119,24 +119,30 @@ describe("the chat in an erasure and an export", () => {
     const theirs = `Moi Aino 😀 ${MARK}`;
     expect((await send(ctx.app, b, id, theirs)).status).toBe(201);
     expect((await send(ctx.app, a, id, "Kahvilla?")).status).toBe(201);
-    const document = await exportOf(ctx.app, a.headers);
+    const { document, raw } = await openExport(
+      await ctx.app.request("/account/export", { headers: a.headers }),
+    );
     expect(document.conversations).toEqual([
       {
         openedAt: expect.any(String),
         state: "open",
         closedHow: null,
         mine: [
-          { at: expect.any(String), body: "Hei Bea" },
-          { at: expect.any(String), body: "Kahvilla?" },
+          { at: expect.any(String), kind: "text", body: "Hei Bea", photo: null },
+          { at: expect.any(String), kind: "text", body: "Kahvilla?", photo: null },
         ],
-        theirs: [{ at: expect.any(String), length: [...theirs].length }],
+        theirs: [{ at: expect.any(String), kind: "text", length: [...theirs].length }],
       },
     ]);
-    const raw = JSON.stringify(document);
+    // Read as the zip carries it, before the contract drops a key it does not name.
     expect(raw).not.toContain(b.accountId);
     // B's words never leave the database for A's copy.
     expect(raw).not.toContain(MARK);
-    expect(Object.keys(document.conversations[0]?.theirs[0] ?? {})).toEqual(["at", "length"]);
+    expect(Object.keys(JSON.parse(raw).conversations[0].theirs[0])).toEqual([
+      "at",
+      "kind",
+      "length",
+    ]);
   });
 
   test("a conversation goes whole once both people are erased: nobody is left to keep it for", async ({

@@ -67,7 +67,7 @@ export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCou
   const { rows } = await db.query<FactsRow>(
     `SELECT a.pond_id, a.gender, a.state, p.display_name, p.bio, p.bio_preset, p.prompts,
             (SELECT count(*) FROM photo ph
-              WHERE ph.account_id = a.id AND ph.state = 'approved') AS approved_photos,
+              WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
             (SELECT r.value FROM preferences r
               WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'seeks') AS seeks,
             (SELECT r.value FROM preferences r

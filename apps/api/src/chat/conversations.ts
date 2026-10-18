@@ -9,6 +9,7 @@ import {
   type ConversationSummary,
   type ConversationThumb,
   type ExportedConversation,
+  type ExportedSentPhoto,
   MESSAGE_PREVIEW_LENGTH,
   messageCountBand,
 } from "@kuutti/schema";
@@ -248,6 +249,8 @@ export async function eraseConversationsOf(
 export async function exportConversations(
   db: Queryable,
   accountId: string,
+  /** A sent photo's entry by its id (#350), from the media slice's export; null when it has none. */
+  sentPhoto: (photoId: string) => ExportedSentPhoto | null,
 ): Promise<ExportedConversation[]> {
   const rows = await repo.exportConversationsOf(db, accountId);
   return rows.map((row) => {
@@ -264,10 +267,15 @@ export async function exportConversations(
       closedHow,
       mine: row.lines
         .filter((line) => line.mine)
-        .map((line) => ({ at: line.at.toISOString(), body: line.body ?? "" })),
+        .map((line) => ({
+          at: line.at.toISOString(),
+          kind: line.kind,
+          body: line.body ?? "",
+          photo: line.photoId ? sentPhoto(line.photoId) : null,
+        })),
       theirs: row.lines
         .filter((line) => !line.mine)
-        .map((line) => ({ at: line.at.toISOString(), length: line.length })),
+        .map((line) => ({ at: line.at.toISOString(), kind: line.kind, length: line.length })),
     };
   });
 }

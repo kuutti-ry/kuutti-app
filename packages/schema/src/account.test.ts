@@ -206,8 +206,8 @@ function anExport(): Record<string, unknown> {
         openedAt: at,
         state: "open",
         closedHow: null,
-        mine: [{ at, body: "Hei" }],
-        theirs: [{ at, length: 12 }],
+        mine: [{ at, kind: "text", body: "Hei", photo: null }],
+        theirs: [{ at, kind: "text", length: 12 }],
       },
     ],
   };

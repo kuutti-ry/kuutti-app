@@ -45,7 +45,13 @@ import { loadConfig, parseConfig } from "../src/lib/config.ts";
 import { createLogger, type Logger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError, lookAtApi, onThisComputer, whyNotTheLocalStore } from "./demo/bank.ts";
-import { giveConversations, giveHistory, type HistoryResult, viaRoutes } from "./demo/histories.ts";
+import {
+  giveConversations,
+  giveHistory,
+  givePhotoMessages,
+  type HistoryResult,
+  viaRoutes,
+} from "./demo/histories.ts";
 import { loadAssets } from "./demo/photos.ts";
 import { type ResetResult, resetPersonas } from "./demo/reset.ts";
 import { giveStories, personaHashes, viaServices } from "./demo/services.ts";
@@ -228,6 +234,12 @@ async function localReset(): Promise<void> {
       }
       const talked = await giveConversations(pool, results, now());
       console.log(JSON.stringify({ msg: "demo reset: conversations", ...talked }));
+      const photos = await givePhotoMessages(
+        { db: pool, logger, ...(store ? { media: store } : {}), assets },
+        results,
+        now(),
+      );
+      console.log(JSON.stringify({ msg: "demo reset: photos in conversations", ...photos }));
     }
     await recount(pool, logger, now);
     sparedOrThrow(reset);
@@ -295,6 +307,12 @@ async function stagingReset(): Promise<void> {
       }
       const talked = await giveConversations(pool, results, now());
       console.log(JSON.stringify({ msg: "demo reset: conversations", ...talked }));
+      const photos = await givePhotoMessages(
+        { db: pool, logger, ...(media.deps ? { media: media.deps } : {}), assets },
+        results,
+        now(),
+      );
+      console.log(JSON.stringify({ msg: "demo reset: photos in conversations", ...photos }));
     }
     await recount(pool, logger, now);
     sparedOrThrow(reset);

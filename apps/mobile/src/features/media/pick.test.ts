@@ -1,5 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
-import { pickPhoto, prepareForUpload, UPLOAD_LONG_EDGE } from "./pick";
+import { setLocalCheck } from "./localCheck";
+import { pickPhoto, pickPrepared, prepareForUpload, UPLOAD_LONG_EDGE } from "./pick";
 
 const { ImageManipulator } = jest.requireMock("expo-image-manipulator") as {
   ImageManipulator: { manipulate: jest.Mock };
@@ -77,5 +78,47 @@ describe("preparing for upload", () => {
     expect(context.resize).not.toHaveBeenCalled();
     expect(prepared.uri).toBe("file:///s.jpg#resized");
     expect(prepared.mimeType).toBe("image/jpeg");
+  });
+});
+
+describe("the chain before an upload (#48, #350)", () => {
+  afterEach(() => setLocalCheck(null));
+
+  it("picks, checks and resizes, saying when the picture is being prepared", async () => {
+    launch.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///a.heic", width: 4032, height: 3024 }],
+    });
+    const preparing = jest.fn();
+    expect(await pickPrepared(preparing)).toEqual({
+      kind: "picked",
+      photo: { uri: "file:///a.heic#resized", width: 1600, height: 1067, mimeType: "image/jpeg" },
+    });
+    expect(preparing).toHaveBeenCalledTimes(1);
+  });
+
+  it("hands back a cancel and a denied library as they came, preparing nothing", async () => {
+    const preparing = jest.fn();
+    launch.mockResolvedValueOnce({ canceled: true, assets: null });
+    expect(await pickPrepared(preparing)).toEqual({ kind: "cancelled" });
+    launch.mockRejectedValueOnce(new Error("Missing permission"));
+    expect(await pickPrepared()).toEqual({ kind: "denied" });
+    expect(preparing).not.toHaveBeenCalled();
+    expect(ImageManipulator.manipulate).not.toHaveBeenCalled();
+  });
+
+  it("stops at the on-device check's refusal, before the resize", async () => {
+    launch.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///nude.jpg", width: 1200, height: 900 }],
+    });
+    const checked: string[] = [];
+    setLocalCheck(async (uri) => {
+      checked.push(uri);
+      return "refuse";
+    });
+    expect(await pickPrepared()).toEqual({ kind: "refused_local" });
+    expect(checked).toEqual(["file:///nude.jpg"]);
+    expect(ImageManipulator.manipulate).not.toHaveBeenCalled();
   });
 });

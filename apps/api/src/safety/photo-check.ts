@@ -32,13 +32,21 @@ export type CloserLook = {
 /** A day here is 24 hours, in SQL as in JS, whatever the session's time zone does with summer time. */
 const DAY_MS = 86_400_000;
 
-/** One note, written in the transaction that rejects the photo. */
+/**
+ * One note, written in the transaction that rejects the photo. A message
+ * photo the check refused was never stored (#350): its note names no photo,
+ * and it is written after the check, outside any transaction of the send.
+ * So the account's row is held for it: an erasure under way (which holds
+ * the row first) is waited for and then seen, and a note never outlives the
+ * erasure that deleted the account's notes (#51, #253).
+ */
 export async function recordPhotoCheckNote(
   db: Queryable,
-  input: { accountId: string; photoId: string; kind: PhotoCheckKind; at: Date },
+  input: { accountId: string; photoId: string | null; kind: PhotoCheckKind; at: Date },
 ): Promise<void> {
   await db.query(
-    "INSERT INTO photo_check_note (account_id, photo_id, kind, at) VALUES ($1, $2, $3, $4)",
+    `INSERT INTO photo_check_note (account_id, photo_id, kind, at)
+     SELECT $1, $2, $3, $4 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE`,
     [input.accountId, input.photoId, input.kind, input.at],
   );
 }

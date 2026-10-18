@@ -5,25 +5,30 @@ import {
   MESSAGES_PAGE_DEFAULT,
   messageLength,
 } from "@kuutti/schema";
+import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
+import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
+import { type PickedPhoto, pickPrepared } from "@/features/media";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
-import { cn } from "@/lib/utils";
 import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
+import { TextBubble } from "./Bubble";
 import { ConnectionLine } from "./ConnectionLine";
 import { counterpartName } from "./ConversationsScreen";
-import { fetchConversation, fetchMessages, markRead, sendMessage } from "./client";
+import { fetchConversation, fetchMessages, markRead, sendMessage, sendPhoto } from "./client";
+import { PhotoBubble, SendingPhotoBubble } from "./PhotoBubble";
 import { type ConversationLive, merged, useChatLive } from "./store";
-import { dayOf, timeOf } from "./time";
+import { dayOf } from "./time";
 
 type Loaded = { detail: ConversationDetail; messages: ChatMessage[] };
 type ScreenView =
@@ -32,16 +37,43 @@ type ScreenView =
   | { status: "gone" }
   | { status: "failed"; error: unknown };
 
-/** The refusals the composer says in its own words; anything else is a failure to try again. */
-const REFUSALS: Record<string, PlainMessageKey> = {
-  message_too_long: "chat.composer.error.message_too_long",
-  contact_details: "chat.composer.error.contact_details",
-  conversation_closed: "chat.composer.error.conversation_closed",
-  message_budget_exceeded: "chat.composer.error.message_budget_exceeded",
-};
+/**
+ * The refusals the composer says in its own words; anything else is a failure
+ * to try again. A Map, so a code like `toString` finds nothing rather than a
+ * prototype member. A photo's (#350) are the check's, the day's photos, the
+ * file's and the pipeline's, in the words the photos screen has for the last two.
+ */
+const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
+  ["message_too_long", "chat.composer.error.message_too_long"],
+  ["contact_details", "chat.composer.error.contact_details"],
+  ["conversation_closed", "chat.composer.error.conversation_closed"],
+  ["message_budget_exceeded", "chat.composer.error.message_budget_exceeded"],
+  ["photo_rejected_nudity", "errors.photo_rejected_nudity"],
+  ["photo_rejected_violence", "errors.photo_rejected_violence"],
+  ["photo_rejected_other", "errors.photo_rejected_other"],
+  ["message_photo_budget_exceeded", "errors.message_photo_budget_exceeded"],
+  ["photo_unsupported", "photos.error.photo_unsupported"],
+  ["photo_invalid", "photos.error.photo_invalid"],
+  ["photo_too_many_pixels", "photos.error.tooLarge"],
+  ["payload_too_large", "photos.error.tooLarge"],
+  ["media_busy", "photos.error.media_busy"],
+  ["media_unavailable", "photos.error.media_unavailable"],
+]);
+
+/**
+ * The refusals of the words or of the pace, not of the picture: the photo
+ * stays attached for the next try, as the words stay in the field. Any other
+ * refusal of a photo takes it off.
+ */
+const KEEPS_PHOTO: ReadonlySet<string> = new Set([
+  "message_too_long",
+  "contact_details",
+  "message_budget_exceeded",
+  "media_busy",
+]);
 
 /** A message on its way: shown until the API's answer or the socket brings one with its id. */
-type Pending = { body: string; at: string; clientId: string };
+type Pending = { body: string; at: string; clientId: string; photo: PickedPhoto | null };
 
 /** The detail as the socket has told it since it was read (#349): the state, and the read mark. */
 function withLive(
@@ -73,7 +105,12 @@ function withLive(
  * messages are a button. Live (#349): what the socket brings joins what was
  * read, by sequence; the read mark and the state follow its frames; "Online"
  * under the header while the counterpart is; a line at the top while the
- * connection is lost.
+ * connection is lost. A photo (#350): Add photo beside the field picks one
+ * through the photos screen's chain, shown above the field until it is sent or
+ * removed; Send then sends it with the field's words as its caption, its
+ * progress in the sending row. A refusal of the picture takes it off; a
+ * failure keeps it and its id for the next try. A photo that came without
+ * URLs (the socket's) or whose URL expired is read again over HTTP, once.
  */
 export function ConversationScreen({ id }: { id: string }) {
   const { t } = useT();
@@ -82,6 +119,9 @@ export function ConversationScreen({ id }: { id: string }) {
   const [view, setView] = useState<ScreenView>({ status: "loading" });
   const [text, setText] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
+  const [percent, setPercent] = useState(0);
+  const [attached, setAttached] = useState<PickedPhoto | null>(null);
+  const [picking, setPicking] = useState(false);
   const [refusal, setRefusal] = useState<PlainMessageKey | null>(null);
   const scroll = useRef<ScrollView>(null);
   const loaded = useRef<ChatMessage[]>([]);
@@ -89,7 +129,7 @@ export function ConversationScreen({ id }: { id: string }) {
   // Whether a page back may hold more: the last one came full. Not the first
   // sequence: a message the caller may not read still has its place.
   const [more, setMore] = useState(false);
-  const unsent = useRef<{ body: string; clientId: string } | null>(null);
+  const unsent = useRef<{ body: string; clientId: string; photo: PickedPhoto | null } | null>(null);
   // Only a screen in front marks read: one under another screen, or under
   // the app switcher or the control centre (iOS's inactive), is not being read.
   const focused = useRef(false);
@@ -113,6 +153,7 @@ export function ConversationScreen({ id }: { id: string }) {
         unsent.current = null;
         setRefusal(null);
         setText((words) => (words === lost.body ? "" : words));
+        setAttached((photo) => (photo === lost.photo ? null : photo));
       }
       // The newest is on the screen now: read up to it, once per new message of theirs.
       const newest = messages.at(-1);
@@ -135,15 +176,15 @@ export function ConversationScreen({ id }: { id: string }) {
     try {
       const detail = await fetchConversation(id);
       const newest = loaded.current.at(-1);
+      // What is held is taken once the page is here, not before: what came
+      // meanwhile (the socket's, a photo's URLs read again) is kept.
       if (newest) {
-        show(
-          detail,
-          merged(loaded.current, await fetchMessages(id, { after: newest.seq, limit: 100 })),
-        );
+        const page = await fetchMessages(id, { after: newest.seq, limit: 100 });
+        show(detail, merged(loaded.current, page));
       } else {
         const page = await fetchMessages(id, {});
         setMore(page.length === MESSAGES_PAGE_DEFAULT);
-        show(detail, page.reverse());
+        show(detail, merged(loaded.current, page.reverse()));
       }
     } catch (error) {
       if (error instanceof ApiError && error.status === 404) setView({ status: "gone" });
@@ -191,6 +232,37 @@ export function ConversationScreen({ id }: { id: string }) {
     if (newestSeq !== null) report({ [id]: newestSeq });
   }, [id, newestSeq, report]);
 
+  // A photo without URLs (the socket's copy, rules/api.md) or with an expired
+  // URL: the message read again over HTTP signs them, and the
+  // copy with them takes its place. Once each for a message and a reason; a
+  // read that fails may be tried again.
+  const reread = useRef(new Set<string>());
+  const readAgain = useCallback(
+    async (message: ChatMessage, why: "missing" | "expired") => {
+      const key = `${why} ${message.id}`;
+      if (reread.current.has(key)) return;
+      reread.current.add(key);
+      try {
+        const [fresh] = await fetchMessages(id, { after: message.seq - 1, limit: 1 });
+        if (fresh?.id !== message.id) return;
+        loaded.current = merged(loaded.current, [fresh]);
+        setView((was) => (was.status === "ready" ? { ...was, messages: loaded.current } : was));
+      } catch {
+        reread.current.delete(key);
+      }
+    },
+    [id],
+  );
+  const shownMessages = view.status === "ready" ? view.messages : null;
+  const sendingId = pending?.clientId ?? null;
+  useEffect(() => {
+    for (const message of shownMessages ?? []) {
+      // One's own photo on its way: the send's answer brings it signed.
+      const answering = sendingId !== null && message.clientId === sendingId;
+      if (message.photo && !message.photo.urls && !answering) void readAgain(message, "missing");
+    }
+  }, [shownMessages, sendingId, readAgain]);
+
   const earlier = async (detail: ConversationDetail, oldest: number) => {
     tap();
     try {
@@ -202,17 +274,45 @@ export function ConversationScreen({ id }: { id: string }) {
     }
   };
 
+  const attach = async () => {
+    tap();
+    setRefusal(null);
+    setPicking(true);
+    try {
+      const picked = await pickPrepared();
+      if (picked.kind === "picked") setAttached(picked.photo);
+      else if (picked.kind === "denied") setRefusal("photos.error.permission");
+      else if (picked.kind === "refused_local") setRefusal("photos.refused.local");
+    } catch {
+      // The phone could not read the picture to resize it.
+      setRefusal("photos.error.photo_invalid");
+    } finally {
+      setPicking(false);
+    }
+  };
+
   const send = async (detail: ConversationDetail) => {
     const body = text.trim();
+    const photo = attached;
     tap();
+    // The same words, and the same picture, sent again keep their id.
+    const again = unsent.current;
     const clientId =
-      unsent.current?.body === body ? unsent.current.clientId : globalThis.expo.uuidv4();
-    unsent.current = { body, clientId };
-    setPending({ body, at: new Date().toISOString(), clientId });
+      again && again.body === body && again.photo?.uri === photo?.uri
+        ? again.clientId
+        : globalThis.expo.uuidv4();
+    unsent.current = { body, clientId, photo };
+    setPending({ body, at: new Date().toISOString(), clientId, photo });
+    setPercent(0);
     setText("");
+    setAttached(null);
     setRefusal(null);
     try {
-      const message = await sendMessage(id, { clientId, body });
+      const message = photo
+        ? await sendPhoto(id, { photo, clientId, caption: body }, (fraction) =>
+            setPercent(Math.round(fraction * 100)),
+          )
+        : await sendMessage(id, { clientId, body });
       unsent.current = null;
       setPending(null);
       // A message brings an archived conversation back (TD-13).
@@ -225,10 +325,12 @@ export function ConversationScreen({ id }: { id: string }) {
         return;
       }
       setText(body);
-      const code = error instanceof ApiError ? error.code : undefined;
-      setRefusal((code && REFUSALS[code]) || "chat.composer.error.failed");
+      const code = (error instanceof ApiError ? error.code : undefined) ?? "";
+      const refused = REFUSALS.get(code);
+      setRefusal(refused ?? "chat.composer.error.failed");
+      if (photo && (!refused || KEEPS_PHOTO.has(code))) setAttached(photo);
       // A refusal is final for these words; only a failure is tried again with the same id.
-      if (code && REFUSALS[code]) unsent.current = null;
+      if (refused) unsent.current = null;
       if (code === "conversation_closed") void load();
     }
   };
@@ -280,9 +382,11 @@ export function ConversationScreen({ id }: { id: string }) {
             detail={detail}
             messages={messages}
             pending={sending}
+            percent={percent}
             more={more}
             scroll={scroll}
             onEarlier={(oldest) => void earlier(detail, oldest)}
+            onExpired={(message) => void readAgain(message, "expired")}
           />
           <View className="gap-2 border-t border-border p-4">
             {refusal && <Text accessibilityLiveRegion="assertive">{t(refusal)}</Text>}
@@ -296,9 +400,16 @@ export function ConversationScreen({ id }: { id: string }) {
                 maxLength={detail.limits.maxLength}
                 archived={detail.state === "archived"}
                 sending={pending !== null}
+                picking={picking}
+                attached={attached}
                 onChange={(value) => {
                   setText(value);
                   setRefusal(null);
+                }}
+                onAttach={() => void attach()}
+                onDetach={() => {
+                  tap();
+                  setAttached(null);
                 }}
                 onSend={() => void send(detail)}
               />
@@ -314,16 +425,20 @@ function Conversation({
   detail,
   messages,
   pending,
+  percent,
   more,
   scroll,
   onEarlier,
+  onExpired,
 }: {
   detail: ConversationDetail;
   messages: ChatMessage[];
   pending: Pending | null;
+  percent: number;
   more: boolean;
   scroll: React.RefObject<ScrollView | null>;
   onEarlier: (oldest: number) => void;
+  onExpired: (message: ChatMessage) => void;
 }) {
   const { t, locale } = useT();
   const theirName = detail.counterpart.deleted ? t("chat.deletedUser") : detail.counterpart.name;
@@ -353,17 +468,36 @@ function Conversation({
               {dayOf(locale, message.createdAt)}
             </Text>
           )}
-          <Bubble
-            mine={message.side === "mine"}
-            who={message.side === "mine" ? t("chat.message.you") : theirName}
-            body={message.body ?? ""}
-            at={message.createdAt}
-            note={message.seq === readSeq ? t("chat.message.read") : null}
-          />
+          {message.kind === "photo" ? (
+            <PhotoBubble
+              message={message}
+              conversationId={detail.id}
+              who={message.side === "mine" ? t("chat.message.you") : theirName}
+              note={message.seq === readSeq ? t("chat.message.read") : null}
+              onExpired={onExpired}
+            />
+          ) : (
+            <TextBubble
+              mine={message.side === "mine"}
+              who={message.side === "mine" ? t("chat.message.you") : theirName}
+              body={message.body ?? ""}
+              at={message.createdAt}
+              note={message.seq === readSeq ? t("chat.message.read") : null}
+            />
+          )}
         </Fragment>
       ))}
-      {pending && (
-        <Bubble
+      {pending?.photo && (
+        <SendingPhotoBubble
+          who={t("chat.message.you")}
+          uri={pending.photo.uri}
+          caption={pending.body}
+          at={pending.at}
+          percent={percent}
+        />
+      )}
+      {pending && !pending.photo && (
+        <TextBubble
           mine
           who={t("chat.message.you")}
           body={pending.body}
@@ -375,79 +509,83 @@ function Conversation({
   );
 }
 
-/** One message: the person's own on the right, the other's on the left, read as who, when and what. */
-function Bubble({
-  mine,
-  who,
-  body,
-  at,
-  note,
-}: {
-  mine: boolean;
-  who: string;
-  body: string;
-  at: string;
-  note: string | null;
-}) {
-  const { t, locale } = useT();
-  const time = timeOf(locale, at);
-  return (
-    <View
-      className={cn("max-w-[85%] gap-1", mine ? "items-end self-end" : "items-start self-start")}
-    >
-      <View
-        accessible
-        accessibilityLabel={t("chat.message.label", { who, time, text: body })}
-        className={cn("rounded-2xl px-3 py-2", mine ? "bg-primary" : "bg-secondary")}
-      >
-        <Text className={mine ? "text-primary-foreground" : "text-secondary-foreground"}>
-          {body}
-        </Text>
-      </View>
-      <Text variant="muted" {...DECORATIVE}>
-        {time}
-      </Text>
-      {note && <Text variant="muted">{note}</Text>}
-    </View>
-  );
-}
+/** The attached photo's edge above the field, in points. */
+const ATTACHED_EDGE = 56;
 
 function Composer({
   text,
   maxLength,
   archived,
   sending,
+  picking,
+  attached,
   onChange,
+  onAttach,
+  onDetach,
   onSend,
 }: {
   text: string;
   maxLength: number;
   archived: boolean;
   sending: boolean;
+  picking: boolean;
+  attached: PickedPhoto | null;
   onChange: (value: string) => void;
+  onAttach: () => void;
+  onDetach: () => void;
   onSend: () => void;
 }) {
   const { t } = useT();
   const left = maxLength - messageLength(text.trim());
+  // A photo goes without words; words go without a photo.
+  const empty = text.trim().length === 0 && attached === null;
   return (
     <>
       {archived && <Text>{t("chat.archived.banner")}</Text>}
-      <Input
-        accessibilityLabel={t("chat.composer.label")}
-        placeholder={t("chat.composer.placeholder")}
-        value={text}
-        multiline
-        textAlignVertical="top"
-        className="min-h-touch"
-        onChangeText={onChange}
-      />
+      {attached && (
+        <View className="flex-row items-center gap-3">
+          <Image
+            testID="photo-attached"
+            source={{ uri: attached.uri }}
+            contentFit="cover"
+            style={{ width: ATTACHED_EDGE, height: ATTACHED_EDGE, borderRadius: 8 }}
+            {...DECORATIVE}
+          />
+          <Text accessibilityLiveRegion="polite" className="flex-1">
+            {t("chat.composer.photoAttached")}
+          </Text>
+          <Button variant="ghost" disabled={sending} onPress={onDetach}>
+            {t("chat.composer.removePhoto")}
+          </Button>
+        </View>
+      )}
+      <View className="flex-row items-end gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel={t("chat.composer.photo")}
+          disabled={sending || picking}
+          onPress={onAttach}
+        >
+          <Icon as={ImagePlus} />
+        </Button>
+        <Input
+          accessibilityLabel={t("chat.composer.label")}
+          placeholder={t("chat.composer.placeholder")}
+          value={text}
+          multiline
+          textAlignVertical="top"
+          className="min-h-touch w-auto flex-1"
+          onChangeText={onChange}
+        />
+      </View>
       <View className="flex-row items-center justify-between gap-3">
         <Text variant="muted" className="flex-1">
           {left < 0
             ? t("chat.composer.error.message_too_long")
             : t("chat.composer.remaining", { characters: left })}
         </Text>
-        <Button disabled={text.trim().length === 0 || left < 0 || sending} onPress={onSend}>
+        <Button disabled={empty || left < 0 || sending} onPress={onSend}>
           {t("chat.composer.send")}
         </Button>
       </View>

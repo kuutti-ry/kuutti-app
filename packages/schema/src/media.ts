@@ -37,6 +37,10 @@ export const PhotoState = z.enum(["pending", "approved", "queued", "rejected"]).
 });
 export type PhotoState = z.infer<typeof PhotoState>;
 
+/** What a photo is for (#350): the profile's, or one sent in a conversation to its two people only. */
+export const PhotoPurpose = z.enum(["profile", "message"]).meta({ id: "PhotoPurpose" });
+export type PhotoPurpose = z.infer<typeof PhotoPurpose>;
+
 /** The upload's size cap (rules/api.md Media): checked on the Content-Length before any byte is read. */
 export const PHOTO_MAX_BYTES = 10 * 1024 * 1024;
 /** Refused from the file header before the decoder runs; the app sends 1600 px, so this is a backstop. */
@@ -44,19 +48,20 @@ export const PHOTO_MAX_INPUT_PIXELS = 30_000_000;
 /** What the API decodes. An animated GIF is refused, never reduced to a frame. */
 const PHOTO_INPUT_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 
+/** The picture of an upload, a profile photo or a photo sent in a conversation (#350). */
+export const PhotoFile = z
+  .file()
+  .max(PHOTO_MAX_BYTES)
+  .mime([...PHOTO_INPUT_TYPES])
+  .meta({
+    // The document generator has no mapping for a file schema; this is what it should say.
+    type: "string",
+    format: "binary",
+    description: "The picture, pre-resized to 1600 px by the app; JPEG, PNG or WebP.",
+  });
+
 export const PhotoUploadRequest = z
-  .object({
-    photo: z
-      .file()
-      .max(PHOTO_MAX_BYTES)
-      .mime([...PHOTO_INPUT_TYPES])
-      .meta({
-        // The document generator has no mapping for a file schema; this is what it should say.
-        type: "string",
-        format: "binary",
-        description: "The picture, pre-resized to 1600 px by the app; JPEG, PNG or WebP.",
-      }),
-  })
+  .object({ photo: PhotoFile })
   .strict()
   .meta({ id: "PhotoUploadRequest" });
 export type PhotoUploadRequest = z.infer<typeof PhotoUploadRequest>;
@@ -69,6 +74,27 @@ export const PhotoRejectionReason = z
   .enum(["nudity", "no_person", "several_people", "minor", "violence", "contact_details", "other"])
   .meta({ id: "PhotoRejectionReason" });
 export type PhotoRejectionReason = z.infer<typeof PhotoRejectionReason>;
+
+/** `photos/<photo id>.webp`: where a photo's file sits inside the export's zip (#237). */
+export const EXPORT_PHOTO_PATH_MAX = 60;
+/** The description in words is a few short sentences; Finnish runs a third longer than English. */
+export const EXPORT_DESCRIPTION_TEXT_MAX = 600;
+
+/** A photo's moderation outcome in the data export (ADR-007 §3): a profile photo's, or one sent in a conversation (#350). */
+export const ExportedPhotoReview = z
+  .object({
+    decision: z.enum(["approved", "queued", "rejected"]),
+    reason: PhotoRejectionReason.nullable(),
+    decidedByStaff: z
+      .boolean()
+      .meta({ description: "True when a person decided, false when the automatic check did." }),
+    decidedAt: z.iso.datetime().nullable(),
+  })
+  .meta({
+    id: "ExportedPhotoReview",
+    description: "The moderation outcome; label names are not part of it.",
+  });
+export type ExportedPhotoReview = z.infer<typeof ExportedPhotoReview>;
 
 /**
  * The hard groups of the automatic check (#253): what a photo it did not show

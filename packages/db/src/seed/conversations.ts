@@ -24,6 +24,13 @@ export type PersonaConversation = {
   messages: readonly { from: "a" | "b"; hoursAgo: number; body: string }[];
   /** The highest sequence each side has read (`read_up_to`). */
   readUpTo: { a: number; b: number };
+  /**
+   * A photo sent after the messages (#350). Not written here: the API's demo
+   * commands send it through the chat's own send, the pipeline and the check
+   * included, from the release's pictures, with this fixed id, so a second
+   * run is answered with the stored message and writes nothing.
+   */
+  photo?: { from: "a" | "b"; hoursAgo: number; asset: string; caption: string; clientId: string };
 };
 
 export const PERSONA_CONVERSATIONS: readonly PersonaConversation[] = [
@@ -57,6 +64,15 @@ export const PERSONA_CONVERSATIONS: readonly PersonaConversation[] = [
       { from: "b", hoursAgo: 20, body: "Tulen mielelläni. Sopisiko lauantai?" },
     ],
     readUpTo: { a: 5, b: 5 },
+    // Ville's view of the lake, the seventh message: his own, so his unread
+    // count stays as `chat-text` reads it; Antti has not opened it yet.
+    photo: {
+      from: "b",
+      hoursAgo: 19,
+      asset: "negatives/no-face.jpg",
+      caption: "Tällainen ilta järvellä. Lauantaina kuulemma samanlainen sää.",
+      clientId: "7b1d3a52-0c9e-4f6a-9d2b-5e8c1f4a6b30",
+    },
   },
   {
     // Matched ten days ago, and nobody wrote: Antti's archived group.

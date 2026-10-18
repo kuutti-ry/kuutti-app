@@ -6,6 +6,7 @@ import {
   MessageKind,
   ModeratorRole,
   PHOTO_VARIANTS,
+  PhotoPurpose,
   PhotoRejectionReason,
   PhotoState,
   ReportOutcome,
@@ -172,6 +173,10 @@ describe("the foreign keys", () => {
     ]);
   });
 
+  it("let a message outlive its photo, which reads as removed (#350)", () => {
+    expect(references).toContain("message.photo_id -> photo.id set null");
+  });
+
   it("let the photo check's note outlive its photo, without the link (#253)", () => {
     expect(
       references.filter((reference) => reference.startsWith("photo_check_note.")).sort(),
@@ -246,9 +251,14 @@ describe("the indexes", () => {
     ["sanction", "sanction_account_created_idx", ["account_id", "created_at"]],
     ["sanction", "sanction_identity_open_idx", ["identity_id"]],
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
+    ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);
+  });
+
+  it("count only message photos for the day's budget (#350)", () => {
+    expect(index("photo", "photo_message_day_idx")?.where).toBeDefined();
   });
 
   it("read only what is still open when settling a sanction (#307)", () => {
@@ -302,7 +312,12 @@ describe("the checks", () => {
       "conversation_next_seq_check",
     ]);
     expect(checks("conversation_participant")).toEqual(["conversation_participant_read_check"]);
-    expect(checks("message")).toEqual(["message_seq_check", "message_text_body_check"]);
+    expect(checks("message")).toEqual([
+      "message_photo_check",
+      "message_seq_check",
+      "message_text_body_check",
+    ]);
+    expect(checks("photo")).toEqual(["photo_position_check"]);
     const unique = (table: string) =>
       byName
         .get(table)
@@ -313,7 +328,11 @@ describe("the checks", () => {
       "conversation_participant_account_idx",
       "conversation_participant_side_idx",
     ]);
-    expect(unique("message")).toEqual(["message_client_idx", "message_seq_idx"]);
+    expect(unique("message")).toEqual([
+      "message_client_idx",
+      "message_photo_idx",
+      "message_seq_idx",
+    ]);
   });
 });
 
@@ -329,6 +348,7 @@ describe("the enums", () => {
     expect(enums.moderator_role).toEqual(ModeratorRole.options);
     expect(enums.photo_state).toEqual(PhotoState.options);
     expect(enums.photo_variant).toEqual([...PHOTO_VARIANTS]);
+    expect(enums.photo_purpose).toEqual(PhotoPurpose.options);
     expect(enums.photo_rejection_reason).toEqual(PhotoRejectionReason.options);
     expect(enums.sanction_kind).toEqual(SanctionKind.options);
     expect(enums.sanction_reason).toEqual(SanctionReason.options);

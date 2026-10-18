@@ -64,6 +64,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `language` | Sanna | the language choice changes the app at once (#220) |
 | `give-feedback` | Sanna | a kind ticked in words, a few lines, Send, the thanks (#171) |
 | `chat-text` | Antti, Ville | Antti's list: Ville's conversation open, the silent match with Sanna in the archived group; a message Antti writes reaches Ville with its time, and Antti then sees Read under it (#348); the live socket connects, with no connection line while Antti writes (#349). Each run adds a message of its own words, so it runs again without a reset |
+| `chat-photo` | Antti, Ville | a photo from the library through Add photo, attached and sent with a caption of its own words through the pipeline (#350): Sending… until it is there, then the bubble with who, when and the caption; Ville's row says it unread with the caption, the conversation shows it, a tap opens it full size and the button goes back. Each run sends a photo of its own, counted against Antti's photos of the day (`message_photos_per_day`, 10): after that many runs in a Finnish day, `pnpm demo:reset` first |
 
 Mikael is left out: given the moderator role on a machine, he is spared by `pnpm demo:reset`, which then exits with an error after doing the rest.
 

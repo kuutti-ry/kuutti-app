@@ -54,9 +54,24 @@ const BLANK: ConversationLive = {
   cursor: 0,
 };
 
+/**
+ * A message as the later copy says it, except that a socket's copy of a photo
+ * (no URLs: rules/api.md) never takes the URLs a page signed for the same
+ * photo (#350). A photo gone since (null) is the later word.
+ */
+function later(earlier: ChatMessage | undefined, next: ChatMessage): ChatMessage {
+  const kept = earlier?.photo;
+  return next.photo && !next.photo.urls && kept?.urls && kept.photoId === next.photo.photoId
+    ? { ...next, photo: kept }
+    : next;
+}
+
 /** Oldest first, each sequence once, the later one winning. */
-export const merged = (a: ChatMessage[], b: ChatMessage[]): ChatMessage[] =>
-  [...new Map([...a, ...b].map((m) => [m.seq, m])).values()].sort((x, y) => x.seq - y.seq);
+export const merged = (a: ChatMessage[], b: ChatMessage[]): ChatMessage[] => {
+  const bySeq = new Map<number, ChatMessage>();
+  for (const m of [...a, ...b]) bySeq.set(m.seq, later(bySeq.get(m.seq), m));
+  return [...bySeq.values()].sort((x, y) => x.seq - y.seq);
+};
 
 function changed(
   live: ChatLive,

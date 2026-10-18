@@ -167,6 +167,36 @@ describe("the list of conversations", () => {
     expect(router.back).toHaveBeenCalled();
   });
 
+  it("says a photo's caption as the row's line, else Photo, with You: before one's own (#350)", async () => {
+    const photo = (n: number, preview: string, side: "mine" | "theirs") =>
+      summary(ID(n), {
+        counterpart: { deleted: false, name: `Nimi${n}`, age: 30, thumb: null },
+        lastMessage: { seq: 2, at: OLD, kind: "photo", preview, side },
+        unread: 0,
+      });
+    api(() =>
+      json({
+        open: [
+          photo(1, "", "theirs"),
+          photo(2, "", "mine"),
+          photo(3, "Mökillä", "theirs"),
+          photo(4, "Mökillä", "mine"),
+        ],
+        archived: [],
+      }),
+    );
+    await renderWithTheme(<ConversationsScreen />);
+    const old = dayOf("en", OLD);
+    for (const name of [
+      `Nimi1, 30, Photo, ${old}`,
+      `Nimi2, 30, You: Photo, ${old}`,
+      `Nimi3, 30, Mökillä, ${old}`,
+      `Nimi4, 30, You: Mökillä, ${old}`,
+    ]) {
+      expect(await screen.findByRole("button", { name })).toBeTruthy();
+    }
+  });
+
   it("says there is nothing yet", async () => {
     api(() => json({ open: [], archived: [] }));
     await renderWithTheme(<ConversationsScreen />);
@@ -373,6 +403,7 @@ describe("the list, live over the socket", () => {
         body,
         createdAt: NOW,
         clientId: null,
+        photo: null,
       },
     });
     // A message is applied where it lands: the row's last line, one more unread, and no read of the list.

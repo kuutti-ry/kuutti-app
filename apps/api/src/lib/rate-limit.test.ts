@@ -51,6 +51,33 @@ describe("rate limit", () => {
     expect((await app.request("/", client)).status).toBe(200);
   });
 
+  it("ends a window where windowEnd says, not windowMs after it opened (#350)", async () => {
+    let clock = 1_000;
+    const app = new Hono<AppEnv>();
+    app.use("*", serverRequestId());
+    app.use(
+      "*",
+      rateLimit({
+        limit: 1,
+        windowMs: 10_000,
+        // A calendar's window: every one ends at the next whole 5 seconds.
+        windowEnd: (at) => (Math.floor(at / 5_000) + 1) * 5_000,
+        keyOf: () => "one",
+        now: () => clock,
+      }),
+    );
+    app.get("/", (c) => c.text("ok"));
+    expect((await app.request("/")).status).toBe(200);
+    clock = 4_000;
+    const blocked = await app.request("/");
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("retry-after")).toBe("1");
+    clock = 5_000;
+    expect((await app.request("/")).status).toBe(200);
+    clock = 9_999;
+    expect((await app.request("/")).status).toBe(429);
+  });
+
   // Audit F19 (#52): the first hop is whatever the client wrote before Traefik
   // appended the address it saw. Forging it must not buy a fresh bucket.
   it("behind Traefik, keys on the last forwarded hop, so a forged first hop changes nothing", async () => {

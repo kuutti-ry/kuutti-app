@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseConfig } from "../lib/config.ts";
+import { type Config, parseConfig } from "../lib/config.ts";
 import { testConfig } from "../test/harness.ts";
 import { testSigningKeys } from "../test/media.ts";
 import { createMediaDeps } from "./wiring.ts";
@@ -98,6 +98,56 @@ describe("media wiring", () => {
     expect(deps).toBeUndefined();
     expect(setup.mode).toBe("off");
   });
+});
+
+describe("a message photo no check saw (#350)", () => {
+  // deliverUnchecked is the one switch between delivering such a photo and
+  // refusing it as busy; a deployed environment must never hold it.
+  const deployed = {
+    staging: () => testConfig({ APP_ENV: "staging", NODE_ENV: "production", ...cloudfront }),
+    production: () =>
+      testConfig({
+        APP_ENV: "production",
+        NODE_ENV: "production",
+        ADMIN_APP_URL: "https://admin.kuutti.app",
+        ...cloudfront,
+      }),
+    // parseConfig keeps a preview off CloudFront (the test above); should the
+    // values reach the wiring anyway, a preview is still no developer's machine.
+    preview: (): Config => ({
+      ...testConfig({ APP_ENV: "staging", NODE_ENV: "production", ...cloudfront }),
+      APP_ENV: "preview",
+    }),
+  };
+
+  it.each(Object.keys(deployed) as Array<keyof typeof deployed>)(
+    "is refused on CloudFront in %s: a deployed box is no developer's machine",
+    (env) => {
+      const { deps, setup } = createMediaDeps(deployed[env]());
+      expect(setup.mode).toBe("cloudfront");
+      expect(deps?.deliverUnchecked).toBe(false);
+    },
+  );
+
+  it.each(["development", "test"] as const)(
+    "is delivered on CloudFront in %s: a developer's machine or a test has no Rekognition",
+    (env) => {
+      const { deps, setup } = createMediaDeps(testConfig({ APP_ENV: env, ...cloudfront }));
+      expect(setup.mode).toBe("cloudfront");
+      expect(deps?.deliverUnchecked).toBe(true);
+    },
+  );
+
+  it.each(["development", "test"] as const)(
+    "is delivered on the compose stand-in in %s: the stand-in runs on a developer's machine or in CI only",
+    (env) => {
+      const { deps, setup } = createMediaDeps(
+        testConfig({ APP_ENV: env, S3_ENDPOINT: "http://127.0.0.1:9000" }),
+      );
+      expect(setup.mode).toBe("presigned");
+      expect(deps?.deliverUnchecked).toBe(true);
+    },
+  );
 });
 
 describe("moderation wiring", () => {

@@ -87,7 +87,7 @@ const FACTS = `
   SELECT a.id, a.identity_id, a.gender, a.state, a.birth_year, a.birth_month, a.registered_at,
          p.display_name, p.bio, p.bio_preset, p.prompts, p.fields->>'intent' AS intent,
          (SELECT count(*) FROM photo ph
-           WHERE ph.account_id = a.id AND ph.state = 'approved') AS approved_photos,
+           WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
          (SELECT r.value FROM preferences r
            WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'seeks') AS seeks,
          (SELECT r.value FROM preferences r

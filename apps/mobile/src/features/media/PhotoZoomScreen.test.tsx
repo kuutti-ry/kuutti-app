@@ -25,7 +25,7 @@ beforeEach(async () => {
 });
 
 describe("PhotoZoomScreen", () => {
-  it("is the one place that asks for the full variant, and goes back with a labelled button", async () => {
+  it("asks for the full variant of one's own photo, and goes back with a labelled button", async () => {
     const calls: Request[] = [];
     globalThis.fetch = jest.fn(async (input: Request | string) => {
       const req = input instanceof Request ? input : new Request(input);

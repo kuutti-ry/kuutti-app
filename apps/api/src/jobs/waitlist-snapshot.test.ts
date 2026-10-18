@@ -71,6 +71,19 @@ describe("the figures", () => {
     expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 1 });
   });
 
+  test("photos sent in conversations finish no profile: one whose approved photos are all of messages is finishing (#350)", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-waitlist-message-photos");
+    const [messagesOnly] = await people(ctx.client, pond, 2, { gender: "woman", complete: true });
+    // The same three approved photos, sent in conversations instead.
+    await ctx.client.query(
+      "UPDATE photo SET purpose = 'message', position = NULL WHERE account_id = $1",
+      [messagesOnly],
+    );
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 2, finishing: 1 });
+  });
+
   test("A profile that is not complete counts as finishing", async ({ ctx }) => {
     const pond = await pondNamed(ctx.client, "test-waitlist-finishing");
     await people(ctx.client, pond, 10, { gender: "woman", complete: true });

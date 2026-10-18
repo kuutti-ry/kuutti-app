@@ -59,6 +59,7 @@ export function withLive(
         seq: last.seq,
         at: last.createdAt,
         kind: last.kind,
+        // A photo's caption, or "" without one, as the API's preview (#350): the row says Photo.
         preview: [...(last.body ?? "")].slice(0, MESSAGE_PREVIEW_LENGTH).join(""),
         side: last.side,
       },

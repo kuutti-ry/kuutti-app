@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -24,6 +26,13 @@ import { account, identity } from "./identity.ts";
  */
 export const photoState = pgEnum("photo_state", ["pending", "approved", "queued", "rejected"]);
 export const photoVariant = pgEnum("photo_variant", ["thumb", "card", "full"]);
+/**
+ * What a photo is for (#350): one of the profile's, ordered and on the card,
+ * or one sent in a conversation, seen by its two people only. The profile's
+ * reads ask for `profile`; a message photo never reaches a card, a photos
+ * screen or the moderators' queue.
+ */
+export const photoPurpose = pgEnum("photo_purpose", ["profile", "message"]);
 /** The closed list a moderator chooses from; the owner is told it in words (#49). */
 export const photoRejectionReason = pgEnum("photo_rejection_reason", [
   "nudity",
@@ -55,8 +64,10 @@ export const photo = pgTable(
     // The owner may ask a person to look (#253): set when the check rejects,
     // unless it was sure of nudity; cleared by the appeal or a person's decision.
     appealable: boolean("appealable").notNull().default(false),
-    // 0 is the main photo. The owner orders; the API renumbers 0..n-1.
-    position: smallint("position").notNull(),
+    purpose: photoPurpose("purpose").notNull().default("profile"),
+    // 0 is the main photo. The owner orders; the API renumbers 0..n-1. A
+    // message photo has none.
+    position: smallint("position"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     // The owner's line for the photo (#296): a key of PHOTO_CAPTIONS, never
     // the person's text, so there is nothing to check; the words are the
@@ -66,6 +77,14 @@ export const photo = pgTable(
   (table) => [
     index("photo_account_position_idx").on(table.accountId, table.position),
     index("photo_key_idx").on(table.key),
+    // The day's message photos of an account (message_photos_per_day, #350).
+    index("photo_message_day_idx")
+      .on(table.accountId, table.createdAt)
+      .where(sql`${table.purpose} = 'message'`),
+    check(
+      "photo_position_check",
+      sql`(${table.purpose} = 'profile') = (${table.position} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -86,6 +105,10 @@ export const photoAccess = pgTable(
     photoId: uuid("photo_id").notNull(),
     variant: photoVariant("variant").notNull(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+    // A message photo's fetch is logged and never counted against the day's
+    // budget (#350): written when the URL is issued, since the photo it names
+    // may be gone by the time a later fetch is counted.
+    purpose: photoPurpose("purpose").notNull().default("profile"),
   },
   // The budget is counted per account per day (#52); the same index serves it.
   (table) => [index("photo_access_account_at_idx").on(table.accountId, table.at)],

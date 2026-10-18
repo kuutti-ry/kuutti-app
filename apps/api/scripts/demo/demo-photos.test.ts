@@ -2,7 +2,12 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { manifestOf, PERSONA_HISTORIES, type PhotoAsset } from "@kuutti/db/demo";
+import {
+  manifestOf,
+  PERSONA_CONVERSATIONS,
+  PERSONA_HISTORIES,
+  type PhotoAsset,
+} from "@kuutti/db/demo";
 import sharp from "sharp";
 import { afterAll } from "vitest";
 import { hmacKeyFromHex } from "../../src/identity/index.ts";
@@ -11,6 +16,7 @@ import { signedInAccount } from "../../src/test/account.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../../src/test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../../src/test/media.ts";
 import { DemoError } from "./bank.ts";
+import { giveConversations, givePhotoMessages } from "./histories.ts";
 import { approveLocally, loadAssets, picturesOf, uploadFaces } from "./photos.ts";
 import { giveStories, viaServices } from "./services.ts";
 
@@ -97,6 +103,65 @@ describe("the release in the cache", () => {
     expect(() =>
       picturesOf({ dir, manifest }, { key: "noa", photos: 0, negatives: ["cartoon"] }),
     ).toThrow(/no negative cartoon/);
+  });
+});
+
+describe("the stories' photos in their conversations (#350)", () => {
+  test("give the chat's pair the story's photo, through the pipeline, once, and none without object storage", async ({
+    ctx,
+  }) => {
+    const assets = await release();
+    const { writer, store, media, logger } = await world(ctx, assets);
+    const results = await giveStories(writer);
+    await giveConversations(ctx.client, results, new Date());
+    const story = PERSONA_CONVERSATIONS.find((c) => c.photo)?.photo;
+    if (!story) throw new Error("no story with a photo");
+    const deps = { db: ctx.client, logger, media: media.deps, assets };
+    expect(await givePhotoMessages(deps, results, new Date())).toEqual({
+      sent: 1,
+      already: 0,
+      skipped: 0,
+    });
+    const sent = await ctx.client.query(
+      `SELECT m.seq, m.side, m.kind, m.body, p.purpose, p.position, p.key
+       FROM message m JOIN photo p ON p.id = m.photo_id`,
+    );
+    expect(sent.rows).toEqual([
+      {
+        seq: 7,
+        side: story.from,
+        kind: "photo",
+        body: story.caption,
+        purpose: "message",
+        position: null,
+        key: expect.any(String),
+      },
+    ]);
+    const full = store.objects.get(objectKey(sent.rows[0]?.key, "full"));
+    const meta = await sharp(Buffer.from(full as Uint8Array)).metadata();
+    expect([meta.format, meta.exif]).toEqual(["webp", undefined]);
+    // A second run is answered with the stored message.
+    expect(await givePhotoMessages(deps, results, new Date())).toEqual({
+      sent: 0,
+      already: 1,
+      skipped: 0,
+    });
+    // Without object storage, or with no pictures, none; a release without the picture is refused.
+    expect(
+      await givePhotoMessages({ db: ctx.client, logger, assets }, results, new Date()),
+    ).toEqual({ sent: 0, already: 0, skipped: 1 });
+    expect(await givePhotoMessages({ ...deps, assets: null }, results, new Date())).toEqual({
+      sent: 0,
+      already: 0,
+      skipped: 1,
+    });
+    await expect(
+      givePhotoMessages(
+        { ...deps, assets: { dir: assets.dir, manifest: [] } },
+        results,
+        new Date(),
+      ),
+    ).rejects.toThrow(/no negatives\/no-face\.jpg/);
   });
 });
 

@@ -7,13 +7,23 @@ export { photoAdminRoutes } from "./admin-routes.ts";
 export { dayWindow, localYearMonth, secondsUntil } from "./budget.ts";
 export {
   deleteOrphanedObjects,
+  EXPORT_MESSAGE_PHOTOS_MAX,
   type ExportedPhotoFile,
   erasePhotosOfAccount,
   exportPhotos,
   type PhotoErasure,
 } from "./erasure.ts";
-export { sweepPendingPhotos } from "./moderation.ts";
-export { issueConversationThumb, type MediaDeps, uploadPhoto } from "./photos.ts";
+export { type Inspection, type Moderator, sweepPendingPhotos } from "./moderation.ts";
+export {
+  countMessagePhotosSince,
+  issueConversationThumb,
+  issueMessagePhotoUrls,
+  type MediaDeps,
+  type PreparedMessagePhoto,
+  prepareMessagePhoto,
+  storeMessagePhoto,
+  uploadPhoto,
+} from "./photos.ts";
 export {
   listApprovedPhotos,
   listPhotos,

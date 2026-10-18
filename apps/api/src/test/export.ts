@@ -10,6 +10,8 @@ import type { App } from "../app.ts";
 export type OpenedExport = {
   response: Response;
   document: AccountExport;
+  /** The document as the zip carries it, before the contract drops a key it does not name: what a leak test reads. */
+  raw: string;
   /** Every entry of the zip by its path, the document's among them. */
   files: Map<string, Uint8Array>;
 };
@@ -21,10 +23,9 @@ export async function openExport(response: Response): Promise<OpenedExport> {
   const files = new Map(Object.entries(entries));
   const json = [...files.keys()].find((path) => path.endsWith(".json"));
   if (!json) throw new Error("no document in the export");
-  const document = AccountExport.parse(
-    JSON.parse(new TextDecoder().decode(files.get(json) as Uint8Array)),
-  );
-  return { response, document, files };
+  const raw = new TextDecoder().decode(files.get(json) as Uint8Array);
+  const document = AccountExport.parse(JSON.parse(raw));
+  return { response, document, raw, files };
 }
 
 /** `GET /account/export` as the caller, opened; the document alone is what most tests read. */

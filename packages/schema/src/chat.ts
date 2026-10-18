@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  EXPORT_DESCRIPTION_TEXT_MAX,
+  EXPORT_PHOTO_PATH_MAX,
+  ExportedPhotoReview,
+  PhotoDescription,
+  PhotoFile,
+} from "./media.ts";
 
 // The chat (#348, ADR-031): the conversations a match opens, the text
 // messages in them, the read marks. Nothing here carries the other person's
@@ -46,7 +53,8 @@ export const ConversationClosedHow = z
   .meta({ id: "ConversationClosedHow" });
 export type ConversationClosedHow = z.infer<typeof ConversationClosedHow>;
 
-export const MessageKind = z.enum(["text"]).meta({ id: "MessageKind" });
+/** A text, or a photo (#350) whose caption is the body. */
+export const MessageKind = z.enum(["text", "photo"]).meta({ id: "MessageKind" });
 export type MessageKind = z.infer<typeof MessageKind>;
 
 /** Whose a message is, seen from the caller. */
@@ -147,6 +155,29 @@ export const ConversationDetail = ConversationSummary.extend({
 }).meta({ id: "ConversationDetail" });
 export type ConversationDetail = z.infer<typeof ConversationDetail>;
 
+/**
+ * A photo sent in a conversation (#350): small in the thread from the thumb,
+ * full on a tap. The caption is the message's body. `description` is what the
+ * check saw (#296), in keys the app says in the viewer's language. The URLs
+ * are signed in a page's answer, the read of one message and the send's
+ * answer to its sender, until the next five-minute mark plus fifteen
+ * minutes (15 to 20 minutes, `expiresAt`); a socket frame carries none
+ * (rules/api.md: URLs only inside rate-limited responses), and the phone
+ * reads the message again for them. The app caches by `photoId/variant`,
+ * never by the URL.
+ */
+export const ChatPhoto = z
+  .object({
+    photoId: z.uuid(),
+    blurhash: z.string().max(100),
+    width: z.int().min(1),
+    height: z.int().min(1),
+    description: PhotoDescription.nullable(),
+    urls: z.object({ thumb: z.url(), full: z.url(), expiresAt: z.iso.datetime() }).nullable(),
+  })
+  .meta({ id: "ChatPhoto" });
+export type ChatPhoto = z.infer<typeof ChatPhoto>;
+
 export const ChatMessage = z
   .object({
     id: z.uuid(),
@@ -162,6 +193,12 @@ export const ChatMessage = z
      * stay theirs.
      */
     clientId: z.uuid().nullable(),
+    /**
+     * A photo message's photo; null on a text, and on a photo message whose
+     * photo went with its sender's erasure: "Photo removed" (#350). Whoever
+     * may read the message sees its photo, so a block reads like any close.
+     */
+    photo: ChatPhoto.nullable(),
   })
   .meta({ id: "ChatMessage" });
 export type ChatMessage = z.infer<typeof ChatMessage>;
@@ -212,12 +249,51 @@ export const SendMessageRequest = z
   .meta({ id: "SendMessageRequest" });
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
 
+/**
+ * A photo sent in a conversation (#350), one request that uploads and sends,
+ * multipart: the picture, the phone's id for the message (a resend with it
+ * doubles nothing), and an optional caption under the text rules, whose
+ * blank reads as none.
+ */
+export const SendPhotoRequest = z
+  .object({
+    photo: PhotoFile,
+    clientId: z.uuid(),
+    caption: z
+      .string()
+      .trim()
+      .max(MESSAGE_BODY_CEILING)
+      .refine((caption) => !caption.includes("\u0000"), "No NUL character")
+      .optional(),
+  })
+  .strict()
+  .meta({ id: "SendPhotoRequest" });
+export type SendPhotoRequest = z.infer<typeof SendPhotoRequest>;
+
 /** Read up to this sequence; the mark never goes back, nor past the newest message. */
 export const ReadRequest = z
   .object({ upTo: z.int().min(0).max(MESSAGE_SEQ_MAX) })
   .strict()
   .meta({ id: "ReadRequest" });
 export type ReadRequest = z.infer<typeof ReadRequest>;
+
+/**
+ * A photo the person sent, on its line of their export (#350, ADR-007 §3):
+ * what a profile photo's entry says, its file, the check's outcome and its
+ * description, with the time and the caption on the line.
+ */
+export const ExportedSentPhoto = z
+  .object({
+    /** The full-size file in the zip, `photos/<id>.webp`; null when the zip does not carry it: its object is gone, or it is not among the newest sent photos. */
+    file: z.string().max(EXPORT_PHOTO_PATH_MAX).nullable(),
+    /** For a sent photo, `queued` is one the check was unsure of, delivered and put to no person (ADR-031 §10). */
+    review: ExportedPhotoReview.nullable(),
+    description: PhotoDescription.nullable(),
+    /** The description in words, in the request's language (#296); null where there is none. */
+    descriptionText: z.string().max(EXPORT_DESCRIPTION_TEXT_MAX).nullable(),
+  })
+  .meta({ id: "ExportedSentPhoto" });
+export type ExportedSentPhoto = z.infer<typeof ExportedSentPhoto>;
 
 /**
  * A conversation in the person's own export (ADR-007 §4, ADR-031 §5): when it
@@ -231,20 +307,34 @@ export const ExportedConversation = z
     state: ConversationState,
     closedHow: ConversationClosedHow.nullable(),
     mine: z
-      .array(z.object({ at: z.iso.datetime(), body: z.string().max(MESSAGE_BODY_CEILING) }))
+      .array(
+        z.object({
+          at: z.iso.datetime(),
+          kind: MessageKind,
+          /** The words, or a photo's caption ("" without one). */
+          body: z.string().max(MESSAGE_BODY_CEILING),
+          /** The photo the person sent (#350); null for a text, or once the photo went. */
+          photo: ExportedSentPhoto.nullable(),
+        }),
+      )
       .max(1_000_000),
-    theirs: z.array(z.object({ at: z.iso.datetime(), length: z.int().min(0) })).max(1_000_000),
+    /** The counterpart's: when, what kind and how long, never the words (the caption's length for a photo). */
+    theirs: z
+      .array(z.object({ at: z.iso.datetime(), kind: MessageKind, length: z.int().min(0) }))
+      .max(1_000_000),
   })
   .meta({ id: "ExportedConversation" });
 export type ExportedConversation = z.infer<typeof ExportedConversation>;
 
 /** The research events' coarse lengths (ADR-011 §1 and §9): a band, never the count. */
 export const MessageLengthBand = z
-  .enum(["1-20", "21-80", "81-280", "281-1000", "1001+"])
+  .enum(["0", "1-20", "21-80", "81-280", "281-1000", "1001+"])
   .meta({ id: "MessageLengthBand" });
 export type MessageLengthBand = z.infer<typeof MessageLengthBand>;
 
+/** "0" is a photo sent without a caption (#350); a text is never empty. */
 export function messageLengthBand(length: number): MessageLengthBand {
+  if (length === 0) return "0";
   if (length <= 20) return "1-20";
   if (length <= 80) return "21-80";
   if (length <= 280) return "81-280";

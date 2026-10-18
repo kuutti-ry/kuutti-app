@@ -6,7 +6,7 @@ import { AppState } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { underProviders } from "@/test/render";
 import { FakeWebSocket } from "@/test/websocket";
-import { type ChatLive, ChatLiveProvider, EMPTY, reduce, useChatLive } from "./store";
+import { type ChatLive, ChatLiveProvider, EMPTY, merged, reduce, useChatLive } from "./store";
 
 // What the socket said, held for the screens (#349): the reducer for every
 // frame, the cursors the screens report, and the provider that holds the
@@ -32,6 +32,7 @@ const message = (seq: number, body = `Viesti ${seq}`): ChatMessage => ({
   body,
   createdAt: "2026-10-17T11:03:00.000Z",
   clientId: null,
+  photo: null,
 });
 const frames = (...all: ServerFrame[]): ChatLive =>
   all.reduce((live, frame) => reduce(live, { type: "frame", frame }), EMPTY);
@@ -48,6 +49,32 @@ describe("the chat's live store", () => {
       [3, "Korjattu"],
     ]);
     expect(live.conversations[A]?.cursor).toBe(3);
+  });
+
+  it("keeps the URLs a page signed when the socket's copy of the same photo comes without them (#350)", () => {
+    const photo = (urls: boolean, photoId = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01") => ({
+      photoId,
+      blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+      width: 1600,
+      height: 1067,
+      description: null,
+      urls: urls
+        ? {
+            thumb: "https://media.test/thumb.webp?sig=s",
+            full: "https://media.test/full.webp?sig=s",
+            expiresAt: "2030-01-01T00:15:00.000Z",
+          }
+        : null,
+    });
+    const signed = { ...message(2), kind: "photo" as const, photo: photo(true) };
+    const bare = { ...signed, photo: photo(false) };
+    expect(merged([signed], [bare])).toEqual([signed]);
+    // A copy with URLs, a photo gone since, or another photo at the place is the later word.
+    expect(merged([bare], [signed])).toEqual([signed]);
+    expect(merged([signed], [{ ...signed, photo: null }])).toEqual([{ ...signed, photo: null }]);
+    const other = { ...signed, photo: photo(false, "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a02") };
+    expect(merged([signed], [other])).toEqual([other]);
+    expect(merged([message(2)], [bare])).toEqual([bare]);
   });
 
   it("raises the read mark only, and follows presence", () => {

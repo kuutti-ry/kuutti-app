@@ -35,6 +35,7 @@ const MESSAGE = {
     body: "Moi",
     createdAt: "2026-10-17T11:59:00.000Z",
     clientId: null,
+    photo: null,
   },
 };
 
@@ -129,6 +130,50 @@ describe("the chat's socket", () => {
     expect((ws.sent.at(-1) as { conversations: unknown[] }).conversations).toHaveLength(2000);
   });
 
+  it("hands on a photo's message with a description key this build cannot say left out (#350)", async () => {
+    const description = {
+      people: 1,
+      setting: "outdoors",
+      scene: ["lake"],
+      objects: ["dog"],
+      smile: true,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
+    };
+    const photo = {
+      photoId: "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01",
+      blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+      width: 1600,
+      height: 1067,
+      urls: null,
+    };
+    stop = connect(handlers);
+    const ws = ready();
+    ws.receive({
+      ...MESSAGE,
+      message: {
+        ...MESSAGE.message,
+        kind: "photo",
+        body: null,
+        photo: { ...photo, description: { ...description, scene: ["lake", "volcano"] } },
+      },
+    });
+    expect(handlers.onFrame.mock.calls).toEqual([
+      [
+        {
+          ...MESSAGE,
+          message: {
+            ...MESSAGE.message,
+            kind: "photo",
+            body: null,
+            photo: { ...photo, description },
+          },
+        },
+      ],
+    ]);
+  });
+
   it("drops a frame outside the contract, and one that is not JSON, without a word", async () => {
     const log = jest.spyOn(console, "log");
     const warn = jest.spyOn(console, "warn");
@@ -138,6 +183,7 @@ describe("the chat's socket", () => {
     ws.receive({ type: "shout", text: "secret" });
     ws.receiveRaw("not json: secret");
     ws.receiveRaw(undefined);
+    ws.receiveRaw("null");
     expect(handlers.onFrame).not.toHaveBeenCalled();
     expect([...log.mock.calls, ...warn.mock.calls]).toEqual([]);
     expect(ws.sent).toHaveLength(2);

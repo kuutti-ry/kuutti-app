@@ -48,7 +48,7 @@ const exportRoute = createRoute({
   path: "/account/export",
   summary: "Everything Kuutti holds about this account",
   description:
-    "One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every photo whose object the store holds. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant.",
+    "One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every profile photo whose object the store holds and of the newest hundred photos the person sent in conversations, whose lines carry each one's moderation outcome and description. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant, a sent photo's with the purpose message, never counted.",
   ...bearer,
   responses: {
     200: {

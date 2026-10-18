@@ -24,7 +24,14 @@ export type RateLimitOptions = {
    * admin's edit (#348, #305).
    */
   limit: number | ((c: Context<AppEnv>) => number | Promise<number>);
+  /** How long a window lasts; with `windowEnd`, the longest one may. */
   windowMs: number;
+  /**
+   * When a window opened at `at` ends, for a limit of the calendar: the
+   * day's photo tries end at midnight in Finland (#350), as the day's
+   * photos do. `at + windowMs` when absent.
+   */
+  windowEnd?: (at: number) => number;
   /** Whose budget a request spends; null shares one bucket rather than bypassing the limit (fail closed). */
   keyOf: (c: Context<AppEnv>) => string | null;
   /** Asked once the request has been answered: true gives its count back (ADR-026 §2). */
@@ -79,7 +86,7 @@ export function rateLimit(options: RateLimitOptions): MiddlewareHandler<AppEnv> 
     const key = options.keyOf(c) ?? "unknown";
     let bucket = buckets.get(key);
     if (!bucket || bucket.resetAt <= at) {
-      bucket = { count: 0, resetAt: at + options.windowMs };
+      bucket = { count: 0, resetAt: options.windowEnd?.(at) ?? at + options.windowMs };
       buckets.set(key, bucket);
       if (!sweeping) sweepLater();
     }

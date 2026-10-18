@@ -11,6 +11,7 @@ import {
   refreshSession,
   type StoredSession,
 } from "@/lib/session";
+import { messageWithKnownDescription } from "./known";
 
 // The chat's socket (#349, ADR-031 §5): one connection at a time, which says
 // what changed; writing stays on the HTTP routes. The access token goes in
@@ -45,10 +46,23 @@ const AUTH_ERRORS: ReadonlySet<FrameErrorCode> = new Set([
 
 const socketUrl = () => `${apiBaseUrl().replace(/^http/, "ws")}/ws`;
 
-/** A frame from the API, or null for anything outside the contract; its content is never logged. */
+/**
+ * A frame from the API, or null for anything outside the contract; its content
+ * is never logged. A message's photo description keeps what this build can
+ * say (#350), as a page's does.
+ */
 function parsed(data: unknown): ServerFrame | null {
   try {
-    const frame = ServerFrame.safeParse(JSON.parse(String(data)));
+    const sent: unknown = JSON.parse(String(data));
+    const message = (sent as { type?: unknown; message?: unknown } | null)?.type === "message";
+    const frame = ServerFrame.safeParse(
+      message
+        ? {
+            ...(sent as object),
+            message: messageWithKnownDescription((sent as { message: unknown }).message),
+          }
+        : sent,
+    );
     return frame.success ? frame.data : null;
   } catch {
     return null;

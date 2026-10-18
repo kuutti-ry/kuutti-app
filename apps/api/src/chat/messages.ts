@@ -9,6 +9,7 @@ import {
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { issueMessagePhotoUrls } from "../media/index.ts";
 import { contactDetailsIn } from "../profile/index.ts";
 import { track } from "../research/index.ts";
 import { type ChatDeps, MESSAGE_MAX_LENGTH_KEY, requireConversation } from "./conversations.ts";
@@ -21,7 +22,11 @@ import * as repo from "./repo.ts";
 
 export const MESSAGES_PER_MINUTE_KEY = "messages_per_minute";
 
-/** A message as the account on `side` reads it: the phone's own id only on its own messages. */
+/**
+ * A message as the account on `side` reads it: the phone's own id only on its
+ * own messages, a photo without its URLs (withPhotoUrls signs them where the
+ * answer may carry them, #350).
+ */
 export const toMessage = (row: repo.MessageRow, side: repo.Side): ChatMessage => ({
   id: row.id,
   seq: row.seq,
@@ -30,7 +35,48 @@ export const toMessage = (row: repo.MessageRow, side: repo.Side): ChatMessage =>
   body: row.body,
   createdAt: row.createdAt.toISOString(),
   clientId: row.side === side ? row.clientId : null,
+  photo: row.photo
+    ? {
+        photoId: row.photo.id,
+        blurhash: row.photo.blurhash,
+        width: row.photo.width,
+        height: row.photo.height,
+        description: row.photo.description,
+        urls: null,
+      }
+    : null,
 });
+
+/**
+ * The photos of an answer, signed for the reader (#350): each photo message's
+ * thumb and full size, logged as fetches of the reader's that the day's
+ * budget never counts. A photo follows its message: whoever may read the
+ * message sees it, so a closed conversation reads alike whatever closed it,
+ * and a block is never told apart from an unmatch (ADR-030 §6). Without media
+ * configured, a photo has no URLs.
+ */
+export async function withPhotoUrls(
+  deps: ChatDeps,
+  input: {
+    viewerAccountId: string;
+    side: repo.Side;
+    rows: readonly repo.MessageRow[];
+  },
+): Promise<ChatMessage[]> {
+  const messages = input.rows.map((row) => toMessage(row, input.side));
+  const photos = input.rows.flatMap((row) => (row.photo ? [row.photo] : []));
+  if (!deps.media || photos.length === 0) return messages;
+  const urls = await issueMessagePhotoUrls(
+    { ...deps.media, db: deps.db, logger: deps.logger, now: deps.now },
+    { viewerAccountId: input.viewerAccountId, photos },
+  );
+  return messages.map((message) => {
+    const signed = message.photo ? urls?.get(message.photo.photoId) : undefined;
+    return message.photo && signed
+      ? { ...message, photo: { ...message.photo, urls: signed } }
+      : message;
+  });
+}
 
 type Outcome =
   | { kind: "not_found" }
@@ -150,7 +196,13 @@ export async function readMessages(
     after: query.after,
     limit: query.limit,
   });
-  return { messages: rows.map((row) => toMessage(row, conversation.side)) };
+  return {
+    messages: await withPhotoUrls(deps, {
+      viewerAccountId: accountId,
+      side: conversation.side,
+      rows,
+    }),
+  };
 }
 
 /** The read mark: up, never down, never past the newest message; read in a closed conversation too. */

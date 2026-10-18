@@ -5,6 +5,7 @@ import { createApp } from "../app.ts";
 import type { IdentityBroker } from "../identity/index.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession } from "./account.ts";
+import { conversationBetween } from "./chat.ts";
 import {
   captureLogger,
   closeTestPool,
@@ -13,7 +14,7 @@ import {
   testConfig,
   testPool,
 } from "./harness.ts";
-import { testMediaDeps } from "./media.ts";
+import { fixturePng, testMediaDeps } from "./media.ts";
 
 /** The verifier of a sign-in attempt, as the app makes one (ADR-027): 256 bits as lowercase hex. */
 const VERIFIER_PROBE = "4711beef".repeat(8);
@@ -111,8 +112,9 @@ function requestFor(
             message: FIXTURES.message,
             text: FIXTURES.message,
             note: FIXTURES.message,
-            // A message's text (#348), under the name the send takes it by.
+            // A message's text (#348), under the name the send takes it by, and a photo's caption (#350).
             body: FIXTURES.message,
+            caption: FIXTURES.message,
             nested: { hetu: FIXTURES.hetu, body: FIXTURES.message },
           }),
         }
@@ -153,6 +155,37 @@ const MODES_AND_CLIENTS = TRUSTED_PROXIES.flatMap((mode) =>
 
 describe("PII in logs", () => {
   afterAll(closeTestPool);
+
+  // The sweep above sends JSON, which the photo route refuses before its
+  // handler (#350): a multipart send of its own, sent and refused.
+  test("no caption reaches a log line through a photo sent in a conversation", async ({ ctx }) => {
+    const { logger, lines } = await captureLogger();
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db: ctx.client,
+      media: testMediaDeps().deps,
+    });
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    const send = async (caption: string) => {
+      const form = new FormData();
+      const bytes = await fixturePng(320, 240);
+      form.append("photo", new Blob([new Uint8Array(bytes)], { type: "image/png" }), "p.png");
+      form.append("clientId", crypto.randomUUID());
+      form.append("caption", caption);
+      return app.request(`/conversations/${id}/photos`, {
+        method: "POST",
+        headers: a.headers,
+        body: form,
+      });
+    };
+    expect((await send(FIXTURES.message)).status).toBe(201);
+    expect((await send(`${FIXTURES.message} ${FIXTURES.email}`)).status).toBe(400);
+    expect(lines().length).toBeGreaterThan(0);
+    expect(leakedFixtures(lines())).toEqual([]);
+  });
 
   it.each(MODES_AND_CLIENTS)(
     "no fixture reaches a log line through any registered route, behind %s, from an %s client",

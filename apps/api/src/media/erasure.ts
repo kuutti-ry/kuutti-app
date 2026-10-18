@@ -1,5 +1,10 @@
 import type { Queryable } from "@kuutti/db";
-import { type ExportedPhoto, PHOTO_VARIANTS } from "@kuutti/schema";
+import {
+  type ExportedPhoto,
+  type ExportedPhotoReview,
+  type ExportedSentPhoto,
+  PHOTO_VARIANTS,
+} from "@kuutti/schema";
 import type { Logger } from "../lib/logger.ts";
 import { type PhotoServiceDeps, toPhoto } from "./photos.ts";
 import * as repo from "./repo.ts";
@@ -18,11 +23,19 @@ export type PhotoErasure = {
   keys: string[];
 };
 
+/**
+ * The person's photos, every purpose, their fetch log and the cards shown to
+ * them, in the caller's transaction. `keep` names photos that outlive the
+ * erasure: #351 fills it with the photos a report's frozen copy holds for its
+ * twelve months; nothing does yet (#350). A message photo that goes leaves
+ * its message reading "Photo removed" (message.photo_id on delete set null).
+ */
 export async function erasePhotosOfAccount(
   tx: Queryable,
   accountId: string,
+  keep: readonly string[] = [],
 ): Promise<PhotoErasure> {
-  const keys = await repo.deletePhotosOfAccount(tx, accountId);
+  const keys = await repo.deletePhotosOfAccount(tx, accountId, keep);
   const accessRows = await repo.deletePhotoAccessOfAccount(tx, accountId);
   const shownRows = await repo.deleteCardShownOfAccount(tx, accountId);
   return { photos: keys.length, accessRows, shownRows, keys };
@@ -64,6 +77,8 @@ export async function deleteOrphanedObjects(
 }
 
 const EXPORT_ACCESS_LOG_LIMIT = 1000;
+/** The photos sent in conversations whose files an export carries, the newest first (#350). */
+export const EXPORT_MESSAGE_PHOTOS_MAX = 100;
 
 /** One photo's file for the zip (#237): where the document points, and the bytes as stored. */
 export type ExportedPhotoFile = { path: string; bytes: Uint8Array };
@@ -91,6 +106,8 @@ export async function exportPhotos(
   files: ExportedPhotoFile[];
   accessLog: Array<{ photoId: string; variant: (typeof PHOTO_VARIANTS)[number]; at: string }>;
   cardsShown: Array<{ photoId: string; at: string }>;
+  /** The photos sent in conversations (#350), by id, for their lines; less the words, as above. */
+  sent: Map<string, Omit<ExportedSentPhoto, "descriptionText">>;
 }> {
   const rows = await repo.listPhotos(deps.db, accountId);
   const reviews = await repo.listReviewsForAccount(deps.db, accountId);
@@ -113,19 +130,40 @@ export async function exportPhotos(
       });
     }
     const review = reviews.get(row.id);
-    photos.push({
-      ...toPhoto(row),
+    photos.push({ ...toPhoto(row), file, review: review ? exportedReview(review) : null });
+  }
+  // The photos the person sent in conversations (#350), for their lines:
+  // each one's outcome and description, as a profile photo's, and its file,
+  // logged as any read is (with the purpose `message`, never counted).
+  // shortcut: files for the newest EXPORT_MESSAGE_PHOTOS_MAX only, since the
+  // zip is built in memory (ADR-007 §3) and ten a day add up; the rest say
+  // no file. A zip streamed to the response lifts it.
+  const sent = new Map<string, Omit<ExportedSentPhoto, "descriptionText">>();
+  for (const photo of await repo.listMessagePhotosOfAccount(deps.db, accountId)) {
+    const bytes =
+      store && sent.size < EXPORT_MESSAGE_PHOTOS_MAX
+        ? await store.get(objectKey(photo.key, "full"))
+        : null;
+    let file: string | null = null;
+    if (bytes) {
+      file = exportedPhotoPath(photo.id);
+      files.push({ path: file, bytes });
+      await repo.logPhotoAccess(deps.db, {
+        accountId,
+        photoId: photo.id,
+        variant: "full",
+        at: deps.now(),
+        purpose: "message",
+      });
+    }
+    const review = reviews.get(photo.id);
+    sent.set(photo.id, {
       file,
-      review: review
-        ? {
-            decision: review.decision,
-            reason: review.reason,
-            decidedByStaff: review.decidedBy !== null,
-            decidedAt: review.decidedAt?.toISOString() ?? null,
-          }
-        : null,
+      review: review ? exportedReview(review) : null,
+      description: photo.description,
     });
   }
+  // After every read above, so the export appears in the log it returns.
   const accessLog = (
     await repo.listPhotoAccessOfAccount(deps.db, accountId, EXPORT_ACCESS_LOG_LIMIT)
   ).map((entry) => ({
@@ -136,5 +174,20 @@ export async function exportPhotos(
   const cardsShown = (
     await repo.listCardShownOfAccount(deps.db, accountId, EXPORT_ACCESS_LOG_LIMIT)
   ).map((entry) => ({ photoId: entry.photoId, at: entry.at.toISOString() }));
-  return { photos, files, accessLog, cardsShown };
+  return { photos, files, accessLog, cardsShown, sent };
+}
+
+/** The moderation outcome as the export says it: who decided, never the labels. */
+function exportedReview(review: {
+  decision: ExportedPhotoReview["decision"];
+  reason: ExportedPhotoReview["reason"];
+  decidedBy: string | null;
+  decidedAt: Date | null;
+}): ExportedPhotoReview {
+  return {
+    decision: review.decision,
+    reason: review.reason,
+    decidedByStaff: review.decidedBy !== null,
+    decidedAt: review.decidedAt?.toISOString() ?? null,
+  };
 }

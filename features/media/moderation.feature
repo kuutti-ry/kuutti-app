@@ -5,7 +5,10 @@ Feature: Photo moderation before anyone else sees a photo
   what it is sure of and tells the owner why; what it is unsure of is a
   person's to decide (ADR-006 §2, #206, #253); nothing is ever deleted by a
   machine. Each hard group of labels has two lines, 60 to ask a person and 90
-  to decide, as migration 0030 sets them.
+  to decide, as migration 0030 sets them. A photo sent in a conversation is
+  held to the same lines without the face rules, and only what the check is
+  sure of is refused: there `queued` is the stored state of a photo
+  delivered with no human queue (ADR-031 §10).
 
   Scenario Outline: Automatic moderation decision
     Given the check found labels <labels> and faces <faces> at thresholds <label_threshold> and <face_threshold>
@@ -35,6 +38,22 @@ Feature: Photo moderation before anyone else sees a photo
       | Violence 80, Explicit Nudity 61                 | 99         | 60              | 90             | queued   | Violence, Explicit Nudity  | none           |
       | Weapons 95, Explicit Nudity 92                  | 99         | 60              | 90             | rejected | Weapons, Explicit Nudity   | nudity         |
       | unchecked                                       | none       | 60              | 90             | queued   | not_checked                | none           |
+
+  Scenario Outline: Automatic decision on a photo sent in a conversation
+    Given the check found labels <labels> and faces <faces> in a photo sent in a conversation
+    Then the outcome is <outcome> with <flagged> flagged and the sender told <reason>
+
+    Examples:
+      | labels                          | faces      | outcome  | flagged            | reason   |
+      | none                            | none       | approved | nothing            | none     |
+      | none                            | 99, 98, 95 | approved | nothing            | none     |
+      | none                            | 70         | approved | nothing            | none     |
+      | Female Swimwear or Underwear 99 | 99         | approved | nothing            | none     |
+      | Explicit Nudity 97              | 99         | rejected | Explicit Nudity    | nudity   |
+      | Explicit Nudity 75              | none       | queued   | Explicit Nudity    | none     |
+      | Weapons 93                      | none       | rejected | Weapons            | violence |
+      | Corpses 95                      | none       | rejected | Corpses            | other    |
+      | unchecked                       | none       | queued   | not_checked        | none     |
 
   Scenario: An upload is checked and the photo leaves pending with what the check saw recorded
     Given an account uploads a photo

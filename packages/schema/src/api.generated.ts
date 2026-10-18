@@ -934,7 +934,7 @@ export interface paths {
         };
         /**
          * Everything Kuutti holds about this account
-         * @description One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every photo whose object the store holds. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant.
+         * @description One zip, named <stem>-<date>.zip in the request's language: a JSON document (the AccountExport schema) with the account, the identity's dates and login level, the devices signed in, the photos with their moderation outcome and the person's own fetch log, and beside it photos/<photo id>.webp, the full-size file of every profile photo whose object the store holds and of the newest hundred photos the person sent in conversations, whose lines carry each one's moderation outcome and description. Nothing about anyone else. At most matching_config exports_per_day copies per Finnish calendar day; each photo read is logged as a fetch of the full variant, a sent photo's with the purpose message, never counted.
          */
         get: {
             parameters: {
@@ -2861,6 +2861,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversations/{id}/photos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a photo
+         * @description One request uploads and sends (#350): the picture through the photo pipeline (validated, EXIF stripped, re-encoded, the variants, the original never stored), the automatic check before anything is stored, then the photo and its message in one transaction, as a text is sent. A clientId already stored answers 200 with that message and writes nothing. The caption follows the text's rules. At most matching_config message_photos_per_day a Finnish day, and the send counts against messages_per_minute. A Finnish day also counts the sends tried, refused ones included (matching_config message_photo_attempts_per_day). The answer carries the photo's thumb and full size, signed until the next five-minute mark plus fifteen minutes.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": components["schemas"]["SendPhotoRequest"];
+                };
+            };
+            responses: {
+                /** @description Sent before: the stored message, nothing written. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatMessage"];
+                    };
+                };
+                /** @description Sent. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ChatMessage"];
+                    };
+                };
+                /** @description validation_failed (no picture, a type other than JPEG, PNG or WebP, a malformed client id, an unknown field, a client id the other side used); message_too_long and contact_details for the caption; photo_rejected_nudity, photo_rejected_violence or photo_rejected_other: the check was sure, and nothing was stored. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such conversation for the caller: not theirs, nobody's, or hidden from the one who blocked the other. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description conversation_closed: closed, a block stands between the two, or the counterpart deleted their account; nothing was stored. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description payload_too_large: over 10 MB. */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description photo_unsupported: not a picture the pipeline reads. */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description photo_invalid or photo_too_many_pixels. */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description message_budget_exceeded (the minute's messages) or message_photo_budget_exceeded (the day's photos, or the day's tries, matching_config message_photo_attempts_per_day, both until midnight in Finland); Retry-After is the wait. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description media_busy (the pipeline at capacity, or the check unavailable; Retry-After) or media_unavailable (no object storage here). */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/conversations/{id}/read": {
         parameters: {
             query?: never;
@@ -4583,16 +4718,7 @@ export interface components {
                 facialHair: boolean;
             } | null;
             file: string | null;
-            /** @description The moderation outcome; label names are not part of it. */
-            review: {
-                /** @enum {string} */
-                decision: "approved" | "queued" | "rejected";
-                reason: components["schemas"]["PhotoRejectionReason"];
-                /** @description True when a person decided, false when the automatic check did. */
-                decidedByStaff: boolean;
-                /** Format: date-time */
-                decidedAt: string | null;
-            } | null;
+            review: components["schemas"]["ExportedPhotoReview"];
             descriptionText: string | null;
         };
         /** Format: uuid */
@@ -4603,6 +4729,16 @@ export interface components {
         PhotoScene: "lake" | "sea" | "beach" | "river" | "forest" | "mountain" | "snow" | "ice" | "field" | "park" | "garden" | "countryside" | "city" | "street" | "cafe" | "restaurant" | "kitchen" | "living_room" | "office" | "gym" | "concert" | "festival" | "bar" | "library" | "museum" | "church" | "harbour" | "sauna" | "tent" | "sunset" | "aurora";
         /** @enum {string} */
         PhotoObject: "hiking" | "fishing" | "skiing" | "snowboarding" | "ice_skating" | "hockey" | "football" | "basketball" | "tennis" | "golf" | "running" | "cycling" | "swimming" | "surfing" | "yoga" | "climbing" | "dancing" | "cooking" | "baking" | "guitar" | "piano" | "reading" | "gardening" | "camping" | "picnic" | "kayak" | "canoe" | "sailboat" | "boat" | "rowing" | "bicycle" | "motorcycle" | "car" | "horse" | "horse_riding" | "dog" | "cat" | "fish" | "coffee" | "flowers" | "bonfire";
+        /** @description The moderation outcome; label names are not part of it. */
+        ExportedPhotoReview: {
+            /** @enum {string} */
+            decision: "approved" | "queued" | "rejected";
+            reason: components["schemas"]["PhotoRejectionReason"];
+            /** @description True when a person decided, false when the automatic check did. */
+            decidedByStaff: boolean;
+            /** Format: date-time */
+            decidedAt: string | null;
+        } | null;
         /** @enum {string|null} */
         PhotoRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
         /**
@@ -4714,11 +4850,14 @@ export interface components {
             mine: {
                 /** Format: date-time */
                 at: string;
+                kind: components["schemas"]["MessageKind"];
                 body: string;
+                photo: components["schemas"]["ExportedSentPhoto"];
             }[];
             theirs: {
                 /** Format: date-time */
                 at: string;
+                kind: components["schemas"]["MessageKind"];
                 length: number;
             }[];
         };
@@ -4726,6 +4865,33 @@ export interface components {
         ConversationState: "open" | "archived" | "closed";
         /** @enum {string|null} */
         ConversationClosedHow: "unmatch" | "erasure" | null;
+        /** @enum {string} */
+        MessageKind: "text" | "photo";
+        ExportedSentPhoto: {
+            file: string | null;
+            review: components["schemas"]["ExportedPhotoReview"];
+            description: components["schemas"]["PhotoDescription"];
+            descriptionText: string | null;
+        } | null;
+        /** @description What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks. */
+        PhotoDescription: {
+            /** @description Faces the check counted as people present (the face threshold of ADR-006 §2). */
+            people: number;
+            /**
+             * @description Indoors or outdoors when the check is sure enough of one; null otherwise.
+             * @enum {string|null}
+             */
+            setting: "indoors" | "outdoors" | null;
+            /** @description Where, the surest first; each a key of photos.description.scene. */
+            scene: components["schemas"]["PhotoScene"][];
+            /** @description Activities, animals and objects, the surest first; each a key of photos.description.object. */
+            objects: components["schemas"]["PhotoObject"][];
+            smile: boolean;
+            glasses: boolean;
+            sunglasses: boolean;
+            /** @description A beard or a moustache. */
+            facialHair: boolean;
+        } | null;
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -5037,28 +5203,6 @@ export interface components {
             caption?: components["schemas"]["PhotoCaption"];
             description?: components["schemas"]["PhotoDescription"];
         };
-        /**
-         * @description What the photo check sees in the photo, as keys the client renders in the viewer's language (#296). Read with the photo by screen readers, after the owner's caption; shown under it when the viewer asks.
-         * @default null
-         */
-        PhotoDescription: {
-            /** @description Faces the check counted as people present (the face threshold of ADR-006 §2). */
-            people: number;
-            /**
-             * @description Indoors or outdoors when the check is sure enough of one; null otherwise.
-             * @enum {string|null}
-             */
-            setting: "indoors" | "outdoors" | null;
-            /** @description Where, the surest first; each a key of photos.description.scene. */
-            scene: components["schemas"]["PhotoScene"][];
-            /** @description Activities, animals and objects, the surest first; each a key of photos.description.object. */
-            objects: components["schemas"]["PhotoObject"][];
-            smile: boolean;
-            glasses: boolean;
-            sunglasses: boolean;
-            /** @description A beard or a moustache. */
-            facialHair: boolean;
-        } | null;
         OnboardingStatus: {
             /** @enum {string} */
             state: "registered" | "active" | "paused" | "shadow_banned" | "suspended" | "banned" | "deleted";
@@ -5207,8 +5351,6 @@ export interface components {
             side: components["schemas"]["MessageSide"];
         } | null;
         /** @enum {string} */
-        MessageKind: "text";
-        /** @enum {string} */
         MessageSide: "mine" | "theirs";
         ConversationDetail: {
             /** Format: uuid */
@@ -5237,11 +5379,38 @@ export interface components {
             createdAt: string;
             /** Format: uuid */
             clientId: string | null;
+            photo: components["schemas"]["ChatPhoto"];
         };
+        ChatPhoto: {
+            /** Format: uuid */
+            photoId: string;
+            blurhash: string;
+            width: number;
+            height: number;
+            description: components["schemas"]["PhotoDescription"];
+            urls: {
+                /** Format: uri */
+                thumb: string;
+                /** Format: uri */
+                full: string;
+                /** Format: date-time */
+                expiresAt: string;
+            } | null;
+        } | null;
         SendMessageRequest: {
             /** Format: uuid */
             clientId: string;
             body: string;
+        };
+        SendPhotoRequest: {
+            /**
+             * Format: binary
+             * @description The picture, pre-resized to 1600 px by the app; JPEG, PNG or WebP.
+             */
+            photo: string;
+            /** Format: uuid */
+            clientId: string;
+            caption?: string;
         };
         ReadRequest: {
             upTo: number;

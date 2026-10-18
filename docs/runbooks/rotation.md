@@ -165,7 +165,7 @@ CLAUDE.md rule 2 and TD-1: the key is never rotated and never leaves SSM, except
 
 ## 7. CloudFront signing key
 
-The private half signs every photo URL for fifteen minutes (ADR-005 §3). The key group trusts every public half committed as `infra/envs/<env>/cloudfront-signing-key.pub.pem` (the current one) or `cloudfront-signing-key.*.pub.pem` (more), each named by a hash of its PEM (`infra/modules/media/main.tf`). The apply writes the current key's id to `/kuutti/<env>/cloudfront-key-pair-id`. The API reads that id and the private half at boot and does not check that they match.
+The private half signs every photo URL. A profile photo's lives fifteen minutes (ADR-005 §3); a photo sent in a conversation's lives until the next five-minute mark and fifteen minutes more, so up to twenty minutes (ADR-031 §10). The key group trusts every public half committed as `infra/envs/<env>/cloudfront-signing-key.pub.pem` (the current one) or `cloudfront-signing-key.*.pub.pem` (more), each named by a hash of its PEM (`infra/modules/media/main.tf`). The apply writes the current key's id to `/kuutti/<env>/cloudfront-key-pair-id`. The API reads that id and the private half at boot and does not check that they match.
 
 **Who:** the maintainer for the key and SSM. The pull requests go through review as usual. On staging each merge applies; on production each step needs a `v*` tag and the `prod` approval (`infra-prod.yml`).
 
@@ -187,13 +187,13 @@ The private half signs every photo URL for fifteen minutes (ADR-005 §3). The ke
    ```
 
    then restart.
-4. **Pull request three**, at least fifteen minutes later (the URLs' lifetime): delete `cloudfront-signing-key.previous.pub.pem`. The apply removes the old public key. Destroy the old private file on the medium; staging also replaces its laptop copy.
+4. **Pull request three**, at least twenty minutes later (the longest a URL lives, a sent photo's, ADR-031 §10): delete `cloudfront-signing-key.previous.pub.pem`. The apply removes the old public key. Destroy the old private file on the medium; staging also replaces its laptop copy.
 
 **Check.** `aws ssm get-parameter --name /kuutti/<env>/cloudfront-key-pair-id --query Parameter.Value --output text` equals `keyPairId` in the API's `media` boot line. A photo opens in the app, and its URL carries `Key-Pair-Id=` with that id.
 
-**What breaks meanwhile.** Photos only. Between the switch's apply and the restart that follows the `put-parameter`, a process that boots (for example the deploy of the same merge) holds the new id with the old private half, or the other way round. Every URL it signs answers 403 until the restart. Keep that gap short. A URL signed before the switch keeps working for its fifteen minutes, because the old public key is still trusted until step 4.
+**What breaks meanwhile.** Photos only. Between the switch's apply and the restart that follows the `put-parameter`, a process that boots (for example the deploy of the same merge) holds the new id with the old private half, or the other way round. Every URL it signs answers 403 until the restart. Keep that gap short. A URL signed before the switch keeps working for the rest of its life, up to twenty minutes, because the old public key is still trusted until step 4.
 
-**If the private half leaked:** anyone can sign URLs for objects under `/media/` and pass by the exposure budget (ADR-008). Run the steps at once and do not wait longer than the fifteen minutes before step 4.
+**If the private half leaked:** anyone can sign URLs for objects under `/media/` and pass by the exposure budget (ADR-008). Run the steps at once and do not wait longer than the twenty minutes before step 4.
 
 ## 8. Session tokens and sign-in codes: nothing to rotate
 

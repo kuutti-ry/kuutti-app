@@ -25,11 +25,12 @@ export type PhotoZoomParams = {
 };
 
 /**
- * The one screen that asks for the full variant (rules/mobile.md Images):
- * everywhere else a photo is a thumb or a card. Opened from the grid with what
- * the label needs; nothing is fetched here but the URL. Here the owner reads
- * the automatic description of their own photo, so they know what others
- * may hear (#296).
+ * The screen that asks for the full variant of one's own photos
+ * (rules/mobile.md Images); a photo sent in a conversation has the chat's
+ * own, `ChatPhotoScreen` (#350). Everywhere else a photo is a thumb or a
+ * card. Opened from the grid with what the label needs; nothing is fetched
+ * here but the URL. Here the owner reads the automatic description of their
+ * own photo, so they know what others may hear (#296).
  */
 export function PhotoZoomScreen({
   id,

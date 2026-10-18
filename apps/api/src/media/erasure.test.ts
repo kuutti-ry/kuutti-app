@@ -257,6 +257,74 @@ describe("the export of the photos", () => {
     );
   });
 
+  test("a sent photo is there by its id, with its outcome, its description and its file, read and logged as a message photo's (#350)", async ({
+    ctx,
+  }) => {
+    const { service, store } = await serviceDeps(ctx);
+    const a = await signedInAccount(ctx.client);
+    const description = {
+      people: 0,
+      setting: "outdoors",
+      scene: [],
+      objects: [],
+      smile: false,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
+    };
+    const sentPhoto = async (key: string, state: "approved" | "queued") => {
+      const { rows } = await ctx.client.query<{ id: string }>(
+        `INSERT INTO photo (account_id, key, blurhash, width, height, state, purpose)
+         VALUES ($1, $2, $3, 1600, 1200, $4, 'message') RETURNING id`,
+        [a.accountId, key, BLURHASH, state],
+      );
+      return rows[0]?.id ?? "";
+    };
+    const checked = await sentPhoto("k-sent", "approved");
+    // The check was unsure: delivered, put to no person, and its object is gone.
+    const unsure = await sentPhoto("k-unsure", "queued");
+    await ctx.client.query(
+      `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision, description)
+       VALUES ($1, '[]', 0, '{}', 'approved', $3), ($2, '[]', 0, '{}', 'queued', NULL)`,
+      [checked, unsure, JSON.stringify(description)],
+    );
+    await store.put(objectKey("k-sent", "full"), bytesOf("sent-full"), "image/webp");
+
+    const exported = await exportPhotos(service, a.accountId);
+    // Never among the profile's photos.
+    expect(exported.photos).toEqual([]);
+    expect(exported.sent).toEqual(
+      new Map([
+        [
+          checked,
+          {
+            file: `photos/${checked}.webp`,
+            review: { decision: "approved", reason: null, decidedByStaff: false, decidedAt: null },
+            description,
+          },
+        ],
+        [
+          unsure,
+          {
+            file: null,
+            review: { decision: "queued", reason: null, decidedByStaff: false, decidedAt: null },
+            description: null,
+          },
+        ],
+      ]),
+    );
+    expect(exported.files.map((f) => [f.path, new TextDecoder().decode(f.bytes)])).toEqual([
+      [`photos/${checked}.webp`, "sent-full"],
+    ]);
+    // The export's own read is in the log it returns, with the purpose that is never counted.
+    expect(exported.accessLog.map((e) => [e.photoId, e.variant])).toEqual([[checked, "full"]]);
+    const { rows } = await ctx.client.query(
+      "SELECT photo_id, purpose FROM photo_access WHERE account_id = $1",
+      [a.accountId],
+    );
+    expect(rows).toEqual([{ photo_id: checked, purpose: "message" }]);
+  });
+
   test("over the day's photo budget the file is still given and the read still logged", async ({
     ctx,
   }) => {
@@ -315,6 +383,7 @@ describe("the export of the photos", () => {
       files: [],
       accessLog: [],
       cardsShown: [],
+      sent: new Map(),
     });
   });
 
@@ -348,6 +417,7 @@ describe("the export of the photos", () => {
       files: [],
       accessLog: [],
       cardsShown: [],
+      sent: new Map(),
     });
   });
 });

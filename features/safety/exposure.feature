@@ -1,11 +1,13 @@
 # features/safety/exposure.feature
 Feature: Exposure is budgeted and counted
   Photos of verified people are what a scraper wants (TD-6). Every signed URL
-  is a fetch-log row; the day's fetches of a variant are counted against
-  matching_config.photo_fetches_per_day in the statement that writes the row,
-  and another account's photo is served only from a card the account was
-  shown. A refusal is said in plain words and counted; nobody is limited in
-  silence. The day is the calendar day in Finland (#52, ADR-008).
+  of a profile photo is a fetch-log row; the day's fetches of a variant are
+  counted against matching_config.photo_fetches_per_day in the statement that
+  writes the row, and another account's photo is served only from a card the
+  account was shown. A photo sent in a conversation is logged with the
+  purpose message and never counted (ADR-031 §10, ADR-008). A refusal is said
+  in plain words and counted; nobody is limited in silence. The day is the
+  calendar day in Finland (#52, ADR-008).
 
   Scenario Outline: The photo fetch budget of a day
     Given matching_config allows <limit> fetches of the <variant> variant per day

@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import type { ConversationCloseKind, MessageKind } from "@kuutti/schema";
+import type { ConversationCloseKind, MessageKind, PhotoDescription } from "@kuutti/schema";
 
 // The chat's statements (#348, ADR-031). Raw parameterised SQL, as in the
 // other slices: Deps.db is the Queryable seam the tests hand a rolled-back
@@ -160,6 +160,15 @@ export type MessageRow = {
   body: string | null;
   createdAt: Date;
   clientId: string;
+  /** A photo message's photo (#350), null on a text and once the photo went. `key` never leaves the API. */
+  photo: {
+    id: string;
+    key: string;
+    blurhash: string;
+    width: number;
+    height: number;
+    description: PhotoDescription | null;
+  } | null;
 };
 
 const messageFrom = (r: Row): MessageRow => ({
@@ -170,7 +179,26 @@ const messageFrom = (r: Row): MessageRow => ({
   body: (r.body as string | null) ?? null,
   createdAt: r.created_at as Date,
   clientId: r.client_id as string,
+  photo: !r.photo_id
+    ? null
+    : {
+        id: r.photo_id as string,
+        key: r.photo_key as string,
+        blurhash: r.photo_blurhash as string,
+        width: r.photo_width as number,
+        height: r.photo_height as number,
+        description: (r.photo_description as PhotoDescription | null) ?? null,
+      },
 });
+
+// A message with its photo (#350): the photo only when it is a message photo,
+// so a profile photo can never be read through a message; its description is
+// the check's, from the review row, as the photos' reads take it.
+const MESSAGE_COLUMNS = `m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id,
+  ph.id AS photo_id, ph.key AS photo_key, ph.blurhash AS photo_blurhash,
+  ph.width AS photo_width, ph.height AS photo_height,
+  (SELECT r.description FROM photo_review r WHERE r.photo_id = ph.id) AS photo_description`;
+const MESSAGE_PHOTO = "LEFT JOIN photo ph ON ph.id = m.photo_id AND ph.purpose = 'message'";
 
 /**
  * A page of what the caller may read: back from `before` (or from the
@@ -189,9 +217,10 @@ export async function listMessages(
 ): Promise<MessageRow[]> {
   const onward = input.after !== undefined;
   const { rows } = await db.query<Row>(
-    `SELECT m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id
+    `SELECT ${MESSAGE_COLUMNS}
      ${FROM_CALLER}
      JOIN message m ON m.conversation_id = c.id
+     ${MESSAGE_PHOTO}
      WHERE me.account_id = $1 AND me.conversation_id = $2 AND ${VISIBLE_TO_CALLER}
        AND ${MESSAGE_VISIBLE}
        AND ($3::int IS NULL OR m.seq < $3) AND ($4::int IS NULL OR m.seq > $4)
@@ -306,9 +335,10 @@ export async function findByClientId(
   input: { accountId: string; conversationId: string; clientId: string },
 ): Promise<MessageRow | null> {
   const { rows } = await db.query<Row>(
-    `SELECT m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id
+    `SELECT ${MESSAGE_COLUMNS}
      FROM conversation_participant me
      JOIN message m ON m.conversation_id = me.conversation_id
+     ${MESSAGE_PHOTO}
      WHERE me.account_id = $1 AND me.conversation_id = $2 AND m.client_id = $3`,
     [input.accountId, input.conversationId, input.clientId],
   );
@@ -329,8 +359,11 @@ export async function insertMessage(
     conversationId: string;
     side: Side;
     clientId: string;
-    body: string;
+    /** A text's words, or a photo's caption (null without one). */
+    body: string | null;
     at: Date;
+    /** A photo message's photo (#350), written in the same transaction; absent for a text. */
+    photoId?: string;
   },
 ): Promise<MessageRow> {
   const { rows } = await db.query<Row>(
@@ -339,11 +372,22 @@ export async function insertMessage(
        WHERE c.id = $1
          AND EXISTS (SELECT 1 FROM conversation_participant me
                      WHERE me.conversation_id = c.id AND me.account_id = $6 AND me.side = $2::conversation_side)
-       RETURNING next_seq - 1 AS seq)
-     INSERT INTO message (conversation_id, seq, side, client_id, kind, body, created_at)
-     SELECT $1, bumped.seq, $2::conversation_side, $3, 'text', $4, $5 FROM bumped
-     RETURNING id, seq, side, kind, body, created_at, client_id`,
-    [input.conversationId, input.side, input.clientId, input.body, input.at, input.accountId],
+       RETURNING next_seq - 1 AS seq),
+     m AS (
+       INSERT INTO message (conversation_id, seq, side, client_id, kind, body, photo_id, created_at)
+       SELECT $1, bumped.seq, $2::conversation_side, $3, $7::message_kind, $4, $8, $5 FROM bumped
+       RETURNING *)
+     SELECT ${MESSAGE_COLUMNS} FROM m ${MESSAGE_PHOTO}`,
+    [
+      input.conversationId,
+      input.side,
+      input.clientId,
+      input.body,
+      input.at,
+      input.accountId,
+      input.photoId ? "photo" : "text",
+      input.photoId ?? null,
+    ],
   );
   const row = rows[0];
   if (!row) throw new Error("message insert returned no row");
@@ -503,7 +547,15 @@ export type ExportedRow = {
   counterpartLinked: boolean;
   blocked: boolean;
   /** The person's own messages and the counterpart's readable ones, in order; the counterpart's without words. */
-  lines: Array<{ mine: boolean; at: Date; body: string | null; length: number }>;
+  lines: Array<{
+    mine: boolean;
+    at: Date;
+    kind: MessageKind;
+    body: string | null;
+    length: number;
+    /** The person's own photo message's photo (#350), while it is there; null otherwise. */
+    photoId: string | null;
+  }>;
 };
 
 /**
@@ -523,8 +575,10 @@ export async function exportConversationsOf(
               SELECT json_agg(json_build_object(
                        'mine', m.side = me.side,
                        'at', m.created_at,
+                       'kind', m.kind,
                        'body', CASE WHEN m.side = me.side THEN m.body END,
-                       'length', char_length(m.body))
+                       'length', char_length(m.body),
+                       'photoId', CASE WHEN m.side = me.side THEN m.photo_id END)
                      ORDER BY m.seq)
               FROM message m
               WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}), '[]'::json) AS lines
@@ -542,12 +596,21 @@ export async function exportConversationsOf(
     counterpartLinked: r.counterpart_linked === true,
     blocked: r.blocked === true,
     lines: (
-      r.lines as Array<{ mine: boolean; at: string; body: string | null; length: number | null }>
+      r.lines as Array<{
+        mine: boolean;
+        at: string;
+        kind: MessageKind;
+        body: string | null;
+        length: number | null;
+        photoId: string | null;
+      }>
     ).map((line) => ({
       mine: line.mine,
       at: new Date(line.at),
+      kind: line.kind,
       body: line.body,
       length: line.length ?? 0,
+      photoId: line.photoId ?? null,
     })),
   }));
 }
@@ -595,9 +658,10 @@ export async function messageFor(
   input: { accountId: string; conversationId: string; seq: number },
 ): Promise<{ side: Side; row: MessageRow } | null> {
   const { rows } = await db.query<Row>(
-    `SELECT me.side AS my_side, m.id, m.seq, m.side, m.kind, m.body, m.created_at, m.client_id
+    `SELECT me.side AS my_side, ${MESSAGE_COLUMNS}
      ${FROM_CALLER}
      JOIN message m ON m.conversation_id = c.id
+     ${MESSAGE_PHOTO}
      WHERE me.account_id = $1 AND me.conversation_id = $2 AND m.seq = $3
        AND ${VISIBLE_TO_CALLER} AND ${MESSAGE_VISIBLE}`,
     [input.accountId, input.conversationId, input.seq],

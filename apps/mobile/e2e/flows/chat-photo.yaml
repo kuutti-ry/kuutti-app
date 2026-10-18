@@ -1,0 +1,79 @@
+# A photo in a message between the chat's pair (#350, ADR-031): Antti picks a
+# picture from the phone's library with Add photo, writes a caption and sends
+# it through the photo pipeline (rule 4); it shows in the thread with its
+# caption. Ville signs in, sees the row with the caption unread, opens the
+# conversation, which reads it (so chat-text's "1 unread message" holds in
+# either order), opens the photo full size and comes back with the button. The
+# picture is a landscape with nobody in it: a message photo has no face rules,
+# and the local stack's check queues everything, which delivers. Each run
+# sends a photo with a caption of its own, counted against Antti's photos of
+# the day (matching_config message_photos_per_day, 10): after that many runs
+# in a Finnish day, `pnpm demo:reset` first.
+appId: fi.kuutti.app
+name: A photo with a caption reaches the other person, small in the thread and full size on a tap
+---
+- addMedia:
+    - ../media/negatives/no-face.jpg
+# Letters only, unique to the run, as chat-text's words: the caption follows
+# the text's rules, and an earlier run's photo may be on the screen too.
+- evalScript: "${output.caption = 'Terveiset mokilta ' + Date.now().toString(36).replace(/[0-9]/g, function (d) { return 'kmnprstvyz'.charAt(Number(d)); })}"
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Antti Nurmi
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Open|Avoimet|Öppna"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn:
+    text: "Ville, \\d+, .*"
+    below: "Open|Avoimet|Öppna"
+# The field is its label, and on iOS its placeholder after it.
+- extendedWaitUntil:
+    visible: "(Message|Viesti|Meddelande)( .*)?"
+    timeout: 15000
+- waitForAnimationToEnd
+# Add photo beside the field opens the library; the picture is attached above the field.
+- runFlow:
+    file: ../common/pick-photo.yaml
+    env:
+      BUTTON: "Add photo|Lisää kuva|Lägg till foto"
+      INDEX: 0
+      COUNT: "Photo attached\\. The words in the field go under it\\.|Kuva liitetty\\. Kentän sanat tulevat sen alle\\.|Foto bifogat\\. Orden i fältet hamnar under det\\."
+# The keyboard stays up (README): Send is above it, on the composer.
+- tapOn: "(Message|Viesti|Meddelande)( .*)?"
+- inputText: ${output.caption}
+- tapOn: "Send|Lähetä|Skicka"
+# The upload, the re-encoding and the variants take a while on an emulator;
+# the row says how far it is until the photo is there.
+- extendedWaitUntil:
+    notVisible: "(Sending…|Lähetetään…|Skickar…).*"
+    timeout: 60000
+# One button: who, when and the caption.
+- assertVisible: "(You|Sinä|Du), \\d{1,2}[.:]\\d{2}[^,]*, ${output.caption}"
+
+# Ville: the row says a message is unread and what its caption says. Opening
+# the conversation reads it; the photo opens full size and the button goes back.
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Ville Rantanen
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), ${output.caption}, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Antti, \\d+, (1 unread message|1 lukematon viesti|1 oläst meddelande), ${output.caption}, .*"
+- extendedWaitUntil:
+    visible: "Antti, \\d{1,2}[.:]\\d{2}[^,]*, ${output.caption}"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Antti, \\d{1,2}[.:]\\d{2}[^,]*, ${output.caption}"
+- extendedWaitUntil:
+    visible: "(Photo, full size|Kuva, täysikokoinen|Foto, full storlek)\\. ${output.caption}"
+    timeout: 15000
+- tapOn: "Back to the conversation|Takaisin keskusteluun|Tillbaka till samtalet"
+- extendedWaitUntil:
+    visible: "Antti, \\d{1,2}[.:]\\d{2}[^,]*, ${output.caption}"
+    timeout: 15000

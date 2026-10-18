@@ -46,7 +46,7 @@ Stop and write to the authority's official address when:
 - the sender uses a personal or free webmail address;
 - there is no case number, or the officer cannot be confirmed;
 - the request asks for "everything": ask what exactly, and on which provision;
-- the request asks only for what Kuutti does not hold, such as an identity code or messages (step 4): say so, once the requester is verified;
+- the request asks only for what Kuutti does not hold, such as an identity code (step 4): say so, once the requester is verified;
 - the request comes directly from an authority outside the EU: such requests go through the Finnish authorities (step 3).
 
 An order from an authority of another EU member state on the e-evidence regulation's form (step 3) is not stopped. It goes to the contact and counsel the same day, with its deadline written in the record: it may be eight hours (step 9). It is still verified as above.
@@ -76,8 +76,11 @@ From the schema (`packages/db/src/schema/`). "Erasure" is the person deleting th
 | The account: id, state, registration date, state change date, deletion date, birth year and month, self-declared gender, pond, the optional e-mail | `account` | after erasure a tombstone keeps the id, the state `deleted` and the dates; the age, gender, pond and e-mail are nulled |
 | The profile: display name, bio, closed-list fields, prompts; politics and religion under the article 9 consent | `profile` | until erasure; politics and religion also go when the special-category consent is withdrawn (ADR-019 §4) |
 | Preferences: whom the person seeks (article 9), the age window, deal-breakers | `preferences` | until erasure; whom the person seeks also goes when the special-category consent is withdrawn (ADR-010 §10) |
-| Photos: re-encoded variants without metadata, never the original (rule 4); the check's outcome and the automatic description | `photo`, `photo_review`, the media bucket | until the person removes the photo, or erasure |
-| What the person fetched and was shown: these rows name other people's photos | `photo_access`, `card_shown` | until erasure |
+| Profile photos: re-encoded variants without metadata, never the original (rule 4); the check's outcome and the automatic description | `photo` (`purpose = profile`), `photo_review`, the media bucket | until the person removes the photo, or erasure |
+| Photos sent in a conversation (#350, ADR-031 §10): the same three variants (thumb, card, full) without metadata, never the original; the check's outcome and the automatic description. A photo the check refused was never stored | `photo` (`purpose = message`), `photo_review`, the media bucket | until the sender's erasure: the sender cannot delete one. The erasure takes the rows and the objects (unless another row shares the content), and the message then reads "Photo removed" to the counterpart. Nothing keeps a sent photo past the erasure yet; #351 will keep the ones a report's frozen copy holds (`erasePhotosOfAccount`'s `keep`) |
+| Conversations and messages (#348, ADR-031): when each conversation opened, its last message, whether it is archived or closed, how and by which side; its two participants and how far each has read; each message's sequence, side, time, kind and words (a photo's caption is its words). A conversation is the record of a match, which does not exist yet (#100): until then only the demo stories and the tests write one | `conversation`, `conversation_participant`, `message` | while one of its two people has an account (ADR-031 §5); nothing goes on an archive or a close. At erasure the person's link goes (`account_id` null) and the messages stay for the counterpart, the person's own among them, except those sent under a shadow ban still open, which go; once both people are erased, the conversation goes with its messages |
+| Reports the person filed or received (#84, ADR-030): the reason, the reporter's note if they wrote one, the time, and the moderators' decision with who decided and the sanction it led to; the blocks the person set or received, between the two identities, with the date | `report`, `block` | a report twelve months from filing, swept nightly, whoever of the two is erased; a block as long as the two identities, so it survives erasure |
+| What the person fetched and was shown: these rows name other people's photos. A fetch of a photo sent in a conversation has the purpose `message`, written once per viewer, photo and variant in a five-minute window, two reads at the same instant aside | `photo_access`, `card_shown` | until erasure; a `photo_access` row outlives the photo it names |
 | Devices: platform, a truncated user agent, when created, last used and revoked; no address | `session` | swept nightly 30 days after sign-out or revocation, or once expired (90 days after the device signed in), and at erasure (`apps/api/src/identity/sessions.ts`) |
 | Consents, export requests, the place at the pond gate | `consent`, `account_export`, `gate` | until erasure |
 | Sanctions, with staff's note | `sanction` | erasure keeps the open bans and suspensions (ADR-024 §8) |
@@ -94,7 +97,7 @@ Telia, not Kuutti, keeps the identification logs: five years under section 24 of
 
 Sentry receives errors from the API and the app with the request data and the user stripped (`apps/api/src/lib/sentry.ts`, `apps/mobile/src/lib/sentry.ts`). Not storing IP addresses there is an organisation setting (`sentry-setup.md`), which the repository cannot confirm (Open, below). It is not a source for a request.
 
-**Kuutti does not hold:** the identity code; the name from the bank; legal sex; the date of birth (only year and month); a phone number; a location finer than the pond; contacts; payment data. Messages, likes, matches and reports do not exist yet (#101, #84).
+**Kuutti does not hold:** the identity code; the name from the bank; legal sex; the date of birth (only year and month); a phone number; a location finer than the pond; contacts; payment data. Likes and matches do not exist yet (#96, #97, #100). Reports and blocks (#84), conversations with their messages (#348) and the photos sent in them (#350) do, in the table above.
 
 **Client addresses:** the API writes none to a row or a log line, and holds one in memory for at most two rate-limit windows (ADR-026 §7). Whether the proxy on the box logs addresses is open (below). Until the maintainer has checked, say exactly this, not that Kuutti holds no addresses.
 
@@ -105,7 +108,7 @@ Sentry receives errors from the API and the app with the request data and the us
 | an account id | `account.id` | the person's own export carries it (ADR-007 §3) |
 | Telia's session index of a login to Kuutti | `identity.broker_session_index` | the latest bank login only, in the app or on the panel; a refused login does not replace it. An older login's index finds nothing, which does not mean there was no account (step 7) |
 | an e-mail address | `account.email` | optional, and only on a live account: erasure nulls it |
-| a photo id | `photo.id` | seen in the app's calls to the API (`/photos/{id}/{variant}`) and in the app's cache, not in a media address; while the photo exists |
+| a photo id | `photo.id` | seen in the app's calls to the API (`/photos/{id}/{variant}`, or a conversation's messages for a photo sent in one) and in the app's cache, not in a media address; while the photo exists |
 | a media address (`media/<key>/<variant>.webp`, the path of a signed URL) | `photo.key` | the SHA-256 of the re-encoded picture. The same picture uploaded by two accounts is one key and two rows (`packages/db/src/schema/media.ts`), so it may name several accounts, and only while a row exists. Several accounts: counsel (step 6) |
 | an identity code | none | Kuutti has no tool to search by identity code and keeps only the keyed hash (rule 1). Computing the hash of a given code is possible with the key, which rule 2 keeps in SSM with one offline backup. Building that is an identity change that needs an ADR, and a court's order for it is counsel's question (step 6). The police can ask Telia for the person's identification events at Kuutti; whether Telia answers with the session index is not confirmed yet (`docs/vendors/telia.md`) |
 | a name, a display name, an age, an area, a screenshot | none | not identifiers. Display names are not unique, and the panel has no search by design (`.claude/rules/admin.md`). A stored photo is a re-encoded file, so a screenshot matches nothing. Ask for one of the identifiers above |
@@ -165,8 +168,8 @@ Write each lookup in the record: the identifier, the query, the time, the result
 | tier | what | when |
 |---|---|---|
 | A | Whether an account exists for the identifier, and whether it is deleted. Its id, its registration date (an erased account's only if counsel allows, below) and its deletion date. The latest bank login's time and Telia's session index, when that login fell in this account's life, so Telia can map it to the person | a verified request (step 2) with a provision that covers it (step 3) |
-| B | Content and activity: the profile, the photos, the devices, the fetch log, the feedback text, the sanctions and staff's note (a note may name a reporter), the account's other states (paused, shadow-banned, suspended, banned) and their dates, the identity's standing, whom the person seeks, politics and religion (article 9), the method of the bank login, the API's log lines about the account | never without a court's decision or a decision under the Coercive Measures Act that names it (the proposed line, for counsel); the board approves (Who) |
-| – | The frozen conversation of a report (#84) | it does not exist yet. #189 lists it as answerable. Whether messages fall under the confidentiality of communications, and so need a court, is counsel's question before #84 and #101 ship |
+| B | Content and activity: the profile, the profile photos, the devices, the fetch log, the feedback text, the sanctions and staff's note (a note may name a reporter), the account's other states (paused, shadow-banned, suspended, banned) and their dates, the identity's standing, whom the person seeks, politics and religion (article 9), the method of the bank login, the API's log lines about the account | never without a court's decision or a decision under the Coercive Measures Act that names it (the proposed line, for counsel); the board approves (Who) |
+| – | Conversations, their messages and the photos sent in them (#348, #350); the frozen copy of a conversation a report names (#351) | open: whether any of it may be answered, in which tier and on which decision, is for counsel and the maintainer to settle (Open, below). The frozen copy does not exist yet; #189 lists it as answerable. Whether messages fall under the confidentiality of communications, and so need a court, is counsel's question, open now that messages exist |
 | C | Never: the identity code (not held); `hetu_hmac` and the key; the birth year and month, which come from the identity code (that every account was 18 or older at registration may be said); research events and the `research_id` of a person (rule 5, ADR-011 §9); anyone else's data; a bulk answer or an "everyone who" search; a backup restored, a new log started or an account watched for the requester | if a court orders any of these, counsel and the maintainer decide together. This page does not |
 
 Answer only what was asked, even when more is found.
@@ -235,7 +238,10 @@ What expires, and when. A request about an older event may find nothing:
 | whom the person seeks, politics and religion | when the special-category consent is withdrawn, or at erasure |
 | the box's container logs, the API's included | 30 days |
 | Dokploy's nightly backups | 90 days |
-| an erased account's rows | at once (ADR-007 §1); in the database's backups for 35 days |
+| an erased account's rows | at once (ADR-007 §1), except what step 4 keeps past an erasure; in the database's backups for 35 days |
+| a photo sent in a conversation | at the sender's erasure; the message then reads "Photo removed" |
+| a conversation and its messages | when the second of its two people is erased; messages sent under a shadow ban still open, at the sender's erasure |
+| a report | twelve months from filing, swept nightly |
 | research events | 90 days, and never answered by person |
 | the photo check's notes | twelve months |
 | the audit log | five years by rule; no prune exists yet, so kept longer |
@@ -263,6 +269,7 @@ Kuutti has no legal hold. If the person deletes their account while a request is
 - Telia: whether its logs answer by session index (`docs/vendors/telia.md`), to ask again when the agreement is signed.
 - Whether the box keeps client addresses: Traefik's access log, if it is on, in the CloudWatch group `/kuutti/prod/api` (every container logs there), on the box's disk under `/etc/dokploy`, and in the nightly Dokploy backups kept 90 days under `dokploy-backup/prod/` (`infra/modules/compute/templates/user_data.sh.tpl`, `infra/bootstrap/main.tf`). It is Dokploy's configuration, outside this repository; the maintainer checks once, and with it that Sentry's organisation setting "Prevent storing of IP addresses" is on (`sentry-setup.md`). CloudFront has no access logging in `infra/`. Until then, step 4's line on client addresses is what may be said.
 - Whether a backup may be restored to answer about an erased account.
+- Conversations, their messages and the photos sent in them (#348, #350): whether any of it may be answered, in which tier, and whether the confidentiality of communications asks a court's decision for it (step 6).
 
 ## The paper test
 
@@ -280,7 +287,7 @@ Expected: nothing about any person, not even whether one exists. Ask for the req
 
 An e-mail from a free webmail address, signed "Crime inspector Example", with a case number and no provision. It asks for "all messages, photos, IP addresses and the identity code" of the account with a given e-mail address, within 24 hours.
 
-Expected: verification fails on the domain (step 2). The maintainer finds the switchboard on the authority's website and asks for the request from an official address, naming its provision. Nothing is looked up yet. Once verified, the answer says what Kuutti does not hold (messages, identity codes), says of addresses only what step 4 allows (the API writes none; the proxy's log is open until the maintainer has checked), and photos are tier B: counsel.
+Expected: verification fails on the domain (step 2). The maintainer finds the switchboard on the authority's website and asks for the request from an official address, naming its provision. Nothing is looked up yet. Once verified, the answer says what Kuutti does not hold (identity codes), says of addresses only what step 4 allows (the API writes none; the proxy's log is open until the maintainer has checked), and profile photos are tier B: counsel. Messages and the photos sent in them are held; whether any may be answered is open for counsel and the maintainer (step 6).
 
 **Round 3: the real one.** Target: a drafted answer within 30 minutes, counsel's step played by the second person.
 

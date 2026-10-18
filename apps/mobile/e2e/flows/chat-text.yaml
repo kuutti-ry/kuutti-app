@@ -4,7 +4,8 @@
 # with his silent match with Sanna. The stories give both conversations
 # (packages/db/src/seed/conversations.ts). Each run adds a message in words of
 # its own, so the flow runs again without a reset; `pnpm demo:reset` takes the
-# conversation back to the stories' six messages.
+# conversation back to the stories' six messages and sends a seventh, Ville's
+# photo to Antti (the same file).
 appId: fi.kuutti.app
 name: A message reaches the other person with its time, the writer then sees it read, and a silent match waits in the archive
 ---

@@ -6,6 +6,7 @@ import { MATCHING_CONFIG_V1 } from "../seed.ts";
 import { withTemporaryDatabase } from "../test/temporary-database.ts";
 import { PERSONA_CONVERSATIONS, writeConversations } from "./conversations.ts";
 import { PERSONA_HISTORIES } from "./histories.ts";
+import { PHOTOS_MANIFEST } from "./photos-manifest.ts";
 
 // The conversations of the stories (#348, ADR-031). Whether their two people
 // pass each other's filters is the API's rule, tested beside it
@@ -49,6 +50,30 @@ describe("the conversations of the stories", () => {
         expect(told.readUpTo[side], where).toBeGreaterThanOrEqual(0);
         expect(told.readUpTo[side], where).toBeLessThanOrEqual(told.messages.length);
       }
+    }
+  });
+
+  it("send a photo after the last message, from a picture of the release, with a caption within the rules (#350)", () => {
+    const withPhoto = PERSONA_CONVERSATIONS.filter((c) => c.photo);
+    expect(withPhoto.length).toBeGreaterThan(0);
+    for (const told of withPhoto) {
+      const where = told.between.join("+");
+      const photo = told.photo;
+      if (!photo) continue;
+      expect(photo.hoursAgo, where).toBeLessThan(told.messages.at(-1)?.hoursAgo ?? Infinity);
+      expect(photo.hoursAgo, where).toBeGreaterThan(0);
+      expect(
+        PHOTOS_MANIFEST.map((asset) => asset.path),
+        where,
+      ).toContain(photo.asset);
+      expect(photo.caption.length, where).toBeLessThanOrEqual(
+        MATCHING_CONFIG_V1.message_max_length,
+      );
+      // Letters only: nothing the send could take for a phone number or a handle.
+      expect(photo.caption, where).not.toMatch(/[0-9@]/);
+      expect(photo.clientId, where).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
     }
   });
 

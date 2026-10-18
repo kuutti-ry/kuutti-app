@@ -10,8 +10,7 @@ import {
   uploadPhoto,
 } from "./client";
 import { placed } from "./drag";
-import { checkPhoto } from "./localCheck";
-import { pickPhoto, prepareForUpload } from "./pick";
+import { pickPrepared } from "./pick";
 
 type PhotosBusy =
   | { kind: "idle" }
@@ -104,19 +103,16 @@ export function usePhotos() {
   const add = useCallback(async () => {
     update({ busy: { kind: "picking" }, notice: null });
     try {
-      const picked = await pickPhoto();
+      const picked = await pickPrepared(() => update({ busy: { kind: "preparing" } }));
       if (picked.kind === "cancelled") return update({ busy: { kind: "idle" } });
       if (picked.kind === "denied") {
         return update({ busy: { kind: "idle" }, notice: { kind: "permission" } });
       }
-      update({ busy: { kind: "preparing" } });
-      // The check sees the picked file, before the resize and before any byte leaves the phone.
-      if ((await checkPhoto(picked.asset.uri)) === "refuse") {
+      if (picked.kind === "refused_local") {
         return update({ busy: { kind: "idle" }, notice: { kind: "refused_local" } });
       }
-      const prepared = await prepareForUpload(picked.asset);
       update({ busy: { kind: "uploading", percent: 0 } });
-      const photo = await uploadPhoto(prepared, (fraction) =>
+      const photo = await uploadPhoto(picked.photo, (fraction) =>
         update({ busy: { kind: "uploading", percent: Math.round(fraction * 100) } }),
       );
       changes.current += 1;

@@ -118,6 +118,7 @@ describe("the list as the socket moved it", () => {
       body: m.body,
       createdAt: at(m.minute),
       clientId: null,
+      photo: null,
     })),
     readUpTo: 0,
     online: false,
@@ -154,6 +155,30 @@ describe("the list as the socket moved it", () => {
     expect(moved.open[1]).toMatchObject({ unread: 2, lastMessage: { seq: 3, preview: "Moi" } });
     expect(moved.open[2]).toEqual(row(A));
     expect(moved.archived[0]).toEqual(row(D, { state: "closed", closedHow: "unmatch" }));
+  });
+
+  it("makes a photo the row's last line by its caption, or by nothing for the row to call Photo, with its kind (#350)", () => {
+    const photo = (seq: number, body: string | null) => ({
+      id: `00000000-0000-4000-8000-${String(seq).padStart(12, "0")}`,
+      seq,
+      side: "theirs" as const,
+      kind: "photo" as const,
+      body,
+      createdAt: at(seq),
+      clientId: null,
+      photo: null,
+    });
+    const moved = withLive(
+      { open: [row(A), row(B)], archived: [] },
+      {
+        [A]: { ...liveOf([]), messages: [photo(3, "Mökillä")] },
+        [B]: { ...liveOf([]), messages: [photo(4, null)] },
+      },
+    );
+    expect(moved.open.map((c) => c.lastMessage)).toEqual([
+      { seq: 4, at: at(4), kind: "photo", preview: "", side: "theirs" },
+      { seq: 3, at: at(3), kind: "photo", preview: "Mökillä", side: "theirs" },
+    ]);
   });
 
   it("counts from no message at all", () => {

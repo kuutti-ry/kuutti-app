@@ -10,6 +10,8 @@ import {
   readPhotoList,
   reorderPhotos,
   uploadPhoto,
+  uploadPicture,
+  uploadRefusal,
 } from "./client";
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -331,6 +333,67 @@ describe("uploading a photo, the rest of the way", () => {
     expect(parts).toHaveLength(1);
     expect(parts[0]).toMatchObject({ fieldName: "photo" });
     expect(parts[0]?.uri).not.toBe(picked.uri);
+  });
+});
+
+describe("uploading a picture to another route (#350)", () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it("posts to the route's path with its string fields before the picture, and hands the answer back as it came", async () => {
+    await saveSession(session);
+    const answer = { id: "m1", kind: "photo" };
+    FakeXhr.answers = [{ status: 200, body: JSON.stringify(answer), progress: [100] }];
+    const seen: number[] = [];
+    expect(
+      await uploadPicture(
+        "/conversations/c1/photos",
+        picked,
+        { clientId: "id-1", caption: "Mökillä" },
+        (fraction) => seen.push(fraction),
+      ),
+    ).toEqual({ status: 200, body: answer });
+    expect(seen).toEqual([1]);
+    const sent = FakeXhr.sent[0];
+    expect(sent?.url).toMatch(/\/conversations\/c1\/photos$/);
+    expect(sent?.headers.authorization).toBe(`Bearer ${session.accessToken}`);
+    expect(partsOf(sent).map((part) => [part.fieldName, part.string ?? part.uri])).toEqual([
+      ["clientId", "id-1"],
+      ["caption", "Mökillä"],
+      ["photo", picked.uri],
+    ]);
+  });
+
+  it("hands back an empty body or one that is not JSON as none, and a refusal as an error with its code", async () => {
+    await saveSession(session);
+    FakeXhr.answers = [
+      { status: 204, body: "" },
+      { status: 502, body: "<html>Bad gateway</html>" },
+    ];
+    expect(await uploadPicture("/photos", picked)).toEqual({ status: 204, body: null });
+    expect(await uploadPicture("/photos", picked)).toEqual({ status: 502, body: null });
+    const refused = uploadRefusal({
+      status: 400,
+      body: { error: { code: "photo_rejected_nudity", message: "x", requestId: "r" } },
+    });
+    expect(refused).toBeInstanceOf(ApiError);
+    expect(refused).toMatchObject({
+      status: 400,
+      code: "photo_rejected_nudity",
+      message: "photo upload answered 400",
+    });
+    expect(uploadRefusal({ status: 502, body: null })).toMatchObject({
+      status: 502,
+      code: undefined,
+    });
+  });
+
+  it("sends the fields on the web preview too, before the picture's bytes", async () => {
+    await saveSession(session);
+    jest.replaceProperty(Platform, "OS", "web");
+    answering(new Response(new Blob(["jpeg bytes"], { type: "image/jpeg" })));
+    FakeXhr.answers = [{ status: 201, body: "{}" }];
+    await uploadPicture("/conversations/c1/photos", picked, { clientId: "id-1" });
+    expect(partsOf(FakeXhr.sent[0]).map((part) => part.fieldName)).toEqual(["clientId", "photo"]);
   });
 });
 

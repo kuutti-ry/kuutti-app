@@ -59,6 +59,8 @@ describe("the stories' conversations", () => {
       for (const message of told.messages) {
         expect(contactDetailsIn(message.body), message.body).toBeNull();
       }
+      // A photo's caption follows the text's rules (#350).
+      if (told.photo) expect(contactDetailsIn(told.photo.caption), told.photo.caption).toBeNull();
     }
   });
 });

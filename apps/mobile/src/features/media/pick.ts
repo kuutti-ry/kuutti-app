@@ -1,5 +1,6 @@
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { checkPhoto } from "./localCheck";
 
 /** The long edge the app sends (rules/mobile.md Images); the API makes the variants. */
 export const UPLOAD_LONG_EDGE = 1600;
@@ -52,4 +53,27 @@ export async function prepareForUpload(asset: {
   const image = await context.renderAsync();
   const saved = await image.saveAsync({ format: SaveFormat.JPEG, compress: JPEG_QUALITY });
   return { uri: saved.uri, width: saved.width, height: saved.height, mimeType: "image/jpeg" };
+}
+
+/** What the chain before an upload ended with: a picture ready to send, or why there is none. */
+export type PreparedPick =
+  | { kind: "picked"; photo: PickedPhoto }
+  | { kind: "cancelled" }
+  | { kind: "denied" }
+  /** The on-device check refused the picture; nothing was sent. */
+  | { kind: "refused_local" };
+
+/**
+ * The chain on the phone before anything is sent (#48), for the photos screen
+ * and the chat's composer (#350) alike: the library, the on-device check on
+ * the picked file (before the resize and before any byte leaves the phone),
+ * then the pre-resize. `onPreparing` is told once a picture is chosen, while
+ * it is checked and resized.
+ */
+export async function pickPrepared(onPreparing?: () => void): Promise<PreparedPick> {
+  const picked = await pickPhoto();
+  if (picked.kind !== "picked") return picked;
+  onPreparing?.();
+  if ((await checkPhoto(picked.asset.uri)) === "refuse") return { kind: "refused_local" };
+  return { kind: "picked", photo: await prepareForUpload(picked.asset) };
 }

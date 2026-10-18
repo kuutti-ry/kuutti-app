@@ -107,6 +107,13 @@ export const MATCHING_CONFIG_V1 = {
   // send reads both on each request.
   message_max_length: 2000,
   messages_per_minute: 30,
+  // #350 (migration 0057): photos one account may send in conversations per
+  // Finnish day, counted in the statement that writes the photo; the next
+  // one is refused in words until midnight.
+  message_photos_per_day: 10,
+  // #350: the sends one account may try in a day, refused ones included; the
+  // route's limiter counts them, since a refused photo is stored nowhere.
+  message_photo_attempts_per_day: 30,
   // #54 (ADR-013, rules/schema.md): the public waitlist counter says a number
   // only where at least this many people stand behind it.
   waitlist_k: 10,

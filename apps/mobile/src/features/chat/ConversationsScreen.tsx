@@ -28,14 +28,18 @@ export function counterpartName(t: T, conversation: ConversationSummary): string
     : t("profile.card.nameAge", { name: counterpart.name, years: counterpart.age });
 }
 
-/** The line under the name: how a closed one ended, else the last message, else that there is none. */
+/**
+ * The line under the name: how a closed one ended, else the last message (a
+ * photo's caption, or "Photo" without one, #350), else that there is none.
+ */
 function lineOf(t: T, conversation: ConversationSummary): string {
   if (conversation.state === "closed") {
     return conversation.closedHow === "erasure" ? t("chat.state.deleted") : t("chat.state.ended");
   }
   const last = conversation.lastMessage;
   if (!last) return t("chat.row.noMessages");
-  return last.side === "mine" ? t("chat.row.mine", { preview: last.preview }) : last.preview;
+  const preview = last.kind === "photo" && last.preview === "" ? t("chat.row.photo") : last.preview;
+  return last.side === "mine" ? t("chat.row.mine", { preview }) : preview;
 }
 
 function Row({ conversation }: { conversation: ConversationSummary }) {

@@ -3,7 +3,13 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Queryable } from "@kuutti/db";
 import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
-import { chatRoutes, chatSocketRoutes, createLive, type Live } from "./chat/index.ts";
+import {
+  chatRoutes,
+  chatSocketRoutes,
+  createLive,
+  type Live,
+  PHOTO_MESSAGE_PATH,
+} from "./chat/index.ts";
 import { healthRoutes } from "./health/index.ts";
 import {
   accountRoutes,
@@ -123,14 +129,17 @@ export function createApp(deps: Deps) {
     c.header("X-Robots-Tag", "noindex, nofollow");
   });
   app.use("*", corsAllowlist(deps.config.corsAllowedOrigins));
-  // The photo upload is the one body allowed past the app-wide cap; its own
-  // 10 MB limit sits on the route, behind the session guard (media/routes.ts).
+  // The two photo uploads are the bodies allowed past the app-wide cap: a
+  // profile photo and a photo sent in a conversation (#350). Each has its own
+  // 10 MB limit on its route, behind the session guard (media/routes.ts,
+  // chat/routes.ts).
   const limitBody = bodyLimit({
     maxSize: deps.config.BODY_LIMIT_BYTES,
     onError: (c) => c.json(localisedEnvelope(c, "payload_too_large"), 413),
   });
   app.use("*", (c, next) =>
-    c.req.method === UPLOAD_ROUTE.method && c.req.path === UPLOAD_ROUTE.path
+    c.req.method === UPLOAD_ROUTE.method &&
+    (c.req.path === UPLOAD_ROUTE.path || PHOTO_MESSAGE_PATH.test(c.req.path))
       ? next()
       : limitBody(c, next),
   );
