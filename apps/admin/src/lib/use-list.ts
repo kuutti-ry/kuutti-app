@@ -9,30 +9,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ListPage<T> = { items: T[]; total: number };
 
-export type ListState<T> =
+/** Ready: the page as parsed, with whatever else it carries (the report queue's clock, #311). */
+export type ListState<P extends ListPage<unknown>> =
   | { kind: "loading" }
   | { kind: "error" }
   | { kind: "forbidden" }
-  | ({ kind: "ready" } & ListPage<T>);
+  | ({ kind: "ready" } & P);
 
-export type ListSource<T> = {
+export type ListSource<P extends ListPage<unknown>> = {
   /** One request through the generated client; it resolves with the answer or rejects on the network. */
   fetchPage: () => Promise<{ data?: unknown; response: Response }>;
   /** The contract's parse: an answer that is not the contract is the error state. */
-  parse: (data: unknown) => ListPage<T>;
+  parse: (data: unknown) => P;
   /** Names the list in the console line of a failed load. */
   what: string;
 };
 
-export function useList<T>(source: ListSource<T>): {
-  state: ListState<T>;
+export function useList<P extends ListPage<unknown>>(
+  source: ListSource<P>,
+): {
+  state: ListState<P>;
   reload: () => Promise<void>;
   /** One item was decided where it stands: what waits goes down by one. */
   settle: () => void;
   /** The items changed where they stand, without a reload that would unmount them. */
-  update: (change: (items: T[]) => T[]) => void;
+  update: (change: (items: P["items"]) => P["items"]) => void;
 } {
-  const [state, setState] = useState<ListState<T>>({ kind: "loading" });
+  const [state, setState] = useState<ListState<P>>({ kind: "loading" });
   // The source is read at load time, so a screen may pass a new object on every render.
   const current = useRef(source);
   current.current = source;
@@ -41,7 +44,7 @@ export function useList<T>(source: ListSource<T>): {
   const reload = useCallback(async () => {
     latest.current += 1;
     const mine = latest.current;
-    const land = (next: ListState<T>) => {
+    const land = (next: ListState<P>) => {
       if (mine === latest.current) setState(next);
     };
     setState({ kind: "loading" });
@@ -73,7 +76,7 @@ export function useList<T>(source: ListSource<T>): {
   );
 
   const update = useCallback(
-    (change: (items: T[]) => T[]) =>
+    (change: (items: P["items"]) => P["items"]) =>
       setState((previous) =>
         previous.kind === "ready" ? { ...previous, items: change(previous.items) } : previous,
       ),

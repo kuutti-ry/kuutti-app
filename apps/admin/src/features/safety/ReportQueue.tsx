@@ -1,0 +1,201 @@
+import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
+import { useT } from "@kuutti/i18n/react";
+import {
+  type ReportListItem,
+  type ReportOutcome,
+  ReportQueue as ReportPage,
+  type ReportQueueQuery,
+  type ReportSource,
+  type SanctionReason,
+} from "@kuutti/schema";
+import { useState } from "react";
+import { Link } from "react-router";
+import { isLate, useAge } from "../../lib/age.ts";
+import { api } from "../../lib/api.ts";
+import { ScreenTitle } from "../../lib/screen-title.tsx";
+import { useList } from "../../lib/use-list.ts";
+
+// The report queue (#311, TD-5, rules/admin.md): the reports waiting for a
+// decision, the oldest first, those about one person under one heading, each
+// with its age against the response time promised (#299), "Late" in words
+// and weight; and both people by account id, linked to their pages (#306),
+// with how each has figured in reports before. Decided reports are behind the
+// filter, for the record. Neither the reporter's words nor the conversation
+// are here: opening a report is #312's, with its audit row. Plain HTML,
+// keyboard first; English only (TD-17).
+
+type State = ReportQueueQuery["state"];
+
+const REASON: Record<SanctionReason, PlainMessageKey> = {
+  harassment: "admin.sanction.reason.harassment",
+  misrepresentation: "admin.sanction.reason.misrepresentation",
+  under_age: "admin.sanction.reason.under_age",
+  commercial_use: "admin.sanction.reason.commercial_use",
+  scraping: "admin.sanction.reason.scraping",
+  other: "admin.sanction.reason.other",
+};
+
+const SOURCE: Record<ReportSource, PlainMessageKey> = {
+  card: "admin.reports.source.card",
+  conversation: "admin.reports.source.conversation",
+};
+
+const OUTCOME: Record<ReportOutcome, PlainMessageKey> = {
+  dismissed: "admin.reports.outcome.dismissed",
+  acted: "admin.reports.outcome.acted",
+};
+
+/** The account id as the panel shortens it elsewhere (#171). */
+const short = (accountId: string) => accountId.slice(0, 8);
+
+/** Reports about one person under one heading, named by the first one's id. */
+type Group = { id: string; reported: ReportListItem["reported"]; items: ReportListItem[] };
+
+/** Neighbours about the same person under one heading; the API puts a person's open reports together. */
+function groupsOf(items: ReportListItem[]): Group[] {
+  const groups: Group[] = [];
+  for (const item of items) {
+    const last = groups.at(-1);
+    if (last?.reported.accountId === item.reported.accountId) last.items.push(item);
+    else groups.push({ id: item.id, reported: item.reported, items: [item] });
+  }
+  return groups;
+}
+
+export function ReportQueue() {
+  const { t } = useT();
+  // The filter is the screen's own state, not a move: the focus stays on it.
+  const [state, setState] = useState<State>("open");
+  return (
+    <section aria-labelledby="reports-title">
+      <ScreenTitle id="reports-title">{t("admin.reports.title")}</ScreenTitle>
+      <fieldset className="actions">
+        <legend>{t("admin.reports.show")}</legend>
+        {(["open", "closed"] as const).map((value) => (
+          <label key={value} className="choice">
+            <input
+              type="radio"
+              name="report-state"
+              value={value}
+              checked={state === value}
+              onChange={() => setState(value)}
+            />
+            {t(value === "open" ? "admin.reports.show.open" : "admin.reports.show.closed")}
+          </label>
+        ))}
+      </fieldset>
+      {/* A new filter is a new list: loaded afresh, never the other state's rows. */}
+      <ReportList key={state} state={state} />
+    </section>
+  );
+}
+
+function ReportList({ state }: { state: State }) {
+  const { t } = useT();
+  const { state: page, reload } = useList({
+    fetchPage: () => api.GET("/admin/reports", { params: { query: { state, limit: 50 } } }),
+    parse: (data) => ReportPage.parse(data),
+    what: "reports",
+  });
+  return (
+    <>
+      <div className="row">
+        {page.kind === "ready" && (
+          <p aria-live="polite">
+            {t(state === "open" ? "admin.reports.total.open" : "admin.reports.total.closed", {
+              total: page.total,
+            })}
+            {page.items.length < page.total && (
+              <> {t("admin.reports.shown", { shown: String(page.items.length) })}</>
+            )}
+          </p>
+        )}
+        <button type="button" className="apart" onClick={() => void reload()}>
+          {t("admin.reports.refresh")}
+        </button>
+      </div>
+      {page.kind === "loading" && <p aria-busy="true">{t("admin.reports.loading")}</p>}
+      {page.kind === "error" && <p role="alert">{t("admin.reports.error")}</p>}
+      {page.kind === "ready" && (
+        <ul className="queue">
+          {groupsOf(page.items).map((group) => (
+            <ReportGroup
+              key={group.id}
+              group={group}
+              now={page.now}
+              responseHours={page.responseHours}
+            />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function ReportGroup({
+  group: { reported, items },
+  now,
+  responseHours,
+}: {
+  group: Group;
+  now: string;
+  responseHours: number;
+}) {
+  const { t, locale } = useT();
+  const ageOf = useAge();
+  return (
+    <li className="group">
+      <h3>
+        <Link className="target" to={`/accounts/${reported.accountId}`}>
+          {t("admin.reports.reported", { account: short(reported.accountId) })}
+        </Link>
+      </h3>
+      <p>
+        {t("admin.reports.history.reported", {
+          received: reported.received,
+          sanctions: reported.sanctions,
+        })}
+      </p>
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            <p>
+              <strong>{t(REASON[item.reason])}</strong>, {t(SOURCE[item.source])} ·{" "}
+              {t("admin.reports.filed", {
+                time: formatDateTime(locale, new Date(item.createdAt)),
+              })}
+            </p>
+            {item.decidedAt === null ? (
+              <p>
+                {t("admin.reports.waiting", { age: ageOf(item.createdAt, now) })}
+                {isLate(item.createdAt, now, responseHours) && (
+                  <>
+                    {" "}
+                    <strong>{t("admin.late", { hours: String(responseHours) })}</strong>
+                  </>
+                )}
+              </p>
+            ) : (
+              <p>
+                {item.outcome && <strong>{t(OUTCOME[item.outcome])}</strong>} ·{" "}
+                {t("admin.reports.decided", {
+                  time: formatDateTime(locale, new Date(item.decidedAt)),
+                })}
+              </p>
+            )}
+            <p>
+              <Link to={`/accounts/${item.reporter.accountId}`}>
+                {t("admin.reports.reporter", { account: short(item.reporter.accountId) })}
+              </Link>
+              {" · "}
+              {t("admin.reports.history.reporter", {
+                filed: item.reporter.filed,
+                upheld: String(item.reporter.upheld),
+              })}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </li>
+  );
+}

@@ -46,9 +46,9 @@ export type AdminSession = z.infer<typeof AdminSession>;
 /** One queue on the panel's front page (#303): how many wait, and since when the oldest. */
 export const OverviewQueue = z
   .object({
-    queue: z.enum(["photos", "feedback"]),
+    queue: z.enum(["reports", "photos", "feedback"]),
     waiting: z.int().min(0),
-    /** When the oldest began to wait: its upload, or for a photo its owner's appeal; null when nothing waits. */
+    /** When the oldest began to wait: its filing or upload, or for a photo its owner's appeal; null when nothing waits. */
     oldestSince: z.iso.datetime().nullable(),
   })
   .meta({ id: "OverviewQueue" });

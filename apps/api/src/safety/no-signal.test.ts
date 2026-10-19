@@ -131,6 +131,8 @@ describe("blocks and reports", () => {
 
   it("feed moderation alone: only the safety slice and the demo's removal read a report", () => {
     expect(readersOf(readsReport)).toEqual([
+      // The panel's queue and the front page's count of it (#311).
+      "apps/api/src/safety/report-queue.ts",
       "apps/api/src/safety/reports.ts",
       "packages/db/src/seed/write-population.ts",
     ]);

@@ -10,3 +10,5 @@ export { ConfigList } from "./ConfigList.tsx";
 export { FeedbackList } from "./FeedbackList.tsx";
 // The front page (#303): what waits and for how long.
 export { Overview } from "./Overview.tsx";
+// The report queue (#311).
+export { ReportQueue } from "./ReportQueue.tsx";

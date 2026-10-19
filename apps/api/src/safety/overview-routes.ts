@@ -2,15 +2,19 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { AdminOverview, ErrorResponse } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
+import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { queueSummary } from "../media/index.ts";
 import { feedbackSummary } from "./feedback.ts";
+import { reportSummary } from "./report-queue.ts";
 
 // The panel's front page (#303): every queue's count and the age of its
 // oldest, against the response time the association promises (#299). Counts
 // of queues, nothing about a person, so no audit row. The API's clock comes
 // with the answer, so the panel measures ages by it and not by the browser's.
+// The reports' count leaves out those the reader is a party to, as their
+// queue does (#311, ADR-030 §6).
 
 /** matching_config: the hours the association promises to answer within (#299). */
 export const MODERATION_RESPONSE_HOURS_KEY = "moderation_response_hours";
@@ -25,7 +29,7 @@ const overviewRoute = createRoute({
   path: "/admin/overview",
   summary: "What waits for the moderators",
   description:
-    "Per queue (photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
+    "Per queue (reports not decided that the reader is no party to, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
   security: [{ session: [] }],
   responses: {
     200: {
@@ -43,12 +47,14 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
   app.use(overviewRoute.getRoutingPath(), requireModerator);
 
   app.openapi(overviewRoute, async (c) => {
-    const [photos, feedback, responseHours] = await Promise.all([
+    const staff = staffOf(c);
+    const [reports, photos, feedback, responseHours] = await Promise.all([
+      reportSummary(deps.db, staff.identityId),
       queueSummary(deps.db),
       feedbackSummary(deps.db),
       matchingConfigNumber(deps.db, MODERATION_RESPONSE_HOURS_KEY),
     ]);
-    const queue = (name: "photos" | "feedback", s: typeof photos) => ({
+    const queue = (name: "reports" | "photos" | "feedback", s: typeof photos) => ({
       queue: name,
       waiting: s.waiting,
       oldestSince: s.oldestSince?.toISOString() ?? null,
@@ -57,7 +63,7 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
       {
         now: now().toISOString(),
         responseHours,
-        queues: [queue("photos", photos), queue("feedback", feedback)],
+        queues: [queue("reports", reports), queue("photos", photos), queue("feedback", feedback)],
       },
       200,
     );

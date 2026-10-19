@@ -52,6 +52,7 @@ import {
   feedbackAdminRoutes,
   feedbackRoutes,
   overviewAdminRoutes,
+  reportAdminRoutes,
   reportRoutes,
   sanctionAdminRoutes,
   staffAdminRoutes,
@@ -244,6 +245,7 @@ export function createApp(deps: Deps) {
   app.route("/", sanctionAdminRoutes(deps, moderators, admins));
   app.route("/", configAdminRoutes(deps, admins));
   app.route("/", overviewAdminRoutes(deps, moderators));
+  app.route("/", reportAdminRoutes(deps, moderators));
   app.route("/", accountAdminRoutes(deps, moderators));
   app.route("/", auditAdminRoutes(deps, admins));
   app.route("/", staffAdminRoutes(deps, admins));

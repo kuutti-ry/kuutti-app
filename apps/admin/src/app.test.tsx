@@ -234,6 +234,7 @@ describe("App", () => {
     const links = within(menu).getAllByRole("link");
     expect(links.map((link) => link.textContent)).toEqual([
       "Overview",
+      "Reports",
       "Photos",
       "Feedback",
       "A person",
@@ -333,7 +334,16 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Photos", "Feedback", "A person", "Tunables", "Audit log", "Staff"]);
+    ).toEqual([
+      "Overview",
+      "Reports",
+      "Photos",
+      "Feedback",
+      "A person",
+      "Tunables",
+      "Audit log",
+      "Staff",
+    ]);
     expect(calls).not.toContain("GET /admin/config");
     fireEvent.click(within(menu).getByRole("link", { name: "Tunables" }));
     const heading = await screen.findByRole("heading", { level: 2, name: "Tunables" });
@@ -380,7 +390,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
     expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
@@ -459,7 +469,7 @@ describe("App", () => {
         within(menu)
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Overview", "Photos", "Feedback", "A person"]);
+      ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
       expect(within(menu).queryByRole("link", { name: "Audit log" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Staff" })).toBeNull();
       expect(screen.queryByRole("form", { name: "Filters" })).toBeNull();
@@ -518,7 +528,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
     expect(screen.queryByText("Nothing at this address")).toBeNull();
     expect(calls).toContain(`GET /admin/accounts/${accountId}`);
     expect(calls).not.toContain("GET /admin/overview");
