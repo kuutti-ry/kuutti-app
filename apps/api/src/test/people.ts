@@ -20,6 +20,8 @@ export type PeopleOptions = {
   bio?: "written" | "ready_line" | "none";
   /** With `complete`: what they are here for (default: open to either, which fits everybody but dance partners; #147, #175). */
   intent?: NonNullable<ProfileFields["intent"]>;
+  /** With `complete`: their other answers, beside the intent (default: none; #87). */
+  fields?: ProfileFields;
   /** Born in June of this year (default: 1990). */
   birthYear?: number;
   /** Terms, privacy and the special-category consent in their current wording, as onboarding leaves them (#46, #146): what the pond gate asks for (#94). */
@@ -98,7 +100,7 @@ export async function people(
           ? "A bio that is long enough to count as one, by the rule of the profile."
           : null,
         options.bio === "ready_line" ? "photos_speak" : null,
-        JSON.stringify({ intent: options.intent ?? "open_to_either" }),
+        JSON.stringify({ ...options.fields, intent: options.intent ?? "open_to_either" }),
       ],
     );
     await db.query(

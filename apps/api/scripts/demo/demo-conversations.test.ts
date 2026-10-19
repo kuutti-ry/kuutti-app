@@ -43,6 +43,9 @@ function poolPerson(key: string, at: Date): PoolPerson {
     intent,
     identityId: key,
     blocks: new Set(),
+    fields: profile.fields,
+    // No persona sets a deal-breaker; one that does belongs here (#87).
+    dealBreakers: [],
   };
 }
 

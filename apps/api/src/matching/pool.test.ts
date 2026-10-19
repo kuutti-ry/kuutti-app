@@ -1,7 +1,18 @@
-import { AGE_MAX, AGE_MIN, GENDERS, PROFILE_FIELDS } from "@kuutti/schema";
+import {
+  AGE_MAX,
+  AGE_MIN,
+  DEAL_BREAKER_FIELDS,
+  type DealBreaker,
+  GENDERS,
+  PROFILE_FIELD_KEYS,
+  PROFILE_FIELDS,
+  type ProfileFieldKey,
+  type ProfileFields,
+} from "@kuutti/schema";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  accepts,
   type Intent,
   inEachOthersPool,
   intentsFit,
@@ -10,7 +21,9 @@ import {
 } from "./pool.ts";
 
 // features/pond/gate.feature (#94, #147, ADR-015): who is in whose pool;
-// features/safety/blocks.feature (#84, ADR-030): a block, set by either.
+// features/safety/blocks.feature (#84, ADR-030): a block, set by either;
+// features/matching/filters.feature (#87): the deal-breakers, both ways, and
+// the soft answers, which no pool reads.
 
 type Gender = PoolPerson["gender"];
 
@@ -30,6 +43,8 @@ const person = (
   intent,
   identityId: `identity-${++identities}`,
   blocks: new Set(),
+  fields: { intent },
+  dealBreakers: [],
 });
 
 describe("Two people are in each other's pool only when each passes what the other asked for", () => {
@@ -246,6 +261,35 @@ describe("The sheet's examples of who is shown to whom, by gender and seek", () 
   );
 });
 
+/** A field's options; every deal-breaker field and every soft field has them. */
+const optionsOf = (key: ProfileFieldKey): readonly string[] => {
+  const spec = PROFILE_FIELDS[key];
+  return "options" in spec ? spec.options : [];
+};
+const SOFT_FIELDS = PROFILE_FIELD_KEYS.filter(
+  (key) => PROFILE_FIELDS[key].preferenceAbout === "soft",
+);
+
+/** A few of a field's options, at least one: what a deal-breaker accepts, or a list's answer. */
+const someOf = (key: ProfileFieldKey) =>
+  fc.subarray([...optionsOf(key)], { minLength: 1, maxLength: Math.min(3, optionsOf(key).length) });
+
+/** An answer as the registry takes it: one option, or for a list one or more of them. */
+const answerArb = (key: ProfileFieldKey): fc.Arbitrary<unknown> =>
+  PROFILE_FIELDS[key].kind === "multi" ? someOf(key) : fc.constantFrom(...optionsOf(key));
+/** Any of the given fields answered or left open: an open one is a missing key, as the registry reads it. */
+const answersArb = (keys: readonly ProfileFieldKey[]) =>
+  fc.record(Object.fromEntries(keys.map((key) => [key, answerArb(key)])), { requiredKeys: [] });
+const dealBreakerArb: fc.Arbitrary<DealBreaker> = fc
+  .constantFrom(...DEAL_BREAKER_FIELDS)
+  .chain((field) =>
+    fc.record({
+      field: fc.constant(field),
+      accept: someOf(field),
+      includeUnknown: fc.boolean(),
+    }),
+  );
+
 const genderArb = fc.constantFrom(...GENDERS);
 const intentArb = fc.constantFrom(...PROFILE_FIELDS.intent.options);
 // A few identities, so that two people drawn at random often have blocked each other, or one the other.
@@ -260,8 +304,11 @@ const personArb: fc.Arbitrary<PoolPerson> = fc
     intent: intentArb,
     identityId: identityArb,
     blocks: fc.uniqueArray(identityArb, { maxLength: 3 }),
+    answers: answersArb([...DEAL_BREAKER_FIELDS, ...SOFT_FIELDS]),
+    // Up to the cap's two, each on a field of its own (#149); paused when the field is open.
+    dealBreakers: fc.uniqueArray(dealBreakerArb, { maxLength: 2, selector: (d) => d.field }),
   })
-  .map(({ gender, age, seeks, a, b, intent, identityId, blocks }) => ({
+  .map(({ gender, age, seeks, a, b, intent, identityId, blocks, answers, dealBreakers }) => ({
     gender,
     age,
     seeks,
@@ -269,7 +316,44 @@ const personArb: fc.Arbitrary<PoolPerson> = fc
     intent,
     identityId,
     blocks: new Set(blocks),
+    fields: { ...answers, intent } as ProfileFields,
+    dealBreakers,
   }));
+
+/**
+ * Two people every filter but the deal-breakers lets through, both ways:
+ * each one's gender among the other's seeks, any age, the same intent, no
+ * block. Two people drawn apart are rarely in each other's pool, and a rule
+ * about who stays in it says little about people who are out anyway.
+ */
+const pairArb: fc.Arbitrary<readonly [PoolPerson, PoolPerson]> = fc
+  .tuple(personArb, personArb)
+  .map(([a, b]) => {
+    const anyAge = { min: AGE_MIN, max: AGE_MAX };
+    const gender = a.seeks[0] ?? a.gender;
+    const seeks = b.seeks.includes(a.gender) ? b.seeks : [...b.seeks, a.gender];
+    return [
+      { ...a, ageWindow: anyAge, blocks: new Set<string>(), identityId: "identity-a" },
+      {
+        ...b,
+        gender,
+        seeks,
+        ageWindow: anyAge,
+        intent: a.intent,
+        fields: { ...b.fields, intent: a.intent },
+        blocks: new Set<string>(),
+        identityId: "identity-b",
+      },
+    ] as const;
+  });
+
+/** The person with their soft answers replaced, every other answer kept. */
+const withSoft = (person: PoolPerson, soft: Record<string, unknown>): PoolPerson => {
+  const rest = Object.fromEntries(
+    Object.entries(person.fields).filter(([key]) => !SOFT_FIELDS.includes(key as ProfileFieldKey)),
+  );
+  return { ...person, fields: { ...rest, ...soft } as ProfileFields };
+};
 
 describe("the pool, for any two people", () => {
   it("is the same asked from either side", () => {
@@ -298,6 +382,16 @@ describe("the pool, for any two people", () => {
         // Nobody has blocked the other (#84).
         expect(a.blocks.has(b.identityId)).toBe(false);
         expect(b.blocks.has(a.identityId)).toBe(false);
+        // Every deal-breaker of either that is not paused accepts the other's answer (#87).
+        for (const [holder, other] of [
+          [a, b],
+          [b, a],
+        ] as const) {
+          for (const dealBreaker of holder.dealBreakers) {
+            if (holder.fields[dealBreaker.field] === undefined) continue;
+            expect(accepts(dealBreaker, other.fields[dealBreaker.field])).toBe(true);
+          }
+        }
         if (a.intent !== b.intent) {
           expect([a.intent, b.intent]).toContain("open_to_either");
           expect([a.intent, b.intent]).not.toContain("dance_partner");
@@ -329,6 +423,57 @@ describe("the pool, for any two people", () => {
     );
   });
 
+  it("leaves out two people a deal-breaker of either excludes, asked from either side (#87)", () => {
+    fc.assert(
+      fc.property(personArb, personArb, (a, b) => {
+        const excludes = (holder: PoolPerson, other: PoolPerson) =>
+          holder.dealBreakers.some(
+            (d) => holder.fields[d.field] !== undefined && !accepts(d, other.fields[d.field]),
+          );
+        if (excludes(a, b) || excludes(b, a)) {
+          expect(inEachOthersPool(a, b)).toBe(false);
+          expect(inEachOthersPool(b, a)).toBe(false);
+        }
+      }),
+    );
+  });
+
+  it("is the same with a paused deal-breaker as without it (#87)", () => {
+    fc.assert(
+      fc.property(fc.oneof(pairArb, fc.tuple(personArb, personArb)), ([a, b]) => {
+        const live = a.dealBreakers.filter((d) => a.fields[d.field] !== undefined);
+        expect(inEachOthersPool({ ...a, dealBreakers: live }, b)).toBe(inEachOthersPool(a, b));
+        expect(inEachOthersPool(b, { ...a, dealBreakers: live })).toBe(inEachOthersPool(b, a));
+      }),
+    );
+  });
+
+  it("Soft preferences never take anybody out of a pool, nor bring anybody into one", () => {
+    fc.assert(
+      fc.property(
+        fc.oneof(pairArb, fc.tuple(personArb, personArb)),
+        answersArb(SOFT_FIELDS),
+        answersArb(SOFT_FIELDS),
+        ([a, b], softA, softB) => {
+          const changed = inEachOthersPool(withSoft(a, softA), withSoft(b, softB));
+          expect(changed).toBe(inEachOthersPool(a, b));
+          expect(inEachOthersPool(withSoft(b, softB), withSoft(a, softA))).toBe(changed);
+        },
+      ),
+    );
+    // Two in each other's pool stay in it, as far apart as the soft answers go;
+    // two out of it stay out, the same in every soft answer.
+    const far = (p: PoolPerson, answers: Record<string, string>) => withSoft(p, answers);
+    const [a, b] = [person("woman", 30, "woman", 25, 40), person("woman", 30, "woman", 25, 40)];
+    const lowest = { education: "peruskoulu", drinking: "never", drugsAttitude: "not_my_thing" };
+    const highest = { education: "tohtori", drinking: "often", drugsAttitude: "fine_with_it" };
+    expect(inEachOthersPool(far(a, lowest), far(b, highest))).toBe(true);
+    expect(inEachOthersPool(far(b, highest), far(a, lowest))).toBe(true);
+    const out = person("man", 30, "woman", 25, 40);
+    expect(inEachOthersPool(far(a, lowest), far(out, lowest))).toBe(false);
+    expect(inEachOthersPool(far(out, lowest), far(a, lowest))).toBe(false);
+  });
+
   it("holds everybody who passes both ways: nobody is left out for anything else", () => {
     fc.assert(
       fc.property(personArb, personArb, (a, b) => {
@@ -358,5 +503,99 @@ describe("blocks", () => {
     // A block of somebody else leaves the two as they were.
     const [g, h] = fits();
     expect(inEachOthersPool({ ...g, blocks: new Set(["identity-elsewhere"]) }, h)).toBe(true);
+  });
+});
+
+// features/matching/filters.feature (#87, #149): the deal-breakers in the pool.
+describe("deal-breakers", () => {
+  /** Two people in each other's pool by everything else: women of thirty who seek women. */
+  const pair = () => [person("woman", 30, "woman", 25, 40), person("woman", 30, "woman", 25, 40)];
+  /** The holder's own answer on each field, which keeps the deal-breaker from pausing. */
+  const OWN: Partial<Record<DealBreaker["field"], unknown>> = {
+    smoking: "never",
+    languages: ["fi"],
+    hasKids: "no",
+    monogamy: "monogamous",
+  };
+  const answered = (field: string, answer: string) =>
+    answer === "nothing" ? {} : { [field]: field === "languages" ? answer.split(",") : answer };
+
+  describe("A deal-breaker lets through only the answers its holder accepts, asked from either side", () => {
+    it.each([
+      ["smoking", "never", "without", "never", "in"],
+      ["smoking", "never", "without", "regularly", "not in"],
+      ["smoking", "never,quitting", "without", "quitting", "in"],
+      ["smoking", "never", "without", "nothing", "not in"],
+      ["smoking", "never", "with", "nothing", "in"],
+      ["smoking", "never", "with", "vaping", "not in"],
+      ["languages", "fi", "without", "sv,fi", "in"],
+      ["languages", "fi,sv", "without", "en", "not in"],
+      ["languages", "fi", "with", "nothing", "in"],
+      ["hasKids", "no", "without", "yes_not_with_me", "not in"],
+      ["monogamy", "monogamous", "without", "monogamous", "in"],
+    ] as const)(
+      "a deal-breaker on %s accepting %s, %s people who did not answer, and the other answered %s: %s",
+      (field, accept, unknown, answer, expected) => {
+        const [first, second] = pair();
+        if (!first || !second) throw new Error("no pair");
+        const holder: PoolPerson = {
+          ...first,
+          fields: { ...first.fields, [field]: OWN[field] },
+          dealBreakers: [{ field, accept: accept.split(","), includeUnknown: unknown === "with" }],
+        };
+        const other: PoolPerson = {
+          ...second,
+          fields: { ...second.fields, ...answered(field, answer) },
+        };
+        // The holder first and second: the same answer from either side.
+        expect(inEachOthersPool(holder, other)).toBe(expected === "in");
+        expect(inEachOthersPool(other, holder)).toBe(expected === "in");
+      },
+    );
+  });
+
+  it("The deal-breakers of both people are asked, each against the other's answers", () => {
+    const [first, second] = pair();
+    if (!first || !second) throw new Error("no pair");
+    const a: PoolPerson = {
+      ...first,
+      fields: { ...first.fields, smoking: "never", hasKids: "no" },
+      dealBreakers: [{ field: "smoking", accept: ["never"], includeUnknown: false }],
+    };
+    const b: PoolPerson = {
+      ...second,
+      fields: { ...second.fields, smoking: "never", hasKids: "no" },
+      dealBreakers: [{ field: "hasKids", accept: ["no"], includeUnknown: false }],
+    };
+    expect(inEachOthersPool(a, b)).toBe(true);
+    // B now smokes, which A's deal-breaker does not accept.
+    const bSmokes = { ...b, fields: { ...b.fields, smoking: "regularly" as const } };
+    expect(inEachOthersPool(a, bSmokes)).toBe(false);
+    expect(inEachOthersPool(bSmokes, a)).toBe(false);
+    // A now has children, which B's deal-breaker does not accept.
+    const aHasKids = { ...a, fields: { ...a.fields, hasKids: "yes_with_me" as const } };
+    expect(inEachOthersPool(aHasKids, b)).toBe(false);
+    expect(inEachOthersPool(b, aHasKids)).toBe(false);
+  });
+
+  it("A paused deal-breaker filters nothing", () => {
+    const [first, second] = pair();
+    if (!first || !second) throw new Error("no pair");
+    const smoker: PoolPerson = { ...second, fields: { ...second.fields, smoking: "regularly" } };
+    const dealBreakers = [{ field: "smoking" as const, accept: ["never"], includeUnknown: false }];
+    const holder: PoolPerson = {
+      ...first,
+      fields: { ...first.fields, smoking: "never" },
+      dealBreakers,
+    };
+    expect(inEachOthersPool(holder, smoker)).toBe(false);
+    // The holder takes their own smoking answer back: the filter waits.
+    const paused: PoolPerson = { ...holder, fields: { intent: holder.intent } };
+    expect(inEachOthersPool(paused, smoker)).toBe(true);
+    expect(inEachOthersPool(smoker, paused)).toBe(true);
+    // Answering again, whatever the answer, takes it up again.
+    const again: PoolPerson = { ...paused, fields: { ...paused.fields, smoking: "sometimes" } };
+    expect(inEachOthersPool(again, smoker)).toBe(false);
+    expect(inEachOthersPool(smoker, again)).toBe(false);
   });
 });
