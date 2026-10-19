@@ -22,15 +22,14 @@ import { applySanction } from "./sanctions.ts";
 // the reporter's, and whom they reported reaches no log line (ADR-030 §9).
 
 /** matching_config: the reports rule, different people within days (the maintainer, 19/10/2026). */
-export const AUTO_SHADOW_BAN_REPORTS_KEY = "auto_shadow_ban_reports";
-export const AUTO_SHADOW_BAN_REPORTS_DAYS_KEY = "auto_shadow_ban_reports_days";
+const AUTO_SHADOW_BAN_REPORTS_KEY = "auto_shadow_ban_reports";
+const AUTO_SHADOW_BAN_REPORTS_DAYS_KEY = "auto_shadow_ban_reports_days";
 /** matching_config: conversations opened within the minutes. */
-export const AUTO_SHADOW_BAN_FIRST_MESSAGES_KEY = "auto_shadow_ban_first_messages";
-export const AUTO_SHADOW_BAN_FIRST_MESSAGES_MINUTES_KEY = "auto_shadow_ban_first_messages_minutes";
+const AUTO_SHADOW_BAN_FIRST_MESSAGES_KEY = "auto_shadow_ban_first_messages";
+const AUTO_SHADOW_BAN_FIRST_MESSAGES_MINUTES_KEY = "auto_shadow_ban_first_messages_minutes";
 /** matching_config: the same first message to people within the hours. */
-export const AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_KEY = "auto_shadow_ban_same_first_message";
-export const AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_HOURS_KEY =
-  "auto_shadow_ban_same_first_message_hours";
+const AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_KEY = "auto_shadow_ban_same_first_message";
+const AUTO_SHADOW_BAN_SAME_FIRST_MESSAGE_HOURS_KEY = "auto_shadow_ban_same_first_message_hours";
 /** matching_config: the hours a moderator has to confirm or reverse one; past them it stays, and says late. */
 export const AUTO_SHADOW_BAN_REVIEW_HOURS_KEY = "auto_shadow_ban_review_hours";
 

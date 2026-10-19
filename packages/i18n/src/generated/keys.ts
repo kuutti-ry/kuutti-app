@@ -52,6 +52,13 @@ export type MessageParams = {
   "account.export.report.outcome.acted": Record<never, never>;
   "account.export.report.outcome.dismissed": Record<never, never>;
   "account.export.report.outcome.open": Record<never, never>;
+  "account.export.round.about": Record<never, never>;
+  "account.export.round.decision.like": Record<never, never>;
+  "account.export.round.decision.pass": Record<never, never>;
+  "account.export.round.reason.liked_you": Record<never, never>;
+  "account.export.round.reason.matches_filters": Record<never, never>;
+  "account.export.round.reason.relaxed": Record<never, never>;
+  "account.export.round.reason.seen_before": Record<never, never>;
   "account.export.sanction.kind.ban": Record<never, never>;
   "account.export.sanction.kind.shadow_ban": Record<never, never>;
   "account.export.sanction.kind.suspend": Record<never, never>;
@@ -533,6 +540,7 @@ export type MessageParams = {
   "errors.rate_limited": { "seconds": number };
   "errors.report_budget_exceeded": Record<never, never>;
   "errors.report_window_closed": Record<never, never>;
+  "errors.round_expired": Record<never, never>;
   "errors.session_expired": Record<never, never>;
   "errors.session_revoked": Record<never, never>;
   "errors.special_category_locked": Record<never, never>;

@@ -223,6 +223,29 @@ function anExport(): Record<string, unknown> {
       ],
       notices: [{ kind: "warning", at, readAt: null }],
     },
+    // The person's own rounds (#96): places, reasons and decisions, never whom.
+    rounds: {
+      about: "Your rounds",
+      items: [
+        {
+          day: "2026-10-19",
+          builtAt: at,
+          openedAt: at,
+          completedAt: null,
+          entries: [
+            {
+              position: 1,
+              reason: "matches_filters",
+              reasonInWords: "Matches all your filters",
+              seenAt: at,
+              decision: "like",
+              decisionInWords: "Liked",
+              decidedAt: at,
+            },
+          ],
+        },
+      ],
+    },
   };
 }
 

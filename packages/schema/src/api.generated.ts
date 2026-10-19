@@ -5504,6 +5504,219 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/rounds/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Today's round
+         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision; entries null before the day's round is built. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Today's round. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RoundResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rounds/{day}/entries/{position}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Report a card seen
+         * @description The phone had the card on the screen. The first report is recorded; a repeat writes nothing. A decision does not need it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                    position: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Recorded, or recorded before. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rounds/{day}/entries/{position}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Like or pass a card
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                    position: number;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["RoundDecisionUpdate"];
+                };
+            };
+            responses: {
+                /** @description Recorded. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/deal-breakers": {
         parameters: {
             query?: never;
@@ -5802,6 +6015,7 @@ export interface components {
             conversations: components["schemas"]["ExportedConversation"][];
             contacts: components["schemas"]["StoredContact"][];
             notifications: components["schemas"]["ExportedNotifications"];
+            rounds: components["schemas"]["ExportedRounds"];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -6167,6 +6381,37 @@ export interface components {
         NotificationKind: "round" | "message" | "match" | "moderation";
         /** @enum {string} */
         NoticeKind: "warning";
+        ExportedRounds: {
+            /** @description What this part is, in the request's language. */
+            about: string;
+            items: components["schemas"]["ExportedRound"][];
+        };
+        ExportedRound: {
+            /** Format: date */
+            day: string;
+            /** Format: date-time */
+            builtAt: string;
+            /** Format: date-time */
+            openedAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+            entries: components["schemas"]["ExportedRoundEntry"][];
+        };
+        ExportedRoundEntry: {
+            position: number;
+            reason: components["schemas"]["RoundReason"];
+            reasonInWords: string;
+            /** Format: date-time */
+            seenAt: string | null;
+            decision: components["schemas"]["RoundDecision"];
+            decisionInWords: string | null;
+            /** Format: date-time */
+            decidedAt: string | null;
+        };
+        /** @enum {string} */
+        RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed";
+        /** @enum {string|null} */
+        RoundDecision: "like" | "pass" | null;
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -7101,6 +7346,20 @@ export interface components {
         PondChoice: {
             /** Format: uuid */
             pondId: string;
+        };
+        RoundResponse: {
+            /** Format: date */
+            day: string;
+            entries: components["schemas"]["RoundEntry"][] | null;
+        };
+        RoundEntry: {
+            position: number;
+            reason: components["schemas"]["RoundReason"];
+            decision: components["schemas"]["RoundDecision"];
+            card: components["schemas"]["ProfileCard"];
+        };
+        RoundDecisionUpdate: {
+            decision: components["schemas"]["RoundDecision"];
         };
         DealBreakersResponse: {
             dealBreakers: components["schemas"]["StoredDealBreaker"][];

@@ -234,6 +234,8 @@ export type CardServed = {
   recorded: boolean;
   /** A block stands between the two (#84, ADR-030 §2): nothing was written, whatever the budget. */
   blocked: boolean;
+  /** False for a viewer erased meanwhile (#96): nothing was written, whatever the budget. */
+  live: boolean;
 };
 
 /**
@@ -246,7 +248,10 @@ export type CardServed = {
  * again, so the card counts against today's budget once (#64 review).
  * A block between the two writes nothing (#84, ADR-030 §2): asked in this
  * statement, so a block that lands after the card builder's own look is
- * still honoured where the record is written. The viewer's account id is in
+ * still honoured where the record is written. Nor does a viewer erased
+ * meanwhile (#96: today's round builds its cards one after another): the
+ * viewer's row is held FOR SHARE, so an erasure in flight finishes first and
+ * the tombstone is seen. The viewer's account id is in
  * every branch (rule 6); the photo ids are the card the server built, never
  * a request body.
  */
@@ -265,13 +270,19 @@ export async function recordCardServed(
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `card_shown:${input.viewerAccountId}`,
     ]);
-    const { rows } = await tx.query<{ used: number; allowed: boolean; blocked: boolean }>(
-      `WITH blocked AS (SELECT blocked_between($1, $2) AS b),
+    const { rows } = await tx.query<{
+      used: number;
+      allowed: boolean;
+      blocked: boolean;
+      live: boolean;
+    }>(
+      `WITH live AS (SELECT 1 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE),
+            blocked AS (SELECT blocked_between($1, $2) AS b),
             today AS (SELECT DISTINCT p.account_id AS subject
                       FROM card_shown s JOIN photo p ON p.id = s.photo_id
                       WHERE s.account_id = $1 AND s.at >= $5),
             used AS (SELECT count(*)::int AS n FROM today),
-            allowed AS (SELECT NOT (SELECT b FROM blocked)
+            allowed AS (SELECT EXISTS (SELECT 1 FROM live) AND NOT (SELECT b FROM blocked)
                             AND ((SELECT n FROM used) < $6
                               OR EXISTS (SELECT 1 FROM today WHERE subject = $2)) AS ok),
             ins AS (INSERT INTO card_shown (account_id, photo_id, at)
@@ -280,7 +291,7 @@ export async function recordCardServed(
                       WHERE card_shown.at < $5
                     RETURNING 1 AS one)
        SELECT (SELECT n FROM used) AS used, (SELECT ok FROM allowed) AS allowed,
-              (SELECT b FROM blocked) AS blocked`,
+              (SELECT b FROM blocked) AS blocked, EXISTS (SELECT 1 FROM live) AS live`,
       [
         input.viewerAccountId,
         input.subjectAccountId,
@@ -292,7 +303,7 @@ export async function recordCardServed(
     );
     const row = rows[0];
     if (!row) throw new Error("card_shown insert returned no row");
-    return { used: row.used, recorded: row.allowed, blocked: row.blocked };
+    return { used: row.used, recorded: row.allowed, blocked: row.blocked, live: row.live };
   });
 }
 

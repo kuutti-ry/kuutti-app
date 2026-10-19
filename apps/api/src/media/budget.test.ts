@@ -146,6 +146,24 @@ describe("exposure", () => {
     });
   });
 
+  test("a viewer erased is recorded no card, whatever the budget (#96)", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const theirs = await upload(app, b.headers, await fixturePng(64, 64));
+    await ctx.client.query("UPDATE account SET state = 'deleted' WHERE id = $1", [a.accountId]);
+    expect(await showCard(ctx, a.accountId, b.accountId, [theirs.id])).toEqual({
+      used: 0,
+      recorded: false,
+      blocked: false,
+      live: false,
+    });
+    const shown = await ctx.client.query("SELECT 1 FROM card_shown WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    expect(shown.rowCount).toBe(0);
+  });
+
   test("A photo shown twice is one shown record", async ({ ctx }) => {
     const { app } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
@@ -155,11 +173,13 @@ describe("exposure", () => {
       used: 0,
       recorded: true,
       blocked: false,
+      live: true,
     });
     expect(await showCard(ctx, a.accountId, b.accountId, [theirs.id])).toEqual({
       used: 1,
       recorded: true,
       blocked: false,
+      live: true,
     });
     const { rows } = await ctx.client.query<{ n: string }>(
       "SELECT count(*) AS n FROM card_shown WHERE account_id = $1",
@@ -283,7 +303,7 @@ describe("the card budget across days", () => {
       [viewer.accountId, theirs.id],
     );
     const again = await serve(b.accountId, theirs.id);
-    expect(again).toEqual({ used: 0, recorded: true, blocked: false });
+    expect(again).toEqual({ used: 0, recorded: true, blocked: false, live: true });
     const { rows } = await ctx.client.query<{ at: Date }>(
       "SELECT at FROM card_shown WHERE account_id = $1 AND photo_id = $2",
       [viewer.accountId, theirs.id],
@@ -296,6 +316,7 @@ describe("the card budget across days", () => {
       used: 1,
       recorded: true,
       blocked: false,
+      live: true,
     });
   });
 });
@@ -534,6 +555,7 @@ describe("A block between the two (#84, ADR-030, features/safety/blocks.feature)
       used: 0,
       recorded: true,
       blocked: false,
+      live: true,
     });
     expect((await fetchUrl(app, c.headers, bAgain.photo.id, "thumb")).status).toBe(200);
   });

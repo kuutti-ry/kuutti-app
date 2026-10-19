@@ -29,3 +29,4 @@ Nothing can be matched without a profile, and everything on a card is a decision
 ## History
 
 - 2026-10-17 (#84, ADR-030 §2): §6's builder refuses the card to anyone but the owner while a block stands between the two, set by either: `findCardSubject` names the viewer and reads `blocked_between`, and `buildCard` answers the 404 of somebody outside the pool right after the state, before photos, completeness and the budget, so nothing is recorded or counted.
+- 2026-10-19 (#96, ADR-034): `GET /rounds/today` is the caller §6 waited for: it takes no subject id, leaves out a card the builder refuses, and lets the budget's 429 through with its wait.

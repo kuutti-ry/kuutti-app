@@ -97,7 +97,7 @@ Telia, not Kuutti, keeps the identification logs: five years under section 24 of
 
 Sentry receives errors from the API and the app with the request data and the user stripped (`apps/api/src/lib/sentry.ts`, `apps/mobile/src/lib/sentry.ts`). Not storing IP addresses there is an organisation setting (`sentry-setup.md`), which the repository cannot confirm (Open, below). It is not a source for a request.
 
-**Kuutti does not hold:** the identity code; the name from the bank; legal sex; the date of birth (only year and month); a phone number; a location finer than the pond; contacts; payment data. Likes and matches do not exist yet (#96, #97, #100). Reports and blocks (#84), conversations with their messages (#348) and the photos sent in them (#350) do, in the table above.
+**Kuutti does not hold:** the identity code; the name from the bank; legal sex; the date of birth (only year and month); a phone number; a location finer than the pond; contacts; payment data. Matches do not exist yet (#100). Likes and passes are the decisions in a person's rounds (#96, ADR-034): whom each person was shown on each day and what they decided, kept until either person's erasure. Reports and blocks (#84), conversations with their messages (#348) and the photos sent in them (#350) do, in the table above.
 
 **Client addresses:** the API writes none to a row or a log line, and holds one in memory for at most two rate-limit windows (ADR-026 §7). Whether the proxy on the box logs addresses is open (below). Until the maintainer has checked, say exactly this, not that Kuutti holds no addresses.
 

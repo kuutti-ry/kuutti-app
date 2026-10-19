@@ -3007,6 +3007,13 @@ errors.report_window_closed:
   sv: "Det går inte längre att anmäla det här samtalet."
   machine: { fi: true, sv: true }
 
+errors.round_expired:
+  en: "That round ended at midnight, so this was not saved."
+  description: "Today's round (409, #96, ADR-034): a card of a day that has ended was liked, passed or reported seen; the app reads today's round again."
+  fi: "Kierros päättyi keskiyöllä, joten tätä ei tallennettu."
+  sv: "Rundan tog slut vid midnatt, så det här sparades inte."
+  machine: { fi: true, sv: true }
+
 errors.conversation_closed:
   en: "This conversation has ended, so the message was not sent."
   description: "Send (409, #348, ADR-031 §3): the conversation is closed, a block stands between the two, or the other person deleted their account. Must not say which: a block reads as an ended conversation (ADR-030 §6)."
@@ -6475,6 +6482,55 @@ account.export.report.outcome.acted:
   description: "Inside the downloaded data file (#84, #312), what came of a report the person filed: a moderator took action on the reported person. Never which action: that is the other person's."
   fi: "Moderaattori ryhtyi toimiin"
   sv: "En moderator vidtog åtgärder"
+  machine: { fi: true, sv: true }
+
+account.export.round.about:
+  en: "The rounds you were shown, a day each: when it was ready and opened, each card's place and why it was there, when you saw it, and whether you liked or passed it. Who was on a card is not written here."
+  description: "Inside the downloaded data file (#96, ADR-034), the text that opens the part listing the person's own rounds. Plain; says why no name is there."
+  fi: "Sinulle näytetyt kierrokset, yksi kultakin päivältä: milloin kierros oli valmis ja avattiin, kunkin kortin paikka ja miksi se oli mukana, milloin näit sen ja tykkäsitkö vai ohititko sen. Sitä, kuka kortilla oli, ei kirjoiteta tähän."
+  sv: "Rundorna du fick se, en för varje dag: när rundan var klar och öppnades, varje korts plats och varför det var med, när du såg det och om du gillade eller hoppade över det. Vem som fanns på ett kort står inte här."
+  machine: { fi: true, sv: true }
+
+account.export.round.reason.matches_filters:
+  en: "Matched all your filters"
+  description: "Inside the downloaded data file (#96), why a card was in the person's round (TD-12); the same reason the card's label gave."
+  fi: "Täytti kaikki suodattimesi"
+  sv: "Matchade alla dina filter"
+  machine: { fi: true, sv: true }
+
+account.export.round.reason.liked_you:
+  en: "Had liked you"
+  description: "Inside the downloaded data file (#96), why a card was in the person's round (TD-12): the card's person had liked them, as the card's label said."
+  fi: "Oli tykännyt sinusta"
+  sv: "Hade gillat dig"
+  machine: { fi: true, sv: true }
+
+account.export.round.reason.seen_before:
+  en: "Seen before"
+  description: "Inside the downloaded data file (#96), why a card was in the person's round (TD-12): shown to them on an earlier day."
+  fi: "Nähty aiemmin"
+  sv: "Sedd tidigare"
+  machine: { fi: true, sv: true }
+
+account.export.round.reason.relaxed:
+  en: "There because you relaxed a filter"
+  description: "Inside the downloaded data file (#96), why a card was in the person's round (TD-12, #99): included after they relaxed a filter."
+  fi: "Mukana, koska väljensit suodatinta"
+  sv: "Med eftersom du lättade på ett filter"
+  machine: { fi: true, sv: true }
+
+account.export.round.decision.like:
+  en: "Liked"
+  description: "Inside the downloaded data file (#96), the person's decision on a card of their round."
+  fi: "Tykkäsit"
+  sv: "Gillade"
+  machine: { fi: true, sv: true }
+
+account.export.round.decision.pass:
+  en: "Passed"
+  description: "Inside the downloaded data file (#96), the person's decision on a card of their round."
+  fi: "Ohitit"
+  sv: "Hoppade över"
   machine: { fi: true, sv: true }
 
 account.export.block.about:

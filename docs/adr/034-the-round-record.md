@@ -1,0 +1,53 @@
+# ADR-034: Today's round: the round record, seen and decided, and the Finnish day's edge
+
+- Status: accepted 2026-10-19 (#96, built as written here on the maintainer's decisions of that day, #96's comments; the points under "Open, the maintainer's" are his to confirm or change)
+- Date: 2026-10-19
+- Follows: TD-5 (research events never carry text), TD-7 (erasure), TD-11 (rounds and entries), TD-12 (the reason on every card), ADR-007 §3 and §4 (export and erasure), ADR-008 §3 (the shown record), ADR-009 §6 (the card builder), ADR-011 §1 and §4 (the research events), ADR-022 §5 (a break), ADR-030 §2, §5, §7 and Open 15 (blocks, the proof of contact), ADR-031 (the conversation as the match's record, #100), CLAUDE.md rules 5, 6, 7 and 10; issues #96, #95, #97, #98, #99, #100
+
+## Context
+
+Everything in matching stands on a record of whom each person was shown on each day and what they decided (TD-11): the round builder (#95) writes it, liked-you (#97), the like budgets (#98), the short-pool screen (#99) and the match (#100) read it, exposure is counted from it, and the research events describe it. #96 builds that record and the app's three routes on it, and builds none of what follows. The maintainer decided on 19/10/2026 that a decision may change until the day ends, and that the research events are coarse: places, reasons, the round's size and its count per reason, a band of seconds since a card was seen, and a flag on a changed decision.
+
+## Decision
+
+1. **Two tables** (migration 0066, generated). `rounds(id, account_id, day, built_at, opened_at, completed_at)`, one per account and Finnish day (`rounds_account_day_idx`). `round_entries(id, round_id, position, candidate_id, reason, seen_at, decision, decided_at)`: one card per place (`round_entries_round_position_idx`), places from 1, a candidate never twice in a round, and the exposure index of TD-11 on `(candidate_id, round_id)`; its seven-day count walks a candidate's entries and takes the day through `rounds` (a `shortcut:`). `reason` is TD-12's closed list (`matches_filters`, `liked_you`, `seen_before`, `relaxed`), `decision` is `like` or `pass`, a check holds the decision and its time together. An entry keeps a uuid, as every table does, but no route addresses it: an entry is its round's day and its place. Undecided is no value; expired is undecided on an ended day, computed, never stored, so nothing sweeps.
+2. **Shown, served, seen and decided.** Shown is an entry (the builder's allocation, what exposure counts). Served is the card builder's `card_shown` rows when the read builds the card (ADR-008 §3). Seen is the phone's report (`seen_at`, the first one), which gates nothing and is never answered. Decided is the like or the pass, which needs no seen report and never writes one.
+3. **The day.** One clock reading per request; the day is `finnishDay` of it, Europe/Helsinki with its daylight saving. The writes name the day in their path (`/rounds/{day}/entries/{position}/…`), so a phone holding yesterday's round after midnight is refused 409 `round_expired`, answered before any statement, and never decides the next day's card at the same place; a day not begun is 404. Before the night's builder (#95) has built the day's round, `GET /rounds/today` answers the day with no cards.
+4. **The routes** (`matching/round-routes.ts`, behind the session guard): `GET /rounds/today`, `POST …/seen` (204), `PUT …/decision` with `like` or `pass` (204). No route takes another person's id. The read serves each card through the profile slice's builder, handed in by `app.ts` (profile already imports matching), so the shown record, the day's card budget and its 429 with `Retry-After`, and the read-time block of ADR-030 §2 hold as for any card; a card the builder refuses is left out, so places may skip. Every write asks, in the statement that writes, that the candidate is still active and that no block stands between the two (`blocked_between`), so a block or a sanction that commits meanwhile leaves nothing written and answers the 404 of a place with no card; `matching/rounds.ts` joins `no-signal.test.ts`'s readers of a block.
+5. **A decision changes until the day ends**, under the round row's lock (`FOR UPDATE`), which serialises a person's day across devices and which #98's count and #100's match will take too. The same decision again writes nothing; a change rewrites `decided_at`. The round is complete (`completed_at`, never cleared) at the decision after which nothing that can still be shown is undecided; `opened_at` is the first read that found it.
+6. **The research events** (`round_built`, `profile_viewed`, `like`, `pass`), emitted after the commit through `track`, keyed by `research_id`: `round_built` carries the round's size and its count per reason; `profile_viewed` the place and reason, at the first seen report only; `like` and `pass` the place, reason, `sinceSeen` (six bands, null when never reported seen) and `revised`, true on a change of the day's decision, so a researcher does not count one card twice (the build's proposal). None carries the candidate, the day, a seen time or a score. The rows keep exact times while they live: a holder of the whole database could re-link a person's hour-cut events after a withdrawal, which the rounds' retention bounds (ADR-011 §1's holder residual).
+7. **Erasure and export.** Erasure (TD-7) deletes the entries in which the person is somebody's card, others' decisions on them included, and the person's own rounds with their entries (`eraseRoundsOf`, in its transaction); `ErasureSummary` counts both. The export carries the person's own rounds, newest day first: the day, its times, and each card's place, reason, seen time and decision, in keys and words; never whom, and never a round in which the person was somebody's card. Rows are kept until erasure (a `shortcut:`; about 60,000 a day at 5,000 people).
+8. **What follows builds on it**: #95 writes through `saveRound`, the one writer, which refuses a person as their own card, writes nothing for an erased owner and drops a candidate erased, sanctioned or blocked since the pool was read (each statement asks for itself, holding the rows `FOR SHARE`, so an erasure or a block in between leaves no row that outlives it), and emits `round_built` with what it wrote; #97 reads the likes, #98 counts the day's likes under the round lock, #99 adds places and the `relaxed` reason, #100 makes a match from a mutual like.
+9. **The proof of contact stays `card_shown`** (ADR-030 §5): an entry is written at build time even if never served, and entries go with the candidate's erasure, so the round record cannot close Open 15.
+
+## Consequences
+
+- Matching has its record; the builder and what follows add no migration that rewrites rows.
+- A decision is the person's own until midnight, then final.
+- The round read serves up to a round's cards through the card builder: each writes the shown record and counts the day's cards (ADR-008).
+- Twenty-two million rows a year until a retention is set.
+
+## Alternatives considered
+
+- **A decision final once made**: simpler, but the maintainer chose changeable until the day ends.
+- **Entries addressed by id**: a phone past midnight could decide a different day's card; the day in the path refuses it.
+- **A day and an account on every entry**: faster exposure counts, at the cost of a composite key; left until #95 measures it.
+- **The round entry as proof of contact**: it is no proof a card was served (§9).
+
+## Open, the maintainer's
+
+1. The `revised` flag on a changed decision's event, and the six `sinceSeen` bands.
+2. Retention of rounds and entries (a horizon of at least #99's look-back); it bears on the privacy notice, the DPIA (#190) and the police-disclosure runbook, before #95 writes in production.
+3. TD-11's `opened_at` and `completed_at`, kept with the meanings of §5.
+4. The export's `liked_you` reason, which says somebody liked the person, as the card's label did.
+5. Rule 7 within the day: the read and the writes ask the block and the account's state; seeks, ages, intent and deal-breakers stay as the night built them, unless #95 asks them again.
+6. The card builder's "card served" log line names the subject: through the round read, a who-saw-whom line per card kept thirty days.
+7. A card budget below a round's size answers 429 for the whole read.
+8. Which issue carries the round screen, with ADR-030 §11's Maestro flow.
+9. A caller on a break may still decide a round built before it (ADR-022 §5).
+10. Completeness is the card builder's alone: a card the read leaves out because its profile is no longer complete can still be decided from a screen that holds it, and keeps the round from completing, since SQL cannot ask completeness.
+
+## History
+
+- 2026-10-19: written with #96's build, on the maintainer's decisions of that day.
+- 2026-10-19, after review: `saveRound` asks liveness and blocks in its own statements (§8); the card builder's shown record refuses a viewer erased while their round is read (ADR-008); Open 10.

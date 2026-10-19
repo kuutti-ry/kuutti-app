@@ -453,6 +453,8 @@ describe("migrate", () => {
           "report",
           "report_message",
           "research_subject",
+          "round_entries",
+          "rounds",
           "sanction",
           "session",
           "waitlist_snapshot",

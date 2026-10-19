@@ -150,8 +150,9 @@ export async function buildCard(
       since: day.start,
       limit,
     });
-    // A block that landed after findCardSubject's look: the same 404, nothing written.
-    if (served.blocked) throw new AppError(404, "not_found", "No such card");
+    // A block that landed after findCardSubject's look, or the viewer erased
+    // meanwhile: the same 404, nothing written.
+    if (served.blocked || !served.live) throw new AppError(404, "not_found", "No such card");
     if (!served.recorded) {
       const retryAfterSeconds = secondsUntil(day.end, at);
       deps.logger.warn(

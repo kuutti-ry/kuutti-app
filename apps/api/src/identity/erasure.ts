@@ -6,6 +6,8 @@ import { AppError } from "../lib/errors.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
   deletePreferencesOfAccount,
+  eraseRoundsOf,
+  exportRounds,
   readDealBreakers,
   readPreferences,
 } from "../matching/index.ts";
@@ -91,6 +93,10 @@ export type ErasureSummary = {
   profileRows: number;
   /** The hard preference rows (#46). */
   preferences: number;
+  /** The person's own rounds, their entries with them (#96). */
+  rounds: number;
+  /** The entries in which the person was somebody's card, decisions on them included (#96). */
+  roundEntriesAsCandidate: number;
   /** The consent rows (ADR-010 §14). */
   consents: number;
   /** The export requests (#237). */
@@ -147,6 +153,9 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     const profileRows = await eraseProfileOfAccount(tx, accountId);
     // The two hard rows go (TD-7), and the tombstone keeps neither gender nor pond.
     const preferences = await deletePreferencesOfAccount(tx, accountId);
+    // The person's rounds, and the entries in which they are somebody's card,
+    // others' likes on them included (TD-7, #96).
+    const rounds = await eraseRoundsOf(tx, accountId);
     // The consent rows go (ADR-010 §14): the terms were the condition of use,
     // the sensitive answers they covered went just above, and the events keep
     // the version they were written under; nothing is left to prove.
@@ -178,6 +187,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       photos,
       profileRows,
       preferences,
+      rounds,
       consents,
       exports,
       feedback,
@@ -201,6 +211,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     authRequests: result.authRequests,
     profileRows: result.profileRows,
     preferences: result.preferences,
+    rounds: result.rounds.rounds,
+    roundEntriesAsCandidate: result.rounds.entriesAsCandidate,
     consents: result.consents,
     exports: result.exports,
     feedback: result.feedback,
@@ -289,6 +301,7 @@ export async function exportAccount(
     conversations,
     contacts,
     notifications,
+    rounds,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
@@ -313,6 +326,7 @@ export async function exportAccount(
     }),
     exportContacts(deps, accountId),
     exportNotifications(deps.db, accountId),
+    exportRounds(deps.db, accountId, EXPORT_HISTORY_LIMIT),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -397,6 +411,27 @@ export async function exportAccount(
     contacts,
     // What the person chose to be notified of, and the notices they were shown (#176).
     notifications,
+    // The person's own rounds (#96, ADR-034): places, reasons and decisions; never whom.
+    rounds: {
+      about: t("account.export.round.about"),
+      items: rounds.map((round) => ({
+        day: round.day,
+        builtAt: round.builtAt.toISOString(),
+        openedAt: round.openedAt?.toISOString() ?? null,
+        completedAt: round.completedAt?.toISOString() ?? null,
+        entries: round.entries.map((entry) => ({
+          position: entry.position,
+          reason: entry.reason,
+          reasonInWords: t(`account.export.round.reason.${entry.reason}`),
+          seenAt: entry.seenAt?.toISOString() ?? null,
+          decision: entry.decision,
+          decisionInWords: entry.decision
+            ? t(`account.export.round.decision.${entry.decision}`)
+            : null,
+          decidedAt: entry.decidedAt?.toISOString() ?? null,
+        })),
+      })),
+    },
   };
   return { document, files: photos.files };
 }

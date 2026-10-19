@@ -119,6 +119,8 @@ describe("blocks and reports", () => {
       "apps/api/src/chat/repo.ts",
       // The gate's count: who is in whose pool (ADR-015 §1).
       "apps/api/src/jobs/pond-gate.ts",
+      // Today's round: seen and the decision ask at the write (ADR-030 §2, ADR-034).
+      "apps/api/src/matching/rounds.ts",
       // The photos a card showed (ADR-008 §3).
       "apps/api/src/media/repo.ts",
       // The card (ADR-009 §6).
