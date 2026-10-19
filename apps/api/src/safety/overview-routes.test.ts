@@ -13,8 +13,8 @@ import {
 import { MODERATION_RESPONSE_HOURS_KEY } from "./overview-routes.ts";
 
 // The panel's front page (#303): the figures read back exactly as the queues
-// hold them, photos by the later of upload and appeal, feedback by its
-// sending; the API's clock and the promised response time ride along; the
+// hold them, reports by their filing (#311), photos by the later of upload
+// and appeal, feedback by its sending; the API's clock and the promised response time ride along; the
 // moderators' guard in each of its variants; and no audit row, since the page
 // shows counts of queues and nothing about a person. Rows are written straight
 // into the test's transaction in the states moderation leaves them in.
@@ -138,9 +138,37 @@ describe("GET /admin/overview", () => {
       now: "2026-10-16T09:00:00.000Z",
       responseHours: 24,
       queues: [
+        { queue: "reports", waiting: 0, oldestSince: null },
         { queue: "photos", waiting: 2, oldestSince: "2026-10-15T20:00:00.000Z" },
         { queue: "feedback", waiting: 1, oldestSince: "2026-10-15T12:34:56.789Z" },
       ],
+    });
+  });
+
+  test("reports wait from their filing, and a decided one is not counted", async ({ ctx, app }) => {
+    const staff = await staffSession(ctx.client);
+    const [a, b, x] = [
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+      await signedInAccount(ctx.client),
+    ];
+    const file = (reporter: string, at: string, decided: boolean) =>
+      ctx.client.query(
+        `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, created_at,
+                             outcome, decided_at, decided_by)
+         VALUES ($1, $2, 'card', 'harassment', $3, $4, $5, $6)`,
+        decided
+          ? [reporter, x.accountId, at, "dismissed", "2026-10-15T00:00:00.000Z", staff.identityId]
+          : [reporter, x.accountId, at, null, null, null],
+      );
+    // The oldest was decided: it no longer waits, and the next one is the oldest.
+    await file(a.accountId, "2026-10-10T08:00:00.000Z", true);
+    await file(a.accountId, "2026-10-15T07:30:00.000Z", false);
+    await file(b.accountId, "2026-10-16T08:00:00.000Z", false);
+    expect((await read(app, staff.headers)).queues[0]).toEqual({
+      queue: "reports",
+      waiting: 2,
+      oldestSince: "2026-10-15T07:30:00.000Z",
     });
   });
 
@@ -163,17 +191,19 @@ describe("GET /admin/overview", () => {
     await feedbackIn(ctx, owner.accountId, "2026-10-13T00:00:00.000Z");
 
     expect((await read(app, staff.headers)).queues).toEqual([
+      { queue: "reports", waiting: 0, oldestSince: null },
       { queue: "photos", waiting: 3, oldestSince: "2026-10-13T10:15:00.000Z" },
       { queue: "feedback", waiting: 3, oldestSince: "2026-10-11T00:00:00.001Z" },
     ]);
   });
 
-  test("an empty panel answers zero and null for both queues", async ({ ctx, app }) => {
+  test("an empty panel answers zero and null for every queue", async ({ ctx, app }) => {
     const staff = await staffSession(ctx.client);
     expect(await read(app, staff.headers)).toEqual({
       now: "2026-10-16T09:00:00.000Z",
       responseHours: 24,
       queues: [
+        { queue: "reports", waiting: 0, oldestSince: null },
         { queue: "photos", waiting: 0, oldestSince: null },
         { queue: "feedback", waiting: 0, oldestSince: null },
       ],
@@ -188,6 +218,7 @@ describe("GET /admin/overview", () => {
     const owner = await signedInAccount(ctx.client);
     await nothingWaiting(ctx, owner.accountId, staff.identityId);
     expect((await read(app, staff.headers)).queues).toEqual([
+      { queue: "reports", waiting: 0, oldestSince: null },
       { queue: "photos", waiting: 0, oldestSince: null },
       { queue: "feedback", waiting: 0, oldestSince: null },
     ]);
@@ -268,6 +299,7 @@ describe("GET /admin/overview", () => {
     }
     expect(answers[0]).toEqual(answers[1]);
     expect(answers[0]?.queues).toEqual([
+      { queue: "reports", waiting: 0, oldestSince: null },
       { queue: "photos", waiting: 1, oldestSince: "2026-10-16T06:00:00.000Z" },
       { queue: "feedback", waiting: 1, oldestSince: "2026-10-16T07:00:00.000Z" },
     ]);

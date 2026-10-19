@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.43.1",
+    "version": "0.44.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -4571,6 +4571,7 @@
           "queue": {
             "type": "string",
             "enum": [
+              "reports",
               "photos",
               "feedback"
             ]
@@ -4589,6 +4590,117 @@
           "queue",
           "waiting",
           "oldestSince"
+        ]
+      },
+      "ReportQueue": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "responseHours": {
+            "type": "number",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportListItem"
+            },
+            "maxItems": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "now",
+          "responseHours",
+          "items",
+          "total"
+        ]
+      },
+      "ReportListItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReportSource"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReportOutcome"
+          },
+          "decidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "filed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "upheld": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "accountId",
+              "filed",
+              "upheld"
+            ]
+          },
+          "reported": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "received": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sanctions": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "accountId",
+              "received",
+              "sanctions"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "source",
+          "createdAt",
+          "outcome",
+          "decidedAt",
+          "reporter",
+          "reported"
         ]
       },
       "AdminAccount": {
@@ -9598,7 +9710,7 @@
     "/admin/overview": {
       "get": {
         "summary": "What waits for the moderators",
-        "description": "Per queue (photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
+        "description": "Per queue (reports not decided that the reader is no party to, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
         "security": [
           {
             "session": []
@@ -9611,6 +9723,85 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports": {
+      "get": {
+        "summary": "The reports, for a moderator",
+        "description": "Open reports the oldest first, those about one account together, the group whose oldest waited longest first; or closed ones, the newest decision first. Each with its reason, where it was made, both account ids, the reporter's reports filed and upheld, and the reported account's reports received and sanctions. A report the reading member of staff is a party to is left out, and out of every count. With the API's clock and matching_config moderation_response_hours. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "default": "open"
+            },
+            "required": false,
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of reports.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportQueue"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

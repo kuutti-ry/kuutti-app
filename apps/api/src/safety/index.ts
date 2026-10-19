@@ -27,6 +27,8 @@ export {
   recordPhotoCheckNote,
   withdrawPhotoCheckNote,
 } from "./photo-check.ts";
+// The panel's report queue (#311).
+export { reportAdminRoutes } from "./report-admin-routes.ts";
 export { reportRoutes } from "./report-routes.ts";
 export { listReportsOfAccount, photosHeldByReports, pruneReports } from "./reports.ts";
 // Sanctions (#307, ADR-024): the panel's routes, the night's end of

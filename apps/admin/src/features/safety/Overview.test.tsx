@@ -19,7 +19,11 @@ const HOUR = 3_600_000;
 /** An instant `ms` before the API's now. */
 const before = (ms: number) => new Date(Date.parse(NOW) - ms).toISOString();
 
-type Queue = { queue: "photos" | "feedback"; waiting: number; oldestSince: string | null };
+type Queue = {
+  queue: "reports" | "photos" | "feedback";
+  waiting: number;
+  oldestSince: string | null;
+};
 const empty = (queue: Queue["queue"]): Queue => ({ queue, waiting: 0, oldestSince: null });
 const overview = (queues: Queue[], responseHours = 24, now = NOW) => ({
   now,
@@ -61,6 +65,7 @@ function show() {
       <MemoryRouter>
         <Routes>
           <Route path="/" element={<Overview />} />
+          <Route path="/reports" element={<p>the report screen</p>} />
           <Route path="/photos" element={<p>the photo screen</p>} />
           <Route path="/feedback" element={<p>the feedback screen</p>} />
         </Routes>
@@ -118,12 +123,14 @@ describe("the front page", () => {
   });
 
   it.each([
+    ["Reports", "/reports", "the report screen"],
     ["Photo review queue", "/photos", "the photo screen"],
     ["Feedback", "/feedback", "the feedback screen"],
   ])("links %s to its screen at %s", async (name, href, screenText) => {
     fetchMock([
       answer(
         overview([
+          { queue: "reports", waiting: 1, oldestSince: before(HOUR) },
           { queue: "photos", waiting: 2, oldestSince: before(HOUR) },
           { queue: "feedback", waiting: 4, oldestSince: before(HOUR) },
         ]),

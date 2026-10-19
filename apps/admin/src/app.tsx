@@ -12,6 +12,7 @@ import {
   ConfigList,
   FeedbackList,
   Overview,
+  ReportQueue,
   StaffList,
 } from "./features/safety/index.ts";
 import { setRoleAnswerHandler } from "./lib/api.ts";
@@ -41,6 +42,12 @@ const SCREENS: readonly Screen[] = [
     label: "admin.nav.overview",
     roles: ["moderator", "admin"],
     element: <Overview />,
+  },
+  {
+    path: "/reports",
+    label: "admin.nav.reports",
+    roles: ["moderator", "admin"],
+    element: <ReportQueue />,
   },
   {
     path: "/photos",

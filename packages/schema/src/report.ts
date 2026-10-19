@@ -89,3 +89,64 @@ export const ExportedBlocks = z
   })
   .meta({ id: "ExportedBlocks" });
 export type ExportedBlocks = z.infer<typeof ExportedBlocks>;
+
+/** The panel's report queue (#311): the reports waiting for a moderator, or those decided, for the record. */
+export const ReportQueueQuery = z
+  .object({
+    state: z.enum(["open", "closed"]).default("open"),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .meta({ id: "ReportQueueQuery" });
+export type ReportQueueQuery = z.infer<typeof ReportQueueQuery>;
+
+/**
+ * One report as the queue lists it (#311, TD-5): why, where and when it was
+ * made, and both people by account id with how they have figured in reports
+ * before; never the reporter's note or anything of a conversation, which are
+ * read on opening the report (#312, an audit row). The counts leave out every
+ * report the reading member of staff is a party to (ADR-030 §6).
+ */
+export const ReportListItem = z
+  .object({
+    id: z.uuid(),
+    reason: SanctionReason,
+    source: ReportSource,
+    createdAt: z.iso.datetime(),
+    /** Null while it waits for a moderator. */
+    outcome: ReportOutcome.nullable(),
+    decidedAt: z.iso.datetime().nullable(),
+    reporter: z.object({
+      accountId: z.uuid(),
+      /** The reports this account filed, this one included. */
+      filed: z.int().min(0),
+      /** Of those, the ones a moderator acted on. */
+      upheld: z.int().min(0),
+    }),
+    reported: z.object({
+      accountId: z.uuid(),
+      /** The reports filed about this account, this one included. */
+      received: z.int().min(0),
+      /** The sanctions this account has had, lifted ones included (#307). */
+      sanctions: z.int().min(0),
+    }),
+  })
+  .meta({ id: "ReportListItem" });
+export type ReportListItem = z.infer<typeof ReportListItem>;
+
+/**
+ * A page of the queue: open reports the oldest first, those about one person
+ * together, the group whose oldest waited longest first; closed ones the
+ * newest decision first. The API's clock and the response time promised
+ * (#299) ride along, as on the front page.
+ */
+export const ReportQueue = z
+  .object({
+    now: z.iso.datetime(),
+    /** matching_config moderation_response_hours: past it, an open report is late. */
+    responseHours: z.number().min(0),
+    items: z.array(ReportListItem).max(100),
+    /** Reports in this state in total, beyond this page. */
+    total: z.int().min(0),
+  })
+  .meta({ id: "ReportQueue" });
+export type ReportQueue = z.infer<typeof ReportQueue>;

@@ -19,7 +19,9 @@ const parse = (data: unknown): ListPage<Item> => {
   }
   return value;
 };
-const source = (fetchPage: ListSource<Item>["fetchPage"]): ListSource<Item> => ({
+const source = (
+  fetchPage: ListSource<ListPage<Item>>["fetchPage"],
+): ListSource<ListPage<Item>> => ({
   fetchPage,
   parse,
   what: "probe",

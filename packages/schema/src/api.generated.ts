@@ -4668,7 +4668,7 @@ export interface paths {
         };
         /**
          * What waits for the moderators
-         * @description Per queue (photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.
+         * @description Per queue (reports not decided that the reader is no party to, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.
          */
         get: {
             parameters: {
@@ -4686,6 +4686,75 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["AdminOverview"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The reports, for a moderator
+         * @description Open reports the oldest first, those about one account together, the group whose oldest waited longest first; or closed ones, the newest decision first. Each with its reason, where it was made, both account ids, the reporter's reports filed and upheld, and the reported account's reports received and sanctions. A report the reading member of staff is a party to is left out, and out of every count. With the API's clock and matching_config moderation_response_hours. Moderators and admins.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    state?: "open" | "closed";
+                    limit?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A page of reports. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReportQueue"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description unauthenticated, session_expired or session_revoked. */
@@ -6468,10 +6537,40 @@ export interface components {
         };
         OverviewQueue: {
             /** @enum {string} */
-            queue: "photos" | "feedback";
+            queue: "reports" | "photos" | "feedback";
             waiting: number;
             /** Format: date-time */
             oldestSince: string | null;
+        };
+        ReportQueue: {
+            /** Format: date-time */
+            now: string;
+            responseHours: number;
+            items: components["schemas"]["ReportListItem"][];
+            total: number;
+        };
+        ReportListItem: {
+            /** Format: uuid */
+            id: string;
+            reason: components["schemas"]["SanctionReason"];
+            source: components["schemas"]["ReportSource"];
+            /** Format: date-time */
+            createdAt: string;
+            outcome: components["schemas"]["ReportOutcome"];
+            /** Format: date-time */
+            decidedAt: string | null;
+            reporter: {
+                /** Format: uuid */
+                accountId: string;
+                filed: number;
+                upheld: number;
+            };
+            reported: {
+                /** Format: uuid */
+                accountId: string;
+                received: number;
+                sanctions: number;
+            };
         };
         AdminAccount: {
             /** Format: uuid */

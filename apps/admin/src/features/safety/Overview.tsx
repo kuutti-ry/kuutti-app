@@ -3,6 +3,7 @@ import { useT } from "@kuutti/i18n/react";
 import { AdminOverview, type OverviewQueue } from "@kuutti/schema";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
+import { isLate, useAge } from "../../lib/age.ts";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 
@@ -13,11 +14,10 @@ import { ScreenTitle } from "../../lib/screen-title.tsx";
 // person. English only (TD-17).
 
 const QUEUES: Record<OverviewQueue["queue"], { label: PlainMessageKey; path: string }> = {
+  reports: { label: "admin.overview.queue.reports", path: "/reports" },
   photos: { label: "admin.overview.queue.photos", path: "/photos" },
   feedback: { label: "admin.overview.queue.feedback", path: "/feedback" },
 };
-
-const HOUR_MS = 3_600_000;
 
 type State =
   | { kind: "loading" }
@@ -28,6 +28,7 @@ type State =
 export function Overview() {
   const { t } = useT();
   const [state, setState] = useState<State>({ kind: "loading" });
+  const ageOf = useAge();
 
   const load = useCallback(async () => {
     setState({ kind: "loading" });
@@ -46,14 +47,6 @@ export function Overview() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  /** How long the oldest has waited, in the coarsest unit that still says it. */
-  const ageOf = (since: string, now: string) => {
-    const hours = Math.floor((Date.parse(now) - Date.parse(since)) / HOUR_MS);
-    if (hours < 1) return t("admin.overview.age.lessThanHour");
-    if (hours < 48) return t("admin.overview.age.hours", { hours });
-    return t("admin.overview.age.days", { days: Math.floor(hours / 24) });
-  };
 
   return (
     <section aria-labelledby="overview-title">
@@ -74,9 +67,7 @@ export function Overview() {
             {state.overview.queues.map((q) => {
               const { label, path } = QUEUES[q.queue];
               const { now, responseHours } = state.overview;
-              const late =
-                q.oldestSince !== null &&
-                Date.parse(now) - Date.parse(q.oldestSince) > responseHours * HOUR_MS;
+              const late = q.oldestSince !== null && isLate(q.oldestSince, now, responseHours);
               return (
                 <li key={q.queue}>
                   <Link className="target" to={path}>
@@ -91,7 +82,7 @@ export function Overview() {
                   {late && (
                     <>
                       {" "}
-                      <strong>{t("admin.overview.late", { hours: String(responseHours) })}</strong>
+                      <strong>{t("admin.late", { hours: String(responseHours) })}</strong>
                     </>
                   )}
                 </li>

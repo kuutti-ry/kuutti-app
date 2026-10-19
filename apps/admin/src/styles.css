@@ -253,3 +253,29 @@ fieldset.actions legend {
 .dialog select {
   width: 100%;
 }
+/* The report queue (#311): a box per person reported, their reports a plain list under it; the filter's choices are targets of 44 px. */
+.group {
+  border: 1px solid GrayText;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+.group h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+.group ul {
+  padding-inline-start: 1.25rem;
+}
+.group li {
+  margin-block-end: 0.75rem;
+}
+.group p {
+  margin: 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+}

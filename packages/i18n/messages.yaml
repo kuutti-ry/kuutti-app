@@ -5328,6 +5328,10 @@ admin.overview.empty:
   en: "Nothing waits in any queue."
   description: "Admin panel, every queue on the front page is empty (#303)."
 
+admin.overview.queue.reports:
+  en: "Reports"
+  description: "Admin panel, the report queue's name on the front page, a link to it (#311)."
+
 admin.overview.queue.photos:
   en: "Photo review queue"
   description: "Admin panel, the photo queue's name on the front page, a link to it (#303)."
@@ -5342,23 +5346,107 @@ admin.overview.none:
 
 admin.overview.waiting:
   en: "{waiting, plural, one {# waits} other {# wait}}. Oldest: {age}"
-  description: "Admin panel, after a queue's name on the front page: how many wait and how long the oldest has, {age} being one of the admin.overview.age texts (#303)."
+  description: "Admin panel, after a queue's name on the front page: how many wait and how long the oldest has, {age} being one of the admin.age texts (#303)."
 
-admin.overview.age.lessThanHour:
+admin.age.lessThanHour:
   en: "less than an hour"
-  description: "Admin panel, the oldest has waited under an hour (#303)."
+  description: "Admin panel, something has waited under an hour: the oldest of a queue on the front page (#303), a report in the queue (#311)."
 
-admin.overview.age.hours:
+admin.age.hours:
   en: "{hours, plural, one {# hour} other {# hours}}"
-  description: "Admin panel, the oldest has waited this many whole hours, under two days (#303)."
+  description: "Admin panel, something has waited this many whole hours, under two days: the oldest of a queue on the front page (#303), a report in the queue (#311)."
 
-admin.overview.age.days:
+admin.age.days:
   en: "{days, plural, one {# day} other {# days}}"
-  description: "Admin panel, the oldest has waited this many whole days, from two days on (#303)."
+  description: "Admin panel, something has waited this many whole days, from two days on: the oldest of a queue on the front page (#303), a report in the queue (#311)."
 
-admin.overview.late:
+admin.late:
   en: "Late (response time: {hours} h)"
-  description: "Admin panel, after a queue whose oldest has waited longer than matching_config moderation_response_hours, the time the association promises (#299, #303); said in words and bold, never by colour alone."
+  description: "Admin panel, after a queue on the front page whose oldest (#303), or a report in the queue (#311), has waited longer than matching_config moderation_response_hours, the time the association promises (#299); said in words and bold, never by colour alone."
+
+admin.reports.title:
+  en: "Reports"
+  description: "Admin panel, the report queue's heading (#311)."
+
+admin.reports.refresh:
+  en: "Refresh"
+  description: "Admin panel, the report queue: reload the list (#311)."
+
+admin.reports.loading:
+  en: "Loading the reports…"
+  description: "Admin panel, the report queue while the list loads (#311)."
+
+admin.reports.error:
+  en: "The reports could not be loaded. Try Refresh."
+  description: "Admin panel, the report queue when the list failed to load (#311)."
+
+admin.reports.show:
+  en: "Show"
+  description: "Admin panel, the report queue: the legend of the filter between the reports waiting and those decided (#311)."
+
+admin.reports.show.open:
+  en: "Waiting for a decision"
+  description: "Admin panel, the report queue's filter: the reports no moderator has decided yet, the oldest first (#311)."
+
+admin.reports.show.closed:
+  en: "Decided"
+  description: "Admin panel, the report queue's filter: the reports a moderator decided, the newest decision first, for the record (#311)."
+
+admin.reports.total.open:
+  en: "{total, plural, =0 {Nothing waits.} one {# report waits.} other {# reports wait.}}"
+  description: "Admin panel, the report queue: how many reports wait for a decision in all (#311)."
+
+admin.reports.total.closed:
+  en: "{total, plural, =0 {No report has been decided yet.} one {# report decided.} other {# reports decided.}}"
+  description: "Admin panel, the report queue's decided filter: how many reports were decided in all (#311)."
+
+admin.reports.shown:
+  en: "Showing the first {shown} of them."
+  description: "Admin panel, the report queue, after the total when the list holds only its first page (#311)."
+
+admin.reports.reported:
+  en: "About account {account}"
+  description: "Admin panel, the report queue: a group's heading, a link to the reported person's page, with their account id shortened (#311)."
+
+admin.reports.history.reported:
+  en: "{received, plural, one {# report} other {# reports}} received, {sanctions, plural, =0 {no sanctions} one {# sanction} other {# sanctions}}"
+  description: "Admin panel, the report queue, under a group's heading: how many reports the person received in all, this one included, and how many sanctions they have had, lifted ones included (#311, #307)."
+
+admin.reports.reporter:
+  en: "Reported by account {account}"
+  description: "Admin panel, the report queue: a link to the reporter's page, with their account id shortened (#311)."
+
+admin.reports.history.reporter:
+  en: "{filed, plural, one {# report} other {# reports}} filed, {upheld} upheld"
+  description: "Admin panel, the report queue, after the reporter's link: how many reports they filed, this one included, and how many of those a moderator acted on (#311)."
+
+admin.reports.source.card:
+  en: "from a card"
+  description: "Admin panel, the report queue: the report was made from a person's card (#311)."
+
+admin.reports.source.conversation:
+  en: "from a conversation"
+  description: "Admin panel, the report queue: the report was made from a conversation, whose copy is read on opening it (#311, #312)."
+
+admin.reports.filed:
+  en: "Filed {time}"
+  description: "Admin panel, the report queue: when the report was filed, a date and time (#311)."
+
+admin.reports.waiting:
+  en: "Waited: {age}."
+  description: "Admin panel, the report queue: how long a report has waited for a decision, {age} being one of the admin.age texts (#311)."
+
+admin.reports.outcome.dismissed:
+  en: "Dismissed"
+  description: "Admin panel, the report queue's decided filter: a moderator found nothing to act on (#311, #312)."
+
+admin.reports.outcome.acted:
+  en: "Acted on"
+  description: "Admin panel, the report queue's decided filter: a moderator acted on the report, a sanction or otherwise (#311, #312)."
+
+admin.reports.decided:
+  en: "Decided {time}"
+  description: "Admin panel, the report queue's decided filter: when a moderator decided the report, a date and time (#311)."
 
 admin.nav.accounts:
   en: "A person"
@@ -5907,6 +5995,10 @@ admin.skip:
 admin.nav.label:
   en: Screens
   description: "Admin panel, the accessible name of the menu of screens (#302)."
+
+admin.nav.reports:
+  en: Reports
+  description: "Admin panel, the menu entry of the report queue (#311)."
 
 admin.nav.photos:
   en: Photos
