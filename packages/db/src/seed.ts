@@ -106,6 +106,18 @@ export const MATCHING_CONFIG_V1 = {
   // during which either person may still report it, so a block cannot be
   // used to dodge a report.
   report_after_close_days: 30,
+  // #105 (ADR-033, migration 0065): the automatic shadow bans, the
+  // maintainer's of 19/10/2026. Reports by this many different people within
+  // the days; this many first messages within the minutes; the same first
+  // message to this many people within the hours; and the hours a moderator
+  // has to confirm or reverse one. A threshold of 0 switches its rule off.
+  auto_shadow_ban_reports: 3,
+  auto_shadow_ban_reports_days: 7,
+  auto_shadow_ban_first_messages: 20,
+  auto_shadow_ban_first_messages_minutes: 60,
+  auto_shadow_ban_same_first_message: 5,
+  auto_shadow_ban_same_first_message_hours: 24,
+  auto_shadow_ban_review_hours: 48,
   // #348 (ADR-031 §6, migration 0054): the longest message, in characters
   // after trimming, and the messages one account may send in a minute; the
   // send reads both on each request.

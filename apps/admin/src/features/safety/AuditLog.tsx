@@ -166,9 +166,19 @@ export function AuditLog() {
                     <tr key={`${index}-${row.at}-${row.action}-${row.subjectId}`}>
                       <td>{formatDateTime(locale, new Date(row.at))}</td>
                       <td>
-                        <code>{row.actorIdentityId}</code>
+                        {/* No person: a shadow ban an automatic rule applied (#105). */}
+                        {row.actorIdentityId === null ? (
+                          t("admin.audit.actorAutomatic")
+                        ) : (
+                          <code>{row.actorIdentityId}</code>
+                        )}
                       </td>
-                      <td>{row.actorRole ?? t("admin.audit.noRole")}</td>
+                      {/* The automatic rules hold no role, and never held one. */}
+                      <td>
+                        {row.actorIdentityId === null
+                          ? t("admin.audit.roleAutomatic")
+                          : (row.actorRole ?? t("admin.audit.noRole"))}
+                      </td>
                       <td>{row.action}</td>
                       <td>
                         {row.accountId ? (

@@ -69,6 +69,7 @@ function readersOf(test: (source: string) => boolean): string[] {
 const readsBlock = (source: string) =>
   names(source, "block") || /blocked_between/.test(withoutComments(source));
 const readsReport = (source: string) => names(source, "report");
+const readsMessage = (source: string) => names(source, "message");
 const readsReportCopy = (source: string) =>
   names(source, "report_message") || names(source, "reportMessage");
 
@@ -135,6 +136,15 @@ describe("blocks and reports", () => {
       "apps/api/src/safety/report-queue.ts",
       "apps/api/src/safety/reports.ts",
       "packages/db/src/seed/write-population.ts",
+    ]);
+  });
+
+  it("a message is read in the chat slice and the demo's own writers alone, so its words stay where they are compared (#105)", () => {
+    expect(readersOf(readsMessage)).toEqual([
+      // The chat's statements: the thread, the copy, and the openers the rules compare in memory.
+      "apps/api/src/chat/repo.ts",
+      // The demo's stories write their conversations' lines.
+      "packages/db/src/seed/conversations.ts",
     ]);
   });
 

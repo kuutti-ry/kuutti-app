@@ -6,6 +6,7 @@ import {
   type SanctionKind,
   SanctionNote,
   type SanctionReason,
+  type SanctionRule,
   SUSPENSION_DAYS_MAX,
 } from "@kuutti/schema";
 import { closeConversationsOf } from "../chat/index.ts";
@@ -37,7 +38,7 @@ type Actor = string | null;
 export type SanctionScope = "ban" | "other";
 
 const COLUMNS = `id, identity_id, account_id, kind, reason, note, ends_at, created_by, created_at,
-  lifted_at, lifted_by, review_note, reviewed_by, reviewed_at`;
+  lifted_at, lifted_by, review_note, reviewed_by, reviewed_at, rule`;
 
 type Row = {
   id: string;
@@ -54,7 +55,11 @@ type Row = {
   review_note: string | null;
   reviewed_by: string | null;
   reviewed_at: Date | null;
+  rule: SanctionRule | null;
 };
+
+/** The rule a sanction's audit rows name, when an automatic rule applied it (#105). */
+const ruleOf = (row: Row): Record<string, string> => (row.rule ? { rule: row.rule } : {});
 
 const iso = (at: Date | null) => (at ? at.toISOString() : null);
 
@@ -186,6 +191,8 @@ export type ApplyInput = {
   endsOn?: string;
   actor: Actor;
   at: Date;
+  /** An automatic rule's shadow ban (#105, ADR-033): which rule, what it counted, its earliest event. */
+  rule?: { rule: SanctionRule; count: number; firstAt: Date };
 };
 
 /**
@@ -209,20 +216,29 @@ export async function applySanction(db: Queryable, input: ApplyInput): Promise<S
     }
     await refuseStaffTarget(tx, account.identityId);
     const id = randomUUID();
-    if (input.actor) {
+    // A person's sanction names them; an automatic rule's names the rule and
+    // no actor (#105, the maintainer, 19/10/2026). What else nobody does (the
+    // demo's story) writes no row.
+    if (input.actor || input.rule) {
       await recordAudit(tx, {
         actorIdentityId: input.actor,
         action: "sanction.apply",
         subjectType: "account",
         subjectId: input.accountId,
-        detail: { sanctionId: id, kind: input.kind, reason: input.reason },
+        detail: {
+          sanctionId: id,
+          kind: input.kind,
+          reason: input.reason,
+          ...(input.rule ? { rule: input.rule.rule, count: input.rule.count } : {}),
+        },
       });
     }
     const { rows } = await tx.query<Row>(
-      `INSERT INTO sanction (id, identity_id, account_id, kind, reason, note, ends_at, created_by, created_at)
+      `INSERT INTO sanction (id, identity_id, account_id, kind, reason, note, ends_at, created_by, created_at,
+                             rule, rule_count, rule_first_at)
        VALUES ($1, $2, $3, $4, $5, $6,
          CASE WHEN $7::date IS NULL THEN NULL ELSE ($7::date)::timestamp AT TIME ZONE 'Europe/Helsinki' END,
-         $8, $9)
+         $8, $9, $10, $11, $12)
        RETURNING ${COLUMNS}`,
       [
         id,
@@ -234,6 +250,9 @@ export async function applySanction(db: Queryable, input: ApplyInput): Promise<S
         input.kind === "suspend" ? input.endsOn : null,
         input.actor,
         input.at,
+        input.rule?.rule ?? null,
+        input.rule?.count ?? null,
+        input.rule?.firstAt ?? null,
       ],
     );
     const row = rows[0];
@@ -295,7 +314,7 @@ export async function liftSanction(
       action: "sanction.lift",
       subjectType: "account",
       subjectId: found.account_id,
-      detail: { sanctionId: found.id, kind: found.kind, reason: found.reason },
+      detail: { sanctionId: found.id, kind: found.kind, reason: found.reason, ...ruleOf(found) },
     });
     // Keyed on the open state: of two staff lifting at once one writes, and the
     // other's audit row is rolled back with its refusal.
@@ -351,6 +370,7 @@ export async function reviewSanction(
         kind: found.kind,
         reason: found.reason,
         outcome: input.outcome,
+        ...ruleOf(found),
       },
     });
     const { rows } = await tx.query<Row>(

@@ -20,14 +20,16 @@ const HOUR = 3_600_000;
 const before = (ms: number) => new Date(Date.parse(NOW) - ms).toISOString();
 
 type Queue = {
-  queue: "reports" | "photos" | "feedback";
+  queue: "reports" | "automatic_bans" | "photos" | "feedback";
   waiting: number;
   oldestSince: string | null;
 };
 const empty = (queue: Queue["queue"]): Queue => ({ queue, waiting: 0, oldestSince: null });
-const overview = (queues: Queue[], responseHours = 24, now = NOW) => ({
+/** The front page's answer; the automatic bans' review time (#105) apart from the response time. */
+const overview = (queues: Queue[], responseHours = 24, now = NOW, reviewHours = 48) => ({
   now,
   responseHours,
+  reviewHours,
   queues,
 });
 
@@ -66,6 +68,7 @@ function show() {
         <Routes>
           <Route path="/" element={<Overview />} />
           <Route path="/reports" element={<p>the report screen</p>} />
+          <Route path="/automatic-bans" element={<p>the automatic bans screen</p>} />
           <Route path="/photos" element={<p>the photo screen</p>} />
           <Route path="/feedback" element={<p>the feedback screen</p>} />
         </Routes>
@@ -124,6 +127,7 @@ describe("the front page", () => {
 
   it.each([
     ["Reports", "/reports", "the report screen"],
+    ["Automatic shadow bans", "/automatic-bans", "the automatic bans screen"],
     ["Photo review queue", "/photos", "the photo screen"],
     ["Feedback", "/feedback", "the feedback screen"],
   ])("links %s to its screen at %s", async (name, href, screenText) => {
@@ -131,6 +135,7 @@ describe("the front page", () => {
       answer(
         overview([
           { queue: "reports", waiting: 1, oldestSince: before(HOUR) },
+          { queue: "automatic_bans", waiting: 3, oldestSince: before(HOUR) },
           { queue: "photos", waiting: 2, oldestSince: before(HOUR) },
           { queue: "feedback", waiting: 4, oldestSince: before(HOUR) },
         ]),
@@ -294,6 +299,54 @@ describe("the front page", () => {
       const feedback = await lineOf("Feedback");
       expect(feedback).toHaveTextContent(/Oldest: 9 days Late \(response time: 36 h\)$/);
       expect(within(feedback).getByText("Late (response time: 36 h)").tagName).toBe("STRONG");
+    });
+
+    it("judges the automatic shadow bans by their own review time, and the other queues by the response time (#105)", async () => {
+      fetchMock([
+        answer(
+          overview(
+            [
+              { queue: "reports", waiting: 1, oldestSince: before(24 * HOUR + 1) },
+              { queue: "automatic_bans", waiting: 2, oldestSince: before(48 * HOUR) },
+              { queue: "photos", waiting: 1, oldestSince: before(24 * HOUR) },
+            ],
+            24,
+            NOW,
+            48,
+          ),
+        ),
+      ]);
+      show();
+      // Forty-eight hours is not late against a forty-eight hour review time, though past the response time.
+      expect(await lineOf("Automatic shadow bans")).toHaveTextContent(
+        /^Automatic shadow bans 2 wait\. Oldest: 2 days$/,
+      );
+      const reports = await lineOf("Reports");
+      expect(reports).toHaveTextContent(/Oldest: 24 hours Late \(response time: 24 h\)$/);
+      expect(screen.getAllByText(/Late/)).toHaveLength(1);
+    });
+
+    it("says the automatic shadow bans are late a millisecond past their review time, naming it, even when it is shorter than the response time (#105)", async () => {
+      fetchMock([
+        answer(
+          overview(
+            [
+              { queue: "automatic_bans", waiting: 1, oldestSince: before(12 * HOUR + 1) },
+              { queue: "photos", waiting: 1, oldestSince: before(12 * HOUR + 1) },
+            ],
+            24,
+            NOW,
+            12,
+          ),
+        ),
+      ]);
+      show();
+      const bans = await lineOf("Automatic shadow bans");
+      expect(bans).toHaveTextContent(
+        /^Automatic shadow bans 1 waits\. Oldest: 12 hours Late \(response time: 12 h\)$/,
+      );
+      expect(within(bans).getByText("Late (response time: 12 h)").tagName).toBe("STRONG");
+      expect(await lineOf("Photo review queue")).not.toHaveTextContent(/Late/);
     });
 
     it("is never late for an empty queue, even with no response time to spare", async () => {

@@ -13,7 +13,7 @@ import {
   SignJWT,
 } from "jose";
 import type * as oidc from "openid-client";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
   callback,
   documentedDiscovery,
@@ -561,10 +561,26 @@ describe("what we send is what Telia documents", () => {
       const { iat, exp } = sent.assertion;
       expect(typeof iat).toBe("number");
       expect((exp ?? 0) - (iat ?? 0)).toBe(60);
-      for (const exp of [nowSeconds() + 3601, undefined]) {
+      // The double reads the clock after the test does: frozen, the two readings
+      // agree, so the boundary is exact and a slow runner crossing a second
+      // cannot let the second past it through. Only Date: the requests stay real.
+      vi.useFakeTimers({ toFake: ["Date"], now: Date.now() });
+      try {
+        const at = nowSeconds() + 3600;
         expect(
-          (await tokenRequest(await form({ client_assertion: await assertion({ exp }) }))).body,
-        ).toEqual({ error: "invalid_client", error_description: "exp more than 60 minutes ahead" });
+          (await tokenRequest(await form({ client_assertion: await assertion({ exp: at }) })))
+            .status,
+        ).toBe(200);
+        for (const exp of [at + 1, undefined]) {
+          expect(
+            (await tokenRequest(await form({ client_assertion: await assertion({ exp }) }))).body,
+          ).toEqual({
+            error: "invalid_client",
+            error_description: "exp more than 60 minutes ahead",
+          });
+        }
+      } finally {
+        vi.useRealTimers();
       }
     });
 

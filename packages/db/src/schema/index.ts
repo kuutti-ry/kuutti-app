@@ -67,6 +67,7 @@ export {
   sanction,
   sanctionKind,
   sanctionReason,
+  sanctionRule,
 } from "./safety.ts";
 export { session } from "./sessions.ts";
 export { waitlistSnapshot } from "./waitlist.ts";

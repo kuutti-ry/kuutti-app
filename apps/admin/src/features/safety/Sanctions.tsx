@@ -21,8 +21,9 @@ import { type Refusals, useSend } from "./use-send.ts";
 // sanction with who did what, and a lift or a second look where the role
 // allows it; the API refuses the rest and the panel says why in words. A 403
 // is the shell's to say (#302). The actions and their confirm step are also
-// a report's (#312, SanctionActions), where applying one closes the report.
-// English only (TD-17); keyboard first.
+// a report's (#312, SanctionActions), where applying one closes the report;
+// the second look is also the automatic shadow bans' Confirm and Reverse
+// (#105, AutomaticBans). English only (TD-17); keyboard first.
 
 /** The actions in their fixed order: the gentlest first, the ban last and apart. */
 const ORDER: readonly SanctionKind[] = ["warn", "shadow_ban", "suspend", "ban"];
@@ -416,7 +417,7 @@ function ApplyStep({
   );
 }
 
-const liftPath = (item: SanctionEntry) => ({ params: { path: { id: item.id } } });
+const liftPath = (item: Pick<Sanction, "id">) => ({ params: { path: { id: item.id } } });
 
 function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
   const { t } = useT();
@@ -455,11 +456,32 @@ function LiftStep({ item, onCancel, onShell, onDone }: StepProps & { item: Sanct
   );
 }
 
-function ReviewStep({ item, onCancel, onShell, onDone }: StepProps & { item: SanctionEntry }) {
+/**
+ * A second look whose decision is the button that opened it (#105: Confirm or
+ * Reverse on the automatic shadow bans): no choice in the step, so nothing is
+ * preset in it (rules/admin.md), and its title, effect and button say that
+ * decision.
+ */
+export type FixedReview = {
+  outcome: "keep" | "lift";
+  title: string;
+  effect: string;
+  submit: string;
+};
+
+/** A second look at a sanction (#307): a note, and keep it or lift it; on a person's page and the automatic bans' list. */
+export function ReviewStep({
+  item,
+  fixed,
+  onCancel,
+  onShell,
+  onDone,
+}: StepProps & { item: Pick<Sanction, "id" | "kind" | "liftedAt">; fixed?: FixedReview }) {
   const { t } = useT();
   const ids = useId();
   const [note, setNote] = useState("");
-  const [outcome, setOutcome] = useState<"keep" | "lift" | "">("");
+  const [chosen, setOutcome] = useState<"keep" | "lift" | "">("");
+  const outcome = fixed?.outcome ?? chosen;
   const { sending, refused, send } = useSend({
     answer: Sanction,
     refusals: REFUSALS,
@@ -479,11 +501,11 @@ function ReviewStep({ item, onCancel, onShell, onDone }: StepProps & { item: San
   };
   return (
     <Dialog
-      title={t("admin.sanction.reviewTitle", { kind: t(KIND_WORDS[item.kind]) })}
+      title={fixed?.title ?? t("admin.sanction.reviewTitle", { kind: t(KIND_WORDS[item.kind]) })}
       onClose={onCancel}
     >
       <form className="actions" onSubmit={submit}>
-        <p>{t("admin.sanction.reviewExplain")}</p>
+        <p>{fixed?.effect ?? t("admin.sanction.reviewExplain")}</p>
         {refused && <p role="alert">{t(refused)}</p>}
         <label htmlFor={`${ids}-note`}>{t("admin.sanction.reviewNote")}</label>
         <textarea
@@ -501,33 +523,35 @@ function ReviewStep({ item, onCancel, onShell, onDone }: StepProps & { item: San
             max: String(SANCTION_NOTE_MAX),
           })}
         </p>
-        <fieldset>
-          <legend>{t("admin.sanction.outcome")}</legend>
-          <label>
-            <input
-              type="radio"
-              name={`${ids}-outcome`}
-              value="keep"
-              checked={outcome === "keep"}
-              onChange={() => setOutcome("keep")}
-            />
-            {t("admin.sanction.keep")}
-          </label>
-          {!item.liftedAt && (
+        {!fixed && (
+          <fieldset>
+            <legend>{t("admin.sanction.outcome")}</legend>
             <label>
               <input
                 type="radio"
                 name={`${ids}-outcome`}
-                value="lift"
-                checked={outcome === "lift"}
-                onChange={() => setOutcome("lift")}
+                value="keep"
+                checked={outcome === "keep"}
+                onChange={() => setOutcome("keep")}
               />
-              {t("admin.sanction.liftIt")}
+              {t("admin.sanction.keep")}
             </label>
-          )}
-        </fieldset>
+            {!item.liftedAt && (
+              <label>
+                <input
+                  type="radio"
+                  name={`${ids}-outcome`}
+                  value="lift"
+                  checked={outcome === "lift"}
+                  onChange={() => setOutcome("lift")}
+                />
+                {t("admin.sanction.liftIt")}
+              </label>
+            )}
+          </fieldset>
+        )}
         <button type="submit" disabled={!ready} aria-busy={sending || undefined}>
-          {t("admin.sanction.apply")}
+          {fixed?.submit ?? t("admin.sanction.apply")}
         </button>
         <button type="button" onClick={onCancel}>
           {t("admin.sanction.cancel")}

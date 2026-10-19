@@ -137,8 +137,10 @@ describe("GET /admin/overview", () => {
     expect(await read(app, staff.headers)).toEqual({
       now: "2026-10-16T09:00:00.000Z",
       responseHours: 24,
+      reviewHours: 48,
       queues: [
         { queue: "reports", waiting: 0, oldestSince: null },
+        { queue: "automatic_bans", waiting: 0, oldestSince: null },
         { queue: "photos", waiting: 2, oldestSince: "2026-10-15T20:00:00.000Z" },
         { queue: "feedback", waiting: 1, oldestSince: "2026-10-15T12:34:56.789Z" },
       ],
@@ -192,6 +194,7 @@ describe("GET /admin/overview", () => {
 
     expect((await read(app, staff.headers)).queues).toEqual([
       { queue: "reports", waiting: 0, oldestSince: null },
+      { queue: "automatic_bans", waiting: 0, oldestSince: null },
       { queue: "photos", waiting: 3, oldestSince: "2026-10-13T10:15:00.000Z" },
       { queue: "feedback", waiting: 3, oldestSince: "2026-10-11T00:00:00.001Z" },
     ]);
@@ -202,8 +205,10 @@ describe("GET /admin/overview", () => {
     expect(await read(app, staff.headers)).toEqual({
       now: "2026-10-16T09:00:00.000Z",
       responseHours: 24,
+      reviewHours: 48,
       queues: [
         { queue: "reports", waiting: 0, oldestSince: null },
+        { queue: "automatic_bans", waiting: 0, oldestSince: null },
         { queue: "photos", waiting: 0, oldestSince: null },
         { queue: "feedback", waiting: 0, oldestSince: null },
       ],
@@ -219,6 +224,7 @@ describe("GET /admin/overview", () => {
     await nothingWaiting(ctx, owner.accountId, staff.identityId);
     expect((await read(app, staff.headers)).queues).toEqual([
       { queue: "reports", waiting: 0, oldestSince: null },
+      { queue: "automatic_bans", waiting: 0, oldestSince: null },
       { queue: "photos", waiting: 0, oldestSince: null },
       { queue: "feedback", waiting: 0, oldestSince: null },
     ]);
@@ -300,6 +306,7 @@ describe("GET /admin/overview", () => {
     expect(answers[0]).toEqual(answers[1]);
     expect(answers[0]?.queues).toEqual([
       { queue: "reports", waiting: 0, oldestSince: null },
+      { queue: "automatic_bans", waiting: 0, oldestSince: null },
       { queue: "photos", waiting: 1, oldestSince: "2026-10-16T06:00:00.000Z" },
       { queue: "feedback", waiting: 1, oldestSince: "2026-10-16T07:00:00.000Z" },
     ]);

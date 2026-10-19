@@ -23,16 +23,16 @@ import { photo } from "./media.ts";
  * refuses UPDATE, DELETE and TRUNCATE from the application role; the owner
  * could still disable the trigger, which is why a separate owner role is the
  * M4 step (ADR-006). Kept five years, survives erasure (rules/db.md).
- * `detail` is bounded structured data, never text from a person.
+ * `detail` is bounded structured data, never text from a person. The actor
+ * is null for one thing only: a shadow ban an automatic rule applied (#105,
+ * ADR-033), which no person did; a check holds every other row to a person.
  */
 export const auditLog = pgTable(
   "audit_log",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
-    actorIdentityId: uuid("actor_identity_id")
-      .notNull()
-      .references(() => identity.id),
+    actorIdentityId: uuid("actor_identity_id").references(() => identity.id),
     // e.g. photo.view, photo.approve, photo.reject; a closed set in code.
     action: text("action").notNull(),
     subjectType: text("subject_type").notNull(),
@@ -42,6 +42,10 @@ export const auditLog = pgTable(
   (table) => [
     index("audit_log_subject_idx").on(table.subjectType, table.subjectId),
     index("audit_log_actor_at_idx").on(table.actorIdentityId, table.at),
+    check(
+      "audit_log_actor_check",
+      sql`${table.actorIdentityId} IS NOT NULL OR ${table.action} = 'sanction.apply'`,
+    ),
   ],
 );
 
@@ -89,6 +93,16 @@ export const photoCheckNote = pgTable(
  * the history.
  */
 export const sanctionKind = pgEnum("sanction_kind", ["warn", "shadow_ban", "suspend", "ban"]);
+/**
+ * The automatic rule that applied a shadow ban (#105, ADR-033): reports by
+ * different people, first messages faster than a person writes them, the
+ * same first message to many. #86's view velocity would add its own.
+ */
+export const sanctionRule = pgEnum("sanction_rule", [
+  "reports",
+  "first_messages",
+  "same_first_message",
+]);
 export const sanctionReason = pgEnum("sanction_reason", [
   "harassment",
   "misrepresentation",
@@ -120,6 +134,12 @@ export const sanction = pgTable(
     reviewNote: text("review_note"),
     reviewedBy: uuid("reviewed_by").references(() => identity.id),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    // An automatic rule's record (#105, ADR-033): which rule, what it
+    // counted, and the earliest event it counted; counts and times only,
+    // never a message, a reporter or a conversation.
+    rule: sanctionRule("rule"),
+    ruleCount: integer("rule_count"),
+    ruleFirstAt: timestamp("rule_first_at", { withTimezone: true }),
   },
   (table) => [
     // The person's page lists an account's rows, newest first.
@@ -137,6 +157,15 @@ export const sanction = pgTable(
       sql`(${table.reviewedAt} IS NULL AND ${table.reviewedBy} IS NULL AND ${table.reviewNote} IS NULL)
         OR (${table.reviewedAt} IS NOT NULL AND ${table.reviewedBy} IS NOT NULL
           AND ${table.reviewNote} IS NOT NULL AND char_length(${table.reviewNote}) BETWEEN 1 AND 500)`,
+    ),
+    // A rule's record comes whole, and only on a shadow ban by nobody: a
+    // machine never warns, suspends or bans (#105).
+    check(
+      "sanction_rule_check",
+      sql`(${table.rule} IS NULL) = (${table.ruleCount} IS NULL)
+        AND (${table.rule} IS NULL) = (${table.ruleFirstAt} IS NULL)
+        AND (${table.rule} IS NULL OR (${table.createdBy} IS NULL AND ${table.kind} = 'shadow_ban'
+          AND ${table.ruleCount} >= 1 AND ${table.ruleFirstAt} <= ${table.createdAt}))`,
     ),
   ],
 );
@@ -220,6 +249,8 @@ export const report = pgTable(
   (table) => [
     // The day's count and the export: the reporter's rows by time.
     index("report_reporter_created_idx").on(table.reporterAccountId, table.createdAt),
+    // The reports rule's window (#105): the reported account's rows by time.
+    index("report_reported_created_idx").on(table.reportedAccountId, table.createdAt),
     // One open report per pair; a second one while it is open writes nothing.
     uniqueIndex("report_open_pair_idx")
       .on(table.reporterAccountId, table.reportedAccountId)

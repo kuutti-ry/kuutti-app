@@ -1126,3 +1126,33 @@ export async function contactsFrameReaches(
   );
   return rows.length > 0;
 }
+
+/**
+ * The openers a person wrote since `since` (#105, ADR-033): each
+ * conversation's first message, sequence 1, on the person's own side, read
+ * through their own participant rows (rule 6). Its words go only to
+ * `first-messages.ts`, which compares them in memory and returns counts;
+ * no word is a statement parameter, so a database error cannot echo one.
+ */
+export async function openersSince(
+  db: Queryable,
+  accountId: string,
+  since: Date,
+): Promise<{ conversationId: string; body: string | null; at: Date }[]> {
+  const { rows } = await db.query<{
+    conversation_id: string;
+    body: string | null;
+    created_at: Date;
+  }>(
+    `SELECT m.conversation_id, m.body, m.created_at
+       FROM conversation_participant me
+       JOIN message m ON m.conversation_id = me.conversation_id AND m.seq = 1 AND m.side = me.side
+      WHERE me.account_id = $1 AND m.created_at > $2`,
+    [accountId, since],
+  );
+  return rows.map((row) => ({
+    conversationId: row.conversation_id,
+    body: row.body,
+    at: row.created_at,
+  }));
+}

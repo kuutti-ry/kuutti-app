@@ -321,6 +321,71 @@ describe("PII in logs", () => {
     expect(JSON.stringify(events.rows)).not.toContain(FIXTURES.message);
   });
 
+  // The automatic rules (#105, ADR-033): five openers of the fixture, the
+  // fifth through the send route, which meets the same-first-message rule;
+  // a moderator confirms the ban. The words are compared in memory and reach
+  // no log line, answer, event, sanction column or audit detail.
+  test("No word of a first message reaches a log line, an event or the rule's record", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    // A clock a second later at each reading, from a fixed instant.
+    const start = Date.parse("2026-10-16T09:00:00.000Z");
+    let tick = start;
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db: ctx.client,
+      now: () => {
+        tick += 1000;
+        return new Date(tick);
+      },
+    });
+    const moderator = await staffSession(ctx.client, "moderator");
+    const a = await signedInAccount(ctx.client);
+    const now = start;
+    for (let i = 0; i < 4; i++) {
+      const other = await signedInAccount(ctx.client);
+      await conversationBetween(ctx.client, a.accountId, other.accountId, {
+        openedAt: new Date(now - (5 - i) * 3_600_000),
+        messages: [{ from: "a", body: FIXTURES.message, at: new Date(now - (4 - i) * 3_600_000) }],
+      });
+    }
+    const fifth = await signedInAccount(ctx.client);
+    const id = await conversationBetween(ctx.client, a.accountId, fifth.accountId, {
+      openedAt: new Date(now - 60_000),
+    });
+    const sent = await app.request(`/conversations/${id}/messages`, {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ clientId: crypto.randomUUID(), body: FIXTURES.message }),
+    });
+    expect(sent.status).toBe(201);
+    const ban = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM sanction WHERE account_id = $1 AND rule = 'same_first_message'",
+      [a.accountId],
+    );
+    const banId = ban.rows[0]?.id;
+    expect(banId).toBeDefined();
+    const confirmed = await app.request(`/admin/sanctions/${banId}/review`, {
+      method: "POST",
+      headers: { ...moderator.headers, "content-type": "application/json" },
+      body: JSON.stringify({ outcome: "keep", note: "Five copies of one opener; it stands." }),
+    });
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.text()).not.toContain(FIXTURES.message);
+    expect(lines().length).toBeGreaterThan(0);
+    expect(leakedFixtures(lines())).toEqual([]);
+    const kept = await ctx.client.query("SELECT * FROM sanction WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    expect(JSON.stringify(kept.rows)).not.toContain(FIXTURES.message);
+    const audit = await ctx.client.query("SELECT detail FROM audit_log");
+    expect(JSON.stringify(audit.rows)).not.toContain(FIXTURES.message);
+    const events = await ctx.client.query("SELECT props FROM events");
+    expect(JSON.stringify(events.rows)).not.toContain(FIXTURES.message);
+  });
+
   // A stored contact (#103, ADR-031 §11): a phone number and a username, kept,
   // refused by their kind's rule and by the contract, shared, read on both
   // sides (the detail and the contacts alone), stopped and removed, and a

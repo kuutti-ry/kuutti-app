@@ -14,6 +14,7 @@ import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
+import { checkReports } from "./automatic.ts";
 import { recordBlock, recordConversationBlock } from "./blocks.ts";
 import { REPORTS_PER_DAY_KEY, recordConversationReport, recordReport } from "./reports.ts";
 
@@ -137,6 +138,10 @@ const conversationReportRoute = createRoute({
 export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const now = () => (deps.now ?? (() => new Date()))();
+  // The reports rule (#105, ADR-033) after a report is filed and committed;
+  // it changes no answer, whatever it finds.
+  const afterFiled = (reportedAccountId: string) =>
+    checkReports({ db: deps.db, logger: deps.logger, now }, reportedAccountId);
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
   for (const route of [blockRoute, reportRoute, conversationBlockRoute, conversationReportRoute]) {
     app.use(route.getRoutingPath(), guard);
@@ -203,6 +208,7 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       c.header("Retry-After", String(refused.retryAfterSeconds));
       throw refused.error;
     }
+    if (record.outcome === "filed") await afterFiled(record.reportedAccountId);
     return c.body(null, 204);
   });
 
@@ -246,6 +252,7 @@ export function reportRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       c.header("Retry-After", String(refused.retryAfterSeconds));
       throw refused.error;
     }
+    if (record.outcome === "filed") await afterFiled(record.reportedAccountId);
     return c.body(null, 204);
   });
 

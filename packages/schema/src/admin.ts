@@ -46,7 +46,7 @@ export type AdminSession = z.infer<typeof AdminSession>;
 /** One queue on the panel's front page (#303): how many wait, and since when the oldest. */
 export const OverviewQueue = z
   .object({
-    queue: z.enum(["reports", "photos", "feedback"]),
+    queue: z.enum(["reports", "automatic_bans", "photos", "feedback"]),
     waiting: z.int().min(0),
     /** When the oldest began to wait: its filing or upload, or for a photo its owner's appeal; null when nothing waits. */
     oldestSince: z.iso.datetime().nullable(),
@@ -60,6 +60,8 @@ export const AdminOverview = z
     now: z.iso.datetime(),
     /** matching_config moderation_response_hours: past it, the oldest is late (#299). */
     responseHours: z.number().min(0),
+    /** matching_config auto_shadow_ban_review_hours: the automatic bans' own deadline (#105). */
+    reviewHours: z.number().min(0),
     queues: z.array(OverviewQueue).max(10),
   })
   .meta({ id: "AdminOverview" });
@@ -137,7 +139,8 @@ export type AdminAccountPhoto = z.infer<typeof AdminAccountPhoto>;
 export const AdminAuditRow = z
   .object({
     at: z.iso.datetime(),
-    actorIdentityId: z.uuid(),
+    /** Null for what no person did: a shadow ban an automatic rule applied (#105). */
+    actorIdentityId: z.uuid().nullable(),
     action: z.string().max(60),
     subjectType: z.string().max(40),
     subjectId: z.uuid(),

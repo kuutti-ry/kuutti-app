@@ -255,6 +255,36 @@ describe("the way to a person's page", () => {
 });
 
 describe("a person's page", () => {
+  it("names the automatic rules as who did it in the audit when no person did: a rule's shadow ban (#105)", async () => {
+    const audit = [
+      {
+        at: CHANGED,
+        actorIdentityId: null,
+        action: "sanction.apply",
+        subjectType: "account",
+        subjectId: ID,
+        detail: { rule: "reports", count: 3 },
+      },
+    ];
+    fetchMock([pageOf(page({ audit })), sanctionsOf(sanctions)]);
+    show();
+    const table = await screen.findByRole("table", { name: "Newest first, at most fifty" });
+    const [cells] = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      );
+    expect(cells).toEqual([
+      when(CHANGED),
+      "The automatic rules",
+      "sanction.apply",
+      "rulereportscount3",
+    ]);
+  });
+
   it("says it is loading until the answer comes", () => {
     fetchMock([on(`/admin/accounts/${ID}`, () => new Promise<Response>(() => {}))]);
     show();

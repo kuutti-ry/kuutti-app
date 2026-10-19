@@ -6,6 +6,7 @@ import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { queueSummary } from "../media/index.ts";
+import { AUTO_SHADOW_BAN_REVIEW_HOURS_KEY, automaticBanSummary } from "./automatic.ts";
 import { feedbackSummary } from "./feedback.ts";
 import { reportSummary } from "./report-queue.ts";
 
@@ -29,7 +30,7 @@ const overviewRoute = createRoute({
   path: "/admin/overview",
   summary: "What waits for the moderators",
   description:
-    "Per queue (reports not decided that the reader is no party to, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
+    "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. Moderators and admins.",
   security: [{ session: [] }],
   responses: {
     200: {
@@ -48,13 +49,18 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
 
   app.openapi(overviewRoute, async (c) => {
     const staff = staffOf(c);
-    const [reports, photos, feedback, responseHours] = await Promise.all([
+    const [reports, automatic, photos, feedback, responseHours, reviewHours] = await Promise.all([
       reportSummary(deps.db, staff.identityId),
+      automaticBanSummary(deps.db, staff.identityId),
       queueSummary(deps.db),
       feedbackSummary(deps.db),
       matchingConfigNumber(deps.db, MODERATION_RESPONSE_HOURS_KEY),
+      matchingConfigNumber(deps.db, AUTO_SHADOW_BAN_REVIEW_HOURS_KEY),
     ]);
-    const queue = (name: "reports" | "photos" | "feedback", s: typeof photos) => ({
+    const queue = (
+      name: "reports" | "automatic_bans" | "photos" | "feedback",
+      s: typeof photos,
+    ) => ({
       queue: name,
       waiting: s.waiting,
       oldestSince: s.oldestSince?.toISOString() ?? null,
@@ -63,7 +69,13 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
       {
         now: now().toISOString(),
         responseHours,
-        queues: [queue("reports", reports), queue("photos", photos), queue("feedback", feedback)],
+        reviewHours,
+        queues: [
+          queue("reports", reports),
+          queue("automatic_bans", automatic),
+          queue("photos", photos),
+          queue("feedback", feedback),
+        ],
       },
       200,
     );

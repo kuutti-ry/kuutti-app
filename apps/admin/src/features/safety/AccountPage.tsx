@@ -254,7 +254,12 @@ export function AccountPage() {
               <tr key={`${row.at}-${row.action}-${row.subjectId}`}>
                 <td>{when(row.at)}</td>
                 <td>
-                  <code>{row.actorIdentityId.slice(0, 8)}</code>
+                  {/* No person: a shadow ban an automatic rule applied (#105). */}
+                  {row.actorIdentityId === null ? (
+                    t("admin.audit.actorAutomatic")
+                  ) : (
+                    <code>{row.actorIdentityId.slice(0, 8)}</code>
+                  )}
                 </td>
                 <td>{row.action}</td>
                 <td>

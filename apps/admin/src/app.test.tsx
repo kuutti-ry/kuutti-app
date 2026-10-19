@@ -44,6 +44,7 @@ const staff = {
 const overview = {
   now: "2026-09-25T12:00:00.000Z",
   responseHours: 24,
+  reviewHours: 48,
   queues: [
     { queue: "photos", waiting: 0, oldestSince: null },
     { queue: "feedback", waiting: 0, oldestSince: null },
@@ -256,6 +257,7 @@ describe("App", () => {
     expect(links.map((link) => link.textContent)).toEqual([
       "Overview",
       "Reports",
+      "Automatic bans",
       "Photos",
       "Feedback",
       "A person",
@@ -331,6 +333,31 @@ describe("App", () => {
     expect(calls).toContain("GET /admin/feedback");
   });
 
+  it("opens the automatic shadow bans from the menu, right after the reports, asking for them only then (#105)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    const calls: string[] = [];
+    renderApp(
+      staffApi("moderator", calls, {
+        answers: {
+          "GET /admin/sanctions/automatic": () =>
+            json({ now: overview.now, reviewHours: 48, items: [], total: 0 }),
+        },
+      }),
+    );
+    const menu = await screen.findByRole("navigation", { name: "Screens" });
+    expect(calls).not.toContain("GET /admin/sanctions/automatic");
+    const link = within(menu).getByRole("link", { name: "Automatic bans" });
+    expect(link).toHaveAttribute("href", "/automatic-bans");
+    fireEvent.click(link);
+    const heading = await screen.findByRole("heading", { level: 2, name: "Automatic shadow bans" });
+    expect(window.location.pathname).toBe("/automatic-bans");
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(link).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByText("No automatic shadow ban waits.")).toBeInTheDocument();
+    expect(document.title).toBe("Automatic shadow bans · Kuutti admin");
+    expect(calls.filter((call) => call === "GET /admin/sanctions/automatic")).toHaveLength(1);
+  });
+
   it("opens a screen from its own address, without taking the focus on the first load (#302)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     window.history.replaceState(null, "", "/feedback");
@@ -358,6 +385,7 @@ describe("App", () => {
     ).toEqual([
       "Overview",
       "Reports",
+      "Automatic bans",
       "Photos",
       "Feedback",
       "A person",
@@ -411,7 +439,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
     expect(within(menu).queryByRole("link", { name: "Tunables" })).toBeNull();
     expect(screen.queryByText("Loading the tunables…")).toBeNull();
     expect(document.title).toBe("Tunables · Kuutti admin");
@@ -490,7 +518,7 @@ describe("App", () => {
         within(menu)
           .getAllByRole("link")
           .map((link) => link.textContent),
-      ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
+      ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
       expect(within(menu).queryByRole("link", { name: "Audit log" })).toBeNull();
       expect(within(menu).queryByRole("link", { name: "Staff" })).toBeNull();
       expect(screen.queryByRole("form", { name: "Filters" })).toBeNull();
@@ -549,7 +577,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
     expect(screen.queryByText("Nothing at this address")).toBeNull();
     expect(calls).toContain(`GET /admin/accounts/${accountId}`);
     expect(calls).not.toContain("GET /admin/overview");
@@ -605,7 +633,7 @@ describe("App", () => {
       within(menu)
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
+    ).toEqual(["Overview", "Reports", "Automatic bans", "Photos", "Feedback", "A person"]);
     expect(calls.filter((call) => call.includes("/admin/reports"))).toEqual([
       `GET /admin/reports/${reportId}`,
     ]);

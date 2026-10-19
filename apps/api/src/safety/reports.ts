@@ -45,8 +45,8 @@ export type NewReport = {
 };
 
 export type ReportRecord =
-  /** Filed, and the block with it. */
-  | { outcome: "filed" }
+  /** Filed, and the block with it; whom it named, for the reports rule (#105). */
+  | { outcome: "filed"; reportedAccountId: string }
   /** One is open for the pair already: nothing written, nothing counted. */
   | { outcome: "open" }
   /** Over the day's cap: nothing written, the block neither. */
@@ -110,7 +110,7 @@ export async function recordReport(db: Queryable, input: NewReport): Promise<Rep
       blockedAccountId: input.reportedAccountId,
       at: input.at,
     });
-    return { outcome: "filed" };
+    return { outcome: "filed", reportedAccountId: input.reportedAccountId };
   });
 }
 
@@ -203,7 +203,7 @@ export async function recordConversationReport(
       blockedAccountId: reported,
       at: input.at,
     });
-    return { outcome: "filed" };
+    return { outcome: "filed", reportedAccountId: reported };
   });
 }
 
@@ -328,4 +328,26 @@ export async function pruneReports(
       })
     : 0;
   return { pruned, photos: keys.length, objects };
+}
+
+/**
+ * The reports rule's count (#105, ADR-033): how many different people, by
+ * identity, reported the account since `since`, and the earliest of those
+ * reports. A dismissed report does not count; a block never does (ADR-030
+ * §7). A moderation read keyed by the reported account, whose result reaches
+ * no answer.
+ */
+export async function reportersSince(
+  db: Queryable,
+  reportedAccountId: string,
+  since: Date,
+): Promise<{ count: number; firstAt: Date | null }> {
+  const { rows } = await db.query<{ n: number; first_at: Date | null }>(
+    `SELECT count(DISTINCT reporter.identity_id)::int AS n, min(r.created_at) AS first_at
+       FROM report r JOIN account reporter ON reporter.id = r.reporter_account_id
+      WHERE r.reported_account_id = $1 AND r.created_at > $2
+        AND r.outcome IS DISTINCT FROM 'dismissed'`,
+    [reportedAccountId, since],
+  );
+  return { count: rows[0]?.n ?? 0, firstAt: rows[0]?.first_at ?? null };
 }

@@ -74,7 +74,7 @@ async function readAudit(db: Queryable, query: AuditQuery): Promise<AuditPage> {
     id: string;
     at: Date;
     at_exact: string;
-    actor_identity_id: string;
+    actor_identity_id: string | null;
     actor_role: AuditEntry["actorRole"];
     action: string;
     subject_type: string;
