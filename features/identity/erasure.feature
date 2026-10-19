@@ -133,6 +133,11 @@ Feature: Account deletion per the erasure table
     Then the export lists A's two reports with their reasons, A's own note and what came of them, and A's three blocks by date, in the request's language
     And nothing names "B", "C", "D", "E" or "F", and nothing of E's report or F's block is there
 
+  Scenario: The export names where each report was made and carries no conversation's copy
+    Given "A" reported "B" from a card and "C" from a conversation where both wrote
+    When "A" exports the account
+    Then each report says whether it came from a card or a conversation, and nothing of the copy or C's words is in the export
+
   Scenario: Erasure leaves the counterpart "Deleted user" and the messages, and closes the conversation
     Given "A" and "B" wrote to each other, and "A" wrote once more under a shadow ban still open
     When "A" deletes the account

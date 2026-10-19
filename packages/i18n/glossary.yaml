@@ -36,3 +36,6 @@ moderator:
 
 contact:
   definition: A way to reach a person outside the app that they keep in Settings, under Your contacts (#103) - a phone number, WhatsApp, Telegram or Instagram. Nobody sees one until its owner shares it in one conversation, and it disappears there when they stop sharing it, change or remove it, or the conversation ends. Not an address-book entry and not a social "connection"; sharing asks nothing back. The brand names stay as they are in every language.
+
+end a conversation:
+  definition: Either person's choice to close a conversation for both of them (#351, the unmatch of #101). Nobody can write in it again, nobody is blocked, and either can still report it for a while. Neither person is told who ended it or how. Plain and calm; not a word for rejecting, breaking up or blocking, and not "unmatch".

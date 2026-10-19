@@ -60,6 +60,12 @@ Feature: Reporting somebody from a card or a conversation
     When the night prunes
     Then the older ones are gone and the blocks they made stay
 
+  Scenario: A report from a card ends the conversation between the two as a block does
+    Given "A" was shown "B"'s card, "A" and "B" are in a conversation where "A" shares a contact, and "A" is in another with "C"
+    When "A" reports "B" from the card
+    Then the conversation with "B" closes as "A"'s block, with no copy, and what "A" shared there ends
+    And "B" reads it ended and may still report it, and the conversation with "C" stays open
+
   Scenario: Reporting refuses without a session
     When nobody, a token nobody issued, a staff token, an ended session or an expired one reports
     Then the answer is 401 with its code, and nothing is written
@@ -79,6 +85,16 @@ Feature: Reporting somebody from a card or a conversation
     Given matching_config allows five a day, and "A" reported "B" from their conversation
     When "A" sends the same report again, files four more, and reports "G" from another conversation
     Then the repeat answers 204 and writes nothing, and the last is refused with 429 report_budget_exceeded, without a report, a copy, a block or a close
+
+  Scenario: A second report from a conversation while one is open writes nothing more, whoever is gone meanwhile
+    Given "A" reported "B" from their conversation and nobody has decided it
+    When "A" sends the report again, and again after "B" deleted the account
+    Then each answer is 204, and no report, copy, block or close more is written
+
+  Scenario: The one who blocked cannot report the conversation they no longer see, and learns nothing from the answer
+    Given "A" blocked "B" from their conversation
+    When "A" reports from it, again after "B" deleted the account, and again after the window
+    Then each answer is 404, and nothing is written
 
   Scenario: Only the conversation's two people can report or block from it
     Given "A" and "B" are in a conversation and "C" is not

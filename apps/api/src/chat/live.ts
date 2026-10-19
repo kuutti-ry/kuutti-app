@@ -24,7 +24,7 @@ import * as repo from "./repo.ts";
 
 export const CHAT_CHANNEL = "kuutti_chat";
 
-/** What the triggers send (packages/db/drizzle/0055_chat_notify.sql, 0059_contact_share_notify.sql). */
+/** What the triggers send (packages/db/drizzle/0055_chat_notify.sql, 0059_contact_share_notify.sql, 0063_conversation_notify_close_only.sql). */
 const Notification = z.discriminatedUnion("t", [
   z.object({ t: z.literal("message"), c: z.uuid(), s: z.int().min(1) }),
   z.object({ t: z.literal("conversation"), c: z.uuid() }),
@@ -120,7 +120,8 @@ function createChatHub(deps: { db: Queryable; logger: Logger; presence: Presence
           for (const { accountId, side } of await repo.participantsOf(db, note.c)) {
             if (side === reader || !listening(accountId)) continue;
             const row = await repo.findConversation(db, accountId, note.c);
-            // A closed conversation delivers no frame.
+            // A closed conversation delivers no frame: its marks stand still
+            // (`repo.markRead`), and this is a mark that raced the close.
             if (row && visibleState(row).state !== "closed") {
               sendTo(accountId, { type: "read", conversationId: note.c, upTo: note.u });
             }
@@ -134,7 +135,19 @@ function createChatHub(deps: { db: Queryable; logger: Logger; presence: Presence
           }
           return;
         case "block":
-          return announceStates(await repo.conversationsBetweenIdentities(db, note.a, note.b));
+          // Only the blocker's side, whose conversation turns gone. The other
+          // person hears the close's own state, the frame an end without a
+          // block sends, and nothing where it had ended already, so no frame
+          // tells a block or a report from an unmatch (ADR-030 §6 and §12).
+          for (const { conversationId, accountId } of await repo.blockerSidesBetween(
+            db,
+            note.a,
+            note.b,
+          )) {
+            if (listening(accountId))
+              sendTo(accountId, await stateFrame(accountId, conversationId));
+          }
+          return;
       }
     },
 
@@ -216,6 +229,7 @@ function createChatHub(deps: { db: Queryable; logger: Logger; presence: Presence
           socket.send({ type: "conversation", conversationId: id, state: "gone", closedHow: null });
           continue;
         }
+        // A closed conversation's mark is where the close found it, what the phone showed then.
         socket.send({ type: "read", conversationId: id, upTo: row.counterpartReadUpTo });
         socket.send({ type: "presence", conversationId: id, online: counterpartOnline(row) });
         socket.send({ type: "conversation", conversationId: id, ...visibleState(row) });

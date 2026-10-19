@@ -1,6 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
+import { PHOTO_VARIANTS } from "@kuutti/schema";
 import type { QueryResultRow } from "pg";
+import { type MediaStore, objectKey } from "../media/index.ts";
 
 /**
  * A conversation between two accounts, as the match's record will write it
@@ -50,6 +52,47 @@ export async function conversationBetween(
     last,
   ]);
   return id;
+}
+
+/**
+ * A photo sent in the conversation by one side, as the send writes it (#350):
+ * a message photo row of the sender's, approved, and its message, the next
+ * in sequence. The objects go into the store when one is given, so an
+ * erasure, a prune or a reset can be seen to delete them (#351).
+ */
+export async function photoMessage(
+  db: Queryable,
+  input: {
+    conversationId: string;
+    accountId: string;
+    side: "a" | "b";
+    caption?: string | null;
+    store?: MediaStore;
+  },
+): Promise<{ photoId: string; key: string; seq: number }> {
+  const key = randomBytes(32).toString("hex");
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO photo (account_id, key, blurhash, width, height, state, purpose)
+     VALUES ($1, $2, 'LKO2?U%2Tw=w', 800, 600, 'approved', 'message') RETURNING id`,
+    [input.accountId, key],
+  );
+  const photoId = rows[0]?.id;
+  if (!photoId) throw new Error("test photo not written");
+  const sent = await db.query<{ seq: number }>(
+    `WITH bumped AS (
+       UPDATE conversation SET next_seq = next_seq + 1, last_message_at = now()
+       WHERE id = $1 RETURNING next_seq - 1 AS seq)
+     INSERT INTO message (conversation_id, seq, side, client_id, kind, body, photo_id)
+     SELECT $1, bumped.seq, $2, $3, 'photo', $4, $5 FROM bumped
+     RETURNING seq`,
+    [input.conversationId, input.side, randomUUID(), input.caption ?? null, photoId],
+  );
+  const seq = sent.rows[0]?.seq;
+  if (seq === undefined) throw new Error("test conversation not found");
+  for (const variant of PHOTO_VARIANTS) {
+    await input.store?.put(objectKey(key, variant), new Uint8Array([1, 2, 3]), "image/webp");
+  }
+  return { photoId, key, seq };
 }
 
 /**

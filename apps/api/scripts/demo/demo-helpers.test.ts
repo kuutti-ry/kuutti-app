@@ -9,10 +9,12 @@ import {
   type PersonaHistory,
   type PhotoAsset,
 } from "@kuutti/db/demo";
-import type { OnboardingStatus } from "@kuutti/schema";
+import { type OnboardingStatus, PHOTO_VARIANTS } from "@kuutti/schema";
 import { afterAll, afterEach, it, vi } from "vitest";
 import { hmacKeyFromHex } from "../../src/identity/index.ts";
+import { objectKey } from "../../src/media/index.ts";
 import { signedInAccount } from "../../src/test/account.ts";
+import { conversationBetween, photoMessage } from "../../src/test/chat.ts";
 import { captureLogger, describe, expect, type TestContext, test } from "../../src/test/harness.ts";
 import { fixtureJpeg, testMediaDeps } from "../../src/test/media.ts";
 import { pondNamed } from "../../src/test/people.ts";
@@ -789,5 +791,84 @@ describe("the reset where there is nobody, or the store says nothing useful", ()
         media: { store } as unknown as Parameters<typeof resetPersonas>[0]["media"],
       }),
     ).rejects.toThrow(/does not answer \(unknown\).* Nobody was erased/);
+  });
+});
+
+describe("the reset and a report's copy (#351)", () => {
+  test("a persona's photo that a report's copy held through the erasure goes with its objects, or the reset is taken back", async ({
+    ctx,
+  }) => {
+    const { logger } = await captureLogger();
+    const identity = await ctx.client.query<{ id: string }>(
+      `INSERT INTO identity (hetu_hmac, broker_subject, acr, amr)
+       VALUES ('a hash for aino in the copy', 'aino', 'x', ARRAY[$1]) RETURNING id`,
+      [MOCK_BANK_AMR],
+    );
+    const account = await ctx.client.query<{ id: string }>(
+      `INSERT INTO account (identity_id, state, birth_year, birth_month)
+       VALUES ($1, 'active', 1997, 3) RETURNING id`,
+      [identity.rows[0]?.id],
+    );
+    const aino = account.rows[0]?.id as string;
+    const media = testMediaDeps();
+    // Somebody who is no persona reported Aino from their conversation, with
+    // the photo she sent there in the copy, as the route writes it.
+    const reporter = await signedInAccount(ctx.client);
+    const id = await conversationBetween(ctx.client, reporter.accountId, aino);
+    const sent = await photoMessage(ctx.client, {
+      conversationId: id,
+      accountId: aino,
+      side: "b",
+      store: media.store,
+    });
+    const report = await ctx.client.query<{ id: string }>(
+      `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, conversation_id)
+       VALUES ($1, $2, 'conversation', 'harassment', $3) RETURNING id`,
+      [reporter.accountId, aino, id],
+    );
+    await ctx.client.query(
+      `INSERT INTO report_message (report_id, seq, side, kind, body, photo_id, created_at)
+       SELECT $1, seq, (CASE WHEN side = 'a' THEN 'reporter' ELSE 'reported' END)::report_message_side,
+              kind, body, photo_id, created_at
+       FROM message WHERE conversation_id = $2`,
+      [report.rows[0]?.id, id],
+    );
+    const keys = PHOTO_VARIANTS.map((variant) => objectKey(sent.key, variant));
+    const now = () => NOW;
+
+    // A store that cannot delete: the erasure keeps the photo for the copy,
+    // the deletion takes the report and the row, and the objects are not
+    // deleted, so nothing is.
+    const failing = {
+      ...media.deps,
+      store: { ...media.store, delete: () => Promise.reject(new Error("unavailable")) },
+    };
+    await expect(resetPersonas({ db: ctx.client, logger, now, media: failing })).rejects.toThrow(
+      /the objects of the photos a report kept of aino were not deleted \(0 of 3\)/,
+    );
+    const { rows: still } = await ctx.client.query(
+      `SELECT a.state, (SELECT count(*)::int FROM photo WHERE id = $2) AS photos,
+              (SELECT count(*)::int FROM report_message) AS lines
+       FROM account a WHERE a.id = $1`,
+      [aino, sent.photoId],
+    );
+    expect(still).toEqual([{ state: "active", photos: 1, lines: 1 }]);
+    expect(keys.filter((key) => media.store.objects.has(key))).toEqual(keys);
+
+    // With the store: everything of Aino goes, the held photo's objects too.
+    expect(await resetPersonas({ db: ctx.client, logger, now, media: media.deps })).toEqual({
+      identities: 1,
+      erased: 1,
+      objects: keys.length,
+      spared: [],
+    });
+    expect(keys.filter((key) => media.store.objects.has(key))).toEqual([]);
+    const { rows: left } = await ctx.client.query(
+      `SELECT (SELECT count(*)::int FROM photo WHERE id = $1) AS photos,
+              (SELECT count(*)::int FROM report) AS reports,
+              (SELECT count(*)::int FROM identity WHERE id = $2) AS identities`,
+      [sent.photoId, identity.rows[0]?.id],
+    );
+    expect(left).toEqual([{ photos: 0, reports: 0, identities: 0 }]);
   });
 });

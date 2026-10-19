@@ -3,7 +3,12 @@ import { describe, expect } from "vitest";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
-import { deleteOrphanedObjects, erasePhotosOfAccount, exportPhotos } from "./erasure.ts";
+import {
+  deleteOrphanedObjects,
+  erasePhotosOfAccount,
+  eraseReleasedPhotos,
+  exportPhotos,
+} from "./erasure.ts";
 import type { PhotoServiceDeps } from "./photos.ts";
 import { insertPhoto, insertPhotoAccess, logPhotoAccess } from "./repo.ts";
 import { type MediaStore, objectKey } from "./store.ts";
@@ -112,6 +117,42 @@ describe("erasing the photo rows", () => {
     expect(await left("card_shown")).toEqual([]);
   });
 
+  test("the photos a report's copy holds stay through the erasure, the rest go (#351)", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client, "a");
+    const held = await photoOf(ctx, a.accountId, "k-held");
+    await photoOf(ctx, a.accountId, "k-gone", "approved", 1);
+    const erased = await erasePhotosOfAccount(ctx.client, a.accountId, [held]);
+    expect(erased).toMatchObject({ photos: 1, keys: ["k-gone"] });
+    const left = await ctx.client.query("SELECT id FROM photo WHERE account_id = $1", [
+      a.accountId,
+    ]);
+    expect(left.rows).toEqual([{ id: held }]);
+  });
+
+  test("the night lets go of the photos it names of erased accounts, and never a live owner's (#351)", async ({
+    ctx,
+  }) => {
+    const erased = await signedInAccount(ctx.client, "erased");
+    const live = await signedInAccount(ctx.client, "live");
+    const released = await photoOf(ctx, erased.accountId, "k-released");
+    const notNamed = await photoOf(ctx, erased.accountId, "k-not-named", "approved", 1);
+    const theirs = await photoOf(ctx, live.accountId, "k-live");
+    await ctx.client.query(
+      "UPDATE account SET state = 'deleted', deleted_at = now() WHERE id = $1",
+      [erased.accountId],
+    );
+    expect(await eraseReleasedPhotos(ctx.client, [])).toEqual([]);
+    // A live owner's photo is theirs, named or not; only the erased one's named go.
+    expect(await eraseReleasedPhotos(ctx.client, [released, theirs])).toEqual(["k-released"]);
+    const left = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM photo WHERE id = ANY($1) ORDER BY key",
+      [[released, notNamed, theirs]],
+    );
+    expect(left.rows.map((r) => r.id)).toEqual([theirs, notNamed]);
+  });
+
   test("an account with no photos erases nothing and names no key", async ({ ctx }) => {
     const a = await signedInAccount(ctx.client);
     expect(await erasePhotosOfAccount(ctx.client, a.accountId)).toEqual({
@@ -189,6 +230,17 @@ describe("deleting the objects after the commit", () => {
       keys: ["k-lost"],
       objects: 3,
     });
+    // The night's prune of a report's held photos names its job instead (#351).
+    expect(
+      await deleteOrphanedObjects({ db: ctx.client, store, logger }, ["k-lost"], {
+        job: "prune-reports",
+      }),
+    ).toBe(0);
+    const night = lines()
+      .filter((l) => l.msg === "erasure: deleting photo objects failed")
+      .at(-1);
+    expect(night).toMatchObject({ job: "prune-reports", keys: ["k-lost"], objects: 3 });
+    expect(night).not.toHaveProperty("accountId");
   });
 });
 

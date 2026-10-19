@@ -3,7 +3,7 @@ import { DEMO_PERSONAS, deleteIdentities, MOCK_BANK_AMR } from "@kuutti/db/demo"
 import { PHOTO_VARIANTS } from "@kuutti/schema";
 import { type ErasureSummary, eraseAccount } from "../../src/identity/index.ts";
 import type { Logger } from "../../src/lib/logger.ts";
-import { type MediaDeps, objectKey } from "../../src/media/index.ts";
+import { deleteOrphanedObjects, type MediaDeps, objectKey } from "../../src/media/index.ts";
 import { DemoError } from "./bank.ts";
 
 /**
@@ -57,7 +57,9 @@ import { DemoError } from "./bank.ts";
  *   objects that are gone for good;
  * - after each erasure the objects it deleted are counted. The erasure path
  *   forgives a store that fails, as it must for a person who leaves; a
- *   reset does not.
+ *   reset does not. The photos a report's copy held through the erasure
+ *   (#351, ADR-030 §12) keep their rows until the deletion takes the
+ *   reports and them; their objects go after it, counted alike.
  *
  * On staging (#141, ADR-018) the personas are the test persons of Telia's
  * bed and are known by the hash the container derived from their artificial
@@ -168,6 +170,18 @@ export async function resetPersonas(deps: ResetDeps): Promise<ResetResult> {
       "SELECT id, state FROM account WHERE identity_id = ANY($1) AND state <> 'deleted'",
       [ids],
     );
+    /**
+     * The objects of these contents that no photo row names any more: what
+     * deleteOrphanedObjects must have deleted, the media slice's own rule.
+     */
+    const objectsDue = async (contents: readonly string[]) => {
+      const { rows } = await tx.query(
+        `SELECT 1 FROM unnest($1::text[]) AS k(key)
+         WHERE NOT EXISTS (SELECT 1 FROM photo p WHERE p.key = k.key)`,
+        [[...new Set(contents)]],
+      );
+      return rows.length * PHOTO_VARIANTS.length;
+    };
     let erased = 0;
     let objects = 0;
     for (const account of accounts) {
@@ -179,18 +193,24 @@ export async function resetPersonas(deps: ResetDeps): Promise<ResetResult> {
       // names any more (the media slice's own rule). It answers 0 when the
       // store failed, and throwing here takes the rows back with it.
       const mine = photos.filter((photo) => photo.account === account.id);
-      const { rows: orphaned } = await tx.query(
-        `SELECT 1 FROM unnest($1::text[]) AS k(key)
-         WHERE NOT EXISTS (SELECT 1 FROM photo p WHERE p.key = k.key)`,
-        [[...new Set(mine.map((photo) => photo.content))]],
-      );
-      const due = orphaned.length * PHOTO_VARIANTS.length;
+      const due = await objectsDue(mine.map((photo) => photo.content));
       if (summary.objects !== due) {
         throw new DemoError(
           `the objects of the photos of ${named(mine)} were not deleted (${summary.objects} of ${due}): is the object store running? The reset is taken back: everybody's rows are as they were, and objects deleted before this one are gone (--objects-lost goes ahead without them)`,
         );
       }
     }
+    // The photos the erasures kept for a report's copy (#351), and those an
+    // earlier erasure of a persona kept: the deletion below takes their
+    // reports and rows, and their objects go after it. Without a store there
+    // are none: a persona with photos stopped the reset above.
+    const { rows: heldRows } = await tx.query<{ subject: string; hash: string; content: string }>(
+      `SELECT DISTINCT i.broker_subject AS subject, i.hetu_hmac AS hash, p.key AS content
+       FROM photo p JOIN account a ON a.id = p.account_id JOIN identity i ON i.id = a.identity_id
+       WHERE i.id = ANY($1) ORDER BY 1, 3`,
+      [ids],
+    );
+    const held = heldRows.map((r) => ({ key: keyOf(r), content: r.content }));
     // The ended ones only, by the sweep's own rule (deleteDeadAdminSessions).
     await tx.query(
       `DELETE FROM admin_session WHERE identity_id = ANY($1)
@@ -198,6 +218,21 @@ export async function resetPersonas(deps: ResetDeps): Promise<ResetResult> {
       [ids, at],
     );
     await deleteIdentities(tx, ids);
+    if (deps.media && held.length > 0) {
+      const contents = [...new Set(held.map((photo) => photo.content))];
+      const deleted = await deleteOrphanedObjects(
+        { db: tx, store: deps.media.store, logger: deps.logger },
+        contents,
+        { job: "demo-reset" },
+      );
+      const due = await objectsDue(contents);
+      if (deleted !== due) {
+        throw new DemoError(
+          `the objects of the photos a report kept of ${named(held)} were not deleted (${deleted} of ${due}): is the object store running? The reset is taken back: everybody's rows are as they were, and objects deleted before this one are gone (--objects-lost goes ahead without them)`,
+        );
+      }
+      objects += deleted;
+    }
     return { identities: ids.length, erased, objects, spared };
   });
 }

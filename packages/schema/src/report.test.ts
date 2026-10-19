@@ -104,6 +104,7 @@ describe("a report from a conversation (#351)", () => {
 describe("the reporter's export", () => {
   const report = {
     at,
+    source: "card",
     reason: "harassment",
     reasonInWords: "Harassment",
     note: null,
@@ -118,6 +119,11 @@ describe("the reporter's export", () => {
       expect(ExportedReport.safeParse({ ...report, outcome, decidedAt: at }).success).toBe(true);
     }
     expect(Object.keys(ExportedReport.shape)).not.toContain("accountId");
+    // Where it was made, from the closed list; the conversation's copy is in nobody's export (#351).
+    expect(ExportedReport.parse({ ...report, source: "conversation" }).source).toBe("conversation");
+    expect(codes(ExportedReport, { ...report, source: "profile" })).toEqual(["invalid_value"]);
+    expect(codes(ExportedReport, { ...report, source: undefined })).toEqual(["invalid_value"]);
+    expect(Object.keys(ExportedReport.shape)).not.toContain("messages");
     expect(ExportedReports.parse({ about: "x", items: [report] }).items).toHaveLength(1);
     expect(ExportedBlocks.parse({ about: "x", items: [{ at }] }).items).toEqual([{ at }]);
   });

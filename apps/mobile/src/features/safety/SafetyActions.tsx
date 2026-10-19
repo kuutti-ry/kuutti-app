@@ -54,7 +54,11 @@ type ReportBody = { reason: SanctionReason; note?: string };
 /** The steps after which the card leaves the screen. */
 const FINAL: ReadonlySet<Step> = new Set(["blocked", "reported", "gone"]);
 
-/** The dialog is bounded by the window, so its middle scrolls rather than overflows (2x text). */
+/**
+ * The dialog is bounded by the window, so its middle scrolls rather than
+ * overflows (2x text); on Android, by the space above the keyboard while it
+ * is up (the dialog primitive, #351).
+ */
 const WINDOW_SHARE = 0.9;
 
 /**
@@ -110,7 +114,7 @@ export function SafetyActions({
         words={{
           title: "safety.actions.title",
           blockBody: "safety.block.body",
-          reportLead: null,
+          reportSays: ["safety.report.alsoBlocks"],
         }}
         requests={{
           block: () => blockPerson(accountId),
@@ -130,50 +134,65 @@ export function SafetyActions({
  * in words: a report (the card's reasons and note, which also says that the
  * moderators get a copy of the conversation and that it blocks), a block
  * (which ends the conversation for both), and End conversation (an unmatch,
- * which blocks nobody). In an ended conversation the report alone is
- * offered, while `reportable` says the window holds; with nothing to offer
- * there is no button. Once one went through, the dialog closes and
- * `onDone` takes the person back to the list, which says what happened; a
+ * which blocks nobody, and which either can still report for a while). The
+ * report says that it ends the conversation only while it has not ended. In
+ * an ended conversation the report alone is offered, while `reportable` says
+ * the window holds; with nothing to offer there is no button, and no dialog
+ * unless one is open: a dialog open when its offers went (the report's block
+ * takes the conversation away before its answer lands, #351) keeps its words
+ * and its outcome. Once one went through, the dialog closes and `onDone`
+ * takes the person back to the list, which says what happened; a
  * conversation the API no longer has is handed back as `gone`. A report
- * refused because the window closed meanwhile is said in words.
+ * refused because the window closed meanwhile is said in words, and
+ * `onStale` has the screen read the conversation again, so More stops
+ * offering it.
  */
 export function ConversationActions({
   conversationId,
   ended,
   reportable,
+  button,
   unmatch,
   open,
   onOpenChange,
   onDone,
+  onStale,
 }: {
   conversationId: string;
   /** The conversation is closed: only a report may be offered. */
   ended: boolean;
   /** The API takes a report from it now (the window after a close). */
   reportable: boolean;
+  /** Whether More is in the header: not while the screen says the conversation is gone. */
+  button: boolean;
   /** Ends the conversation for both, the chat slice's route. */
   unmatch: () => Promise<void>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDone: (outcome: SafetyOutcome) => void;
+  /** A refusal that says what the screen shows is out of date: it reads the conversation again. */
+  onStale: () => void;
 }) {
   const { t } = useT();
   const tap = useHapticTap();
   const offers = { report: reportable, block: !ended, unmatch: !ended };
-  if (!offers.report && !offers.block && !offers.unmatch) return null;
+  const offered = offers.report || offers.block || offers.unmatch;
+  if (!offered && !open) return null;
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        accessibilityLabel={t("chat.actions.open")}
-        onPress={() => {
-          tap();
-          onOpenChange(true);
-        }}
-      >
-        <Icon as={Ellipsis} />
-      </Button>
+      {button && offered && (
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel={t("chat.actions.open")}
+          onPress={() => {
+            tap();
+            onOpenChange(true);
+          }}
+        >
+          <Icon as={Ellipsis} />
+        </Button>
+      )}
       <SafetyDialog
         open={open}
         onOpenChange={onOpenChange}
@@ -181,7 +200,11 @@ export function ConversationActions({
         words={{
           title: "chat.actions.title",
           blockBody: "chat.block.body",
-          reportLead: "chat.report.copy",
+          // The report ends the conversation too, unless it has ended already.
+          reportSays: [
+            "chat.report.copy",
+            ended ? "safety.report.alsoBlocks" : "chat.report.alsoEnds",
+          ],
         }}
         requests={{
           block: () => blockConversation(conversationId),
@@ -190,6 +213,7 @@ export function ConversationActions({
         }}
         settle="screen"
         onOutcome={onDone}
+        onStale={onStale}
       />
     </>
   );
@@ -209,11 +233,17 @@ function SafetyDialog({
   requests,
   settle,
   onOutcome,
+  onStale,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   offers: { report: boolean; block: boolean; unmatch: boolean };
-  words: { title: PlainMessageKey; blockBody: PlainMessageKey; reportLead: PlainMessageKey | null };
+  /** The report step's lines say what it does, above the reasons. */
+  words: {
+    title: PlainMessageKey;
+    blockBody: PlainMessageKey;
+    reportSays: readonly PlainMessageKey[];
+  };
   requests: {
     block: () => Promise<void>;
     report: (body: ReportBody) => Promise<void>;
@@ -221,6 +251,8 @@ function SafetyDialog({
   };
   settle: "dialog" | "screen";
   onOutcome: (outcome: SafetyOutcome) => void;
+  /** A conversation's: a card meets no refusal that says it is out of date. */
+  onStale?: () => void;
 }) {
   const { t } = useT();
   const tap = useHapticTap();
@@ -330,6 +362,8 @@ function SafetyDialog({
       } else if (code === "report_window_closed") {
         setNotice("late");
         say(t("errors.report_window_closed"));
+        // What the screen holds says it can be reported: read it again.
+        onStale?.();
       } else {
         setNotice("failed");
         say(t(failed));
@@ -354,7 +388,8 @@ function SafetyDialog({
   const unmatch = () => unmatchRequest && send("unmatched", unmatchRequest, "chat.unmatch.failed");
 
   // The day's cap with a Block in its place where one is offered; in an
-  // ended conversation, which offers none, tomorrow (#351).
+  // ended conversation, which offers none, that the cap lifts at midnight,
+  // promising nothing of this conversation, whose window may close first (#351).
   const limitedWords: PlainMessageKey = offers.block
     ? "errors.report_budget_exceeded"
     : "chat.report.limited";
@@ -460,8 +495,10 @@ function SafetyDialog({
               <DialogTitle ref={focusTitle}>{t("safety.actions.report")}</DialogTitle>
             </DialogHeader>
             {/* What it does, six reasons and a text field outgrow a phone's screen at a large
-                text size, and the keyboard covers the dialog's lower half: they scroll, a drag
-                puts the keyboard away, and the field scrolls into view above it. */}
+                text size, and the keyboard takes the lower half: they scroll, a drag puts the
+                keyboard away, and the field scrolls into view above it, its label with it. On
+                iOS the scroll view insets itself; on Android the dialog shrinks into the space
+                above the keyboard (the dialog primitive, #351), and the scroll view with it. */}
             <ScrollView
               style={{ flexShrink: 1 }}
               contentContainerClassName="gap-3"
@@ -469,8 +506,9 @@ function SafetyDialog({
               keyboardDismissMode="on-drag"
               automaticallyAdjustKeyboardInsets
             >
-              {texts.reportLead && <DialogDescription>{t(texts.reportLead)}</DialogDescription>}
-              <DialogDescription>{t("safety.report.alsoBlocks")}</DialogDescription>
+              {texts.reportSays.map((key) => (
+                <DialogDescription key={key}>{t(key)}</DialogDescription>
+              ))}
               {/* role, not accessibilityRole: the primitive sets role from its variant, and small has none. */}
               <Text variant="small" role="heading" aria-level="3">
                 {t("safety.report.reasonLabel")}

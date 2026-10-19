@@ -442,6 +442,13 @@
       "when": 1792347446527,
       "tag": "0062_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1792384544826,
+      "tag": "0063_conversation_notify_close_only",
+      "breakpoints": true
     }
   ]
 }

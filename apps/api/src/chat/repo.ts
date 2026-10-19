@@ -14,7 +14,9 @@ import type {
 // conversation the caller is not in is never read. The block table is read
 // here, and only here in the slice, for the one thing a block does to a
 // conversation: it ends it for both, and the blocker never sees it again
-// (ADR-030 §2 and §6; safety/no-signal.test.ts lists this file).
+// (ADR-030 §2 and §6; safety/no-signal.test.ts lists this file). A report's
+// frozen copy is written here, from the thread, and read nowhere in the
+// slice (`copyConversation`, #351; listed there too).
 
 export type Side = "a" | "b";
 
@@ -106,6 +108,8 @@ const conversationFrom = (r: Row): ConversationRow => ({
   unread: r.unread as number,
 });
 
+// Nothing is unread in a closed conversation: its marks stand still
+// (`markRead`), so a count there could never be read away.
 const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, c.archived_at,
   c.closed_at, c.closed_how, me.side, me.read_up_to,
   them.account_id AS counterpart_id, them.read_up_to AS counterpart_read_up_to,
@@ -113,9 +117,10 @@ const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, 
   p.display_name AS counterpart_name, a.birth_year, a.birth_month,
   lm.seq AS last_seq, lm.side AS last_side, lm.kind AS last_kind, lm.body AS last_body,
   lm.created_at AS last_created_at,
-  (SELECT count(*)::int FROM message m
-   WHERE m.conversation_id = c.id AND m.side <> me.side AND m.seq > me.read_up_to
-     AND ${MESSAGE_VISIBLE}) AS unread`;
+  CASE WHEN c.closed_at IS NOT NULL THEN 0 ELSE
+    (SELECT count(*)::int FROM message m
+     WHERE m.conversation_id = c.id AND m.side <> me.side AND m.seq > me.read_up_to
+       AND ${MESSAGE_VISIBLE}) END AS unread`;
 
 const CONVERSATION_JOINS = `LEFT JOIN account a ON a.id = them.account_id
   LEFT JOIN profile p ON p.account_id = them.account_id
@@ -240,7 +245,13 @@ export async function listMessages(
 /**
  * The read mark, raised and never lowered, never past the newest message; 0
  * rows for a conversation the caller may not see. The participant row is
- * the caller's own (rule 6).
+ * the caller's own (rule 6). A closed conversation's marks stand where the
+ * close found them, whoever closed it and how: the blocker can no longer
+ * reach it and the one who ended it still can, so a mark moving after an
+ * end would tell the other person it was not a block (ADR-030 §12). The
+ * answer stays the same, and the trigger fires only on a change. A mark
+ * whose statement saw the conversation open lands as a read before the
+ * close, which it was.
  */
 export async function markRead(
   db: Queryable,
@@ -248,7 +259,9 @@ export async function markRead(
 ): Promise<boolean> {
   const result = await db.query(
     `UPDATE conversation_participant me
-     SET read_up_to = greatest(me.read_up_to, least($3::int, c.next_seq - 1))
+     SET read_up_to = CASE WHEN c.closed_at IS NULL
+                           THEN greatest(me.read_up_to, least($3::int, c.next_seq - 1))
+                           ELSE me.read_up_to END
      FROM conversation c, conversation_participant them
      WHERE me.account_id = $1 AND me.conversation_id = $2
        AND c.id = me.conversation_id
@@ -724,11 +737,11 @@ export async function exportConversationsOf(
 }
 
 // A report or a block from a conversation (#351, ADR-030 §12): the safety
-// slice writes the report, its copy and the block; these read the
-// conversation it names, through the caller's own participant row (rule 6),
-// after its row is locked, so the copy is the thread as it stood when the
-// report was filed: a send either committed before the lock and is copied,
-// or waits for the report's close and is refused.
+// slice writes the report and the block; these read the conversation it
+// names, and write its copy, through the caller's own participant row (rule
+// 6), after its row is locked, so the copy is the thread as it stood when
+// the report was filed: a send either committed before the lock and is
+// copied, or waits for the report's close and is refused.
 
 export type ReportedConversation = {
   /** The caller blocked the other person: the conversation is hidden from them. */
@@ -782,42 +795,31 @@ export async function lockForReport(
   };
 }
 
-export type CopiedMessage = {
-  seq: number;
-  mine: boolean;
-  kind: MessageKind;
-  body: string | null;
-  photoId: string | null;
-  createdAt: Date;
-};
-
 /**
- * Every message of the conversation, oldest first, both people's, those a
- * shadow ban withholds from the caller included: the moderators read the
- * thread as it is, not as one side was shown it. Through the caller's own
- * participant row; the caller has locked the conversation.
+ * A report's frozen copy (#351, ADR-030 §12): every message of the
+ * conversation, both people's, those a shadow ban withholds from the caller
+ * included, since the moderators read the thread as it is, not as one side
+ * was shown it; each line's side seen from the report. One INSERT … SELECT,
+ * so the words never pass through the process (rule 5). Through the caller's
+ * own participant row, under the conversation's lock the caller holds: a send
+ * either committed before the lock and is copied, or waits for the report's
+ * close and is refused. The number of lines copied.
  */
-export async function threadOf(
+export async function copyConversation(
   db: Queryable,
-  accountId: string,
-  conversationId: string,
-): Promise<CopiedMessage[]> {
-  const { rows } = await db.query<Row>(
-    `SELECT m.seq, m.side = me.side AS mine, m.kind, m.body, m.photo_id, m.created_at
+  input: { accountId: string; conversationId: string; reportId: string },
+): Promise<number> {
+  const result = await db.query(
+    `INSERT INTO report_message (report_id, seq, side, kind, body, photo_id, created_at)
+     SELECT $3, m.seq,
+            (CASE WHEN m.side = me.side THEN 'reporter' ELSE 'reported' END)::report_message_side,
+            m.kind, m.body, m.photo_id, m.created_at
      FROM conversation_participant me
      JOIN message m ON m.conversation_id = me.conversation_id
-     WHERE me.account_id = $1 AND me.conversation_id = $2
-     ORDER BY m.seq`,
-    [accountId, conversationId],
+     WHERE me.account_id = $1 AND me.conversation_id = $2`,
+    [input.accountId, input.conversationId, input.reportId],
   );
-  return rows.map((r) => ({
-    seq: r.seq as number,
-    mine: r.mine === true,
-    kind: r.kind as MessageKind,
-    body: (r.body as string | null) ?? null,
-    photoId: (r.photo_id as string | null) ?? null,
-    createdAt: r.created_at as Date,
-  }));
+  return result.rowCount ?? 0;
 }
 
 // The socket's fan-out (#349, ADR-031 §5). A notification names a
@@ -839,22 +841,36 @@ export async function participantsOf(
   return rows.map((r) => ({ accountId: r.account_id, side: r.side }));
 }
 
-/** The conversations between the accounts of two identities: what a block between them ends. */
-export async function conversationsBetweenIdentities(
+/**
+ * The blocker's side of each conversation between the accounts of two
+ * identities: whom a block between them turns the conversation gone for.
+ * The blocked side is told by the close's own notification, never by the
+ * block's (ADR-030 §6, migration 0063). The listener reads this after the
+ * commit, and the blocked person's erasure may have cut their link by then:
+ * a conversation of the blocker's whose other side is unlinked and whose
+ * close is the blocker's own block counts too, so the blocker's phones still
+ * hear that it is gone. That may tell the blocker again of one already gone
+ * for them, which tells nobody anything.
+ */
+export async function blockerSidesBetween(
   db: Queryable,
-  a: string,
-  b: string,
-): Promise<string[]> {
-  const { rows } = await db.query<{ id: string }>(
-    `SELECT DISTINCT p.conversation_id AS id
+  blocker: string,
+  blocked: string,
+): Promise<Array<{ conversationId: string; accountId: string }>> {
+  const { rows } = await db.query<{ conversation_id: string; account_id: string }>(
+    `SELECT DISTINCT p.conversation_id, p.account_id
      FROM conversation_participant p
      JOIN account pa ON pa.id = p.account_id
+     JOIN conversation c ON c.id = p.conversation_id
      JOIN conversation_participant q ON q.conversation_id = p.conversation_id AND q.side <> p.side
-     JOIN account qa ON qa.id = q.account_id
-     WHERE pa.identity_id = $1 AND qa.identity_id = $2`,
-    [a, b],
+     LEFT JOIN account qa ON qa.id = q.account_id
+     WHERE pa.identity_id = $1
+       AND (qa.identity_id = $2
+         OR (q.account_id IS NULL AND c.closed_how = 'block' AND c.closed_by = p.side))
+     ORDER BY p.conversation_id`,
+    [blocker, blocked],
   );
-  return rows.map((r) => r.id);
+  return rows.map((r) => ({ conversationId: r.conversation_id, accountId: r.account_id }));
 }
 
 /** One message as the caller reads it, with the caller's side, or null when it is not theirs to read. */

@@ -1,14 +1,26 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { createPool, migrate, withTemporaryDatabase } from "@kuutti/db";
+import {
+  createPool,
+  migrate,
+  type Pool,
+  type PoolClient,
+  type Queryable,
+  withTemporaryDatabase,
+} from "@kuutti/db";
 import { ConversationDetail, ConversationList, ErrorResponse, MessagePage } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
-import { type MediaStore, objectKey } from "../media/index.ts";
+import { objectKey } from "../media/index.ts";
 import { signInAs, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
-import { conversationBetween, interleaved, twoInAConversation } from "../test/chat.ts";
+import {
+  conversationBetween,
+  interleaved,
+  photoMessage,
+  twoInAConversation,
+} from "../test/chat.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { people } from "../test/people.ts";
@@ -79,44 +91,6 @@ const blockStands = (ctx: TestContext, blocker: Person, blocked: Person) =>
     [blocker.accountId, blocked.accountId],
   );
 
-/**
- * A photo sent in the conversation by one side, as the send writes it (#350):
- * a message photo row of the sender's and its message, the next in sequence.
- * The objects go into the store when one is given, so a prune can be seen to
- * delete them.
- */
-async function photoMessage(
-  ctx: TestContext,
-  input: {
-    conversationId: string;
-    sender: Person;
-    side: "a" | "b";
-    caption: string | null;
-    store?: MediaStore;
-  },
-): Promise<{ photoId: string; key: string }> {
-  const key = randomBytes(32).toString("hex");
-  const { rows } = await ctx.client.query<{ id: string }>(
-    `INSERT INTO photo (account_id, key, blurhash, width, height, state, purpose)
-     VALUES ($1, $2, 'LKO2?U%2Tw=w', 800, 600, 'approved', 'message') RETURNING id`,
-    [input.sender.accountId, key],
-  );
-  const photoId = rows[0]?.id;
-  if (!photoId) throw new Error("no photo");
-  await ctx.client.query(
-    `WITH bumped AS (
-       UPDATE conversation SET next_seq = next_seq + 1, last_message_at = now()
-       WHERE id = $1 RETURNING next_seq - 1 AS seq)
-     INSERT INTO message (conversation_id, seq, side, client_id, kind, body, photo_id)
-     SELECT $1, bumped.seq, $2, $3, 'photo', $4, $5 FROM bumped`,
-    [input.conversationId, input.side, randomUUID(), input.caption, photoId],
-  );
-  for (const variant of ["thumb", "card", "full"] as const) {
-    await input.store?.put(objectKey(key, variant), new Uint8Array([1, 2, 3]), "image/webp");
-  }
-  return { photoId, key };
-}
-
 describe("a report from a conversation", () => {
   test("A report from a conversation copies every message, blocks both ways and closes it", async ({
     ctx,
@@ -129,15 +103,15 @@ describe("a report from a conversation", () => {
         { from: "a", body: "Hei Bea" },
       ],
     });
-    const fromB = await photoMessage(ctx, {
+    const fromB = await photoMessage(ctx.client, {
       conversationId: id,
-      sender: b,
+      accountId: b.accountId,
       side: "b",
       caption: "Katso",
     });
-    const fromA = await photoMessage(ctx, {
+    const fromA = await photoMessage(ctx.client, {
       conversationId: id,
-      sender: a,
+      accountId: a.accountId,
       side: "a",
       caption: null,
     });
@@ -294,6 +268,61 @@ describe("a report from a conversation", () => {
     expect((await detailOf(ctx.app, a, last)).state).toBe("open");
   });
 
+  test("A second report from a conversation while one is open writes nothing more, whoever is gone meanwhile", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
+      messages: [{ from: "b", body: "Moi" }],
+    });
+    expect((await report(ctx.app, a, id)).status).toBe(204);
+    const once = await written(ctx);
+    expect(once).toMatchObject({ reports: 1, copies: 1, blocks: 1 });
+    // Again, as after a lost answer, with other words: the report is open.
+    expect((await report(ctx.app, a, id, { reason: "other", note: "Taas." })).status).toBe(204);
+    expect(await written(ctx)).toEqual(once);
+    // B deletes the account: the conversation is still hidden from A, and the
+    // open report is found by the conversation, not by B, so the answer stays.
+    await eraseAccount(
+      { db: ctx.client, logger: (await captureLogger()).logger, now: () => new Date() },
+      b.accountId,
+    );
+    expect(await written(ctx)).toEqual(once);
+    expect((await report(ctx.app, a, id)).status).toBe(204);
+    expect(await written(ctx)).toEqual(once);
+  });
+
+  test("The one who blocked cannot report the conversation they no longer see, and learns nothing from the answer", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { report_after_close_days: 30 });
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
+      messages: [{ from: "b", body: "Moi" }],
+    });
+    expect((await blockFrom(ctx.app, a, id)).status).toBe(204);
+    const before = await written(ctx);
+    const refused = async (when: string) => {
+      const answer = await report(ctx.app, a, id);
+      expect(answer.status, when).toBe(404);
+      expect(await errorCode(answer), when).toBe("not_found");
+    };
+    await refused("within the window");
+    await eraseAccount(
+      { db: ctx.client, logger: (await captureLogger()).logger, now: () => new Date() },
+      b.accountId,
+    );
+    await refused("after B's erasure");
+    await ctx.client.query("UPDATE conversation SET closed_at = $2 WHERE id = $1", [
+      id,
+      new Date(Date.now() - 31 * DAY),
+    ]);
+    await refused("after the window");
+    expect(await written(ctx)).toEqual(before);
+  });
+
   test("an open report of the same person, filed before the block it brings, answers the same and writes nothing", async ({
     ctx,
   }) => {
@@ -395,16 +424,16 @@ describe("a report from a conversation", () => {
     const a = await person(ctx, "Aino");
     const b = await person(ctx, "Bea");
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
-    const fromA = await photoMessage(ctx, {
+    const fromA = await photoMessage(ctx.client, {
       conversationId: id,
-      sender: a,
+      accountId: a.accountId,
       side: "a",
       caption: null,
       store: media.store,
     });
-    const fromB = await photoMessage(ctx, {
+    const fromB = await photoMessage(ctx.client, {
       conversationId: id,
-      sender: b,
+      accountId: b.accountId,
       side: "b",
       caption: "Tässä",
       store: media.store,
@@ -451,9 +480,9 @@ describe("a report from a conversation", () => {
     // it on the erased account with no copy: the next night's sweep takes it.
     const c = await person(ctx, "Cia");
     const late = await conversationBetween(ctx.client, c.accountId, a.accountId);
-    const fromC = await photoMessage(ctx, {
+    const fromC = await photoMessage(ctx.client, {
       conversationId: late,
-      sender: c,
+      accountId: c.accountId,
       side: "a",
       caption: null,
       store: media.store,
@@ -479,16 +508,16 @@ describe("a report from a conversation", () => {
     const a = await person(ctx, "Aino");
     const b = await person(ctx, "Bea");
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
-    const fromA = await photoMessage(ctx, {
+    const fromA = await photoMessage(ctx.client, {
       conversationId: id,
-      sender: a,
+      accountId: a.accountId,
       side: "a",
       caption: "Minä",
       store: media.store,
     });
-    const fromB = await photoMessage(ctx, {
+    const fromB = await photoMessage(ctx.client, {
       conversationId: id,
-      sender: b,
+      accountId: b.accountId,
       side: "b",
       caption: "Sinä",
       store: media.store,
@@ -506,6 +535,8 @@ describe("a report from a conversation", () => {
       1,
     );
     expect(summary.photos).toBe(owned - 1);
+    // The log line says why: one held for the copy (#351).
+    expect(summary.heldPhotos).toBe(1);
     expect(media.store.objects.has(objectKey(fromA.key, "full"))).toBe(true);
     // In the conversation it reads removed, as an erased person's photo does.
     const page = await app.request(`/conversations/${id}/messages`, { headers: b.headers });
@@ -588,6 +619,74 @@ describe("a block from a conversation", () => {
       { id, closed_how: "block", closed_by: "a" },
       { id: elsewhere, closed_how: null, closed_by: null },
     ]);
+    // The window to report it starts for the one blocked.
+    expect(await detailOf(ctx.app, b, id)).toMatchObject({
+      state: "closed",
+      closedHow: "unmatch",
+      reportable: true,
+    });
+  });
+
+  test("A report from a card ends the conversation between the two as a block does", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const c = await person(ctx, "Cia");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
+      messages: [{ from: "b", body: "Moi" }],
+    });
+    const elsewhere = await conversationBetween(ctx.client, a.accountId, c.accountId);
+    const kept = await ctx.app.request("/contacts/telegram", {
+      method: "PUT",
+      headers: jsonHeaders(a.headers),
+      body: JSON.stringify({ value: "piiprobe_4711" }),
+    });
+    expect(kept.status).toBe(200);
+    for (const where of [id, elsewhere]) {
+      const shared = await ctx.app.request(`/conversations/${where}/contacts/telegram`, {
+        method: "POST",
+        headers: a.headers,
+      });
+      expect(shared.status).toBe(200);
+    }
+    await cardShown(ctx.client, a.accountId, b.accountId);
+    const answer = await ctx.app.request("/reports", {
+      method: "POST",
+      headers: jsonHeaders(a.headers),
+      body: JSON.stringify({ accountId: b.accountId, reason: "harassment" }),
+    });
+    expect(answer.status).toBe(204);
+    const closed = await ctx.client.query(
+      "SELECT id, closed_how, closed_by FROM conversation WHERE id = ANY($1) ORDER BY id = $2 DESC",
+      [[id, elsewhere], id],
+    );
+    expect(closed.rows).toEqual([
+      { id, closed_how: "block", closed_by: "a" },
+      { id: elsewhere, closed_how: null, closed_by: null },
+    ]);
+    // A card's report names no conversation and copies nothing.
+    const filed = await ctx.client.query("SELECT source, conversation_id FROM report");
+    expect(filed.rows).toEqual([{ source: "card", conversation_id: null }]);
+    expect(await count(ctx, "SELECT count(*) AS n FROM report_message")).toBe(0);
+    // What A shared there ends with it; the share elsewhere stands.
+    const shares = await ctx.client.query(
+      "SELECT conversation_id, ended_how FROM contact_share ORDER BY conversation_id = $1 DESC",
+      [id],
+    );
+    expect(shares.rows).toEqual([
+      { conversation_id: id, ended_how: "closed" },
+      { conversation_id: elsewhere, ended_how: null },
+    ]);
+    expect((await ctx.app.request(`/conversations/${id}`, { headers: a.headers })).status).toBe(
+      404,
+    );
+    expect(await detailOf(ctx.app, b, id)).toMatchObject({
+      state: "closed",
+      closedHow: "unmatch",
+      counterpart: null,
+      reportable: true,
+    });
   });
 });
 
@@ -712,6 +811,185 @@ describe("a report or a block against the other person's erasure or ban", () => 
         blocking.release();
         await pool.end();
       }
+    });
+  }, 30_000);
+});
+
+// A report from a conversation against the other person's erasure when the
+// report holds them first, against a close in flight, and against the other
+// person's report (#351, ADR-030 §12), each on connections of their own over
+// committed rows, the one let go on only once Postgres says the other waits
+// for it (pg_blocking_pids, never a sleep).
+describe("a report from a conversation in a race", () => {
+  const filedAt = (db: Queryable, reporter: string, conversationId: string, at = new Date()) =>
+    recordConversationReport(db, {
+      reporterAccountId: reporter,
+      conversationId,
+      reason: "harassment",
+      note: null,
+      at,
+      since: new Date(at.getTime() - DAY),
+      limit: 5,
+      afterCloseDays: 30,
+    });
+
+  /** A database of the test's own, migrated, with a pool and two connections of it. */
+  async function withTwoConnections(
+    name: string,
+    work: (pool: Pool, first: PoolClient, second: PoolClient) => Promise<void>,
+  ): Promise<void> {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 4, applicationName: name });
+      const first = await pool.connect();
+      const second = await pool.connect();
+      try {
+        await migrate(pool, MIGRATIONS);
+        await work(pool, first, second);
+      } finally {
+        first.release();
+        second.release();
+        await pool.end();
+      }
+    });
+  }
+
+  const countIn = async (pool: Pool, sql: string, params: unknown[] = []) =>
+    Number((await pool.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);
+
+  it("a report that holds the other person before their erasure is filed, and the erasure keeps the photo its copy names", async () => {
+    await withTwoConnections("kuutti-351-report-first", async (pool, reporting, erasing) => {
+      const { logger } = await captureLogger();
+      const { a, b, id } = await twoInAConversation(pool, "kuutti 351 report first");
+      const sent = await photoMessage(pool, { conversationId: id, accountId: b, side: "b" });
+      const reportPid = await pidOf(reporting);
+      const erasurePid = await pidOf(erasing);
+      await reporting.query("BEGIN");
+      await erasing.query("BEGIN");
+      // The report holds both people (FOR KEY SHARE) and is about to write;
+      // B's erasure starts then and waits for it on B's account row.
+      let erasure: ReturnType<typeof watched<null>> | undefined;
+      let waited = false;
+      const db = interleaved(reporting, /^INSERT INTO report \(/, async () => {
+        const started = watched(
+          eraseAccount({ db: erasing, logger, now: () => new Date() }, b).then(() => null),
+        );
+        erasure = started;
+        waited = await waitsFor(pool, erasurePid, reportPid, started.settled);
+      });
+      const filed = await filedAt(db, a, id).catch((error: unknown) => String(error));
+      await reporting.query(typeof filed === "string" ? "ROLLBACK" : "COMMIT");
+      const erased = await erasure?.outcome;
+      await erasing.query(erased === null ? "COMMIT" : "ROLLBACK");
+      expect(db.ran()).toBe(true);
+      expect(waited).toBe(true);
+      expect({ filed, erased }).toEqual({ filed: { outcome: "filed" }, erased: null });
+      // The copy names B's photo; the erasure, let go after the commit, held it.
+      const copy = await pool.query(
+        `SELECT rm.side, rm.photo_id FROM report_message rm JOIN report r ON r.id = rm.report_id
+         WHERE r.conversation_id = $1 ORDER BY rm.seq`,
+        [id],
+      );
+      expect(copy.rows).toEqual([{ side: "reported", photo_id: sent.photoId }]);
+      expect(
+        await countIn(pool, "SELECT count(*) AS n FROM photo WHERE id = $1", [sent.photoId]),
+      ).toBe(1);
+      const message = await pool.query("SELECT photo_id FROM message WHERE conversation_id = $1", [
+        id,
+      ]);
+      expect(message.rows).toEqual([{ photo_id: null }]);
+      expect(
+        await countIn(
+          pool,
+          "SELECT count(*) AS n FROM account WHERE id = $1 AND state = 'deleted'",
+          [b],
+        ),
+      ).toBe(1);
+    });
+  }, 30_000);
+
+  it("a report that waits for a close in flight reads it, and is filed within the window", async () => {
+    await withTwoConnections("kuutti-351-report-close", async (pool, ending, reporting) => {
+      const { a, b, id } = await twoInAConversation(pool, "kuutti 351 report close");
+      const asB = await signInAs(pool, b);
+      const { logger } = await captureLogger();
+      const endedAt = new Date(Date.now() - 60_000);
+      // B's unmatch, through its route, on a connection of its own: written, not yet committed.
+      const app = createApp({ config: testConfig(), logger, db: ending, now: () => endedAt });
+      await ending.query("BEGIN");
+      const ended = await app.request(`/conversations/${id}/unmatch`, {
+        method: "POST",
+        headers: asB.headers,
+      });
+      expect(ended.status).toBe(204);
+      const endPid = await pidOf(ending);
+      const reportPid = await pidOf(reporting);
+      await reporting.query("BEGIN");
+      const pending = watched(filedAt(reporting, a, id));
+      const waited = await waitsFor(pool, reportPid, endPid, pending.settled);
+      await ending.query("COMMIT");
+      const filed = await pending.outcome;
+      await reporting.query(typeof filed === "string" ? "ROLLBACK" : "COMMIT");
+      expect(waited).toBe(true);
+      expect(filed).toEqual({ outcome: "filed" });
+      // The unmatch's time stays; the close becomes the reporter's block.
+      const close = await pool.query(
+        "SELECT closed_at, closed_how, closed_by FROM conversation WHERE id = $1",
+        [id],
+      );
+      expect(close.rows).toEqual([{ closed_at: endedAt, closed_how: "block", closed_by: "a" }]);
+      expect(await countIn(pool, "SELECT count(*) AS n FROM report")).toBe(1);
+      expect(await countIn(pool, "SELECT count(*) AS n FROM block")).toBe(1);
+    });
+  }, 30_000);
+
+  it("two reports at once from both sides are both filed, each with its copy, and the conversation closes once", async () => {
+    await withTwoConnections("kuutti-351-two-reports", async (pool, first, second) => {
+      const { a, b, id } = await twoInAConversation(pool, "kuutti 351 two reports");
+      await pool.query(
+        `INSERT INTO message (conversation_id, seq, side, client_id, kind, body, created_at)
+         VALUES ($1, 1, 'a', gen_random_uuid(), 'text', 'Hei', now()),
+                ($1, 2, 'b', gen_random_uuid(), 'text', 'Moi', now())`,
+        [id],
+      );
+      await pool.query("UPDATE conversation SET next_seq = 3 WHERE id = $1", [id]);
+      const firstPid = await pidOf(first);
+      const secondPid = await pidOf(second);
+      // A's report holds the conversation, written and not yet committed; B's waits for it.
+      const atA = new Date(Date.now() - 1000);
+      await first.query("BEGIN");
+      const fromA = await filedAt(first, a, id, atA);
+      await second.query("BEGIN");
+      const pending = watched(filedAt(second, b, id));
+      const waited = await waitsFor(pool, secondPid, firstPid, pending.settled);
+      await first.query("COMMIT");
+      const fromB = await pending.outcome;
+      await second.query(typeof fromB === "string" ? "ROLLBACK" : "COMMIT");
+      expect(waited).toBe(true);
+      expect({ fromA, fromB }).toEqual({
+        fromA: { outcome: "filed" },
+        fromB: { outcome: "filed" },
+      });
+      // Each copy is the whole thread, each line's side seen from its own report.
+      const copies = await pool.query<{ reporter: string; sides: string[] }>(
+        `SELECT r.reporter_account_id AS reporter,
+                array_agg(rm.side::text ORDER BY rm.seq) AS sides
+         FROM report r JOIN report_message rm ON rm.report_id = r.id
+         WHERE r.conversation_id = $1 GROUP BY r.reporter_account_id`,
+        [id],
+      );
+      expect(new Map(copies.rows.map((row) => [row.reporter, row.sides]))).toEqual(
+        new Map([
+          [a, ["reporter", "reported"]],
+          [b, ["reported", "reporter"]],
+        ]),
+      );
+      expect(await countIn(pool, "SELECT count(*) AS n FROM block")).toBe(2);
+      // Closed once, at A's report, as A's block; B's report found it closed and kept it so.
+      const close = await pool.query(
+        "SELECT closed_at, closed_how, closed_by FROM conversation WHERE id = $1",
+        [id],
+      );
+      expect(close.rows).toEqual([{ closed_at: atA, closed_how: "block", closed_by: "a" }]);
     });
   }, 30_000);
 });

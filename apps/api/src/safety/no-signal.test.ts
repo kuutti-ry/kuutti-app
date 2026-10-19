@@ -5,10 +5,12 @@ import { describe, expect, it } from "vitest";
 // A block is a filter, never a signal (#84, ADR-030 §7, CLAUDE.md Product
 // constraints): no ordering, score, exposure floor, card or count reads one,
 // and being blocked is not counted against anybody, since being blocked is
-// too often only being unwanted. A report feeds moderation and nothing else.
-// So the statements that name either table, or the database's block test,
-// are in the files listed here and nowhere else in the apps or the database
-// package; a new reader is a decision, made here in review. Tests and
+// too often only being unwanted. A report feeds moderation and nothing else,
+// and so does a conversation's frozen copy (`report_message`, #351, ADR-030
+// §12), which holds both people's words. So the statements that name any of
+// the three tables, or the database's block test, are in the files listed
+// here and nowhere else in the apps or the database package; a new reader is
+// a decision, made here in review. Tests and
 // comments are not read; SQL across lines, the schema-qualified name and
 // drizzle's builder are.
 
@@ -67,6 +69,8 @@ function readersOf(test: (source: string) => boolean): string[] {
 const readsBlock = (source: string) =>
   names(source, "block") || /blocked_between/.test(withoutComments(source));
 const readsReport = (source: string) => names(source, "report");
+const readsReportCopy = (source: string) =>
+  names(source, "report_message") || names(source, "reportMessage");
 
 describe("the guard's own reading", () => {
   it.each([
@@ -95,6 +99,16 @@ describe("the guard's own reading", () => {
     expect(readsReport("db.insert(report).values(x)")).toBe(true);
     expect(readsReport("SELECT 1 FROM report_outcome")).toBe(false);
   });
+
+  it("tells a conversation's copy from its report", () => {
+    expect(readsReportCopy("INSERT INTO report_message (report_id) SELECT 1")).toBe(true);
+    expect(readsReportCopy('SELECT body FROM\n "report_message" rm')).toBe(true);
+    expect(readsReportCopy("db.select().from(reportMessage)")).toBe(true);
+    expect(readsReportCopy("db.select().from(schema.reportMessage)")).toBe(true);
+    expect(readsReportCopy("SELECT 1 FROM report r")).toBe(false);
+    // The copy is not its report, nor the report the copy.
+    expect(readsReport("INSERT INTO report_message (report_id) SELECT 1")).toBe(false);
+  });
 });
 
 describe("blocks and reports", () => {
@@ -119,6 +133,15 @@ describe("blocks and reports", () => {
     expect(readersOf(readsReport)).toEqual([
       "apps/api/src/safety/reports.ts",
       "packages/db/src/seed/write-population.ts",
+    ]);
+  });
+
+  it("a conversation's copy is written by the chat's copy and read by the hold and the prune alone", () => {
+    expect(readersOf(readsReportCopy)).toEqual([
+      // The copy itself, one INSERT … SELECT from the thread under the conversation's lock.
+      "apps/api/src/chat/repo.ts",
+      // The photos a copy holds through an erasure, and the night's prune of them.
+      "apps/api/src/safety/reports.ts",
     ]);
   });
 });

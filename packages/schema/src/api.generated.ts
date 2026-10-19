@@ -5679,6 +5679,7 @@ export interface components {
         ExportedReport: {
             /** Format: date-time */
             at: string;
+            source: components["schemas"]["ReportSource"];
             reason: components["schemas"]["SanctionReason"];
             reasonInWords: string;
             note: string | null;
@@ -5687,6 +5688,8 @@ export interface components {
             /** Format: date-time */
             decidedAt: string | null;
         };
+        /** @enum {string} */
+        ReportSource: "card" | "conversation";
         /** @enum {string|null} */
         ReportOutcome: "dismissed" | "acted" | null;
         ExportedBlocks: {

@@ -1,7 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
-import { Platform, StyleSheet, Text } from "react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { DeviceEventEmitter, Keyboard, Platform, StyleSheet, Text, TextInput } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import {
   Dialog,
   DialogContent,
@@ -124,4 +124,134 @@ describe("Dialog on the web preview", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
     expect(onOpenChange).not.toHaveBeenCalled();
   });
+
+  it("leaves the keyboard be as it opens: the browser has none to put away", async () => {
+    const dismiss = jest.spyOn(Keyboard, "dismiss");
+    await showOverlay();
+    expect(dismiss).not.toHaveBeenCalled();
+  });
+});
+
+describe("Dialog with a field, as the keyboard comes (#351)", () => {
+  // The window is 844 points tall with a status bar of 47 (the test providers);
+  // the dialog's space runs from y 8 to 836, inside the scrim's margin, and the
+  // keyboard's top is at 500.
+  afterEach(() => jest.restoreAllMocks());
+  const onAndroid = () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    // The module picked iOS's FullWindowOverlay when it loaded; off iOS it warns, which is beside the point here.
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+  };
+
+  type Instance = ReturnType<typeof screen.container.queryAll>[number];
+  /** The nearest host view around a node. */
+  const hostAbove = (node: Instance): Instance => {
+    let up = node.parent;
+    while (up && typeof up.type !== "string") up = up.parent;
+    if (!up) throw new Error("nothing around it");
+    return up;
+  };
+  /** The dialog, the view that fades it in, and the space it is given, outward. */
+  const around = () => {
+    const [dialog] = screen.container.queryAll(
+      (node) => typeof node.type === "string" && node.props.role === "dialog",
+    );
+    if (!dialog) throw new Error("no dialog");
+    const fading = hostAbove(dialog);
+    return { dialog, fading, space: hostAbove(fading) };
+  };
+  const style = (node: Instance) => StyleSheet.flatten(node.props.style) ?? {};
+  const keyboard = (event: string) =>
+    act(async () => {
+      DeviceEventEmitter.emit(event, {
+        endCoordinates: { screenX: 0, screenY: 500, width: 390, height: 344 },
+      });
+    });
+  async function open() {
+    await renderWithTheme(
+      <Dialog open>
+        <DialogContent closeLabel="Close" style={{ maxHeight: 760 }}>
+          <DialogTitle>Report</DialogTitle>
+          <Text>Anything the moderators should know</Text>
+          <TextInput accessibilityLabel="Anything the moderators should know" />
+        </DialogContent>
+      </Dialog>,
+    );
+    // The view reads its place from the layout event, which it keeps (persist).
+    await act(async () => {
+      fireEvent(around().space, "layout", {
+        persist: () => undefined,
+        nativeEvent: { layout: { x: 8, y: 8, width: 374, height: 828 } },
+      });
+    });
+  }
+
+  it("on Android, keeps the dialog between the status bar and the keyboard's top, shrinking into that space, and gives it back when the keyboard goes", async () => {
+    onAndroid();
+    await open();
+    expect(style(around().space)).toMatchObject({ paddingTop: 47, paddingBottom: 0 });
+    await keyboard("keyboardDidShow");
+    // From 836 down to the keyboard's top at 500.
+    expect(style(around().space).paddingBottom).toBe(336);
+    // Taller than that, it shrinks rather than run under the keyboard; its
+    // own cap is the caller's, and its scroll view, the caller's, shrinks in it.
+    const { dialog, fading } = around();
+    expect(style(fading).flexShrink).toBe(1);
+    expect(dialog.props.className).toMatch(/\bshrink\b/);
+    expect(style(dialog).maxHeight).toBe(760);
+    await keyboard("keyboardDidHide");
+    expect(style(around().space).paddingBottom).toBe(0);
+  });
+
+  it("on iOS, puts away a keyboard the screen behind left up as it opens, keeps its place, where the scroll view insets itself, and leaves the field's own keyboard be", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    const dismiss = jest.spyOn(Keyboard, "dismiss");
+    await open();
+    // The composer's keyboard would lie over the dialog: the overlay is below the keyboard's window.
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    const before = [around().fading, around().space].map(style);
+    await act(async () => {
+      fireEvent(screen.getByLabelText("Anything the moderators should know"), "focus");
+    });
+    await keyboard("keyboardWillShow");
+    await keyboard("keyboardDidShow");
+    expect([around().fading, around().space].map(style)).toEqual(before);
+    expect(before.some((each) => "paddingTop" in each || "paddingBottom" in each)).toBe(false);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["iOS", "ios"],
+    ["Android", "android"],
+  ] as const)(
+    "on %s, puts away a keyboard the screen behind left up, once each time it opens, never as what is in it changes",
+    async (_platform, os) => {
+      if (os === "android") onAndroid();
+      else jest.replaceProperty(Platform, "OS", os);
+      const dismiss = jest.spyOn(Keyboard, "dismiss");
+      const dialog = (open: boolean, title: string) => (
+        <Dialog open={open}>
+          <DialogContent closeLabel="Close">
+            <DialogTitle>{title}</DialogTitle>
+            <TextInput accessibilityLabel="Anything the moderators should know" />
+          </DialogContent>
+        </Dialog>
+      );
+      await renderWithTheme(dialog(true, "Report"));
+      expect(dismiss).toHaveBeenCalledTimes(1);
+      // A step of the same dialog (the report's, its note's keyboard up), then its outcome.
+      await act(async () => {
+        fireEvent(screen.getByLabelText("Anything the moderators should know"), "focus");
+      });
+      await keyboard("keyboardDidShow");
+      await screen.rerender(underProviders(dialog(true, "Report sent")));
+      expect(screen.getByText("Report sent")).toBeTruthy();
+      expect(dismiss).toHaveBeenCalledTimes(1);
+      await screen.rerender(underProviders(dialog(false, "Report sent")));
+      expect(screen.queryByText("Report sent")).toBeNull();
+      await screen.rerender(underProviders(dialog(true, "Report")));
+      expect(screen.getByText("Report")).toBeTruthy();
+      expect(dismiss).toHaveBeenCalledTimes(2);
+    },
+  );
 });

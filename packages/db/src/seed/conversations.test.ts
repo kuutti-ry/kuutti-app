@@ -77,6 +77,20 @@ describe("the conversations of the stories", () => {
     }
   });
 
+  it("give the report's pair an open conversation of their own, words alone, both writing (#351)", () => {
+    const theirs = PERSONA_CONVERSATIONS.filter((c) =>
+      c.between.some((key) => key === "laura" || key === "emmi"),
+    );
+    expect(theirs.map((c) => c.between)).toEqual([["laura", "emmi"]]);
+    const [told] = theirs;
+    if (!told) throw new Error("the report's pair have no conversation");
+    // Open, so the flow's report closes it and the flow can end it; no photo,
+    // so the copy holds none through the reset's erasure.
+    expect(told.archivedHoursAgo).toBeUndefined();
+    expect(told.photo).toBeUndefined();
+    expect(new Set(told.messages.map((m) => m.from))).toEqual(new Set(["a", "b"]));
+  });
+
   it("are open within the archive's week, and archived only when silent for longer, after the night's sweep", () => {
     const open = PERSONA_CONVERSATIONS.filter((c) => c.archivedHoursAgo === undefined);
     const archived = PERSONA_CONVERSATIONS.filter((c) => c.archivedHoursAgo !== undefined);
