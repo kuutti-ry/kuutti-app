@@ -81,6 +81,16 @@ const bansOf = async (ctx: TestContext, identityId: string | undefined) =>
     )
   ).rows;
 
+/** What a report from a conversation writes (#351): the reports, their copies and the blocks. */
+const reportsAndBlocks = (ctx: TestContext) =>
+  ctx.client
+    .query<{ reports: number; copies: number; blocks: number }>(
+      `SELECT (SELECT count(*) FROM report)::int AS reports,
+              (SELECT count(*) FROM report_message)::int AS copies,
+              (SELECT count(*) FROM block)::int AS blocks`,
+    )
+    .then((r) => r.rows[0]);
+
 const markedIdentities = (ctx: TestContext) =>
   ctx.client
     .query<{ n: string }>(
@@ -294,7 +304,49 @@ describe("the stories through the services", () => {
     ctx,
   }) => {
     const { writer, hmacKey, logger, now } = await world(ctx);
-    await giveConversations(ctx.client, await giveStories(writer), now());
+    const results = await giveStories(writer);
+    await giveConversations(ctx.client, results, now());
+    // The stories file no report and set no block: the report's flow files its own (#351).
+    expect(await reportsAndBlocks(ctx)).toEqual({ reports: 0, copies: 0, blocks: 0 });
+    // What that flow leaves, once per reset (#351): Laura's report of Emmi from
+    // their conversation with the copy of its every message, the block both
+    // ways, Laura's and then Emmi's back, and the conversation closed by
+    // Laura's. Written as the route writes it, which the safety slice's own
+    // tests hold; here only the reset's part.
+    const [laura, emmi] = ["laura", "emmi"].map(
+      (key) => results.find((r) => r.key === key)?.accountId,
+    );
+    const { rows: theirs } = await ctx.client.query<{ id: string; side: string }>(
+      `SELECT p.conversation_id AS id, p.side FROM conversation_participant p
+       JOIN conversation_participant q ON q.conversation_id = p.conversation_id AND q.side <> p.side
+       WHERE p.account_id = $1 AND q.account_id = $2`,
+      [laura, emmi],
+    );
+    const conversationId = theirs[0]?.id;
+    const { rows: filed } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, note,
+                           conversation_id)
+       VALUES ($1, $2, 'conversation', 'harassment', 'Kysyy osoitettani.', $3) RETURNING id`,
+      [laura, emmi, conversationId],
+    );
+    await ctx.client.query(
+      `INSERT INTO report_message (report_id, seq, side, kind, body, photo_id, created_at)
+       SELECT $1, seq, (CASE WHEN side = $3::conversation_side THEN 'reporter' ELSE 'reported' END)::report_message_side,
+              kind, body, photo_id, created_at
+       FROM message WHERE conversation_id = $2`,
+      [filed[0]?.id, conversationId, theirs[0]?.side],
+    );
+    await ctx.client.query(
+      `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+       SELECT a.identity_id, b.identity_id FROM account a, account b
+       WHERE (a.id, b.id) IN (($1::uuid, $2::uuid), ($2::uuid, $1::uuid))`,
+      [laura, emmi],
+    );
+    await ctx.client.query(
+      "UPDATE conversation SET closed_at = $2, closed_how = 'block', closed_by = $3 WHERE id = $1",
+      [conversationId, now(), theirs[0]?.side],
+    );
+    expect(await reportsAndBlocks(ctx)).toEqual({ reports: 1, copies: 3, blocks: 2 });
     const personas = personaHashes(hmacKey, now());
     const sanctions = () =>
       ctx.client
@@ -314,11 +366,18 @@ describe("the stories through the services", () => {
     // Both people of each conversation were erased, so the conversations went too (ADR-031 §5).
     const conversations = await ctx.client.query("SELECT 1 FROM conversation");
     expect(conversations.rows).toEqual([]);
+    // And the report with its copy, and the blocks: the report's flow can run again.
+    expect(await reportsAndBlocks(ctx)).toEqual({ reports: 0, copies: 0, blocks: 0 });
     for (const history of PERSONA_HISTORIES) {
       expect((await loginWouldBe(ctx, hmacKey, history.key)).identity, history.key).toBeNull();
     }
     const again = await giveStories(writer);
     expect(again.every((r) => r.login === "created")).toBe(true);
+    expect(await giveConversations(ctx.client, again, now())).toEqual({
+      written: 4,
+      already: 0,
+      missing: 0,
+    });
   });
 
   test("the lines carry keys and counts, never a code, a name or whom one seeks", async ({

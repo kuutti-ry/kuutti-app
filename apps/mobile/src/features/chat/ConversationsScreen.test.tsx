@@ -145,7 +145,9 @@ describe("the list of conversations", () => {
     expectPinnedHeader("Conversations", "Back");
     expect(screen.getByRole("heading", { name: "Archived" })).toBeTruthy();
     expect(
-      screen.getByText("A conversation quiet for a week moves here. Writing in it brings it back."),
+      screen.getByText(
+        "A conversation quiet for a week moves here, and so does one that has ended. Writing in a quiet one brings it back.",
+      ),
     ).toBeTruthy();
     const today = timeOf("en", NOW);
     const old = dayOf("en", OLD);

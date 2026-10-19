@@ -9,6 +9,10 @@ import { SanctionReason } from "./sanction.ts";
 /** A reporter's own words, trimmed; held to this length by the database too. */
 export const REPORT_NOTE_MAX = 500;
 
+/** Where a report was made: a card, or a conversation with its frozen copy (#351). Mirrors the database's enum. */
+export const ReportSource = z.enum(["card", "conversation"]).meta({ id: "ReportSource" });
+export type ReportSource = z.infer<typeof ReportSource>;
+
 /** What a moderator decided (#312); a report waiting for one has none. Mirrors the database's enum. */
 export const ReportOutcome = z.enum(["dismissed", "acted"]).meta({ id: "ReportOutcome" });
 export type ReportOutcome = z.infer<typeof ReportOutcome>;
@@ -55,6 +59,8 @@ export type ConversationReportRequest = z.infer<typeof ConversationReportRequest
 export const ExportedReport = z
   .object({
     at: z.iso.datetime(),
+    /** From a card or from a conversation (#351); the conversation's copy is in nobody's export. */
+    source: ReportSource,
     reason: SanctionReason,
     reasonInWords: z.string(),
     note: z.string().max(REPORT_NOTE_MAX).nullable(),

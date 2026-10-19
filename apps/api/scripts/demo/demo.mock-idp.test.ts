@@ -812,6 +812,11 @@ describe.skipIf(!reachable)("the personas, through the mock bank", () => {
       open: [{ name: "Laura", state: "open", unread: 0, last: "theirs" }],
       archived: [],
     });
+    // Nobody has reported or blocked anybody: the report's flow files its own, once per reset.
+    const { rows: filed } = await ctx.client.query<{ reports: number; blocks: number }>(
+      "SELECT (SELECT count(*) FROM report)::int AS reports, (SELECT count(*) FROM block)::int AS blocks",
+    );
+    expect(filed).toEqual([{ reports: 0, blocks: 0 }]);
 
     // The wording moved on: an active account that is asked for the terms again, and only for them.
     const kerttu = await as("kerttu");

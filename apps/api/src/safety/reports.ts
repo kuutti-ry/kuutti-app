@@ -1,6 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import type { ReportOutcome, SanctionReason } from "@kuutti/schema";
-import { lockReportedConversation, reportWindowHolds, threadForReport } from "../chat/index.ts";
+import type { ReportOutcome, ReportSource, SanctionReason } from "@kuutti/schema";
+import { copyConversation, lockReportedConversation, reportWindowHolds } from "../chat/index.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
   deleteOrphanedObjects,
@@ -193,9 +193,10 @@ export async function recordConversationReport(
     );
     const reportId = filed.rows[0]?.id;
     if (!reportId) throw new Error("report insert returned no row");
-    await copyThread(tx, {
+    await copyConversation(tx, {
+      accountId: input.reporterAccountId,
+      conversationId: input.conversationId,
       reportId,
-      thread: await threadForReport(tx, input.reporterAccountId, input.conversationId),
     });
     await insertBlock(tx, {
       blockerAccountId: input.reporterAccountId,
@@ -220,33 +221,6 @@ async function openReportFrom(
   return rows.length > 0;
 }
 
-/** The frozen copy, one statement for the whole thread; each line's side seen from the report. */
-async function copyThread(
-  db: Queryable,
-  input: {
-    reportId: string;
-    thread: Awaited<ReturnType<typeof threadForReport>>;
-  },
-): Promise<void> {
-  if (input.thread.length === 0) return;
-  const { thread } = input;
-  await db.query(
-    `INSERT INTO report_message (report_id, seq, side, kind, body, photo_id, created_at)
-     SELECT $1, t.seq, t.side::report_message_side, t.kind::message_kind, t.body, t.photo_id, t.created_at
-     FROM unnest($2::int[], $3::text[], $4::text[], $5::text[], $6::uuid[], $7::timestamptz[])
-       AS t(seq, side, kind, body, photo_id, created_at)`,
-    [
-      input.reportId,
-      thread.map((m) => m.seq),
-      thread.map((m) => (m.mine ? "reporter" : "reported")),
-      thread.map((m) => m.kind),
-      thread.map((m) => m.body),
-      thread.map((m) => m.photoId),
-      thread.map((m) => m.createdAt),
-    ],
-  );
-}
-
 /**
  * The person's photos that a report's frozen copy holds (#351): erasure
  * keeps them (`erasePhotosOfAccount`'s `keep`) for as long as a copy names
@@ -265,6 +239,7 @@ export async function photosHeldByReports(db: Queryable, accountId: string): Pro
 
 export type FiledReport = {
   at: Date;
+  source: ReportSource;
   reason: SanctionReason;
   note: string | null;
   outcome: ReportOutcome | null;
@@ -273,7 +248,8 @@ export type FiledReport = {
 
 /**
  * The reports the person filed, for their export (ADR-030 §8), newest first:
- * when, why, their own words and what came of it, never whom. From this
+ * when, where (a card or a conversation, #351), why, their own words and
+ * what came of it, never whom, and never a conversation's copy. From this
  * account or an earlier one of the same identity, the blocks' scope: both
  * are kept through an erasure, so both are the person's to read after
  * coming back. A report about the person is not theirs to read here
@@ -287,12 +263,13 @@ export async function listReportsOfAccount(
 ): Promise<FiledReport[]> {
   const { rows } = await db.query<{
     created_at: Date;
+    source: ReportSource;
     reason: SanctionReason;
     note: string | null;
     outcome: ReportOutcome | null;
     decided_at: Date | null;
   }>(
-    `SELECT r.created_at, r.reason, r.note, r.outcome, r.decided_at FROM report r
+    `SELECT r.created_at, r.source, r.reason, r.note, r.outcome, r.decided_at FROM report r
      JOIN account filer ON filer.id = r.reporter_account_id
      JOIN account me ON me.identity_id = filer.identity_id
      WHERE me.id = $1
@@ -301,6 +278,7 @@ export async function listReportsOfAccount(
   );
   return rows.map((row) => ({
     at: row.created_at,
+    source: row.source,
     reason: row.reason,
     note: row.note,
     outcome: row.outcome,

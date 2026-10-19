@@ -1,9 +1,9 @@
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { useState } from "react";
-import { AccessibilityInfo, Platform } from "react-native";
+import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { ConversationActions, SafetyActions, type SafetyOutcome } from "./SafetyActions";
 
 // Block or report from someone else's card (#84, ADR-030 §11): a labelled
@@ -71,6 +71,51 @@ const disabled = (name: string) =>
   screen.getByRole("button", { name }).props.accessibilityState?.disabled === true;
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
+
+type Node = ReturnType<typeof screen.container.queryAll>[number];
+/** The host views around a node, outward. */
+const hostsAround = (node: Node): Node[] => {
+  const hosts: Node[] = [];
+  for (let up = node.parent; up; up = up.parent) if (typeof up.type === "string") hosts.push(up);
+  return hosts;
+};
+const flat = (node: Node) => StyleSheet.flatten(node.props.style) ?? {};
+/**
+ * On Android (#351), the report's note with the keyboard up: the space the
+ * dialog is given ends at the keyboard's top (here 500, the space from y 8 to
+ * 836 of an 844 point window), the dialog shrinks into it, and the scroll view
+ * holding the note's label and its field shrinks in the dialog, so the field
+ * comes into view just above the keyboard with its label above it, and Send
+ * report, outside the scroll view, stays above the keyboard too.
+ */
+async function expectNoteAboveKeyboard() {
+  const [dialog] = screen.container.queryAll(
+    (node) => typeof node.type === "string" && node.props.role === "dialog",
+  );
+  const space = dialog && hostsAround(dialog)[1];
+  if (!dialog || !space) throw new Error("no dialog");
+  await act(async () => {
+    fireEvent(space, "layout", {
+      persist: () => undefined,
+      nativeEvent: { layout: { x: 8, y: 8, width: 374, height: 828 } },
+    });
+  });
+  await act(async () => {
+    fireEvent(screen.getByLabelText(NOTE_LABEL), "focus");
+    DeviceEventEmitter.emit("keyboardDidShow", {
+      endCoordinates: { screenX: 0, screenY: 500, width: 390, height: 344 },
+    });
+  });
+  expect(flat(space).paddingBottom).toBe(336);
+  expect(dialog.props.className).toMatch(/\bshrink\b/);
+  const scrollOf = (node: Node) => hostsAround(node).find((up) => up.type === "RCTScrollView");
+  const scroll = scrollOf(screen.getByLabelText(NOTE_LABEL));
+  if (!scroll) throw new Error("the note is in no scroll view");
+  expect(scrollOf(screen.getByText(NOTE_LABEL))).toBe(scroll);
+  expect(flat(scroll).flexShrink).toBe(1);
+  expect(hostsAround(dialog)).not.toContain(scroll);
+  expect(scrollOf(screen.getByText("Send report"))).toBeUndefined();
+}
 
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
@@ -463,6 +508,17 @@ describe("SafetyActions", () => {
     expect(scroller?.props).toMatchObject({ automaticallyAdjustKeyboardInsets: true });
   });
 
+  it("keeps the note and its label in sight above the keyboard on Android, Send report too", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    // The dialog module picked iOS's FullWindowOverlay when it loaded; off iOS it warns, beside the point here.
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    api(done);
+    await show();
+    await press("Block or report");
+    await press("Report and block");
+    await expectNoteAboveKeyboard();
+  });
+
   it("speaks the person's language", async () => {
     (useLocales as jest.Mock).mockReturnValue([{ languageTag: "fi-FI" }]);
     api(done);
@@ -478,11 +534,15 @@ describe("SafetyActions", () => {
 // same dialog with Report and block, Block and End conversation, each behind
 // its confirmation in words, the copy said with the report, and the outcome
 // handed to the screen at once; in an ended conversation the report alone,
-// while the window holds.
+// while the window holds, saying that it blocks and not that it ends.
 
 const CONVERSATION = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
 const COPY =
-  "The moderators get a copy of this conversation, your messages and theirs, and keep it for twelve months. The conversation ends.";
+  "The moderators get a copy of this whole conversation, your own messages and photos included, and keep it for twelve months.";
+const ALSO_ENDS =
+  "A report also blocks them, for good, and ends this conversation for both of you: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told.";
+const REPORT = `/conversations/${CONVERSATION}/report`;
+const BLOCK = `/conversations/${CONVERSATION}/block`;
 
 /** The conversation's API: every block and report on it recorded, answered as told. */
 function conversationApi(answer: (path: string) => Response | Promise<Response>) {
@@ -503,24 +563,32 @@ function conversationApi(answer: (path: string) => Response | Promise<Response>)
 function ConversationHost({
   ended = false,
   reportable = true,
+  button = true,
+  startOpen = false,
   unmatch = jest.fn(async () => undefined),
   onDone,
+  onStale = jest.fn(),
 }: {
   ended?: boolean;
   reportable?: boolean;
+  button?: boolean;
+  startOpen?: boolean;
   unmatch?: () => Promise<void>;
   onDone: (outcome: SafetyOutcome) => void;
+  onStale?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(startOpen);
   return (
     <ConversationActions
       conversationId={CONVERSATION}
       ended={ended}
       reportable={reportable}
+      button={button}
       unmatch={unmatch}
       open={open}
       onOpenChange={setOpen}
       onDone={onDone}
+      onStale={onStale}
     />
   );
 }
@@ -533,9 +601,12 @@ describe("ConversationActions", () => {
     noProblems();
     await press("More");
     expect(screen.getByText("Report, block or end")).toBeTruthy();
-    for (const name of ["Block", "Report and block", "End conversation"]) {
-      expect(screen.getByRole("button", { name })).toBeTruthy();
-    }
+    // In this order, as a screen reader reaches them, each with its line.
+    const buttons = screen.getAllByRole("button");
+    const at = (name: string) => buttons.indexOf(screen.getByRole("button", { name }));
+    const places = ["Block", "Report and block", "End conversation", "Cancel"].map(at);
+    expect(places.every((place) => place >= 0)).toBe(true);
+    expect([...places].sort((a, b) => a - b)).toEqual(places);
     expect(
       screen.getByText("Neither of you can write in it any more. Nobody is blocked."),
     ).toBeTruthy();
@@ -546,14 +617,15 @@ describe("ConversationActions", () => {
     expect(onDone).not.toHaveBeenCalled();
   });
 
-  it("reports with the copy said and the reason and note sent, and hands the outcome on at once", async () => {
+  it("reports with the copy and the end said and the reason and note sent, and hands the outcome on at once", async () => {
     const sent = conversationApi(done);
     const onDone = jest.fn();
     await renderWithTheme(<ConversationHost onDone={onDone} />);
     await press("More");
     await press("Report and block");
     expect(screen.getByText(COPY)).toBeTruthy();
-    expect(screen.getByText(ALSO_BLOCKS)).toBeTruthy();
+    expect(screen.getByText(ALSO_ENDS)).toBeTruthy();
+    expect(screen.queryByText(ALSO_BLOCKS)).toBeNull();
     await press("Harassing, threatening or hateful", "radio");
     await type("  Uhkaili.  ");
     noProblems();
@@ -601,7 +673,7 @@ describe("ConversationActions", () => {
     expect(screen.getByText("End this conversation?")).toBeTruthy();
     expect(
       screen.getByText(
-        "Neither of you can write in it any more. It stays in the archive for both of you, and nobody is told who ended it. Nobody is blocked.",
+        "Neither of you can write in it any more. It stays in the archive for both of you, and nobody is told who ended it. Nobody is blocked, and either of you can still report it for a while.",
       ),
     ).toBeTruthy();
     expect(unmatch).not.toHaveBeenCalled();
@@ -613,19 +685,22 @@ describe("ConversationActions", () => {
     expect(onDone).toHaveBeenCalledWith("unmatched");
   });
 
-  it("hands a conversation gone meanwhile on as gone, and says a report past the window in words", async () => {
+  it("hands a conversation gone meanwhile on as gone, and says a report past the window in words, having the screen read it again", async () => {
     const onDone = jest.fn();
+    const onStale = jest.fn();
     conversationApi((path) =>
       path.endsWith("/block") ? refusal("not_found", 404) : refusal("report_window_closed", 409),
     );
-    await renderWithTheme(<ConversationHost onDone={onDone} />);
+    await renderWithTheme(<ConversationHost onDone={onDone} onStale={onStale} />);
     await press("More");
     await press("Report and block");
     await press("Something else", "radio");
     await press("Send report");
     expect(screen.getByText("This conversation can no longer be reported.")).toBeTruthy();
-    // Trying again cannot help: Send waits for nothing.
+    // Trying again cannot help: Send waits for nothing, and what the screen
+    // holds, that it can be reported, is read again.
     expect(disabled("Send report")).toBe(true);
+    expect(onStale).toHaveBeenCalledTimes(1);
     expect(onDone).not.toHaveBeenCalled();
     await press("Cancel");
     await press("More");
@@ -634,7 +709,7 @@ describe("ConversationActions", () => {
     expect(onDone).toHaveBeenCalledWith("gone");
   });
 
-  it("offers only the report in an ended conversation while the window holds, and nothing after it", async () => {
+  it("offers only the report in an ended conversation while the window holds, which says it blocks and not that it ends", async () => {
     conversationApi(done);
     const onDone = jest.fn();
     await renderWithTheme(<ConversationHost ended reportable onDone={onDone} />);
@@ -642,20 +717,119 @@ describe("ConversationActions", () => {
     expect(screen.getByRole("button", { name: "Report and block" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
     expect(screen.queryByRole("button", { name: "End conversation" })).toBeNull();
-    // The day's cap points to tomorrow: no Block is offered here to take its place.
+    await press("Report and block");
+    expect(screen.getByText(COPY)).toBeTruthy();
+    expect(screen.getByText(ALSO_BLOCKS)).toBeTruthy();
+    expect(screen.queryByText(ALSO_ENDS)).toBeNull();
+    expect(screen.queryByText(/ends/)).toBeNull();
+  });
+
+  it("says the day's cap without a Block in an ended conversation, and when it lifts, keeping the words and saying it aloud on iOS", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
     conversationApi(() => refusal("report_budget_exceeded", 429));
+    await renderWithTheme(<ConversationHost ended reportable onDone={jest.fn()} />);
+    await press("More");
+    await press("Report and block");
+    await press("Something else", "radio");
+    await type("Kept writing after I said no.");
+    await press("Send report");
+    // No promise about this conversation, whose window may close first.
+    const limited = "That is enough reports for today. You can send more after midnight.";
+    expect(screen.getByText(limited)).toBeTruthy();
+    expect(screen.queryByText(CAP)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+    expect(announced().at(-1)).toBe(limited);
+    // Nothing typed is lost to it.
+    expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("Kept writing after I said no.");
+    expect(screen.getByRole("radio", { name: "✓ Something else" })).toBeTruthy();
+  });
+
+  it("says the day's cap with a Block under it in a conversation going on, which blocks through the conversation's route", async () => {
+    const sent = conversationApi((path) =>
+      path === REPORT ? refusal("report_budget_exceeded", 429) : done(),
+    );
+    const onDone = jest.fn();
+    await renderWithTheme(<ConversationHost onDone={onDone} />);
+    await press("More");
     await press("Report and block");
     await press("Something else", "radio");
     await press("Send report");
-    expect(
-      screen.getByText("That is enough reports for today. You can try again after midnight."),
-    ).toBeTruthy();
-    expect(screen.queryByText(CAP)).toBeNull();
-    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+    expect(screen.getByText(CAP)).toBeTruthy();
+    expect(onDone).not.toHaveBeenCalled();
+    await press("Block");
+    expect(screen.getByText("Block this person?")).toBeTruthy();
+    await press("Block");
+    expect(sent.map((s) => s.path)).toEqual([REPORT, BLOCK]);
+    expect(onDone).toHaveBeenCalledWith("blocked");
+  });
+
+  it("keeps the note and its label in sight above the keyboard on Android, Send report too", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    // The dialog module picked iOS's FullWindowOverlay when it loaded; off iOS it warns, beside the point here.
+    jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    conversationApi(done);
+    await renderWithTheme(<ConversationHost onDone={jest.fn()} />);
+    await press("More");
+    await press("Report and block");
+    await expectNoteAboveKeyboard();
+  });
+
+  it("keeps an open dialog, its step and its words, when its offers go, and has no More once it closes", async () => {
+    conversationApi(() => refusal("report_window_closed", 409));
+    const onDone = jest.fn();
+    const ui = (reportable: boolean) => (
+      <ConversationHost ended reportable={reportable} startOpen onDone={onDone} />
+    );
+    await renderWithTheme(ui(true));
+    await press("Report and block");
+    await press("Something else", "radio");
+    await type("Threatened me.");
+    await press("Send report");
+    // The screen read it again: nothing is left to offer.
+    await screen.rerender(underProviders(ui(false)));
+    expect(screen.getByText("This conversation can no longer be reported.")).toBeTruthy();
+    expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("Threatened me.");
+    expect(disabled("Send report")).toBe(true);
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    await press("Cancel");
+    expect(screen.queryByText("Report and block")).toBeNull();
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("keeps the dialog without More while the screen says the conversation is gone, and hands on what then lands", async () => {
+    let land: (response: Response) => void = () => undefined;
+    conversationApi(() => new Promise<Response>((resolve) => (land = resolve)));
+    const onDone = jest.fn();
+    const ui = (button: boolean) => <ConversationHost button={button} onDone={onDone} />;
+    await renderWithTheme(ui(true));
+    await press("More");
+    await press("Block");
+    await press("Block");
+    expect(screen.getByText("Sending…")).toBeTruthy();
+    await screen.rerender(underProviders(ui(false)));
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    expect(screen.getByText("Sending…")).toBeTruthy();
+    await act(async () => {
+      land(done());
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    });
+    expect(onDone).toHaveBeenCalledWith("blocked");
+    expect(screen.queryByText("Block this person?")).toBeNull();
   });
 
   it("has no More at all when nothing is left to offer", async () => {
     await renderWithTheme(<ConversationHost ended reportable={false} onDone={jest.fn()} />);
     expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+  });
+
+  it("speaks the person's language", async () => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: "fi-FI" }]);
+    conversationApi(done);
+    await renderWithTheme(<ConversationHost onDone={jest.fn()} />);
+    await press("Lisää");
+    expect(screen.getByText("Ilmoita, estä tai lopeta")).toBeTruthy();
+    await press("Lopeta keskustelu");
+    expect(screen.getByText("Lopetetaanko tämä keskustelu?")).toBeTruthy();
   });
 });

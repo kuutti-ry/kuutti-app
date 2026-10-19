@@ -1,13 +1,15 @@
 # A report from a conversation (#351, ADR-030 §12): Laura opens her
-# conversation with Emmi, reports Emmi from the header's More with a reason,
-# and is taken back to the list, which thanks her and no longer has the
-# conversation (the report blocked Emmi). Emmi signs in and finds it among the
-# archived, ended and naming nobody; inside it, the composer is gone, More
-# offers only the report, and her report goes through too. The stories give
-# the pair their conversation (packages/db/src/seed/conversations.ts), which
-# no other flow reads. A block is final, so the flow runs once after each
-# `pnpm demo:reset`. That Emmi's card is out of Laura's reach is the API's
-# tests until the round (#96) shows a card.
+# conversation with Emmi, reports Emmi from the header's More with a reason
+# and a short note, typed in the dialog with the keyboard up, and is taken
+# back to the list, which thanks her and no longer has the conversation (the
+# report blocked Emmi). Emmi signs in and finds it among the archived, ended
+# and naming nobody, under the group's hint that only a quiet one comes back;
+# inside it, the composer is gone, More offers only the report, and her report
+# goes through too. The stories give the pair their conversation
+# (packages/db/src/seed/conversations.ts), which no other flow reads. A block
+# is final, so the flow runs once after each `pnpm demo:reset`. That Emmi's
+# card is out of Laura's reach is the API's tests until the round (#96) shows
+# a card.
 appId: fi.kuutti.app
 name: A report from a conversation takes it from the reporter's list, and the other finds it ended and can still report it
 ---
@@ -32,11 +34,35 @@ name: A report from a conversation takes it from the reporter's list, and the ot
     timeout: 15000
 - assertVisible: "End conversation|Lopeta keskustelu|Avsluta samtalet"
 - tapOn: "Report and block|Ilmoita ja estä|Anmäl och blockera"
-# The report says the moderators get a copy of the conversation.
+# The report says first that the moderators get a copy of the whole
+# conversation, the reporter's own messages and photos included.
 - extendedWaitUntil:
-    visible: "The moderators get a copy of this conversation, your messages and theirs, and keep it for twelve months\\. The conversation ends\\.|Moderaattorit saavat kopion tästä keskustelusta, sinun ja hänen viesteistään, ja säilyttävät sen kaksitoista kuukautta\\. Keskustelu päättyy\\.|Moderatorerna får en kopia av det här samtalet, dina och personens meddelanden, och sparar den i tolv månader\\. Samtalet avslutas\\."
+    visible: "The moderators get a copy of this whole conversation, your own messages and photos included, and keep it for twelve months\\.|Moderaattorit saavat kopion tästä koko keskustelusta, myös omista viesteistäsi ja kuvistasi, ja säilyttävät sen kaksitoista kuukautta\\.|Moderatorerna får en kopia av hela det här samtalet, även dina egna meddelanden och bilder, och sparar den i tolv månader\\."
     timeout: 15000
 - tapOn: "Harassing, threatening or hateful|Häiritsevä, uhkaava tai vihamielinen|Trakasserande, hotfull eller hatisk"
+# The note's field is the last in the dialog, below its label, which is also
+# its name, and above Send report, which the reason has enabled: tapped
+# between the two. Letters only, as the stories' lines are.
+- scrollUntilVisible:
+    element: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn:
+    below: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    above: "Send report|Lähetä ilmoitus|Skicka anmälan"
+- inputText: "Kysyy aina kotiosoitettani"
+# The dialog keeps the focused field in sight just above the keyboard, its
+# label above it: on iOS its scroll view insets itself and Send report stays
+# under the keyboard; on Android, drawn edge to edge, the whole dialog shrinks
+# into the space above the keyboard (the dialog primitive, #351), Send report
+# included. A tap on the label, which is no button, closes the keyboard
+# (README, the keyboard): the field carries the same words as its name, hence
+# the label above what was typed, matched by its last word, which the
+# keyboard never corrects.
+- tapOn:
+    text: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    above: "(.* )?kotiosoitettani"
 - tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
 # Back on the list: thanked, and the conversation is gone from it.
 - extendedWaitUntil:
@@ -59,6 +85,8 @@ name: A report from a conversation takes it from the reporter's list, and the ot
 - assertVisible:
     text: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
     below: "Archived|Arkistoidut|Arkiverade"
+# The group's hint no longer promises that writing brings every one back.
+- assertVisible: "A conversation quiet for a week moves here, and so does one that has ended\\. Writing in a quiet one brings it back\\.|Viikon hiljaa ollut keskustelu siirtyy tänne, samoin päättynyt keskustelu\\. Kun kirjoitat hiljaiseen keskusteluun, se palaa\\.|Ett samtal som varit tyst en vecka flyttas hit, liksom ett samtal som har avslutats\\. När du skriver i ett tyst samtal kommer det tillbaka\\."
 - assertNotVisible: "Laura, \\d+, .*"
 - tapOn: "(Conversation ended|Keskustelu päättynyt|Samtalet har avslutats), .*"
 # Ended in words in place of the composer, which is gone.

@@ -512,6 +512,13 @@ export function ConversationScreen({ id }: { id: string }) {
   const name = theirName(t, detail);
   // Offered while there is something to share and someone to share it with.
   const offered = detail !== null && detail.state !== "closed" && detail.contacts.mine.length > 0;
+  // What More offers, from the newest detail read, under a gone frame too: the
+  // block a report or a block from here sets sends the person's own phones
+  // that frame, which may come before the answer, and the dialog open then
+  // keeps its words and its outcome (#351). More itself goes with the
+  // conversation. Nothing before a detail was read, or once the API said it
+  // is gone.
+  const known = detail ?? (view.status === "ready" ? withLive(view.detail, here) : null);
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader title={title} backLabel={t("chat.back")} onBack={() => router.back()}>
@@ -528,15 +535,17 @@ export function ConversationScreen({ id }: { id: string }) {
             <Icon as={ContactRound} />
           </Button>
         )}
-        {detail && (
+        {known && (
           <ConversationActions
-            conversationId={detail.id}
-            ended={detail.state === "closed"}
-            reportable={detail.reportable}
-            unmatch={() => unmatchConversation(detail.id)}
+            conversationId={known.id}
+            ended={known.state === "closed"}
+            reportable={known.reportable}
+            button={detail !== null}
+            unmatch={() => unmatchConversation(known.id)}
             open={acting}
             onOpenChange={setActing}
             onDone={done}
+            onStale={() => void load()}
           />
         )}
       </ScreenHeader>
@@ -572,7 +581,11 @@ export function ConversationScreen({ id }: { id: string }) {
         </Text>
       )}
       {shown.status === "gone" && (
-        <Text accessibilityLiveRegion="polite" className="p-6">
+        // Not said while the dialog is open: a report or a block from it
+        // sends this frame before its answer (#351), and these words between
+        // Sending… and the list's thanks would sound like a failure. The
+        // dialog, then the list, say what happened.
+        <Text accessibilityLiveRegion={acting ? "none" : "polite"} className="p-6">
           {t("chat.conversation.gone")}
         </Text>
       )}

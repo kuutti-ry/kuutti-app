@@ -205,7 +205,7 @@ export async function readMessages(
   };
 }
 
-/** The read mark: up, never down, never past the newest message; read in a closed conversation too. */
+/** The read mark: up, never down, never past the newest message; answered in a closed conversation too, where it stands still. */
 export async function markRead(
   deps: ChatDeps,
   accountId: string,

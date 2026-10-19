@@ -245,6 +245,9 @@ describe("boot", () => {
     // Nothing is pending in this database: the look finds nothing and asks the store nothing.
     const sweep = jobs.at(-1);
     expect(await sweep?.run()).toEqual({ rechecked: 0, failed: 0 });
+    // The reports' prune is handed the store, for the objects of the photos it lets go (#351).
+    const prune = jobs.find((j) => j.name === "prune-reports");
+    expect(await prune?.run()).toEqual({ pruned: 0, photos: 0, objects: 0 });
   });
 
   it("logs an idle client the server dropped by its code and class, never its connection parameters, and lives on", async () => {

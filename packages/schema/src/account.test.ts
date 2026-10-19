@@ -190,6 +190,7 @@ function anExport(): Record<string, unknown> {
       items: [
         {
           at,
+          source: "conversation",
           reason: "harassment",
           reasonInWords: "Harassment",
           note: "Rude.",

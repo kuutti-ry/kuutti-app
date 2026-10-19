@@ -540,6 +540,44 @@ describe("what the socket carries", () => {
     });
   });
 
+  it("A resume carries the read mark a close found, and an archived conversation's as it moved (ADR-030 §12)", async () => {
+    const a = await signedInAccount(ctx.pool);
+    const b = await signedInAccount(ctx.pool);
+    const messages = [
+      { from: "b" as const, body: "Moi" },
+      { from: "b" as const, body: "Mitä kuuluu?" },
+    ];
+    const ended = await conversationBetween(ctx.pool, a.accountId, b.accountId, { messages });
+    const archived = await conversationBetween(ctx.pool, a.accountId, b.accountId, {
+      messages,
+      archivedAt: new Date(),
+    });
+    for (const id of [ended, archived]) expect((await markRead(a.headers, id, 1)).status).toBe(204);
+    const unmatched = await ctx.app.request(`/conversations/${ended}/unmatch`, {
+      method: "POST",
+      headers: a.headers,
+    });
+    expect(unmatched.status).toBe(204);
+    // The one who ended it opens it from Archived and reads it to the end.
+    for (const id of [ended, archived]) expect((await markRead(a.headers, id, 2)).status).toBe(204);
+    // The marks' notifications are through once a later message elsewhere
+    // arrives, so none reaches B's phone live.
+    const x = await signedInAccount(ctx.pool);
+    const elsewhere = await conversationBetween(ctx.pool, x.accountId, b.accountId);
+    const px = await signedIn(x.accessToken, [{ id: elsewhere, seq: 0 }]);
+    expect((await send(b.headers, elsewhere, "Valmis")).status).toBe(201);
+    await px.next(isMessage(elsewhere, 1));
+    const pb = await signedIn(b.accessToken, [
+      { id: ended, seq: 2 },
+      { id: archived, seq: 2 },
+    ]);
+    expect(pb.frames.filter((f) => f.type === "read")).toEqual([
+      { type: "read", conversationId: ended, upTo: 1 },
+      { type: "read", conversationId: archived, upTo: 2 },
+    ]);
+    for (const p of [pb, px]) p.close();
+  });
+
   it("The counterpart shows online while a socket is open, and offline when the last one closes", async () => {
     const { a, b, id } = await pair();
     const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
@@ -604,7 +642,7 @@ describe("what the socket withholds", () => {
   it("A block reaches both sides as a conversation frame, and nothing after it", async () => {
     const a = await signedInAccount(ctx.pool);
     const b = await signedInAccount(ctx.pool);
-    // A message of B's, so A's read mark can move after the block.
+    // A message of B's, so A has something to mark read after the block.
     const id = await conversationBetween(ctx.pool, a.accountId, b.accountId, {
       messages: [{ from: "b", body: "Moi" }],
     });
@@ -631,18 +669,30 @@ describe("what the socket withholds", () => {
     });
     const sinceBlock =
       pb.frames.findIndex((f) => f.type === "conversation" && f.state === "gone") + 1;
-    // A's read mark moves (the trigger fires); B, gone from the conversation, hears nothing of it.
+    const sinceClose =
+      pa.frames.findIndex((f) => f.type === "conversation" && f.state === "closed") + 1;
+    // A's read mark stands where the close found it (ADR-030 §12), so the
+    // trigger stays quiet; a mark that raced the close, its notification
+    // delivered by hand from either side, reaches neither phone: B no longer
+    // sees the conversation, and A's is closed.
     expect((await send(a.headers, id, "Hei")).status).toBe(409);
     expect((await markRead(a.headers, id, 1)).status).toBe(204);
     const { rows } = await ctx.pool.query<{ read_up_to: number }>(
       "SELECT read_up_to FROM conversation_participant WHERE conversation_id = $1 AND account_id = $2",
       [id, a.accountId],
     );
-    expect(rows[0]?.read_up_to).toBe(1);
+    expect(rows[0]?.read_up_to).toBe(0);
+    for (const side of ["a", "b"]) {
+      await ctx.live.hub.deliver(JSON.stringify({ t: "read", c: id, side, u: 1 }));
+    }
     const other = await signedInAccount(ctx.pool);
     const later = await conversationBetween(ctx.pool, other.accountId, b.accountId);
     expect((await send(other.headers, later, "Tässä")).status).toBe(201);
     await pb.next(isMessage(later, 1));
+    const aside = await conversationBetween(ctx.pool, other.accountId, a.accountId);
+    expect((await send(other.headers, aside, "Tässäkin")).status).toBe(201);
+    await pa.next(isMessage(aside, 1));
+    expect(pa.frames.slice(sinceClose).filter((f) => f.type === "read")).toEqual([]);
     // Since the block, nothing of the conversation has reached B but that it is gone: the
     // block and the close it writes (#351) are each a notification, and each says the same.
     expect(
@@ -651,6 +701,124 @@ describe("what the socket withholds", () => {
         .filter((f) => "conversationId" in f && f.conversationId === id)
         .filter((f) => !(f.type === "conversation" && f.state === "gone")),
     ).toEqual([]);
+  });
+
+  it("a block, a report and an end send the other person the same frames, and one after an end sends them none (#351)", async () => {
+    type Who = Awaited<ReturnType<typeof signedInAccount>>;
+    type Act = (actor: Who, other: Who, id: string) => Response | Promise<Response>;
+    const block: Act = (actor, _other, id) =>
+      ctx.app.request(`/conversations/${id}/block`, { method: "POST", headers: actor.headers });
+    const report: Act = (actor, _other, id) =>
+      ctx.app.request(`/conversations/${id}/report`, {
+        method: "POST",
+        headers: json(actor.headers),
+        body: JSON.stringify({ reason: "harassment" }),
+      });
+    const end: Act = (actor, _other, id) =>
+      ctx.app.request(`/conversations/${id}/unmatch`, { method: "POST", headers: actor.headers });
+    const fromCard =
+      (path: "/blocks" | "/reports"): Act =>
+      async (actor, other) => {
+        await cardShown(ctx.pool, actor.accountId, other.accountId);
+        return ctx.app.request(path, {
+          method: "POST",
+          headers: json(actor.headers),
+          body: JSON.stringify({
+            accountId: other.accountId,
+            ...(path === "/reports" ? { reason: "harassment" } : {}),
+          }),
+        });
+      };
+    /**
+     * Every frame naming the conversation that reached the phone since
+     * `since`, closed by a message of the person's own in a conversation of
+     * its own, which the ordered delivery brings after anything the act sent;
+     * the conversation's id left out, so pairs compare.
+     */
+    async function heard(p: Phone, who: Who, aside: string, since: number, id: string) {
+      expect((await send(who.headers, aside, "Tässä")).status).toBe(201);
+      const until = p.frames.indexOf(await p.next(isMessage(aside, 1)));
+      return p.frames
+        .slice(since, until)
+        .filter((f) => "conversationId" in f && f.conversationId === id && f.type !== "presence")
+        .map((f) => {
+          const { conversationId: _id, ...rest } = f as ServerFrame & { conversationId: string };
+          return rest;
+        });
+    }
+    /**
+     * A pair in a conversation, each with a phone and a conversation of
+     * their own with somebody else; ended first by one of them if `ended`
+     * says so; then `by` acts. What each phone heard of it.
+     */
+    async function scene(act: Act, by: "actor" | "other", ended?: "actor" | "other") {
+      const [actor, other, third] = [
+        await signedInAccount(ctx.pool),
+        await signedInAccount(ctx.pool),
+        await signedInAccount(ctx.pool),
+      ];
+      const id = await conversationBetween(ctx.pool, actor.accountId, other.accountId, {
+        messages: [{ from: "b", body: "Moi" }],
+      });
+      const aside = {
+        actor: await conversationBetween(ctx.pool, actor.accountId, third.accountId),
+        other: await conversationBetween(ctx.pool, other.accountId, third.accountId),
+      };
+      const phones = {
+        actor: await signedIn(actor.accessToken, [{ id, seq: 0 }]),
+        other: await signedIn(other.accessToken, [{ id, seq: 0 }]),
+      };
+      const who = { actor, other };
+      const opposite = (side: "actor" | "other") => (side === "actor" ? "other" : "actor");
+      if (ended) {
+        expect((await end(who[ended], who[opposite(ended)], id)).status).toBe(204);
+        for (const p of Object.values(phones)) {
+          await p.next((f) => f.type === "conversation" && f.conversationId === id);
+        }
+      }
+      const since = { actor: phones.actor.frames.length, other: phones.other.frames.length };
+      expect((await act(who[by], who[opposite(by)], id)).status).toBe(204);
+      const result = {
+        actor: await heard(phones.actor, actor, aside.actor, since.actor, id),
+        other: await heard(phones.other, other, aside.other, since.other, id),
+      };
+      for (const p of Object.values(phones)) p.close();
+      return result;
+    }
+
+    const closed = { type: "conversation", state: "closed", closedHow: "unmatch" };
+    const gone = { type: "conversation", state: "gone", closedHow: null };
+    // The actor ends the conversation for the other person, five ways: the
+    // other hears the same one frame each time. The one who blocked or
+    // reported hears it gone, from the close and from the block.
+    const ways: Record<string, Act> = {
+      "a block from the conversation": block,
+      "a report from the conversation": report,
+      "a block from the card": fromCard("/blocks"),
+      "a report from the card": fromCard("/reports"),
+      "an end": end,
+    };
+    const heardOf: Record<string, unknown> = {};
+    for (const [way, act] of Object.entries(ways)) heardOf[way] = await scene(act, "actor");
+    expect(heardOf).toEqual({
+      "a block from the conversation": { actor: [gone, gone], other: [closed] },
+      "a report from the conversation": { actor: [gone, gone], other: [closed] },
+      "a block from the card": { actor: [gone, gone], other: [closed] },
+      "a report from the card": { actor: [gone, gone], other: [closed] },
+      "an end": { actor: [closed], other: [closed] },
+    });
+
+    // After an end: a block or a report by either rewrites the close as the
+    // block's, and only its maker hears of it, as gone.
+    expect({
+      "the other blocks the one who ended it": await scene(block, "other", "actor"),
+      "the other reports the one who ended it": await scene(report, "other", "actor"),
+      "the one who ended it blocks": await scene(block, "actor", "actor"),
+    }).toEqual({
+      "the other blocks the one who ended it": { actor: [], other: [gone] },
+      "the other reports the one who ended it": { actor: [], other: [gone] },
+      "the one who ended it blocks": { actor: [gone], other: [] },
+    });
   });
 
   it("A change of what is shared reaches no phone across a block, a close or a shadow ban", async () => {
@@ -910,6 +1078,53 @@ describe("the socket's keepalive", () => {
 });
 
 describe("what the listener hands the hub", () => {
+  it("a block the listener reads after the blocked person's erasure still tells the blocker's phones the conversation is gone (#351)", async () => {
+    const a = await signedInAccount(ctx.pool);
+    const b = await signedInAccount(ctx.pool);
+    const id = await conversationBetween(ctx.pool, a.accountId, b.accountId);
+    const pa = await signedIn(a.accessToken, [{ id, seq: 0 }]);
+    // B ended it; then A's block and B's erasure land before the listener
+    // reads the block's notification: one transaction here, so the hub
+    // reads it with B's link already cut and no close of its own to say so.
+    expect(
+      (
+        await ctx.app.request(`/conversations/${id}/unmatch`, {
+          method: "POST",
+          headers: b.headers,
+        })
+      ).status,
+    ).toBe(204);
+    await pa.next((f) => f.type === "conversation" && f.state === "closed");
+    const client = await ctx.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `INSERT INTO block (blocker_identity_id, blocked_identity_id)
+         SELECT x.identity_id, y.identity_id FROM account x, account y WHERE x.id = $1 AND y.id = $2`,
+        [a.accountId, b.accountId],
+      );
+      await client.query(
+        `UPDATE conversation c SET closed_how = 'block', closed_by = p.side
+         FROM conversation_participant p
+         WHERE c.id = $1 AND p.conversation_id = c.id AND p.account_id = $2`,
+        [id, a.accountId],
+      );
+      await client.query(
+        "UPDATE conversation_participant SET account_id = NULL WHERE conversation_id = $1 AND account_id = $2",
+        [id, b.accountId],
+      );
+      await client.query("COMMIT");
+    } finally {
+      client.release();
+    }
+    expect(await pa.next((f) => f.type === "conversation" && f.state === "gone")).toEqual({
+      type: "conversation",
+      conversationId: id,
+      state: "gone",
+      closedHow: null,
+    });
+  });
+
   it("a notification outside the contract is dropped with a line naming its channel only", async () => {
     const refused = ctx.log.next("chat notification refused");
     await ctx.live.hub.deliver(`not json ${MARK}`);

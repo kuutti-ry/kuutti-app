@@ -2166,3 +2166,222 @@ describe("a photo in a conversation (#350)", () => {
     ]);
   });
 });
+
+describe("a conversation's More (#351)", () => {
+  const CHOICES = ["Block", "Report and block", "End conversation"];
+  const GONE = "This conversation is no longer available.";
+  const NOTE = "Anything the moderators should know (optional, up to 500 characters)";
+  const ACT = /\/(report|block|unmatch)$/;
+  const done = () => new Response(null, { status: 204 });
+
+  /** The conversation as the API answers it, the detail the test may change, and its acts answered as told. */
+  function moreApi(
+    start: ConversationDetail,
+    answer: (call: Call) => Response | Promise<Response> = done,
+  ) {
+    let shown = start;
+    const calls = api((call) => {
+      if (call.method === "GET" && call.path === `/conversations/${ID}`) return json(shown);
+      if (call.method === "GET" && call.path === `/conversations/${ID}/contacts`) {
+        return json(shown.contacts);
+      }
+      if (call.method === "GET") return json({ messages: [message(1, "theirs", "Moi", DAY_1)] });
+      if (ACT.test(call.path)) return answer(call);
+      return done();
+    });
+    return {
+      acts: () => calls.filter((c) => ACT.test(c.path)).map(({ path, body }) => ({ path, body })),
+      detailReads: () =>
+        calls.filter((c) => c.method === "GET" && c.path === `/conversations/${ID}`).length,
+      set: (next: ConversationDetail) => {
+        shown = next;
+      },
+    };
+  }
+  /** What the dialog behind More offers, each a named button. */
+  const offered = () => CHOICES.filter((name) => screen.queryByRole("button", { name }) !== null);
+  const radio = async (name: string) => {
+    await userEvent.setup().press(screen.getByRole("radio", { name }));
+    await settle();
+  };
+  const frame = (sent: unknown) => act(async () => FakeWebSocket.latest().receive(sent));
+  /** The screen under the live provider, its socket open, the conversation shown. */
+  async function live(): Promise<void> {
+    FakeWebSocket.install();
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ConversationScreen id={ID} />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    await screen.findByLabelText("Message");
+    await act(async () => {
+      FakeWebSocket.latest().open();
+      FakeWebSocket.latest().receive({ type: "ready" });
+    });
+  }
+
+  beforeEach(() => {
+    router.dismissTo.mockReset();
+    takeNotice();
+  });
+
+  it.each([
+    ["an open conversation", detail(), CHOICES],
+    ["an archived one", detail({ state: "archived" }), CHOICES],
+    [
+      "an ended one, while it can be reported",
+      detail({ state: "closed", closedHow: "unmatch", counterpart: null }),
+      ["Report and block"],
+    ],
+  ])("offers under More what %s allows", async (_, shown, choices) => {
+    moreApi(shown);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByRole("button", { name: "More" });
+    noProblems();
+    await press("More");
+    expect(screen.getByText("Report, block or end")).toBeTruthy();
+    expect(offered()).toEqual(choices);
+    noProblems();
+    await press("Cancel");
+    expect(offered()).toEqual([]);
+  });
+
+  it("sits after Share contact in the header, the order a screen reader reaches them, and only there", async () => {
+    moreApi(detail({ contacts: { mine: [INSTAGRAM], theirs: [] } }));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    const labels = pressables(screen.toJSON() as HostNode).map(
+      (node) => node.props.accessibilityLabel,
+    );
+    expect(labels.slice(0, 3)).toEqual(["Back", "Share contact", "More"]);
+    expect(labels.filter((label) => label === "More")).toHaveLength(1);
+  });
+
+  it("reports from the conversation with the reason and the note, and goes back to the list, leaving it the thanks", async () => {
+    const { acts } = moreApi(detail());
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("More");
+    await press("Report and block");
+    await radio("Harassing, threatening or hateful");
+    await act(async () => {
+      fireEvent.changeText(screen.getByLabelText(NOTE), "Threatened me after I said no.");
+    });
+    await press("Send report");
+    expect(acts()).toEqual([
+      {
+        path: `/conversations/${ID}/report`,
+        body: { reason: "harassment", note: "Threatened me after I said no." },
+      },
+    ]);
+    expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expect(takeNotice()).toBe("reported");
+  });
+
+  it("blocks from the conversation after its confirmation, and goes back to the list, leaving it the word", async () => {
+    const { acts } = moreApi(detail({ state: "archived" }));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByLabelText("Message");
+    await press("More");
+    await press("Block");
+    expect(screen.getByText("Block this person?")).toBeTruthy();
+    expect(acts()).toEqual([]);
+    await press("Block");
+    expect(acts()).toEqual([{ path: `/conversations/${ID}/block`, body: null }]);
+    expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expect(takeNotice()).toBe("blocked");
+  });
+
+  it.each([
+    ["a report", "reported" as const],
+    ["a block", "blocked" as const],
+  ])(
+    "keeps the dialog through the frame that takes the conversation away before the answer to %s, then goes back to the list",
+    async (_, outcome) => {
+      let land: (response: Response) => void = () => undefined;
+      moreApi(detail(), () => new Promise<Response>((resolve) => (land = resolve)));
+      await live();
+      await press("More");
+      if (outcome === "reported") {
+        await press("Report and block");
+        await radio("Something else");
+        await press("Send report");
+      } else {
+        await press("Block");
+        await press("Block");
+      }
+      expect(screen.getByText("Sending…")).toBeTruthy();
+      // The block it sets reaches the person's own socket before the answer does.
+      await frame({ type: "conversation", conversationId: ID, state: "gone", closedHow: null });
+      expect(screen.getByText(GONE)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+      expect(screen.getByText("Sending…")).toBeTruthy();
+      expect(router.dismissTo).not.toHaveBeenCalled();
+      await act(async () => land(done()));
+      await settle();
+      expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+      expect(takeNotice()).toBe(outcome);
+    },
+  );
+
+  it.each([
+    ["a report", "reported" as const],
+    ["a block", "blocked" as const],
+  ])(
+    "says nothing on Android of the frame that takes the conversation away before the answer to %s",
+    async (_, outcome) => {
+      jest.replaceProperty(Platform, "OS", "android");
+      let land: (response: Response) => void = () => undefined;
+      moreApi(detail(), () => new Promise<Response>((resolve) => (land = resolve)));
+      await live();
+      await press("More");
+      if (outcome === "reported") {
+        await press("Report and block");
+        await radio("Something else");
+        await press("Send report");
+      } else {
+        await press("Block");
+        await press("Block");
+      }
+      await frame({ type: "conversation", conversationId: ID, state: "gone", closedHow: null });
+      // Between Sending… and the list's thanks it would sound like a failure.
+      expect(screen.getByText("Sending…").props.accessibilityLiveRegion).toBe("polite");
+      expect(screen.getByText(GONE).props.accessibilityLiveRegion).toBe("none");
+      await act(async () => land(done()));
+      await settle();
+      expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+      expect(takeNotice()).toBe(outcome);
+    },
+  );
+
+  it("says on Android a conversation taken away with no action of the person's under way", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    moreApi(detail());
+    await live();
+    await frame({ type: "conversation", conversationId: ID, state: "gone", closedHow: null });
+    expect(screen.getByText(GONE).props.accessibilityLiveRegion).toBe("polite");
+  });
+
+  it("says a report refused for its window, reads the conversation again, and offers no More once it cannot be reported", async () => {
+    const ended = detail({ state: "closed", closedHow: "unmatch", counterpart: null });
+    const { detailReads, set } = moreApi(ended, () => refusal("report_window_closed", 409));
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByText("This conversation has ended.");
+    await press("More");
+    await press("Report and block");
+    await radio("Something else");
+    set({ ...ended, reportable: false });
+    const reads = detailReads();
+    await press("Send report");
+    expect(detailReads()).toBe(reads + 1);
+    // The read took the report away; the dialog still says why.
+    expect(screen.getByText("This conversation can no longer be reported.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    await press("Cancel");
+    expect(screen.queryByText("This conversation can no longer be reported.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    expect(screen.getByText("This conversation has ended.")).toBeTruthy();
+    expect(router.dismissTo).not.toHaveBeenCalled();
+  });
+});

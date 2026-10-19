@@ -26,7 +26,7 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
   {
     group: "history",
     title: "People with a history",
-    lead: "The same identity on every day, and, but for the two pairs of the conversations, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
+    lead: "The same identity on every day, and, but for the three pairs of the conversations, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
   },
   {
     group: "ages",
@@ -65,6 +65,11 @@ export function renderBankPage(personas: readonly DemoPersona[]): string {
   // without scrolling, so an end-to-end flow taps one where it is (#226). Scrolled to a card, a
   // flow could stop with the card's edge at the screen's edge, a sliver Maestro counts as wholly
   // visible, and its tap there missed.
+  // shortcut: two columns on a phone hold twenty names. Measured with nineteen (#351), the last
+  // button ends 711 CSS px down the page at 375 to 411 px wide; an iPhone 17's Safari shows about
+  // 728 above its floating bar, a Pixel 7's Chrome about 780. (The report's pair had other names
+  // then, none longer than Mikael Lindqvist's, so every row is as high.) A twenty-first persona
+  // needs a third column or a shorter head of the page.
   const names = personas
     .map(
       (p) =>

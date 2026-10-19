@@ -7,6 +7,7 @@ import { objectKey } from "../media/index.ts";
 import { prunePhotoCheckNotes } from "../safety/index.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
+import { conversationBetween } from "../test/chat.ts";
 import { exportOf, openExport } from "../test/export.ts";
 import { captureLogger, englishT, type TestContext, test, testConfig } from "../test/harness.ts";
 import { fixtureJpeg, fixturePng, testMediaDeps } from "../test/media.ts";
@@ -123,6 +124,7 @@ describe("account erasure", () => {
       sessions: 2,
       authRequests: 1,
       photos: 2,
+      heldPhotos: 0,
       objects: 6,
     });
   });
@@ -995,6 +997,7 @@ describe("reports and blocks in erasure and export (#84, ADR-030 §8)", () => {
       items: [
         {
           at: "2026-10-20T10:00:00.000Z",
+          source: "card",
           reason: "commercial_use",
           reasonInWords: "Selling, advertising or asking for money",
           note: null,
@@ -1004,6 +1007,7 @@ describe("reports and blocks in erasure and export (#84, ADR-030 §8)", () => {
         },
         {
           at: "2026-10-20T09:00:00.000Z",
+          source: "card",
           reason: "harassment",
           reasonInWords: "Harassing, threatening or hateful",
           note: "Rude.",
@@ -1039,6 +1043,41 @@ describe("reports and blocks in erasure and export (#84, ADR-030 §8)", () => {
       expect(translated.reports.about).not.toBe(document.reports.about);
       expect(translated.blocks.about).not.toBe(document.blocks.about);
     }
+  });
+
+  test("The export names where each report was made and carries no conversation's copy", async ({
+    ctx,
+  }) => {
+    let clock = new Date("2026-10-20T09:00:00Z");
+    const { app } = await appWith(ctx, { media: false, now: () => clock });
+    const [a, b, c] = [
+      await signedInAccount(ctx.client, "a"),
+      await signedInAccount(ctx.client, "b"),
+      await signedInAccount(ctx.client, "c"),
+    ];
+    await cardShown(ctx.client, a.accountId, b.accountId);
+    await post(app, a, "/reports", { accountId: b.accountId, reason: "harassment" });
+    const theirs = "Tule kotiini qzxvkw";
+    const id = await conversationBetween(ctx.client, a.accountId, c.accountId, {
+      openedAt: new Date("2026-10-19T09:00:00Z"),
+      messages: [
+        { from: "a", body: "Hei" },
+        { from: "b", body: theirs },
+      ],
+    });
+    clock = new Date("2026-10-20T10:00:00Z");
+    await post(app, a, `/conversations/${id}/report`, { reason: "other", note: "Pushy." });
+    expect(await count(ctx, "SELECT count(*) AS n FROM report_message")).toBe(2);
+    const document = await exportOf(app, a.headers);
+    expect(document.reports.items.map((item) => [item.at, item.source, item.note])).toEqual([
+      ["2026-10-20T10:00:00.000Z", "conversation", "Pushy."],
+      ["2026-10-20T09:00:00.000Z", "card", null],
+    ]);
+    // A's own words are in A's conversation, as they always are; C's words and the copy nowhere.
+    const text = JSON.stringify(document);
+    expect(text).not.toContain(theirs);
+    expect(text).not.toContain(c.accountId);
+    expect(Object.keys(document.reports.items[0] ?? {})).not.toContain("messages");
   });
 
   test("a later account of the identity reads the reports and blocks the earlier one left, as both are kept on it", async ({

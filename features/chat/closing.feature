@@ -25,6 +25,12 @@ Feature: Ending a conversation
     When "B" deletes the account
     Then "A" reads the conversation as before: ended, naming nobody, its messages as they were
 
+  Scenario: A close stops both read marks where it found them, and an archived conversation's still move
+    Given "A" and "B" wrote two messages each, "A" read up to the second and "B" up to the first
+    When "A" ends it and both mark it read to the end
+    Then both answers are 204, each reads the other's mark where the close found it, and neither has anything unread
+    And in an archived conversation the same marks move to the end
+
   Scenario: What either shared ends with an unmatch or a block
     Given "A" shares a contact in a conversation with "B", and "C" one in a conversation with "D"
     When "A" ends theirs and "C" blocks "D" from theirs
@@ -34,6 +40,16 @@ Feature: Ending a conversation
     Given "A" and "B" gave the research consent, in two conversations
     When "A" ends one and blocks "B" from the other
     Then "B" has one conversation_closed event, how unmatch, and nobody has another
+
+  Scenario: Ending a conversation that has ended answers the same and changes nothing
+    Given "B" ended the conversation with "A", "C" blocked "A" from theirs, and "D" was banned
+    When "A" ends each of the three
+    Then each answer is 204, each close stays as it was, and no research event more is written
+
+  Scenario: The report window in the detail runs while the conversation is open or archived, and to the millisecond after a close
+    Given report_after_close_days is thirty, and "A" has an open, an archived and an ended conversation with "B"
+    Then the open and the archived read reportable, the ended one at the window's last millisecond, and not a millisecond after
+    And a conversation the other person's erasure closed is not reportable, nor one whose other person was erased after it ended, and a report from it is refused with 409 report_window_closed
 
   Scenario: Only the conversation's two people can end it
     Given "A" and "B" are in a conversation and "C" is not

@@ -6560,10 +6560,10 @@ chat.list.archived:
   machine: { fi: true, sv: true }
 
 chat.list.archivedHint:
-  en: "A conversation quiet for a week moves here. Writing in it brings it back."
-  description: "One line under the Archived heading (#348, TD-13). The week is silent_match_archive_days; say it plainly, no countdown."
-  fi: "Viikon hiljaa ollut keskustelu siirtyy tänne. Kun kirjoitat siihen, se palaa."
-  sv: "Ett samtal som varit tyst en vecka flyttas hit. När du skriver i det kommer det tillbaka."
+  en: "A conversation quiet for a week moves here, and so does one that has ended. Writing in a quiet one brings it back."
+  description: "One line under the Archived heading (#348, TD-13, #351): the group holds the quiet conversations and the ended ones, and only a quiet one comes back when the person writes in it; an ended one never opens again. The week is silent_match_archive_days; say it plainly, no countdown. Never says how a conversation ended."
+  fi: "Viikon hiljaa ollut keskustelu siirtyy tänne, samoin päättynyt keskustelu. Kun kirjoitat hiljaiseen keskusteluun, se palaa."
+  sv: "Ett samtal som varit tyst en vecka flyttas hit, liksom ett samtal som har avslutats. När du skriver i ett tyst samtal kommer det tillbaka."
   machine: { fi: true, sv: true }
 
 chat.list.empty:
@@ -6686,10 +6686,10 @@ chat.unmatch.title:
   machine: { fi: true, sv: true }
 
 chat.unmatch.body:
-  en: "Neither of you can write in it any more. It stays in the archive for both of you, and nobody is told who ended it. Nobody is blocked."
-  description: "The conversation's dialog of actions (#351), under the confirmation's title: an unmatch closes the conversation for both, keeps it read-only in both archives, says nothing of who ended it, and blocks nobody. Plain, calm."
-  fi: "Kumpikaan teistä ei voi enää kirjoittaa siihen. Se jää teidän molempien arkistoon, eikä kenellekään kerrota, kuka sen lopetti. Ketään ei estetä."
-  sv: "Ingen av er kan skriva i det längre. Det stannar i arkivet för er båda, och ingen får veta vem som avslutade det. Ingen blockeras."
+  en: "Neither of you can write in it any more. It stays in the archive for both of you, and nobody is told who ended it. Nobody is blocked, and either of you can still report it for a while."
+  description: "The conversation's dialog of actions (#351, ADR-030 §12), under the confirmation's title: an unmatch closes the conversation for both, keeps it read-only in both archives, says nothing of who ended it, blocks nobody, and leaves both able to report it for matching_config report_after_close_days. Never a number: the window is a tunable. Plain, calm."
+  fi: "Kumpikaan teistä ei voi enää kirjoittaa siihen. Se jää teidän molempien arkistoon, eikä kenellekään kerrota, kuka sen lopetti. Ketään ei estetä, ja kumpi tahansa teistä voi vielä jonkin aikaa ilmoittaa siitä."
+  sv: "Ingen av er kan skriva i det längre. Det stannar i arkivet för er båda, och ingen får veta vem som avslutade det. Ingen blockeras, och ni kan båda fortfarande anmäla det en tid."
   machine: { fi: true, sv: true }
 
 chat.unmatch.done:
@@ -6714,17 +6714,24 @@ chat.block.body:
   machine: { fi: true, sv: true }
 
 chat.report.copy:
-  en: "The moderators get a copy of this conversation, your messages and theirs, and keep it for twelve months. The conversation ends."
-  description: "The report step of the conversation's dialog of actions (#351, ADR-030 §12), above what the report's block means: a report from a conversation freezes a copy of every message, both people's, for the moderators, kept twelve months from filing, and closes the conversation."
-  fi: "Moderaattorit saavat kopion tästä keskustelusta, sinun ja hänen viesteistään, ja säilyttävät sen kaksitoista kuukautta. Keskustelu päättyy."
-  sv: "Moderatorerna får en kopia av det här samtalet, dina och personens meddelanden, och sparar den i tolv månader. Samtalet avslutas."
+  en: "The moderators get a copy of this whole conversation, your own messages and photos included, and keep it for twelve months."
+  description: "The report step of the conversation's dialog of actions (#351, ADR-030 §8 and §12), first under its title: a report from a conversation freezes a copy of every message, both people's, photos included, for the moderators, kept twelve months from filing. Plain; the reporter should know their own words and pictures go too. What the report's block does follows it (chat.report.alsoEnds, or safety.report.alsoBlocks in an ended conversation)."
+  fi: "Moderaattorit saavat kopion tästä koko keskustelusta, myös omista viesteistäsi ja kuvistasi, ja säilyttävät sen kaksitoista kuukautta."
+  sv: "Moderatorerna får en kopia av hela det här samtalet, även dina egna meddelanden och bilder, och sparar den i tolv månader."
+  machine: { fi: true, sv: true }
+
+chat.report.alsoEnds:
+  en: "A report also blocks them, for good, and ends this conversation for both of you: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told."
+  description: "The report step of the conversation's dialog of actions (#351, ADR-030 §1, §4 and §12), under chat.report.copy in a conversation that has not ended: sending the report sets the same final block as Block and ends the conversation for both; there is no confirmation step after it. In an ended conversation safety.report.alsoBlocks stands in its place. Says what chat.block.body says, in the report's words."
+  fi: "Ilmoitus myös estää hänet pysyvästi ja päättää tämän keskustelun teiltä molemmilta: ette näe toisianne täällä enää, vaikka jompikumpi teistä poistaisi tilinsä. Estoa ei voi perua. Hänelle ei kerrota."
+  sv: "En anmälan blockerar också personen, för gott, och avslutar det här samtalet för er båda: ni ser inte varandra här igen, även om någon av er raderar sitt konto. En blockering kan inte ångras. Personen får inte veta det."
   machine: { fi: true, sv: true }
 
 chat.report.limited:
-  en: "That is enough reports for today. You can try again after midnight."
-  description: "The report step in an ended conversation (#351), the day's reports filed (429 report_budget_exceeded, matching_config reports_per_day): nothing was written. No block is offered there, so unlike errors.report_budget_exceeded it points to tomorrow, while the conversation can still be reported. Never a number, the cap is a tunable."
-  fi: "Tältä päivältä ilmoituksia on jo tarpeeksi. Voit yrittää uudelleen keskiyön jälkeen."
-  sv: "Det räcker med anmälningar för i dag. Du kan försöka igen efter midnatt."
+  en: "That is enough reports for today. You can send more after midnight."
+  description: "The report step in an ended conversation (#351), the day's reports filed (429 report_budget_exceeded, matching_config reports_per_day): nothing was written. No block is offered there, so unlike errors.report_budget_exceeded it says when the cap lifts (the day rolls at midnight in Finland). Must not promise that this conversation can still be reported then: its window may close first. Never a number, the cap is a tunable."
+  fi: "Tältä päivältä ilmoituksia on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen."
+  sv: "Det räcker med anmälningar för i dag. Du kan skicka fler efter midnatt."
   machine: { fi: true, sv: true }
 
 chat.notice.gone:

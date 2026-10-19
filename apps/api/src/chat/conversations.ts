@@ -306,13 +306,17 @@ export async function lockReportedConversation(
   return repo.lockForReport(db, accountId, conversationId);
 }
 
-/** The whole thread of a conversation the caller locked, for a report's copy (#351). */
-export async function threadForReport(
+/**
+ * A report's frozen copy of a conversation the caller locked (#351, ADR-030
+ * §12): every message of both people, into the report the caller just wrote,
+ * inside its transaction; the words never pass through the process. The
+ * number of lines.
+ */
+export async function copyConversation(
   db: Queryable,
-  accountId: string,
-  conversationId: string,
-): Promise<repo.CopiedMessage[]> {
-  return repo.threadOf(db, accountId, conversationId);
+  input: { accountId: string; conversationId: string; reportId: string },
+): Promise<number> {
+  return repo.copyConversation(db, input);
 }
 
 export type ConversationErasure = {

@@ -12,6 +12,7 @@ import {
   PhotoRejectionReason,
   PhotoState,
   ReportOutcome,
+  ReportSource,
   SanctionKind,
   SanctionReason,
 } from "@kuutti/schema";
@@ -385,7 +386,7 @@ describe("the enums", () => {
     expect(enums.sanction_reason).toEqual(SanctionReason.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
     // Where a report was made: a card, or a conversation (#351).
-    expect(enums.report_source).toEqual(["card", "conversation"]);
+    expect(enums.report_source).toEqual(ReportSource.options);
     // Whose line a report's copy holds, seen from the report (#351).
     expect(enums.report_message_side).toEqual(["reporter", "reported"]);
     // What a person may be notified of, and what a notice is about (#176).

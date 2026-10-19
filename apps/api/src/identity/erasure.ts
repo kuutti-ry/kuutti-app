@@ -59,7 +59,9 @@ import { visibleState } from "./standing.ts";
 // long as they are kept, so that neither a later account of the blocked
 // person nor of the blocker meets the other. The export lists the reports
 // the person filed and the blocks they set, from this account or an earlier
-// one of their identity, since both are kept on it; never whom.
+// one of their identity, since both are kept on it; never whom. Each report
+// says where it was made, a card or a conversation (#351); a conversation's
+// frozen copy is in nobody's export, the reporter's included.
 // The conversations (#348, ADR-031 §5): the person's link goes and their open
 // conversations close; the messages stay for the counterpart, who reads
 // "Deleted user" (TD-7's kept side), except those the counterpart never
@@ -111,6 +113,8 @@ export type ErasureSummary = {
   notificationChoices: number;
   notices: number;
   photos: number;
+  /** Photos a report's copy names, kept for its twelve months (#351); the night's prune deletes them. */
+  heldPhotos: number;
   accessRows: number;
   shownRows: number;
   objects: number;
@@ -181,6 +185,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       notifications,
       researchSubjects,
       chat,
+      heldPhotos: held.length,
       reregisterAfter: deletion.reregisterAfter,
     };
   });
@@ -208,6 +213,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     notificationChoices: result.notifications.choices,
     notices: result.notifications.notices,
     photos: result.photos.photos,
+    heldPhotos: result.heldPhotos,
     accessRows: result.photos.accessRows,
     shownRows: result.photos.shownRows,
     objects,
@@ -371,6 +377,7 @@ export async function exportAccount(
       about: t("account.export.report.about"),
       items: reports.map((report) => ({
         at: report.at.toISOString(),
+        source: report.source,
         reason: report.reason,
         // The words the person chose in the app, not the sanction's, which state a finding.
         reasonInWords: t(`safety.report.reason.${report.reason}`),

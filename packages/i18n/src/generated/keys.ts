@@ -378,6 +378,7 @@ export type MessageParams = {
   "chat.photo.removedCaption": { "caption": string };
   "chat.photo.uploading": { "percent": number };
   "chat.presence.online": Record<never, never>;
+  "chat.report.alsoEnds": Record<never, never>;
   "chat.report.copy": Record<never, never>;
   "chat.report.limited": Record<never, never>;
   "chat.row.mine": { "preview": string };
