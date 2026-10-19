@@ -17,6 +17,7 @@ import {
 } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { pondNamed } from "../test/people.ts";
+import { recorder } from "../test/recorder.ts";
 import { accountPage } from "./accounts.ts";
 import { applySanction, liftSanction } from "./sanctions.ts";
 
@@ -837,19 +838,6 @@ describe("the account.view row", () => {
    * the account.view insert goes to Postgres with an actor no identity has, so
    * the database refuses it by its foreign key, as any failed write would be.
    */
-  function recorder(db: Queryable, refuse = false) {
-    const statements: string[] = [];
-    const recorded: Queryable = {
-      query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-        statements.push(text);
-        const fail =
-          refuse && text.includes("INTO public.audit_log") && values?.[1] === "account.view";
-        return db.query<R>(text, fail ? [UNKNOWN_ID, ...(values ?? []).slice(1)] : values);
-      },
-    };
-    return { db: recorded, statements };
-  }
-
   /** What building the page reads; each must come after the audit row. */
   const PAGE_READS = [
     ["the account row", /SELECT \* FROM account WHERE id/],
@@ -886,7 +874,7 @@ describe("the account.view row", () => {
     const person = await signedInAccount(ctx.client);
     await profileOf(ctx, person.accountId);
     await feedbackOf(ctx, person.accountId, "bug", BUG_TEXT, at(-DAY));
-    const spy = recorder(ctx.client, true);
+    const spy = recorder(ctx.client, "account.view");
     const api = await apiOn(spy.db);
     const response = await open(api, moderator.headers, person.accountId);
     const text = await response.text();

@@ -11,6 +11,7 @@ import {
   PhotoPurpose,
   PhotoRejectionReason,
   PhotoState,
+  ReportMessageSide,
   ReportOutcome,
   ReportSource,
   SanctionKind,
@@ -388,7 +389,7 @@ describe("the enums", () => {
     // Where a report was made: a card, or a conversation (#351).
     expect(enums.report_source).toEqual(ReportSource.options);
     // Whose line a report's copy holds, seen from the report (#351).
-    expect(enums.report_message_side).toEqual(["reporter", "reported"]);
+    expect(enums.report_message_side).toEqual(ReportMessageSide.options);
     // What a person may be notified of, and what a notice is about (#176).
     expect(enums.notification_kind).toEqual(NotificationKind.options);
     expect(enums.notice_kind).toEqual(NoticeKind.options);

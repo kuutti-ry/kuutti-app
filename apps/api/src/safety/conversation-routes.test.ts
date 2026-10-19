@@ -1,13 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import {
-  createPool,
-  migrate,
-  type Pool,
-  type PoolClient,
-  type Queryable,
-  withTemporaryDatabase,
-} from "@kuutti/db";
+import { createPool, migrate, type Pool, type Queryable, withTemporaryDatabase } from "@kuutti/db";
 import { ConversationDetail, ConversationList, ErrorResponse, MessagePage } from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
@@ -24,7 +17,7 @@ import {
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { testMediaDeps } from "../test/media.ts";
 import { people } from "../test/people.ts";
-import { pidOf, waitsFor, watched } from "../test/races.ts";
+import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
 import { recordConversationBlock } from "./blocks.ts";
 import { pruneReports, REPORT_RETENTION_DAYS, recordConversationReport } from "./reports.ts";
 import { applySanction } from "./sanctions.ts";
@@ -832,26 +825,6 @@ describe("a report from a conversation in a race", () => {
       limit: 5,
       afterCloseDays: 30,
     });
-
-  /** A database of the test's own, migrated, with a pool and two connections of it. */
-  async function withTwoConnections(
-    name: string,
-    work: (pool: Pool, first: PoolClient, second: PoolClient) => Promise<void>,
-  ): Promise<void> {
-    await withTemporaryDatabase(async (url) => {
-      const pool = createPool({ connectionString: url, max: 4, applicationName: name });
-      const first = await pool.connect();
-      const second = await pool.connect();
-      try {
-        await migrate(pool, MIGRATIONS);
-        await work(pool, first, second);
-      } finally {
-        first.release();
-        second.release();
-        await pool.end();
-      }
-    });
-  }
 
   const countIn = async (pool: Pool, sql: string, params: unknown[] = []) =>
     Number((await pool.query<{ n: string }>(sql, params)).rows[0]?.n ?? 0);

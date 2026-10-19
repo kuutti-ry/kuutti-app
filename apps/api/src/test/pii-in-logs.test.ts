@@ -7,7 +7,7 @@ import { createApp } from "../app.ts";
 import type { IdentityBroker } from "../identity/index.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "./account.ts";
-import { conversationBetween } from "./chat.ts";
+import { conversationBetween, photoMessage } from "./chat.ts";
 import {
   captureLogger,
   closeTestPool,
@@ -17,6 +17,7 @@ import {
   testPool,
 } from "./harness.ts";
 import { fixturePng, testMediaDeps } from "./media.ts";
+import { accountOf } from "./reports.ts";
 
 /** The verifier of a sign-in attempt, as the app makes one (ADR-027): 256 bits as lowercase hex. */
 const VERIFIER_PROBE = "4711beef".repeat(8);
@@ -242,6 +243,78 @@ describe("PII in logs", () => {
         ).rows[0]?.n,
       ),
     ).toBe(2);
+    expect(lines().length).toBeGreaterThan(0);
+    expect(leakedFixtures(lines())).toEqual([]);
+    const events = await ctx.client.query("SELECT props FROM events");
+    expect(JSON.stringify(events.rows)).not.toContain(FIXTURES.message);
+  });
+
+  // A report worked by the moderators (#312): opened with its note and copy,
+  // its photo asked for and the report dismissed, by a moderator; the same by
+  // a member of staff who is a party and by a researcher. The moderator's
+  // opened report carries the words, on purpose; nothing else does.
+  test("No word of the note or the copy reaches a log line, an error answer or an event", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    const media = testMediaDeps();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client, media: media.deps });
+    const moderator = await staffSession(ctx.client, "moderator");
+    const party = await staffSession(ctx.client, "moderator");
+    const researcher = await staffSession(ctx.client, "researcher");
+    const a = await signedInAccount(ctx.client);
+    // The reported person is the party's own account.
+    const b = await accountOf(ctx.client, party.identityId);
+    const id = await conversationBetween(ctx.client, a.accountId, b, {
+      messages: [
+        { from: "a", body: FIXTURES.message },
+        { from: "b", body: FIXTURES.message },
+      ],
+    });
+    const sent = await photoMessage(ctx.client, {
+      conversationId: id,
+      accountId: b,
+      side: "b",
+      caption: FIXTURES.message,
+      store: media.store,
+    });
+    const filed = await app.request(`/conversations/${id}/report`, {
+      method: "POST",
+      headers: { ...a.headers, "content-type": "application/json" },
+      body: JSON.stringify({ reason: "harassment", note: `He wrote: ${FIXTURES.message}` }),
+    });
+    expect(filed.status).toBe(204);
+    const report = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM report WHERE conversation_id = $1",
+      [id],
+    );
+    const reportId = report.rows[0]?.id as string;
+    const work = (headers: Record<string, string>) => [
+      () => app.request(`/admin/reports/${reportId}`, { headers }),
+      () => app.request(`/admin/reports/${reportId}/copy/${sent.seq}/photo`, { headers }),
+      () =>
+        app.request(`/admin/reports/${reportId}/decision`, {
+          method: "POST",
+          headers: { ...headers, "content-type": "application/json" },
+          body: JSON.stringify({ outcome: "dismissed" }),
+        }),
+    ];
+    const refused: Response[] = [];
+    for (const who of [party, researcher]) {
+      for (const send of work(who.headers)) refused.push(await send());
+    }
+    expect(refused.map((answer) => answer.status)).toEqual([404, 404, 404, 403, 403, 403]);
+    for (const answer of refused) expect(await answer.text()).not.toContain(FIXTURES.message);
+    const [openIt, photoIt, dismissIt] = work(moderator.headers);
+    const opened = await (openIt as () => Promise<Response>)();
+    expect(opened.status).toBe(200);
+    // The moderators' to read: the note and both lines, the caption among them.
+    expect(await opened.text()).toContain(FIXTURES.message);
+    for (const send of [photoIt, dismissIt] as Array<() => Promise<Response>>) {
+      const answer = await send();
+      expect(answer.status).toBe(200);
+      expect(await answer.text()).not.toContain(FIXTURES.message);
+    }
     expect(lines().length).toBeGreaterThan(0);
     expect(leakedFixtures(lines())).toEqual([]);
     const events = await ctx.client.query("SELECT props FROM events");

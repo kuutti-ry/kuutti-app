@@ -3,7 +3,6 @@ import { useT } from "@kuutti/i18n/react";
 import {
   AdminAccount,
   type AdminAccountPhoto,
-  PhotoUrlResponse,
   type SanctionEntry,
   SanctionList,
 } from "@kuutti/schema";
@@ -12,6 +11,7 @@ import { useNavigate, useParams } from "react-router";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { AuditDetail } from "./audit-detail.tsx";
+import { usePhotoOnRequest } from "./photo-on-request.ts";
 import { Sanctions } from "./Sanctions.tsx";
 
 // A person's page in the panel (#306): one account by its id, never a
@@ -269,39 +269,13 @@ export function AccountPage() {
   );
 }
 
-/**
- * One photo, hidden until asked: the request is the audit row (photo.view),
- * so one press is one look, and the picture takes the focus the button had.
- * The button stays enabled while it asks, so a failure leaves the focus on it
- * (a disabled button loses it); a second press is a no-op.
- */
+/** One photo, hidden until asked (photo-on-request.ts): its card variant, as others see it. */
 function PersonPhoto({ photo }: { photo: AdminAccountPhoto }) {
   const { t, locale } = useT();
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [pending, setPending] = useState(false);
-  const asking = useRef(false);
-  const picture = useRef<HTMLImageElement>(null);
-  useEffect(() => {
-    if (url) picture.current?.focus();
-  }, [url]);
+  const { url, failed, pending, show, picture } = usePhotoOnRequest(() =>
+    api.GET("/admin/photos/{id}/card", { params: { path: { id: photo.id } } }),
+  );
   const uploaded = formatDateTime(locale, new Date(photo.uploadedAt));
-  const show = async () => {
-    if (asking.current) return;
-    asking.current = true;
-    setPending(true);
-    setFailed(false);
-    const answer = await api
-      .GET("/admin/photos/{id}/card", { params: { path: { id: photo.id } } })
-      .catch(() => null);
-    asking.current = false;
-    setPending(false);
-    // A 403 is the shell's to say (#302): the button stays, with no failure of its own.
-    if (answer?.response.status === 403) return;
-    const parsed = PhotoUrlResponse.safeParse(answer?.data);
-    if (!parsed.success) return setFailed(true);
-    setUrl(parsed.data.url);
-  };
   return (
     <li className="item">
       <p>

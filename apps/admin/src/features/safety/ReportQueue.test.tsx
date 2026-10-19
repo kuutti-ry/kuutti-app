@@ -76,6 +76,10 @@ function Person() {
   return <p>the page of {useParams().id}</p>;
 }
 
+function OneReport() {
+  return <p>the report {useParams().id}</p>;
+}
+
 function show() {
   render(
     <I18nProvider i18n={i18n}>
@@ -270,6 +274,48 @@ describe("the report queue", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.queryByText("Loading the reports…")).toBeNull();
     expect(screen.queryByText(/wait/)).toBeNull();
+  });
+
+  it("links each report to its own page, one link per report, named by its first line (#312)", async () => {
+    fetchMock([
+      pages(
+        page([
+          report(1),
+          report(2, { reason: "scraping", source: "conversation" }),
+          report(3, { reported: { accountId: Y, received: 1, sanctions: 0 } }),
+        ]),
+      ),
+    ]);
+    render(
+      <I18nProvider i18n={i18n}>
+        <MemoryRouter initialEntries={["/reports"]}>
+          <Routes>
+            <Route path="/reports" element={<ReportQueue />} />
+            <Route path="/reports/:id" element={<OneReport />} />
+          </Routes>
+        </MemoryRouter>
+      </I18nProvider>,
+    );
+    const lines = within(await groupOf(X)).getAllByRole("listitem");
+    const links = lines.map((line) =>
+      within(line)
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("href")?.startsWith("/reports/")),
+    );
+    expect(links.map((found) => found.length)).toEqual([1, 1]);
+    const [first, second] = links.map(([link]) => link as HTMLElement);
+    expect(first).toHaveAttribute("href", `/reports/${report(1).id}`);
+    expect(first?.textContent).toMatch(/^Harassment, from a card · Filed /);
+    expect(first).toHaveClass("target");
+    expect(second).toHaveAttribute("href", `/reports/${report(2).id}`);
+    expect(second?.textContent).toMatch(/^Scraping, from a conversation · Filed /);
+    expect(
+      screen
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("href")?.startsWith("/reports/")),
+    ).toHaveLength(3);
+    fireEvent.click(second as HTMLElement);
+    expect(await screen.findByText(`the report ${report(2).id}`)).toBeInTheDocument();
   });
 
   it.each([

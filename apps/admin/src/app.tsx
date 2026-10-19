@@ -12,6 +12,7 @@ import {
   ConfigList,
   FeedbackList,
   Overview,
+  ReportPage,
   ReportQueue,
   StaffList,
 } from "./features/safety/index.ts";
@@ -32,7 +33,7 @@ type Screen = {
   /** The roles the menu shows it to; the API's own guard is what refuses the rest. */
   roles: readonly ModeratorRole[];
   element: ReactNode;
-  /** False for a screen reached from another, not from the menu (a person's page, #306). */
+  /** False for a screen reached from another, not from the menu (a person's page, #306; a report, #312). */
   inMenu?: false;
 };
 
@@ -48,6 +49,13 @@ const SCREENS: readonly Screen[] = [
     label: "admin.nav.reports",
     roles: ["moderator", "admin"],
     element: <ReportQueue />,
+  },
+  {
+    path: "/reports/:id",
+    label: "admin.nav.reports",
+    roles: ["moderator", "admin"],
+    element: <ReportPage />,
+    inMenu: false,
   },
   {
     path: "/photos",

@@ -4785,6 +4785,260 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/reports/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One report, with the reporter's note and the frozen conversation
+         * @description The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The report. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReportDetail"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such report, or one the reader is a party to, answered alike. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports/{id}/copy/{seq}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A signed URL for a photo of a report's frozen conversation
+         * @description The full variant of the photo the copy holds at that line, for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    seq: number;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The signed URL. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoUrlResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such report, a party's, or no photo at that line, answered alike. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description media_unavailable: no object storage is configured here. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide a report
+         * @description Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, applied by a person at or after the filing. Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ReportDecisionRequest"];
+                };
+            };
+            responses: {
+                /** @description The decision. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ReportDecision"];
+                    };
+                };
+                /** @description Validation failed: acted without a sanction, or dismissed with one. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such report, or one the reader is a party to, answered alike. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description report_decided: decided already; sanction_not_for_report: the sanction does not answer this report. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/accounts/{id}": {
         parameters: {
             query?: never;
@@ -6571,6 +6825,77 @@ export interface components {
                 received: number;
                 sanctions: number;
             };
+        };
+        ReportDetail: {
+            /** Format: uuid */
+            id: string;
+            reason: components["schemas"]["SanctionReason"];
+            source: components["schemas"]["ReportSource"];
+            /** Format: date-time */
+            createdAt: string;
+            outcome: components["schemas"]["ReportOutcome"];
+            /** Format: date-time */
+            decidedAt: string | null;
+            reporter: {
+                /** Format: uuid */
+                accountId: string;
+                filed: number;
+                upheld: number;
+            };
+            reported: {
+                /** Format: uuid */
+                accountId: string;
+                received: number;
+                sanctions: number;
+            };
+            note: string | null;
+            /** Format: uuid */
+            decidedBy: string | null;
+            /** Format: uuid */
+            sanctionId: string | null;
+            copy: components["schemas"]["ReportCopyLine"][] | null;
+            actable: components["schemas"]["ReportActable"][];
+        };
+        ReportCopyLine: {
+            seq: number;
+            side: components["schemas"]["ReportMessageSide"];
+            kind: components["schemas"]["MessageKind"];
+            body: string | null;
+            photo: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        ReportMessageSide: "reporter" | "reported";
+        ReportActable: {
+            /** Format: uuid */
+            id: string;
+            kind: components["schemas"]["SanctionKind"];
+            reason: components["schemas"]["SanctionReason"];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            liftedAt: string | null;
+        };
+        ReportDecision: {
+            /** Format: uuid */
+            id: string;
+            outcome: components["schemas"]["ReportOutcome"];
+            /** Format: date-time */
+            decidedAt: string;
+            /** Format: uuid */
+            decidedBy: string;
+            /** Format: uuid */
+            sanctionId: string | null;
+        };
+        ReportDecisionRequest: {
+            /** @enum {string} */
+            outcome: "dismissed";
+        } | {
+            /** @enum {string} */
+            outcome: "acted";
+            /** Format: uuid */
+            sanctionId: string;
         };
         AdminAccount: {
             /** Format: uuid */

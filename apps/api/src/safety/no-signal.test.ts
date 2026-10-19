@@ -138,10 +138,12 @@ describe("blocks and reports", () => {
     ]);
   });
 
-  it("a conversation's copy is written by the chat's copy and read by the hold and the prune alone", () => {
+  it("a conversation's copy is written by the chat's copy and read by the moderators, the hold and the prune alone", () => {
     expect(readersOf(readsReportCopy)).toEqual([
       // The copy itself, one INSERT … SELECT from the thread under the conversation's lock.
       "apps/api/src/chat/repo.ts",
+      // The moderators' opened report and its copy's photos, behind conversation.view and photo.view (#312).
+      "apps/api/src/safety/report-queue.ts",
       // The photos a copy holds through an erasure, and the night's prune of them.
       "apps/api/src/safety/reports.ts",
     ]);

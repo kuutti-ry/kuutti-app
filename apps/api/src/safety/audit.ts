@@ -19,6 +19,12 @@ const AUDIT_ACTIONS = [
   "config.change",
   "account.view",
   "audit.read",
+  // A report opened (#312): a card's, or a conversation's with its frozen
+  // copy; and the decision. Their subject is the report, never a person, so a
+  // member of staff who is a party finds no trace of it (ADR-030 §6).
+  "report.view",
+  "conversation.view",
+  "report.decide",
 ] as const;
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -26,7 +32,7 @@ export type AuditEntry = {
   actorIdentityId: string;
   action: AuditAction;
   /** "any": an audit read narrowed to a subject id of no named type (#309). */
-  subjectType: "photo" | "feedback" | "account" | "config" | "any";
+  subjectType: "photo" | "feedback" | "account" | "config" | "report" | "any";
   subjectId: string;
   detail?: Record<string, string | number | boolean | null>;
 };

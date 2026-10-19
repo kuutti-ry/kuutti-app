@@ -7,7 +7,11 @@ import {
   ExportedReport,
   ExportedReports,
   REPORT_NOTE_MAX,
+  ReportCopyLine,
+  ReportCopyPhotoParams,
+  ReportDecisionRequest,
   ReportOutcome,
+  ReportQueueQuery,
   ReportRequest,
 } from "./report.ts";
 
@@ -138,5 +142,55 @@ describe("the reporter's export", () => {
     expect(codes(ExportedReport, { ...report, note: "x".repeat(REPORT_NOTE_MAX + 1) })).toEqual([
       "too_big",
     ]);
+  });
+});
+
+describe("the moderators' queue and decision (#311, #312)", () => {
+  it("reads the open reports by default, fifty at a time, and refuses another state or a page out of bounds", () => {
+    expect(ReportQueueQuery.parse({})).toEqual({ state: "open", limit: 50 });
+    expect(ReportQueueQuery.parse({ state: "closed", limit: "100" })).toEqual({
+      state: "closed",
+      limit: 100,
+    });
+    expect(codes(ReportQueueQuery, { state: "pending" })).toEqual(["invalid_value"]);
+    expect(codes(ReportQueueQuery, { limit: "0" })).toEqual(["too_small"]);
+    expect(codes(ReportQueueQuery, { limit: "101" })).toEqual(["too_big"]);
+  });
+
+  it("names a photo of the copy by its line, a positive sequence number", () => {
+    expect(ReportCopyPhotoParams.parse({ id, seq: "3" })).toEqual({ id, seq: 3 });
+    expect(codes(ReportCopyPhotoParams, { id, seq: "0" })).toEqual(["too_small"]);
+    expect(codes(ReportCopyPhotoParams, { id, seq: String(2 ** 31) })).toEqual(["too_big"]);
+    expect(codes(ReportCopyPhotoParams, { id, seq: "1.5" })).toEqual(["invalid_type"]);
+    expect(codes(ReportCopyPhotoParams, { id: "x", seq: "1" })).toEqual(["invalid_format"]);
+  });
+
+  it("dismisses with nothing more, and acts only naming a sanction", () => {
+    expect(ReportDecisionRequest.parse({ outcome: "dismissed" })).toEqual({ outcome: "dismissed" });
+    expect(ReportDecisionRequest.parse({ outcome: "acted", sanctionId: id })).toEqual({
+      outcome: "acted",
+      sanctionId: id,
+    });
+    expect(codes(ReportDecisionRequest, { outcome: "acted" })).toEqual(["invalid_type"]);
+    expect(codes(ReportDecisionRequest, { outcome: "dismissed", sanctionId: id })).toEqual([
+      "unrecognized_keys",
+    ]);
+    expect(codes(ReportDecisionRequest, { outcome: "ignored" })).toEqual(["invalid_union"]);
+    expect(codes(ReportDecisionRequest, { outcome: "acted", sanctionId: "warn-1" })).toEqual([
+      "invalid_format",
+    ]);
+  });
+
+  it("carries a copied line's words and whether a photo is held, never the photo itself", () => {
+    const line = {
+      seq: 1,
+      side: "reported",
+      kind: "photo",
+      body: null,
+      photo: true,
+      createdAt: at,
+    };
+    expect(ReportCopyLine.parse({ ...line, photoId: id })).toEqual(line);
+    expect(codes(ReportCopyLine, { ...line, side: "a" })).toEqual(["invalid_value"]);
   });
 });

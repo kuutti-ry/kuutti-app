@@ -5448,6 +5448,206 @@ admin.reports.decided:
   en: "Decided {time}"
   description: "Admin panel, the report queue's decided filter: when a moderator decided the report, a date and time (#311)."
 
+admin.report.title:
+  en: "Report {report}"
+  description: "Admin panel, one report's page (#312): its heading, with the report's id shortened to its first eight characters."
+
+admin.report.loading:
+  en: "Loading the report…"
+  description: "Admin panel, one report's page (#312): while the report loads."
+
+admin.report.error:
+  en: "The report could not be loaded."
+  description: "Admin panel, one report's page (#312): the report failed to load."
+
+admin.report.missing:
+  en: "No such report."
+  description: "Admin panel, one report's page (#312): no report has this id, or the reader is a party to it, said alike."
+
+admin.report.back:
+  en: "Back to the reports"
+  description: "Admin panel, one report's page (#312): the link back to the report queue."
+
+admin.report.factsTitle:
+  en: "The report"
+  description: "Admin panel, one report's page (#312): the heading of the report's facts."
+
+admin.report.reason:
+  en: "Reason"
+  description: "Admin panel, one report's page (#312), the facts: the label of the reason the reporter chose."
+
+admin.report.source:
+  en: "Made"
+  description: "Admin panel, one report's page (#312), the facts: the label of where the report was made, a card or a conversation."
+
+admin.report.filed:
+  en: "Filed"
+  description: "Admin panel, one report's page (#312), the facts: the label of when the report was filed."
+
+admin.report.state:
+  en: "State"
+  description: "Admin panel, one report's page (#312), the facts: the label of whether the report waits or was decided."
+
+admin.report.waiting:
+  en: "Waiting for a decision"
+  description: "Admin panel, one report's page (#312), the facts: no moderator has decided the report yet."
+
+admin.report.decided:
+  en: "{outcome} · {time} · Who: {who}"
+  description: "Admin panel, one report's page (#312), the facts: the decision, {outcome} being Dismissed or Acted on, its date and time, and the member of staff by the start of their id."
+
+admin.report.withSanction:
+  en: "with sanction {sanction}"
+  description: "Admin panel, one report's page (#312), the facts: after an acted-on decision, a link to the reported person's page naming the sanction by the start of its id."
+
+admin.report.peopleTitle:
+  en: "The two people"
+  description: "Admin panel, one report's page (#312): the heading of the reporter and the reported person, each linked to their page."
+
+admin.report.noteTitle:
+  en: "The reporter's words"
+  description: "Admin panel, one report's page (#312): the heading of the note the reporter wrote."
+
+admin.report.noNote:
+  en: "No note."
+  description: "Admin panel, one report's page (#312): the reporter wrote no note."
+
+admin.report.copyTitle:
+  en: "The conversation as it was when reported"
+  description: "Admin panel, one report's page (#312): the heading of the frozen copy of the conversation, for a report made from one."
+
+admin.report.copyEmpty:
+  en: "The conversation held no messages."
+  description: "Admin panel, one report's page (#312): the frozen copy has no lines."
+
+admin.report.side.reporter:
+  en: "Reporter"
+  description: "Admin panel, one report's page (#312), the frozen copy: a line the reporter sent; said in words, never by colour or alignment alone."
+
+admin.report.side.reported:
+  en: "Reported person"
+  description: "Admin panel, one report's page (#312), the frozen copy: a line the reported person sent; said in words, never by colour or alignment alone."
+
+admin.report.showPhoto:
+  en: "Show photo"
+  description: "Admin panel, one report's page (#312), the frozen copy: the button that fetches a photo a line held; the fetch is an audit row."
+
+admin.report.photoRemoved:
+  en: "Photo removed"
+  description: "Admin panel, one report's page (#312), the frozen copy: the line held a photo removed before the report."
+
+admin.report.photoFailed:
+  en: "The photo could not be shown."
+  description: "Admin panel, one report's page (#312), the frozen copy: a photo's signed URL was refused or failed."
+
+admin.report.image:
+  en: "Photo sent by {side, select, reporter {the reporter} other {the reported person}}. Sent: {time}"
+  description: "Admin panel, one report's page (#312), the frozen copy: the alt text of a photo a moderator asked to see, who sent it and when."
+
+admin.report.decisionTitle:
+  en: "Decision"
+  description: "Admin panel, one report's page (#312): the heading of the decision, its actions while the report waits."
+
+admin.report.reportedFor:
+  en: "Reported for: {reason}"
+  description: "Admin panel, one report's page (#312), the decision: the reason the reporter chose, beside the actions, since a sanction's reason is chosen on purpose."
+
+admin.report.act:
+  en: "Act on the reported person"
+  description: "Admin panel, one report's page (#312), the decision: the legend of the sanctions' buttons (#308)."
+
+admin.report.actAlso:
+  en: "Applying one also closes this report as acted on; the reporter's export will say it was acted on, never which action."
+  description: "Admin panel, one report's page (#312), the decision: a line in a sanction's confirm step, saying the rest of its effect."
+
+admin.report.closeWithTitle:
+  en: "Close as acted on with a sanction applied since the report"
+  description: "Admin panel, one report's page (#312), the decision: the heading of the sanctions that may close the report."
+
+admin.report.closeWith:
+  en: "Close with this"
+  description: "Admin panel, one report's page (#312), the decision: the button beside a sanction that opens the step closing the report with it."
+
+admin.report.closeTitle:
+  en: "Close the report as acted on"
+  description: "Admin panel, one report's page (#312), the decision: the heading of the step that closes the report naming a sanction."
+
+admin.report.closeEffect:
+  en: "The report closes as acted on, naming this sanction: {kind}, applied {time}. Nothing more happens to the reported person; the reporter's export will say it was acted on, never which action."
+  description: "Admin panel, one report's page (#312), the decision: the effect of closing the report with a sanction, {kind} being the sanction's kind."
+
+admin.report.closeConfirm:
+  en: "Close report"
+  description: "Admin panel, one report's page (#312), the decision: the button that closes the report naming the sanction."
+
+admin.report.dismiss:
+  en: "Dismiss"
+  description: "Admin panel, one report's page (#312), the decision: the button, set apart, that opens the step dismissing the report."
+
+admin.report.dismissTitle:
+  en: "Dismiss the report"
+  description: "Admin panel, one report's page (#312), the decision: the heading of the step that dismisses the report."
+
+admin.report.dismissEffect:
+  en: "The report closes with no action on the reported person. The block between the two stays. The reporter's export will say it was dismissed."
+  description: "Admin panel, one report's page (#312), the decision: the effect of dismissing the report."
+
+admin.report.dismissConfirm:
+  en: "Dismiss report"
+  description: "Admin panel, one report's page (#312), the decision: the button that dismisses the report."
+
+admin.report.cancel:
+  en: "Cancel"
+  description: "Admin panel, one report's page (#312), the decision: closes a step and sends nothing."
+
+admin.report.done.dismissed:
+  en: "Report dismissed."
+  description: "Admin panel, one report's page (#312), the decision: the status after the report was dismissed."
+
+admin.report.done.acted:
+  en: "Report closed as acted on."
+  description: "Admin panel, one report's page (#312), the decision: the status after the report was closed naming a sanction."
+
+admin.report.done.applied:
+  en: "Applied: {kind}. The report is closed as acted on."
+  description: "Admin panel, one report's page (#312), the decision: the status after a sanction was applied and the report closed with it, {kind} being the sanction's kind."
+
+admin.report.closing:
+  en: "Applied: {kind}. Closing the report…"
+  description: "Admin panel, one report's page (#312), the decision: a sanction was applied and the report is being closed with it; the actions are gone until the answer, {kind} being the sanction's kind."
+
+admin.report.appliedNotClosed:
+  en: "Applied: {kind}, and it stands. The report is not closed: close it with that sanction in the list above."
+  description: "Admin panel, one report's page (#312), the decision: a sanction was applied, but closing the report with it failed; it is listed among the sanctions that may close it."
+
+admin.report.decidedMeanwhile:
+  en: "Applied: {kind}, and it stands. Another member of staff decided this report meanwhile."
+  description: "Admin panel, one report's page (#312), the decision: a sanction was applied, but somebody else had decided the report; a link to the person's page follows."
+
+admin.report.personPage:
+  en: "The reported person's page, where it can be lifted"
+  description: "Admin panel, one report's page (#312), the decision: after admin.report.decidedMeanwhile, the link to the reported person's page."
+
+admin.report.lifted:
+  en: "lifted"
+  description: "Admin panel, one report's page (#312), the decision: after a sanction that may close the report, when it has been lifted since."
+
+admin.report.error.report_decided:
+  en: "Another member of staff decided this report meanwhile."
+  description: "Admin panel, one report's page (#312), the decision: refused, the report was decided already."
+
+admin.report.error.sanction_not_for_report:
+  en: "That sanction does not answer this report."
+  description: "Admin panel, one report's page (#312), the decision: refused, the sanction is not one that may close this report."
+
+admin.report.error.not_found:
+  en: "No such report."
+  description: "Admin panel, one report's page (#312), the decision: refused, the report is gone or the reader is a party to it."
+
+admin.report.error.failed:
+  en: "The decision could not be saved."
+  description: "Admin panel, one report's page (#312), the decision: any other failure."
+
 admin.nav.accounts:
   en: "A person"
   description: "Admin panel, the menu entry of the way to a person's page by account id (#306)."

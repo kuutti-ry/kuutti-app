@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { SanctionReason } from "./sanction.ts";
+import { MESSAGE_BODY_CEILING, MESSAGE_SEQ_MAX, MessageKind } from "./chat.ts";
+import { Sanction, SanctionReason } from "./sanction.ts";
 
 // Reports and blocks (#84, ADR-030): a person blocks somebody whose card they
 // were shown, or reports them with a reason of #106's list, which blocks too.
@@ -103,7 +104,7 @@ export type ReportQueueQuery = z.infer<typeof ReportQueueQuery>;
  * One report as the queue lists it (#311, TD-5): why, where and when it was
  * made, and both people by account id with how they have figured in reports
  * before; never the reporter's note or anything of a conversation, which are
- * read on opening the report (#312, an audit row). The counts leave out every
+ * read on opening the report (`GET /admin/reports/{id}`, #312, an audit row). The counts leave out every
  * report the reading member of staff is a party to (ADR-030 §6).
  */
 export const ReportListItem = z
@@ -150,3 +151,75 @@ export const ReportQueue = z
   })
   .meta({ id: "ReportQueue" });
 export type ReportQueue = z.infer<typeof ReportQueue>;
+
+/** Whose line a copied message was, seen from the report (#351). Mirrors the database's report_message_side. */
+export const ReportMessageSide = z.enum(["reporter", "reported"]).meta({ id: "ReportMessageSide" });
+export type ReportMessageSide = z.infer<typeof ReportMessageSide>;
+
+export const ReportParams = z.object({ id: z.uuid() }).meta({ id: "ReportParams" });
+
+/** A photo of a report's frozen copy, by the line that holds it: no photo id leaves the API. */
+export const ReportCopyPhotoParams = z
+  .object({ id: z.uuid(), seq: z.coerce.number().int().min(1).max(MESSAGE_SEQ_MAX) })
+  .meta({ id: "ReportCopyPhotoParams" });
+
+/** One line of a report's frozen copy (#312, ADR-030 §12), its words as they were when the report was filed. */
+export const ReportCopyLine = z
+  .object({
+    seq: z.int().min(1).max(MESSAGE_SEQ_MAX),
+    side: ReportMessageSide,
+    kind: MessageKind,
+    body: z.string().max(MESSAGE_BODY_CEILING).nullable(),
+    /** The copy holds the line's photo, shown on request; false on a text, and on a photo removed before the report. */
+    photo: z.boolean(),
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "ReportCopyLine" });
+export type ReportCopyLine = z.infer<typeof ReportCopyLine>;
+
+/** A sanction that may close the report as acted on: on the reported account or a ban of its identity, applied by a person since the filing. */
+export const ReportActable = Sanction.pick({
+  id: true,
+  kind: true,
+  reason: true,
+  createdAt: true,
+  liftedAt: true,
+}).meta({ id: "ReportActable" });
+export type ReportActable = z.infer<typeof ReportActable>;
+
+/**
+ * One report opened (#312): the queue's item, the reporter's note, who
+ * decided and with which sanction, the frozen copy of a conversation, and the
+ * sanctions that may close it. Answered after its audit row, never to a
+ * member of staff who is a party to it (ADR-030 §6).
+ */
+export const ReportDetail = ReportListItem.extend({
+  note: z.string().max(REPORT_NOTE_MAX).nullable(),
+  decidedBy: z.uuid().nullable(),
+  sanctionId: z.uuid().nullable(),
+  /** Null for a card's report; the whole conversation otherwise, as the export answers one (ExportedConversation's bound). */
+  copy: z.array(ReportCopyLine).max(1_000_000).nullable(),
+  /** Newest first; empty once decided. */
+  actable: z.array(ReportActable).max(100),
+}).meta({ id: "ReportDetail" });
+export type ReportDetail = z.infer<typeof ReportDetail>;
+
+/** A moderator's decision on a report: dismissed, or acted on with the sanction applied for it (#307). */
+export const ReportDecisionRequest = z
+  .discriminatedUnion("outcome", [
+    z.object({ outcome: z.literal("dismissed") }).strict(),
+    z.object({ outcome: z.literal("acted"), sanctionId: z.uuid() }).strict(),
+  ])
+  .meta({ id: "ReportDecisionRequest" });
+export type ReportDecisionRequest = z.infer<typeof ReportDecisionRequest>;
+
+export const ReportDecision = z
+  .object({
+    id: z.uuid(),
+    outcome: ReportOutcome,
+    decidedAt: z.iso.datetime(),
+    decidedBy: z.uuid(),
+    sanctionId: z.uuid().nullable(),
+  })
+  .meta({ id: "ReportDecision" });
+export type ReportDecision = z.infer<typeof ReportDecision>;
