@@ -70,6 +70,7 @@ Feature: Opening and deciding a report
       | "B" was warned before the report was filed |
       | "B" was banned by nobody after the report |
       | "B" came back with another account and was warned there after the report |
+      | "B" was shadow-banned by a rule after the report and a moderator reversed it |
       | no sanction has the id                    |
 
   Scenario: A ban of the reported person's identity through a later account answers the report

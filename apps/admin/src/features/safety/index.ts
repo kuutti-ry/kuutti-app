@@ -6,6 +6,8 @@ export { StaffList } from "./StaffList.tsx";
 
 // A person's page (#306), by account id only.
 export { AccountLookup, AccountPage } from "./AccountPage.tsx";
+// The automatic shadow bans, each confirmed or reversed by a moderator (#105).
+export { AutomaticBans } from "./AutomaticBans.tsx";
 export { ConfigList } from "./ConfigList.tsx";
 export { FeedbackList } from "./FeedbackList.tsx";
 // The front page (#303): what waits and for how long.

@@ -102,6 +102,8 @@ describe("route table", () => {
       "GET /admin/reports/:id",
       "GET /admin/reports/:id/copy/:seq/photo",
       "POST /admin/reports/:id/decision",
+      // The automatic shadow bans waiting for a moderator (#105).
+      "GET /admin/sanctions/automatic",
     ]) {
       expect(rolesOf(key), key).toEqual([["moderator", "admin"]]);
     }

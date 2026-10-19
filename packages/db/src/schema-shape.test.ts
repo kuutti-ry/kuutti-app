@@ -16,6 +16,7 @@ import {
   ReportSource,
   SanctionKind,
   SanctionReason,
+  SanctionRule,
 } from "@kuutti/schema";
 import { is } from "drizzle-orm";
 import { getTableConfig, isPgEnum, PgTable } from "drizzle-orm/pg-core";
@@ -316,6 +317,8 @@ describe("the checks", () => {
       "sanction_lift_check",
       "sanction_note_check",
       "sanction_review_check",
+      // An automatic rule's record, whole and only on a shadow ban by nobody (#105).
+      "sanction_rule_check",
     ]);
   });
 
@@ -385,6 +388,8 @@ describe("the enums", () => {
     expect(enums.photo_rejection_reason).toEqual(PhotoRejectionReason.options);
     expect(enums.sanction_kind).toEqual(SanctionKind.options);
     expect(enums.sanction_reason).toEqual(SanctionReason.options);
+    // The automatic rule that applied a shadow ban (#105).
+    expect(enums.sanction_rule).toEqual(SanctionRule.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
     // Where a report was made: a card, or a conversation (#351).
     expect(enums.report_source).toEqual(ReportSource.options);

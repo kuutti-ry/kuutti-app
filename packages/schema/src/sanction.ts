@@ -16,6 +16,12 @@ export const SanctionReason = z
   .meta({ id: "SanctionReason" });
 export type SanctionReason = z.infer<typeof SanctionReason>;
 
+/** The automatic rule that applied a shadow ban (#105, ADR-033); mirrors the database's sanction_rule. */
+export const SanctionRule = z
+  .enum(["reports", "first_messages", "same_first_message"])
+  .meta({ id: "SanctionRule" });
+export type SanctionRule = z.infer<typeof SanctionRule>;
+
 /** Staff's own words on a sanction or its review; held to this length by the database too. */
 export const SANCTION_NOTE_MAX = 500;
 /** A suspension ends at most this many days ahead; a longer exclusion is a ban (ADR-024 §5). */
@@ -123,3 +129,35 @@ export const ExportedSanction = z
   })
   .meta({ id: "ExportedSanction" });
 export type ExportedSanction = z.infer<typeof ExportedSanction>;
+
+/**
+ * A shadow ban an automatic rule applied, waiting for a moderator to confirm
+ * or reverse it (#105, ADR-033): which rule, what it counted and since when;
+ * counts and times only, never a message or a reporter.
+ */
+export const AutomaticBan = z
+  .object({
+    /** The sanction's id, for #307's review route. */
+    id: z.uuid(),
+    accountId: z.uuid(),
+    rule: SanctionRule,
+    count: z.int().min(1),
+    /** The earliest event the rule counted. */
+    firstAt: z.iso.datetime(),
+    /** When the rule applied it: the review deadline counts from here. */
+    createdAt: z.iso.datetime(),
+  })
+  .meta({ id: "AutomaticBan" });
+export type AutomaticBan = z.infer<typeof AutomaticBan>;
+
+/** The rules' open shadow bans, oldest first, never the reader's own; the API's clock and the hours a review may take. */
+export const AutomaticBanQueue = z
+  .object({
+    now: z.iso.datetime(),
+    /** matching_config auto_shadow_ban_review_hours: past it, a ban is late. */
+    reviewHours: z.number().min(0),
+    items: z.array(AutomaticBan).max(100),
+    total: z.int().min(0),
+  })
+  .meta({ id: "AutomaticBanQueue" });
+export type AutomaticBanQueue = z.infer<typeof AutomaticBanQueue>;

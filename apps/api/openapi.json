@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.45.0",
+    "version": "0.46.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -4055,6 +4055,80 @@
         ],
         "additionalProperties": false
       },
+      "AutomaticBanQueue": {
+        "type": "object",
+        "properties": {
+          "now": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewHours": {
+            "type": "number",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomaticBan"
+            },
+            "maxItems": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "now",
+          "reviewHours",
+          "items",
+          "total"
+        ]
+      },
+      "AutomaticBan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rule": {
+            "$ref": "#/components/schemas/SanctionRule"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "firstAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "accountId",
+          "rule",
+          "count",
+          "firstAt",
+          "createdAt"
+        ]
+      },
+      "SanctionRule": {
+        "type": "string",
+        "enum": [
+          "reports",
+          "first_messages",
+          "same_first_message"
+        ]
+      },
       "SanctionList": {
         "type": "object",
         "properties": {
@@ -4551,6 +4625,10 @@
             "type": "number",
             "minimum": 0
           },
+          "reviewHours": {
+            "type": "number",
+            "minimum": 0
+          },
           "queues": {
             "type": "array",
             "items": {
@@ -4562,6 +4640,7 @@
         "required": [
           "now",
           "responseHours",
+          "reviewHours",
           "queues"
         ]
       },
@@ -4572,6 +4651,7 @@
             "type": "string",
             "enum": [
               "reports",
+              "automatic_bans",
               "photos",
               "feedback"
             ]
@@ -5176,6 +5256,7 @@
           },
           "actorIdentityId": {
             "type": "string",
+            "nullable": true,
             "format": "uuid"
           },
           "action": {
@@ -5250,6 +5331,7 @@
           },
           "actorIdentityId": {
             "type": "string",
+            "nullable": true,
             "format": "uuid"
           },
           "action": {
@@ -9215,6 +9297,49 @@
         }
       }
     },
+    "/admin/sanctions/automatic": {
+      "get": {
+        "summary": "The automatic shadow bans waiting for a moderator",
+        "description": "The shadow bans an automatic rule applied (#105) that nobody has confirmed, reversed or lifted, oldest first, never the reader's own: the rule, what it counted and since when; counts and times only. With the API's clock and matching_config auto_shadow_ban_review_hours, past which one is late; it stays until a moderator decides. Confirm and reverse are POST /admin/sanctions/{id}/review. Moderators and admins; no audit row.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bans waiting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutomaticBanQueue"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/accounts/{id}/sanctions": {
       "get": {
         "summary": "A person's sanctions",
@@ -9971,7 +10096,7 @@
     "/admin/overview": {
       "get": {
         "summary": "What waits for the moderators",
-        "description": "Per queue (reports not decided that the reader is no party to, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.",
+        "description": "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. Moderators and admins.",
         "security": [
           {
             "session": []
@@ -10261,7 +10386,7 @@
     "/admin/reports/{id}/decision": {
       "post": {
         "summary": "Decide a report",
-        "description": "Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, applied by a person at or after the filing. Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.",
+        "description": "Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, at or after the filing, applied by a person or applied by an automatic rule and kept by a person on review (#105). Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.",
         "security": [
           {
             "session": []

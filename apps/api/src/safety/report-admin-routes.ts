@@ -107,7 +107,7 @@ const decisionRoute = createRoute({
   path: "/admin/reports/{id}/decision",
   summary: "Decide a report",
   description:
-    "Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, applied by a person at or after the filing. Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.",
+    "Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, at or after the filing, applied by a person or applied by an automatic rule and kept by a person on review (#105). Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.",
   ...bearer,
   request: {
     params: ReportParams,

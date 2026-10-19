@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
+  AutomaticBanQueue,
   BanRequest,
   ErrorResponse,
   Sanction,
@@ -14,6 +15,8 @@ import type { Deps } from "../app.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
+import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { AUTO_SHADOW_BAN_REVIEW_HOURS_KEY, listAutomaticBans } from "./automatic.ts";
 import {
   applySanction,
   liftSanction,
@@ -38,6 +41,19 @@ const staffErrors = {
   403: errorContent("admin_forbidden: the role does not allow this."),
 };
 const validation = errorContent("Validation failed.");
+
+const automaticRoute = createRoute({
+  method: "get",
+  path: "/admin/sanctions/automatic",
+  summary: "The automatic shadow bans waiting for a moderator",
+  description:
+    "The shadow bans an automatic rule applied (#105) that nobody has confirmed, reversed or lifted, oldest first, never the reader's own: the rule, what it counted and since when; counts and times only. With the API's clock and matching_config auto_shadow_ban_review_hours, past which one is late; it stays until a moderator decides. Confirm and reverse are POST /admin/sanctions/{id}/review. Moderators and admins; no audit row.",
+  ...bearer,
+  responses: {
+    200: { description: "The bans waiting.", ...json(AutomaticBanQueue) },
+    ...staffErrors,
+  },
+});
 
 const listRoute = createRoute({
   method: "get",
@@ -153,12 +169,23 @@ export function sanctionAdminRoutes(
   // On each routing path itself, which app.test.ts holds every guarded route
   // to; the list and the apply share one path and one guard.
   const moderated = new Set(
-    [listRoute, applyRoute, lift.other, review.other].map((r) => r.getRoutingPath()),
+    [automaticRoute, listRoute, applyRoute, lift.other, review.other].map((r) =>
+      r.getRoutingPath(),
+    ),
   );
   for (const path of moderated) app.use(path, requireModerator);
   for (const route of [banRoute, lift.ban, review.ban]) {
     app.use(route.getRoutingPath(), requireAdministrator);
   }
+
+  app.openapi(automaticRoute, async (c) => {
+    const staff = staffOf(c);
+    const [page, reviewHours] = await Promise.all([
+      listAutomaticBans(deps.db, staff.identityId),
+      matchingConfigNumber(deps.db, AUTO_SHADOW_BAN_REVIEW_HOURS_KEY),
+    ]);
+    return c.json({ now: now().toISOString(), reviewHours, ...page }, 200);
+  });
 
   app.openapi(listRoute, async (c) => {
     const { id } = c.req.valid("param");

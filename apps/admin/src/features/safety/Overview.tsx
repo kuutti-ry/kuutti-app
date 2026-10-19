@@ -9,12 +9,14 @@ import { ScreenTitle } from "../../lib/screen-title.tsx";
 
 // The panel's front page (#303): what waits in each queue and how long the
 // oldest has, measured by the API's clock, with the response time the
-// association promises (#299): past it the line says "Late" in words and
-// weight, never by colour alone. Counts of queues only; nothing about a
-// person. English only (TD-17).
+// association promises (#299), or for the automatic shadow bans the review
+// time of their own (#105): past it the line says "Late" in words and weight,
+// never by colour alone. Counts of queues only; nothing about a person.
+// English only (TD-17).
 
 const QUEUES: Record<OverviewQueue["queue"], { label: PlainMessageKey; path: string }> = {
   reports: { label: "admin.overview.queue.reports", path: "/reports" },
+  automatic_bans: { label: "admin.overview.queue.automaticBans", path: "/automatic-bans" },
   photos: { label: "admin.overview.queue.photos", path: "/photos" },
   feedback: { label: "admin.overview.queue.feedback", path: "/feedback" },
 };
@@ -66,8 +68,12 @@ export function Overview() {
           <ul className="overview">
             {state.overview.queues.map((q) => {
               const { label, path } = QUEUES[q.queue];
-              const { now, responseHours } = state.overview;
-              const late = q.oldestSince !== null && isLate(q.oldestSince, now, responseHours);
+              const { now } = state.overview;
+              const hours =
+                q.queue === "automatic_bans"
+                  ? state.overview.reviewHours
+                  : state.overview.responseHours;
+              const late = q.oldestSince !== null && isLate(q.oldestSince, now, hours);
               return (
                 <li key={q.queue}>
                   <Link className="target" to={path}>
@@ -82,7 +88,7 @@ export function Overview() {
                   {late && (
                     <>
                       {" "}
-                      <strong>{t("admin.late", { hours: String(responseHours) })}</strong>
+                      <strong>{t("admin.late", { hours: String(hours) })}</strong>
                     </>
                   )}
                 </li>

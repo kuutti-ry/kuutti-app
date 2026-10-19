@@ -855,7 +855,10 @@ describe("a report from a conversation in a race", () => {
       await erasing.query(erased === null ? "COMMIT" : "ROLLBACK");
       expect(db.ran()).toBe(true);
       expect(waited).toBe(true);
-      expect({ filed, erased }).toEqual({ filed: { outcome: "filed" }, erased: null });
+      expect({ filed, erased }).toEqual({
+        filed: { outcome: "filed", reportedAccountId: b },
+        erased: null,
+      });
       // The copy names B's photo; the erasure, let go after the commit, held it.
       const copy = await pool.query(
         `SELECT rm.side, rm.photo_id FROM report_message rm JOIN report r ON r.id = rm.report_id
@@ -903,7 +906,7 @@ describe("a report from a conversation in a race", () => {
       const filed = await pending.outcome;
       await reporting.query(typeof filed === "string" ? "ROLLBACK" : "COMMIT");
       expect(waited).toBe(true);
-      expect(filed).toEqual({ outcome: "filed" });
+      expect(filed).toEqual({ outcome: "filed", reportedAccountId: b });
       // The unmatch's time stays; the close becomes the reporter's block.
       const close = await pool.query(
         "SELECT closed_at, closed_how, closed_by FROM conversation WHERE id = $1",
@@ -939,8 +942,8 @@ describe("a report from a conversation in a race", () => {
       await second.query(typeof fromB === "string" ? "ROLLBACK" : "COMMIT");
       expect(waited).toBe(true);
       expect({ fromA, fromB }).toEqual({
-        fromA: { outcome: "filed" },
-        fromB: { outcome: "filed" },
+        fromA: { outcome: "filed", reportedAccountId: b },
+        fromB: { outcome: "filed", reportedAccountId: a },
       });
       // Each copy is the whole thread, each line's side seen from its own report.
       const copies = await pool.query<{ reporter: string; sides: string[] }>(

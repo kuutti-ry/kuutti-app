@@ -5332,6 +5332,10 @@ admin.overview.queue.reports:
   en: "Reports"
   description: "Admin panel, the report queue's name on the front page, a link to it (#311)."
 
+admin.overview.queue.automaticBans:
+  en: "Automatic shadow bans"
+  description: "Admin panel, the name on the front page of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each; a link to them (#105)."
+
 admin.overview.queue.photos:
   en: "Photo review queue"
   description: "Admin panel, the photo queue's name on the front page, a link to it (#303)."
@@ -5362,7 +5366,91 @@ admin.age.days:
 
 admin.late:
   en: "Late (response time: {hours} h)"
-  description: "Admin panel, after a queue on the front page whose oldest (#303), or a report in the queue (#311), has waited longer than matching_config moderation_response_hours, the time the association promises (#299); said in words and bold, never by colour alone."
+  description: "Admin panel, after a queue on the front page whose oldest (#303), or a report in the queue (#311), has waited longer than matching_config moderation_response_hours, the time the association promises (#299); for the automatic shadow bans, on the front page and in their list, longer than matching_config auto_shadow_ban_review_hours (#105). Said in words and bold, never by colour alone."
+
+admin.automaticBans.title:
+  en: "Automatic shadow bans"
+  description: "Admin panel, the heading of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each (#105)."
+
+admin.automaticBans.explain:
+  en: "A rule hid these people from everyone else, and they are not told. Confirm or reverse each within {hours, plural, one {# hour} other {# hours}}. Past that the shadow ban stays as it is, and says Late."
+  description: "Admin panel, the automatic shadow bans (#105): what the list is; {hours} is matching_config auto_shadow_ban_review_hours."
+
+admin.automaticBans.loading:
+  en: "Loading the automatic shadow bans…"
+  description: "Admin panel, the automatic shadow bans while the list loads (#105)."
+
+admin.automaticBans.error:
+  en: "The automatic shadow bans could not be loaded. Try Refresh."
+  description: "Admin panel, the automatic shadow bans when the list failed to load (#105)."
+
+admin.automaticBans.refresh:
+  en: "Refresh"
+  description: "Admin panel, the automatic shadow bans: reload the list (#105)."
+
+admin.automaticBans.total:
+  en: "{total, plural, =0 {No automatic shadow ban waits.} one {# automatic shadow ban waits.} other {# automatic shadow bans wait.}}"
+  description: "Admin panel, the automatic shadow bans: how many wait for a moderator in all, said again when one is decided (#105)."
+
+admin.automaticBans.shown:
+  en: "Showing the first {shown} of them."
+  description: "Admin panel, the automatic shadow bans, after the total when the list holds only its first page (#105)."
+
+admin.automaticBans.account:
+  en: "Account {account}"
+  description: "Admin panel, the automatic shadow bans: a link to the hidden person's page, with their account id shortened (#105)."
+
+admin.automaticBans.rule.reports:
+  en: "{people, plural, one {# person} other {# people}} reported this account between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the reports rule applied it; {people} is how many distinct people reported, {first} the first report's time and {at} when the rule applied the ban (#105)."
+
+admin.automaticBans.rule.first_messages:
+  en: "Sent the first message of {conversations, plural, one {# conversation} other {# conversations}} between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the rule on how many first messages a person sends applied it; {conversations} is how many, {first} the first one's time and {at} when the rule applied the ban (#105)."
+
+admin.automaticBans.rule.same_first_message:
+  en: "Sent the same first message to {people, plural, one {# person} other {# people}} between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the rule on one first message sent to many applied it; {people} is to how many, {first} the first one's time and {at} when the rule applied the ban. The message itself is never shown (#105)."
+
+admin.automaticBans.hidden:
+  en: "Hidden: {age}."
+  description: "Admin panel, the automatic shadow bans: how long the person has been hidden, by the API's clock, {age} being one of the admin.age texts (#105)."
+
+admin.automaticBans.confirm:
+  en: "Confirm"
+  description: "Admin panel, the automatic shadow bans (#105): the button that keeps the shadow ban, in the list and in its confirm step."
+
+admin.automaticBans.reverse:
+  en: "Reverse"
+  description: "Admin panel, the automatic shadow bans (#105): the button that lifts the shadow ban, in the list and in its confirm step."
+
+admin.automaticBans.confirmTitle:
+  en: "Confirm the automatic shadow ban on account {account}"
+  description: "Admin panel, the automatic shadow bans (#105): the title of the step that keeps one; {account} is the account id shortened, so the moderator sees whose ban it is."
+
+admin.automaticBans.confirmEffect:
+  en: "The person stays hidden from everyone else, and what they send stays withheld, until somebody lifts it. They are not told. The reports filed before it can then be closed with it, one by one."
+  description: "Admin panel, the automatic shadow bans (#105): what confirming one does, in words."
+
+admin.automaticBans.reverseTitle:
+  en: "Reverse the automatic shadow ban on account {account}"
+  description: "Admin panel, the automatic shadow bans (#105): the title of the step that lifts one; {account} is the account id shortened, so the moderator sees whose ban it is."
+
+admin.automaticBans.reverseEffect:
+  en: "The person is seen again at once, unless something else still open hides them, and what they sent while hidden reaches the people they wrote to. They are not told."
+  description: "Admin panel, the automatic shadow bans (#105): what reversing one does, in words."
+
+admin.automaticBans.done.confirm:
+  en: "Confirmed: the shadow ban on account {account} stays. The reports filed before it can now be closed with it, one by one."
+  description: "Admin panel, the automatic shadow bans (#105): the status after a moderator confirmed one, followed by a link to the report queue; {account} is the account id shortened."
+
+admin.automaticBans.done.reverse:
+  en: "Reversed: the automatic shadow ban on account {account} is lifted."
+  description: "Admin panel, the automatic shadow bans (#105): the status after a moderator reversed one; {account} is the account id shortened."
+
+admin.automaticBans.reportsLink:
+  en: "Open the reports"
+  description: "Admin panel, the automatic shadow bans (#105): after a confirmation, the link to the report queue, where the person's reports wait under one heading."
 
 admin.reports.title:
   en: "Reports"
@@ -5880,6 +5968,14 @@ admin.audit.noRole:
   en: "None now"
   description: "Admin panel, the audit log: the actor holds no role any more (#309)."
 
+admin.audit.roleAutomatic:
+  en: "Not a person"
+  description: "Admin panel, the audit log (#309), the role column of a row the automatic rules wrote (#105): they hold no role, and never held one."
+
+admin.audit.actorAutomatic:
+  en: "The automatic rules"
+  description: "Admin panel, the audit log and a person's page: who did it, when no person did: a shadow ban an automatic rule applied (#105)."
+
 admin.audit.subject:
   en: "Subject"
   description: "Admin panel, audit log table column (#309)."
@@ -6199,6 +6295,10 @@ admin.nav.label:
 admin.nav.reports:
   en: Reports
   description: "Admin panel, the menu entry of the report queue (#311)."
+
+admin.nav.automaticBans:
+  en: Automatic bans
+  description: "Admin panel, the menu entry of the shadow bans an automatic rule applied, waiting for a moderator to confirm or reverse each (#105)."
 
 admin.nav.photos:
   en: Photos

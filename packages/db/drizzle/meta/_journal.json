@@ -449,6 +449,20 @@
       "when": 1792384544826,
       "tag": "0063_conversation_notify_close_only",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1792402704362,
+      "tag": "0064_auto_shadow_ban",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1792402714276,
+      "tag": "0065_auto_shadow_ban_config",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@ import {
   AccountLookup,
   AccountPage,
   AuditLog,
+  AutomaticBans,
   ConfigList,
   FeedbackList,
   Overview,
@@ -56,6 +57,12 @@ const SCREENS: readonly Screen[] = [
     roles: ["moderator", "admin"],
     element: <ReportPage />,
     inMenu: false,
+  },
+  {
+    path: "/automatic-bans",
+    label: "admin.nav.automaticBans",
+    roles: ["moderator", "admin"],
+    element: <AutomaticBans />,
   },
   {
     path: "/photos",

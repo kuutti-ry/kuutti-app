@@ -17,6 +17,9 @@ export {
   REPORT_AFTER_CLOSE_DAYS_KEY,
   reportWindowHolds,
 } from "./conversations.ts";
+// The measure for the automatic rules on first messages (#105, ADR-033):
+// counts and times, never a word.
+export { firstMessageCounts } from "./first-messages.ts";
 export { startChatListener } from "./listen.ts";
 // The live half (#349): the registry and hub, the listener, the socket's route.
 export { createLive, type Live } from "./live.ts";

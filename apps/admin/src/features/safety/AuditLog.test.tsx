@@ -207,6 +207,38 @@ describe("the audit log", () => {
     ).toEqual(["spam", "7", "false", "–"]);
   });
 
+  it("names the automatic rules as who did it when no person did: a rule's shadow ban (#105)", async () => {
+    fetchMock([
+      pages({
+        "": page([
+          row({
+            actorIdentityId: null,
+            actorRole: null,
+            action: "sanction.apply",
+            detail: { rule: "reports", count: 3 },
+          }),
+        ]),
+      }),
+    ]);
+    show();
+    const table = await shown();
+    const [cells] = within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((tr) =>
+        within(tr)
+          .getAllByRole("cell")
+          .map((cell) => cell.textContent),
+      );
+    expect(cells?.slice(0, 4)).toEqual([
+      formatDateTime("en", new Date(AT)),
+      "The automatic rules",
+      "Not a person",
+      "sanction.apply",
+    ]);
+    expect(within(table).queryByText(ACTOR)).toBeNull();
+  });
+
   it("links an account or a photo to the person's page by the whole id, and no other subject or a photo that is gone", async () => {
     fetchMock([
       pages({

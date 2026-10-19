@@ -29,7 +29,8 @@ const AUDIT_ACTIONS = [
 type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
 export type AuditEntry = {
-  actorIdentityId: string;
+  /** Null only for a shadow ban an automatic rule applied (#105); the database refuses it on any other action. */
+  actorIdentityId: string | null;
   action: AuditAction;
   /** "any": an audit read narrowed to a subject id of no named type (#309). */
   subjectType: "photo" | "feedback" | "account" | "config" | "report" | "any";

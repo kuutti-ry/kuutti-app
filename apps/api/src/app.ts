@@ -48,6 +48,7 @@ import { exportProfile, profileRoutes } from "./profile/index.ts";
 import {
   accountAdminRoutes,
   auditAdminRoutes,
+  checkFirstMessage,
   configAdminRoutes,
   feedbackAdminRoutes,
   feedbackRoutes,
@@ -218,7 +219,17 @@ export function createApp(deps: Deps) {
   // What a person chose to be notified of, and the notices in the app (#176, ADR-032).
   app.route("/", notificationRoutes(deps, guard));
   // The conversations a match opens and their text messages (#348, ADR-031).
-  app.route("/", chatRoutes(deps, guard));
+  // A conversation's first message is checked by the automatic rules (#105,
+  // ADR-033): the safety slice decides, the chat only measures.
+  app.route(
+    "/",
+    chatRoutes(deps, guard, (accountId, conversationId) =>
+      checkFirstMessage(
+        { db: deps.db, logger: deps.logger, now: deps.now ?? (() => new Date()) },
+        { accountId, conversationId },
+      ),
+    ),
+  );
   // ...and what changes in them, live over one socket (#349, ADR-031 §5).
   app.route(
     "/",

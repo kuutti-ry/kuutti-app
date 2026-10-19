@@ -127,10 +127,15 @@ export async function reportSummary(
  * A sanction `s` that may close report `r` as acted on (#312): on the
  * reported account, or a ban of its identity set through any of its accounts
  * (the set the person's page lists), applied by a person at or after the
- * filing. Lifted or reviewed ones answer too, and one sanction may close
- * several reports; what no person applied (#105's rules) does not.
+ * filing, or applied by an automatic rule and kept by a person on review
+ * (#105; a review that lifts writes its own instant as the lift, so a kept
+ * one is reviewed with any other lift time). Lifted or reviewed ones answer
+ * too, and one sanction may close several reports; an automatic ban nobody
+ * kept does not.
  */
-const NAMEABLE = `s.created_by IS NOT NULL AND s.created_at >= r.created_at
+const NAMEABLE = `(s.created_by IS NOT NULL
+       OR (s.reviewed_at IS NOT NULL AND s.lifted_at IS DISTINCT FROM s.reviewed_at))
+  AND s.created_at >= r.created_at
   AND (s.account_id = r.reported_account_id
        OR (s.kind = 'ban' AND s.identity_id =
            (SELECT a.identity_id FROM account a WHERE a.id = r.reported_account_id)))`;

@@ -325,7 +325,16 @@ const stopShareRoute = createRoute({
   },
 });
 
-export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
+/**
+ * `opened` is the safety slice's check after a conversation's first message
+ * (#105, ADR-033), handed in by app.ts so the chat never imports safety;
+ * awaited after the send has committed, it changes no answer.
+ */
+export function chatRoutes(
+  deps: Deps,
+  guard: MiddlewareHandler<AppEnv>,
+  opened?: (accountId: string, conversationId: string) => Promise<void>,
+) {
   const app = new OpenAPIHono<AppEnv>();
   const chat = (): ChatDeps => ({
     db: deps.db,
@@ -436,6 +445,7 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
       clientId: body.clientId,
       body: body.body,
     });
+    if (sent.created && sent.message.seq === 1) await opened?.(accountId, id);
     return sent.created ? c.json(sent.message, 201) : c.json(sent.message, 200);
   });
 
@@ -452,6 +462,7 @@ export function chatRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
         caption,
         bytes: new Uint8Array(await form.photo.arrayBuffer()),
       });
+      if (sent.created && sent.message.seq === 1) await opened?.(accountId, id);
       return sent.created ? c.json(sent.message, 201) : c.json(sent.message, 200);
     } catch (error) {
       // The wait goes in the header, as a limiter's refusal says it.

@@ -22,7 +22,7 @@ const iso = (at: Date | null) => (at ? at.toISOString() : null);
 async function auditAbout(db: Queryable, accountId: string): Promise<AdminAuditRow[]> {
   const { rows } = await db.query<{
     at: Date;
-    actor_identity_id: string;
+    actor_identity_id: string | null;
     action: string;
     subject_type: string;
     subject_id: string;

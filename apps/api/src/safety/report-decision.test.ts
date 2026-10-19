@@ -680,6 +680,7 @@ describe("POST /admin/reports/{id}/decision", () => {
       ['"B" was warned before the report was filed'],
       ['"B" was banned by nobody after the report'],
       ['"B" came back with another account and was warned there after the report'],
+      ['"B" was shadow-banned by a rule after the report and a moderator reversed it'],
       ["no sanction has the id"],
     ] as const)("%s", async ([sanction], { ctx, app }) => {
       const moderator = await staffSession(ctx.client);
@@ -706,6 +707,21 @@ describe("POST /admin/reports/{id}/decision", () => {
           return (await warn(ctx.client, later, moderator.identityId, "2026-10-15T09:00:00.000Z"))
             .id;
         },
+        // An automatic ban a person reversed answers nothing (#105): only one kept does.
+        '"B" was shadow-banned by a rule after the report and a moderator reversed it':
+          async () => {
+            const { rows } = await ctx.client.query<{ id: string }>(
+              `INSERT INTO sanction (identity_id, account_id, kind, reason, note, created_at,
+                                     rule, rule_count, rule_first_at, lifted_at, lifted_by,
+                                     reviewed_at, reviewed_by, review_note)
+               SELECT identity_id, id, 'shadow_ban', 'other', 'Applied by the automatic rule.',
+                      '2026-10-15T09:00:00Z', 'reports', 3, '2026-10-15T08:00:00Z',
+                      '2026-10-15T10:00:00Z', $2, '2026-10-15T10:00:00Z', $2, 'Not abuse.'
+                 FROM account WHERE id = $1 RETURNING id`,
+              [b.accountId, moderator.identityId],
+            );
+            return rows[0]?.id as string;
+          },
         "no sanction has the id": async () => randomUUID(),
       }[sanction]();
       const before = await written(ctx.client);

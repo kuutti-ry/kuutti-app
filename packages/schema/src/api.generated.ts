@@ -3919,6 +3919,63 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/sanctions/automatic": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The automatic shadow bans waiting for a moderator
+         * @description The shadow bans an automatic rule applied (#105) that nobody has confirmed, reversed or lifted, oldest first, never the reader's own: the rule, what it counted and since when; counts and times only. With the API's clock and matching_config auto_shadow_ban_review_hours, past which one is late; it stays until a moderator decides. Confirm and reverse are POST /admin/sanctions/{id}/review. Moderators and admins; no audit row.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The bans waiting. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AutomaticBanQueue"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/accounts/{id}/sanctions": {
         parameters: {
             query?: never;
@@ -4668,7 +4725,7 @@ export interface paths {
         };
         /**
          * What waits for the moderators
-         * @description Per queue (reports not decided that the reader is no party to, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; and matching_config moderation_response_hours, past which the oldest is late. Moderators and admins.
+         * @description Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. Moderators and admins.
          */
         get: {
             parameters: {
@@ -4960,7 +5017,7 @@ export interface paths {
         put?: never;
         /**
          * Decide a report
-         * @description Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, applied by a person at or after the filing. Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.
+         * @description Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, at or after the filing, applied by a person or applied by an automatic rule and kept by a person on review (#105). Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.
          */
         post: {
             parameters: {
@@ -6669,6 +6726,27 @@ export interface components {
         ReadRequest: {
             upTo: number;
         };
+        AutomaticBanQueue: {
+            /** Format: date-time */
+            now: string;
+            reviewHours: number;
+            items: components["schemas"]["AutomaticBan"][];
+            total: number;
+        };
+        AutomaticBan: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            accountId: string;
+            rule: components["schemas"]["SanctionRule"];
+            count: number;
+            /** Format: date-time */
+            firstAt: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        /** @enum {string} */
+        SanctionRule: "reports" | "first_messages" | "same_first_message";
         SanctionList: {
             items: components["schemas"]["SanctionEntry"][];
         };
@@ -6787,11 +6865,12 @@ export interface components {
             /** Format: date-time */
             now: string;
             responseHours: number;
+            reviewHours: number;
             queues: components["schemas"]["OverviewQueue"][];
         };
         OverviewQueue: {
             /** @enum {string} */
-            queue: "reports" | "photos" | "feedback";
+            queue: "reports" | "automatic_bans" | "photos" | "feedback";
             waiting: number;
             /** Format: date-time */
             oldestSince: string | null;
@@ -6949,7 +7028,7 @@ export interface components {
             /** Format: date-time */
             at: string;
             /** Format: uuid */
-            actorIdentityId: string;
+            actorIdentityId: string | null;
             action: string;
             subjectType: string;
             /** Format: uuid */
@@ -6966,7 +7045,7 @@ export interface components {
             /** Format: date-time */
             at: string;
             /** Format: uuid */
-            actorIdentityId: string;
+            actorIdentityId: string | null;
             action: string;
             subjectType: string;
             /** Format: uuid */
