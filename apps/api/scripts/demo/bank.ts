@@ -106,7 +106,13 @@ async function patient(context: BankContext, input: URL, init?: RequestInit): Pr
 }
 
 export type Login =
-  | { kind: "session"; outcome: AuthExchangeResponse["outcome"]; accessToken: string }
+  | {
+      kind: "session";
+      outcome: AuthExchangeResponse["outcome"];
+      accessToken: string;
+      /** For a caller that uses the session later than an access token lives (the e2e's chat-live, #349). */
+      refreshToken: string;
+    }
   | { kind: "refused"; error: string; until: string | null };
 
 export class DemoError extends Error {
@@ -255,7 +261,12 @@ export async function loginAs(
   });
   if (!exchanged.ok) throw new DemoError(`/auth/exchange: ${exchanged.status}`);
   const session = AuthExchangeResponse.parse(await exchanged.json());
-  return { kind: "session", outcome: session.outcome, accessToken: session.accessToken };
+  return {
+    kind: "session",
+    outcome: session.outcome,
+    accessToken: session.accessToken,
+    refreshToken: session.refreshToken,
+  };
 }
 
 /** One call of the API as the persona. Throws with the envelope's code, never with a body. */

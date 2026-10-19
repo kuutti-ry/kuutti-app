@@ -13,6 +13,12 @@
  * Maestro's addMedia reads files inside the flows' workspace and does not
  * follow a link out of it. Homebrew's OpenJDK, which Maestro needs, is
  * keg-only, so it is put on the PATH here.
+ *
+ * chat-live (#349) needs a second phone: its script writes as Ville over
+ * HTTP while the flow watches Antti's screen. When it is among the flows to
+ * run, Ville signs in here first, at the mock bank on this computer as the
+ * demo commands sign in, and the flow is handed the refresh token and the
+ * API's address (E2E_API_URL, http://127.0.0.1:3000 unless set).
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -30,6 +36,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse, parseAllDocuments, stringify } from "yaml";
 // By path: the root is no workspace of @kuutti/db, and this is a command line (the demo tools' rule).
+import { loginAs } from "../apps/api/scripts/demo/bank.ts";
+import { DEMO_PERSONAS } from "../packages/db/src/seed/personas.ts";
 import { demoAssetsDir } from "../packages/db/src/seed/photos.ts";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -57,7 +65,11 @@ if (lstatSync(MEDIA, { throwIfNoEntry: false })?.isSymbolicLink()) rmSync(MEDIA)
 cpSync(photos, MEDIA, { recursive: true, force: true });
 
 const single = args.some((arg) => arg.endsWith(".yaml"));
-const config = single ? [] : planRun(shard);
+const plan = single
+  ? { config: [], flows: args.filter((arg) => arg.endsWith(".yaml")) }
+  : planRun(shard);
+const { config } = plan;
+const live = plan.flows.some((flow) => flow.endsWith("chat-live.yaml")) ? await liveEnv() : [];
 // A simulator named by its UDID is booted if it is not and shut down after the run, passed or
 // failed: left booted between runs, one gathered 127 web content processes, some 6 GB, in an
 // hour of runs (11/10/2026). An emulator's serial cannot start it again, so Android stays up.
@@ -70,13 +82,36 @@ const metro = process.env.METRO_PORT ? ["-e", `METRO_PORT=${process.env.METRO_PO
 // Off a Mac (CI) there is no Homebrew, and the job puts its own JDK on the PATH.
 const brew = spawnSync("brew", ["--prefix", "openjdk"], { encoding: "utf8" });
 const jdk = brew.status === 0 ? `${brew.stdout.trim()}/bin:` : "";
-const run = spawnSync("maestro", [...global, "test", ...config, ...metro, ...args, ...target], {
-  cwd: ROOT,
-  stdio: "inherit",
-  env: { ...process.env, PATH: `${jdk}${process.env.PATH ?? ""}` },
-});
+const run = spawnSync(
+  "maestro",
+  [...global, "test", ...config, ...metro, ...live, ...args, ...target],
+  {
+    cwd: ROOT,
+    stdio: "inherit",
+    env: { ...process.env, PATH: `${jdk}${process.env.PATH ?? ""}` },
+  },
+);
 if (simulator) spawnSync("xcrun", ["simctl", "shutdown", simulator], { stdio: "inherit" });
 process.exit(run.status ?? 1);
+
+/**
+ * chat-live's second phone (#349): Ville's session, made through the mock bank
+ * as `pnpm demo:reset` makes the personas', handed to Maestro as the refresh
+ * token. The flow's script trades it for an access token when it writes, so
+ * the fifteen minutes an access token lives never run out first. The bank
+ * and the API must be on this computer (`loginAs` refuses anything else).
+ */
+async function liveEnv(): Promise<string[]> {
+  const api = process.env.E2E_API_URL ?? "http://127.0.0.1:3000";
+  const ville = DEMO_PERSONAS.find((persona) => persona.key === "ville");
+  if (!ville) throw new Error("no persona ville");
+  const login = await loginAs(ville, { api, fetch, now: () => new Date() });
+  if (login.kind !== "session") {
+    console.error(`e2e: chat-live: the bank refused Ville (${login.error}); run pnpm demo:reset`);
+    process.exit(1);
+  }
+  return ["-e", `API_URL=${api}`, "-e", `CHAT_LIVE_REFRESH=${login.refreshToken}`];
+}
 
 /**
  * The order of config.yaml held to the flows, and for `--shard i/n` a config of the i-th stretch,
@@ -85,7 +120,7 @@ process.exit(run.status ?? 1);
  * and a name twice are refused here. A stretch is cut where the running weight passes i/n of the
  * whole, so a persona's flows stay on one device as far as the cut allows (#226).
  */
-function planRun(shard: string | undefined): string[] {
+function planRun(shard: string | undefined): { config: string[]; flows: string[] } {
   const dir = resolve(ROOT, WORKSPACE);
   const order: string[] = parse(readFileSync(join(dir, "config.yaml"), "utf8")).executionOrder
     .flowsOrder;
@@ -110,7 +145,9 @@ function planRun(shard: string | undefined): string[] {
     );
     process.exit(1);
   }
-  if (shard === undefined) return [];
+  if (shard === undefined) {
+    return { config: [], flows: order.map((name) => `flows/${flows.get(name)?.file}`) };
+  }
 
   const [i, n] = shard.split("/").map(Number);
   const total = order.reduce((sum, name) => sum + (flows.get(name)?.weight ?? 0), 0);
@@ -137,7 +174,7 @@ function planRun(shard: string | undefined): string[] {
   console.log(
     `e2e: shard ${shard}, ${part.length} of ${order.length} flows: ${flowsOf.join(", ")}`,
   );
-  return ["--config", file];
+  return { config: ["--config", file], flows: flowsOf };
 }
 
 /**

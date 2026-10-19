@@ -1,0 +1,50 @@
+# A message arrives live (#349, ADR-031 §9): Antti has his conversation with
+# Ville open, and Ville writes, over HTTP from the flow's script, as his phone
+# would. The message shows on Antti's screen without a reload, and Antti's
+# phone marks it read at once, which Ville's view of the conversation tells.
+# Ville's session comes from scripts/e2e.ts, which signs him in at the mock
+# bank before the run when this flow is among those to run (`pnpm e2e`; a
+# bare `maestro test` has no session for him and the script says so). Each
+# run adds a message of its own words, so it runs again without a reset.
+appId: fi.kuutti.app
+name: A message the other person writes arrives on an open conversation, and is marked read at once
+---
+# Letters only, the run's own at the end: the send refuses what looks like a
+# number or a handle, and an earlier run's message may be on the screen too.
+- evalScript: "${output.token = Date.now().toString(36).replace(/[0-9]/g, function (d) { return 'kmnprstvyz'.charAt(Number(d)); })}"
+- evalScript: "${output.words = 'Olen jo matkalla ' + output.token}"
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Antti Nurmi
+- openLink: kuutti://chats
+- extendedWaitUntil:
+    visible: "Ville, \\d+, .*"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Ville, \\d+, .*"
+- extendedWaitUntil:
+    visible: "(Message|Viesti|Meddelande)( .*)?"
+    timeout: 15000
+# Connected: a socket that could not connect says so at the top.
+- assertNotVisible: "Connection lost\\. Reconnecting…|Yhteys katkesi\\. Yhdistetään uudelleen…|Anslutningen bröts\\. Ansluter igen…"
+- runScript:
+    file: ../scripts/ville-session.js
+- runScript:
+    file: ../scripts/ville-writes.js
+    env:
+      WORDS: ${output.words}
+# The message arrives on the open screen, said as who, when and what.
+- extendedWaitUntil:
+    visible: "Ville, \\d{1,2}[.:]\\d{2}[^,]*, (.* )?${output.token}"
+    timeout: 15000
+# Marked read while in front: Ville's view of the conversation says so. The
+# app sends the read mark as the message is shown, before the bubble renders;
+# each failed attempt costs a hierarchy dump of the device before the next.
+# Maestro 2.11 takes at most 3 retries, whatever is asked.
+- retry:
+    maxRetries: 3
+    commands:
+      - runScript:
+          file: ../scripts/ville-reads.js
+      - assertTrue: ${output.liveRead}
