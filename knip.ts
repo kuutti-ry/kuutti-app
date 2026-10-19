@@ -29,6 +29,8 @@ const config: KnipConfig = {
         // Run by hand to draw the icons from the mask in docs/design/logo:
         // node scripts/logo/icons.mjs <mask.png> <out dir>; png.mjs is its codec.
         "scripts/logo/icons.mjs",
+        // Run by Maestro's runScript from chat-live.yaml (#349), never imported.
+        "e2e/scripts/*.js",
       ],
       metro: false,
       // app.json's userInterfaceStyle wants it on Android. A native module moves

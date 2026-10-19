@@ -254,19 +254,27 @@ jobs:
           API_URL: ${{ needs.api.outputs.api_url }}
         run: |
           # A brand-new alias took over 150 s to answer on its first
-          # deployment (PR #18); later ones are quick. Six minutes is the
-          # limit before the lane is called broken.
-          for _ in $(seq 1 72); do
-            if html=$(curl -fsS --max-time 10 "$URL/"); then break; fi
-            sleep 5
-          done
-          [ -n "${html:-}" ] || { echo "::error::$URL did not answer within 6 minutes"; exit 1; }
-          scripts=$(grep -o '/_expo/static/js/web/[^"]*\.js' <<< "$html" | sort -u)
+          # deployment (PR #18); later ones are quick. Its page can also
+          # answer before the bundle it names is served there (PR #368: the
+          # page after 27 s, its bundle 404 at once, 200 when asked later), so
+          # the page and each bundle are asked again until they answer.
+          # Six minutes in all is the limit before the lane is called broken.
+          deadline=$((SECONDS + 360))
+          fetch() {
+            until curl -fsS --max-time 30 "$1" -o "$2"; do
+              [ "$SECONDS" -lt "$deadline" ] || return 1
+              sleep 5
+            done
+          }
+          fetch "$URL/" "$RUNNER_TEMP/page.html" \
+            || { echo "::error::$URL did not answer within 6 minutes"; exit 1; }
+          scripts=$(grep -o '/_expo/static/js/web/[^"]*\.js' "$RUNNER_TEMP/page.html" | sort -u)
           [ -n "$scripts" ] || { echo "::error::no bundle referenced by $URL"; exit 1; }
           # Not `curl | grep -q`: grep exits on the first match, curl gets EPIPE
           # (exit 23) and pipefail turns a found URL into "not found".
           for s in $scripts; do
-            curl -fsS --max-time 30 "$URL$s" -o "$RUNNER_TEMP/bundle.js"
+            fetch "$URL$s" "$RUNNER_TEMP/bundle.js" \
+              || { echo "::error::$URL$s did not answer within 6 minutes"; exit 1; }
             if grep -q "$API_URL" "$RUNNER_TEMP/bundle.js"; then echo "bundle $s targets $API_URL"; exit 0; fi
           done
           echo "::error::no bundle of $URL mentions $API_URL"; exit 1
