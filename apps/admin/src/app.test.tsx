@@ -74,6 +74,27 @@ const accountAnswers = {
   [`GET /admin/accounts/${accountId}/sanctions`]: () => json({ items: [] }),
 };
 
+/** One report (#312): a card's, waiting, with no note. */
+const reportId = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
+const reportAnswers = {
+  [`GET /admin/reports/${reportId}`]: () =>
+    json({
+      id: reportId,
+      reason: "harassment",
+      source: "card",
+      createdAt: "2026-09-25T10:00:00.000Z",
+      outcome: null,
+      decidedAt: null,
+      reporter: { accountId: accountId, filed: 1, upheld: 0 },
+      reported: { accountId: "7a2d2d5f-9a8e-4a0b-9c3a-0c8d1e2f3a4b", received: 1, sanctions: 0 },
+      note: null,
+      decidedBy: null,
+      sanctionId: null,
+      copy: null,
+      actable: [],
+    }),
+};
+
 const refused = () =>
   new Response(
     JSON.stringify({ error: { code: "admin_forbidden", message: "x", requestId: "r" } }),
@@ -568,6 +589,39 @@ describe("App", () => {
     expect(screen.queryByText("No account has this id.")).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Account 6f1c1c4e" })).toBeInTheDocument();
     expect(calls).not.toContain(`GET /admin/accounts/${accountId}/sanctions`);
+  });
+
+  it("opens a report from its own address, outside the menu, asking for it once (#312)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", `/reports/${reportId}`);
+    const calls: string[] = [];
+    renderApp(staffApi("moderator", calls, { answers: reportAnswers }));
+    const heading = await screen.findByRole("heading", { level: 2, name: "Report 0b1c1c4e" });
+    expect(heading).not.toHaveFocus();
+    expect(await screen.findByText("No note.")).toBeInTheDocument();
+    expect(document.title).toBe("Report 0b1c1c4e · Kuutti admin");
+    const menu = screen.getByRole("navigation", { name: "Screens" });
+    expect(
+      within(menu)
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Overview", "Reports", "Photos", "Feedback", "A person"]);
+    expect(calls.filter((call) => call.includes("/admin/reports"))).toEqual([
+      `GET /admin/reports/${reportId}`,
+    ]);
+  });
+
+  it("says a refused report once, by the shell, never as the page's failure (#302, #312)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    window.history.replaceState(null, "", `/reports/${reportId}`);
+    renderApp(
+      staffApi("moderator", [], { answers: { [`GET /admin/reports/${reportId}`]: refused } }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Your role does not allow this.");
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.queryByText("No such report.")).toBeNull();
+    expect(screen.queryByText("The report could not be loaded.")).toBeNull();
+    expect(screen.getByRole("heading", { level: 2, name: "Report 0b1c1c4e" })).toBeInTheDocument();
   });
 
   it("says there is nothing at an address the panel does not have, and links back to the start (#302)", async () => {

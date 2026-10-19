@@ -19,8 +19,7 @@ import { groupOf } from "./label-groups.ts";
 import { isTipSignal, readThresholds } from "./moderation.ts";
 import type { MediaDeps } from "./photos.ts";
 import * as repo from "./repo.ts";
-import { objectKey } from "./store.ts";
-import { URL_TTL_MS } from "./urls.ts";
+import { staffPhotoUrl } from "./urls.ts";
 
 // The photo review queue (#49, rules/admin.md): what a moderator sees and
 // decides. Every route sits behind requireAdmin with the moderator and admin
@@ -146,13 +145,12 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
       subjectId: id,
       detail: { variant: "card", state: photo.state },
     });
-    const expiresAt = new Date(at.getTime() + URL_TTL_MS);
-    const url = await signer.sign(objectKey(photo.key, "card"), expiresAt);
+    const answer = await staffPhotoUrl(signer, photo.key, "card", at);
     deps.logger.info(
       { staffIdentityId: staff.identityId, photoId: id, variant: "card", at },
       "staff photo view",
     );
-    return c.json({ url, variant: "card" as const, expiresAt: expiresAt.toISOString() }, 200);
+    return c.json(answer, 200);
   });
 
   app.openapi(decisionRoute, async (c) => {

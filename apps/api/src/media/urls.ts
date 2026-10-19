@@ -1,6 +1,8 @@
 import { GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl as signCloudFrontUrl } from "@aws-sdk/cloudfront-signer";
 import { getSignedUrl as presignS3Url } from "@aws-sdk/s3-request-presigner";
+import type { PhotoUrlResponse, PhotoVariant } from "@kuutti/schema";
+import { objectKey } from "./store.ts";
 
 // Signed URL issuance, the fourth of the four security surfaces (security
 // checklist). A URL names one object for fifteen minutes and nothing else; the
@@ -20,6 +22,24 @@ export type UrlSigner = {
   /** A URL for the object at `objectKey`, valid until `expiresAt`. */
   sign(objectKey: string, expiresAt: Date): Promise<string>;
 };
+
+/**
+ * A photo signed for a member of staff, after the caller has written the
+ * look's audit row: fifteen minutes from `at`, counted against no budget and
+ * logged in no photo_access row (that log is keyed by a viewer's account, and
+ * staff have none). The profile photo's card for review (#306), a report's
+ * copied photo in full (#312).
+ */
+export async function staffPhotoUrl(
+  signer: UrlSigner,
+  key: string,
+  variant: PhotoVariant,
+  at: Date,
+): Promise<PhotoUrlResponse> {
+  const expiresAt = new Date(at.getTime() + URL_TTL_MS);
+  const url = await signer.sign(objectKey(key, variant), expiresAt);
+  return { url, variant, expiresAt: expiresAt.toISOString() };
+}
 
 export type CloudFrontSignerOptions = {
   /** https://<distribution host>, without a path; the object key is appended. */

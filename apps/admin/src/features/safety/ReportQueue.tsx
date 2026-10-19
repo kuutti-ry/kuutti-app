@@ -1,12 +1,9 @@
-import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
+import { formatDateTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import {
   type ReportListItem,
-  type ReportOutcome,
   ReportQueue as ReportPage,
   type ReportQueueQuery,
-  type ReportSource,
-  type SanctionReason,
 } from "@kuutti/schema";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -14,6 +11,7 @@ import { isLate, useAge } from "../../lib/age.ts";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
+import { OUTCOME, REASON, SOURCE } from "./report-words.ts";
 
 // The report queue (#311, TD-5, rules/admin.md): the reports waiting for a
 // decision, the oldest first, those about one person under one heading, each
@@ -21,29 +19,11 @@ import { useList } from "../../lib/use-list.ts";
 // and weight; and both people by account id, linked to their pages (#306),
 // with how each has figured in reports before. Decided reports are behind the
 // filter, for the record. Neither the reporter's words nor the conversation
-// are here: opening a report is #312's, with its audit row. Plain HTML,
-// keyboard first; English only (TD-17).
+// are here: each report's first line opens its own page (#312, ReportPage),
+// whose every open is an audit row. The values' words are shared with that
+// page (report-words.ts). Plain HTML, keyboard first; English only (TD-17).
 
 type State = ReportQueueQuery["state"];
-
-const REASON: Record<SanctionReason, PlainMessageKey> = {
-  harassment: "admin.sanction.reason.harassment",
-  misrepresentation: "admin.sanction.reason.misrepresentation",
-  under_age: "admin.sanction.reason.under_age",
-  commercial_use: "admin.sanction.reason.commercial_use",
-  scraping: "admin.sanction.reason.scraping",
-  other: "admin.sanction.reason.other",
-};
-
-const SOURCE: Record<ReportSource, PlainMessageKey> = {
-  card: "admin.reports.source.card",
-  conversation: "admin.reports.source.conversation",
-};
-
-const OUTCOME: Record<ReportOutcome, PlainMessageKey> = {
-  dismissed: "admin.reports.outcome.dismissed",
-  acted: "admin.reports.outcome.acted",
-};
 
 /** The account id as the panel shortens it elsewhere (#171). */
 const short = (accountId: string) => accountId.slice(0, 8);
@@ -160,10 +140,13 @@ function ReportGroup({
         {items.map((item) => (
           <li key={item.id}>
             <p>
-              <strong>{t(REASON[item.reason])}</strong>, {t(SOURCE[item.source])} ·{" "}
-              {t("admin.reports.filed", {
-                time: formatDateTime(locale, new Date(item.createdAt)),
-              })}
+              {/* One link per report, named by its reason, source and filing time. */}
+              <Link className="target" to={`/reports/${item.id}`}>
+                <strong>{t(REASON[item.reason])}</strong>, {t(SOURCE[item.source])} ·{" "}
+                {t("admin.reports.filed", {
+                  time: formatDateTime(locale, new Date(item.createdAt)),
+                })}
+              </Link>
             </p>
             {item.decidedAt === null ? (
               <p>

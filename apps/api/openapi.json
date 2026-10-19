@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.44.0",
+    "version": "0.45.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -4701,6 +4701,267 @@
           "decidedAt",
           "reporter",
           "reported"
+        ]
+      },
+      "ReportDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReportSource"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReportOutcome"
+          },
+          "decidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "reporter": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "filed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "upheld": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "accountId",
+              "filed",
+              "upheld"
+            ]
+          },
+          "reported": {
+            "type": "object",
+            "properties": {
+              "accountId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "received": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sanctions": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "accountId",
+              "received",
+              "sanctions"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          },
+          "decidedBy": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "sanctionId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          },
+          "copy": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/ReportCopyLine"
+            },
+            "maxItems": 1000000
+          },
+          "actable": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportActable"
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "id",
+          "reason",
+          "source",
+          "createdAt",
+          "outcome",
+          "decidedAt",
+          "reporter",
+          "reported",
+          "note",
+          "decidedBy",
+          "sanctionId",
+          "copy",
+          "actable"
+        ]
+      },
+      "ReportCopyLine": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "side": {
+            "$ref": "#/components/schemas/ReportMessageSide"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/MessageKind"
+          },
+          "body": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 10000
+          },
+          "photo": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "seq",
+          "side",
+          "kind",
+          "body",
+          "photo",
+          "createdAt"
+        ]
+      },
+      "ReportMessageSide": {
+        "type": "string",
+        "enum": [
+          "reporter",
+          "reported"
+        ]
+      },
+      "ReportActable": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SanctionKind"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/SanctionReason"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "liftedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "reason",
+          "createdAt",
+          "liftedAt"
+        ]
+      },
+      "ReportDecision": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ReportOutcome"
+          },
+          "decidedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decidedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sanctionId": {
+            "type": "string",
+            "nullable": true,
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "id",
+          "outcome",
+          "decidedAt",
+          "decidedBy",
+          "sanctionId"
+        ]
+      },
+      "ReportDecisionRequest": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "dismissed"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "acted"
+                ]
+              },
+              "sanctionId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "outcome",
+              "sanctionId"
+            ],
+            "additionalProperties": false
+          }
         ]
       },
       "AdminAccount": {
@@ -9818,6 +10079,268 @@
           },
           "403": {
             "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/{id}": {
+      "get": {
+        "summary": "One report, with the reporter's note and the frozen conversation",
+        "description": "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such report, or one the reader is a party to, answered alike.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/{id}/copy/{seq}/photo": {
+      "get": {
+        "summary": "A signed URL for a photo of a report's frozen conversation",
+        "description": "The full variant of the photo the copy holds at that line, for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            },
+            "required": true,
+            "name": "seq",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such report, a party's, or no photo at that line, answered alike.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "media_unavailable: no object storage is configured here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/{id}/decision": {
+      "post": {
+        "summary": "Decide a report",
+        "description": "Dismissed, or acted on naming the sanction applied for it: one on the reported account, or a ban of its identity, applied by a person at or after the filing. Once; written to audit_log as report.decide. Tells nobody. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: acted without a sanction, or dismissed with one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such report, or one the reader is a party to, answered alike.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "report_decided: decided already; sanction_not_for_report: the sanction does not answer this report.",
             "content": {
               "application/json": {
                 "schema": {

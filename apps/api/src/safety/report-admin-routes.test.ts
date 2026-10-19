@@ -1,7 +1,7 @@
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, ReportQueue } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
-import { type SignedIn, signedInAccount, staffSession } from "../test/account.ts";
+import { signedInAccount, staffSession } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
 import {
   test as base,
@@ -11,6 +11,7 @@ import {
   type TestContext,
   testConfig,
 } from "../test/harness.ts";
+import { accountOf, reportIn, sanctionOn, signedInPeople } from "../test/reports.ts";
 
 // The panel's report queue (#311, features/safety/report-queue.feature): the
 // order of what waits and its groups, both people's figures, the closed
@@ -49,60 +50,6 @@ async function errorCode(response: Response): Promise<string> {
   return ErrorResponse.parse(await response.json()).error.code;
 }
 
-/** A report from `reporter` about `reported`, filed at `created`; decided when `decided` is given. */
-async function reportIn(
-  ctx: TestContext,
-  reporter: string,
-  reported: string,
-  created: string,
-  decided?: { outcome: "dismissed" | "acted"; at: string; by: string },
-  source: "card" | "conversation" = "card",
-): Promise<string> {
-  const { rows } = await ctx.client.query<{ id: string }>(
-    `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, created_at,
-                         outcome, decided_at, decided_by)
-     VALUES ($1, $2, $3, 'harassment', $4, $5, $6, $7) RETURNING id`,
-    [
-      reporter,
-      reported,
-      source,
-      created,
-      decided?.outcome ?? null,
-      decided?.at ?? null,
-      decided?.by ?? null,
-    ],
-  );
-  const id = rows[0]?.id;
-  if (!id) throw new Error("test report not written");
-  return id;
-}
-
-/** A sanction on the account, as #307 leaves it; lifted when `lifted` is given. */
-async function sanctionOn(ctx: TestContext, accountId: string, lifted?: string): Promise<void> {
-  await ctx.client.query(
-    `INSERT INTO sanction (identity_id, account_id, kind, reason, note, lifted_at)
-     SELECT identity_id, id, 'warn', 'harassment', 'Kept asking for an address.', $2
-       FROM account WHERE id = $1`,
-    [accountId, lifted ?? null],
-  );
-}
-
-/** A second account of the staff member's own identity, as a person who also uses the app. */
-async function accountOf(ctx: TestContext, identityId: string, state = "active"): Promise<string> {
-  const { rows } = await ctx.client.query<{ id: string }>(
-    `INSERT INTO account (identity_id, state, birth_year, birth_month)
-     VALUES ($1, $2, 1990, 6) RETURNING id`,
-    [identityId, state],
-  );
-  return rows[0]?.id as string;
-}
-
-async function people(ctx: TestContext, n: number): Promise<SignedIn[]> {
-  const out: SignedIn[] = [];
-  for (let i = 0; i < n; i++) out.push(await signedInAccount(ctx.client));
-  return out;
-}
-
 async function auditRows(ctx: TestContext) {
   return (await ctx.client.query("SELECT * FROM audit_log ORDER BY at, id")).rows;
 }
@@ -113,12 +60,17 @@ describe("GET /admin/reports", () => {
     app,
   }) => {
     const staff = await staffSession(ctx.client);
-    const [a, b, c, x, y] = await people(ctx, 5);
+    const [a, b, c, x, y] = await signedInPeople(ctx.client, 5);
     if (!a || !b || !c || !x || !y) throw new Error("people not written");
     // Inserted out of order, so the answer cannot be the order rows went in.
-    const yReport = await reportIn(ctx, c.accountId, y.accountId, "2026-10-15T10:00:00.000Z");
-    const xLater = await reportIn(ctx, b.accountId, x.accountId, "2026-10-15T12:00:00.000Z");
-    const xFirst = await reportIn(ctx, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
+    const yReport = await reportIn(
+      ctx.client,
+      c.accountId,
+      y.accountId,
+      "2026-10-15T10:00:00.000Z",
+    );
+    const xLater = await reportIn(ctx.client, b.accountId, x.accountId, "2026-10-15T12:00:00.000Z");
+    const xFirst = await reportIn(ctx.client, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
 
     const page = await read(app, staff.headers);
     expect(page.items.map((item) => item.id)).toEqual([xFirst, xLater, yReport]);
@@ -147,11 +99,11 @@ describe("GET /admin/reports", () => {
     app,
   }) => {
     const staff = await staffSession(ctx.client);
-    const [a, b, c, x, y] = await people(ctx, 5);
+    const [a, b, c, x, y] = await signedInPeople(ctx.client, 5);
     if (!a || !b || !c || !x || !y) throw new Error("people not written");
-    const yOnly = await reportIn(ctx, c.accountId, y.accountId, "2026-10-14T00:00:00.000Z");
-    const xOld = await reportIn(ctx, a.accountId, x.accountId, "2026-10-13T00:00:00.000Z");
-    const xNew = await reportIn(ctx, b.accountId, x.accountId, "2026-10-16T08:00:00.000Z");
+    const yOnly = await reportIn(ctx.client, c.accountId, y.accountId, "2026-10-14T00:00:00.000Z");
+    const xOld = await reportIn(ctx.client, a.accountId, x.accountId, "2026-10-13T00:00:00.000Z");
+    const xNew = await reportIn(ctx.client, b.accountId, x.accountId, "2026-10-16T08:00:00.000Z");
     expect((await read(app, staff.headers)).items.map((item) => item.id)).toEqual([
       xOld,
       xNew,
@@ -161,29 +113,34 @@ describe("GET /admin/reports", () => {
 
   test("Each report shows how both people have figured in reports before", async ({ ctx, app }) => {
     const staff = await staffSession(ctx.client);
-    const [a, x, p, q, r] = await people(ctx, 5);
+    const [a, x, p, q, r] = await signedInPeople(ctx.client, 5);
     if (!a || !x || !p || !q || !r) throw new Error("people not written");
     // A filed three: one upheld, one dismissed, and the one waiting.
-    await reportIn(ctx, a.accountId, p.accountId, "2026-09-01T08:00:00.000Z", {
+    await reportIn(ctx.client, a.accountId, p.accountId, "2026-09-01T08:00:00.000Z", {
       outcome: "acted",
       at: "2026-09-02T08:00:00.000Z",
       by: staff.identityId,
     });
-    await reportIn(ctx, a.accountId, q.accountId, "2026-09-03T08:00:00.000Z", {
+    await reportIn(ctx.client, a.accountId, q.accountId, "2026-09-03T08:00:00.000Z", {
       outcome: "dismissed",
       at: "2026-09-04T08:00:00.000Z",
       by: staff.identityId,
     });
-    const waiting = await reportIn(ctx, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
+    const waiting = await reportIn(
+      ctx.client,
+      a.accountId,
+      x.accountId,
+      "2026-10-15T08:00:00.000Z",
+    );
     // X had one report before, dismissed, and a sanction since lifted.
-    await reportIn(ctx, r.accountId, x.accountId, "2026-08-01T08:00:00.000Z", {
+    await reportIn(ctx.client, r.accountId, x.accountId, "2026-08-01T08:00:00.000Z", {
       outcome: "dismissed",
       at: "2026-08-02T08:00:00.000Z",
       by: staff.identityId,
     });
-    await sanctionOn(ctx, x.accountId, "2026-08-10T08:00:00.000Z");
+    await sanctionOn(ctx.client, x.accountId, "2026-08-10T08:00:00.000Z");
     // Somebody else's sanction is not X's.
-    await sanctionOn(ctx, p.accountId);
+    await sanctionOn(ctx.client, p.accountId);
 
     const [item] = (await read(app, staff.headers)).items;
     expect(item?.id).toBe(waiting);
@@ -196,17 +153,23 @@ describe("GET /admin/reports", () => {
     app,
   }) => {
     const staff = await staffSession(ctx.client);
-    const [a, b, x] = await people(ctx, 3);
+    const [a, b, x] = await signedInPeople(ctx.client, 3);
     if (!a || !b || !x) throw new Error("people not written");
-    const open = await reportIn(ctx, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
+    const open = await reportIn(ctx.client, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
     // Filed first, decided last: the decision orders the record, not the filing.
-    const decidedLast = await reportIn(ctx, b.accountId, x.accountId, "2026-10-01T08:00:00.000Z", {
-      outcome: "acted",
-      at: "2026-10-12T08:00:00.000Z",
-      by: staff.identityId,
-    });
+    const decidedLast = await reportIn(
+      ctx.client,
+      b.accountId,
+      x.accountId,
+      "2026-10-01T08:00:00.000Z",
+      {
+        outcome: "acted",
+        at: "2026-10-12T08:00:00.000Z",
+        by: staff.identityId,
+      },
+    );
     const decidedFirst = await reportIn(
-      ctx,
+      ctx.client,
       a.accountId,
       x.accountId,
       "2026-10-05T08:00:00.000Z",
@@ -228,11 +191,11 @@ describe("GET /admin/reports", () => {
 
   test("a page holds the limit and the total counts beyond it", async ({ ctx, app }) => {
     const staff = await staffSession(ctx.client);
-    const [a, b, c, x] = await people(ctx, 4);
+    const [a, b, c, x] = await signedInPeople(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("people not written");
-    const first = await reportIn(ctx, a.accountId, x.accountId, "2026-10-14T08:00:00.000Z");
-    const second = await reportIn(ctx, b.accountId, x.accountId, "2026-10-14T09:00:00.000Z");
-    await reportIn(ctx, c.accountId, x.accountId, "2026-10-14T10:00:00.000Z");
+    const first = await reportIn(ctx.client, a.accountId, x.accountId, "2026-10-14T08:00:00.000Z");
+    const second = await reportIn(ctx.client, b.accountId, x.accountId, "2026-10-14T09:00:00.000Z");
+    await reportIn(ctx.client, c.accountId, x.accountId, "2026-10-14T10:00:00.000Z");
     const page = await read(app, staff.headers, "?limit=2");
     expect(page.items.map((item) => item.id)).toEqual([first, second]);
     expect(page.total).toBe(3);
@@ -253,18 +216,23 @@ describe("GET /admin/reports", () => {
   test("A member of staff who is a party to a report is not shown it", async ({ ctx, app }) => {
     const m = await staffSession(ctx.client);
     const other = await staffSession(ctx.client);
-    const [x, y, z] = await people(ctx, 3);
+    const [x, y, z] = await signedInPeople(ctx.client, 3);
     if (!x || !y || !z) throw new Error("people not written");
     // M uses the app too, and once did with an account since erased.
-    const mine = await accountOf(ctx, m.identityId);
-    const erased = await accountOf(ctx, m.identityId, "deleted");
-    const byM = await reportIn(ctx, mine, x.accountId, "2026-10-15T08:00:00.000Z");
-    const aboutM = await reportIn(ctx, y.accountId, mine, "2026-10-15T09:00:00.000Z");
-    const aboutErased = await reportIn(ctx, z.accountId, erased, "2026-10-15T10:00:00.000Z");
+    const mine = await accountOf(ctx.client, m.identityId);
+    const erased = await accountOf(ctx.client, m.identityId, "deleted");
+    const byM = await reportIn(ctx.client, mine, x.accountId, "2026-10-15T08:00:00.000Z");
+    const aboutM = await reportIn(ctx.client, y.accountId, mine, "2026-10-15T09:00:00.000Z");
+    const aboutErased = await reportIn(ctx.client, z.accountId, erased, "2026-10-15T10:00:00.000Z");
     // A report M is no party to: by Y, who also reported M, about X, whom M also reported.
-    const neither = await reportIn(ctx, y.accountId, x.accountId, "2026-10-15T11:00:00.000Z");
+    const neither = await reportIn(
+      ctx.client,
+      y.accountId,
+      x.accountId,
+      "2026-10-15T11:00:00.000Z",
+    );
     // Decided ones the same, behind the filter.
-    await reportIn(ctx, x.accountId, mine, "2026-10-01T08:00:00.000Z", {
+    await reportIn(ctx.client, x.accountId, mine, "2026-10-01T08:00:00.000Z", {
       outcome: "dismissed",
       at: "2026-10-02T08:00:00.000Z",
       by: other.identityId,
@@ -303,7 +271,7 @@ describe("GET /admin/reports", () => {
     app,
   }) => {
     const staff = await staffSession(ctx.client);
-    const [a, b] = await people(ctx, 2);
+    const [a, b] = await signedInPeople(ctx.client, 2);
     if (!a || !b) throw new Error("people not written");
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
       messages: [
@@ -349,9 +317,9 @@ describe("GET /admin/reports", () => {
   }) => {
     const moderator = await staffSession(ctx.client, "moderator");
     const admin = await staffSession(ctx.client, "admin");
-    const [a, x] = await people(ctx, 2);
+    const [a, x] = await signedInPeople(ctx.client, 2);
     if (!a || !x) throw new Error("people not written");
-    await reportIn(ctx, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
+    await reportIn(ctx.client, a.accountId, x.accountId, "2026-10-15T08:00:00.000Z");
     const before = await auditRows(ctx);
     const answers = [];
     for (const staff of [moderator, admin]) answers.push(await read(app, staff.headers));

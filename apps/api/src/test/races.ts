@@ -1,4 +1,12 @@
-import type { Queryable } from "@kuutti/db";
+import { resolve } from "node:path";
+import {
+  createPool,
+  migrate,
+  type Pool,
+  type PoolClient,
+  type Queryable,
+  withTemporaryDatabase,
+} from "@kuutti/db";
 
 // Races between connections on committed rows (#348, #103, #351): a piece
 // of work watched as it runs, and Postgres asked until one backend waits for
@@ -48,4 +56,30 @@ export async function waitsFor(
     if (rows[0]?.waits === true) return true;
     if (settled()) return false;
   }
+}
+
+const MIGRATIONS = resolve(import.meta.dirname, "../../../../packages/db/drizzle");
+
+/**
+ * A database of its own, migrated, with two connections held for the work
+ * and a pool for its reads: committed rows the two can race on, which the
+ * rolled-back transaction of an ordinary test cannot give (#351, #312).
+ */
+export async function withTwoConnections(
+  name: string,
+  work: (pool: Pool, first: PoolClient, second: PoolClient) => Promise<void>,
+): Promise<void> {
+  await withTemporaryDatabase(async (url) => {
+    const pool = createPool({ connectionString: url, max: 4, applicationName: name });
+    const first = await pool.connect();
+    const second = await pool.connect();
+    try {
+      await migrate(pool, MIGRATIONS);
+      await work(pool, first, second);
+    } finally {
+      first.release();
+      second.release();
+      await pool.end();
+    }
+  });
 }

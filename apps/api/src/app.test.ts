@@ -94,6 +94,19 @@ describe("route table", () => {
     }
   });
 
+  it("holds the report queue, a report opened, its copy's photos and its decision to moderators and admins (#311, #312)", async () => {
+    const routes = guardedRoutes(await bareApp());
+    const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;
+    for (const key of [
+      "GET /admin/reports",
+      "GET /admin/reports/:id",
+      "GET /admin/reports/:id/copy/:seq/photo",
+      "POST /admin/reports/:id/decision",
+    ]) {
+      expect(rolesOf(key), key).toEqual([["moderator", "admin"]]);
+    }
+  });
+
   it("holds the audit log and the staff list to the admin role (#309, #310)", async () => {
     const routes = guardedRoutes(await bareApp());
     const rolesOf = (key: string) => routes.find((r) => r.key === key)?.roles;

@@ -249,6 +249,26 @@ describe("GET /admin/audit", () => {
     ]);
   });
 
+  test("a row about a report names no person, even where its id is an account's (#312, ADR-030 §6)", async ({
+    ctx,
+  }) => {
+    const { a, admin } = await cast(ctx);
+    await auditIn(ctx, {
+      n: 1,
+      at: "2026-10-09T00:00:00.000Z",
+      actor: a.identityId,
+      action: "report.decide",
+      subjectType: "report",
+      subjectId: ACCOUNT_1,
+    });
+    const answer = await page(ctx.app, admin.headers, { subjectType: "report" });
+    expect(
+      answer.items
+        .filter((item) => item.action === "report.decide")
+        .map((item) => [item.subjectType, item.subjectId, item.accountId]),
+    ).toEqual([["report", ACCOUNT_1, null]]);
+  });
+
   test("names the actor's role now and the person behind a photo; neither once the role or the photo is gone", async ({
     ctx,
   }) => {
@@ -635,6 +655,8 @@ describe("GET /admin/audit", () => {
   test.for([
     ["an account", { subjectType: "account", subjectId: ACCOUNT_1 }, "account"],
     ["a photo", { subjectType: "photo", subjectId: PHOTO_1 }, "photo"],
+    // A report opened or decided (#312) names the report, never a person.
+    ["a report", { subjectType: "report", subjectId: ACCOUNT_2 }, "report"],
     ["an id of no named type", { subjectId: ACCOUNT_2 }, "any"],
     ["an id of a type no row names", { subjectType: "identity", subjectId: ACCOUNT_2 }, "any"],
   ] as const)(
