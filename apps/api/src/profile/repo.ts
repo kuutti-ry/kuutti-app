@@ -64,6 +64,9 @@ function storedPrompts(raw: unknown): { prompts: ProfileDocument["prompts"]; dro
 /** How many prompts of a stored document still count: the ones the registry still knows (#54 reads many rows at once). */
 export const answeredPromptsOf = (raw: unknown): number => storedPrompts(raw).prompts.length;
 
+/** A stored document's answers as the registry still knows them, a removed option unanswered: the pool reads many rows at once (#87). */
+export const answeredFieldsOf = (raw: unknown): ProfileFields => storedFields(raw).fields;
+
 const profileFrom = (r: Row): ProfileRow => {
   const fields = storedFields(r.fields);
   const prompts = storedPrompts(r.prompts);

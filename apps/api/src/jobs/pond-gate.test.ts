@@ -900,6 +900,72 @@ describe("the gate across a block", () => {
   });
 });
 
+// features/matching/filters.feature (#87): a pair one of whom has a
+// deal-breaker the other's answer does not pass is not in each other's pool,
+// so neither counts toward the other's figure; a paused one filters nothing.
+describe("the gate across a deal-breaker", () => {
+  test("The gate's count leaves a pair a deal-breaker excludes out of each other's pool", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-deal-breakers");
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const [holder] = await people(ctx.client, pond, 1, { ...ALIKE, fields: { smoking: "never" } });
+    const [smoker] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      fields: { smoking: "regularly" },
+    });
+    // Twenty-nine others: one who did not answer, whom the holder lets through, and others who never smoke.
+    const [open] = await people(ctx.client, pond, 1, ALIKE);
+    const others = await people(ctx.client, pond, 28, { ...ALIKE, fields: { smoking: "never" } });
+    const saved = await put(ctx, holder, "/preferences/deal-breakers", {
+      dealBreakers: [{ field: "smoking", accept: ["never"], includeUnknown: true }],
+    });
+    expect(saved.status).toBe(200);
+
+    const { result, lines } = await counted(ctx, NIGHT_1);
+    // Thirty-one, each with thirty others: the two stay one short, the rest open.
+    expect(result).toMatchObject({ counted: 31, admitted: 31, opened: 29 });
+    for (const excluded of [holder, smoker]) {
+      expect(await rowOf(ctx, excluded)).toMatchObject({ pool_said: 20, opened_at: null });
+    }
+    expect(await rowOf(ctx, open)).toMatchObject({ pool_said: 30, opened_at: NIGHT_1 });
+    expect(await rowOf(ctx, others[0])).toMatchObject({ pool_said: 30, opened_at: NIGHT_1 });
+    // Nothing of anybody's answers or filters reaches the night's line.
+    expect(JSON.stringify(lines())).not.toMatch(/smoking|never|regularly/);
+
+    // The holder takes their own answer back: the deal-breaker is paused, and the next night counts both.
+    await ctx.client.query("UPDATE profile SET fields = fields - 'smoking' WHERE account_id = $1", [
+      holder,
+    ]);
+    await counted(ctx, NIGHT_2);
+    for (const counted of [holder, smoker]) {
+      expect(await rowOf(ctx, counted)).toMatchObject({ pool_said: 30, opened_at: NIGHT_2 });
+    }
+  });
+
+  test("a deal-breaker on an option the registry no longer has, or a field off the whitelist, filters nothing", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-deal-breakers-stale");
+    const [holder, other] = await people(ctx.client, pond, 2, {
+      ...ALIKE,
+      fields: { smoking: "never", height: 170 },
+    });
+    await people(ctx.client, pond, 29, ALIKE);
+    // Written by hand: rows the save would refuse today (ADR-009 §1: an option removed is a data change).
+    await ctx.client.query(
+      `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
+       VALUES ($1, 'smoking', '["cigars"]'::jsonb, 'hard', false),
+              ($1, 'height', '["180"]'::jsonb, 'hard', false)`,
+      [holder],
+    );
+    await counted(ctx, NIGHT_1);
+    for (const both of [holder, other]) {
+      expect(await rowOf(ctx, both)).toMatchObject({ pool_said: 30, opened_at: NIGHT_1 });
+    }
+  });
+});
+
 // A change of declaration beside the count, in sessions of their own: a pool
 // and a database of its own, as for the two counts of the waitlist.
 //

@@ -6,7 +6,7 @@
 // The card's age and fields, which a person's page in the panel shows as the card does (#306).
 export { ageInYears, buildCard, fieldsOnCard } from "./card.ts";
 export { completeness } from "./completeness.ts";
-export { answeredPromptsOf } from "./repo.ts";
+export { answeredFieldsOf, answeredPromptsOf } from "./repo.ts";
 export { profileRoutes } from "./routes.ts";
 export {
   eraseProfileOfAccount,

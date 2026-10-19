@@ -37,13 +37,34 @@ const optionsOf = (field: DealBreaker["field"]): readonly string[] => {
   return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
 };
 
-/** A filter waits while the person's own answer on its field is missing: read, never stored. */
-const pausedOf = (field: string, own: Record<string, unknown>): boolean => own[field] === undefined;
+/** A filter waits while the person's own answer on its field is missing: read, never stored. The pool asks the same (#87). */
+export const pausedOf = (field: string, own: Record<string, unknown>): boolean =>
+  own[field] === undefined;
 
 /** The first accepted answer that is no option of the field, or null when every one is. */
 function invalidAccept(dealBreaker: DealBreaker): string | null {
   const options = optionsOf(dealBreaker.field);
   return dealBreaker.accept.find((option) => !options.includes(option)) ?? null;
+}
+
+/** A stored row of `preferences` on a deal-breaker's field. */
+export type DealBreakerRow = { field: string; value: unknown; include_unknown: boolean };
+
+/**
+ * Stored rows as the deal-breakers they still are: a field that left the
+ * whitelist reads as none; so does an option that left the registry (ADR-009
+ * §1), and a row with no option left: the next save removes it, since it is
+ * not in the set sent. The caller's own read and the gate's count of many
+ * people at once (#87) read them alike.
+ */
+export function dealBreakersFrom(rows: readonly DealBreakerRow[]): DealBreaker[] {
+  return rows.flatMap((row) => {
+    if (!WHITELIST.includes(row.field)) return [];
+    const field = row.field as DealBreaker["field"];
+    const options = optionsOf(field);
+    const accept = (Accept.safeParse(row.value).data ?? []).filter((o) => options.includes(o));
+    return accept.length === 0 ? [] : [{ field, accept, includeUnknown: row.include_unknown }];
+  });
 }
 
 /** The caller's own deal-breakers, with each one's pause read off the own answers. */
@@ -52,30 +73,16 @@ export async function readDealBreakers(
   accountId: string,
   own: Record<string, unknown>,
 ): Promise<StoredDealBreaker[]> {
-  const { rows } = await db.query<{ field: string; value: unknown; include_unknown: boolean }>(
+  const { rows } = await db.query<DealBreakerRow>(
     `SELECT field, value, include_unknown FROM preferences
      WHERE account_id = $1 AND mode = 'hard' AND field = ANY($2::text[])
      ORDER BY field`,
     [accountId, WHITELIST],
   );
-  const out: StoredDealBreaker[] = [];
-  for (const row of rows) {
-    // A field that left the whitelist reads as none; so does an option that
-    // left the registry (ADR-009 §1), and a row with no option left: the next
-    // save removes it, since it is not in the set sent.
-    if (!WHITELIST.includes(row.field)) continue;
-    const field = row.field as DealBreaker["field"];
-    const options = optionsOf(field);
-    const accept = (Accept.safeParse(row.value).data ?? []).filter((o) => options.includes(o));
-    if (accept.length === 0) continue;
-    out.push({
-      field,
-      accept,
-      includeUnknown: row.include_unknown,
-      paused: pausedOf(row.field, own),
-    });
-  }
-  return out;
+  return dealBreakersFrom(rows).map((dealBreaker) => ({
+    ...dealBreaker,
+    paused: pausedOf(dealBreaker.field, own),
+  }));
 }
 
 /**

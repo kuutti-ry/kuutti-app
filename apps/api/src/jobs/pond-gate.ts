@@ -1,9 +1,15 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { type GateResponse, PROFILE_FIELDS, waitlistK } from "@kuutti/schema";
+import { type DealBreaker, type GateResponse, PROFILE_FIELDS, waitlistK } from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
-import { inEachOthersPool, type PoolPerson, preferencesFrom } from "../matching/index.ts";
+import {
+  type DealBreakerRow,
+  dealBreakersFrom,
+  inEachOthersPool,
+  type PoolPerson,
+  preferencesFrom,
+} from "../matching/index.ts";
 import {
   type Applicant,
   admit,
@@ -17,7 +23,7 @@ import {
   sayPool,
   WAITLIST_K_KEY,
 } from "../pond/index.ts";
-import { ageInYears, answeredPromptsOf, completeness } from "../profile/index.ts";
+import { ageInYears, answeredFieldsOf, answeredPromptsOf, completeness } from "../profile/index.ts";
 import type { NightlyJob } from "./nightly.ts";
 
 /**
@@ -58,6 +64,7 @@ type FactsRow = {
   bio: string | null;
   bio_preset: string | null;
   prompts: unknown;
+  fields: unknown;
   intent: string | null;
   approved_photos: string;
   seeks: unknown;
@@ -85,7 +92,7 @@ type Subject = Applicant & {
 // consents yet), paused, suspended and banned accounts are hidden or gone.
 const FACTS = `
   SELECT a.id, a.identity_id, a.gender, a.state, a.birth_year, a.birth_month, a.registered_at,
-         p.display_name, p.bio, p.bio_preset, p.prompts, p.fields->>'intent' AS intent,
+         p.display_name, p.bio, p.bio_preset, p.prompts, p.fields, p.fields->>'intent' AS intent,
          (SELECT count(*) FROM photo ph
            WHERE ph.account_id = a.id AND ph.purpose = 'profile' AND ph.state = 'approved') AS approved_photos,
          (SELECT r.value FROM preferences r
@@ -109,18 +116,22 @@ const FACTS = `
 
 /** Somebody who blocked nobody of the count, or a question that is not about the pool. */
 const NO_BLOCKS: ReadonlySet<string> = new Set();
+/** Somebody with no deal-breaker, or a question that is not about the pool. */
+const NO_DEAL_BREAKERS: readonly DealBreaker[] = [];
 
 /**
  * The row as a subject, or null while something is missing: the profile's
  * completeness (#47) and onboarding's (ADR-010 §6: a consent for an older
  * wording reads as none) are both asked, by the rules the person's own
- * screens are told by. `blocks` are the identities the person blocked (#84).
+ * screens are told by. `blocks` are the identities the person blocked (#84),
+ * `dealBreakers` the person's deal-breakers as stored (#87).
  */
 function subjectFrom(
   row: FactsRow,
   pondId: string,
   at: Date,
   blocks: ReadonlySet<string>,
+  dealBreakers: readonly DealBreaker[],
 ): Subject | null {
   const preferences = preferencesFrom({ seeks: row.seeks, ageWindow: row.age_window });
   const gender = row.gender as Subject["gender"] | null;
@@ -157,6 +168,8 @@ function subjectFrom(
       intent,
       identityId: row.identity_id,
       blocks,
+      fields: answeredFieldsOf(row.fields),
+      dealBreakers,
     },
     visible: row.state === "active",
     admittedAt: here ? row.admitted_at : null,
@@ -227,8 +240,19 @@ async function countPond(
     tx,
     rows.map((row) => row.identity_id),
   );
+  const dealBreakers = await dealBreakersOf(
+    tx,
+    rows.map((row) => row.id),
+  );
   const subjects = rows.flatMap(
-    (row) => subjectFrom(row, pondId, at, blocks.get(row.identity_id) ?? NO_BLOCKS) ?? [],
+    (row) =>
+      subjectFrom(
+        row,
+        pondId,
+        at,
+        blocks.get(row.identity_id) ?? NO_BLOCKS,
+        dealBreakers.get(row.id) ?? NO_DEAL_BREAKERS,
+      ) ?? [],
   );
   const admission = admit(subjects, config.shareMax);
   const newly = new Set(admission.admitted);
@@ -359,6 +383,33 @@ async function blocksWithin(
     byBlocker.set(row.blocker_identity_id, set);
   }
   return byBlocker;
+}
+
+/**
+ * The deal-breakers of the people of a count (#87, #149), by account, read as
+ * the person's own screen reads them (`dealBreakersFrom`): a pair one of
+ * them excludes is not in each other's pool, so neither counts toward the
+ * other's figure. Whether one is paused is the pool's to ask, from the
+ * holder's own answers. Nothing of them is logged or written by the count.
+ */
+async function dealBreakersOf(
+  tx: Queryable,
+  accounts: readonly string[],
+): Promise<Map<string, DealBreaker[]>> {
+  const { rows } = await tx.query<DealBreakerRow & { account_id: string }>(
+    `SELECT account_id, field, value, include_unknown FROM preferences
+     WHERE account_id = ANY($1::uuid[]) AND mode = 'hard'
+       AND field NOT IN ('seeks', 'age_window')
+     ORDER BY account_id, field`,
+    [accounts],
+  );
+  const byAccount = new Map<string, DealBreakerRow[]>();
+  for (const row of rows) {
+    const list = byAccount.get(row.account_id) ?? [];
+    list.push(row);
+    byAccount.set(row.account_id, list);
+  }
+  return new Map([...byAccount].map(([account, list]) => [account, dealBreakersFrom(list)]));
 }
 
 async function readConfig(db: Queryable) {
@@ -502,8 +553,8 @@ export async function gateOf(deps: GateDeps, accountId: string): Promise<GateRes
     CURRENT_CONSENT_VERSIONS.special_category,
   ]);
   const row = rows[0];
-  // Only whether the person is complete is asked here, so whom they blocked does not matter.
-  if (!row || !subjectFrom(row, pondId, deps.now(), NO_BLOCKS)) {
+  // Only whether the person is complete is asked here, so whom they blocked and their deal-breakers do not matter.
+  if (!row || !subjectFrom(row, pondId, deps.now(), NO_BLOCKS, NO_DEAL_BREAKERS)) {
     return say({ state: "incomplete", ...nothing });
   }
 
