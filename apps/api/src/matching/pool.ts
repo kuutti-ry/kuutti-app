@@ -11,7 +11,8 @@ import { pausedOf } from "./deal-breakers.ts";
  * pass the other's deal-breakers (#149, #87). The pond gate counts a
  * person's pool with this (#94) and the round builder draws its candidates
  * through it (#95), so that no caller can show somebody a filter excludes.
- * The soft preferences only order what passes (`soft.ts`).
+ * The soft preferences only order what passes (`soft.ts`); hiding from one's
+ * own field is a setting the round builder reads (ADR-019 §5), not a filter.
  *
  * Pure, and it names no gender: the rule is the same for everybody.
  */

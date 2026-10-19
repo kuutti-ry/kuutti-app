@@ -949,20 +949,68 @@ describe("the gate across a deal-breaker", () => {
     const pond = await setUp(ctx, "test-gate-deal-breakers-stale");
     const [holder, other] = await people(ctx.client, pond, 2, {
       ...ALIKE,
-      fields: { smoking: "never", height: 170 },
+      fields: { smoking: "never", drinking: "never" },
     });
     await people(ctx.client, pond, 29, ALIKE);
-    // Written by hand: rows the save would refuse today (ADR-009 §1: an option removed is a data change).
+    // Written by hand: rows the save would refuse today (ADR-009 §1: an option
+    // removed is a data change). Each would refuse the twenty-nine, who
+    // answered neither, if it were read as a deal-breaker: drinking has
+    // options, but no deal-breaker may be set on it.
     await ctx.client.query(
       `INSERT INTO preferences (account_id, field, value, mode, include_unknown)
        VALUES ($1, 'smoking', '["cigars"]'::jsonb, 'hard', false),
-              ($1, 'height', '["180"]'::jsonb, 'hard', false)`,
+              ($1, 'drinking', '["never"]'::jsonb, 'hard', false)`,
       [holder],
     );
     await counted(ctx, NIGHT_1);
     for (const both of [holder, other]) {
       expect(await rowOf(ctx, both)).toMatchObject({ pool_said: 30, opened_at: NIGHT_1 });
     }
+  });
+
+  test("an answer the registry no longer has is read as none, by the holder's deal-breaker and by the other's", async ({
+    ctx,
+  }) => {
+    const pond = await setUp(ctx, "test-gate-deal-breakers-stale-answers");
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    // H accepts no children or no answer; C's answer is an option the registry dropped.
+    const [h, c] = await people(ctx.client, pond, 2, {
+      ...ALIKE,
+      fields: { smoking: "never", hasKids: "no" },
+    });
+    // P refuses smokers, then P's own answer becomes a dropped option: the deal-breaker is paused.
+    const [p] = await people(ctx.client, pond, 1, { ...ALIKE, fields: { smoking: "never" } });
+    const [smoker] = await people(ctx.client, pond, 1, {
+      ...ALIKE,
+      fields: { smoking: "regularly" },
+    });
+    await people(ctx.client, pond, 27, { ...ALIKE, fields: { smoking: "never" } });
+    for (const [holder, dealBreaker] of [
+      [h, { field: "hasKids", accept: ["no"], includeUnknown: true }],
+      [p, { field: "smoking", accept: ["never"], includeUnknown: false }],
+    ] as const) {
+      const saved = await put(ctx, holder, "/preferences/deal-breakers", {
+        dealBreakers: [dealBreaker],
+      });
+      expect(saved.status).toBe(200);
+    }
+    for (const [account, stale] of [
+      [c, { hasKids: "maybe" }],
+      [p, { smoking: "cigars" }],
+    ] as const) {
+      await ctx.client.query(
+        "UPDATE profile SET fields = fields || $2::jsonb WHERE account_id = $1",
+        [account, JSON.stringify(stale)],
+      );
+    }
+    await counted(ctx, NIGHT_1);
+    for (const each of [h, c, p, smoker]) {
+      expect(await rowOf(ctx, each)).toMatchObject({ pool_said: 30, opened_at: NIGHT_1 });
+    }
+    // The holder's own screen says the same of P's deal-breaker.
+    const who = await signInAs(ctx.client, p as string);
+    const read = await ctx.app.request("/preferences/deal-breakers", { headers: who.headers });
+    expect(await read.json()).toMatchObject({ dealBreakers: [{ field: "smoking", paused: true }] });
   });
 });
 

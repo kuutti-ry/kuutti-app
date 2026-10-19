@@ -320,6 +320,33 @@ const personArb: fc.Arbitrary<PoolPerson> = fc
     dealBreakers,
   }));
 
+/**
+ * Two people every filter but the deal-breakers lets through, both ways:
+ * each one's gender among the other's seeks, any age, the same intent, no
+ * block. Two people drawn apart are rarely in each other's pool, and a rule
+ * about who stays in it says little about people who are out anyway.
+ */
+const pairArb: fc.Arbitrary<readonly [PoolPerson, PoolPerson]> = fc
+  .tuple(personArb, personArb)
+  .map(([a, b]) => {
+    const anyAge = { min: AGE_MIN, max: AGE_MAX };
+    const gender = a.seeks[0] ?? a.gender;
+    const seeks = b.seeks.includes(a.gender) ? b.seeks : [...b.seeks, a.gender];
+    return [
+      { ...a, ageWindow: anyAge, blocks: new Set<string>(), identityId: "identity-a" },
+      {
+        ...b,
+        gender,
+        seeks,
+        ageWindow: anyAge,
+        intent: a.intent,
+        fields: { ...b.fields, intent: a.intent },
+        blocks: new Set<string>(),
+        identityId: "identity-b",
+      },
+    ] as const;
+  });
+
 /** The person with their soft answers replaced, every other answer kept. */
 const withSoft = (person: PoolPerson, soft: Record<string, unknown>): PoolPerson => {
   const rest = Object.fromEntries(
@@ -413,7 +440,7 @@ describe("the pool, for any two people", () => {
 
   it("is the same with a paused deal-breaker as without it (#87)", () => {
     fc.assert(
-      fc.property(personArb, personArb, (a, b) => {
+      fc.property(fc.oneof(pairArb, fc.tuple(personArb, personArb)), ([a, b]) => {
         const live = a.dealBreakers.filter((d) => a.fields[d.field] !== undefined);
         expect(inEachOthersPool({ ...a, dealBreakers: live }, b)).toBe(inEachOthersPool(a, b));
         expect(inEachOthersPool(b, { ...a, dealBreakers: live })).toBe(inEachOthersPool(b, a));
@@ -424,16 +451,27 @@ describe("the pool, for any two people", () => {
   it("Soft preferences never take anybody out of a pool, nor bring anybody into one", () => {
     fc.assert(
       fc.property(
-        personArb,
-        personArb,
+        fc.oneof(pairArb, fc.tuple(personArb, personArb)),
         answersArb(SOFT_FIELDS),
         answersArb(SOFT_FIELDS),
-        (a, b, softA, softB) => {
+        ([a, b], softA, softB) => {
           const changed = inEachOthersPool(withSoft(a, softA), withSoft(b, softB));
           expect(changed).toBe(inEachOthersPool(a, b));
+          expect(inEachOthersPool(withSoft(b, softB), withSoft(a, softA))).toBe(changed);
         },
       ),
     );
+    // Two in each other's pool stay in it, as far apart as the soft answers go;
+    // two out of it stay out, the same in every soft answer.
+    const far = (p: PoolPerson, answers: Record<string, string>) => withSoft(p, answers);
+    const [a, b] = [person("woman", 30, "woman", 25, 40), person("woman", 30, "woman", 25, 40)];
+    const lowest = { education: "peruskoulu", drinking: "never", drugsAttitude: "not_my_thing" };
+    const highest = { education: "tohtori", drinking: "often", drugsAttitude: "fine_with_it" };
+    expect(inEachOthersPool(far(a, lowest), far(b, highest))).toBe(true);
+    expect(inEachOthersPool(far(b, highest), far(a, lowest))).toBe(true);
+    const out = person("man", 30, "woman", 25, 40);
+    expect(inEachOthersPool(far(a, lowest), far(out, lowest))).toBe(false);
+    expect(inEachOthersPool(far(out, lowest), far(a, lowest))).toBe(false);
   });
 
   it("holds everybody who passes both ways: nobody is left out for anything else", () => {
