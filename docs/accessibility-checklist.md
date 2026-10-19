@@ -79,6 +79,7 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
 | Home, signed in | `/` (Sanna) | Settings and Tech config named (Tech config outside production only); the mark silent; the title a header; welcome back said once after a break (Helmi); the gate's checking line said, and its failure; the area card's figures in words, none below the threshold; the gate card in words, nothing on it tappable; the button to the profile | | |
+| Home, a notice (#176) | `/` (a person a moderator warned) | Notices a header, first in the list; the warning's title and its reason heard in order; Got it named; after it the notice gone and the focus not lost; a failure said (VoiceOver is told, TalkBack reads the region); nothing at all without a notice | | |
 
 ### Conversations
 
@@ -175,6 +176,7 @@ Sanna; Helmi and Noa where it says.
 | This device | `/settings/device` | Log out and Log out everywhere named | | |
 | E-mail | `/settings/email` | the field named; save and remove; a malformed address refused in words; the loading and the failed read said | | |
 | Your contacts (#103) | `/settings/contacts` | the line that nobody sees them until one is shared; four cards, each title a header with what to type under it; each field named by its kind ("Your phone number"), the number pad for the two numbers; Save and Remove heard with the kind, Save dimmed while empty or unchanged, Remove only while one is kept; saved, removed, a refusal in words for the kind and a failure said, the words kept; the loading and the failed read said | | |
+| Notifications (#176) | `/settings/notifications` | the line that nothing is sent to the phone yet; the four kinds as switches, each by its name with its line after it, on or off; a switch heard as dimmed while a change is on its way; a failed change said, the switch as it was; the loading and the failed read said, Try again named | | |
 | Feedback (#171) | `/settings/feedback` | the four kinds as radios, the chosen one said; the text field named; Send; the thanks, the day's cap and a failure said, the words kept | | |
 | Your account | `/settings/account` | Download my data (the share sheet or the folder picker after it is the system's), Take a break, Delete my account; the deletion's dialog names the waiting time | | |
 | Taking a break | `/account/break` (Helmi) | the consequences as a list; the switch I understand what a break means; the button dimmed until it is on; working and failed said; then the sign-in with the paused card | | |

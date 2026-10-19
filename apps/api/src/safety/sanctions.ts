@@ -17,6 +17,7 @@ import {
 } from "../identity/index.ts";
 import { AppError } from "../lib/errors.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
+import { recordWarningNotice } from "../notifications/index.ts";
 import { recordAudit } from "./audit.ts";
 
 // Sanctions (#307, ADR-024): the record of what staff did to a person, and the
@@ -237,6 +238,10 @@ export async function applySanction(db: Queryable, input: ApplyInput): Promise<S
     );
     const row = rows[0];
     if (!row) throw new Error("sanction insert returned no row");
+    // A warning tells the person in the app (ADR-024 §7, #176), in its transaction.
+    if (input.kind === "warn") {
+      await recordWarningNotice(tx, { accountId: input.accountId, sanctionId: id, at: input.at });
+    }
     await settleAll(tx, account, input.at);
     if (input.kind === "suspend" || input.kind === "ban") {
       await endSessionsForSanction(tx, {

@@ -15,6 +15,7 @@ import { EmailSettingsScreen } from "./EmailSettingsScreen";
 import { LanguageScreen } from "./LanguageScreen";
 import { LegalScreen, legalKindOf } from "./LegalScreen";
 import { LicensesScreen } from "./LicensesScreen";
+import { NotificationsSettingsScreen } from "./NotificationsSettingsScreen";
 import { SourceScreen } from "./SourceScreen";
 import { ThemeScreen } from "./ThemeScreen";
 
@@ -289,6 +290,24 @@ describe("the e-mail and the account screens", () => {
     expectPinnedHeader("Your contacts", "Back");
     expect(screen.getByLabelText("Your Instagram username")).toBeTruthy();
     noProblems();
+  });
+
+  it("hold the notification choices for a person (#176)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<NotificationsSettingsScreen />);
+    expectPinnedHeader("Notifications", "Back");
+    expect(
+      screen.getByText(
+        "Nothing is sent to this phone yet. What you choose here is kept, and decides what is sent once it is. Each kind is on until you switch it off.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("say there is no session on the notifications screen of a signed-out device (#176)", async () => {
+    await renderWithTheme(<NotificationsSettingsScreen />);
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByText("Loading your choices…")).toBeNull();
   });
 
   it("say there is no session on the contacts screen of a signed-out device (#103)", async () => {

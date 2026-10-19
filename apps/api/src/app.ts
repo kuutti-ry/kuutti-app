@@ -42,6 +42,7 @@ import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
+import { notificationRoutes } from "./notifications/index.ts";
 import { pondRoutes } from "./pond/index.ts";
 import { exportProfile, profileRoutes } from "./profile/index.ts";
 import {
@@ -213,6 +214,8 @@ export function createApp(deps: Deps) {
   app.route("/", feedbackRoutes(deps, guard));
   app.route("/", feedbackAdminRoutes(deps, moderators));
   app.route("/", reportRoutes(deps, guard));
+  // What a person chose to be notified of, and the notices in the app (#176, ADR-032).
+  app.route("/", notificationRoutes(deps, guard));
   // The conversations a match opens and their text messages (#348, ADR-031).
   app.route("/", chatRoutes(deps, guard));
   // ...and what changes in them, live over one socket (#349, ADR-031 §5).

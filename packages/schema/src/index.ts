@@ -13,6 +13,7 @@ export * from "./gate.ts";
 export { HealthResponse } from "./health.ts";
 export * from "./identity.ts";
 export * from "./media.ts";
+export * from "./notifications.ts";
 export * from "./onboarding.ts";
 export * from "./profile.ts";
 export * from "./profile-fields.ts";

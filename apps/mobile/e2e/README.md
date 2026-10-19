@@ -56,6 +56,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `home-and-tech` | Sanna | the area and its numbers, the gate in words; the tech screen's API |
 | `email` | Sanna | malformed refused, valid saved, removed |
 | `research-switch` | Sanna | the opt-in recorded and withdrawn |
+| `notification-settings` | Sanna | Settings › Notifications says nothing is sent yet; Messages switched off, kept on the server after a way round by home, then on again, so Sanna ends as she began (#176) |
 | `data-export` | Sanna | Download my data hands the zip over: the share sheet on iOS, the folder picker on Android (#237) |
 | `photo-descriptions` | Sanna | the Photo descriptions row and its screen (#296): Show under photos on, Face off, both kept when the screen is opened again, then back as found; the description itself needs Rekognition, which the local stack has none of |
 | `settings-survive-relaunch` | Sanna | theme, language and session outlast closing the app |

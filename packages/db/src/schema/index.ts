@@ -41,6 +41,12 @@ export {
   photoState,
   photoVariant,
 } from "./media.ts";
+export {
+  notice,
+  noticeKind,
+  notificationKind,
+  notificationPreference,
+} from "./notifications.ts";
 export { ponds } from "./ponds.ts";
 export {
   preferenceMode,

@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
+import { Notices } from "@/features/notifications";
 import { GateCard, WaitlistCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
@@ -98,6 +99,8 @@ export function HomeScreen() {
 
         {gate.status === "complete" && (
           <View className="w-full max-w-md gap-4">
+            {/* What must reach the person even without a push, unread, first (#176). */}
+            <Notices />
             {/* How the person's own pond is filling up (#54), and where they stand themselves (#94). */}
             {gate.pond && <WaitlistCard pond={gate.pond} />}
             {gate.pond && <GateCard />}

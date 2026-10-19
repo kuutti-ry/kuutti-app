@@ -14,6 +14,7 @@ import {
   PhotoCheckKind,
   PhotoVariant,
 } from "./media.ts";
+import { ExportedNotifications } from "./notifications.ts";
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ExportedBlocks, ExportedReports } from "./report.ts";
@@ -190,6 +191,8 @@ export const AccountExport = z
     conversations: z.array(ExportedConversation).max(CONVERSATIONS_MAX * 2),
     /** The contacts the person keeps to share in a conversation (#103, ADR-031 §11). */
     contacts: z.array(StoredContact).max(4),
+    /** What the person chose to be notified of, and the notices the app showed them (#176, ADR-032). */
+    notifications: ExportedNotifications,
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

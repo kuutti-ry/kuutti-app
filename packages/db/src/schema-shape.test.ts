@@ -5,6 +5,8 @@ import {
   GENDERS,
   MessageKind,
   ModeratorRole,
+  NoticeKind,
+  NotificationKind,
   PHOTO_VARIANTS,
   PhotoPurpose,
   PhotoRejectionReason,
@@ -51,6 +53,8 @@ describe("the tables", () => {
       "matching_config",
       "message",
       "moderator_roles",
+      "notice",
+      "notification_preference",
       "photo",
       "photo_access",
       "photo_check_note",
@@ -115,7 +119,7 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it, from a conversation to its people and messages, and from a report to its copy; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, and from a sanction to its notice; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
       // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
@@ -123,6 +127,8 @@ describe("the foreign keys", () => {
       "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
+      // A warning's notice goes with its warning (#176).
+      "notice.sanction_id -> sanction.id cascade",
       "photo_review.photo_id -> photo.id cascade",
       // A report's frozen copy goes with the report, twelve months from filing (#351).
       "report_message.report_id -> report.id cascade",
@@ -144,6 +150,9 @@ describe("the foreign keys", () => {
       "conversation_participant",
       "feedback",
       "gate",
+      // A notice and the notification choices (#176), erased with the account.
+      "notice",
+      "notification_preference",
       "photo",
       "photo_access",
       "photo_check_note",
@@ -251,6 +260,7 @@ describe("the indexes", () => {
     ["block", "block_pair_idx", ["blocker_identity_id", "blocked_identity_id"]],
     ["report", "report_open_pair_idx", ["reporter_account_id", "reported_account_id"]],
     ["report_message", "report_message_seq_idx", ["report_id", "seq"]],
+    ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
   ])("keep %s unique by %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(true);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -271,6 +281,7 @@ describe("the indexes", () => {
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
+    ["notice", "notice_account_created_idx", ["account_id", "created_at"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -377,6 +388,9 @@ describe("the enums", () => {
     expect(enums.report_source).toEqual(["card", "conversation"]);
     // Whose line a report's copy holds, seen from the report (#351).
     expect(enums.report_message_side).toEqual(["reporter", "reported"]);
+    // What a person may be notified of, and what a notice is about (#176).
+    expect(enums.notification_kind).toEqual(NotificationKind.options);
+    expect(enums.notice_kind).toEqual(NoticeKind.options);
     expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
     expect(enums.conversation_side).toEqual(["a", "b"]);
     expect(enums.message_kind).toEqual(MessageKind.options);

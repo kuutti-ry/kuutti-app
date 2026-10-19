@@ -34,6 +34,7 @@ executionOrder:
     - Home names the area with its numbers and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
     - The research switch in Settings records the opt-in and withdraws it again
+    - The messages switch in Settings, Notifications, goes off, is kept on the server, and goes on again
     - Download my data hands the person's file over
     - Feedback sent from Settings is thanked, the kind chosen in words
     - The language choice in Settings changes the app's language at once
