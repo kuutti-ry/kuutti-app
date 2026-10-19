@@ -14,6 +14,8 @@ import {
   ReportMessageSide,
   ReportOutcome,
   ReportSource,
+  RoundDecision,
+  RoundReason,
   SanctionKind,
   SanctionReason,
   SanctionRule,
@@ -68,6 +70,9 @@ describe("the tables", () => {
       "report",
       "report_message",
       "research_subject",
+      // Today's round and its entries (#96, ADR-034).
+      "round_entries",
+      "rounds",
       "sanction",
       "session",
       "waitlist_snapshot",
@@ -135,6 +140,8 @@ describe("the foreign keys", () => {
       "photo_review.photo_id -> photo.id cascade",
       // A report's frozen copy goes with the report, twelve months from filing (#351).
       "report_message.report_id -> report.id cascade",
+      // A round's entries go with their round (#96).
+      "round_entries.round_id -> rounds.id cascade",
     ]);
   });
 
@@ -164,6 +171,9 @@ describe("the foreign keys", () => {
       "report",
       "report",
       "research_subject",
+      // The entries in which the person is somebody's card, and the person's own rounds (#96).
+      "round_entries",
+      "rounds",
       "sanction",
       "session",
     ]);
@@ -390,6 +400,9 @@ describe("the enums", () => {
     expect(enums.sanction_reason).toEqual(SanctionReason.options);
     // The automatic rule that applied a shadow ban (#105).
     expect(enums.sanction_rule).toEqual(SanctionRule.options);
+    // Why a card is in a round, and what was decided about it (#96).
+    expect(enums.round_reason).toEqual(RoundReason.options);
+    expect(enums.round_decision).toEqual(RoundDecision.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
     // Where a report was made: a card, or a conversation (#351).
     expect(enums.report_source).toEqual(ReportSource.options);

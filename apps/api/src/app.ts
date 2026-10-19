@@ -29,6 +29,7 @@ import type { Config } from "./lib/config.ts";
 import { corsAllowlist } from "./lib/cors.ts";
 import type { AppEnv } from "./lib/env.ts";
 import {
+  AppError,
   type ErrorReporter,
   localisedEnvelope,
   notFound,
@@ -40,11 +41,11 @@ import { type Logger, requestLogger } from "./lib/logger.ts";
 import { servedDocument } from "./lib/openapi.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
-import { preferencesRoutes } from "./matching/index.ts";
+import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
 import { notificationRoutes } from "./notifications/index.ts";
 import { pondRoutes } from "./pond/index.ts";
-import { exportProfile, profileRoutes } from "./profile/index.ts";
+import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
 import {
   accountAdminRoutes,
   auditAdminRoutes,
@@ -266,6 +267,30 @@ export function createApp(deps: Deps) {
     pondRoutes(deps, guard, (accountId) =>
       gateOf({ db: deps.db, logger: deps.logger, now: () => new Date() }, accountId),
     ),
+  );
+  // Today's round (#96, ADR-034) serves its cards through the profile slice's
+  // builder, handed in here since profile already imports matching; a card
+  // the builder refuses (404) is a card the round leaves out, and its budget's
+  // 429 goes through.
+  app.route(
+    "/",
+    roundRoutes(deps, guard, async (viewerAccountId, subjectAccountId) => {
+      try {
+        const built = await buildCard(
+          {
+            db: deps.db,
+            logger: deps.logger,
+            now: deps.now ?? (() => new Date()),
+            readPreferences,
+          },
+          { viewerAccountId, subjectAccountId },
+        );
+        return built.card;
+      } catch (error) {
+        if (error instanceof AppError && error.status === 404) return null;
+        throw error;
+      }
+    }),
   );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
   app.route(

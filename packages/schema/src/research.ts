@@ -8,6 +8,7 @@ import {
   MessageLengthBand,
 } from "./chat.ts";
 import { FeedbackKind } from "./feedback.ts";
+import { ROUND_ENTRIES_MAX, RoundReason, SinceSeenBand } from "./matching.ts";
 import { Gender } from "./onboarding.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
 
@@ -22,6 +23,16 @@ import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./prof
  */
 
 const props = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
+
+const roundCount = z.int().min(0).max(ROUND_ENTRIES_MAX);
+const roundPosition = z.int().min(1).max(ROUND_ENTRIES_MAX);
+/** A like or a pass: its place and reason, the band since the card was seen (null when never reported seen), and whether it changed the day's earlier decision. */
+const decisionProps = props({
+  position: roundPosition,
+  reason: RoundReason,
+  sinceSeen: SinceSeenBand.nullable(),
+  revised: z.boolean(),
+});
 
 export const RESEARCH_EVENTS = {
   research_opt_in: {
@@ -105,6 +116,35 @@ export const RESEARCH_EVENTS = {
       how: ConversationClosedHow,
       messages: MessageCountBand,
     }),
+  },
+  // Today's round (#96, ADR-034, the maintainer's of 19/10/2026): places,
+  // reasons and coarse times only; never the candidate, a score, the day or
+  // a seen time.
+  round_built: {
+    question:
+      "How large are rounds, and how many of their cards are there for each reason (#96, TD-11, TD-12)?",
+    props: props({
+      size: roundCount,
+      matchesFilters: roundCount,
+      likedYou: roundCount,
+      seenBefore: roundCount,
+      relaxed: roundCount,
+    }),
+  },
+  profile_viewed: {
+    question:
+      "Which cards of a round are looked at, by their place and the reason they are there (#96)?",
+    props: props({ position: roundPosition, reason: RoundReason }),
+  },
+  like: {
+    question:
+      "Which cards are liked, by place and reason, how soon after being seen, and how often a decision is changed (#96)?",
+    props: decisionProps,
+  },
+  pass: {
+    question:
+      "Which cards are passed, by place and reason, how soon after being seen, and how often a decision is changed (#96)?",
+    props: decisionProps,
   },
 } as const;
 

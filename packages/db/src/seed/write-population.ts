@@ -57,6 +57,8 @@ const ACCOUNT_TABLES = [
   "research_subject",
   "consent",
   "preferences",
+  // A story's or the builder's rounds (#96), their entries by the cascade.
+  "rounds",
   "profile",
   "session",
   "auth_request",
@@ -121,6 +123,9 @@ export async function deleteIdentities(
        SELECT conversation_id FROM conversation_participant WHERE account_id = ANY($1))`,
     [accounts],
   );
+  // The entries in which the accounts are somebody's card (#96); their own
+  // rounds go with ACCOUNT_TABLES, their entries by the cascade.
+  await tx.query("DELETE FROM round_entries WHERE candidate_id = ANY($1)", [accounts]);
   for (const table of ACCOUNT_TABLES) {
     await tx.query(`DELETE FROM ${table} WHERE account_id = ANY($1)`, [accounts]);
   }

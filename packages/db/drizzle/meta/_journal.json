@@ -463,6 +463,13 @@
       "when": 1792402714276,
       "tag": "0065_auto_shadow_ban_config",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1792409349815,
+      "tag": "0066_rounds",
+      "breakpoints": true
     }
   ]
 }

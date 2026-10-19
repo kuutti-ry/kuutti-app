@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.46.0",
+    "version": "0.47.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -320,6 +320,9 @@
           },
           "notifications": {
             "$ref": "#/components/schemas/ExportedNotifications"
+          },
+          "rounds": {
+            "$ref": "#/components/schemas/ExportedRounds"
           }
         },
         "required": [
@@ -345,7 +348,8 @@
           "blocks",
           "conversations",
           "contacts",
-          "notifications"
+          "notifications",
+          "rounds"
         ]
       },
       "Gender": {
@@ -2008,6 +2012,123 @@
         "type": "string",
         "enum": [
           "warning"
+        ]
+      },
+      "ExportedRounds": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "What this part is, in the request's language."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedRound"
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "about",
+          "items"
+        ]
+      },
+      "ExportedRound": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "builtAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "openedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "completedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedRoundEntry"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "day",
+          "builtAt",
+          "openedAt",
+          "completedAt",
+          "entries"
+        ]
+      },
+      "ExportedRoundEntry": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RoundReason"
+          },
+          "reasonInWords": {
+            "type": "string"
+          },
+          "seenAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/RoundDecision"
+          },
+          "decisionInWords": {
+            "type": "string",
+            "nullable": true
+          },
+          "decidedAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "position",
+          "reason",
+          "reasonInWords",
+          "seenAt",
+          "decision",
+          "decisionInWords",
+          "decidedAt"
+        ]
+      },
+      "RoundReason": {
+        "type": "string",
+        "enum": [
+          "matches_filters",
+          "liked_you",
+          "seen_before",
+          "relaxed"
+        ]
+      },
+      "RoundDecision": {
+        "type": "string",
+        "nullable": true,
+        "enum": [
+          "like",
+          "pass",
+          null
         ]
       },
       "HealthResponse": {
@@ -5588,6 +5709,64 @@
         },
         "required": [
           "pondId"
+        ],
+        "additionalProperties": false
+      },
+      "RoundResponse": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date"
+          },
+          "entries": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/RoundEntry"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "day",
+          "entries"
+        ]
+      },
+      "RoundEntry": {
+        "type": "object",
+        "properties": {
+          "position": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "reason": {
+            "$ref": "#/components/schemas/RoundReason"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/RoundDecision"
+          },
+          "card": {
+            "$ref": "#/components/schemas/ProfileCard"
+          }
+        },
+        "required": [
+          "position",
+          "reason",
+          "decision",
+          "card"
+        ]
+      },
+      "RoundDecisionUpdate": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/RoundDecision"
+          }
+        },
+        "required": [
+          "decision"
         ],
         "additionalProperties": false
       },
@@ -10844,6 +11023,213 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/today": {
+      "get": {
+        "summary": "Today's round",
+        "description": "The Finnish day and its cards in order, each with why it is there and the caller's own decision; entries null before the day's round is built. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Today's round.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "card_budget_exceeded: the day's cards are used up; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/{day}/entries/{position}/seen": {
+      "post": {
+        "summary": "Report a card seen",
+        "description": "The phone had the card on the screen. The first report is recorded; a repeat writes nothing. A decision does not need it.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "required": true,
+            "name": "position",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Recorded, or recorded before."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/{day}/entries/{position}/decision": {
+      "put": {
+        "summary": "Like or pass a card",
+        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "required": true,
+            "name": "position",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoundDecisionUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded."
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no round today, no card at that place, a card that can no longer be shown, or a day not begun.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; nothing was written.",
             "content": {
               "application/json": {
                 "schema": {

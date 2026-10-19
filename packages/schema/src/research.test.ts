@@ -100,6 +100,13 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
       return { sinceOpened: "1d_7d", messages: "6-20" };
     case "contact_unshared":
       return {};
+    case "round_built":
+      return { size: 12, matchesFilters: 9, likedYou: 2, seenBefore: 1, relaxed: 0 };
+    case "profile_viewed":
+      return { position: 3, reason: "liked_you" };
+    case "like":
+    case "pass":
+      return { position: 3, reason: "matches_filters", sinceSeen: "10s_30s", revised: false };
   }
 }
 

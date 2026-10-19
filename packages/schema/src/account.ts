@@ -6,6 +6,7 @@ import { DEAL_BREAKERS_CAP, StoredDealBreaker } from "./deal-breakers.ts";
 import { ExportedFeedback } from "./feedback.ts";
 import { ExportedGate } from "./gate.ts";
 import { AuthPlatform, IdentityStanding, USER_AGENT_MAX } from "./identity.ts";
+import { ExportedRounds } from "./matching.ts";
 import {
   EXPORT_DESCRIPTION_TEXT_MAX,
   EXPORT_PHOTO_PATH_MAX,
@@ -193,6 +194,8 @@ export const AccountExport = z
     contacts: z.array(StoredContact).max(4),
     /** What the person chose to be notified of, and the notices the app showed them (#176, ADR-032). */
     notifications: ExportedNotifications,
+    /** The person's own rounds (#96, ADR-034): places, reasons and their own decisions; never whom, and never a round in which the person was somebody's card. */
+    rounds: ExportedRounds,
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;
