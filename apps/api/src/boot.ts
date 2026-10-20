@@ -19,7 +19,7 @@ import type { Logger } from "./lib/logger.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
-import { createMediaDeps, sweepPendingPhotos } from "./media/index.ts";
+import { createMediaDeps, rejectUnreviewedPhotos, sweepPendingPhotos } from "./media/index.ts";
 import {
   copiedBeforeDrop,
   ensureEventPartitions,
@@ -246,6 +246,9 @@ export async function boot({
     waitlistJob({ db: pool, logger, now }),
     // Who is let into each pond, and for whom matching opens (#94).
     gateJob({ db: pool, logger, now }),
+    // A photo nobody decided in photo_queue_reject_days is rejected as not reviewed (#376),
+    // wherever there is a queue, Rekognition or none.
+    { name: "reject-unreviewed-photos", run: () => rejectUnreviewedPhotos({ db: pool, now }) },
     // The photo check's notes keep twelve months (#253).
     {
       name: "prune-photo-check-notes",

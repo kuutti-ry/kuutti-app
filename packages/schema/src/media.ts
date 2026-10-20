@@ -67,13 +67,30 @@ export const PhotoUploadRequest = z
 export type PhotoUploadRequest = z.infer<typeof PhotoUploadRequest>;
 
 /**
- * Why a moderator said no (#49): a closed list the owner is told in words,
- * never the label names behind it.
+ * Why a photo was not accepted (#49): a closed list the owner is told in
+ * words, never the label names behind it. `not_reviewed` is the night's, for a
+ * photo nobody decided within matching_config photo_queue_reject_days (#376,
+ * ADR-006 §2); a moderator never chooses it.
  */
 export const PhotoRejectionReason = z
-  .enum(["nudity", "no_person", "several_people", "minor", "violence", "contact_details", "other"])
+  .enum([
+    "nudity",
+    "no_person",
+    "several_people",
+    "minor",
+    "violence",
+    "contact_details",
+    "other",
+    "not_reviewed",
+  ])
   .meta({ id: "PhotoRejectionReason" });
 export type PhotoRejectionReason = z.infer<typeof PhotoRejectionReason>;
+
+/** The reasons a moderator chooses from: every one but the night's. */
+export const ModeratorRejectionReason = PhotoRejectionReason.exclude(["not_reviewed"]).meta({
+  id: "ModeratorRejectionReason",
+});
+export type ModeratorRejectionReason = z.infer<typeof ModeratorRejectionReason>;
 
 /** `photos/<photo id>.webp`: where a photo's file sits inside the export's zip (#237). */
 export const EXPORT_PHOTO_PATH_MAX = 60;
@@ -85,9 +102,10 @@ export const ExportedPhotoReview = z
   .object({
     decision: z.enum(["approved", "queued", "rejected"]),
     reason: PhotoRejectionReason.nullable(),
-    decidedByStaff: z
-      .boolean()
-      .meta({ description: "True when a person decided, false when the automatic check did." }),
+    decidedByStaff: z.boolean().meta({
+      description:
+        "True when a person decided, false when the automatic check did or nobody did in time (not_reviewed).",
+    }),
     decidedAt: z.iso.datetime().nullable(),
   })
   .meta({

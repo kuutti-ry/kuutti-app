@@ -30,15 +30,18 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
 /**
  * The person's own settings, after login, in every build (#143): a list of
  * sections the way the profile's front page is one (#227, #287), each row a
- * screen of its own. Appearance and language (the OS's and the phone's by
- * default, kept across restarts, and the photo descriptions of #296); the legal part, the two consents (#46,
- * #146) and the texts they refer to; about Kuutti, the version, the source
- * offer of AGPL-3.0 section 13 (visible to everybody) and the licences; the
- * account, this device, the e-mail, the contacts to share in a conversation
- * (#103), the feedback to the moderators (#171),
- * and the export, the break and the deletion last (#51, #148, #170). The tech config screen keeps what is
- * technical beyond the version (the API, the native build, a test error) and
- * exists outside production only.
+ * screen of its own, in the order of #376. Appearance and language (the OS's
+ * and the phone's by default, kept across restarts, and the photo
+ * descriptions of #296); the account, this device, the e-mail, the contacts
+ * to share in a conversation (#103), the notifications (#176), the feedback
+ * to the moderators (#171), and the export, the break and the deletion last
+ * (#51, #148, #170); the legal part, the two consents (#46, #146) and the
+ * texts they refer to; about Kuutti, the version, the source offer of
+ * AGPL-3.0 section 13 (visible to everybody) and the licences. A row's second
+ * line is its value (the theme, a consent on or off, a version), never a
+ * description of the row its title already names (#376). The tech config
+ * screen keeps what is technical beyond the version (the API, the native
+ * build, a test error) and exists outside production only.
  */
 export function SettingsScreen() {
   const { t } = useT();
@@ -124,6 +127,47 @@ export function SettingsScreen() {
           ]}
         />
         <Section
+          title={t("settings.group.account")}
+          rows={[
+            // Always there: a device with no session says so on its screen, and
+            // a flow signing out finds the row whatever the session is.
+            {
+              key: "device",
+              title: t("settings.session.label"),
+              onPress: open("/settings/device"),
+            },
+            ...(signedIn
+              ? [
+                  {
+                    key: "email",
+                    title: t("settings.email.label"),
+                    onPress: open("/settings/email"),
+                  },
+                  {
+                    key: "contacts",
+                    title: t("settings.contacts.label"),
+                    onPress: open("/settings/contacts"),
+                  },
+                  {
+                    key: "notifications",
+                    title: t("settings.notifications.label"),
+                    onPress: open("/settings/notifications"),
+                  },
+                  {
+                    key: "feedback",
+                    title: t("feedback.title"),
+                    onPress: open("/settings/feedback"),
+                  },
+                  {
+                    key: "account",
+                    title: t("account.title"),
+                    onPress: open("/settings/account"),
+                  },
+                ]
+              : []),
+          ]}
+        />
+        <Section
           title={t("settings.section.agreements")}
           rows={[
             // The two withdrawable consents, each saying whether it is on; nothing signed out.
@@ -158,7 +202,6 @@ export function SettingsScreen() {
             {
               key: "source",
               title: t("about.source.title"),
-              summary: t("settings.source.summary"),
               onPress: open("/settings/source"),
             },
             {
@@ -167,53 +210,6 @@ export function SettingsScreen() {
               summary: t("settings.licenses.summary", { packages: LICENSES.length }),
               onPress: open("/settings/licenses"),
             },
-          ]}
-        />
-        <Section
-          title={t("settings.group.account")}
-          rows={[
-            // Always there: a device with no session says so on its screen, and
-            // a flow signing out finds the row whatever the session is.
-            {
-              key: "device",
-              title: t("settings.session.label"),
-              summary: t("settings.device.summary"),
-              onPress: open("/settings/device"),
-            },
-            ...(signedIn
-              ? [
-                  {
-                    key: "email",
-                    title: t("settings.email.label"),
-                    summary: t("settings.email.summary"),
-                    onPress: open("/settings/email"),
-                  },
-                  {
-                    key: "contacts",
-                    title: t("settings.contacts.label"),
-                    summary: t("settings.contacts.summary"),
-                    onPress: open("/settings/contacts"),
-                  },
-                  {
-                    key: "notifications",
-                    title: t("settings.notifications.label"),
-                    summary: t("settings.notifications.summary"),
-                    onPress: open("/settings/notifications"),
-                  },
-                  {
-                    key: "feedback",
-                    title: t("feedback.title"),
-                    summary: t("settings.feedback.summary"),
-                    onPress: open("/settings/feedback"),
-                  },
-                  {
-                    key: "account",
-                    title: t("account.title"),
-                    summary: t("settings.account.summary"),
-                    onPress: open("/settings/account"),
-                  },
-                ]
-              : []),
           ]}
         />
       </ScrollView>

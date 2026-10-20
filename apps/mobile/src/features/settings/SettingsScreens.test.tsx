@@ -223,10 +223,36 @@ describe("the source screen", () => {
 });
 
 describe("the licences screen", () => {
-  it("lists the packages with their licences", async () => {
+  it("lists the packages with their licences, in families under headings, the rest last", async () => {
     await renderWithTheme(<LicensesScreen />);
     expectPinnedHeader("Licences of the packages", "Back");
     expect(screen.getByText(/^expo \d.* · MIT$/)).toBeTruthy();
+    const headings = screen
+      .getAllByRole("heading")
+      .map((node) => node.props.children)
+      .filter((name) => name !== "Licences of the packages");
+    expect(headings).toEqual([
+      "Expo",
+      "React Native",
+      "React",
+      "Sentry",
+      "FormatJS",
+      "Other packages",
+    ]);
+    // A package sits under its family's heading, before the next one.
+    const flat = JSON.stringify(screen.toJSON());
+    const at = (text: string) => flat.indexOf(text);
+    expect(at('"Expo"')).toBeLessThan(at("expo-router "));
+    expect(at("expo-router ")).toBeLessThan(at('"React Native"'));
+    expect(at('"Other packages"')).toBeLessThan(at("zod "));
+    noProblems();
+  });
+
+  it("names the last family in the person's language", async () => {
+    store.set("kuutti.preference.locale", "fi");
+    await renderWithTheme(<LicensesScreen />);
+    expect(screen.getByRole("heading", { name: "Muut paketit" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Expo" })).toBeTruthy();
   });
 });
 

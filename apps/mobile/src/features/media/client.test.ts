@@ -177,6 +177,22 @@ describe("the photo routes", () => {
     ).toBeNull();
   });
 
+  it("reads a rejection reason this build cannot say as none, on the list and on one photo, and keeps the ones it can (#376)", async () => {
+    const rejected = { ...stored, state: "rejected", rejectionReason: "too_blurry" };
+    answering(
+      json({ photos: [rejected], maxPhotos: 6, tips: [] }),
+      json({ ...rejected, rejectionReason: "not_reviewed" }),
+    );
+    expect((await listPhotos()).photos[0]).toMatchObject({
+      state: "rejected",
+      rejectionReason: null,
+    });
+    expect((await appealPhoto(stored.id)).rejectionReason).toBe("not_reviewed");
+    // No reason at all is handed on as it is; a photo that is not an object still fails the parse.
+    expect(readPhotoList({ photos: [stored], maxPhotos: 6, tips: [] }).photos[0]).toEqual(stored);
+    expect(() => readPhotoList({ photos: [null], maxPhotos: 6, tips: [] })).toThrow();
+  });
+
   it("lists the photos, and fails a refusal with its code", async () => {
     const list = { photos: [stored], maxPhotos: 6, tips: [], fishSpecies: null };
     answering(json(list), refusal("internal_error", 500));

@@ -4148,6 +4148,13 @@ photos.rejected.other:
   sv: Inte godkänt. Det här fotot passar inte på Kuutti; prova ett annat.
   machine: { fi: true, sv: true }
 
+photos.rejected.not_reviewed:
+  en: Not accepted. Nobody reviewed this photo in time; you can add it again.
+  description: "Photos screen, a photo the night rejected because no moderator decided it within the queue's limit (#376, two weeks): nothing was found wrong with it, so the text blames nobody and says it can be added again."
+  fi: Ei hyväksytty. Kukaan ei ehtinyt tarkistaa tätä kuvaa ajoissa; voit lisätä sen uudelleen.
+  sv: Inte godkänt. Ingen hann granska det här fotot i tid; du kan lägga till det igen.
+  machine: { fi: true, sv: true }
+
 photos.caption.recent:
   en: "Taken recently"
   description: "A caption the owner can pick for a photo (#296), shown under it to others in their language and read by screen readers; the key is PHOTO_CAPTIONS of packages/schema. Short: it sits under a thumb on the card."
@@ -7785,6 +7792,13 @@ tech.licenses.title:
   sv: "Paketens licenser"
   machine: { fi: true, sv: true }
 
+tech.licenses.other:
+  en: "Other packages"
+  description: "Licences screen (#376): the heading of the last group, every package outside the named families (Expo, React Native, React, Sentry, FormatJS), whose headings are their own names and are not translated."
+  fi: "Muut paketit"
+  sv: "Övriga paket"
+  machine: { fi: true, sv: true }
+
 settings.section.appearance:
   en: "Appearance and language"
   description: "Settings, heading of the first section (#287): the theme row and the language row."
@@ -7820,13 +7834,6 @@ settings.version.commit:
   sv: "Bygge {commit}"
   machine: { fi: true, sv: true }
 
-settings.source.summary:
-  en: "Free software under the AGPL-3.0 licence"
-  description: "Summary of the source-code row under About Kuutti (#287); the row opens the offer of AGPL-3.0 section 13."
-  fi: "Vapaa ohjelmisto AGPL-3.0-lisenssillä"
-  sv: "Fri programvara under AGPL-3.0-licensen"
-  machine: { fi: true, sv: true }
-
 settings.licenses.label:
   en: "Licences"
   description: "Title of the row that opens the packages' licences (#287)."
@@ -7841,25 +7848,11 @@ settings.licenses.summary:
   sv: "{packages, plural, one {# paket} other {# paket}} som det här bygget består av"
   machine: { fi: true, sv: true }
 
-settings.device.summary:
-  en: "Log out here, or everywhere"
-  description: "Summary of the row that opens this device's session (#287)."
-  fi: "Kirjaudu ulos täältä tai kaikkialta"
-  sv: "Logga ut här eller överallt"
-  machine: { fi: true, sv: true }
-
 settings.email.label:
   en: "E-mail"
   description: "Title of the row and the screen of the optional e-mail (#287); the card on the screen keeps its own words."
   fi: "Sähköposti"
   sv: "E-post"
-  machine: { fi: true, sv: true }
-
-settings.email.summary:
-  en: "A way back in, if a phone is lost"
-  description: "Summary of the row that opens the e-mail screen (#287)."
-  fi: "Paluutie, jos puhelin katoaa"
-  sv: "En väg tillbaka, om en telefon tappas bort"
   machine: { fi: true, sv: true }
 
 settings.contacts.label:
@@ -7869,25 +7862,11 @@ settings.contacts.label:
   sv: "Dina kontaktuppgifter"
   machine: { fi: true, sv: true }
 
-settings.contacts.summary:
-  en: "Shared only where you choose"
-  description: "Summary of the Your contacts row in Settings (#103): nobody sees them until the person shares one in a conversation."
-  fi: "Jaetaan vain, missä itse valitset"
-  sv: "Delas bara där du själv väljer"
-  machine: { fi: true, sv: true }
-
 settings.notifications.label:
   en: "Notifications"
   description: "Title of the row under Account in Settings and of the screen it opens (#176): which kinds of notification the person allows. Short."
   fi: "Ilmoitukset"
   sv: "Aviseringar"
-  machine: { fi: true, sv: true }
-
-settings.notifications.summary:
-  en: "What Kuutti may tell you about"
-  description: "Summary of the Notifications row in Settings (#176). The app name stays in the nominative."
-  fi: "Mistä Kuutti saa kertoa sinulle"
-  sv: "Vad Kuutti får berätta för dig om"
   machine: { fi: true, sv: true }
 
 notifications.intro:
@@ -8105,20 +8084,6 @@ settings.contacts.failed:
   description: "Said on a card of the Your contacts screen when a save or a removal failed for any other reason (#103); the words stay in the field."
   fi: "Mikään ei muuttunut. Tarkista yhteys ja yritä uudelleen."
   sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
-  machine: { fi: true, sv: true }
-
-settings.account.summary:
-  en: "Your data, a break, deletion"
-  description: "Summary of the row that opens the export, the break and the deletion (#287); the row and its screen are titled by account.title."
-  fi: "Tietosi, tauko, poisto"
-  sv: "Dina uppgifter, en paus, radering"
-  machine: { fi: true, sv: true }
-
-settings.feedback.summary:
-  en: "A bug, an idea, a complaint or praise"
-  description: "Summary of the row under Account in Settings that opens the feedback screen (#171); the row and its screen are titled by feedback.title."
-  fi: "Vika, idea, valitus tai kehu"
-  sv: "En bugg, en idé, ett klagomål eller beröm"
   machine: { fi: true, sv: true }
 
 feedback.title:

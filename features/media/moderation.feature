@@ -3,8 +3,9 @@ Feature: Photo moderation before anyone else sees a photo
   A dating app without pre-publication photo moderation ships pornography
   and other people's faces within a day (TD-8). The automatic check rejects
   what it is sure of and tells the owner why; what it is unsure of is a
-  person's to decide (ADR-006 §2, #206, #253); nothing is ever deleted by a
-  machine. Each hard group of labels has two lines, 60 to ask a person and 90
+  person's to decide (ADR-006 §2, #206, #253), and one nobody decided within
+  matching_config photo_queue_reject_days the night rejects as not reviewed
+  (#376); nothing is ever deleted by a machine. Each hard group of labels has two lines, 60 to ask a person and 90
   to decide, as migration 0030 sets them. A photo sent in a conversation is
   held to the same lines without the face rules, and only what the check is
   sure of is refused: there `queued` is the stored state of a photo
@@ -157,6 +158,27 @@ Feature: Photo moderation before anyone else sees a photo
   Scenario: The photo routes for staff refuse a product session and no session
     When a product session or nobody calls the staff photo routes
     Then every answer is 401 and nothing is written
+
+  Scenario: A photo nobody decided within photo_queue_reject_days is rejected as not reviewed
+    Given photo_queue_reject_days is 14 and two photos have waited in the queue for 15 days
+    When the night runs
+    Then both are rejected as not_reviewed with no appeal, their review rows name nobody, and the owner's list says why
+
+  Scenario: The limit counts an appealed photo from its appeal, and leaves every other photo alone
+    Given photo_queue_reject_days is 14, queued photos either side of it by a minute, one appealed 3 days ago
+    And old photos pending, approved, rejected, and one sent in a conversation
+    When the night runs
+    Then only the one past fourteen days by a minute is rejected
+
+  Scenario: A moderator's decision and the night's limit on one photo: the first one stands
+    Given two photos 20 days in the queue, one of which a moderator approves before the night
+    When the night runs and a moderator then decides the other
+    Then the first stays approved, and the second stays rejected as not_reviewed with the decision refused
+
+  Scenario: photo_queue_reject_days at 0 switches the limit off
+    Given photo_queue_reject_days is 0 and a photo has waited 400 days
+    When the night runs
+    Then the photo stays queued until the number is set again
 
   Scenario: The automatic check never overwrites a person's decision
     Given a photo a moderator has decided

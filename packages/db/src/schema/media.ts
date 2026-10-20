@@ -33,7 +33,7 @@ export const photoVariant = pgEnum("photo_variant", ["thumb", "card", "full"]);
  * screen or the moderators' queue.
  */
 export const photoPurpose = pgEnum("photo_purpose", ["profile", "message"]);
-/** The closed list a moderator chooses from; the owner is told it in words (#49). */
+/** Why a photo was not accepted, a closed list the owner is told in words (#49): a moderator's choice, the check's, or the night's. */
 export const photoRejectionReason = pgEnum("photo_rejection_reason", [
   "nudity",
   "no_person",
@@ -42,6 +42,8 @@ export const photoRejectionReason = pgEnum("photo_rejection_reason", [
   "violence",
   "contact_details",
   "other",
+  // The night's, for a photo nobody decided in time (#376, ADR-006 §2); never a moderator's choice.
+  "not_reviewed",
 ]);
 
 export const photo = pgTable(

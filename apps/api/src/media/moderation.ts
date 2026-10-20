@@ -683,3 +683,29 @@ export async function sweepPendingPhotos(
   }
   return { rechecked, failed };
 }
+
+const QUEUE_REJECT_DAYS_KEY = "photo_queue_reject_days";
+/** A day here is 24 hours, as the closer look counts it, whatever summer time does. */
+const DAY_MS = 86_400_000;
+
+/**
+ * The nightly limit on the queue (#376, ADR-006 §2, the maintainer's decision
+ * of 20/10/2026): a photo nobody decided within photo_queue_reject_days is
+ * rejected as not reviewed, so none waits for ever. Nothing expires into
+ * visibility: the photo stays in its owner's list, who reads why and may add
+ * it again. 0 switches the limit off, as for the automatic shadow bans'
+ * thresholds.
+ */
+export async function rejectUnreviewedPhotos(deps: {
+  db: Queryable;
+  now: () => Date;
+}): Promise<{ rejected: number }> {
+  const { [QUEUE_REJECT_DAYS_KEY]: days } = await matchingConfigNumbers(deps.db, [
+    QUEUE_REJECT_DAYS_KEY,
+  ]);
+  if (days <= 0) return { rejected: 0 };
+  const at = deps.now();
+  const waitingSince = new Date(at.getTime() - days * DAY_MS);
+  const ids = await transaction(deps.db, (tx) => repo.rejectQueuedSince(tx, { waitingSince, at }));
+  return { rejected: ids.length };
+}

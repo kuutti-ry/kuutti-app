@@ -207,6 +207,58 @@ describe("PhotosScreen", () => {
     ).toEqual(["Being reviewed", "Main photo", "Visible to others", "Visible to others"]);
   });
 
+  it("marks a photo in review on the photo itself, hidden from a screen reader, which hears the words under it (#376)", async () => {
+    fetchMock([
+      answersList({
+        photos: [
+          { ...photo(1), state: "pending" },
+          { ...photo(2), state: "queued", position: 1 },
+          { ...photo(3), state: "approved", position: 2 },
+          { ...photo(4), state: "rejected", rejectionReason: "no_person", position: 3 },
+        ],
+        maxPhotos: 6,
+        tips: [],
+      }),
+      answersUrls,
+    ]);
+    await show(<PhotosScreen />);
+    await screen.findByText("Being reviewed");
+    expect(screen.getByText("Waiting for review")).toBeTruthy();
+    // The sign is on the two in review only, and a screen reader is not sent to it.
+    for (const position of [1, 2]) {
+      const sign = screen.getByTestId(`photo-in-review-${position}`, {
+        includeHiddenElements: true,
+      });
+      expect(sign.props.importantForAccessibility).toBe("no-hide-descendants");
+      expect(sign.props.accessibilityElementsHidden).toBe(true);
+      expect(screen.queryByTestId(`photo-in-review-${position}`)).toBeNull();
+    }
+    for (const position of [3, 4]) {
+      expect(
+        screen.queryByTestId(`photo-in-review-${position}`, { includeHiddenElements: true }),
+      ).toBeNull();
+    }
+    expect(pressables(screen.toJSON() as HostNode).flatMap((n) => a11yProblems(n))).toEqual([]);
+  });
+
+  it("a photo nobody reviewed in time says so, and that it can be added again (#376)", async () => {
+    fetchMock([
+      answersList({
+        photos: [{ ...photo(1), state: "rejected", rejectionReason: "not_reviewed" }],
+        maxPhotos: 3,
+        tips: [],
+      }),
+      answersUrls,
+    ]);
+    await show(<PhotosScreen />);
+    expect(
+      await screen.findByText(
+        "Not accepted. Nobody reviewed this photo in time; you can add it again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Ask a person/ })).toBeNull();
+  });
+
   it("a rejected photo says why in words, never a label name", async () => {
     fetchMock([
       answersList({
