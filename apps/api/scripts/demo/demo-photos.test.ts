@@ -186,6 +186,11 @@ describe("the stories with their pictures", () => {
       jussi: 0,
       laura: 0,
       emmi: 0,
+      iida: 3,
+      henna: 2,
+      katja: 2,
+      minna: 2,
+      riikka: 2,
     });
     const sanna = await photosOf(ctx, "sanna");
     expect(sanna).toHaveLength(5);
