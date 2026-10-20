@@ -285,13 +285,21 @@ jobs:
       # An adb server that restarts during the run drops every `adb reverse`,
       # and each flow after it reaches neither the API nor Metro (#359). A
       # loop keeps the four forwards while the flows run, puts back one that
-      # had gone and says so in the log; it stops with the step.
+      # had gone and says so in the log; it stops with the step. While the
+      # emulator is offline there is nothing to put them on, so it waits.
+      #
+      # An emulator that drops out of adb mid-run fails every flow after it
+      # in milliseconds (#362). Named by its serial, with the JUnit report,
+      # the script then waits for it to come back and boot, keeps its log,
+      # puts the forwards back and runs those flows once more, each step a
+      # line of the log beginning `e2e:` and the first a warning on the run.
       - name: The flows on the emulator
         env:
           SHARD: ${{ matrix.shard }}
         run: |
           keep_forwards() {
             while sleep 5; do
+              [ "$(adb get-state 2> /dev/null)" = device ] || continue
               forwards="$(adb reverse --list 2> /dev/null || true)"
               for port in 3000 8080 8081 9000; do
                 case "$forwards" in
@@ -307,7 +315,7 @@ jobs:
           keep_forwards &
           watcher=$!
           trap 'kill "$watcher" 2> /dev/null || true' EXIT
-          node scripts/e2e.ts --shard "$SHARD/4" --format junit --output e2e-report.xml
+          node scripts/e2e.ts --device emulator-5554 --shard "$SHARD/4" --format junit --output e2e-report.xml
 
       # Maestro keeps a flow's device log only once a flow runs; a failure
       # before the first (Android restarting as Maestro installed its driver,
@@ -323,6 +331,8 @@ jobs:
           name: e2e-android-${{ matrix.shard }}
           path: |
             e2e-report.xml
+            e2e-report.retry.xml
+            e2e-report.logcat.txt
             api.log
             metro.log
             emulator.log
