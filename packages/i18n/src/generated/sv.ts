@@ -180,6 +180,7 @@ export const sv: Readonly<Record<string, string>> = {
   "errors.filter_unanswered": "För att filtrera på det här, dela ditt eget svar först.",
   "errors.http_error": "Begäran misslyckades.",
   "errors.internal_error": "Något gick fel hos oss.",
+  "errors.like_budget_exceeded": "Du har använt dagens gillanden. Nya kommer efter midnatt, men du kan fortfarande hoppa över.",
   "errors.media_busy": "Många foton bearbetas just nu. Försök igen om en stund.",
   "errors.media_unavailable": "Foton är inte tillgängliga just nu.",
   "errors.message_budget_exceeded": "Du skickar meddelanden väldigt snabbt. Vänta en stund och skicka igen.",

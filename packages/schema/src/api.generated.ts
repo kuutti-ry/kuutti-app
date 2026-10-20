@@ -5647,7 +5647,7 @@ export interface paths {
         get?: never;
         /**
          * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does.
          */
         put: {
             parameters: {
@@ -5701,6 +5701,15 @@ export interface paths {
                 };
                 /** @description round_expired: the day named has ended; nothing was written. */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description like_budget_exceeded: the day's likes are used up; Retry-After is the wait until the day rolls. Nothing was written. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };

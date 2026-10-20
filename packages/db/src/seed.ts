@@ -157,6 +157,8 @@ export const MATCHING_CONFIG_V1 = {
 export const MATCHING_CONFIG_V2 = {
   default_pond: "paakaupunkiseutu",
   round_size: 10,
+  // #98 (ADR-036, migration 0070): ten likes a day for everybody, the first cut's.
+  like_budget_balanced: 10,
 } as const;
 
 /**

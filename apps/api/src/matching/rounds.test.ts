@@ -519,6 +519,166 @@ describe("seen and decided", () => {
   });
 });
 
+/** The day's likes, above every version a migration wrote, so it is the one read (#98). */
+async function likeBudget(db: Queryable, likes: number) {
+  await db.query(
+    `INSERT INTO matching_config (version, key, value, created_by)
+     SELECT max(version) + 1, 'like_budget_balanced', $1::jsonb, 'test'
+       FROM matching_config WHERE key = 'like_budget_balanced'`,
+    [JSON.stringify(likes)],
+  );
+}
+
+describe("the day's likes (#98, ADR-036)", () => {
+  test("The day's likes stop at the budget, and the next is refused with the time they come back", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 2);
+    const [a, b, c, d] = await cast(ctx, 4);
+    if (!a || !b || !c || !d) throw new Error("cast not written");
+    await joinStudy(app, a);
+    const roundId = await roundFor(ctx.client, a, [b, c, d]);
+
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(204);
+    const refused = await decideBy(app, a, TODAY, 3, "like");
+
+    expect(refused.status).toBe(429);
+    expect(await errorCode(refused)).toBe("like_budget_exceeded");
+    // 12:00 in Finland, a few ticking seconds on: about twelve hours until midnight.
+    const wait = Number(refused.headers.get("retry-after"));
+    expect(wait).toBeGreaterThan(12 * 3600 - 60);
+    expect(wait).toBeLessThanOrEqual(12 * 3600);
+    expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual([
+      "like",
+      "like",
+      null,
+    ]);
+    expect(await eventsOf(ctx.client, "like")).toHaveLength(2);
+  });
+
+  test("the refusal is said in the request's language", async ({ ctx, app }) => {
+    await likeBudget(ctx.client, 0);
+    const [a, b] = await cast(ctx, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [b]);
+    const refused = await app.request(`/rounds/${TODAY}/entries/1/decision`, {
+      method: "PUT",
+      headers: { ...a.headers, "content-type": "application/json", "accept-language": "fi" },
+      body: JSON.stringify({ decision: "like" }),
+    });
+    expect(refused.status).toBe(429);
+    expect(ErrorResponse.parse(await refused.json()).error.message).toBe(
+      "Olet käyttänyt tämän päivän tykkäykset. Uusia tulee keskiyön jälkeen, mutta voit yhä ohittaa.",
+    );
+  });
+
+  test("A like back on a card of somebody who liked the person is free", async ({ ctx, app }) => {
+    await likeBudget(ctx.client, 1);
+    const [a, b, c] = await cast(ctx, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    const roundId = await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }, c]);
+
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+
+    expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual(["like", "like"]);
+  });
+
+  test("A pass is never counted, and a like taken back gives its place back", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 1);
+    const [a, b, c, d] = await cast(ctx, 4);
+    if (!a || !b || !c || !d) throw new Error("cast not written");
+    const roundId = await roundFor(ctx.client, a, [b, c, d]);
+
+    expect((await decideBy(app, a, TODAY, 1, "pass")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 3, "like")).status).toBe(429);
+    expect((await decideBy(app, a, TODAY, 2, "pass")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 3, "like")).status).toBe(204);
+
+    expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual([
+      "pass",
+      "pass",
+      "like",
+    ]);
+  });
+
+  test("a card liked already is liked again without a refusal, the budget spent or not", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 1);
+    const [a, b] = await cast(ctx, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [b]);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+  });
+
+  test("the day's likes are ten by the row the first cut wrote", async ({ ctx, app }) => {
+    const [a, ...others] = await cast(ctx, 12);
+    if (!a) throw new Error("cast not written");
+    await roundFor(ctx.client, a, others);
+    for (let position = 1; position <= 10; position += 1) {
+      expect((await decideBy(app, a, TODAY, position, "like")).status).toBe(204);
+    }
+    expect((await decideBy(app, a, TODAY, 11, "like")).status).toBe(429);
+    expect((await decideBy(app, a, TODAY, 11, "pass")).status).toBe(204);
+  });
+
+  test("Two devices liking at once cannot pass the budget together", async () => {
+    await withTwoConnections("kuutti-98-likes", async (pool, first, second) => {
+      const ids = await people(pool, null, 3, { complete: true, consented: true });
+      const [a, b, c] = ids;
+      if (!a || !b || !c) throw new Error("cast not written");
+      await likeBudget(pool, 1);
+      const deps = await depsOn(pool);
+      await saveRound(deps, {
+        accountId: a,
+        day: TODAY,
+        ordering: "count",
+        entries: [
+          { candidateId: b, reason: "matches_filters" },
+          { candidateId: c, reason: "matches_filters" },
+        ],
+      });
+      const firstPid = await pidOf(first);
+      const secondPid = await pidOf(second);
+      await first.query("BEGIN");
+      await second.query("BEGIN");
+      // One device's like holds the round's row; the other's waits, then counts it.
+      await decide(
+        { ...deps, db: first },
+        { accountId: a, day: TODAY, position: 1, decision: "like" },
+      );
+      const racing = watched(
+        decide(
+          { ...deps, db: second },
+          { accountId: a, day: TODAY, position: 2, decision: "like" },
+        ),
+      );
+      expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
+      await first.query("COMMIT");
+      expect(await racing.outcome).toBe("like_budget_exceeded");
+      await second.query("COMMIT");
+      const { rows } = await pool.query<{ position: number; decision: string | null }>(
+        `SELECT e.position, e.decision FROM round_entries e JOIN rounds r ON r.id = e.round_id
+          WHERE r.account_id = $1 ORDER BY e.position`,
+        [a],
+      );
+      expect(rows).toEqual([
+        { position: 1, decision: "like" },
+        { position: 2, decision: null },
+      ]);
+    });
+  });
+});
+
 describe("erasure, the export and the events", () => {
   test("Erasure removes the person's rounds and every entry in which they are somebody's card", async ({
     ctx,
