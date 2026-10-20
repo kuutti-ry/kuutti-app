@@ -45,3 +45,4 @@ TD-14's contest rule and its two budgets, the research buckets, approach 2's wei
 ## History
 
 - 2026-10-20: written with #98's budget half, on the maintainer's decisions of that day.
+- 2026-10-20 (#378, ADR-039 §2, §3): a fish counts against the day's likes as a like; a like on a `fish` card is free as one on a `liked_you` card.

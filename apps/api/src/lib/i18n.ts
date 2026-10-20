@@ -98,6 +98,7 @@ export const ERROR_MESSAGE_KEYS = {
   report_window_closed: "errors.report_window_closed",
   round_expired: "errors.round_expired",
   like_budget_exceeded: "errors.like_budget_exceeded",
+  fish_budget_exceeded: "errors.fish_budget_exceeded",
   match_made: "errors.match_made",
   conversation_closed: "errors.conversation_closed",
   message_too_long: "errors.message_too_long",

@@ -11,7 +11,7 @@ export const ROUND_ENTRIES_MAX = 50;
 
 /** Why a candidate is in the round (TD-12), the label on every card. Mirrors the database's round_reason. */
 export const RoundReason = z
-  .enum(["matches_filters", "liked_you", "seen_before", "relaxed"])
+  .enum(["matches_filters", "liked_you", "seen_before", "relaxed", "fish"])
   .meta({ id: "RoundReason" });
 export type RoundReason = z.infer<typeof RoundReason>;
 
@@ -28,6 +28,13 @@ export type RoundOrdering = z.infer<typeof RoundOrdering>;
 export const RoundDecision = z.enum(["like", "pass"]).meta({ id: "RoundDecision" });
 export type RoundDecision = z.infer<typeof RoundDecision>;
 
+/**
+ * What a person chooses on a card, and reads back (#378): a like, a pass, or
+ * a fish, which is a like with a mark (stored as `like` with `fish`, ADR-039).
+ */
+export const RoundChoice = z.enum(["like", "pass", "fish"]).meta({ id: "RoundChoice" });
+export type RoundChoice = z.infer<typeof RoundChoice>;
+
 const position = z.int().min(1).max(ROUND_ENTRIES_MAX);
 
 /** One card of the round, at its place, with the person's own decision so far. */
@@ -36,7 +43,7 @@ export const RoundEntry = z
     position,
     reason: RoundReason,
     /** Null while undecided. */
-    decision: RoundDecision.nullable(),
+    decision: RoundChoice.nullable(),
     card: ProfileCard,
   })
   .meta({ id: "RoundEntry" });
@@ -65,7 +72,7 @@ export const RoundEntryParams = z
 
 /** A like or a pass; another one the same day replaces it. */
 export const RoundDecisionUpdate = z
-  .object({ decision: RoundDecision })
+  .object({ decision: RoundChoice })
   .strict()
   .meta({ id: "RoundDecisionUpdate" });
 export type RoundDecisionUpdate = z.infer<typeof RoundDecisionUpdate>;
@@ -105,7 +112,7 @@ export const ExportedRoundEntry = z
     reason: RoundReason,
     reasonInWords: z.string(),
     seenAt: z.iso.datetime().nullable(),
-    decision: RoundDecision.nullable(),
+    decision: RoundChoice.nullable(),
     decisionInWords: z.string().nullable(),
     decidedAt: z.iso.datetime().nullable(),
   })
