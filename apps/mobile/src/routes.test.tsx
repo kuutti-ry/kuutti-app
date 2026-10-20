@@ -24,6 +24,7 @@ import ProfileRoute from "../app/profile/index";
 import LaterFieldRoute from "../app/profile/later/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
+import RoundRoute from "../app/round";
 import AccountSettingsRoute from "../app/settings/account";
 import ConsentRoute from "../app/settings/consent/[kind]";
 import ContactsSettingsRoute from "../app/settings/contacts";
@@ -81,6 +82,14 @@ jest.mock("@/features/home", () => {
   return {
     HomeRoute: (props: object) =>
       createElement(Text, { testID: "HomeRoute" }, JSON.stringify(props)),
+  };
+});
+jest.mock("@/features/matching", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  return {
+    RoundScreen: (props: object) =>
+      createElement(Text, { testID: "RoundScreen" }, JSON.stringify(props)),
   };
 });
 jest.mock("@/features/media", () => {
@@ -167,6 +176,7 @@ describe("the screens without params", () => {
     ["/profile", ProfileRoute, "ProfileScreen"],
     ["/profile/card", CardPreviewRoute, "CardPreviewScreen"],
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
+    ["/round", RoundRoute, "RoundScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/account", AccountSettingsRoute, "AccountScreen"],
     ["/settings/contacts", ContactsSettingsRoute, "ContactsSettingsScreen"],

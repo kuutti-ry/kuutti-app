@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -13,8 +14,10 @@ import { useGate } from "./useGate";
  * why there is a line, who counts, and why the numbers are round. They are
  * shown as they were served, in steps; the card works nothing out of them.
  * Nothing here names a gender, and nothing can be tapped to move ahead.
+ * Once matching is open, the card carries what the home screen hands it for
+ * that: the way to today's round (#379).
  */
-export function GateCard() {
+export function GateCard({ whenOpen }: { whenOpen?: ReactNode }) {
   const { t } = useT();
   const tap = useHapticTap();
   const view = useGate();
@@ -56,7 +59,12 @@ export function GateCard() {
               <Text variant="muted">{t("pond.gate.steps", { step: gate.step })}</Text>
             </>
           )}
-          {gate?.state === "open" && <Text>{t("pond.gate.open")}</Text>}
+          {gate?.state === "open" && (
+            <>
+              <Text>{t("pond.gate.open")}</Text>
+              {whenOpen}
+            </>
+          )}
         </CardContent>
       </View>
     </Card>

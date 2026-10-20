@@ -1,6 +1,6 @@
 import type { GateResponse } from "@kuutti/schema";
 import { act, fireEvent } from "@testing-library/react-native";
-import { AppState } from "react-native";
+import { AppState, View } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { GateCard } from "./GateCard";
@@ -89,6 +89,21 @@ describe("GateCard", () => {
     expect(screen.getByText(text)).toBeTruthy();
     expect(screen.queryByText(/\d/)).toBeNull();
   });
+
+  it.each([
+    ["open", gate({ state: "open" }), "Matching is open for you.", true],
+    ["closed", gate({ state: "closed", needed: 20 }), /more people are needed/, false],
+    ["pending", gate({ state: "pending" }), /counted tonight/, false],
+  ] as const)(
+    "carries what the home screen hands it for an open gate only: %s (#379)",
+    async (_state, answer, words, shown) => {
+      answering([() => json(answer)]);
+      const screen = await renderWithTheme(<GateCard whenOpen={<View testID="round" />} />);
+      await settle();
+      expect(screen.getByText(words)).toBeTruthy();
+      expect(screen.queryByTestId("round") !== null).toBe(shown);
+    },
+  );
 
   it("offers to try again when the gate could not be read, and reads it then", async () => {
     const calls = answering([

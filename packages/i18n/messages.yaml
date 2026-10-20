@@ -7019,6 +7019,186 @@ pond.gate.retry:
   sv: "Försök igen"
   machine: { fi: true, sv: true }
 
+# --- Today's round (#379, ADR-034): one card at a time, like and pass, come back tomorrow ---
+
+round.home.open:
+  en: "Today's round"
+  description: "Button on the gate card of the home screen, once matching is open for the person: opens the day's round (#379). Short; no count, no time."
+  fi: "Päivän kierros"
+  sv: "Dagens runda"
+  machine: { fi: true, sv: true }
+
+round.title:
+  en: "Today's round"
+  description: "Title of the round screen, in its header beside the back arrow (#379)."
+  fi: "Päivän kierros"
+  sv: "Dagens runda"
+  machine: { fi: true, sv: true }
+
+round.back:
+  en: "Back to home"
+  description: "Back arrow of the round screen, heard by a screen reader: where it goes (#379)."
+  fi: "Takaisin alkuun"
+  sv: "Tillbaka till start"
+  machine: { fi: true, sv: true }
+
+round.loading:
+  en: "Loading today's round…"
+  description: "Round screen while the day's round is read (#379)."
+  fi: "Ladataan päivän kierrosta…"
+  sv: "Läser in dagens runda…"
+  machine: { fi: true, sv: true }
+
+round.failed:
+  en: "Today's round did not load."
+  description: "Round screen when the day's round could not be read; why, and a button to try again, follow (#379)."
+  fi: "Päivän kierrosta ei voitu ladata."
+  sv: "Dagens runda kunde inte läsas in."
+  machine: { fi: true, sv: true }
+
+round.reason.matches_filters:
+  en: "Matches your filters"
+  description: "Why a card is in the round (TD-12), above the card: the person is in the reader's filters and the reader in theirs. Never a score, never 'best match'. A short label."
+  fi: "Vastaa suodattimiasi"
+  sv: "Matchar dina filter"
+  machine: { fi: true, sv: true }
+
+round.reason.liked_you:
+  en: "Liked you"
+  description: "Why a card is in the round (TD-12, #97), above the card: this person liked the reader, and liking back makes a match. Never says when or how often. A short label."
+  fi: "Tykkäsi sinusta"
+  sv: "Gillade dig"
+  machine: { fi: true, sv: true }
+
+round.reason.seen_before:
+  en: "Seen before"
+  description: "Why a card is in the round (TD-12), above the card: the reader was shown this person in an earlier round. A short label."
+  fi: "Nähty aiemmin"
+  sv: "Sedd tidigare"
+  machine: { fi: true, sv: true }
+
+round.reason.relaxed:
+  en: "Shown because you widened your filters"
+  description: "Why a card is in the round (TD-12, #99), above the card: the person is there because the reader relaxed a filter for a short pool. A short label."
+  fi: "Näytetään, koska laajensit suodattimiasi"
+  sv: "Visas för att du vidgade dina filter"
+  machine: { fi: true, sv: true }
+
+round.like:
+  en: "Like"
+  description: "Decision button on a round card, at the right of the bottom bar, a filled pill with a heart (#379): the reader would like to talk to this person. One word; see the glossary's like."
+  fi: "Tykkää"
+  sv: "Gilla"
+  max_length: 14
+  machine: { fi: true, sv: true }
+
+round.pass:
+  en: "Pass"
+  description: "Decision button on a round card, at the left of the bottom bar, an outlined rectangle with a cross (#379): not this time. Neutral and kind, never a rejection; see the glossary's pass. One word."
+  fi: "Ohita"
+  sv: "Hoppa över"
+  max_length: 14
+  machine: { fi: true, sv: true }
+
+round.undo:
+  en: "Undo"
+  description: "Button in the round screen's header after a decision: brings the last card back to decide again (ADR-034 §5, until midnight). One word."
+  fi: "Kumoa"
+  sv: "Ångra"
+  max_length: 12
+  machine: { fi: true, sv: true }
+
+round.undo.label:
+  en: "Undo your last decision"
+  description: "What a screen reader says for the Undo button of the round screen: the last card comes back to decide again (#379)."
+  fi: "Kumoa viimeisin valintasi"
+  sv: "Ångra ditt senaste val"
+  machine: { fi: true, sv: true }
+
+round.revisit.like:
+  en: "You liked this person. You can change that until midnight."
+  description: "Above a card the reader brought back with Undo, when its decision is a like (ADR-034 §5): the like stands until another button is pressed."
+  fi: "Tykkäsit tästä henkilöstä. Voit muuttaa sitä keskiyöhön asti."
+  sv: "Du gillade den här personen. Du kan ändra det fram till midnatt."
+  machine: { fi: true, sv: true }
+
+round.revisit.pass:
+  en: "You passed on this person. You can change that until midnight."
+  description: "Above a card the reader brought back with Undo, when its decision is a pass (ADR-034 §5): the pass stands until another button is pressed. Neutral, never a rejection."
+  fi: "Ohitit tämän henkilön. Voit muuttaa sitä keskiyöhön asti."
+  sv: "Du hoppade över den här personen. Du kan ändra det fram till midnatt."
+  machine: { fi: true, sv: true }
+
+round.done:
+  en: "That was today's round. The next one comes tomorrow."
+  description: "Round screen after the day's last card is decided (#379). Calm and final: no countdown, no count, nothing that loads more."
+  fi: "Siinä oli päivän kierros. Seuraava tulee huomenna."
+  sv: "Det var dagens runda. Nästa kommer i morgon."
+  machine: { fi: true, sv: true }
+
+round.empty:
+  en: "There is nobody to show you today. Come back tomorrow."
+  description: "Round screen when the day's round has no cards (#95): nobody in the pool both ways today. No filler, no count, nothing that blames the reader."
+  fi: "Tänään ei ole ketään näytettävää. Tule takaisin huomenna."
+  sv: "I dag finns det ingen att visa dig. Kom tillbaka i morgon."
+  machine: { fi: true, sv: true }
+
+round.none:
+  en: "Your round is not ready yet. Come back tomorrow."
+  description: "Round screen when the reader has no round for the day (ADR-035 §5: the read builds none, for instance while matching is not open). No date, no count."
+  fi: "Kierroksesi ei ole vielä valmis. Tule takaisin huomenna."
+  sv: "Din runda är inte klar än. Kom tillbaka i morgon."
+  machine: { fi: true, sv: true }
+
+round.newDay:
+  en: "Yesterday's round ended at midnight. This is today's."
+  description: "Round screen when the day ended while it was open and the new day's round was read in its place (ADR-034 §3). Said once, above the round."
+  fi: "Eilinen kierros päättyi keskiyöllä. Tämä on tämän päivän kierros."
+  sv: "Gårdagens runda tog slut vid midnatt. Det här är dagens."
+  machine: { fi: true, sv: true }
+
+round.gone:
+  en: "That card is no longer available."
+  description: "Round screen when the card on it could not be decided because it is gone meanwhile (404: the person was blocked, left, or is no longer shown). The card leaves the screen. Never says why."
+  fi: "Kortti ei ole enää saatavilla."
+  sv: "Kortet är inte längre tillgängligt."
+  machine: { fi: true, sv: true }
+
+round.decision.failed:
+  en: "That was not saved. Try again."
+  description: "Round screen when a like or a pass did not reach the API or failed there; the card stays for another try (#379)."
+  fi: "Valintaa ei tallennettu. Yritä uudelleen."
+  sv: "Det sparades inte. Försök igen."
+  machine: { fi: true, sv: true }
+
+round.match.title:
+  en: "It's a match"
+  description: "Round screen after a like made a match (#100, ADR-038): both liked each other. A short headline, no exclamation mark; see the tone guide."
+  fi: "Se on mätsi"
+  sv: "Det är en match"
+  machine: { fi: true, sv: true }
+
+round.match.body:
+  en: "You both liked each other, so a conversation is open for you two under Conversations."
+  description: "Round screen under the match headline (#100): what the match is and where it is. Conversations is the list's name (chat.list.title)."
+  fi: "Tykkäsitte toisistanne, joten teillä on nyt keskustelu Keskusteluissa."
+  sv: "Ni gillade varandra, så nu har ni ett samtal under Samtal."
+  machine: { fi: true, sv: true }
+
+round.match.open:
+  en: "Go to the conversation"
+  description: "Button under a match on the round screen (#100): opens the conversation the match opened."
+  fi: "Siirry keskusteluun"
+  sv: "Gå till samtalet"
+  machine: { fi: true, sv: true }
+
+round.match.continue:
+  en: "Back to the round"
+  description: "Button under a match on the round screen (#100): the round goes on with its next card, or says that it is done."
+  fi: "Takaisin kierrokselle"
+  sv: "Tillbaka till rundan"
+  machine: { fi: true, sv: true }
+
 # --- The chat (#348, ADR-031): the list of conversations, a conversation and its composer ---
 
 chat.list.title:
