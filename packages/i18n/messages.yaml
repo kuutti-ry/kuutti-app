@@ -6702,10 +6702,10 @@ account.break.signedOut:
   machine: { fi: true, sv: true }
 
 account.break.comesBack:
-  en: "Your next bank login brings you back. Nothing is deleted and nothing is asked again, though a like waiting for you can run out meanwhile."
-  description: "Break screen, the third consequence. A break stops no clock (ADR-022 §4, the maintainer's of 13/10/2026): a like waiting for the person expires after matching_config like_expiry_days as at any other time (#97), so the line says it can, never how long, since the time is a row."
-  fi: "Seuraava pankkitunnistautuminen tuo sinut takaisin. Mitään ei poisteta eikä mitään kysytä uudelleen, mutta sinua odottava tykkäys voi vanhentua sillä välin."
-  sv: "Nästa bankinloggning tar dig tillbaka. Inget raderas och inget frågas igen, men ett gillande som väntar på dig kan hinna gå ut under tiden."
+  en: "Your next bank login brings you back. Nothing is deleted and nothing is asked again, though meanwhile a like waiting for you can run out, and a quiet conversation moves to Archived."
+  description: "Break screen, the third consequence. A break stops no clock (ADR-022 §4, the maintainer's of 13/10/2026): a like waiting for the person expires after matching_config like_expiry_days (#97), and a match nobody writes in is archived after silent_match_archive_days (#100, ADR-031 §8), as at any other time. So the line says they can, never how long, since the times are rows. Archived is the conversation list's group (chat.list.archived), where writing brings a quiet one back."
+  fi: "Seuraava pankkitunnistautuminen tuo sinut takaisin. Mitään ei poisteta eikä mitään kysytä uudelleen, mutta sillä välin sinua odottava tykkäys voi vanhentua ja hiljainen keskustelu siirtyy Arkistoituihin."
+  sv: "Nästa bankinloggning tar dig tillbaka. Inget raderas och inget frågas igen, men under tiden kan ett gillande som väntar på dig gå ut, och ett tyst samtal flyttas till Arkiverade."
   machine: { fi: true, sv: true }
 
 account.break.understand:
