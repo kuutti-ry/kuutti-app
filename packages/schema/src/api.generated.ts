@@ -5647,7 +5647,7 @@ export interface paths {
         get?: never;
         /**
          * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like.
          */
         put: {
             parameters: {
@@ -5710,7 +5710,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description like_budget_exceeded: the day's likes are used up; Retry-After is the wait until the day rolls. Nothing was written. */
+                /** @description like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days, Retry-After the wait until the next can go. Nothing was written. */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -6414,15 +6414,15 @@ export interface components {
             reasonInWords: string;
             /** Format: date-time */
             seenAt: string | null;
-            decision: components["schemas"]["RoundDecision"];
+            decision: components["schemas"]["RoundChoice"];
             decisionInWords: string | null;
             /** Format: date-time */
             decidedAt: string | null;
         };
         /** @enum {string} */
-        RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed";
+        RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed" | "fish";
         /** @enum {string|null} */
-        RoundDecision: "like" | "pass" | null;
+        RoundChoice: "like" | "pass" | "fish" | null;
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -7368,7 +7368,7 @@ export interface components {
         RoundEntry: {
             position: number;
             reason: components["schemas"]["RoundReason"];
-            decision: components["schemas"]["RoundDecision"];
+            decision: components["schemas"]["RoundChoice"];
             card: components["schemas"]["ProfileCard"];
         };
         RoundDecisionAnswer: {
@@ -7378,7 +7378,7 @@ export interface components {
             } | null;
         };
         RoundDecisionUpdate: {
-            decision: components["schemas"]["RoundDecision"];
+            decision: components["schemas"]["RoundChoice"];
         };
         DealBreakersResponse: {
             dealBreakers: components["schemas"]["StoredDealBreaker"][];

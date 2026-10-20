@@ -27,12 +27,13 @@ const props = <T extends z.ZodRawShape>(shape: T) => z.object(shape).strict();
 const roundCount = z.int().min(0).max(ROUND_ENTRIES_MAX);
 const roundPosition = z.int().min(1).max(ROUND_ENTRIES_MAX);
 /** A like or a pass: its place and reason, the band since the card was seen (null when never reported seen), and whether it changed the day's earlier decision. */
-const decisionProps = props({
+const decisionShape = {
   position: roundPosition,
   reason: RoundReason,
   sinceSeen: SinceSeenBand.nullable(),
   revised: z.boolean(),
-});
+};
+const decisionProps = props(decisionShape);
 
 export const RESEARCH_EVENTS = {
   research_opt_in: {
@@ -130,6 +131,7 @@ export const RESEARCH_EVENTS = {
       likedYou: roundCount,
       seenBefore: roundCount,
       relaxed: roundCount,
+      fish: roundCount,
     }),
   },
   profile_viewed: {
@@ -139,8 +141,8 @@ export const RESEARCH_EVENTS = {
   },
   like: {
     question:
-      "Which cards are liked, by place and reason, how soon after being seen, and how often a decision is changed (#96)?",
-    props: decisionProps,
+      "Which cards are liked, by place and reason, how soon after being seen, how often a decision is changed (#96), and which likes are fish (#378)?",
+    props: props({ ...decisionShape, fish: z.boolean() }),
   },
   pass: {
     question:

@@ -498,6 +498,20 @@
       "when": 1792512853668,
       "tag": "0070_like_budget_ten",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1792515643443,
+      "tag": "0071_fish",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1792515649531,
+      "tag": "0072_fish_budget",
+      "breakpoints": true
     }
   ]
 }

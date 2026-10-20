@@ -26,7 +26,8 @@ import { type Subject, subjectsOfPond } from "./pond-gate.ts";
  * make a shorter round, none an empty one: nothing fills it.
  *
  * The round's first places are the people whose like waits on the person
- * (#97, ADR-037): liked on an ended day within `like_expiry_days`, not yet
+ * (#97, ADR-037), those who sent a fish ahead of the rest, labelled `fish`
+ * (#378, ADR-039): liked on an ended day within `like_expiry_days`, not yet
  * answered, the oldest like first, up to `liked_you_cap`, each still in each
  * other's pool, labelled `liked_you`; no order moves them. A like the person
  * passed within `pass_cooldown_days`, or of somebody they have a
@@ -84,7 +85,8 @@ async function historyOf(
 }
 
 /**
- * The people whose like waits on the owner, the oldest like first (#97): a
+ * The people whose like waits on the owner, those who sent a fish first
+ * (#378), each group the oldest like first (#97): a
  * like of an ended day, so a decision the liker may still change is never
  * shown, within `like_expiry_days`, and not answered, by a decision of the
  * owner's on the liker on the like's day or after it. A like expired is
@@ -95,9 +97,9 @@ async function waitingOn(
   ownerId: string,
   day: string,
   config: BuilderConfig,
-): Promise<string[]> {
-  const { rows } = await db.query<{ id: string }>(
-    `SELECT r.account_id AS id
+): Promise<{ id: string; fish: boolean }[]> {
+  const { rows } = await db.query<{ id: string; fish: boolean }>(
+    `SELECT r.account_id AS id, bool_or(e.fish) AS fish
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE e.candidate_id = $1 AND e.decision = 'like'
         AND r.day < $2::date AND r.day > $2::date - $3::int
@@ -106,10 +108,10 @@ async function waitingOn(
            WHERE mine.account_id = $1 AND answer.candidate_id = r.account_id
              AND answer.decision IS NOT NULL AND mine.day >= r.day)
       GROUP BY r.account_id
-      ORDER BY min(e.decided_at), r.account_id`,
+      ORDER BY bool_or(e.fish) DESC, min(e.decided_at), r.account_id`,
     [ownerId, day, config.like_expiry_days],
   );
-  return rows.map((row) => row.id);
+  return rows;
 }
 
 /** One pond's rounds for the day: of everybody open, or of one person. */
@@ -163,15 +165,16 @@ async function placesOf(
 ): Promise<{ candidateId: string; reason: RoundReason }[]> {
   const history = await historyOf(db, owner.id, round.day, round.config);
   const waiting = (await waitingOn(db, owner.id, round.day, round.config)).filter(
-    (id) => !history.refused.has(id),
+    (like) => !history.refused.has(like.id),
   );
   const byId = new Map(shown.map((subject) => [subject.id, subject]));
+  const fish = new Set(waiting.filter((like) => like.fish).map((like) => like.id));
   const likedYou = likedYouPlaces(
     owner,
-    waiting.flatMap((id) => byId.get(id) ?? []),
+    waiting.flatMap((like) => byId.get(like.id) ?? []),
     round.config.liked_you_cap,
   );
-  const waits = new Set(waiting);
+  const waits = new Set(waiting.map((like) => like.id));
   const ordered = roundOrder(
     owner,
     shown.filter(
@@ -183,7 +186,10 @@ async function placesOf(
     { day: round.day, size: round.config.round_size },
   );
   return [
-    ...likedYou.map((candidate) => ({ candidateId: candidate.id, reason: "liked_you" as const })),
+    ...likedYou.map((candidate) => ({
+      candidateId: candidate.id,
+      reason: fish.has(candidate.id) ? ("fish" as const) : ("liked_you" as const),
+    })),
     ...ordered.map((candidate) => ({
       candidateId: candidate.id,
       reason: history.seen.has(candidate.id)

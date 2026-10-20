@@ -3021,6 +3021,13 @@ errors.match_made:
   sv: "Det här gillandet blev en match, så det står kvar. Du kan fortfarande avsluta samtalet under Samtal."
   machine: { fi: true, sv: true }
 
+errors.fish_budget_exceeded:
+  en: "You have already sent your fish this week. You can still like."
+  description: "Today's round (429 with Retry-After, #378, ADR-039): the person has sent matching_config fish_budget fish within fish_window_days, rolling; Retry-After says when the next can go. Nothing was saved."
+  fi: "Olet jo lähettänyt kalasi tällä viikolla. Voit silti tykätä."
+  sv: "Du har redan skickat din fisk den här veckan. Du kan fortfarande gilla."
+  machine: { fi: true, sv: true }
+
 errors.like_budget_exceeded:
   en: "You have used today's likes. New ones come after midnight; you can still pass."
   description: "Today's round (429 with Retry-After, #98, ADR-036): the day's likes from matching_config like_budget_balanced are used; a like back on a card of somebody who liked the person is free and a pass is never counted. The day rolls at midnight in Finland. Nothing was saved."
@@ -6540,11 +6547,25 @@ account.export.round.reason.relaxed:
   sv: "Med eftersom du lättade på ett filter"
   machine: { fi: true, sv: true }
 
+account.export.round.reason.fish:
+  en: "Had sent you a fish"
+  description: "Inside the downloaded data file (#378), why a card was in the person's round: the card's person had sent them a fish, as the card's label said."
+  fi: "Oli lähettänyt sinulle kalan"
+  sv: "Hade skickat en fisk till dig"
+  machine: { fi: true, sv: true }
+
 account.export.round.decision.like:
   en: "Liked"
   description: "Inside the downloaded data file (#96), the person's decision on a card of their round."
   fi: "Tykkäsit"
   sv: "Gillade"
+  machine: { fi: true, sv: true }
+
+account.export.round.decision.fish:
+  en: "Sent a fish"
+  description: "Inside the downloaded data file (#378), the person's decision on a card of their round: a fish, a like that says a little more, of which a person may send one a week."
+  fi: "Lähetit kalan"
+  sv: "Skickade en fisk"
   machine: { fi: true, sv: true }
 
 account.export.round.decision.pass:

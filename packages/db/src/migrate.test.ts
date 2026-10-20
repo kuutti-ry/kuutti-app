@@ -335,7 +335,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -352,6 +352,8 @@ describe("migrate", () => {
             "auto_shadow_ban_same_first_message_hours",
             "auto_shadow_ban_review_hours",
             "photo_queue_reject_days",
+            "fish_budget",
+            "fish_window_days",
           ]);
           // A key's second version a later migration writes (0069, #95; 0070, #98) is not there yet either.
           const laterVersions = new Set(["round_size", "like_budget_balanced"]);
