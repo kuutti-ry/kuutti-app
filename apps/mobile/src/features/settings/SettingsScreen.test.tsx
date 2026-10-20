@@ -126,7 +126,7 @@ describe("the settings screen", () => {
     );
   });
 
-  it("lists the account's rows for a person, in order after the rest", async () => {
+  it("lists the sections for a person in the order of #376: appearance, account, legal, about", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     expect(await screen.findByRole("button", { name: "Your account" })).toBeTruthy();
@@ -136,6 +136,13 @@ describe("the settings screen", () => {
       "Theme",
       "Language",
       "Photo descriptions",
+      "Account",
+      "This device",
+      "E-mail",
+      "Your contacts",
+      "Notifications",
+      "Give feedback",
+      "Your account",
       "Legal",
       "Research",
       "Sensitive answers",
@@ -145,16 +152,32 @@ describe("the settings screen", () => {
       "Version",
       "Source code",
       "Licences",
-      "Account",
+    ].map((label) => flat.indexOf(`"${label}"`));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("gives a row a second line only for its value, never to describe what its title names (#376)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    for (const name of [
       "This device",
       "E-mail",
       "Your contacts",
       "Notifications",
       "Give feedback",
       "Your account",
-    ].map((label) => flat.indexOf(`"${label}"`));
-    expect(order.every((i) => i >= 0)).toBe(true);
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
+      "Source code",
+    ]) {
+      expect([name, row(name).props.accessibilityHint]).toEqual([name, undefined]);
+      expect([name, row(name).props.accessibilityValue?.text]).toEqual([name, undefined]);
+    }
+    // The rows with a value keep it under the title: the theme, the language, a version, the count.
+    expect(row("Theme").props.accessibilityValue?.text).toBe("System");
+    expect(row("Language").props.accessibilityValue?.text).toBe("Phone's language");
+    expect(row("Terms of use").props.accessibilityHint).toMatch(/^Version /);
+    expect(row("Licences").props.accessibilityHint).toMatch(/packages this build is made of$/);
   });
 
   it("says the defaults under the theme and the language rows", async () => {
@@ -261,8 +284,8 @@ describe("the settings screen", () => {
 
   it("says the chosen theme and language as the rows' values", async () => {
     await renderWithTheme(<SettingsScreen />);
-    expect(row("Theme").props.accessibilityValue).toEqual({ text: "System" });
-    expect(row("Language").props.accessibilityValue).toEqual({ text: "Phone's language" });
+    expect(row("Theme").props.accessibilityValue?.text).toBe("System");
+    expect(row("Language").props.accessibilityValue?.text).toBe("Phone's language");
   });
 
   it("says whether the photo descriptions are shown under the photos as the row's value (#296)", async () => {

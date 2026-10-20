@@ -4,6 +4,7 @@ import {
   Photo,
   type PhotoCaption,
   PhotoList,
+  PhotoRejectionReason,
   PhotoUrlResponse,
   type PhotoVariant,
   photoWithKnownDescription,
@@ -30,25 +31,42 @@ function failed(response: Response, error: unknown, what: string): ApiError {
 }
 
 /**
+ * A rejection reason this build has no words for is no reason (#376): the
+ * tile says "Not accepted" alone, as it would for a rejection without one.
+ */
+function withKnownReason(photo: unknown): unknown {
+  if (photo === null || typeof photo !== "object" || Array.isArray(photo)) return photo;
+  const { rejectionReason } = photo as { rejectionReason?: unknown };
+  if (rejectionReason == null || PhotoRejectionReason.safeParse(rejectionReason).success) {
+    return photo;
+  }
+  return { ...photo, rejectionReason: null };
+}
+
+/** One of the owner's photos as this build can say it: its description (#296) and its reason. */
+const asKnown = (photo: unknown): unknown => withKnownReason(photoWithKnownDescription(photo));
+
+/**
  * The list as the API sent it, less what this build has no words for: a tip
  * kind it does not know is left out, a fish it cannot name is no fish (the
- * plain fish tip), and a description's scene or object it cannot say is left
- * out of the description (#296). A newer API's tip or label never locks an
- * older app out of its own photos.
+ * plain fish tip), a description's scene or object it cannot say is left out
+ * of the description (#296), and a reason it cannot say is none (#376). A
+ * newer API's tip, label or reason never locks an older app out of its own
+ * photos.
  */
 export function readPhotoList(data: unknown): PhotoList {
   const sent = data as { photos?: unknown; tips?: unknown; fishSpecies?: unknown } | null;
   if (!sent || !Array.isArray(sent.tips)) return PhotoList.parse(data);
   return PhotoList.parse({
     ...sent,
-    photos: Array.isArray(sent.photos) ? sent.photos.map(photoWithKnownDescription) : sent.photos,
+    photos: Array.isArray(sent.photos) ? sent.photos.map(asKnown) : sent.photos,
     tips: sent.tips.filter((kind) => TipKind.safeParse(kind).success),
     fishSpecies: FishSpecies.safeParse(sent.fishSpecies).success ? sent.fishSpecies : null,
   });
 }
 
-/** One photo as the API sent it, its description as this build can say it (#296). */
-const readPhoto = (data: unknown): Photo => Photo.parse(photoWithKnownDescription(data));
+/** One photo as the API sent it, as this build can say it. */
+const readPhoto = (data: unknown): Photo => Photo.parse(asKnown(data));
 
 export async function listPhotos(): Promise<PhotoList> {
   const { data, error, response } = await api.GET("/photos");

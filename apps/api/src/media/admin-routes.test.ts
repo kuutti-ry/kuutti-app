@@ -5,6 +5,7 @@ import { createApp } from "../app.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "../test/account.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 import { TEST_MEDIA_BASE, testMediaDeps } from "../test/media.ts";
+import { rejectUnreviewedPhotos } from "./moderation.ts";
 
 // The photo review queue (#49, features/media/moderation.feature): happy
 // path, validation, unauthenticated, wrong role, and the audit row behind
@@ -295,6 +296,10 @@ describe("photo review queue", () => {
     expect(
       (await decide(app, staff.headers, id, { decision: "approve", reason: "nudity" })).status,
     ).toBe(400);
+    // The night's reason is no moderator's to choose (#376).
+    expect(
+      (await decide(app, staff.headers, id, { decision: "reject", reason: "not_reviewed" })).status,
+    ).toBe(400);
     const state = await ctx.client.query("SELECT state FROM photo WHERE id = $1", [id]);
     expect(state.rows[0]?.state).toBe("queued");
     expect(Number((await ctx.client.query("SELECT count(*) AS n FROM audit_log")).rows[0]?.n)).toBe(
@@ -520,5 +525,168 @@ describe("photo review queue, the remaining branches", () => {
       expect(res.status, limit).toBe(400);
       expect(await errorCode(res), limit).toBe("validation_failed");
     }
+  });
+});
+
+// The queue's limit (#376, ADR-006 §2, features/media/moderation.feature): the
+// night rejects a photo nobody decided within photo_queue_reject_days, counted
+// as the queue counts it, and leaves everything else alone.
+describe("the queue's limit", () => {
+  const DAY_S = 86_400;
+  const night = (ctx: TestContext, at = new Date()) =>
+    rejectUnreviewedPhotos({ db: ctx.client, now: () => at });
+  const stateOf = async (ctx: TestContext, id: string) =>
+    (
+      await ctx.client.query<{
+        state: string;
+        rejection_reason: string | null;
+        appealable: boolean;
+      }>("SELECT state, rejection_reason, appealable FROM photo WHERE id = $1", [id])
+    ).rows[0];
+
+  test("A photo nobody decided within photo_queue_reject_days is rejected as not reviewed", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    await withMatchingConfig(ctx.client, { photo_queue_reject_days: 14 });
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    // One the check sent to a person, and one from where no check runs and no review row exists.
+    const checked = await photoIn(ctx, owner.accountId, "queued", { labels: [], ago: 15 * DAY_S });
+    const unchecked = await photoIn(ctx, owner.accountId, "queued", { ago: 15 * DAY_S });
+    const at = new Date();
+    expect(await night(ctx, at)).toEqual({ rejected: 2 });
+    for (const id of [checked, unchecked]) {
+      expect(await stateOf(ctx, id)).toEqual({
+        state: "rejected",
+        rejection_reason: "not_reviewed",
+        appealable: false,
+      });
+    }
+    const reviews = await ctx.client.query(
+      "SELECT decision, reason, decided_by, decided_at FROM photo_review WHERE photo_id = ANY($1) ORDER BY photo_id",
+      [[checked, unchecked]],
+    );
+    expect(reviews.rows).toEqual([
+      { decision: "rejected", reason: "not_reviewed", decided_by: null, decided_at: at },
+      { decision: "rejected", reason: "not_reviewed", decided_by: null, decided_at: at },
+    ]);
+    // The owner reads why and keeps the photo; asking a person again is not offered.
+    const list = PhotoList.parse(
+      await (await app.request("/photos", { headers: owner.headers })).json(),
+    );
+    expect(list.photos.map((p) => [p.state, p.rejectionReason, p.appealable])).toEqual([
+      ["rejected", "not_reviewed", false],
+      ["rejected", "not_reviewed", false],
+    ]);
+    const appeal = await app.request(`/photos/${checked}/appeal`, {
+      method: "POST",
+      headers: owner.headers,
+    });
+    expect(appeal.status).toBe(409);
+    expect(await errorCode(appeal)).toBe("photo_not_appealable");
+    // The queue is empty, and nobody is named in an audit row for what nobody did.
+    const queue = PhotoReviewQueue.parse(
+      await (await app.request("/admin/photos/queue", { headers: staff.headers })).json(),
+    );
+    expect(queue.total).toBe(0);
+    expect(Number((await ctx.client.query("SELECT count(*) AS n FROM audit_log")).rows[0]?.n)).toBe(
+      0,
+    );
+    // The next night finds nothing more to do.
+    expect(await night(ctx, at)).toEqual({ rejected: 0 });
+  });
+
+  test("The limit counts an appealed photo from its appeal, and leaves every other photo alone", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { photo_queue_reject_days: 14 });
+    const owner = await signedInAccount(ctx.client);
+    const at = new Date();
+    // Either side of fourteen days, by a minute.
+    const late = await photoIn(ctx, owner.accountId, "queued", { ago: 14 * DAY_S + 60 });
+    const inTime = await photoIn(ctx, owner.accountId, "queued", { ago: 14 * DAY_S - 60 });
+    // Uploaded long ago, appealed three days ago: it waits from the appeal.
+    const appealed = await photoIn(ctx, owner.accountId, "queued", {
+      labels: [],
+      ago: 40 * DAY_S,
+    });
+    await ctx.client.query("UPDATE photo_review SET appealed_at = $2 WHERE photo_id = $1", [
+      appealed,
+      new Date(at.getTime() - 3 * DAY_S * 1000),
+    ]);
+    // Old photos in every other state are not the queue's.
+    const others: string[] = [];
+    for (const state of ["pending", "approved", "rejected"] as const) {
+      others.push(await photoIn(ctx, owner.accountId, state, { ago: 40 * DAY_S }));
+    }
+    // A photo sent in a conversation is stored queued with no human queue (ADR-031 §10).
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, purpose, created_at)
+       VALUES ($1, 'k-message', 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'queued', 'message', $2)
+       RETURNING id`,
+      [owner.accountId, new Date(at.getTime() - 40 * DAY_S * 1000)],
+    );
+    const message = rows[0]?.id ?? "";
+
+    expect(await night(ctx, at)).toEqual({ rejected: 1 });
+    expect((await stateOf(ctx, late))?.state).toBe("rejected");
+    for (const id of [inTime, appealed, message])
+      expect((await stateOf(ctx, id))?.state).toBe("queued");
+    const after: Array<string | undefined> = [];
+    for (const id of others) after.push((await stateOf(ctx, id))?.state);
+    expect(after).toEqual(["pending", "approved", "rejected"]);
+    // A rejection of any other kind keeps its own reason.
+    expect((await stateOf(ctx, others[2] ?? ""))?.rejection_reason).toBeNull();
+  });
+
+  test("A moderator's decision and the night's limit on one photo: the first one stands", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    await withMatchingConfig(ctx.client, { photo_queue_reject_days: 14 });
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const decidedFirst = await photoIn(ctx, owner.accountId, "queued", { ago: 20 * DAY_S });
+    const lateFirst = await photoIn(ctx, owner.accountId, "queued", { ago: 20 * DAY_S });
+
+    // A moderator approves one just before the night: the night leaves it approved.
+    expect((await decide(app, staff.headers, decidedFirst, { decision: "approve" })).status).toBe(
+      200,
+    );
+    expect(await night(ctx)).toEqual({ rejected: 1 });
+    expect((await stateOf(ctx, decidedFirst))?.state).toBe("approved");
+    const review = await ctx.client.query(
+      "SELECT decision, decided_by FROM photo_review WHERE photo_id = $1",
+      [decidedFirst],
+    );
+    expect(review.rows).toEqual([{ decision: "approved", decided_by: staff.identityId }]);
+
+    // The night got to the other first: a moderator's late decision is refused, with no audit row.
+    const res = await decide(app, staff.headers, lateFirst, { decision: "approve" });
+    expect(res.status).toBe(409);
+    expect(await errorCode(res)).toBe("photo_not_queued");
+    expect(await stateOf(ctx, lateFirst)).toMatchObject({
+      state: "rejected",
+      rejection_reason: "not_reviewed",
+    });
+    const audit = await ctx.client.query("SELECT action, subject_id FROM audit_log");
+    expect(audit.rows).toEqual([{ action: "photo.approve", subject_id: decidedFirst }]);
+  });
+
+  test("photo_queue_reject_days at 0 switches the limit off", async ({ ctx }) => {
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "queued", { ago: 400 * DAY_S });
+    await withMatchingConfig(ctx.client, { photo_queue_reject_days: 0 });
+    expect(await night(ctx)).toEqual({ rejected: 0 });
+    expect((await stateOf(ctx, id))?.state).toBe("queued");
+    // Switched on again with a number, the same photo goes the next night.
+    await withMatchingConfig(ctx.client, { photo_queue_reject_days: 14 });
+    expect(await night(ctx)).toEqual({ rejected: 1 });
+  });
+
+  test("the limit fails loudly when its number is not a number", async ({ ctx }) => {
+    await withMatchingConfig(ctx.client, { photo_queue_reject_days: "two weeks" });
+    await expect(night(ctx)).rejects.toThrow(/photo_queue_reject_days is not a number/);
   });
 });

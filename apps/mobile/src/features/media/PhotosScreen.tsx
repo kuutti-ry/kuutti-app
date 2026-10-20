@@ -1,6 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { Photo, PhotoRejectionReason, PhotoState } from "@kuutti/schema";
 import { useRouter } from "expo-router";
+import Hourglass from "lucide-react-native/icons/hourglass";
 import Trash from "lucide-react-native/icons/trash";
 import { useState } from "react";
 import { Animated, Pressable, ScrollView, View } from "react-native";
@@ -37,7 +38,7 @@ const STATE_TEXT: Record<PhotoState, PlainMessageKey> = {
   rejected: "photos.state.rejected",
 };
 
-/** A rejected photo says why, in words from a list (#49): a moderator's choice, or the check's for several people (#206); never a label name. */
+/** A rejected photo says why, in words from a list (#49): a moderator's choice, the check's (#206), or the night's (#376); never a label name. */
 const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   nudity: "photos.rejected.nudity",
   no_person: "photos.rejected.no_person",
@@ -46,7 +47,11 @@ const REJECTED_TEXT: Record<PhotoRejectionReason, PlainMessageKey> = {
   violence: "photos.rejected.violence",
   contact_details: "photos.rejected.contact_details",
   other: "photos.rejected.other",
+  not_reviewed: "photos.rejected.not_reviewed",
 };
+
+/** Waiting for the check or a person (#376): the tile is dimmed under an hourglass, and its words say which. */
+const inReview = (state: PhotoState) => state === "pending" || state === "queued";
 
 function stateText(photo: Photo, t: ReturnType<typeof useT>["t"]): string {
   if (photo.state === "rejected" && photo.rejectionReason) {
@@ -259,10 +264,36 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
                           if (code === "photo_budget_exceeded") photos.reportRefusal(code);
                         }}
                       />
+                      {/* A sign on the photo itself, not only a line under it (#376):
+                          shape and dimming, never colour alone; the words below say it
+                          to everyone, so the sign is hidden from a screen reader. */}
+                      {inReview(photo.state) && (
+                        <View
+                          testID={`photo-in-review-${index + 1}`}
+                          pointerEvents="none"
+                          accessibilityElementsHidden
+                          importantForAccessibility="no-hide-descendants"
+                          className="absolute inset-0 items-center justify-center bg-background/60"
+                        >
+                          <View className="rounded-full border border-border bg-background p-3">
+                            <Icon as={Hourglass} size={32} />
+                          </View>
+                        </View>
+                      )}
                     </Pressable>
                     <View className="gap-0.5">
                       {photo.id === mainId && <Text variant="small">{t("photos.main")}</Text>}
-                      <Text variant="muted">{stateText(photo, t)}</Text>
+                      {inReview(photo.state) ? (
+                        <View className="flex-row items-center gap-1">
+                          <Icon as={Hourglass} size={16} />
+                          {/* Wraps beside the icon at the largest text sizes, never clipped. */}
+                          <Text variant="small" className="shrink">
+                            {stateText(photo, t)}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text variant="muted">{stateText(photo, t)}</Text>
+                      )}
                       {words && <PhotoDescriptionText text={words} />}
                     </View>
                     {/* The owner's line under the photo (#296): the button says the line, or asks for one. */}

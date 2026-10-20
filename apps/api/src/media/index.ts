@@ -14,7 +14,12 @@ export {
   exportPhotos,
   type PhotoErasure,
 } from "./erasure.ts";
-export { type Inspection, type Moderator, sweepPendingPhotos } from "./moderation.ts";
+export {
+  type Inspection,
+  type Moderator,
+  rejectUnreviewedPhotos,
+  sweepPendingPhotos,
+} from "./moderation.ts";
 export {
   countMessagePhotosSince,
   issueConversationThumb,

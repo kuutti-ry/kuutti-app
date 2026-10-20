@@ -64,6 +64,8 @@ export const MATCHING_CONFIG_V1 = {
   photo_closer_look_window_days: 30,
   photo_closer_look_days: 30,
   photo_closer_look_reject: 75,
+  // #376 (migration 0068): a photo nobody decided in two weeks is rejected as not reviewed.
+  photo_queue_reject_days: 14,
   // #56: profile photo tips; the tips rule reads these against photo_review signals.
   photo_tip_mirror_confidence_min: 50,
   photo_tip_bathroom_confidence_min: 50,

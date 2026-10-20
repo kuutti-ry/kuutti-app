@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PhotoId, PhotoRejectionReason, PhotoState } from "./media.ts";
+import { ModeratorRejectionReason, PhotoId, PhotoRejectionReason, PhotoState } from "./media.ts";
 import { BioPreset, PromptAnswer } from "./profile.ts";
 import { ProfileFields } from "./profile-fields.ts";
 
@@ -282,7 +282,7 @@ export const PhotoReviewQueueQuery = z
 export const PhotoDecisionRequest = z
   .discriminatedUnion("decision", [
     z.object({ decision: z.literal("approve") }).strict(),
-    z.object({ decision: z.literal("reject"), reason: PhotoRejectionReason }).strict(),
+    z.object({ decision: z.literal("reject"), reason: ModeratorRejectionReason }).strict(),
   ])
   .meta({ id: "PhotoDecisionRequest" });
 export type PhotoDecisionRequest = z.infer<typeof PhotoDecisionRequest>;

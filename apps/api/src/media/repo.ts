@@ -732,8 +732,9 @@ export async function findPhotoForStaff(
 /**
  * A person's decision: the photo's state and reason, and the review row with
  * who decided and when. Only a queued photo takes one (null otherwise, and
- * nothing is written), so an earlier decision is never overwritten. Rejected
- * is only ever written here (rules/api.md: never auto-delete, never auto-reject).
+ * nothing is written), so an earlier decision is never overwritten. A queued
+ * photo is rejected only here and by the night's limit below (#376); nothing
+ * is ever deleted by a machine (rules/api.md).
  */
 export async function decidePhoto(
   db: Queryable,
@@ -761,6 +762,38 @@ export async function decidePhoto(
     [input.photoId, input.decision, input.decidedBy, input.at, input.reason],
   );
   return photoFrom(row);
+}
+
+/**
+ * The night's limit on the queue (#376, ADR-006 §2): every queued profile
+ * photo waiting since before `waitingSince`, from its upload or its owner's
+ * appeal as the queue counts it (`listQueue`), is rejected as not_reviewed
+ * with no appeal, and its review row says so with nobody named. Keyed on the
+ * queued state like `decidePhoto`, so of a moderator and the night deciding
+ * at once exactly one writes. The ids it moved.
+ */
+export async function rejectQueuedSince(
+  db: Queryable,
+  input: { waitingSince: Date; at: Date },
+): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `UPDATE photo p SET state = 'rejected', rejection_reason = 'not_reviewed', appealable = false
+     WHERE p.purpose = 'profile' AND p.state = 'queued'
+       AND coalesce((SELECT r.appealed_at FROM photo_review r WHERE r.photo_id = p.id), p.created_at) < $1
+     RETURNING p.id`,
+    [input.waitingSince],
+  );
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return ids;
+  await db.query(
+    `INSERT INTO photo_review (photo_id, labels, faces, flagged, decision, decided_at, reason)
+     SELECT id, '[]'::jsonb, 0, '{}', 'rejected', $2, 'not_reviewed' FROM unnest($1::uuid[]) AS id
+     ON CONFLICT (photo_id) DO UPDATE
+       SET decision = 'rejected', decided_by = NULL, decided_at = EXCLUDED.decided_at,
+           reason = 'not_reviewed'`,
+    [ids, input.at],
+  );
+  return ids;
 }
 
 // Erasure and export (#51, TD-7): the account's photos, their review rows

@@ -180,6 +180,7 @@ describe("a moderator's decision", () => {
   it.each([
     ["a rejection without a reason", { decision: "reject" }],
     ["a rejection for a reason outside the list", { decision: "reject", reason: "ugly" }],
+    ["a rejection for the night's reason (#376)", { decision: "reject", reason: "not_reviewed" }],
     ["an approval that carries a reason", { decision: "approve", reason: "other" }],
     ["a decision outside the two", { decision: "queue" }],
     ["no decision", {}],

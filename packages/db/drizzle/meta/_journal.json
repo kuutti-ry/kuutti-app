@@ -470,6 +470,20 @@
       "when": 1792409349815,
       "tag": "0066_rounds",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1792508944165,
+      "tag": "0067_photo_not_reviewed",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1792508948108,
+      "tag": "0068_photo_queue_reject_days",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import {
-  type PhotoRejectionReason,
+  type ModeratorRejectionReason,
   type PhotoReviewItem,
   PhotoReviewQueue,
   PhotoUrlResponse,
@@ -17,7 +17,7 @@ import { useList } from "../../lib/use-list.ts";
 // first: every control is a button or a labelled select, the image has its
 // alt text, and a decided item announces itself. English only (TD-17).
 
-const REASONS: ReadonlyArray<{ value: PhotoRejectionReason; label: PlainMessageKey }> = [
+const REASONS: ReadonlyArray<{ value: ModeratorRejectionReason; label: PlainMessageKey }> = [
   { value: "nudity", label: "admin.queue.reason.nudity" },
   { value: "no_person", label: "admin.queue.reason.no_person" },
   { value: "several_people", label: "admin.queue.reason.several_people" },
@@ -66,7 +66,7 @@ type ItemState =
   | { kind: "idle" }
   // No reason until one is chosen on purpose (#250): a preset one would tell a
   // person their photo was rejected for it after one careless click.
-  | { kind: "rejecting"; reason: PhotoRejectionReason | null }
+  | { kind: "rejecting"; reason: ModeratorRejectionReason | null }
   | { kind: "saving" }
   | { kind: "decided"; decision: "approved" | "rejected" }
   | { kind: "failed" };
@@ -97,7 +97,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
   }, [item.photoId, shown]);
 
   const decide = async (
-    body: { decision: "approve" } | { decision: "reject"; reason: PhotoRejectionReason },
+    body: { decision: "approve" } | { decision: "reject"; reason: ModeratorRejectionReason },
   ) => {
     setState({ kind: "saving" });
     // A network failure is a decision not saved: never a saving state that
@@ -192,7 +192,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                 onChange={(event) =>
                   setState({
                     kind: "rejecting",
-                    reason: event.target.value as PhotoRejectionReason,
+                    reason: event.target.value as ModeratorRejectionReason,
                   })
                 }
               >

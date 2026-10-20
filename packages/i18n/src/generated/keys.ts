@@ -804,6 +804,7 @@ export type MessageParams = {
   "photos.rejected.contact_details": Record<never, never>;
   "photos.rejected.minor": Record<never, never>;
   "photos.rejected.no_person": Record<never, never>;
+  "photos.rejected.not_reviewed": Record<never, never>;
   "photos.rejected.nudity": Record<never, never>;
   "photos.rejected.other": Record<never, never>;
   "photos.rejected.several_people": Record<never, never>;
@@ -1238,7 +1239,6 @@ export type MessageParams = {
   "safety.report.send": Record<never, never>;
   "safety.sending": Record<never, never>;
   "settings.about.title": Record<never, never>;
-  "settings.account.summary": Record<never, never>;
   "settings.back": Record<never, never>;
   "settings.close": Record<never, never>;
   "settings.contacts.failed": Record<never, never>;
@@ -1255,12 +1255,8 @@ export type MessageParams = {
   "settings.contacts.save": Record<never, never>;
   "settings.contacts.saved": Record<never, never>;
   "settings.contacts.saveLabel": { "kind": string };
-  "settings.contacts.summary": Record<never, never>;
   "settings.contacts.title": { "kind": string };
-  "settings.device.summary": Record<never, never>;
   "settings.email.label": Record<never, never>;
-  "settings.email.summary": Record<never, never>;
-  "settings.feedback.summary": Record<never, never>;
   "settings.group.account": Record<never, never>;
   "settings.highContrast": Record<never, never>;
   "settings.language.label": Record<never, never>;
@@ -1270,7 +1266,6 @@ export type MessageParams = {
   "settings.logout": Record<never, never>;
   "settings.logoutAll": Record<never, never>;
   "settings.notifications.label": Record<never, never>;
-  "settings.notifications.summary": Record<never, never>;
   "settings.open": Record<never, never>;
   "settings.photoDescriptions.explain": Record<never, never>;
   "settings.photoDescriptions.hint.body": Record<never, never>;
@@ -1293,7 +1288,6 @@ export type MessageParams = {
   "settings.sensitive.title": Record<never, never>;
   "settings.session.label": Record<never, never>;
   "settings.session.none": Record<never, never>;
-  "settings.source.summary": Record<never, never>;
   "settings.state.off": Record<never, never>;
   "settings.state.on": Record<never, never>;
   "settings.state.outdated": Record<never, never>;
@@ -1347,6 +1341,7 @@ export type MessageParams = {
   "tech.environment": { "environment": string };
   "tech.errorTest.send": Record<never, never>;
   "tech.errorTest.sent": Record<never, never>;
+  "tech.licenses.other": Record<never, never>;
   "tech.licenses.title": Record<never, never>;
   "tech.title": Record<never, never>;
   "tech.unavailable": Record<never, never>;
