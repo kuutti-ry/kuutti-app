@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
   knownPhotoDescription,
+  ModeratorRejectionReason,
   PHOTO_CAPTIONS,
   PHOTO_DESCRIPTION_OBJECTS_MAX,
   PHOTO_DESCRIPTION_SCENES_MAX,
@@ -126,10 +127,21 @@ describe("a photo as its owner reads it", () => {
   });
 
   it("names a rejection's reason from the closed list", () => {
-    expect(PhotoRejectionReason.options).toHaveLength(7);
+    expect(PhotoRejectionReason.options).toHaveLength(8);
     expect(
       Photo.parse({ ...photo, state: "rejected", rejectionReason: "other" }).rejectionReason,
     ).toBe("other");
+    expect(
+      Photo.parse({ ...photo, state: "rejected", rejectionReason: "not_reviewed" }).rejectionReason,
+    ).toBe("not_reviewed");
+  });
+
+  it("gives a moderator every reason but the night's (#376)", () => {
+    expect(ModeratorRejectionReason.options).toEqual(
+      PhotoRejectionReason.options.filter((reason) => reason !== "not_reviewed"),
+    );
+    expect(ModeratorRejectionReason.safeParse("not_reviewed").success).toBe(false);
+    expect(ModeratorRejectionReason.parse("no_person")).toBe("no_person");
   });
 
   it.each([

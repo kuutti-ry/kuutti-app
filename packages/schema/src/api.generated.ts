@@ -6131,7 +6131,7 @@ export interface components {
              * @description Set when state is rejected: the reason the owner is told.
              * @enum {string|null}
              */
-            rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+            rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | "not_reviewed" | null;
             /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
             appealable: boolean;
             /** @description 0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4). */
@@ -6183,13 +6183,13 @@ export interface components {
             /** @enum {string} */
             decision: "approved" | "queued" | "rejected";
             reason: components["schemas"]["PhotoRejectionReason"];
-            /** @description True when a person decided, false when the automatic check did. */
+            /** @description True when a person decided, false when the automatic check did or nobody did in time (not_reviewed). */
             decidedByStaff: boolean;
             /** Format: date-time */
             decidedAt: string | null;
         } | null;
         /** @enum {string|null} */
-        PhotoRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+        PhotoRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | "not_reviewed" | null;
         /**
          * @description thumb: 200×200 for lists. card: 800×1067 when a profile is opened. full: 1600 px long edge, requested only from the zoom screen.
          * @enum {string}
@@ -6568,7 +6568,7 @@ export interface components {
              * @description Set when state is rejected: the reason the owner is told.
              * @enum {string|null}
              */
-            rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | null;
+            rejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other" | "not_reviewed" | null;
             /** @description The check rejected it and the owner may ask a person to look, once (POST /photos/{id}/appeal); never after sure nudity or a person's decision. */
             appealable: boolean;
             /** @description 0 is first in the owner's order; the main photo is the first approved one (ADR-009 §4). */
@@ -6671,8 +6671,10 @@ export interface components {
         } | {
             /** @enum {string} */
             decision: "reject";
-            reason: components["schemas"]["PhotoRejectionReason"];
+            reason: components["schemas"]["ModeratorRejectionReason"];
         };
+        /** @enum {string} */
+        ModeratorRejectionReason: "nudity" | "no_person" | "several_people" | "minor" | "violence" | "contact_details" | "other";
         ProfileResponse: {
             profile: components["schemas"]["ProfileDocument"];
             completeness: components["schemas"]["Completeness"];

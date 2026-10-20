@@ -286,7 +286,10 @@ export function PhotosScreen({ progress }: { progress?: { step: number; total: n
                       {inReview(photo.state) ? (
                         <View className="flex-row items-center gap-1">
                           <Icon as={Hourglass} size={16} />
-                          <Text variant="small">{stateText(photo, t)}</Text>
+                          {/* Wraps beside the icon at the largest text sizes, never clipped. */}
+                          <Text variant="small" className="shrink">
+                            {stateText(photo, t)}
+                          </Text>
                         </View>
                       ) : (
                         <Text variant="muted">{stateText(photo, t)}</Text>

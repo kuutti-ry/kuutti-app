@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.48.1",
+    "version": "0.49.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1041,6 +1041,7 @@
               "violence",
               "contact_details",
               "other",
+              "not_reviewed",
               null
             ],
             "description": "Set when state is rejected: the reason the owner is told."
@@ -1287,7 +1288,7 @@
           },
           "decidedByStaff": {
             "type": "boolean",
-            "description": "True when a person decided, false when the automatic check did."
+            "description": "True when a person decided, false when the automatic check did or nobody did in time (not_reviewed)."
           },
           "decidedAt": {
             "type": "string",
@@ -1314,6 +1315,7 @@
           "violence",
           "contact_details",
           "other",
+          "not_reviewed",
           null
         ]
       },
@@ -2555,6 +2557,7 @@
               "violence",
               "contact_details",
               "other",
+              "not_reviewed",
               null
             ],
             "description": "Set when state is rejected: the reason the owner is told."
@@ -2960,7 +2963,7 @@
                 ]
               },
               "reason": {
-                "$ref": "#/components/schemas/PhotoRejectionReason"
+                "$ref": "#/components/schemas/ModeratorRejectionReason"
               }
             },
             "required": [
@@ -2969,6 +2972,18 @@
             ],
             "additionalProperties": false
           }
+        ]
+      },
+      "ModeratorRejectionReason": {
+        "type": "string",
+        "enum": [
+          "nudity",
+          "no_person",
+          "several_people",
+          "minor",
+          "violence",
+          "contact_details",
+          "other"
         ]
       },
       "ProfileResponse": {
