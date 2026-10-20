@@ -75,6 +75,12 @@ export {
   type Thresholds,
   uncrossed,
 } from "./population.ts";
+export {
+  PERSONA_ROUNDS,
+  type PersonaRound,
+  type RoundsResult,
+  writeRounds,
+} from "./rounds.ts";
 export { everyText } from "./words.ts";
 export {
   type ConsentVersions,

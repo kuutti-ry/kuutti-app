@@ -34,14 +34,14 @@ const persona = (key: string) => {
 };
 
 describe("the personas of the mock bank", () => {
-  it("are nineteen, each with a name of its own and an artificial code", () => {
-    expect(DEMO_PERSONAS).toHaveLength(19);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(19);
-    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(19);
+  it("are twenty-four, each with a name of its own and an artificial code", () => {
+    expect(DEMO_PERSONAS).toHaveLength(24);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.key)).size).toBe(24);
+    expect(new Set(DEMO_PERSONAS.map((p) => p.individual)).size).toBe(24);
     // A name of its own: a flow finds the persona's button by the name, and
-    // the chat's flows find the counterpart by the given name.
-    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(19);
-    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(19);
+    // the chat's and the round's flows find the other person by the given name.
+    expect(new Set(DEMO_PERSONAS.map((p) => p.given)).size).toBe(24);
+    expect(new Set(DEMO_PERSONAS.map((p) => `${p.given} ${p.family}`)).size).toBe(24);
     for (const p of DEMO_PERSONAS) {
       expect(p.key).toMatch(/^[a-z]+$/);
       // 900 to 999: never given to a person.
@@ -86,9 +86,10 @@ describe("the personas of the mock bank", () => {
       expect(p.bank, key).toBeDefined();
       for (const at of DAYS) expect(personaHetu(p, at), key).toBe(code);
     }
-    // The rest are the mock bank's alone: the ages, and the three pairs of
-    // the conversations, the chat's (#348), the contact share's (#103) and
-    // the report's (#351), for whom the bed has no test user left.
+    // The rest are the mock bank's alone: the ages, the three pairs of the
+    // conversations, the chat's (#348), the contact share's (#103) and the
+    // report's (#351), and the round's cast (#379), for whom the bed has no
+    // test user left.
     const mockOnly = DEMO_PERSONAS.filter((p) => p.bank === undefined).map((p) => p.key);
     expect(mockOnly).toEqual([
       "antti",
@@ -97,12 +98,29 @@ describe("the personas of the mock bank", () => {
       "jussi",
       "laura",
       "emmi",
+      "iida",
+      "henna",
+      "katja",
+      "minna",
+      "riikka",
       "eetu",
       "venla",
       "lauri",
       "siiri",
     ]);
-    for (const key of ["antti", "ville", "elina", "jussi", "laura", "emmi"]) {
+    for (const key of [
+      "antti",
+      "ville",
+      "elina",
+      "jussi",
+      "laura",
+      "emmi",
+      "iida",
+      "henna",
+      "katja",
+      "minna",
+      "riikka",
+    ]) {
       expect(hasFixedIdentity(persona(key)), key).toBe(true);
       expect(Object.values(bed), key).not.toContain(personaHetu(persona(key), DAYS[0] as Date));
     }
@@ -114,7 +132,9 @@ describe("the personas of the mock bank", () => {
       const same = personaHetu(p, first) === personaHetu(p, later);
       expect(same, p.key).toBe(hasFixedIdentity(p));
       // A history needs an identity that stays.
-      if (p.group === "history") expect(hasFixedIdentity(p), p.key).toBe(true);
+      if (p.group === "history" || p.group === "cards") {
+        expect(hasFixedIdentity(p), p.key).toBe(true);
+      }
     }
   });
 
@@ -178,16 +198,30 @@ describe("the login page of the mock bank", () => {
     ).toBe(true);
   });
 
-  it("names every persona in a short button above the cards, the one a flow taps without scrolling (#226)", () => {
+  it("names every persona one signs in as in a short button above the cards, the one a flow taps without scrolling (#226)", () => {
     const names = page.indexOf('<ul class="names">');
     const cards = page.indexOf('<section aria-labelledby="group-walkthrough">');
     expect(names).toBeGreaterThan(-1);
     expect(names).toBeLessThan(cards);
-    for (const p of DEMO_PERSONAS) {
+    const listed = DEMO_PERSONAS.filter((p) => p.group !== "cards");
+    // Two columns on a phone hold twenty names (bank-page.ts).
+    expect(listed.length).toBeLessThanOrEqual(20);
+    for (const p of listed) {
       const short = `<button type="button" data-persona="${p.key}">${p.given} ${p.family}</button>`;
       // The first button a selector by the name finds is the short one.
       expect(page.indexOf(short)).toBeGreaterThan(names);
       expect(page.indexOf(short)).toBeLessThan(cards);
+    }
+  });
+
+  it("leaves the people of Iida's round out of the list at the top, with a card each below (#379)", () => {
+    const cards = page.indexOf('<section aria-labelledby="group-walkthrough">');
+    const theirs = page.indexOf('<section aria-labelledby="group-cards">');
+    expect(theirs).toBeGreaterThan(cards);
+    for (const p of DEMO_PERSONAS.filter((p) => p.group === "cards")) {
+      const at = page.indexOf(`data-persona="${p.key}"`);
+      expect(at, p.key).toBeGreaterThan(theirs);
+      expect(page.slice(at)).toContain(`<span class="name">${p.given} ${p.family}</span>`);
     }
   });
 

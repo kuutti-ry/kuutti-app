@@ -40,7 +40,7 @@ import { loadConfig } from "../src/lib/config.ts";
 import { createLogger } from "../src/lib/logger.ts";
 import { createMediaDeps } from "../src/media/index.ts";
 import { DemoError } from "./demo/bank.ts";
-import { giveConversations, givePhotoMessages } from "./demo/histories.ts";
+import { giveConversations, givePhotoMessages, giveRounds } from "./demo/histories.ts";
 import { loadAssets } from "./demo/photos.ts";
 import { giveStories, viaServices } from "./demo/services.ts";
 
@@ -123,6 +123,9 @@ try {
   console.log(JSON.stringify({ msg: "demo stories: counter recounted", ...counted }));
   const gates = await countGates({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo stories: gates counted", ...gates }));
+  // Iida's round for the day (#379), once the gates are counted; told before, it stays.
+  const rounds = await giveRounds({ db: pool, logger, now }, results);
+  console.log(JSON.stringify({ msg: "demo stories: rounds", ...rounds }));
 } catch (error) {
   if (error instanceof DemoCommandError || error instanceof DemoError) {
     console.error(`✖ ${error.message}`);

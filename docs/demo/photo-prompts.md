@@ -24,11 +24,11 @@ Chosen 09/10/2026.
 | `faces/kerttu/1.jpg` … `4.jpg` | Kerttu's profile | 4 | a woman of 46, Swedish-speaking, by the sea with a book and coffee |
 | `faces/tapio/1.jpg` … `3.jpg` | nothing today: Tapio is banned and refused at login, and his story uploads nothing; the set lets a later story give him a profile without a new release | 3 | a man of 56 |
 | `faces/ilona/1.jpg` … `3.jpg` | nothing today: Ilona deleted her account and is refused at login; the same reason | 3 | a woman of 56 |
-| `faces/iida/1.jpg` … `3.jpg` | Iida's profile (complete): the persona of the round's flow, whose gate the reset opens (#379) | 3 | a woman of 34 |
-| `faces/henna/1.jpg` … `2.jpg` | Henna's profile (complete): the card in Iida's round that liked her and becomes a match (#379) | 2 | a woman of 36 |
-| `faces/katja/1.jpg` … `2.jpg` | Katja's profile (complete): a card in Iida's round (#379) | 2 | a woman of 38 |
-| `faces/minna/1.jpg` … `2.jpg` | Minna's profile (complete): a card in Iida's round (#379) | 2 | a woman of 31 |
-| `faces/riikka/1.jpg` … `2.jpg` | Riikka's profile (complete): a card in Iida's round (#379) | 2 | a woman of 40 |
+| `faces/iida/1.jpg` … `3.jpg` | Iida's profile (complete): the persona of the round's flow, whose gate the reset opens (#379) | 3 | a woman of 36 |
+| `faces/henna/1.jpg` … `2.jpg` | Henna's profile (complete): the card in Iida's round that liked her and becomes a match (#379) | 2 | a woman of 37 |
+| `faces/katja/1.jpg` … `2.jpg` | Katja's profile (complete): a card in Iida's round (#379) | 2 | a woman of 36 |
+| `faces/minna/1.jpg` … `2.jpg` | Minna's profile (complete): a card in Iida's round (#379) | 2 | a woman of 36 |
+| `faces/riikka/1.jpg` … `2.jpg` | Riikka's profile (complete): a card in Iida's round (#379) | 2 | a woman of 37 |
 | `faces/pool/001.jpg` … `060.jpg` | the synthetic population, drawn by seed | 60 | sixty different adults of 18 to 80, every gender, the mix of a Finnish city, one picture each, each a plausible first profile photo |
 | `negatives/no-face.jpg` | no person | 1 | a landscape, no person: the automatic check finds no face and rejects it, the owner told why (ADR-006 §2, #253); queued only where the check queues everything |
 | `negatives/several-people.jpg` | a group photo | 1 | three people in one picture: more than one face, so the check rejects it and tells the owner why (ADR-006 §2, #206); queued only where the check queues everything |
@@ -282,13 +282,13 @@ Another photo of the same woman as in the first picture: keep her face, hair, gl
 Exactly one person, face clearly visible, no text or logos. Candid phone photo, natural light, no retouching, photorealistic, vertical 3:4.
 ```
 
-### The round's cast (#379): Iida, 34, Henna, 36, Katja, 38, Minna, 31, Riikka, 40
+### The round's cast (#379): Iida, 36, Henna, 37, Katja, 36, Minna, 36, Riikka, 37
 
 Five women who seek women, so that a round can be shown with faces: Iida's round, and the four cards in it. Each has a look and a place of her own, unlike each other's and unlike the personas above.
 
 ```
 p-iida-1
-A head-and-shoulders portrait of a Finnish woman of 34 on a city street corner on a bright, cold spring day. Short dark brown hair in a pixie cut, round tortoiseshell glasses, brown eyes, a mustard-yellow corduroy shirt under an open navy rain jacket. An open, friendly smile showing a little of her teeth, looking into the camera. Pale old plaster walls behind her, out of focus, no shop fronts and no signs.
+A head-and-shoulders portrait of a Finnish woman of 36 on a city street corner on a bright, cold spring day. Short dark brown hair in a pixie cut, round tortoiseshell glasses, brown eyes, a mustard-yellow corduroy shirt under an open navy rain jacket. An open, friendly smile showing a little of her teeth, looking into the camera. Pale old plaster walls behind her, out of focus, no shop fronts and no signs.
 Candid smartphone photo taken by a friend: natural available light, true colours, real skin texture with pores and the lines of her age, no retouching, no beauty filter, no studio light, only a little background blur, the framing slightly imperfect. An ordinary, approachable person, not a model. Exactly one person in the picture, face clearly visible and in focus. No text, letters, logos, brand names, licence plates, house numbers or signs anywhere. Photorealistic, vertical 3:4.
 ```
 
@@ -306,7 +306,7 @@ Exactly one person, face visible, no text or logos. An unposed phone selfie, not
 
 ```
 p-henna-1
-A portrait of a Finnish woman of 36 on smooth granite rocks by the sea on a windy late-summer afternoon. Long dark-red curly hair blowing to one side, green eyes, a light dusting of sun on her nose, a faded denim jacket over a white T-shirt. A warm, confident smile, looking into the camera; chest up. The grey-blue Baltic and a pale sky behind her, out of focus.
+A portrait of a Finnish woman of 37 on smooth granite rocks by the sea on a windy late-summer afternoon. Long dark-red curly hair blowing to one side, green eyes, a light dusting of sun on her nose, a faded denim jacket over a white T-shirt. A warm, confident smile, looking into the camera; chest up. The grey-blue Baltic and a pale sky behind her, out of focus.
 Candid smartphone photo taken by a friend: natural available light, true colours, real skin texture with pores and the lines of her age, no retouching, no beauty filter, no studio light, only a little background blur, the framing slightly imperfect. An ordinary, approachable person, not a model. Exactly one person in the picture, face clearly visible and in focus. No text, letters, logos, brand names, licence plates, house numbers or signs anywhere. Photorealistic, vertical 3:4.
 ```
 
@@ -318,7 +318,7 @@ Exactly one person, face clearly visible, no text or logos. Candid phone photo, 
 
 ```
 p-katja-1
-A portrait of a Finnish woman of 38 on a forest trail in autumn, a black-and-white mixed-breed dog sitting at her feet. Blonde hair gathered in a loose, messy bun, light blue eyes, a broad open smile with laugh lines, a grey hooded sweatshirt under a green outdoor vest. Looking into the camera; waist up. Spruces and orange birch leaves behind her, out of focus.
+A portrait of a Finnish woman of 36 on a forest trail in autumn, a black-and-white mixed-breed dog sitting at her feet. Blonde hair gathered in a loose, messy bun, light blue eyes, a broad open smile with laugh lines, a grey hooded sweatshirt under a green outdoor vest. Looking into the camera; waist up. Spruces and orange birch leaves behind her, out of focus.
 Candid smartphone photo taken by a friend: natural available light, true colours, real skin texture with pores and the lines of her age, no retouching, no beauty filter, no studio light, only a little background blur, the framing slightly imperfect. An ordinary, approachable person, not a model. Exactly one person in the picture, face clearly visible and in focus. No text, letters, logos, brand names, licence plates, house numbers or signs anywhere. Photorealistic, vertical 3:4.
 ```
 
@@ -330,7 +330,7 @@ Exactly one person, face clearly visible, no text or logos. Candid phone photo, 
 
 ```
 p-minna-1
-A head-and-shoulders portrait of a Finnish woman of 31 with brown skin and black curly hair tied up on top of her head, by a large café window on a grey winter day. Dark brown eyes, small gold hoop earrings, a rust-coloured roll-neck jumper. A relaxed, warm smile, looking into the camera; a cup of tea on the table in front of her. The window behind her shows only falling snow and a blurred grey street, nobody else in the café.
+A head-and-shoulders portrait of a Finnish woman of 36 with brown skin and black curly hair tied up on top of her head, by a large café window on a grey winter day. Dark brown eyes, small gold hoop earrings, a rust-coloured roll-neck jumper. A relaxed, warm smile, looking into the camera; a cup of tea on the table in front of her. The window behind her shows only falling snow and a blurred grey street, nobody else in the café.
 Candid smartphone photo taken by a friend: natural available light, true colours, real skin texture with pores, no retouching, no beauty filter, no studio light, only a little background blur, the framing slightly imperfect. An ordinary, approachable person, not a model. Exactly one person in the picture, face clearly visible and in focus. No text, letters, logos, brand names, licence plates, house numbers or signs anywhere. Photorealistic, vertical 3:4.
 ```
 
@@ -342,7 +342,7 @@ Exactly one person, face visible, no text or logos. An unposed phone selfie, not
 
 ```
 p-riikka-1
-A portrait of a Finnish woman of 40 in an inner courtyard of an old brick apartment building on an overcast autumn day. Short ash-blonde hair with grey streaks, shaved at the sides and longer on top, grey eyes, a small silver ring in one ear, a worn black leather jacket over a dark green shirt. A dry, friendly half smile, looking into the camera; chest up. Brick walls and a bare tree behind her, out of focus, no doors with numbers.
+A portrait of a Finnish woman of 37 in an inner courtyard of an old brick apartment building on an overcast autumn day. Short ash-blonde hair with grey streaks, shaved at the sides and longer on top, grey eyes, a small silver ring in one ear, a worn black leather jacket over a dark green shirt. A dry, friendly half smile, looking into the camera; chest up. Brick walls and a bare tree behind her, out of focus, no doors with numbers.
 Candid smartphone photo taken by a friend: natural available light, true colours, real skin texture with pores and the lines of her age, no retouching, no beauty filter, no studio light, only a little background blur, the framing slightly imperfect. An ordinary, approachable person, not a model. Exactly one person in the picture, face clearly visible and in focus. No text, letters, logos, brand names, licence plates, house numbers or signs anywhere. Photorealistic, vertical 3:4.
 ```
 

@@ -33,6 +33,11 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
     title: "Ages",
     lead: "Born relative to today, so the age holds whenever this runs and the identity changes as the months pass.",
   },
+  {
+    group: "cards",
+    title: "In Iida's round",
+    lead: "The four people of Iida's round, there to be shown to her: pnpm demo:reset gives them their profiles. Nobody needs to sign in as them, so their names are not in the list at the top.",
+  },
 ];
 
 const escapeHtml = (text: string): string =>
@@ -68,9 +73,12 @@ export function renderBankPage(personas: readonly DemoPersona[]): string {
   // shortcut: two columns on a phone hold twenty names. Measured with nineteen (#351), the last
   // button ends 711 CSS px down the page at 375 to 411 px wide; an iPhone 17's Safari shows about
   // 728 above its floating bar, a Pixel 7's Chrome about 780. (The report's pair had other names
-  // then, none longer than Mikael Lindqvist's, so every row is as high.) A twenty-first persona
-  // needs a third column or a shorter head of the page.
+  // then, none longer than Mikael Lindqvist's, so every row is as high.) Iida is the twentieth
+  // (#379), in the tenth row as the nineteenth was; the people of her round are cards nobody signs
+  // in as, so they are not listed. A twenty-first name needs a third column or a shorter head of
+  // the page.
   const names = personas
+    .filter((p) => p.group !== "cards")
     .map(
       (p) =>
         `        <li><button type="button" data-persona="${escapeHtml(p.key)}">${escapeHtml(`${p.given} ${p.family}`)}</button></li>`,
