@@ -5647,7 +5647,7 @@ export interface paths {
         get?: never;
         /**
          * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final.
          */
         put: {
             parameters: {
@@ -5665,12 +5665,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Recorded. */
-                204: {
+                /** @description Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match. */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["RoundDecisionAnswer"];
+                    };
                 };
                 /** @description Validation failed. */
                 400: {
@@ -5699,7 +5701,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description round_expired: the day named has ended; nothing was written. */
+                /** @description round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -7368,6 +7370,12 @@ export interface components {
             reason: components["schemas"]["RoundReason"];
             decision: components["schemas"]["RoundDecision"];
             card: components["schemas"]["ProfileCard"];
+        };
+        RoundDecisionAnswer: {
+            match: {
+                /** Format: uuid */
+                conversationId: string;
+            } | null;
         };
         RoundDecisionUpdate: {
             decision: components["schemas"]["RoundDecision"];

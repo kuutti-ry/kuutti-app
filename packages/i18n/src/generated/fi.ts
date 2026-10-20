@@ -181,6 +181,7 @@ export const fi: Readonly<Record<string, string>> = {
   "errors.http_error": "Pyyntö epäonnistui.",
   "errors.internal_error": "Jokin meni vikaan meidän päässämme.",
   "errors.like_budget_exceeded": "Olet käyttänyt tämän päivän tykkäykset. Uusia tulee keskiyön jälkeen, mutta voit yhä ohittaa.",
+  "errors.match_made": "Tästä tykkäyksestä tuli mätsi, joten se pysyy. Voit silti lopettaa keskustelun Keskusteluissa.",
   "errors.media_busy": "Kuvia käsitellään juuri nyt paljon. Yritä hetken kuluttua uudelleen.",
   "errors.media_unavailable": "Kuvat eivät ole juuri nyt käytettävissä.",
   "errors.message_budget_exceeded": "Lähetät viestejä hyvin nopeasti. Odota hetki ja lähetä uudelleen.",

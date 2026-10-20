@@ -114,6 +114,8 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
     case "like":
     case "pass":
       return { position: 3, reason: "matches_filters", sinceSeen: "10s_30s", revised: false };
+    case "match":
+      return { completed: true };
   }
 }
 

@@ -70,6 +70,18 @@ export const RoundDecisionUpdate = z
   .meta({ id: "RoundDecisionUpdate" });
 export type RoundDecisionUpdate = z.infer<typeof RoundDecisionUpdate>;
 
+/**
+ * The answer to a decision (#100): the conversation the card's like is part
+ * of, a match made by this like or before it; null for a pass and for a like
+ * that made none. Nothing says whether the other person liked, unless it is a
+ * match.
+ */
+export const RoundDecisionAnswer = z
+  .object({ match: z.object({ conversationId: z.uuid() }).strict().nullable() })
+  .strict()
+  .meta({ id: "RoundDecisionAnswer" });
+export type RoundDecisionAnswer = z.infer<typeof RoundDecisionAnswer>;
+
 /** The research events' coarse time from a card seen to its decision (ADR-011 §1), never the time itself. */
 export const SinceSeenBand = z
   .enum(["under_3s", "3s_10s", "10s_30s", "30s_2m", "2m_10m", "10m_plus"])

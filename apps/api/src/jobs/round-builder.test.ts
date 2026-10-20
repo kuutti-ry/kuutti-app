@@ -675,7 +675,7 @@ describe("liked-you (#97, ADR-037)", () => {
       headers: { ...who.headers, "content-type": "application/json" },
       body: JSON.stringify({ decision: "pass" }),
     });
-    expect(passed.status).toBe(204);
+    expect(passed.status).toBe(200);
 
     expect(await readToday(app, ctx.client, b)).toEqual(before.today);
     expect(await exportRounds(ctx.client, b, 10)).toEqual(before.history);

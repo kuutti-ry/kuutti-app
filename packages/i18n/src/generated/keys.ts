@@ -520,6 +520,7 @@ export type MessageParams = {
   "errors.http_error": Record<never, never>;
   "errors.internal_error": Record<never, never>;
   "errors.like_budget_exceeded": Record<never, never>;
+  "errors.match_made": Record<never, never>;
   "errors.media_busy": Record<never, never>;
   "errors.media_unavailable": Record<never, never>;
   "errors.message_budget_exceeded": Record<never, never>;

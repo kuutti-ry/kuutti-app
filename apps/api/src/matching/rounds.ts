@@ -41,6 +41,30 @@ export type CardOf = (
  */
 export type BuildToday = (accountId: string) => Promise<boolean>;
 
+/**
+ * What the chat slice keeps of a match (#100, ADR-031: the conversation is
+ * its record), handed in by app.ts as the card builder is: whether two
+ * people have a conversation, and the opening of one in the caller's
+ * transaction.
+ */
+export type Matches = {
+  between: (db: Queryable, accountId: string, otherAccountId: string) => Promise<string | null>;
+  open: (tx: Queryable, input: { first: string; second: string; at: Date }) => Promise<string>;
+};
+
+/**
+ * Two people's decisions about each other are taken one pair at a time
+ * (#100, ADR-038): the second like reads the first, committed, and a like
+ * is never taken back while another makes a match of it. A transaction-scoped
+ * advisory lock on the pair, the same whichever of the two decides; taken
+ * after the decider's round lock, never before, so no two wait for each
+ * other. Two pairs whose keys collide wait for each other a moment, no more.
+ */
+const PAIR_LOCK = `SELECT pg_advisory_xact_lock(
+  hashtextextended(least($1::text, $2::text) || greatest($1::text, $2::text), 100))`;
+
+const LIKE_EXPIRY_KEY = "like_expiry_days";
+
 /** An entry `e` of round `r` whose candidate can still be shown to the round's owner. */
 const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AND c.state = 'active')
   AND NOT blocked_between(r.account_id, e.candidate_id)`;
@@ -216,15 +240,24 @@ export async function markSeen(
 
 /**
  * A like or a pass on today's card, changeable until the day ends: under the
- * round row's lock, which serialises the person's day across devices (and
- * which the day's likes are counted under, and #100's match will take too). The same decision again
- * writes nothing; a changed one emits its event with `revised`. The round is
+ * round row's lock, which serialises the person's day across devices and
+ * which the day's likes are counted under. The same decision again writes
+ * nothing; a changed one emits its event with `revised`. The round is
  * complete once nothing that can still be shown is undecided.
+ *
+ * A like of somebody whose like of the person stands, within
+ * `like_expiry_days`, is a match (#100, ADR-038): the conversation is opened
+ * in this transaction, under the pair's lock, and the answer names it. A like
+ * that is part of a match is final, the maintainer's of 20/10/2026: it is
+ * not changed, and its place in the day's likes stays spent; any other like
+ * may still be taken back until midnight. No match is made while the person
+ * is shadow-banned, nor with a block between the two.
  */
 export async function decide(
   deps: RoundDeps,
+  matches: Matches,
   input: { accountId: string; day: string; position: number; decision: RoundDecision },
-): Promise<void> {
+): Promise<{ match: string | null }> {
   const { at, today } = todayOrRefuse(deps, input.day);
   const written = await transaction(deps.db, async (tx) => {
     const round = await tx.query<{ id: string }>(
@@ -235,18 +268,26 @@ export async function decide(
     if (!roundId) throw notFound();
     const found = await tx.query<{
       id: string;
+      candidate_id: string;
       reason: RoundReason;
       seen_at: Date | null;
       decision: RoundDecision | null;
     }>(
-      `SELECT e.id, e.reason, e.seen_at, e.decision
+      `SELECT e.id, e.candidate_id, e.reason, e.seen_at, e.decision
          FROM round_entries e JOIN rounds r ON r.id = e.round_id
         WHERE r.id = $1 AND r.account_id = $2 AND e.position = $3 AND ${SERVABLE}`,
       [roundId, input.accountId, input.position],
     );
     const entry = found.rows[0];
     if (!entry) throw notFound();
-    if (entry.decision === input.decision) return null;
+    await tx.query(PAIR_LOCK, [input.accountId, entry.candidate_id]);
+    const standing = await matches.between(tx, input.accountId, entry.candidate_id);
+    if (entry.decision === input.decision) {
+      return { match: input.decision === "like" ? standing : null, decided: null };
+    }
+    if (standing && entry.decision === "like") {
+      throw new AppError(409, "match_made", "This like made a match and stays");
+    }
     // Counted under the round's lock from the day's standing decisions, so a
     // like taken back gives its place back and two devices cannot both pass
     // the count; the refusal writes nothing.
@@ -279,15 +320,60 @@ export async function decide(
                            WHERE e.round_id = r.id AND e.decision IS NULL AND ${SERVABLE})`,
       [roundId, input.accountId, at],
     );
-    return { reason: entry.reason, seenAt: entry.seen_at, revised: entry.decision !== null };
+    let match = input.decision === "like" ? standing : null;
+    let opened = false;
+    if (input.decision === "like" && !standing) {
+      // The other's like of the person, still standing and not expired, today's
+      // included: under the pair's lock it is committed or it is not there.
+      const mutual = await tx.query(
+        `SELECT 1 FROM round_entries e JOIN rounds r ON r.id = e.round_id
+          WHERE r.account_id = $1 AND e.candidate_id = $2 AND e.decision = 'like'
+            AND r.day > $3::date - $4::int
+            AND EXISTS (SELECT 1 FROM account me WHERE me.id = $2 AND me.state = 'active')
+            AND NOT blocked_between($2, $1)
+          LIMIT 1`,
+        [
+          entry.candidate_id,
+          input.accountId,
+          today,
+          await matchingConfigNumber(tx, LIKE_EXPIRY_KEY),
+        ],
+      );
+      if (mutual.rows.length > 0) {
+        match = await matches.open(tx, {
+          first: entry.candidate_id,
+          second: input.accountId,
+          at,
+        });
+        opened = true;
+      }
+    }
+    return {
+      match,
+      decided: {
+        reason: entry.reason,
+        seenAt: entry.seen_at,
+        revised: entry.decision !== null,
+        candidateId: entry.candidate_id,
+        opened,
+      },
+    };
   });
-  if (!written) return;
-  await track({ ...deps, now: () => at }, input.accountId, input.decision, {
-    position: input.position,
-    reason: written.reason,
-    sinceSeen: written.seenAt ? sinceSeenBand(at.getTime() - written.seenAt.getTime()) : null,
-    revised: written.revised,
-  });
+  const decided = written.decided;
+  if (decided) {
+    const now = () => at;
+    await track({ ...deps, now }, input.accountId, input.decision, {
+      position: input.position,
+      reason: decided.reason,
+      sinceSeen: decided.seenAt ? sinceSeenBand(at.getTime() - decided.seenAt.getTime()) : null,
+      revised: decided.revised,
+    });
+    if (decided.opened) {
+      await track({ ...deps, now }, input.accountId, "match", { completed: true });
+      await track({ ...deps, now }, decided.candidateId, "match", { completed: false });
+    }
+  }
+  return { match: written.match };
 }
 
 /**

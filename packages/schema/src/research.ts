@@ -147,6 +147,12 @@ export const RESEARCH_EVENTS = {
       "Which cards are passed, by place and reason, how soon after being seen, and how often a decision is changed (#96)?",
     props: decisionProps,
   },
+  // The match (#100, TD-5): one for each of the two, never whom.
+  match: {
+    question:
+      "How often does a like become a match, and was it this person's like that made it (#100)?",
+    props: props({ completed: z.boolean() }),
+  },
 } as const;
 
 export type ResearchEventName = keyof typeof RESEARCH_EVENTS;
