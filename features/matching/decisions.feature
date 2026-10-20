@@ -75,3 +75,28 @@ Feature: Today's round, seen and decided
     Given "A" is in the study
     When a round is built for "A" with two cards that match every filter and one that liked "A"
     Then one round_built says three cards, two matching every filter and one liked-you
+
+  # The day's likes (#98's first cut, ADR-036; the maintainer, 20/10/2026):
+  # one budget for everybody, like_budget_balanced a Finnish day, counted
+  # from the day's standing decisions. Liking back somebody who liked the
+  # person answers a like and is free; a pass is never counted.
+
+  Scenario: The day's likes stop at the budget, and the next is refused with the time they come back
+    Given like_budget_balanced is 2 and a round was built for "A" today with "B", "C" and "D"
+    When "A" likes all three
+    Then "B" and "C" are liked, and the like of "D" is refused with the wait until midnight, nothing of it written
+
+  Scenario: A like back on a card of somebody who liked the person is free
+    Given like_budget_balanced is 1 and a round was built for "A" today with "B" who liked "A", and "C"
+    When "A" likes "C" and then "B"
+    Then both are liked
+
+  Scenario: A pass is never counted, and a like taken back gives its place back
+    Given like_budget_balanced is 1 and a round was built for "A" today with "B", "C" and "D"
+    When "A" passes "B", likes "C", is refused "D", then changes "C" to a pass
+    Then "A" can like "D"
+
+  Scenario: Two devices liking at once cannot pass the budget together
+    Given like_budget_balanced is 1 and a round was built for "A" today with "B" and "C"
+    When one device likes "B" while another likes "C"
+    Then the second waits for the first, and its like is refused

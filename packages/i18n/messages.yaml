@@ -3014,6 +3014,13 @@ errors.round_expired:
   sv: "Rundan tog slut vid midnatt, så det här sparades inte."
   machine: { fi: true, sv: true }
 
+errors.like_budget_exceeded:
+  en: "You have used today's likes. New ones come after midnight; you can still pass."
+  description: "Today's round (429 with Retry-After, #98, ADR-036): the day's likes from matching_config like_budget_balanced are used; a like back on a card of somebody who liked the person is free and a pass is never counted. The day rolls at midnight in Finland. Nothing was saved."
+  fi: "Olet käyttänyt tämän päivän tykkäykset. Uusia tulee keskiyön jälkeen, mutta voit yhä ohittaa."
+  sv: "Du har använt dagens gillanden. Nya kommer efter midnatt, men du kan fortfarande hoppa över."
+  machine: { fi: true, sv: true }
+
 errors.conversation_closed:
   en: "This conversation has ended, so the message was not sent."
   description: "Send (409, #348, ADR-031 §3): the conversation is closed, a block stands between the two, or the other person deleted their account. Must not say which: a block reads as an ended conversation (ADR-030 §6)."

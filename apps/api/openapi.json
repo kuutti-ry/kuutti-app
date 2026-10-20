@@ -11172,7 +11172,7 @@
     "/rounds/{day}/entries/{position}/decision": {
       "put": {
         "summary": "Like or pass a card",
-        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired.",
+        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does.",
         "security": [
           {
             "session": []
@@ -11245,6 +11245,16 @@
           },
           "409": {
             "description": "round_expired: the day named has ended; nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "like_budget_exceeded: the day's likes are used up; Retry-After is the wait until the day rolls. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {
