@@ -1,0 +1,106 @@
+# Today's round (#379, ADR-034): Iida opens it from the gate card on home,
+# meets Henna first, who liked her yesterday, and likes her back: it is a
+# match, which leads to the conversation and back to the round. The next card
+# she passes, takes back with Undo and likes; the one after she reports and
+# blocks from the card's header with a reason and a short note (ADR-030 §11),
+# and it leaves the screen; the last one gets her fish (#378). Then the round
+# says to come back tomorrow. Which of Katja, Minna and Riikka comes when is
+# the day's order, so the flow decides by place, never by name. The stories
+# give Iida her round (packages/db/src/seed/rounds.ts); a match and a block
+# are final, so the flow runs once after each `pnpm demo:reset`.
+# shortcut: the note is typed at the phone's own text size; ADR-030 §11's
+# 200% wants a host step between flows (simctl content_size, adb font_scale),
+# which `pnpm e2e` does not have.
+appId: fi.kuutti.app
+name: Today's round shows one card at a time, liking back makes a match, Undo takes a decision back, and a report takes a card away
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Iida Mattila
+# Home: matching is open, and the gate card leads to the round.
+- scrollUntilVisible:
+    element: "Today's round|Päivän kierros|Dagens runda"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible: "Matching is open for you\\.|Seuranhaku on sinulle auki\\.|Matchningen är öppen för dig\\."
+- tapOn: "Today's round|Päivän kierros|Dagens runda"
+# Henna first, labelled: she liked Iida, so there is no fish on her card.
+- extendedWaitUntil:
+    visible: "Liked you|Tykkäsi sinusta|Gillade dig"
+    timeout: 15000
+- assertVisible: "Henna, \\d+"
+- assertNotVisible: "Send a fish|Lähetä kala|Skicka en fisk"
+- waitForAnimationToEnd
+- tapOn: "Like|Tykkää|Gilla"
+- extendedWaitUntil:
+    visible: "It's a match|Se on mätsi|Det är en match"
+    timeout: 15000
+- tapOn: "Go to the conversation|Siirry keskusteluun|Gå till samtalet"
+# The conversation the match opened, with nothing in it yet but the composer.
+- extendedWaitUntil:
+    visible: "(Message|Viesti|Meddelande)( .*)?"
+    timeout: 15000
+- assertVisible: "Henna, \\d+"
+- tapOn: "Back|Takaisin|Tillbaka"
+# Back in the round: the next card, a stranger's.
+- extendedWaitUntil:
+    visible: "Matches your filters|Vastaa suodattimiasi|Matchar dina filter"
+    timeout: 15000
+- assertNotVisible: "Henna, \\d+"
+- waitForAnimationToEnd
+- tapOn: "Pass|Ohita|Hoppa över"
+# Undo brings the passed card back, and says what was decided.
+- extendedWaitUntil:
+    visible: "Undo your last decision|Kumoa viimeisin valintasi|Ångra ditt senaste val"
+    timeout: 15000
+- tapOn: "Undo your last decision|Kumoa viimeisin valintasi|Ångra ditt senaste val"
+- extendedWaitUntil:
+    visible: "You passed on this person\\. You can change that until midnight\\.|Ohitit tämän henkilön\\. Voit muuttaa sitä keskiyöhön asti\\.|Du hoppade över den här personen\\. Du kan ändra det fram till midnatt\\."
+    timeout: 15000
+- tapOn: "Like|Tykkää|Gilla"
+# The third card: reported and blocked from its header, with a reason and a note.
+- extendedWaitUntil:
+    notVisible: "You passed on this person\\. You can change that until midnight\\.|Ohitit tämän henkilön\\. Voit muuttaa sitä keskiyöhön asti\\.|Du hoppade över den här personen\\. Du kan ändra det fram till midnatt\\."
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Block or report|Estä tai ilmoita|Blockera eller anmäl"
+- extendedWaitUntil:
+    visible: "Report and block|Ilmoita ja estä|Anmäl och blockera"
+    timeout: 15000
+- tapOn: "Report and block|Ilmoita ja estä|Anmäl och blockera"
+- extendedWaitUntil:
+    visible: "Harassing, threatening or hateful|Häiritsevä, uhkaava tai vihamielinen|Trakasserande, hotfull eller hatisk"
+    timeout: 15000
+- tapOn: "Harassing, threatening or hateful|Häiritsevä, uhkaava tai vihamielinen|Trakasserande, hotfull eller hatisk"
+- scrollUntilVisible:
+    element: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn:
+    below: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    above: "Send report|Lähetä ilmoitus|Skicka anmälan"
+- inputText: "Kysyi heti puhelinnumeroani"
+# A tap on the label, which is no button, closes the keyboard (README).
+- tapOn:
+    text: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    above: "(.* )?puhelinnumeroani"
+- tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
+- extendedWaitUntil:
+    visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
+    timeout: 15000
+- tapOn: "Done|Valmis|Klar"
+# The last card takes Iida's fish of the week.
+- extendedWaitUntil:
+    visible: "Send a fish|Lähetä kala|Skicka en fisk"
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Send a fish|Lähetä kala|Skicka en fisk"
+# The end, in words: no count, no countdown, nothing more to load.
+- extendedWaitUntil:
+    visible: "That was today's round\\. The next one comes tomorrow\\.|Siinä oli päivän kierros\\. Seuraava tulee huomenna\\.|Det var dagens runda\\. Nästa kommer i morgon\\."
+    timeout: 15000
+- assertNotVisible: "Like|Tykkää|Gilla"
+- assertNotVisible: "Pass|Ohita|Hoppa över"

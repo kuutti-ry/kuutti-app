@@ -42,7 +42,7 @@ Anything wrong: run the reset again (locally two seconds; on staging under a min
 
 ## After the demo
 
-- `pnpm demo:reset` locally, the reset in the container on staging: the stories are told anew and Aino is a newcomer again. Her deleted account (scene 7) is inside its waiting time until the reset.
+- `pnpm demo:reset` locally, the reset in the container on staging: the stories are told anew and Aino is a newcomer again. Her deleted account (scene 8) is inside its waiting time until the reset; and Iida's round (scene 5), once decided, is hers again only after it.
 - The recordings stay with the team: they show generated faces, which are private (`photo-prompts.md`); none in a screenshot that leaves the team or in a store listing.
 - What the run found wrong is an issue of its own.
 

@@ -78,8 +78,17 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
-| Home, signed in | `/` (Sanna) | Settings and Tech config named (Tech config outside production only); the mark silent; the title a header; welcome back said once after a break (Helmi); the gate's checking line said, and its failure; the area card's figures in words, none below the threshold; the gate card in words, nothing on it tappable; the button to the profile | | |
+| Home, signed in | `/` (Sanna) | Settings and Tech config named (Tech config outside production only); the mark silent; the title a header; welcome back said once after a break (Helmi); the gate's checking line said, and its failure; the area card's figures in words, none below the threshold; the gate card in words, nothing on it tappable but, once matching is open (Iida), Today's round named; the button to the profile | | |
 | Home, a notice (#176) | `/` (a person a moderator warned) | Notices a header, first in the list; the warning's title and its reason heard in order; Got it named; after it the notice gone and the focus not lost; a failure said (VoiceOver is told, TalkBack reads the region); nothing at all without a notice | | |
+
+### Today's round
+
+| screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
+|---|---|---|---|---|
+| A round card (#379) | `/round` (Iida, after `pnpm demo:reset`) | back named Back to home; the title a header; the loading line said, the failure and Try again; the focus taken to the card's reason as each card comes ("Liked you", "Matches your filters"), then the photo with its label, the name with the age as a header with its Block or report action, and the card's words; Block or report named beside the name; Pass, Like and, on a card that answers nobody's like, Send a fish, each named, at least 44 points, heard as dimmed while a decision is on its way; no swipe does anything | | |
+| Undo (#379) | `/round` (Iida, after a decision) | Undo heard as "Undo your last decision", absent before the first decision and after a match; the card that comes back says what was decided ("You passed on this person…"), and its button heard as selected | | |
+| A match (#379) | `/round` (Iida, Like on Henna's card) | "It's a match" taken to and heard, the line under it, Go to the conversation and Back to the round named; back from the conversation, the next card | | |
+| The round's words (#379) | `/round` (Iida, the last card decided; a reset without the stories for none) | "That was today's round…", the empty round and the round not ready yet each taken to and heard; a notice (the day ended, a card gone, the likes or the fish used up, a like that made a match) said once without moving the focus (VoiceOver is told, TalkBack reads the region); no count anywhere | | |
 
 ### Conversations
 

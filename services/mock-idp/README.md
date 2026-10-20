@@ -4,7 +4,7 @@ Local stand-in for the Telia ID Broker (Finnish Trust Network): [navikt/mock-oau
 
 - Discovery: `http://127.0.0.1:8080/ftn/.well-known/openid-configuration`
 - Any `client_id` and `client_secret` are accepted. `redirect_uri` is not validated.
-- The login page is ours (`login.html`, `loginPagePath` in `config.json`): a button for each of the nineteen personas and, below them, a form for anybody else.
+- The login page is ours (`login.html`, `loginPagePath` in `config.json`): a button for each of the twenty-four personas (the twenty one signs in as also in a short list at the top, for the flows; the four people of Iida's round are cards nobody signs in as, and only below) and, below them, a form for anybody else.
 
 ## The personas
 
@@ -27,6 +27,11 @@ One tap logs a persona in. Nothing in the API or the app knows about them: the b
 | Jussi Lehtonen | 02/11/1986 | mock bank only | onboarded without photos: a conversation with Elina; the contact share's flow sees her contact as him (#103) |
 | Laura Saarinen | 12/04/1997 | mock bank only | onboarded without photos: a conversation with Emmi; the report's flow reports Emmi from it as her, which blocks for good (#351) |
 | Emmi Kallio | 03/10/1995 | mock bank only | onboarded without photos: a conversation with Laura, which the report's flow ends; she finds it ended and can still report it (#351) |
+| Iida Mattila | 11/03/1990 | mock bank only | onboarded, with a complete profile and three photos: her gate opened by the stories and a round for the day, Henna first; the round's flow likes, passes, likes back and reports as her (#379) |
+| Henna Laaksonen | 27/05/1989 | mock bank only | a card in Iida's round: liked Iida the day before, so she comes first, and Iida's like back is a match (#379) |
+| Katja Rautio | 19/11/1989 | mock bank only | a card in Iida's round (#379) |
+| Minna Peltonen | 08/01/1990 | mock bank only | a card in Iida's round (#379) |
+| Riikka Kivelä | 30/08/1989 | mock bank only | a card in Iida's round (#379) |
 | Eetu Laine | the 1st of last month, 18 years ago | mock bank only | the youngest who gets in |
 | Venla Nieminen | the 1st of this month, 18 years ago | mock bank only | refused until the last day of the month: age is counted from the end of the birth month (TD-14) |
 | Lauri Hämäläinen | the 1st of last month, 17 years ago | mock bank only | refused |
@@ -40,7 +45,7 @@ The first nine are the same identity on every day, and the same person as a test
 pnpm demo:reset
 ```
 
-Returns all nineteen to where they begin, in a couple of seconds, with the local environment running (`pnpm env:up`). First every persona is forgotten: each live account goes through the erasure path, the function behind "delete my account", and then what erasure keeps of a person (the tombstone, the consents, the identity with its waiting time) is deleted too, which is right for a persona and never done for a person. So are the reports and blocks erasure keeps: the report flow's report of Emmi by Laura goes with its copy of their conversation, and the block it set, as does any other between personas. Then the thirteen histories are given anew: the command logs each persona in at this mock bank and sends the answers of onboarding and the profile through the API's own routes, as the app does. What no route does is done in the database afterwards: Kerttu's consent is given the version of an older wording, and Tapio's identity is banned. Ilona deletes her account herself. Last come the stories' four conversations (`packages/db/src/seed/conversations.ts`): Antti's with Ville, four days of messages, his match with Sanna, silent and archived, Elina's with Jussi, two days of messages, and Laura's with Emmi, a day of messages. They are rows, as the match's record will be, until #100 writes a conversation from the second like.
+Returns all twenty-four to where they begin, in a couple of seconds, with the local environment running (`pnpm env:up`). First every persona is forgotten: each live account goes through the erasure path, the function behind "delete my account", and then what erasure keeps of a person (the tombstone, the consents, the identity with its waiting time) is deleted too, which is right for a persona and never done for a person. So are the reports and blocks erasure keeps: the report flow's report of Emmi by Laura goes with its copy of their conversation, and the block it set, as does any other between personas. Then the thirteen histories are given anew: the command logs each persona in at this mock bank and sends the answers of onboarding and the profile through the API's own routes, as the app does. What no route does is done in the database afterwards: Kerttu's consent is given the version of an older wording, and Tapio's identity is banned. Ilona deletes her account herself. Last come the stories' four conversations (`packages/db/src/seed/conversations.ts`): Antti's with Ville, four days of messages, his match with Sanna, silent and archived, Elina's with Jussi, two days of messages, and Laura's with Emmi, a day of messages. They are rows, as the match's record will be, until #100 writes a conversation from the second like.
 
 `pnpm demo:reset -- --bare` forgets everybody and gives no history. `pnpm demo:reset -- --objects-lost` goes ahead although the store does not hold the photos, for objects that are gone for good (a stand-in whose directory was emptied, or a reset that was taken back after some objects had been deleted). The histories are data in `packages/db/src/seed/histories.ts`.
 
