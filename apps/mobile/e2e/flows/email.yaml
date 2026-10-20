@@ -1,5 +1,5 @@
-# A way back in (#148 j3, ADR-009): an optional e-mail address for a lost
-# phone. A malformed address is refused in words, a valid one is saved and
+# A way to stay in touch (#148 j3, ADR-009, #385): an optional e-mail
+# address. A malformed address is refused in words, a valid one is saved and
 # said to be set, and it can be removed again. Sanna has none; the flow
 # removes the one it saves.
 appId: fi.kuutti.app
@@ -8,7 +8,7 @@ name: A malformed e-mail is refused in words, a valid one is saved, and it can b
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://account/email
 - extendedWaitUntil:
-    visible: "A way back in|Tie takaisin sisään|En väg tillbaka in"
+    visible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
     timeout: 15000
 - waitForAnimationToEnd
 - assertVisible:
