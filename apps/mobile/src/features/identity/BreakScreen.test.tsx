@@ -78,8 +78,9 @@ describe("BreakScreen", () => {
       /leaves everybody's view/,
       /signed out on every device/,
       /brings you back/,
-      // A break stops no clock: a waiting like can still run out (#97).
-      /a like waiting for you can run out meanwhile/,
+      // A break stops no clock: a waiting like can still run out (#97), a
+      // quiet match is still put away (#100).
+      /a like waiting for you can run out, and a quiet conversation moves to Archived/,
     ]) {
       expect(screen.getByText(line)).toBeTruthy();
     }

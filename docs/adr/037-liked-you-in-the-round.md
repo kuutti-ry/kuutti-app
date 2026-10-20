@@ -38,3 +38,4 @@ The builder of ADR-035 orders the cards of a round and leaves its first places, 
 ## History
 
 - 2026-10-20: written with #97's build, on the maintainer's decisions of that day.
+- 2026-10-20 (#378, ADR-039 §4): those whose waiting like is a fish take the first places ahead of the rest, labelled `fish`.

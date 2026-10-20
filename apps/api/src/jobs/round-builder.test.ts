@@ -508,7 +508,15 @@ describe("when a round is built", () => {
       "SELECT props FROM events WHERE name = 'round_built'",
     );
     expect(rows.map((row) => row.props)).toEqual([
-      { ordering: "count", size: 2, matchesFilters: 2, likedYou: 0, seenBefore: 0, relaxed: 0 },
+      {
+        ordering: "count",
+        size: 2,
+        matchesFilters: 2,
+        likedYou: 0,
+        seenBefore: 0,
+        relaxed: 0,
+        fish: 0,
+      },
     ]);
   });
 });
@@ -679,6 +687,104 @@ describe("liked-you (#97, ADR-037)", () => {
 
     expect(await readToday(app, ctx.client, b)).toEqual(before.today);
     expect(await exportRounds(ctx.client, b, 10)).toEqual(before.history);
+  });
+});
+
+/** `sender`'s like of `liked`, shown `days` ago, made a fish (#378). */
+async function fishBefore(db: Queryable, sender: string, liked: string, days: number) {
+  await shownBefore(db, sender, liked, days, "like");
+  await db.query(
+    `UPDATE round_entries e SET fish = true FROM rounds r
+      WHERE r.id = e.round_id AND r.account_id = $1 AND e.candidate_id = $2`,
+    [sender, liked],
+  );
+}
+
+describe("the fish (#378, ADR-039)", () => {
+  test("A fish sent today is at the front of the recipient's next round, ahead of every ordinary like", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-fish-first", 1, 2);
+    const [a] = women;
+    const [b, c] = men;
+    if (!a || !b || !c) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 2, "like");
+    await fishBefore(ctx.client, c, a, 1);
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await roundOf(ctx.client, a)).toEqual([
+      { candidate_id: c, reason: "fish" },
+      { candidate_id: b, reason: "liked_you" },
+    ]);
+  });
+
+  describe("Fish and likes waiting on one person come fish oldest first, then likes oldest first", () => {
+    test.for([
+      { sender: "F1", place: 1, label: "fish" },
+      { sender: "F2", place: 2, label: "fish" },
+      { sender: "L1", place: 3, label: "liked you" },
+      { sender: "L2", place: 4, label: "liked you" },
+      { sender: "L3", place: 5, label: "liked you" },
+    ])("$sender at place $place, labelled $label", async ({ sender, place, label }, { ctx }) => {
+      const { women, men } = await pondOf(ctx, `test-fish-queue-${sender}`, 1, 5);
+      const [a] = women;
+      const [f1, f2, l1, l2, l3] = men;
+      if (!a || !f1 || !f2 || !l1 || !l2 || !l3) throw new Error("people not written");
+      await fishBefore(ctx.client, f1, a, 3);
+      await fishBefore(ctx.client, f2, a, 1);
+      await shownBefore(ctx.client, l1, a, 4, "like");
+      await shownBefore(ctx.client, l2, a, 2, "like");
+      await shownBefore(ctx.client, l3, a, 1, "like");
+      const who = { F1: f1, F2: f2, L1: l1, L2: l2, L3: l3 }[sender];
+
+      await buildRounds(await deps(ctx.client));
+
+      const round = await roundOf(ctx.client, a);
+      expect(round?.[place - 1]).toEqual({
+        candidate_id: who,
+        reason: label === "fish" ? "fish" : "liked_you",
+      });
+    });
+  });
+
+  test("round_built counts the fish places", async ({ ctx }) => {
+    const { women, men } = await pondOf(ctx, "test-fish-event", 1, 1);
+    const [a] = women;
+    const [b] = men;
+    if (!a || !b) throw new Error("people not written");
+    const who = await signInAs(ctx.client, a);
+    const answer = await (await appAt(ctx.client, new Date(NIGHT.getTime() - 3600 * 1000))).request(
+      "/consents",
+      {
+        method: "POST",
+        headers: { ...who.headers, "content-type": "application/json" },
+        body: JSON.stringify({
+          kind: "research",
+          version: CURRENT_CONSENT_VERSIONS.research,
+          locale: "fi",
+        }),
+      },
+    );
+    expect(answer.status).toBe(200);
+    await fishBefore(ctx.client, b, a, 1);
+
+    await buildRounds(await deps(ctx.client));
+
+    const { rows } = await ctx.client.query<{ props: Record<string, unknown> }>(
+      "SELECT props FROM events WHERE name = 'round_built'",
+    );
+    expect(rows.map((row) => row.props)).toEqual([
+      {
+        ordering: "count",
+        size: 1,
+        matchesFilters: 0,
+        likedYou: 0,
+        seenBefore: 0,
+        relaxed: 0,
+        fish: 1,
+      },
+    ]);
   });
 });
 

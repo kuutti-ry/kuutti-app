@@ -108,10 +108,18 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
         likedYou: 2,
         seenBefore: 1,
         relaxed: 0,
+        fish: 0,
       };
     case "profile_viewed":
       return { position: 3, reason: "liked_you" };
     case "like":
+      return {
+        position: 3,
+        reason: "matches_filters",
+        sinceSeen: "10s_30s",
+        revised: false,
+        fish: false,
+      };
     case "pass":
       return { position: 3, reason: "matches_filters", sinceSeen: "10s_30s", revised: false };
     case "match":

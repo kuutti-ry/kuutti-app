@@ -53,8 +53,10 @@ export type MessageParams = {
   "account.export.report.outcome.dismissed": Record<never, never>;
   "account.export.report.outcome.open": Record<never, never>;
   "account.export.round.about": Record<never, never>;
+  "account.export.round.decision.fish": Record<never, never>;
   "account.export.round.decision.like": Record<never, never>;
   "account.export.round.decision.pass": Record<never, never>;
+  "account.export.round.reason.fish": Record<never, never>;
   "account.export.round.reason.liked_you": Record<never, never>;
   "account.export.round.reason.matches_filters": Record<never, never>;
   "account.export.round.reason.relaxed": Record<never, never>;
@@ -517,6 +519,7 @@ export type MessageParams = {
   "errors.export_budget_exceeded": Record<never, never>;
   "errors.feedback_budget_exceeded": Record<never, never>;
   "errors.filter_unanswered": Record<never, never>;
+  "errors.fish_budget_exceeded": Record<never, never>;
   "errors.http_error": Record<never, never>;
   "errors.internal_error": Record<never, never>;
   "errors.like_budget_exceeded": Record<never, never>;

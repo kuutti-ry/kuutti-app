@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   pgEnum,
@@ -13,14 +14,17 @@ import { account } from "./identity.ts";
 
 /**
  * Why a candidate is in a round (TD-12), the label every card carries:
- * matches every filter, liked you, seen before, or there because the person
- * relaxed a filter (#99). A closed list, mirrored in packages/schema.
+ * matches every filter, liked you, seen before, there because the person
+ * relaxed a filter (#99), or sent them a fish (#378). A closed list, mirrored
+ * in packages/schema.
  */
 export const roundReason = pgEnum("round_reason", [
   "matches_filters",
   "liked_you",
   "seen_before",
   "relaxed",
+  // #378 (ADR-039): the card of somebody whose fish waits on the person, ahead of every like.
+  "fish",
 ]);
 
 /** What a person decided about a card; undecided is no value, and expired is undecided on an ended day. */
@@ -75,6 +79,8 @@ export const roundEntries = pgTable(
     seenAt: timestamp("seen_at", { withTimezone: true }),
     decision: roundDecision("decision"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
+    // A fish (#378, ADR-039) is a like with a mark: every reader of a like reads it as one.
+    fish: boolean("fish").notNull().default(false),
   },
   (table) => [
     // One card per place: the read's order, the cascade, and #98's count of the day's likes.
@@ -88,5 +94,6 @@ export const roundEntries = pgTable(
       "round_entries_decided_check",
       sql`(${table.decision} IS NULL) = (${table.decidedAt} IS NULL)`,
     ),
+    check("round_entries_fish_check", sql`NOT ${table.fish} OR ${table.decision} = 'like'`),
   ],
 );

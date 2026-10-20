@@ -1,6 +1,7 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import {
   type ProfileCard,
+  type RoundChoice,
   type RoundDecision,
   type RoundEntry,
   type RoundOrdering,
@@ -79,7 +80,29 @@ const notFound = () => new AppError(404, "not_found", "No such card in today's r
  * never counted.
  */
 const LIKE_BUDGET_KEY = "like_budget_balanced";
-const FREE_LIKES: readonly RoundReason[] = ["liked_you"];
+const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
+
+/**
+ * The fish (#378, ADR-039, the maintainer's of 20/10/2026): a like with a
+ * mark, `fish_budget` of them in any `fish_window_days`, rolling, counted
+ * from the person's standing fish under the round's lock, so one changed
+ * back the same day is given back. A fish is a like for every other rule:
+ * the day's likes, the expiry, the match. On a card of somebody whose like or
+ * fish waits on the person it would answer a like, and is a like.
+ */
+const FISH_BUDGET_KEY = "fish_budget";
+const FISH_WINDOW_KEY = "fish_window_days";
+
+/** A Finnish day `days` after another, both as YYYY-MM-DD. */
+function addDays(day: string, days: number): string {
+  const at = new Date(`${day}T12:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+}
+
+/** What a person reads back of their own decision: a like with the mark is a fish. */
+const choiceOf = (decision: RoundDecision | null, fish: boolean): RoundChoice | null =>
+  decision === "like" && fish ? "fish" : decision;
 
 /**
  * A new round, the round builder's (#95) one writer: the round and its
@@ -145,6 +168,7 @@ export async function saveRound(
     likedYou: count("liked_you"),
     seenBefore: count("seen_before"),
     relaxed: count("relaxed"),
+    fish: count("fish"),
   });
   return { roundId: saved.id };
 }
@@ -169,8 +193,9 @@ export async function readTodaysRound(
     candidate_id: string | null;
     reason: RoundReason | null;
     decision: RoundDecision | null;
+    fish: boolean | null;
   }>(
-    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision
+    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish
        FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id
       WHERE r.account_id = $1 AND r.day = $2
       ORDER BY e.position`,
@@ -187,7 +212,12 @@ export async function readTodaysRound(
     if (row.position === null || row.candidate_id === null || row.reason === null) continue;
     const card = await cardOf(accountId, row.candidate_id);
     if (!card) continue;
-    entries.push({ position: row.position, reason: row.reason, decision: row.decision, card });
+    entries.push({
+      position: row.position,
+      reason: row.reason,
+      decision: choiceOf(row.decision, row.fish === true),
+      card,
+    });
   }
   return { day, entries };
 }
@@ -256,9 +286,10 @@ export async function markSeen(
 export async function decide(
   deps: RoundDeps,
   matches: Matches,
-  input: { accountId: string; day: string; position: number; decision: RoundDecision },
+  input: { accountId: string; day: string; position: number; decision: RoundChoice },
 ): Promise<{ match: string | null }> {
   const { at, today } = todayOrRefuse(deps, input.day);
+  const decision: RoundDecision = input.decision === "pass" ? "pass" : "like";
   const written = await transaction(deps.db, async (tx) => {
     const round = await tx.query<{ id: string }>(
       "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
@@ -272,26 +303,29 @@ export async function decide(
       reason: RoundReason;
       seen_at: Date | null;
       decision: RoundDecision | null;
+      fish: boolean;
     }>(
-      `SELECT e.id, e.candidate_id, e.reason, e.seen_at, e.decision
+      `SELECT e.id, e.candidate_id, e.reason, e.seen_at, e.decision, e.fish
          FROM round_entries e JOIN rounds r ON r.id = e.round_id
         WHERE r.id = $1 AND r.account_id = $2 AND e.position = $3 AND ${SERVABLE}`,
       [roundId, input.accountId, input.position],
     );
     const entry = found.rows[0];
     if (!entry) throw notFound();
+    // A fish on a card that answers a like is a like (ADR-039 §2).
+    const fish = input.decision === "fish" && !FREE_LIKES.includes(entry.reason);
     await tx.query(PAIR_LOCK, [input.accountId, entry.candidate_id]);
     const standing = await matches.between(tx, input.accountId, entry.candidate_id);
-    if (entry.decision === input.decision) {
-      return { match: input.decision === "like" ? standing : null, decided: null };
+    if (entry.decision === decision && entry.fish === fish) {
+      return { match: decision === "like" ? standing : null, decided: null };
     }
     if (standing && entry.decision === "like") {
       throw new AppError(409, "match_made", "This like made a match and stays");
     }
     // Counted under the round's lock from the day's standing decisions, so a
     // like taken back gives its place back and two devices cannot both pass
-    // the count; the refusal writes nothing.
-    if (input.decision === "like" && !FREE_LIKES.includes(entry.reason)) {
+    // the count; the refusal writes nothing. A like made a fish was counted.
+    if (decision === "like" && entry.decision !== "like" && !FREE_LIKES.includes(entry.reason)) {
       const budget = await matchingConfigNumber(tx, LIKE_BUDGET_KEY);
       const liked = await tx.query<{ n: number }>(
         `SELECT count(*)::int AS n FROM round_entries
@@ -304,13 +338,35 @@ export async function decide(
         });
       }
     }
+    // The person's fish of the last fish_window_days, this card's aside, under
+    // the round's lock; the next comes back when the oldest leaves the window.
+    if (fish && !entry.fish) {
+      const budget = await matchingConfigNumber(tx, FISH_BUDGET_KEY);
+      const window = await matchingConfigNumber(tx, FISH_WINDOW_KEY);
+      const sent = await tx.query<{ n: number; oldest: string | null }>(
+        `SELECT count(*)::int AS n, min(r.day)::text AS oldest
+           FROM round_entries e JOIN rounds r ON r.id = e.round_id
+          WHERE r.account_id = $1 AND e.fish AND e.id <> $2 AND r.day > $3::date - $4::int`,
+        [input.accountId, entry.id, today, window],
+      );
+      const [row] = sent.rows;
+      if (row && row.n >= budget) {
+        // With a budget of none there is no oldest, and nothing before the day rolls.
+        const back = row.oldest
+          ? dayWindow(new Date(`${addDays(row.oldest, window)}T12:00:00Z`)).start
+          : dayWindow(at).end;
+        throw new AppError(429, "fish_budget_exceeded", "The window's fish are sent", {
+          retryAfterSeconds: secondsUntil(back, at),
+        });
+      }
+    }
     // The predicate again where it writes: a block or an erasure that
     // committed since the read leaves nothing written.
     const updated = await tx.query(
-      `UPDATE round_entries e SET decision = $4, decided_at = $5
+      `UPDATE round_entries e SET decision = $4, decided_at = $5, fish = $6
          FROM rounds r
         WHERE r.id = e.round_id AND r.id = $1 AND r.account_id = $2 AND e.id = $3 AND ${SERVABLE}`,
-      [roundId, input.accountId, entry.id, input.decision, at],
+      [roundId, input.accountId, entry.id, decision, at, fish],
     );
     if (updated.rowCount !== 1) throw notFound();
     await tx.query(
@@ -320,9 +376,9 @@ export async function decide(
                            WHERE e.round_id = r.id AND e.decision IS NULL AND ${SERVABLE})`,
       [roundId, input.accountId, at],
     );
-    let match = input.decision === "like" ? standing : null;
+    let match = decision === "like" ? standing : null;
     let opened = false;
-    if (input.decision === "like" && !standing) {
+    if (decision === "like" && !standing) {
       // The other's like of the person, still standing and not expired, today's
       // included: under the pair's lock it is committed or it is not there.
       const mutual = await tx.query(
@@ -356,18 +412,24 @@ export async function decide(
         revised: entry.decision !== null,
         candidateId: entry.candidate_id,
         opened,
+        fish,
       },
     };
   });
   const decided = written.decided;
   if (decided) {
     const now = () => at;
-    await track({ ...deps, now }, input.accountId, input.decision, {
+    const props = {
       position: input.position,
       reason: decided.reason,
       sinceSeen: decided.seenAt ? sinceSeenBand(at.getTime() - decided.seenAt.getTime()) : null,
       revised: decided.revised,
-    });
+    };
+    if (decision === "like") {
+      await track({ ...deps, now }, input.accountId, "like", { ...props, fish: decided.fish });
+    } else {
+      await track({ ...deps, now }, input.accountId, "pass", props);
+    }
     if (decided.opened) {
       await track({ ...deps, now }, input.accountId, "match", { completed: true });
       await track({ ...deps, now }, decided.candidateId, "match", { completed: false });
@@ -401,7 +463,7 @@ export type OwnRound = {
     position: number;
     reason: RoundReason;
     seenAt: Date | null;
-    decision: RoundDecision | null;
+    decision: RoundChoice | null;
     decidedAt: Date | null;
   }[];
 };
@@ -430,9 +492,10 @@ export async function exportRounds(
     reason: RoundReason;
     seen_at: Date | null;
     decision: RoundDecision | null;
+    fish: boolean;
     decided_at: Date | null;
   }>(
-    `SELECT e.round_id, e.position, e.reason, e.seen_at, e.decision, e.decided_at
+    `SELECT e.round_id, e.position, e.reason, e.seen_at, e.decision, e.fish, e.decided_at
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.id = ANY($2::uuid[])
       ORDER BY e.position`,
@@ -449,7 +512,7 @@ export async function exportRounds(
         position: entry.position,
         reason: entry.reason,
         seenAt: entry.seen_at,
-        decision: entry.decision,
+        decision: choiceOf(entry.decision, entry.fish),
         decidedAt: entry.decided_at,
       })),
   }));

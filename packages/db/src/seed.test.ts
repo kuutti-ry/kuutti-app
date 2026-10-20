@@ -68,6 +68,8 @@ describe("seed", () => {
           photo_closer_look_days: 30,
           photo_closer_look_reject: 75,
           photo_queue_reject_days: 14,
+          fish_budget: 1,
+          fish_window_days: 7,
           photo_tip_mirror_confidence_min: 50,
           photo_tip_bathroom_confidence_min: 50,
           photo_tip_sunglasses_confidence_min: 50,
