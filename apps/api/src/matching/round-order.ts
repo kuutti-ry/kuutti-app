@@ -26,6 +26,28 @@ export function hiddenByField(a: ProfileFields, b: ProfileFields): boolean {
   return (a.field ?? []).some((field) => theirs.has(field));
 }
 
+/** Whether the two may meet in a round at all: two people, in each other's pool both ways, no hidden field between them. */
+function mayMeet(owner: RoundCandidate, other: RoundCandidate): boolean {
+  return (
+    other.id !== owner.id &&
+    inEachOthersPool(owner.person, other.person) &&
+    !hiddenByField(owner.person.fields, other.person.fields)
+  );
+}
+
+/**
+ * The round's first places (#97, TD-11): the people whose like waits on the
+ * owner, in the order given (the oldest like first), whoever of them may
+ * still meet the owner, up to `cap`. No order of any approach moves them.
+ */
+export function likedYouPlaces(
+  owner: RoundCandidate,
+  waiting: readonly RoundCandidate[],
+  cap: number,
+): RoundCandidate[] {
+  return waiting.filter((other) => mayMeet(owner, other)).slice(0, Math.max(0, cap));
+}
+
 /** The order among equal counts: the same for a day, an owner and a candidate, whenever it is asked. */
 function tieOf(day: string, ownerId: string, candidateId: string): string {
   return createHash("sha256").update(`${day}\n${ownerId}\n${candidateId}`).digest("hex");
@@ -38,12 +60,7 @@ export function roundOrder(
 ): RoundCandidate[] {
   return (
     others
-      .filter(
-        (other) =>
-          other.id !== owner.id &&
-          inEachOthersPool(owner.person, other.person) &&
-          !hiddenByField(owner.person.fields, other.person.fields),
-      )
+      .filter((other) => mayMeet(owner, other))
       .map((other) => ({
         other,
         count: softMatches(owner.person.fields, other.person.fields),

@@ -5,7 +5,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "about.source.title": "［Šóóúúrçéé çóódéé］",
   "account.break.back": "［Bááçk］",
   "account.break.button": "［Táákéé áá brééáák］",
-  "account.break.comesBack": "［ÝÝóóúúr ñééxt bááñk lóógííñ brííñgš éévéérýýthííñg bááçk ááš íít wááš. Ñóóthííñg ííš dééléétééd ááñd ñóóthííñg ííš ááškééd áágááííñ.］",
+  "account.break.comesBack": "［ÝÝóóúúr ñééxt bááñk lóógííñ brííñgš ýýóóúú bááçk. Ñóóthííñg ííš dééléétééd ááñd ñóóthííñg ííš ááškééd áágááííñ, thóóúúgh áá lííkéé wááíítííñg fóór ýýóóúú çááñ rúúñ óóúút mééááñwhííléé.］",
   "account.break.confirm": "［Štáárt théé brééáák］",
   "account.break.failed": "［Théé brééáák çóóúúld ñóót béé štáártééd. Trýý áágááííñ.］",
   "account.break.hidden": "［ÝÝóóúúr próófííléé lééáávééš éévéérýýbóódýý'š vííééw. Ñóóbóódýý ñééw šééééš ýýóóúú whííléé ýýóóúú ááréé ááwááýý.］",

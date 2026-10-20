@@ -16,7 +16,7 @@ export {
 } from "./preferences.ts";
 // The round builder (#95, ADR-035) reads across slices and lives with the
 // jobs; its order and its one writer are this slice's.
-export { type RoundCandidate, roundOrder } from "./round-order.ts";
+export { likedYouPlaces, type RoundCandidate, roundOrder } from "./round-order.ts";
 export { roundRoutes } from "./round-routes.ts";
 // Today's round (#96, ADR-034): the routes, and the halves erasure and the
 // export call.

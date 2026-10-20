@@ -5,7 +5,7 @@ export const sv: Readonly<Record<string, string>> = {
   "about.source.title": "Källkod",
   "account.break.back": "Tillbaka",
   "account.break.button": "Ta en paus",
-  "account.break.comesBack": "Nästa bankinloggning tar tillbaka allt som det var. Inget raderas och inget frågas igen.",
+  "account.break.comesBack": "Nästa bankinloggning tar dig tillbaka. Inget raderas och inget frågas igen, men ett gillande som väntar på dig kan hinna gå ut under tiden.",
   "account.break.confirm": "Börja pausen",
   "account.break.failed": "Pausen kunde inte startas. Försök igen.",
   "account.break.hidden": "Din profil försvinner ur allas vy. Ingen ny ser dig medan du är borta.",

@@ -77,7 +77,9 @@ describe("BreakScreen", () => {
     for (const line of [
       /leaves everybody's view/,
       /signed out on every device/,
-      /brings everything back as it was/,
+      /brings you back/,
+      // A break stops no clock: a waiting like can still run out (#97).
+      /a like waiting for you can run out meanwhile/,
     ]) {
       expect(screen.getByText(line)).toBeTruthy();
     }

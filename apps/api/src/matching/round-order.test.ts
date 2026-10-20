@@ -9,7 +9,7 @@ import {
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { inEachOthersPool, type PoolPerson } from "./pool.ts";
-import { hiddenByField, type RoundCandidate, roundOrder } from "./round-order.ts";
+import { hiddenByField, likedYouPlaces, type RoundCandidate, roundOrder } from "./round-order.ts";
 import { softMatches } from "./soft.ts";
 
 // The order of a round's places no rule forces (#95, ADR-035;
@@ -80,6 +80,35 @@ describe("A round holds at most round_size cards, the most soft matches first", 
 
   it("is empty when nobody is in the pool", () => {
     expect(roundOrder(owner, [], { day: DAY, size: 10 })).toEqual([]);
+  });
+});
+
+describe("the liked-you places (#97)", () => {
+  const owner = woman("owner", { education: "amk" });
+  const first = man("first");
+  const second = man("second", { education: "amk" });
+  const third = man("third");
+
+  it("keep the order they are given, the oldest like first, whatever the soft matches say", () => {
+    expect(ids(likedYouPlaces(owner, [first, second, third], 10))).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
+  });
+
+  it("stop at the cap, and are none at a cap of nothing or below it", () => {
+    expect(ids(likedYouPlaces(owner, [first, second, third], 2))).toEqual(["first", "second"]);
+    expect(likedYouPlaces(owner, [first, second], 0)).toEqual([]);
+    expect(likedYouPlaces(owner, [first, second], -1)).toEqual([]);
+  });
+
+  it("leave out the owner, anybody out of their pool, and anybody a hidden field keeps apart, before the cap", () => {
+    const sameGender = woman("same");
+    const hidden = man("hidden", { field: ["tech"] });
+    const hiding = woman("hiding", { field: ["tech"], hideFromField: true });
+    expect(ids(likedYouPlaces(owner, [owner, sameGender, first], 1))).toEqual(["first"]);
+    expect(ids(likedYouPlaces(hiding, [hidden, first], 1))).toEqual(["first"]);
   });
 });
 
@@ -248,6 +277,28 @@ describe("the order, for any people", () => {
             if (taken.has(other.id)) continue;
             expect(softMatches(owner.person.fields, other.person.fields)).toBeLessThanOrEqual(last);
           }
+        },
+      ),
+    );
+  });
+
+  it("puts first only people in each other's pool, both ways, in the order given, up to the cap (rule 7)", () => {
+    fc.assert(
+      fc.property(
+        personArb("owner"),
+        crowdArb,
+        fc.integer({ min: 0, max: 15 }),
+        (owner, crowd, cap) => {
+          const places = likedYouPlaces(owner, crowd, cap);
+          expect(places.length).toBeLessThanOrEqual(cap);
+          for (const candidate of places) {
+            expect(inEachOthersPool(owner.person, candidate.person)).toBe(true);
+            expect(inEachOthersPool(candidate.person, owner.person)).toBe(true);
+            expect(hiddenByField(owner.person.fields, candidate.person.fields)).toBe(false);
+          }
+          const order = ids(crowd);
+          const at = ids(places).map((id) => order.indexOf(id));
+          expect([...at].sort((x, y) => x - y)).toEqual(at);
         },
       ),
     );

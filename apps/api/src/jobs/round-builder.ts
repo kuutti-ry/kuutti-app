@@ -3,7 +3,7 @@ import type { RoundReason } from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
-import { roundOrder, saveRound } from "../matching/index.ts";
+import { likedYouPlaces, roundOrder, saveRound } from "../matching/index.ts";
 import type { NightlyJob } from "./nightly.ts";
 import { type Subject, subjectsOfPond } from "./pond-gate.ts";
 
@@ -25,35 +25,51 @@ import { type Subject, subjectsOfPond } from "./pond-gate.ts";
  * comes back as `seen_before` (TD-12). Fewer candidates than `round_size`
  * make a shorter round, none an empty one: nothing fills it.
  *
+ * The round's first places are the people whose like waits on the person
+ * (#97, ADR-037): liked on an ended day within `like_expiry_days`, not yet
+ * answered, the oldest like first, up to `liked_you_cap`, each still in each
+ * other's pool, labelled `liked_you`; no order moves them. A like the person
+ * passed within `pass_cooldown_days`, or of somebody they have a
+ * conversation with, never comes. Somebody whose like waits beyond the cap
+ * waits for a later round and is no ordinary card meanwhile.
+ *
  * Nothing it reads or decides is logged but how many: whose round has whom
  * in it is the round record's, and the export's (ADR-034 §7).
  */
 export type BuilderDeps = { db: Queryable; logger: Logger; now: () => Date };
 
-const KEYS = ["round_size", "shown_cooldown_days", "pass_cooldown_days"] as const;
+const KEYS = [
+  "round_size",
+  "shown_cooldown_days",
+  "pass_cooldown_days",
+  "liked_you_cap",
+  "like_expiry_days",
+] as const;
 type BuilderConfig = Record<(typeof KEYS)[number], number>;
 
 export type BuildCount = { ponds: number; built: number; cards: number; failed: number };
 
 /**
- * Whom the owner may not be shown today, and whom they were shown before.
- * Earlier days only: today's round is the one being built.
+ * Whom the owner was shown before, and of them whom they may not be shown
+ * today: shown within the cooldown (an ordinary card waits it out), or
+ * refused, passed within the cooldown or in a conversation with them (no
+ * card at all, a like of theirs neither). Earlier days only: today's round is
+ * the one being built.
  */
 async function historyOf(
   db: Queryable,
   ownerId: string,
   day: string,
   config: BuilderConfig,
-): Promise<{ excluded: Set<string>; seen: Set<string> }> {
-  const { rows } = await db.query<{ id: string; cooling: boolean }>(
-    `SELECT e.candidate_id AS id,
-            bool_or(r.day > $2::date - $3::int
-                    OR (e.decision = 'pass' AND r.day > $2::date - $4::int)) AS cooling
+): Promise<{ cooling: Set<string>; refused: Set<string>; seen: Set<string> }> {
+  const { rows } = await db.query<{ id: string; shown: boolean; refused: boolean }>(
+    `SELECT e.candidate_id AS id, bool_or(r.day > $2::date - $3::int) AS shown,
+            bool_or(e.decision = 'pass' AND r.day > $2::date - $4::int) AS refused
        FROM rounds r JOIN round_entries e ON e.round_id = r.id
       WHERE r.account_id = $1 AND r.day < $2::date
       GROUP BY e.candidate_id
      UNION ALL
-     SELECT other.account_id, true
+     SELECT other.account_id, false, true
        FROM conversation_participant mine
        JOIN conversation_participant other
          ON other.conversation_id = mine.conversation_id AND other.account_id <> mine.account_id
@@ -61,9 +77,39 @@ async function historyOf(
     [ownerId, day, config.shown_cooldown_days, config.pass_cooldown_days],
   );
   return {
-    excluded: new Set(rows.filter((row) => row.cooling).map((row) => row.id)),
+    cooling: new Set(rows.filter((row) => row.shown).map((row) => row.id)),
+    refused: new Set(rows.filter((row) => row.refused).map((row) => row.id)),
     seen: new Set(rows.map((row) => row.id)),
   };
+}
+
+/**
+ * The people whose like waits on the owner, the oldest like first (#97): a
+ * like of an ended day, so a decision the liker may still change is never
+ * shown, within `like_expiry_days`, and not answered, by a decision of the
+ * owner's on the liker on the like's day or after it. A like expired is
+ * nobody's to see, and its sender is never told.
+ */
+async function waitingOn(
+  db: Queryable,
+  ownerId: string,
+  day: string,
+  config: BuilderConfig,
+): Promise<string[]> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT r.account_id AS id
+       FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE e.candidate_id = $1 AND e.decision = 'like'
+        AND r.day < $2::date AND r.day > $2::date - $3::int
+        AND NOT EXISTS (
+          SELECT 1 FROM rounds mine JOIN round_entries answer ON answer.round_id = mine.id
+           WHERE mine.account_id = $1 AND answer.candidate_id = r.account_id
+             AND answer.decision IS NOT NULL AND mine.day >= r.day)
+      GROUP BY r.account_id
+      ORDER BY min(e.decided_at), r.account_id`,
+    [ownerId, day, config.like_expiry_days],
+  );
+  return rows.map((row) => row.id);
 }
 
 /** One pond's rounds for the day: of everybody open, or of one person. */
@@ -116,15 +162,35 @@ async function placesOf(
   round: { day: string; config: BuilderConfig },
 ): Promise<{ candidateId: string; reason: RoundReason }[]> {
   const history = await historyOf(db, owner.id, round.day, round.config);
+  const waiting = (await waitingOn(db, owner.id, round.day, round.config)).filter(
+    (id) => !history.refused.has(id),
+  );
+  const byId = new Map(shown.map((subject) => [subject.id, subject]));
+  const likedYou = likedYouPlaces(
+    owner,
+    waiting.flatMap((id) => byId.get(id) ?? []),
+    round.config.liked_you_cap,
+  );
+  const waits = new Set(waiting);
   const ordered = roundOrder(
     owner,
-    shown.filter((subject) => !history.excluded.has(subject.id)),
+    shown.filter(
+      (subject) =>
+        !history.refused.has(subject.id) &&
+        !history.cooling.has(subject.id) &&
+        !waits.has(subject.id),
+    ),
     { day: round.day, size: round.config.round_size },
   );
-  return ordered.map((candidate) => ({
-    candidateId: candidate.id,
-    reason: history.seen.has(candidate.id) ? "seen_before" : "matches_filters",
-  }));
+  return [
+    ...likedYou.map((candidate) => ({ candidateId: candidate.id, reason: "liked_you" as const })),
+    ...ordered.map((candidate) => ({
+      candidateId: candidate.id,
+      reason: history.seen.has(candidate.id)
+        ? ("seen_before" as const)
+        : ("matches_filters" as const),
+    })),
+  ];
 }
 
 /** Every open person's round for the day it is: the night's, after the gate's count. */
