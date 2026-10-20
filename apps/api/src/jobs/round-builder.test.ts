@@ -4,9 +4,9 @@ import { generatePopulation, writePopulation } from "@kuutti/db/demo";
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { type ProfileFields, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
-import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
+import { CURRENT_CONSENT_VERSIONS, eraseAccount } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
-import { inEachOthersPool, saveRound } from "../matching/index.ts";
+import { exportRounds, inEachOthersPool, saveRound } from "../matching/index.ts";
 import { signInAs } from "../test/account.ts";
 import {
   captureLogger,
@@ -510,6 +510,175 @@ describe("when a round is built", () => {
     expect(rows.map((row) => row.props)).toEqual([
       { ordering: "count", size: 2, matchesFilters: 2, likedYou: 0, seenBefore: 0, relaxed: 0 },
     ]);
+  });
+});
+
+describe("liked-you (#97, ADR-037)", () => {
+  test("A like given on an ended day is in the liked person's next round, first and labelled", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-first", 1, 3);
+    const [a] = women;
+    const [b, c, d] = men;
+    if (!a || !b || !c || !d) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 1, "like");
+
+    await buildRounds(await deps(ctx.client));
+
+    const round = await roundOf(ctx.client, a);
+    expect(round?.[0]).toEqual({ candidate_id: b, reason: "liked_you" });
+    expect(round?.slice(1).map((card) => card.reason)).toEqual([
+      "matches_filters",
+      "matches_filters",
+    ]);
+    expect(new Set(candidates(round).slice(1))).toEqual(new Set([c, d]));
+  });
+
+  test("More waiting likes than liked_you_cap wait for a later round, oldest first", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "liked_you_cap", 2);
+    const { women, men } = await pondOf(ctx, "test-liked-cap", 1, 3);
+    const [a] = women;
+    const [b, c, d] = men;
+    if (!a || !b || !c || !d) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 3, "like");
+    await shownBefore(ctx.client, c, a, 2, "like");
+    await shownBefore(ctx.client, d, a, 1, "like");
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await roundOf(ctx.client, a)).toEqual([
+      { candidate_id: b, reason: "liked_you" },
+      { candidate_id: c, reason: "liked_you" },
+    ]);
+  });
+
+  describe("A like waits until it is answered or expires", () => {
+    test.for([
+      {
+        days: 1,
+        answer: '"A" has not seen it',
+        outcome: 'first in "A"\'s round, labelled liked you',
+      },
+      {
+        days: 13,
+        answer: '"A" left it undecided twelve days ago',
+        outcome: 'first in "A"\'s round, labelled liked you',
+      },
+      {
+        days: 14,
+        answer: '"A" has not seen it',
+        outcome: 'in "A"\'s round as an ordinary card',
+      },
+      { days: 3, answer: '"A" passed it two days ago', outcome: 'not in "A"\'s round' },
+      { days: 3, answer: '"A" liked it two days ago', outcome: 'not in "A"\'s round' },
+    ])("$days days ago, $answer: $outcome", async ({ days, answer, outcome }, { ctx }) => {
+      const { women, men } = await pondOf(ctx, `test-liked-wait-${days}-${answer.length}`, 1, 1);
+      const [a] = women;
+      const [b] = men;
+      if (!a || !b) throw new Error("people not written");
+      await shownBefore(ctx.client, b, a, days, "like");
+      if (answer.includes("undecided")) await shownBefore(ctx.client, a, b, 12, null);
+      if (answer.includes("passed")) await shownBefore(ctx.client, a, b, 2, "pass");
+      if (answer.includes("liked it")) await shownBefore(ctx.client, a, b, 2, "like");
+
+      await buildRounds(await deps(ctx.client));
+
+      const round = await roundOf(ctx.client, a);
+      if (outcome.startsWith("first")) {
+        expect(round?.[0]).toEqual({ candidate_id: b, reason: "liked_you" });
+      } else if (outcome.includes("ordinary")) {
+        expect(round).toEqual([{ candidate_id: b, reason: "matches_filters" }]);
+      } else {
+        expect(round).toEqual([]);
+      }
+    });
+  });
+
+  test("A like of today waits for the night", async ({ ctx }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-today", 1, 1);
+    const [a] = women;
+    const [b] = men;
+    if (!a || !b) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 0, "like");
+
+    const read = await readToday(await appAt(ctx.client, NOON), ctx.client, a);
+
+    expect(read.entries?.map((entry) => entry.reason)).not.toContain("liked_you");
+    expect(await roundOf(ctx.client, a)).toEqual([{ candidate_id: b, reason: "matches_filters" }]);
+  });
+
+  test("A like never reaches the round from somebody the person passed, or who no longer passes the filters", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-refused", 1, 2);
+    const [a] = women;
+    const [b, c] = men;
+    if (!a || !b || !c) throw new Error("people not written");
+    await shownBefore(ctx.client, a, b, 30, "pass");
+    await shownBefore(ctx.client, b, a, 1, "like");
+    await shownBefore(ctx.client, c, a, 1, "like");
+    await ctx.client.query(
+      `UPDATE preferences SET value = '["man"]'::jsonb WHERE account_id = $1 AND field = 'seeks'`,
+      [c],
+    );
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await roundOf(ctx.client, a)).toEqual([]);
+  });
+
+  test("a like from somebody erased, shadow-banned or with a conversation with the person never comes", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-gone", 1, 4);
+    const [a] = women;
+    const [erased, hidden, talking, kept] = men;
+    if (!a || !erased || !hidden || !talking || !kept) throw new Error("people not written");
+    for (const liker of [erased, hidden, talking, kept]) {
+      await shownBefore(ctx.client, liker, a, 1, "like");
+    }
+    const { logger } = await captureLogger();
+    await eraseAccount({ db: ctx.client, logger, now: () => NIGHT }, erased);
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [hidden]);
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "INSERT INTO conversation DEFAULT VALUES RETURNING id",
+    );
+    await ctx.client.query(
+      `INSERT INTO conversation_participant (conversation_id, account_id, side)
+       VALUES ($1, $2, 'a'), ($1, $3, 'b')`,
+      [rows[0]?.id, a, talking],
+    );
+
+    await buildRounds(await deps(ctx.client));
+
+    expect(await roundOf(ctx.client, a)).toEqual([{ candidate_id: kept, reason: "liked_you" }]);
+  });
+
+  test("The sender learns nothing of what became of a like", async ({ ctx }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-silent", 1, 1);
+    const [a] = women;
+    const [b] = men;
+    if (!a || !b) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 1, "like");
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client, NOON);
+    const before = {
+      today: await readToday(app, ctx.client, b),
+      history: await exportRounds(ctx.client, b, 10),
+    };
+
+    const who = await signInAs(ctx.client, a);
+    const passed = await app.request(`/rounds/${DAY}/entries/1/decision`, {
+      method: "PUT",
+      headers: { ...who.headers, "content-type": "application/json" },
+      body: JSON.stringify({ decision: "pass" }),
+    });
+    expect(passed.status).toBe(204);
+
+    expect(await readToday(app, ctx.client, b)).toEqual(before.today);
+    expect(await exportRounds(ctx.client, b, 10)).toEqual(before.history);
   });
 });
 

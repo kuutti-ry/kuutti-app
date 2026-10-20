@@ -5,7 +5,7 @@ export const fi: Readonly<Record<string, string>> = {
   "about.source.title": "Lähdekoodi",
   "account.break.back": "Takaisin",
   "account.break.button": "Pidä tauko",
-  "account.break.comesBack": "Seuraava pankkitunnistautuminen palauttaa kaiken ennalleen. Mitään ei poisteta eikä mitään kysytä uudelleen.",
+  "account.break.comesBack": "Seuraava pankkitunnistautuminen tuo sinut takaisin. Mitään ei poisteta eikä mitään kysytä uudelleen, mutta sinua odottava tykkäys voi vanhentua sillä välin.",
   "account.break.confirm": "Aloita tauko",
   "account.break.failed": "Taukoa ei voitu aloittaa. Yritä uudelleen.",
   "account.break.hidden": "Profiilisi poistuu kaikkien näkyvistä. Kukaan uusi ei näe sinua tauon aikana.",

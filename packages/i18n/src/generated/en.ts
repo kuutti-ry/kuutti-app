@@ -5,7 +5,7 @@ export const en: Readonly<Record<string, string>> = {
   "about.source.title": "Source code",
   "account.break.back": "Back",
   "account.break.button": "Take a break",
-  "account.break.comesBack": "Your next bank login brings everything back as it was. Nothing is deleted and nothing is asked again.",
+  "account.break.comesBack": "Your next bank login brings you back. Nothing is deleted and nothing is asked again, though a like waiting for you can run out meanwhile.",
   "account.break.confirm": "Start the break",
   "account.break.failed": "The break could not be started. Try again.",
   "account.break.hidden": "Your profile leaves everybody's view. Nobody new sees you while you are away.",

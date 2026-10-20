@@ -61,3 +61,4 @@ Liked-you's forced places, its queue and its expiry (#97, next) and the fish ahe
 ## History
 
 - 2026-10-20: written with #95's first cut, on the maintainer's decisions of that day.
+- 2026-10-20 (#97, ADR-037): the round's first places are the people whose like waits on the person; the shown cooldown spaces ordinary cards only, a recent pass and a conversation keep a like away too.

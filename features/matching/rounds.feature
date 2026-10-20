@@ -8,7 +8,9 @@ Feature: The day's round, built: whom it holds and in which order
   round_size, the most soft matches first, equal counts in an order of the
   day's and the person's own. Nobody is shown again while they cool down,
   nobody with whom one has a conversation, and nothing fills a short round.
-  Liked-you and its forced places are #97's; recycling and relaxing #99's.
+  Before those cards come the people whose like waits on the person (#97,
+  ADR-037), oldest first, up to liked_you_cap. Recycling and relaxing are
+  #99's.
 
   Scenario: Everybody whose matching has opened gets a round for the day, and nobody else
     Given "A" whose matching has opened, "B" who is let in but whose matching has not opened, and "C" who waits in the line
@@ -77,3 +79,46 @@ Feature: The day's round, built: whom it holds and in which order
     Given "A" who is let in but whose matching has not opened
     When "A" reads today's round
     Then the day has no round, and none is written
+
+  # Liked-you (#97, ADR-037): a like reaches the person it was meant for in
+  # their next round, first and labelled, for free; it waits until it is
+  # answered or like_expiry_days have passed, and its sender is never told
+  # which.
+
+  Scenario: A like given on an ended day is in the liked person's next round, first and labelled
+    Given "B" liked "A" yesterday, and "A" has two more people in their pool
+    When the night builds the rounds
+    Then "A"'s round opens with "B", labelled liked you, then the other two
+
+  Scenario: More waiting likes than liked_you_cap wait for a later round, oldest first
+    Given liked_you_cap is 2, and "B", "C" and "D" liked "A" three, two and one days ago
+    When the night builds the rounds
+    Then "A"'s round opens with "B" and "C", and "D" is no card of it
+
+  Scenario Outline: A like waits until it is answered or expires
+    Given "B" liked "A" <days> days ago, and <answer>
+    When the night builds the rounds
+    Then "B" is <outcome>
+
+    Examples:
+      | days | answer                                   | outcome                                   |
+      | 1    | "A" has not seen it                      | first in "A"'s round, labelled liked you  |
+      | 13   | "A" left it undecided twelve days ago    | first in "A"'s round, labelled liked you  |
+      | 14   | "A" has not seen it                      | in "A"'s round as an ordinary card        |
+      | 3    | "A" passed it two days ago               | not in "A"'s round                        |
+      | 3    | "A" liked it two days ago                | not in "A"'s round                        |
+
+  Scenario: A like of today waits for the night
+    Given "B" liked "A" earlier today
+    When "A" reads today's round for the first time
+    Then "B" is no liked-you card of it
+
+  Scenario: A like never reaches the round from somebody the person passed, or who no longer passes the filters
+    Given "B" and "C" liked "A" yesterday, "A" passed "B" thirty days ago, and "C" seeks only men since
+    When the night builds the rounds
+    Then neither "B" nor "C" is in "A"'s round
+
+  Scenario: The sender learns nothing of what became of a like
+    Given "B" liked "A" yesterday, and the night built both rounds
+    When "A" passes "B"
+    Then what "B" reads of their own round and of their rounds' history is as it was
