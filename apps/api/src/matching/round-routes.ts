@@ -36,6 +36,13 @@ const noCard = errorContent(
 );
 const expired = errorContent("round_expired: the day named has ended; nothing was written.");
 
+/** A budget's refusal names its wait; it goes in the header (the card budget's, the day's likes). */
+function retryAfterOf(error: unknown): number | undefined {
+  return error instanceof AppError
+    ? (error.detail as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds
+    : undefined;
+}
+
 const todayRoute = createRoute({
   method: "get",
   path: "/rounds/today",
@@ -74,7 +81,7 @@ const decisionRoute = createRoute({
   path: "/rounds/{day}/entries/{position}/decision",
   summary: "Like or pass a card",
   description:
-    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired.",
+    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does.",
   ...bearer,
   request: {
     params: RoundEntryParams,
@@ -86,6 +93,9 @@ const decisionRoute = createRoute({
     401: unauthenticated,
     404: noCard,
     409: expired,
+    429: errorContent(
+      "like_budget_exceeded: the day's likes are used up; Retry-After is the wait until the day rolls. Nothing was written.",
+    ),
   },
 });
 
@@ -116,11 +126,7 @@ export function roundRoutes(
       }
       return c.json(round, 200);
     } catch (error) {
-      // The card builder's budget refusal names its wait; it goes in the header.
-      const wait =
-        error instanceof AppError
-          ? (error.detail as { retryAfterSeconds?: number } | undefined)?.retryAfterSeconds
-          : undefined;
+      const wait = retryAfterOf(error);
       if (wait !== undefined) c.header("Retry-After", String(wait));
       throw error;
     }
@@ -135,7 +141,13 @@ export function roundRoutes(
   app.openapi(decisionRoute, async (c) => {
     const { day, position } = c.req.valid("param");
     const { decision } = c.req.valid("json");
-    await decide(rounds(), { accountId: callerOf(c).accountId, day, position, decision });
+    try {
+      await decide(rounds(), { accountId: callerOf(c).accountId, day, position, decision });
+    } catch (error) {
+      const wait = retryAfterOf(error);
+      if (wait !== undefined) c.header("Retry-After", String(wait));
+      throw error;
+    }
     return c.body(null, 204);
   });
 

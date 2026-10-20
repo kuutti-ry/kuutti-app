@@ -11,6 +11,8 @@ import {
 import { AppError } from "../lib/errors.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
+import { matchingConfigNumber } from "../lib/matching-config.ts";
+import { dayWindow, secondsUntil } from "../media/index.ts";
 import { track } from "../research/index.ts";
 
 // Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
@@ -44,6 +46,16 @@ const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AN
   AND NOT blocked_between(r.account_id, e.candidate_id)`;
 
 const notFound = () => new AppError(404, "not_found", "No such card in today's round");
+
+/**
+ * The day's likes (#98's first cut, the maintainer's of 20/10/2026): one
+ * budget for everybody, whatever their pond's contest (TD-14's two budgets
+ * wait for the research partner). A like on the card of somebody who liked
+ * the person answers a like rather than sending one, and is free; a pass is
+ * never counted.
+ */
+const LIKE_BUDGET_KEY = "like_budget_balanced";
+const FREE_LIKES: readonly RoundReason[] = ["liked_you"];
 
 /**
  * A new round, the round builder's (#95) one writer: the round and its
@@ -205,7 +217,7 @@ export async function markSeen(
 /**
  * A like or a pass on today's card, changeable until the day ends: under the
  * round row's lock, which serialises the person's day across devices (and
- * which #98's count and #100's match will take too). The same decision again
+ * which the day's likes are counted under, and #100's match will take too). The same decision again
  * writes nothing; a changed one emits its event with `revised`. The round is
  * complete once nothing that can still be shown is undecided.
  */
@@ -235,6 +247,22 @@ export async function decide(
     const entry = found.rows[0];
     if (!entry) throw notFound();
     if (entry.decision === input.decision) return null;
+    // Counted under the round's lock from the day's standing decisions, so a
+    // like taken back gives its place back and two devices cannot both pass
+    // the count; the refusal writes nothing.
+    if (input.decision === "like" && !FREE_LIKES.includes(entry.reason)) {
+      const budget = await matchingConfigNumber(tx, LIKE_BUDGET_KEY);
+      const liked = await tx.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM round_entries
+          WHERE round_id = $1 AND decision = 'like' AND reason <> ALL($2::round_reason[])`,
+        [roundId, FREE_LIKES],
+      );
+      if ((liked.rows[0]?.n ?? 0) >= budget) {
+        throw new AppError(429, "like_budget_exceeded", "The day's likes are used up", {
+          retryAfterSeconds: secondsUntil(dayWindow(at).end, at),
+        });
+      }
+    }
     // The predicate again where it writes: a block or an erasure that
     // committed since the read leaves nothing written.
     const updated = await tx.query(

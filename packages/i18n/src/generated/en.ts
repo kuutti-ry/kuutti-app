@@ -518,6 +518,7 @@ export const en: Readonly<Record<string, string>> = {
   "errors.filter_unanswered": "To filter on this, share your own answer first.",
   "errors.http_error": "The request failed.",
   "errors.internal_error": "Something went wrong on our side.",
+  "errors.like_budget_exceeded": "You have used today's likes. New ones come after midnight; you can still pass.",
   "errors.media_busy": "Many photos are being processed right now. Try again in a moment.",
   "errors.media_unavailable": "Photos are not available right now.",
   "errors.message_budget_exceeded": "You are sending messages very fast. Wait a moment and send again.",

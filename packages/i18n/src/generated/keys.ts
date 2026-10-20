@@ -519,6 +519,7 @@ export type MessageParams = {
   "errors.filter_unanswered": Record<never, never>;
   "errors.http_error": Record<never, never>;
   "errors.internal_error": Record<never, never>;
+  "errors.like_budget_exceeded": Record<never, never>;
   "errors.media_busy": Record<never, never>;
   "errors.media_unavailable": Record<never, never>;
   "errors.message_budget_exceeded": Record<never, never>;
