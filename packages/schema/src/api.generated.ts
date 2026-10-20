@@ -5513,7 +5513,7 @@ export interface paths {
         };
         /**
          * Today's round
-         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision; entries null before the day's round is built. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
          */
         get: {
             parameters: {

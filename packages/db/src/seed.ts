@@ -150,10 +150,13 @@ export const MATCHING_CONFIG_V1 = {
 /**
  * matching_config version 2 (ADR-010 §11, migration 0025): the one pond is the
  * capital region. Version 1 keeps its row as migration 0020 wrote it; the
- * latest version of a key wins (apps/api/src/lib/matching-config.ts).
+ * latest version of a key wins (apps/api/src/lib/matching-config.ts). The
+ * round is ten cards (#95, ADR-035, migration 0069), the maintainer's of
+ * 20/10/2026 for the round builder's first cut.
  */
 export const MATCHING_CONFIG_V2 = {
   default_pond: "paakaupunkiseutu",
+  round_size: 10,
 } as const;
 
 /**

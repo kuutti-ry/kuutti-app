@@ -353,9 +353,11 @@ describe("migrate", () => {
             "auto_shadow_ban_review_hours",
             "photo_queue_reject_days",
           ]);
+          // A key's second version a later migration writes (0069, #95) is not there yet either.
+          const laterVersions = new Set(["round_size"]);
           expect(rows).toHaveLength(
             Object.keys(MATCHING_CONFIG_V1).filter((key) => !later.has(key)).length +
-              Object.keys(MATCHING_CONFIG_V2).length,
+              Object.keys(MATCHING_CONFIG_V2).filter((key) => !laterVersions.has(key)).length,
           );
 
           expect(await migrate(pool, through0047)).toEqual({ state: "applied", applied: 1 });

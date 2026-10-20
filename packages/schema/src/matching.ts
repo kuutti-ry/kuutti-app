@@ -15,6 +15,15 @@ export const RoundReason = z
   .meta({ id: "RoundReason" });
 export type RoundReason = z.infer<typeof RoundReason>;
 
+/**
+ * How a round's places that no rule forces were ordered (#95), named on
+ * `round_built` so the research can tell the rounds of one ordering from
+ * another's. `count` is approach 1, the soft matches counted without weights,
+ * the first cut's (the maintainer, 20/10/2026); #98's buckets add the others.
+ */
+export const RoundOrdering = z.enum(["count"]).meta({ id: "RoundOrdering" });
+export type RoundOrdering = z.infer<typeof RoundOrdering>;
+
 /** What the person decided about a card. Mirrors the database's round_decision. */
 export const RoundDecision = z.enum(["like", "pass"]).meta({ id: "RoundDecision" });
 export type RoundDecision = z.infer<typeof RoundDecision>;
@@ -34,8 +43,10 @@ export const RoundEntry = z
 export type RoundEntry = z.infer<typeof RoundEntry>;
 
 /**
- * Today's round: the Finnish day it is, and its cards in order; null before
- * the round builder (#95) has built one for the day. A card that cannot be
+ * Today's round: the Finnish day it is, and its cards in order; null while
+ * the person has no round for the day, which the first read builds once their
+ * matching has opened (#95, ADR-035), and an empty list for a round with
+ * nobody to show. A card that cannot be
  * shown now (a block, a sanction, a profile no longer complete) is left out,
  * so places may skip a number.
  */

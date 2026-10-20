@@ -91,8 +91,9 @@ describe("the soft count, for any two people", () => {
 describe("the soft count's readers", () => {
   it("The soft count is read by the round's order alone", () => {
     // Never a card, an event, a log line or a route: the matching document's
-    // invariant 6. The round builder (#95) joins this list when it orders a round.
+    // invariant 6. The round builder (#95) orders a round's places with it.
     expect(readersOf((source) => /\bsoftMatches\b/.test(withoutComments(source)))).toEqual([
+      "apps/api/src/matching/round-order.ts",
       "apps/api/src/matching/soft.ts",
     ]);
   });

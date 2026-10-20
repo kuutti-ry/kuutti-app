@@ -8,7 +8,7 @@ import {
   MessageLengthBand,
 } from "./chat.ts";
 import { FeedbackKind } from "./feedback.ts";
-import { ROUND_ENTRIES_MAX, RoundReason, SinceSeenBand } from "./matching.ts";
+import { ROUND_ENTRIES_MAX, RoundOrdering, RoundReason, SinceSeenBand } from "./matching.ts";
 import { Gender } from "./onboarding.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
 
@@ -122,8 +122,9 @@ export const RESEARCH_EVENTS = {
   // a seen time.
   round_built: {
     question:
-      "How large are rounds, and how many of their cards are there for each reason (#96, TD-11, TD-12)?",
+      "How large are rounds, how many of their cards are there for each reason, and how were the rest ordered (#96, #95, TD-11, TD-12)?",
     props: props({
+      ordering: RoundOrdering,
       size: roundCount,
       matchesFilters: roundCount,
       likedYou: roundCount,

@@ -3,6 +3,7 @@ import {
   type ProfileCard,
   type RoundDecision,
   type RoundEntry,
+  type RoundOrdering,
   type RoundReason,
   type RoundResponse,
   sinceSeenBand,
@@ -30,6 +31,14 @@ export type CardOf = (
   subjectAccountId: string,
 ) => Promise<ProfileCard | null>;
 
+/**
+ * Builds the person's round for today when they have none and their matching
+ * has opened, and says whether it built one: the round builder's (#95,
+ * ADR-035), which reads across slices and lives with the jobs, handed in by
+ * app.ts.
+ */
+export type BuildToday = (accountId: string) => Promise<boolean>;
+
 /** An entry `e` of round `r` whose candidate can still be shown to the round's owner. */
 const SERVABLE = `EXISTS (SELECT 1 FROM account c WHERE c.id = e.candidate_id AND c.state = 'active')
   AND NOT blocked_between(r.account_id, e.candidate_id)`;
@@ -52,6 +61,8 @@ export async function saveRound(
   input: {
     accountId: string;
     day: string;
+    /** How the places no rule forces were ordered, for `round_built` (#95). */
+    ordering: RoundOrdering;
     entries: { candidateId: string; reason: RoundReason }[];
   },
 ): Promise<{ roundId: string } | null> {
@@ -92,6 +103,7 @@ export async function saveRound(
   // What was written, a dropped candidate left out.
   const count = (reason: RoundReason) => saved.reasons.filter((r) => r === reason).length;
   await track({ ...deps, now: () => builtAt }, input.accountId, "round_built", {
+    ordering: input.ordering,
     size: saved.reasons.length,
     matchesFilters: count("matches_filters"),
     likedYou: count("liked_you"),
