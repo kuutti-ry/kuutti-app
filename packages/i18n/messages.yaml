@@ -6788,17 +6788,17 @@ account.specialCategory.explain:
   machine: { fi: true, sv: true }
 
 account.email.title:
-  en: "A way back in"
-  description: "Heading of the optional e-mail card (#148, TD-18), on the e-mail screen in Settings and the last of the later screens."
-  fi: "Tie takaisin sisään"
-  sv: "En väg tillbaka in"
+  en: "A way to stay in touch"
+  description: "Heading of the optional e-mail card (#148, TD-18), on the e-mail screen in Settings and the last of the later screens. Not a way back in (#385): getting back in after losing a phone is a new bank login."
+  fi: "Tapa pitää yhteyttä"
+  sv: "Ett sätt att hålla kontakten"
   machine: { fi: true, sv: true }
 
 account.email.explain:
-  en: "Optional. If a phone is lost, we can reach you here. Never shown to anyone, never a login, and nothing is sent to it yet."
+  en: "Optional. A way for Kuutti to reach you. Never shown to anyone, never a login, and nothing is sent to it yet."
   description: "Explanation of the optional e-mail (#148): the honest reason, as the sheet asks; on the card under its heading."
-  fi: "Vapaaehtoinen. Jos puhelin katoaa, tavoitamme sinut täältä. Ei näytetä kenellekään, ei koskaan kirjautumista varten, eikä tänne vielä lähetetä mitään."
-  sv: "Frivilligt. Om en telefon tappas bort når vi dig här. Visas aldrig för någon, aldrig en inloggning, och inget skickas hit ännu."
+  fi: "Vapaaehtoinen. Tapa, jolla Kuutti voi tavoittaa sinut. Ei näytetä kenellekään, ei koskaan kirjautumista varten, eikä tänne vielä lähetetä mitään."
+  sv: "Frivilligt. Ett sätt för Kuutti att nå dig. Visas aldrig för någon, aldrig en inloggning, och inget skickas hit ännu."
   machine: { fi: true, sv: true }
 
 account.email.label:

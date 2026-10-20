@@ -293,7 +293,7 @@ describe("the e-mail and the account screens", () => {
   it("hold the e-mail card for a person", async () => {
     await saveSession(tokens);
     await renderWithTheme(<EmailSettingsScreen />);
-    expect(await screen.findByText("A way back in")).toBeTruthy();
+    expect(await screen.findByText("A way to stay in touch")).toBeTruthy();
     expectPinnedHeader("E-mail", "Back");
     expect(screen.getByRole("button", { name: "Save the address" })).toBeTruthy();
   });
@@ -404,7 +404,7 @@ describe("the e-mail and the account screens", () => {
     await renderWithTheme(<EmailSettingsScreen />);
     await settle();
     expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByText("A way back in")).toBeNull();
+    expect(screen.queryByText("A way to stay in touch")).toBeNull();
   });
 
   it("say there is no session on the account screen of a signed-out device", async () => {
