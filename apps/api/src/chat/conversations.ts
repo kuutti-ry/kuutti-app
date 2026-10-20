@@ -294,6 +294,51 @@ export async function closeConversationsBetween(
 }
 
 /**
+ * The conversation between two people, in any state, or null: the match's
+ * record (ADR-031), so two people who have one are matched, or were (#100).
+ */
+export async function conversationBetween(
+  db: Queryable,
+  accountId: string,
+  otherAccountId: string,
+): Promise<string | null> {
+  const { rows } = await db.query<{ id: string }>(
+    `SELECT mine.conversation_id AS id
+       FROM conversation_participant mine
+       JOIN conversation_participant other
+         ON other.conversation_id = mine.conversation_id AND other.side <> mine.side
+      WHERE mine.account_id = $1 AND other.account_id = $2
+      ORDER BY mine.joined_at LIMIT 1`,
+    [accountId, otherAccountId],
+  );
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * The match's conversation (#100, ADR-031 §2, ADR-038), written in the
+ * statement of the second like and inside its transaction, the earlier liker
+ * on side a. The caller holds the pair's lock and has asked that none
+ * stands between the two; the socket hears of it on commit (migration 0055).
+ */
+export async function openConversation(
+  tx: Queryable,
+  input: { first: string; second: string; at: Date },
+): Promise<string> {
+  const { rows } = await tx.query<{ id: string }>(
+    "INSERT INTO conversation (opened_at) VALUES ($1) RETURNING id",
+    [input.at],
+  );
+  const id = rows[0]?.id;
+  if (!id) throw new Error("conversation not written");
+  await tx.query(
+    `INSERT INTO conversation_participant (conversation_id, account_id, side, joined_at)
+     VALUES ($1, $2, 'a', $4), ($1, $3, 'b', $4)`,
+    [id, input.first, input.second, input.at],
+  );
+  return id;
+}
+
+/**
  * The conversation a report or a block names (#351), its row locked until the
  * caller's transaction ends, read through the caller's own participant row:
  * null when it is not theirs.

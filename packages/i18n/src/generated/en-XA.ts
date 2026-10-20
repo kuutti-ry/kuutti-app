@@ -519,6 +519,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "errors.http_error": "［Théé rééqúúééšt fááíílééd.］",
   "errors.internal_error": "［Šóómééthííñg wééñt wróóñg óóñ óóúúr šíídéé.］",
   "errors.like_budget_exceeded": "［ÝÝóóúú háávéé úúšééd tóódááýý'š lííkééš. Ñééw óóñééš çóóméé ááftéér míídñííght; ýýóóúú çááñ štííll páášš.］",
+  "errors.match_made": "［Thííš lííkéé máádéé áá máátçh, šóó íít štááýýš. ÝÝóóúú çááñ štííll ééñd théé çóóñvééršáátííóóñ úúñdéér Çóóñvééršáátííóóñš.］",
   "errors.media_busy": "［Mááñýý phóótóóš ááréé bééííñg próóçééššééd rííght ñóów. Trýý áágááííñ ííñ áá móómééñt.］",
   "errors.media_unavailable": "［Phóótóóš ááréé ñóót áávááííláábléé rííght ñóów.］",
   "errors.message_budget_exceeded": "［ÝÝóóúú ááréé šééñdííñg mééššáágééš véérýý fáášt. Wááíít áá móómééñt ááñd šééñd áágááííñ.］",

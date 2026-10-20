@@ -3014,6 +3014,13 @@ errors.round_expired:
   sv: "Rundan tog slut vid midnatt, så det här sparades inte."
   machine: { fi: true, sv: true }
 
+errors.match_made:
+  en: "This like made a match, so it stays. You can still end the conversation under Conversations."
+  description: "Today's round (409, #100, ADR-038): a like that made a match was changed; a like that is part of a match is final (the maintainer, 20/10/2026). Conversations is the list's name (chat.list.title). Nothing was saved."
+  fi: "Tästä tykkäyksestä tuli mätsi, joten se pysyy. Voit silti lopettaa keskustelun Keskusteluissa."
+  sv: "Det här gillandet blev en match, så det står kvar. Du kan fortfarande avsluta samtalet under Samtal."
+  machine: { fi: true, sv: true }
+
 errors.like_budget_exceeded:
   en: "You have used today's likes. New ones come after midnight; you can still pass."
   description: "Today's round (429 with Retry-After, #98, ADR-036): the day's likes from matching_config like_budget_balanced are used; a like back on a card of somebody who liked the person is free and a pass is never counted. The day rolls at midnight in Finland. Nothing was saved."

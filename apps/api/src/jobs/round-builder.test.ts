@@ -675,7 +675,7 @@ describe("liked-you (#97, ADR-037)", () => {
       headers: { ...who.headers, "content-type": "application/json" },
       body: JSON.stringify({ decision: "pass" }),
     });
-    expect(passed.status).toBe(204);
+    expect(passed.status).toBe(200);
 
     expect(await readToday(app, ctx.client, b)).toEqual(before.today);
     expect(await exportRounds(ctx.client, b, 10)).toEqual(before.history);
@@ -683,9 +683,11 @@ describe("liked-you (#97, ADR-037)", () => {
 });
 
 describe("over the synthetic population", () => {
-  test("every open person gets a round, and nobody a candidate a hard filter excludes, in either direction", async ({
-    ctx,
-  }) => {
+  // Three hundred people, the gate's count and every round: about twelve
+  // seconds here and more under CI's coverage, past the default fifteen.
+  test("every open person gets a round, and nobody a candidate a hard filter excludes, in either direction", {
+    timeout: 60_000,
+  }, async ({ ctx }) => {
     await setConfig(ctx.client, "gate_k", 5);
     // The population lives in the seed's ponds, which this database has not been given.
     for (const pond of SEED_PONDS) {

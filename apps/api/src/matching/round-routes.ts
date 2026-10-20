@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import {
   ErrorResponse,
+  RoundDecisionAnswer,
   RoundDecisionUpdate,
   RoundEntryParams,
   RoundResponse,
@@ -14,6 +15,7 @@ import {
   type BuildToday,
   type CardOf,
   decide,
+  type Matches,
   markSeen,
   type RoundDeps,
   readTodaysRound,
@@ -81,18 +83,24 @@ const decisionRoute = createRoute({
   path: "/rounds/{day}/entries/{position}/decision",
   summary: "Like or pass a card",
   description:
-    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does.",
+    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final.",
   ...bearer,
   request: {
     params: RoundEntryParams,
     body: { required: true, ...json(RoundDecisionUpdate) },
   },
   responses: {
-    204: { description: "Recorded." },
+    200: {
+      description:
+        "Recorded, with the conversation the card's like is part of, or null for a pass and a like that made no match.",
+      ...json(RoundDecisionAnswer),
+    },
     400: errorContent("Validation failed."),
     401: unauthenticated,
     404: noCard,
-    409: expired,
+    409: errorContent(
+      "round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written.",
+    ),
     429: errorContent(
       "like_budget_exceeded: the day's likes are used up; Retry-After is the wait until the day rolls. Nothing was written.",
     ),
@@ -104,6 +112,7 @@ export function roundRoutes(
   requireSession: MiddlewareHandler<AppEnv>,
   cardOf: CardOf,
   buildToday: BuildToday,
+  matches: Matches,
 ) {
   const app = new OpenAPIHono<AppEnv>();
   for (const route of [todayRoute, seenRoute, decisionRoute]) {
@@ -142,13 +151,18 @@ export function roundRoutes(
     const { day, position } = c.req.valid("param");
     const { decision } = c.req.valid("json");
     try {
-      await decide(rounds(), { accountId: callerOf(c).accountId, day, position, decision });
+      const { match } = await decide(rounds(), matches, {
+        accountId: callerOf(c).accountId,
+        day,
+        position,
+        decision,
+      });
+      return c.json({ match: match ? { conversationId: match } : null }, 200);
     } catch (error) {
       const wait = retryAfterOf(error);
       if (wait !== undefined) c.header("Retry-After", String(wait));
       throw error;
     }
-    return c.body(null, 204);
   });
 
   return app;

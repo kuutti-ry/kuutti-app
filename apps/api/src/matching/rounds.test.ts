@@ -1,6 +1,7 @@
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
+import { conversationBetween, openConversation } from "../chat/index.ts";
 import { CURRENT_CONSENT_VERSIONS, eraseAccount, exportAccount } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { ensureEventPartitions } from "../research/index.ts";
@@ -17,7 +18,7 @@ import {
 } from "../test/harness.ts";
 import { people } from "../test/people.ts";
 import { pidOf, waitsFor, watched, withTwoConnections } from "../test/races.ts";
-import { decide, type RoundDeps, saveRound } from "./rounds.ts";
+import { decide, type Matches, type RoundDeps, saveRound } from "./rounds.ts";
 
 // Today's round (#96, features/matching/decisions.feature): the read, seen
 // and decided, a decision changed and the day's end, a card that can no
@@ -30,6 +31,8 @@ const T = new Date("2026-10-16T09:00:00.000Z");
 const TODAY = finnishDay(T);
 const YESTERDAY = "2026-10-15";
 const SECOND = 1000;
+/** A match's conversation, as app.ts hands it in (#100). */
+const MATCHES: Matches = { between: conversationBetween, open: openConversation };
 
 type Person = { accountId: string; headers: { authorization: string } };
 
@@ -265,10 +268,10 @@ describe("seen and decided", () => {
     await joinStudy(app, a);
     const roundId = await roundFor(ctx.client, a, [b]);
     expect((await seen(app, a, TODAY, 1)).status).toBe(204);
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
     const first = (await entriesOf(ctx.client, roundId))[0];
     expect(first?.decision).toBe("like");
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
     expect((await entriesOf(ctx.client, roundId))[0]?.decided_at).toEqual(first?.decided_at);
     expect(await eventsOf(ctx.client, "like")).toEqual([
       { position: 1, reason: "matches_filters", sinceSeen: "under_3s", revised: false },
@@ -284,7 +287,7 @@ describe("seen and decided", () => {
     await joinStudy(app, a);
     const roundId = await roundFor(ctx.client, a, [b]);
     for (const decision of ["like", "pass", "like"]) {
-      expect((await decideBy(app, a, TODAY, 1, decision)).status).toBe(204);
+      expect((await decideBy(app, a, TODAY, 1, decision)).status).toBe(200);
     }
     const [entry] = await entriesOf(ctx.client, roundId);
     expect(entry?.decision).toBe("like");
@@ -431,10 +434,10 @@ describe("seen and decided", () => {
           [roundId],
         )
       ).rows[0]?.completed_at;
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
     expect(await completed()).toBeNull();
     await ctx.client.query("UPDATE account SET state = 'suspended' WHERE id = $1", [c.accountId]);
-    expect((await decideBy(app, a, TODAY, 1, "pass")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "pass")).status).toBe(200);
     expect(await completed()).not.toBeNull();
   });
 
@@ -444,7 +447,7 @@ describe("seen and decided", () => {
     const ofA = await roundFor(ctx.client, a, [b]);
     const ofE = await roundFor(ctx.client, e, [f]);
     expect((await seen(app, e, TODAY, 1)).status).toBe(204);
-    expect((await decideBy(app, e, TODAY, 1, "pass")).status).toBe(204);
+    expect((await decideBy(app, e, TODAY, 1, "pass")).status).toBe(200);
     expect((await entriesOf(ctx.client, ofE))[0]).toMatchObject({ decision: "pass" });
     expect((await entriesOf(ctx.client, ofA))[0]).toMatchObject({ seen_at: null, decision: null });
     expect((await readToday(app, e)).entries?.map((x) => x.card.accountId)).toEqual([f.accountId]);
@@ -487,15 +490,19 @@ describe("seen and decided", () => {
       await first.query("BEGIN");
       await second.query("BEGIN");
       // One device's like holds the round's row; the other's pass waits for it.
-      await decide(
-        { ...deps, db: first },
-        { accountId: a, day: TODAY, position: 1, decision: "like" },
-      );
+      await decide({ ...deps, db: first }, MATCHES, {
+        accountId: a,
+        day: TODAY,
+        position: 1,
+        decision: "like",
+      });
       const racing = watched(
-        decide(
-          { ...deps, db: second, now: () => later(11) },
-          { accountId: a, day: TODAY, position: 1, decision: "pass" },
-        ),
+        decide({ ...deps, db: second, now: () => later(11) }, MATCHES, {
+          accountId: a,
+          day: TODAY,
+          position: 1,
+          decision: "pass",
+        }),
       );
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
@@ -540,8 +547,8 @@ describe("the day's likes (#98, ADR-036)", () => {
     await joinStudy(app, a);
     const roundId = await roundFor(ctx.client, a, [b, c, d]);
 
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
-    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(200);
     const refused = await decideBy(app, a, TODAY, 3, "like");
 
     expect(refused.status).toBe(429);
@@ -580,8 +587,8 @@ describe("the day's likes (#98, ADR-036)", () => {
     if (!a || !b || !c) throw new Error("cast not written");
     const roundId = await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }, c]);
 
-    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(204);
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(200);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
 
     expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual(["like", "like"]);
   });
@@ -595,11 +602,11 @@ describe("the day's likes (#98, ADR-036)", () => {
     if (!a || !b || !c || !d) throw new Error("cast not written");
     const roundId = await roundFor(ctx.client, a, [b, c, d]);
 
-    expect((await decideBy(app, a, TODAY, 1, "pass")).status).toBe(204);
-    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "pass")).status).toBe(200);
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(200);
     expect((await decideBy(app, a, TODAY, 3, "like")).status).toBe(429);
-    expect((await decideBy(app, a, TODAY, 2, "pass")).status).toBe(204);
-    expect((await decideBy(app, a, TODAY, 3, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 2, "pass")).status).toBe(200);
+    expect((await decideBy(app, a, TODAY, 3, "like")).status).toBe(200);
 
     expect((await entriesOf(ctx.client, roundId)).map((e) => e.decision)).toEqual([
       "pass",
@@ -616,8 +623,8 @@ describe("the day's likes (#98, ADR-036)", () => {
     const [a, b] = await cast(ctx, 2);
     if (!a || !b) throw new Error("cast not written");
     await roundFor(ctx.client, a, [b]);
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
   });
 
   test("the day's likes are ten by the row the first cut wrote", async ({ ctx, app }) => {
@@ -625,10 +632,10 @@ describe("the day's likes (#98, ADR-036)", () => {
     if (!a) throw new Error("cast not written");
     await roundFor(ctx.client, a, others);
     for (let position = 1; position <= 10; position += 1) {
-      expect((await decideBy(app, a, TODAY, position, "like")).status).toBe(204);
+      expect((await decideBy(app, a, TODAY, position, "like")).status).toBe(200);
     }
     expect((await decideBy(app, a, TODAY, 11, "like")).status).toBe(429);
-    expect((await decideBy(app, a, TODAY, 11, "pass")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 11, "pass")).status).toBe(200);
   });
 
   test("Two devices liking at once cannot pass the budget together", async () => {
@@ -652,15 +659,19 @@ describe("the day's likes (#98, ADR-036)", () => {
       await first.query("BEGIN");
       await second.query("BEGIN");
       // One device's like holds the round's row; the other's waits, then counts it.
-      await decide(
-        { ...deps, db: first },
-        { accountId: a, day: TODAY, position: 1, decision: "like" },
-      );
+      await decide({ ...deps, db: first }, MATCHES, {
+        accountId: a,
+        day: TODAY,
+        position: 1,
+        decision: "like",
+      });
       const racing = watched(
-        decide(
-          { ...deps, db: second },
-          { accountId: a, day: TODAY, position: 2, decision: "like" },
-        ),
+        decide({ ...deps, db: second }, MATCHES, {
+          accountId: a,
+          day: TODAY,
+          position: 2,
+          decision: "like",
+        }),
       );
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
@@ -702,7 +713,7 @@ describe("erasure, the export and the events", () => {
     await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }]);
     // B's own round, in which A is the card: not A's to see.
     await roundFor(ctx.client, b, [a]);
-    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(204);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
     const { logger } = await captureLogger();
     const { document } = await exportAccount(
       { db: ctx.client, logger, now: () => T, version: "test" },

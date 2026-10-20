@@ -6,8 +6,10 @@ import { secureHeaders } from "hono/secure-headers";
 import {
   chatRoutes,
   chatSocketRoutes,
+  conversationBetween,
   createLive,
   type Live,
+  openConversation,
   PHOTO_MESSAGE_PATH,
 } from "./chat/index.ts";
 import { healthRoutes } from "./health/index.ts";
@@ -305,6 +307,9 @@ export function createApp(deps: Deps) {
               { db: deps.db, logger: deps.logger, now: () => deps.now?.() ?? new Date() },
               accountId,
             ),
+      // A match is a conversation (#100, ADR-031): the chat slice's, handed in
+      // here since the chat imports the profile, which imports matching.
+      { between: conversationBetween, open: openConversation },
     ),
   );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.

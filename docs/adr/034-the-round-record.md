@@ -52,3 +52,4 @@ Everything in matching stands on a record of whom each person was shown on each 
 - 2026-10-19: written with #96's build, on the maintainer's decisions of that day.
 - 2026-10-19, after review: `saveRound` asks liveness and blocks in its own statements (§8); the card builder's shown record refuses a viewer erased while their round is read (ADR-008); Open 10.
 - 2026-10-20 (#95, ADR-035 §5): the day's first read builds a missing round once the caller's matching has opened, so §3's entries are null only while the caller has none; Open 8 is answered by #379, which carries the round screen and ADR-030 §11's flow.
+- 2026-10-20 (#100, ADR-038 §3): a like that is part of a match is final, the maintainer's of that day; §5's change until midnight holds for every other decision.

@@ -11,3 +11,5 @@ Rounds, filters, likes, budgets, recycling. TD-11, TD-12, TD-14.
 #98's budget half (ADR-036): `decide` counts the day's likes under the round's lock, `like_budget_balanced` for everybody; a like back on a `liked_you` card and a pass are free; over the budget, 429 `like_budget_exceeded` with the wait until midnight.
 
 #97 (ADR-037): `likedYouPlaces` is the round's first places, the people whose like waits on the person in the order the builder reads them (the oldest like first), up to `liked_you_cap`, each one somebody the person may meet. The builder reads the waiting likes from the round record itself (`waitingOn` in `jobs/round-builder.ts`): likes of ended days within `like_expiry_days`, not answered.
+
+#100 (ADR-038): `decide` makes a match of a like meeting a standing like, under a lock on the pair, opening the conversation through the chat slice's `openConversation` (handed in by `app.ts` as `Matches`), and answers with it; a like that is part of a match is final (409 `match_made`).
