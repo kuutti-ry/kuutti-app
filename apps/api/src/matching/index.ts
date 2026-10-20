@@ -14,8 +14,11 @@ export {
   readPreferences,
   savePreferences,
 } from "./preferences.ts";
+// The round builder (#95, ADR-035) reads across slices and lives with the
+// jobs; its order and its one writer are this slice's.
+export { type RoundCandidate, roundOrder } from "./round-order.ts";
 export { roundRoutes } from "./round-routes.ts";
 // Today's round (#96, ADR-034): the routes, and the halves erasure and the
-// export call; the round builder (#95) adds its writer, saveRound, here.
-export { eraseRoundsOf, exportRounds } from "./rounds.ts";
+// export call.
+export { type BuildToday, eraseRoundsOf, exportRounds, saveRound } from "./rounds.ts";
 export { preferencesRoutes } from "./routes.ts";

@@ -204,7 +204,7 @@ describe("boot", () => {
   });
 
   // Without an object store there is no research copy either (#194).
-  it("arms the eleven nightly jobs, each of which runs against the database it was given", async () => {
+  it("arms the twelve nightly jobs, each of which runs against the database it was given", async () => {
     const { jobs } = await booted();
     expect(jobs.map((j) => j.name)).toEqual([
       "sweep-sessions",
@@ -214,6 +214,7 @@ describe("boot", () => {
       "end-suspensions",
       "waitlist-snapshot",
       "pond-gate",
+      "round-builder",
       "reject-unreviewed-photos",
       "prune-photo-check-notes",
       "prune-reports",
@@ -239,7 +240,7 @@ describe("boot", () => {
       "research-export",
       "research-events-partitions",
     ]);
-    expect(jobs).toHaveLength(13);
+    expect(jobs).toHaveLength(14);
     // The prune asks the copy first; tonight no month is due, so the bucket is asked nothing.
     const partitions = jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).toMatchObject({ dropped: 0, uncopied: 0 });
@@ -648,7 +649,7 @@ describe("boot: a deployed box", () => {
     },
   );
 
-  it("with its photos on CloudFront, staging writes the research copy and production does not", async () => {
+  it("with its photos on CloudFront, staging writes the research copy and builds rounds, and production does neither", async () => {
     const media = {
       S3_BUCKET: "kuutti-media-test",
       MEDIA_URL_BASE: "https://api.test",
@@ -668,6 +669,9 @@ describe("boot: a deployed box", () => {
     });
     expect(line(production.lines, "media")).toMatchObject({ mode: "cloudfront" });
     expect(production.jobs.map((j) => j.name)).not.toContain("research-export");
+    // Nor the rounds, before the maintainer has set how long they are kept (ADR-035, Open 1).
+    expect(staging.jobs.map((j) => j.name)).toContain("round-builder");
+    expect(production.jobs.map((j) => j.name)).not.toContain("round-builder");
     const partitions = production.jobs.find((j) => j.name === "research-events-partitions");
     expect(await partitions?.run()).not.toHaveProperty("uncopied");
   });

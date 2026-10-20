@@ -13,6 +13,7 @@ import {
 } from "./identity/index.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
 import { gateJob } from "./jobs/pond-gate.ts";
+import { roundsJob } from "./jobs/round-builder.ts";
 import { ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
@@ -212,7 +213,7 @@ export async function boot({
     ...(media.deps ? { media: media.deps } : {}),
   });
   // Nightly housekeeping inside the process (rules/api.md): ended sessions and
-  // stale login attempts (#35). The round builder joins here.
+  // stale login attempts (#35).
   const now = () => new Date();
   // The research copy (#194, ADR-029) goes to the bucket the photos use, under
   // research/, wherever media has one: on staging and beside a developer's
@@ -246,6 +247,10 @@ export async function boot({
     waitlistJob({ db: pool, logger, now }),
     // Who is let into each pond, and for whom matching opens (#94).
     gateJob({ db: pool, logger, now }),
+    // The day's round for everybody whose matching is open, after the gate (#95, ADR-035).
+    // shortcut: none in production until the maintainer has set how long rounds
+    // are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and app.ts's twin.
+    ...(config.APP_ENV === "production" ? [] : [roundsJob({ db: pool, logger, now })]),
     // A photo nobody decided in photo_queue_reject_days is rejected as not reviewed (#376),
     // wherever there is a queue, Rekognition or none.
     { name: "reject-unreviewed-photos", run: () => rejectUnreviewedPhotos({ db: pool, now }) },

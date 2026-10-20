@@ -93,6 +93,7 @@ async function roundFor(
   const built = await saveRound(await depsOn(db), {
     accountId: owner.accountId,
     day,
+    ordering: "count",
     entries: cards.map((card) =>
       "person" in card
         ? { candidateId: card.person.accountId, reason: card.reason }
@@ -478,6 +479,7 @@ describe("seen and decided", () => {
       await saveRound(deps, {
         accountId: a,
         day: TODAY,
+        ordering: "count",
         entries: [{ candidateId: b, reason: "matches_filters" }],
       });
       const firstPid = await pidOf(first);
@@ -579,13 +581,14 @@ describe("erasure, the export and the events", () => {
     await joinStudy(app, a);
     await roundFor(ctx.client, a, [b, c, { person: d, reason: "liked_you" }]);
     expect(await eventsOf(ctx.client, "round_built")).toEqual([
-      { size: 3, matchesFilters: 2, likedYou: 1, seenBefore: 0, relaxed: 0 },
+      { ordering: "count", size: 3, matchesFilters: 2, likedYou: 1, seenBefore: 0, relaxed: 0 },
     ]);
     // A second build for the day leaves the first as it was, and says nothing.
     expect(
       await saveRound(await depsOn(ctx.client), {
         accountId: a.accountId,
         day: TODAY,
+        ordering: "count",
         entries: [{ candidateId: b.accountId, reason: "matches_filters" }],
       }),
     ).toBeNull();
@@ -607,6 +610,7 @@ describe("erasure, the export and the events", () => {
       await saveRound(await depsOn(ctx.client), {
         accountId: gone.accountId,
         day: TODAY,
+        ordering: "count",
         entries: [{ candidateId: b.accountId, reason: "matches_filters" }],
       }),
     ).toBeNull();
@@ -619,7 +623,7 @@ describe("erasure, the export and the events", () => {
       [[1, b.accountId]],
     );
     expect(await eventsOf(ctx.client, "round_built")).toEqual([
-      { size: 1, matchesFilters: 1, likedYou: 0, seenBefore: 0, relaxed: 0 },
+      { ordering: "count", size: 1, matchesFilters: 1, likedYou: 0, seenBefore: 0, relaxed: 0 },
     ]);
   });
 

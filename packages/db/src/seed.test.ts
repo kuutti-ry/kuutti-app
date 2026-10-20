@@ -105,11 +105,12 @@ describe("seed", () => {
           deal_breakers_max: 2,
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
-        // Version 2 (ADR-010 §11): the one pond is the capital region, and it wins over version 1.
+        // Version 2 (ADR-010 §11): the one pond is the capital region, and it wins over version 1;
+        // the round is ten cards (#95, ADR-035).
         const later = Object.fromEntries(
           config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
         );
-        expect(later).toEqual({ default_pond: "paakaupunkiseutu" });
+        expect(later).toEqual({ default_pond: "paakaupunkiseutu", round_size: 10 });
         expect(later).toEqual(MATCHING_CONFIG_V2);
       } finally {
         await pool.end();

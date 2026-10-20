@@ -78,8 +78,8 @@ type FactsRow = {
   opened_at: Date | null;
 };
 
-/** A person whose profile and onboarding are complete, as the count sees them. */
-type Subject = Applicant & {
+/** A person whose profile and onboarding are complete, as the count sees them, and the round builder after it (#95). */
+export type Subject = Applicant & {
   person: PoolPerson;
   /** Seen by others: a shadow-banned person has a gate of their own and is in nobody's pool. */
   visible: boolean;
@@ -226,34 +226,7 @@ async function countPond(
   counted: Counted,
 ): Promise<Omit<GateCount, "ponds">> {
   const only = "asker" in counted ? counted.asker : undefined;
-  const { rows } = await tx.query<FactsRow>(
-    "asker" in counted ? FACTS_FOR_THE_ASKER : `${FACTS} AND a.id = ANY($4::uuid[])`,
-    [
-      pondId,
-      CURRENT_CONSENT_VERSIONS.terms,
-      CURRENT_CONSENT_VERSIONS.privacy,
-      "asker" in counted ? counted.asker : counted.locked,
-      CURRENT_CONSENT_VERSIONS.special_category,
-    ],
-  );
-  const blocks = await blocksWithin(
-    tx,
-    rows.map((row) => row.identity_id),
-  );
-  const dealBreakers = await dealBreakersOf(
-    tx,
-    rows.map((row) => row.id),
-  );
-  const subjects = rows.flatMap(
-    (row) =>
-      subjectFrom(
-        row,
-        pondId,
-        at,
-        blocks.get(row.identity_id) ?? NO_BLOCKS,
-        dealBreakers.get(row.id) ?? NO_DEAL_BREAKERS,
-      ) ?? [],
-  );
+  const subjects = await subjectsOf(tx, pondId, at, counted);
   const admission = admit(subjects, config.shareMax);
   const newly = new Set(admission.admitted);
   // The night writes every row, so whoever it lets in is inside for
@@ -357,6 +330,58 @@ async function countPond(
     waiting: written.filter((w) => w.placeSaid !== null).length,
     opened,
   };
+}
+
+/** The complete people of a pond among `counted`, or the asker alone, with whom each blocked and their deal-breakers. */
+async function subjectsOf(
+  db: Queryable,
+  pondId: string,
+  at: Date,
+  counted: Counted,
+): Promise<Subject[]> {
+  const { rows } = await db.query<FactsRow>(
+    "asker" in counted ? FACTS_FOR_THE_ASKER : `${FACTS} AND a.id = ANY($4::uuid[])`,
+    [
+      pondId,
+      CURRENT_CONSENT_VERSIONS.terms,
+      CURRENT_CONSENT_VERSIONS.privacy,
+      "asker" in counted ? counted.asker : counted.locked,
+      CURRENT_CONSENT_VERSIONS.special_category,
+    ],
+  );
+  const blocks = await blocksWithin(
+    db,
+    rows.map((row) => row.identity_id),
+  );
+  const dealBreakers = await dealBreakersOf(
+    db,
+    rows.map((row) => row.id),
+  );
+  return rows.flatMap(
+    (row) =>
+      subjectFrom(
+        row,
+        pondId,
+        at,
+        blocks.get(row.identity_id) ?? NO_BLOCKS,
+        dealBreakers.get(row.id) ?? NO_DEAL_BREAKERS,
+      ) ?? [],
+  );
+}
+
+/**
+ * Everybody of a pond as the count sees them, for the round builder (#95,
+ * ADR-035): who is complete, whether they are seen by others, let in and
+ * open, and their pool facts. Read after the night's count has written, with
+ * no lock: the builder's one writer asks each candidate's liveness and the
+ * blocks again in the statements that write (ADR-034 §8).
+ */
+export async function subjectsOfPond(db: Queryable, pondId: string, at: Date): Promise<Subject[]> {
+  const { rows } = await db.query<{ id: string }>(
+    "SELECT id FROM account WHERE pond_id = $1 AND state IN ('active', 'shadow_banned')",
+    [pondId],
+  );
+  return subjectsOf(db, pondId, at, { locked: rows.map((row) => row.id) });
 }
 
 /**

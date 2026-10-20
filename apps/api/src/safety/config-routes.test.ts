@@ -144,18 +144,26 @@ describe("GET /admin/config", () => {
   }) => {
     const staff = await admin(ctx);
     expect(
-      (await change(api, staff.headers, "round_size", { value: 10, reason: REASON })).status,
+      (await change(api, staff.headers, "round_size", { value: 8, reason: REASON })).status,
     ).toBe(200);
     const { items } = ConfigList.parse(await (await list(api, staff.headers)).json());
     const round = items.find((i) => i.key === "round_size");
-    expect(round).toMatchObject({ value: 10, version: 2 });
+    expect(round).toMatchObject({ value: 8, version: 3 });
     expect(round?.versions).toEqual([
       {
-        version: 2,
-        value: 10,
+        version: 3,
+        value: 8,
         validFrom: T.toISOString(),
         createdBy: staff.identityId,
         reason: REASON,
+      },
+      // The first cut's ten (#95, ADR-035), a migration's version.
+      {
+        version: 2,
+        value: 10,
+        validFrom: expect.any(String),
+        createdBy: "migration:0069",
+        reason: null,
       },
       {
         version: 1,

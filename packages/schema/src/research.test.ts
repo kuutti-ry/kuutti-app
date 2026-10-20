@@ -101,7 +101,14 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
     case "contact_unshared":
       return {};
     case "round_built":
-      return { size: 12, matchesFilters: 9, likedYou: 2, seenBefore: 1, relaxed: 0 };
+      return {
+        ordering: "count",
+        size: 12,
+        matchesFilters: 9,
+        likedYou: 2,
+        seenBefore: 1,
+        relaxed: 0,
+      };
     case "profile_viewed":
       return { position: 3, reason: "liked_you" };
     case "like":

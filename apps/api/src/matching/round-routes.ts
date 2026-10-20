@@ -10,7 +10,14 @@ import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
-import { type CardOf, decide, markSeen, type RoundDeps, readTodaysRound } from "./rounds.ts";
+import {
+  type BuildToday,
+  type CardOf,
+  decide,
+  markSeen,
+  type RoundDeps,
+  readTodaysRound,
+} from "./rounds.ts";
 
 // Today's round for the app (#96, ADR-034): read it, report a card seen,
 // like or pass a card. The day is in the path of every write, so a phone
@@ -34,7 +41,7 @@ const todayRoute = createRoute({
   path: "/rounds/today",
   summary: "Today's round",
   description:
-    "The Finnish day and its cards in order, each with why it is there and the caller's own decision; entries null before the day's round is built. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+    "The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
   ...bearer,
   responses: {
     200: { description: "Today's round.", ...json(RoundResponse) },
@@ -82,7 +89,12 @@ const decisionRoute = createRoute({
   },
 });
 
-export function roundRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv>, cardOf: CardOf) {
+export function roundRoutes(
+  deps: Deps,
+  requireSession: MiddlewareHandler<AppEnv>,
+  cardOf: CardOf,
+  buildToday: BuildToday,
+) {
   const app = new OpenAPIHono<AppEnv>();
   for (const route of [todayRoute, seenRoute, decisionRoute]) {
     app.use(route.getRoutingPath(), requireSession);
@@ -94,8 +106,15 @@ export function roundRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv
   });
 
   app.openapi(todayRoute, async (c) => {
+    const { accountId } = callerOf(c);
     try {
-      return c.json(await readTodaysRound(rounds(), callerOf(c).accountId, cardOf), 200);
+      let round = await readTodaysRound(rounds(), accountId, cardOf);
+      // Nobody built the day's round yet: matching opened during the day, or
+      // the night has not come. The first read builds it (#95, ADR-035 §5).
+      if (round.entries === null && (await buildToday(accountId))) {
+        round = await readTodaysRound(rounds(), accountId, cardOf);
+      }
+      return c.json(round, 200);
     } catch (error) {
       // The card builder's budget refusal names its wait; it goes in the header.
       const wait =

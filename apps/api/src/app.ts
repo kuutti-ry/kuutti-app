@@ -23,6 +23,7 @@ import {
   wellKnownRoutes,
 } from "./identity/index.ts";
 import { gateOf } from "./jobs/pond-gate.ts";
+import { buildRoundOf } from "./jobs/round-builder.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -271,26 +272,40 @@ export function createApp(deps: Deps) {
   // Today's round (#96, ADR-034) serves its cards through the profile slice's
   // builder, handed in here since profile already imports matching; a card
   // the builder refuses (404) is a card the round leaves out, and its budget's
-  // 429 goes through.
+  // 429 goes through. A day's first read with no round builds it through the
+  // round builder, which reads across slices and lives with the jobs (#95).
   app.route(
     "/",
-    roundRoutes(deps, guard, async (viewerAccountId, subjectAccountId) => {
-      try {
-        const built = await buildCard(
-          {
-            db: deps.db,
-            logger: deps.logger,
-            now: deps.now ?? (() => new Date()),
-            readPreferences,
-          },
-          { viewerAccountId, subjectAccountId },
-        );
-        return built.card;
-      } catch (error) {
-        if (error instanceof AppError && error.status === 404) return null;
-        throw error;
-      }
-    }),
+    roundRoutes(
+      deps,
+      guard,
+      async (viewerAccountId, subjectAccountId) => {
+        try {
+          const built = await buildCard(
+            {
+              db: deps.db,
+              logger: deps.logger,
+              now: deps.now ?? (() => new Date()),
+              readPreferences,
+            },
+            { viewerAccountId, subjectAccountId },
+          );
+          return built.card;
+        } catch (error) {
+          if (error instanceof AppError && error.status === 404) return null;
+          throw error;
+        }
+      },
+      // shortcut: nothing is built in production until the maintainer has set how long
+      // rounds are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and boot.ts's twin.
+      deps.config.APP_ENV === "production"
+        ? async () => false
+        : (accountId) =>
+            buildRoundOf(
+              { db: deps.db, logger: deps.logger, now: () => deps.now?.() ?? new Date() },
+              accountId,
+            ),
+    ),
   );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
   app.route(
