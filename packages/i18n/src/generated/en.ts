@@ -518,7 +518,7 @@ export const en: Readonly<Record<string, string>> = {
   "errors.export_budget_exceeded": "That is enough copies of your data for today. You can download it again after midnight.",
   "errors.feedback_budget_exceeded": "That is enough feedback for today. You can send more after midnight.",
   "errors.filter_unanswered": "To filter on this, share your own answer first.",
-  "errors.fish_budget_exceeded": "You have already sent your fish this week. You can still like.",
+  "errors.fish_budget_exceeded": "You cannot send a fish just now. You can still like.",
   "errors.http_error": "The request failed.",
   "errors.internal_error": "Something went wrong on our side.",
   "errors.like_budget_exceeded": "You have used today's likes. New ones come after midnight; you can still pass.",

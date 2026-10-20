@@ -31,7 +31,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 - Every animation and haptic is gated by `useReducedMotion` / `useMotionDuration` / `useHapticTap` from `src/theme/`.
 - Icons: one import per icon (`lucide-react-native/icons/<name>`), never the package root, which pulls the whole set into the bundle.
 - Decisions are buttons with configurable placement (order, left or right thumb, one-handed). No swipe as primary input, no rapid repeat.
-- Every candidate card shows its reason label: matches all filters, liked you, seen before, or included because you relaxed X.
+- Every candidate card shows its reason label: matches all filters, liked you, sent you a fish (#378), seen before, or included because you relaxed X.
 - Candidate lists are bounded to the round. No pagination, no "load more", no on-demand fetch of the next profile.
 - Glyph sets never imitate console vendors' trademarked shapes or names.
 - The Android theme declares `android:forceDarkAllowed=false` (`plugins/withNoForceDark.js`, #27): the app follows the system scheme and ships its own dark and high-contrast sets, so a launcher's forced dark mode (MIUI) must not repaint them.

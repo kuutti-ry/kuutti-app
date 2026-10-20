@@ -318,7 +318,9 @@ export async function conversationBetween(
  * The match's conversation (#100, ADR-031 §2, ADR-038), written in the
  * statement of the second like and inside its transaction, the earlier liker
  * on side a. The caller holds the pair's lock and has asked that none
- * stands between the two; the socket hears of it on commit (migration 0055).
+ * stands between the two. No trigger announces it (migration 0055 notifies
+ * on updates and messages, not on this insert): the other person sees it at
+ * their next read of the list (ADR-038 §1, Open 1).
  */
 export async function openConversation(
   tx: Queryable,

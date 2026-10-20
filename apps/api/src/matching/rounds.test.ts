@@ -820,6 +820,35 @@ describe("erasure, the export and the events", () => {
     ]);
   });
 
+  test("a round is never written for an owner paused or sanctioned since the pool was read", async ({
+    ctx,
+    app,
+  }) => {
+    const [a, b, c] = await cast(ctx, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await joinStudy(app, a);
+    for (const [who, state] of [
+      [a, "paused"],
+      [b, "suspended"],
+    ] as const) {
+      await ctx.client.query("UPDATE account SET state = $2 WHERE id = $1", [who.accountId, state]);
+      expect(
+        await saveRound(await depsOn(ctx.client), {
+          accountId: who.accountId,
+          day: TODAY,
+          ordering: "count",
+          entries: [{ candidateId: c.accountId, reason: "matches_filters" }],
+        }),
+      ).toBeNull();
+    }
+    const { rows } = await ctx.client.query(
+      "SELECT 1 FROM rounds WHERE account_id = ANY($1::uuid[])",
+      [[a.accountId, b.accountId]],
+    );
+    expect(rows).toHaveLength(0);
+    expect(await eventsOf(ctx.client, "round_built")).toEqual([]);
+  });
+
   test("a person is never a card in their own round", async ({ ctx }) => {
     const [a] = await cast(ctx, 1);
     if (!a) throw new Error("cast not written");

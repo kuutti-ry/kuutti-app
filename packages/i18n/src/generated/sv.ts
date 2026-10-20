@@ -180,7 +180,7 @@ export const sv: Readonly<Record<string, string>> = {
   "errors.export_budget_exceeded": "Det räcker med kopior av dina uppgifter för i dag. Du kan ladda ner dem igen efter midnatt.",
   "errors.feedback_budget_exceeded": "Det räcker med respons för i dag. Du kan skicka mer efter midnatt.",
   "errors.filter_unanswered": "För att filtrera på det här, dela ditt eget svar först.",
-  "errors.fish_budget_exceeded": "Du har redan skickat din fisk den här veckan. Du kan fortfarande gilla.",
+  "errors.fish_budget_exceeded": "Du kan inte skicka en fisk just nu. Du kan fortfarande gilla.",
   "errors.http_error": "Begäran misslyckades.",
   "errors.internal_error": "Något gick fel hos oss.",
   "errors.like_budget_exceeded": "Du har använt dagens gillanden. Nya kommer efter midnatt, men du kan fortfarande hoppa över.",

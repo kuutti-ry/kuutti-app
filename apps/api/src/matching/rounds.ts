@@ -36,9 +36,9 @@ export type CardOf = (
 
 /**
  * Builds the person's round for today when they have none and their matching
- * has opened, and says whether it built one: the round builder's (#95,
- * ADR-035), which reads across slices and lives with the jobs, handed in by
- * app.ts.
+ * has opened, and says whether a round for today stands now, whoever wrote
+ * it: the round builder's (#95, ADR-035), which reads across slices and lives
+ * with the jobs, handed in by app.ts.
  */
 export type BuildToday = (accountId: string) => Promise<boolean>;
 
@@ -109,10 +109,11 @@ const choiceOf = (decision: RoundDecision | null, fish: boolean): RoundChoice | 
  * entries in one transaction, then `round_built`. A round already built for
  * the account and day is left as it was (null). Places start at 1; a
  * candidate is never the owner and never twice in one round. Each statement
- * asks for itself, holding the rows FOR SHARE, that the owner is not erased
- * and that each candidate is still active with no block between the two:
- * the builder reads the pool before it writes, and an erasure or a block in
- * between must not leave a row that outlives it. A candidate dropped so
+ * asks for itself, holding the rows FOR SHARE, that the owner is still
+ * active or shadow-banned (not paused, sanctioned or erased) and that each
+ * candidate is still active with no block between the two: the builder reads
+ * the pool before it writes, and a pause, a sanction, an erasure or a block
+ * in between must not leave a row that outlives it. A candidate dropped so
  * leaves its place empty, as the read does.
  */
 export async function saveRound(
@@ -132,7 +133,7 @@ export async function saveRound(
   const saved = await transaction(deps.db, async (tx) => {
     const { rows } = await tx.query<{ id: string }>(
       `INSERT INTO rounds (account_id, day, built_at)
-       SELECT id, $2, $3 FROM account WHERE id = $1 AND state <> 'deleted' FOR SHARE
+       SELECT id, $2, $3 FROM account WHERE id = $1 AND state IN ('active', 'shadow_banned') FOR SHARE
        ON CONFLICT (account_id, day) DO NOTHING RETURNING id`,
       [input.accountId, input.day, builtAt],
     );
@@ -291,6 +292,24 @@ export async function decide(
   const { at, today } = todayOrRefuse(deps, input.day);
   const decision: RoundDecision = input.decision === "pass" ? "pass" : "like";
   const written = await transaction(deps.db, async (tx) => {
+    // The two accounts first, shared and in id order, before any row of a
+    // round: erasure and a sanction take an account FOR UPDATE before they
+    // touch rounds or conversations, so one under way finishes before this
+    // decision reads, and one that comes later waits for it to commit; an
+    // erasure or a ban then closes the match it opened, and a warning, a
+    // shadow ban or a suspension leaves it as it leaves every conversation
+    // (ADR-024, ADR-031 §2). Taken after the round, they deadlocked with an
+    // erasure, and a sanction could slip a match past its own check (ADR-038 §2).
+    const card = await tx.query<{ candidate_id: string }>(
+      `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
+        WHERE r.account_id = $1 AND r.day = $2 AND e.position = $3`,
+      [input.accountId, today, input.position],
+    );
+    const candidateId = card.rows[0]?.candidate_id;
+    if (!candidateId) throw notFound();
+    await tx.query("SELECT 1 FROM account WHERE id = ANY($1::uuid[]) ORDER BY id FOR SHARE", [
+      [input.accountId, candidateId],
+    ]);
     const round = await tx.query<{ id: string }>(
       "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
       [input.accountId, today],

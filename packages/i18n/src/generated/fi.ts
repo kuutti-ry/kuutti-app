@@ -180,7 +180,7 @@ export const fi: Readonly<Record<string, string>> = {
   "errors.export_budget_exceeded": "Tältä päivältä kopioita tiedoistasi on jo tarpeeksi. Voit ladata ne uudelleen keskiyön jälkeen.",
   "errors.feedback_budget_exceeded": "Tältä päivältä palautetta on jo tarpeeksi. Voit lähettää lisää keskiyön jälkeen.",
   "errors.filter_unanswered": "Suodattaaksesi tällä kerro ensin oma vastauksesi.",
-  "errors.fish_budget_exceeded": "Olet jo lähettänyt kalasi tällä viikolla. Voit silti tykätä.",
+  "errors.fish_budget_exceeded": "Et voi lähettää kalaa juuri nyt. Voit silti tykätä.",
   "errors.http_error": "Pyyntö epäonnistui.",
   "errors.internal_error": "Jokin meni vikaan meidän päässämme.",
   "errors.like_budget_exceeded": "Olet käyttänyt tämän päivän tykkäykset. Uusia tulee keskiyön jälkeen, mutta voit yhä ohittaa.",
