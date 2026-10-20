@@ -76,7 +76,7 @@ describe("EmailCard", () => {
   it("saves an address, shows that one is set, removes it, and says when the API refuses one", async () => {
     const { server, calls } = fakeApi();
     await show(<EmailCard />);
-    await waitFor(() => expect(screen.getByText("A way back in")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("A way to stay in touch")).toBeTruthy());
     expect(screen.getByText(/never a login/)).toBeTruthy();
     expect(screen.queryByText("An address is set.")).toBeNull();
     expect(
@@ -124,7 +124,7 @@ describe("EmailCard", () => {
     };
     for (const element of [
       screen.getByText("While you wait"),
-      screen.getByText("A way back in"),
+      screen.getByText("A way to stay in touch"),
       screen.getByLabelText("E-mail address"),
       screen.getByRole("button", { name: "Remove the address" }),
       screen.getByText("That is everything. Thank you."),
@@ -171,27 +171,27 @@ describe("EmailCard", () => {
     ) as unknown as typeof fetch;
     await show(<EmailCard />);
     expect(screen.getByText("Your e-mail address could not be read.")).toBeTruthy();
-    expect(screen.queryByText("A way back in")).toBeNull();
+    expect(screen.queryByText("A way to stay in touch")).toBeNull();
     failing = false;
     await act(async () => {
       fireEvent.press(screen.getByRole("button", { name: "Try again" }));
       await new Promise<void>((resolve) => setTimeout(resolve, 20));
     });
-    expect(await screen.findByText("A way back in")).toBeTruthy();
+    expect(await screen.findByText("A way to stay in touch")).toBeTruthy();
   });
 
   it("says it is reading the address while the read is on its way", async () => {
     globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     await show(<EmailCard />);
     expect(screen.getByText("Reading your e-mail address…")).toBeTruthy();
-    expect(screen.queryByText("A way back in")).toBeNull();
+    expect(screen.queryByText("A way to stay in touch")).toBeNull();
   });
 
   it("shows nothing and asks nothing for a signed-out device", async () => {
     await clearSession();
     fakeApi();
     await show(<EmailCard />);
-    expect(screen.queryByText("A way back in")).toBeNull();
+    expect(screen.queryByText("A way to stay in touch")).toBeNull();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
