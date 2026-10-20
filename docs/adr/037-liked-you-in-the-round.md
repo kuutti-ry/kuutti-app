@@ -2,7 +2,7 @@
 
 - Status: accepted 2026-10-20 (#97, built as written here on the maintainer's decisions of that day, #97's comments of 13/10 and 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change)
 - Date: 2026-10-20
-- Follows: TD-11 (liked-you inside the round, free; the pending-like queue and its expiry), TD-12 (the reason on every card, the pass cooldown), ADR-022 §4 (a break stops no clock), ADR-030 §11 (Block or report on a card), ADR-034 (the round record), ADR-035 (the builder), CLAUDE.md rule 7 and Product constraints; issues #97, #95, #98, #100, #378, #379
+- Follows: TD-11 (liked-you inside the round, free; the pending-like queue and its expiry), TD-12 (the reason on every card, the pass cooldown), TD-13 (the lower cap for a contested pond, waiting), ADR-022 §4 (a break stops no clock), ADR-030 §11 (Block or report on a card), ADR-034 (the round record), ADR-035 (the builder), CLAUDE.md rule 7 and Product constraints; issues #97, #95, #98, #100, #378, #379
 
 ## Context
 

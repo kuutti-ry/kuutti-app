@@ -155,7 +155,7 @@ describe("the fish", () => {
     });
     expect(refused.status).toBe(429);
     expect(ErrorResponse.parse(await refused.json()).error.message).toBe(
-      "Du har redan skickat din fisk den här veckan. Du kan fortfarande gilla.",
+      "Du kan inte skicka en fisk just nu. Du kan fortfarande gilla.",
     );
     expect(Number(refused.headers.get("retry-after"))).toBe(12 * 3600);
   });
@@ -232,6 +232,31 @@ describe("the fish", () => {
     expect(await entriesOf(ctx.client, roundId)).toEqual([
       { decision: "like", fish: false },
       { decision: "like", fish: true },
+    ]);
+  });
+
+  test("a like back on a fish card is free, and a fish there is a like", async ({ ctx }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 1);
+    const [a, b, c, d] = await cast(ctx.client, 4);
+    if (!a || !b || !c || !d) throw new Error("cast not written");
+    await sentBefore(ctx.client, b, a, 1, true);
+    await sentBefore(ctx.client, c, a, 1, true);
+    const roundId = await roundOf(ctx.client, a, [
+      { person: b, reason: "fish" },
+      { person: c, reason: "fish" },
+      d,
+    ]);
+    const app = await appAt(ctx.client);
+
+    // The day's one like on an ordinary card, then a like and a fish back on the fish cards.
+    expect((await choose(app, a, 3, "like")).status).toBe(200);
+    expect((await choose(app, a, 1, "like")).status).toBe(200);
+    expect((await choose(app, a, 2, "fish")).status).toBe(200);
+
+    expect(await entriesOf(ctx.client, roundId)).toEqual([
+      { decision: "like", fish: false },
+      { decision: "like", fish: false },
+      { decision: "like", fish: false },
     ]);
   });
 

@@ -1,11 +1,11 @@
 import type { Queryable } from "@kuutti/db";
-import type { RoundReason } from "@kuutti/schema";
+import { ROUND_ENTRIES_MAX, type RoundReason } from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
 import { likedYouPlaces, roundOrder, saveRound } from "../matching/index.ts";
 import type { NightlyJob } from "./nightly.ts";
-import { type Subject, subjectsOfPond } from "./pond-gate.ts";
+import { type Subject, subjectOf, subjectsOfPond } from "./pond-gate.ts";
 
 /**
  * The round builder, its first cut (#95, ADR-035; the maintainer, 20/10/2026):
@@ -169,10 +169,16 @@ async function placesOf(
   );
   const byId = new Map(shown.map((subject) => [subject.id, subject]));
   const fish = new Set(waiting.filter((like) => like.fish).map((like) => like.id));
+  // shortcut: fish go first with no cap of their own, so a person sent more
+  // fish than liked_you_cap for days sees no ordinary like, and those can
+  // expire unseen (#97's comment of 20/10/2026, ADR-039); a row capping fish
+  // per round lifts it, should it ever happen.
+  // The round's places are bounded by the contract, whatever the panel sets
+  // (ROUND_ENTRIES_MAX): the liked-you places first, the ordered ones after.
   const likedYou = likedYouPlaces(
     owner,
     waiting.flatMap((like) => byId.get(like.id) ?? []),
-    round.config.liked_you_cap,
+    Math.min(round.config.liked_you_cap, ROUND_ENTRIES_MAX),
   );
   const waits = new Set(waiting.map((like) => like.id));
   const ordered = roundOrder(
@@ -183,7 +189,10 @@ async function placesOf(
         !history.cooling.has(subject.id) &&
         !waits.has(subject.id),
     ),
-    { day: round.day, size: round.config.round_size },
+    {
+      day: round.day,
+      size: Math.min(round.config.round_size, ROUND_ENTRIES_MAX - likedYou.length),
+    },
   );
   return [
     ...likedYou.map((candidate) => ({
@@ -220,10 +229,20 @@ export async function buildRounds(deps: BuilderDeps): Promise<BuildCount> {
 /**
  * The person's round for the day it is, when they have none and their
  * matching has opened in the pond they live in: the day's first read asks
- * (ADR-035 §5). Whether it built one; a read beside it that built first
- * leaves this one unwritten (`saveRound` keeps the first).
+ * (ADR-035 §5). Whether a round for the day stands now, whoever wrote it: a
+ * read beside it that built first leaves this one unwritten (`saveRound`
+ * keeps the first), and the caller reads that round.
  */
 export async function buildRoundOf(deps: BuilderDeps, accountId: string): Promise<boolean> {
+  const at = deps.now();
+  const day = finnishDay(at);
+  const stands = async () =>
+    (
+      await deps.db.query("SELECT 1 FROM rounds WHERE account_id = $1 AND day = $2", [
+        accountId,
+        day,
+      ])
+    ).rows.length > 0;
   const { rows } = await deps.db.query<{ pond_id: string }>(
     `SELECT g.pond_id FROM gate g JOIN account a ON a.id = g.account_id AND a.pond_id = g.pond_id
       WHERE g.account_id = $1 AND g.opened_at IS NOT NULL
@@ -232,10 +251,19 @@ export async function buildRoundOf(deps: BuilderDeps, accountId: string): Promis
   );
   const pondId = rows[0]?.pond_id;
   if (!pondId) return false;
-  const at = deps.now();
+  // Another read or the night built it since the caller looked: it stands.
+  if (await stands()) return true;
+  // The person alone first: one whose profile no longer counts as complete,
+  // though their gate is open, costs no read of the pond on every visit.
+  const me = await subjectOf(deps.db, pondId, accountId, at);
+  if (!me?.openedAt) return false;
   const config = await matchingConfigNumbers(deps.db, KEYS);
-  const built = await buildPond(deps, pondId, { day: finnishDay(at), at, config }, accountId);
-  return built.built === 1;
+  await buildPond(deps, pondId, { day, at, config }, accountId);
+  // Built here, or by a read beside this one that wrote first (saveRound keeps
+  // the first); false when the build failed (buildPond logged it), or when the
+  // person was paused, sanctioned or erased between the look above and the
+  // write (nothing to log).
+  return stands();
 }
 
 /** The nightly job: everybody's round for the day, after the gate has let people in. */

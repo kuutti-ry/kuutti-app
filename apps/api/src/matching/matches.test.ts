@@ -3,7 +3,11 @@ import type { Queryable } from "@kuutti/db";
 import { ConversationList, ErrorResponse, RoundDecisionAnswer } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { archiveJob, conversationBetween, openConversation } from "../chat/index.ts";
-import { CURRENT_CONSENT_VERSIONS, eraseAccount } from "../identity/index.ts";
+import {
+  CURRENT_CONSENT_VERSIONS,
+  eraseAccount,
+  lockAccountForSanction,
+} from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import { signInAs } from "../test/account.ts";
 import { captureLogger, describe, expect, test, testConfig } from "../test/harness.ts";
@@ -274,10 +278,17 @@ describe("a match", () => {
 
     await answered(await decideBy(await appAt(ctx.client), a, 1, "like"));
 
-    const { rows } = await ctx.client.query<{ props: { completed: boolean } }>(
-      "SELECT props FROM events WHERE name = 'match' ORDER BY (props->>'completed')::boolean DESC",
+    // Each event by whose it is: the one whose like made the match says so.
+    const { rows } = await ctx.client.query<{ account_id: string; props: { completed: boolean } }>(
+      `SELECT s.account_id, e.props FROM events e
+         JOIN research_subject s ON s.research_id = e.research_id
+        WHERE e.name = 'match'`,
     );
-    expect(rows.map((row) => row.props)).toEqual([{ completed: true }, { completed: false }]);
+    expect(rows).toHaveLength(2);
+    expect(Object.fromEntries(rows.map((row) => [row.account_id, row.props]))).toEqual({
+      [a.accountId]: { completed: true },
+      [b.accountId]: { completed: false },
+    });
   });
 
   test("A match nobody writes in is put away after silent_match_archive_days, and a message keeps it", async ({
@@ -389,6 +400,150 @@ describe("the same moment", () => {
       expect(typeof answer === "object" && answer.match).toBeTruthy();
       const { rows } = await pool.query("SELECT 1 FROM conversation_participant WHERE side = 'a'");
       expect(rows).toHaveLength(1);
+    });
+  });
+
+  /** Two people, each the card of the other's round today, on a database of their own. */
+  async function eachOthersCard(pool: Queryable) {
+    const ids = await people(pool, null, 2, { complete: true, consented: true });
+    const [a, b] = ids;
+    if (!a || !b) throw new Error("cast not written");
+    const deps = { db: pool, logger: (await captureLogger()).logger, now: () => T };
+    for (const [owner, card] of [
+      [a, b],
+      [b, a],
+    ] as const) {
+      await saveRound(deps, {
+        accountId: owner,
+        day: TODAY,
+        ordering: "count",
+        entries: [{ candidateId: card, reason: "matches_filters" }],
+      });
+    }
+    return { a, b, deps };
+  }
+
+  const choice = (accountId: string, decision: "like" | "pass") => ({
+    accountId,
+    day: TODAY,
+    position: 1,
+    decision,
+  });
+
+  test("a like taken back while the other's like makes the match is refused as match_made", async () => {
+    await withTwoConnections("kuutti-100-take-back", async (pool, first, second) => {
+      const { a, b, deps } = await eachOthersCard(pool);
+      await decide(deps, MATCHES, choice(a, "like"));
+      const firstPid = await pidOf(first);
+      const secondPid = await pidOf(second);
+      await first.query("BEGIN");
+      await second.query("BEGIN");
+      // B's like back holds the pair and opens the conversation, not yet committed.
+      expect(
+        (await decide({ ...deps, db: first }, MATCHES, choice(b, "like"))).match,
+      ).not.toBeNull();
+      const taking = watched(decide({ ...deps, db: second }, MATCHES, choice(a, "pass")));
+      expect(await waitsFor(pool, secondPid, firstPid, taking.settled)).toBe(true);
+      await first.query("COMMIT");
+      expect(await taking.outcome).toBe("match_made");
+      // Committed, so the checks below would see anything the refusal wrote.
+      await second.query("COMMIT");
+      const { rows } = await pool.query<{ decision: string }>(
+        `SELECT e.decision FROM round_entries e JOIN rounds r ON r.id = e.round_id
+          WHERE r.account_id = $1`,
+        [a],
+      );
+      expect(rows).toEqual([{ decision: "like" }]);
+      expect(
+        (await pool.query("SELECT 1 FROM conversation_participant WHERE side = 'a'")).rows,
+      ).toHaveLength(1);
+    });
+  });
+
+  test("a like taken back first leaves the other's like, which waited for it, no match", async () => {
+    await withTwoConnections("kuutti-100-taken-first", async (pool, first, second) => {
+      const { a, b, deps } = await eachOthersCard(pool);
+      await decide(deps, MATCHES, choice(a, "like"));
+      const firstPid = await pidOf(first);
+      const secondPid = await pidOf(second);
+      await first.query("BEGIN");
+      await second.query("BEGIN");
+      // A takes the like back and holds the pair; B's like back waits, then finds no like.
+      expect((await decide({ ...deps, db: first }, MATCHES, choice(a, "pass"))).match).toBeNull();
+      const liking = watched(decide({ ...deps, db: second }, MATCHES, choice(b, "like")));
+      expect(await waitsFor(pool, secondPid, firstPid, liking.settled)).toBe(true);
+      await first.query("COMMIT");
+      expect(await liking.outcome).toEqual({ match: null });
+      await second.query("COMMIT");
+      expect((await pool.query("SELECT 1 FROM conversation")).rows).toHaveLength(0);
+    });
+  });
+
+  test("an erasure that starts while a match opens waits for it, and then ends the match", async () => {
+    await withTwoConnections("kuutti-100-erasure", async (pool, first, second) => {
+      const { a, b, deps } = await eachOthersCard(pool);
+      await decide(deps, MATCHES, choice(b, "like"));
+      const firstPid = await pidOf(first);
+      const secondPid = await pidOf(second);
+      // A's like back pauses before it writes the conversation's people, its
+      // entry written: the moment an erasure taking B's account would cross it.
+      let reached: () => void = () => {};
+      const atOpening = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      let go: () => void = () => {};
+      const resume = new Promise<void>((resolve) => {
+        go = resolve;
+      });
+      const paused: Queryable = {
+        query: (async (text: string, values?: unknown[]) => {
+          if (String(text).includes("INSERT INTO conversation_participant")) {
+            reached();
+            await resume;
+          }
+          return first.query(text, values);
+        }) as Queryable["query"],
+      };
+      await first.query("BEGIN");
+      await second.query("BEGIN");
+      const liking = watched(decide({ ...deps, db: paused }, MATCHES, choice(a, "like")));
+      await atOpening;
+      const erasing = watched(eraseAccount({ ...deps, db: second }, b));
+      // The erasure waits for the like before it touches anything of a round.
+      expect(await waitsFor(pool, secondPid, firstPid, erasing.settled)).toBe(true);
+      go();
+      const liked = await liking.outcome;
+      expect(typeof liked === "object" && liked.match).toBeTruthy();
+      await first.query("COMMIT");
+      const erased = await erasing.outcome;
+      expect(typeof erased).toBe("object");
+      await second.query("COMMIT");
+      // The match opened, and the erasure closed it for A, who keeps it.
+      const { rows } = await pool.query<{ closed: boolean }>(
+        "SELECT closed_at IS NOT NULL AS closed FROM conversation",
+      );
+      expect(rows).toEqual([{ closed: true }]);
+    });
+  });
+
+  test("a sanction under way is waited for, and opens no match with its person", async () => {
+    await withTwoConnections("kuutti-100-sanction", async (pool, first, second) => {
+      const { a, b, deps } = await eachOthersCard(pool);
+      await decide(deps, MATCHES, choice(b, "like"));
+      const firstPid = await pidOf(first);
+      const secondPid = await pidOf(second);
+      await first.query("BEGIN");
+      await second.query("BEGIN");
+      // A sanction under way: B's accounts and identity under its lock
+      // (lockAccountForSanction, identity/standing.ts), B's state changed, not yet committed.
+      expect(await lockAccountForSanction(first, b)).not.toBeNull();
+      await first.query("UPDATE account SET state = 'suspended' WHERE id = $1", [b]);
+      const liking = watched(decide({ ...deps, db: second }, MATCHES, choice(a, "like")));
+      expect(await waitsFor(pool, secondPid, firstPid, liking.settled)).toBe(true);
+      await first.query("COMMIT");
+      expect(await liking.outcome).toBe("not_found");
+      await second.query("COMMIT");
+      expect((await pool.query("SELECT 1 FROM conversation")).rows).toHaveLength(0);
     });
   });
 });

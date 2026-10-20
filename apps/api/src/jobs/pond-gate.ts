@@ -384,6 +384,16 @@ export async function subjectsOfPond(db: Queryable, pondId: string, at: Date): P
   return subjectsOf(db, pondId, at, { locked: rows.map((row) => row.id) });
 }
 
+/** One person of a pond as the count sees them, or null while they are not complete: the round builder's first look (#95, ADR-035 §5). */
+export async function subjectOf(
+  db: Queryable,
+  pondId: string,
+  accountId: string,
+  at: Date,
+): Promise<Subject | null> {
+  return (await subjectsOf(db, pondId, at, { locked: [accountId] }))[0] ?? null;
+}
+
 /**
  * The blocks between the people of a count, by who set them (#84, ADR-030
  * §3): a blocked pair is not in each other's pool, so neither counts toward

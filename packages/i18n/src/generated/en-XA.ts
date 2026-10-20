@@ -518,7 +518,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "errors.export_budget_exceeded": "［Tháát ííš ééñóóúúgh çóópííééš óóf ýýóóúúr dáátáá fóór tóódááýý. ÝÝóóúú çááñ dóówñlóóáád íít áágááííñ ááftéér míídñííght.］",
   "errors.feedback_budget_exceeded": "［Tháát ííš ééñóóúúgh féééédbááçk fóór tóódááýý. ÝÝóóúú çááñ šééñd móóréé ááftéér míídñííght.］",
   "errors.filter_unanswered": "［Tóó fííltéér óóñ thííš, šhááréé ýýóóúúr óówñ ááñšwéér fííršt.］",
-  "errors.fish_budget_exceeded": "［ÝÝóóúú háávéé áálrééáádýý šééñt ýýóóúúr fííšh thííš wéééék. ÝÝóóúú çááñ štííll lííkéé.］",
+  "errors.fish_budget_exceeded": "［ÝÝóóúú çááññóót šééñd áá fííšh júúšt ñóów. ÝÝóóúú çááñ štííll lííkéé.］",
   "errors.http_error": "［Théé rééqúúééšt fááíílééd.］",
   "errors.internal_error": "［Šóómééthííñg wééñt wróóñg óóñ óóúúr šíídéé.］",
   "errors.like_budget_exceeded": "［ÝÝóóúú háávéé úúšééd tóódááýý'š lííkééš. Ñééw óóñééš çóóméé ááftéér míídñííght; ýýóóúú çááñ štííll páášš.］",
