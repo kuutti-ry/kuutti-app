@@ -342,6 +342,95 @@ describe("today's round", () => {
     expect(screen.queryByRole("button", { name: "Undo your last decision" })).toBeNull();
   });
 
+  it("sends a fish from a card that answers nobody's like, and says it back after Undo (#378)", async () => {
+    const sent = api(undefined, { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")] });
+    await show();
+    const buttons = screen
+      .getAllByRole("button")
+      .map((button) => button.props.accessibilityLabel)
+      .filter((label) => ["Send a fish", "Pass", "Like"].includes(label));
+    expect(buttons).toEqual(["Send a fish", "Pass", "Like"]);
+    noProblems();
+    await press("Send a fish");
+    expect(heading("Minna, 34")).toBeTruthy();
+    await press("Undo your last decision");
+    expect(
+      screen.getByText("You sent this person a fish. You can change that until midnight."),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Send a fish" }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+    expect(sent.decisions()).toEqual([`${DAY}/2 fish`]);
+  });
+
+  it.each([
+    ["liked the reader", "liked_you", "Liked you"],
+    ["sent the reader a fish", "fish", "Sent you a fish"],
+  ] as const)(
+    "offers no fish on a card that %s, which a like answers (ADR-039 §2)",
+    async (_what, reason, label) => {
+      api(undefined, { day: DAY, entries: [entry(1, "Henna", reason)] });
+      await show();
+      expect(screen.getByText(label)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Like" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Send a fish" })).toBeNull();
+    },
+  );
+
+  it("says the earliest day for the next fish when the week's fish is sent, and keeps the card for a like", async () => {
+    // 10:00 UTC on 20.10.; the window opens at midnight in Finland before 23.10. (21:00 UTC on 22.10.).
+    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T10:00:00Z"));
+    const wait = (Date.parse("2026-10-22T21:00:00Z") - Date.parse("2026-10-20T10:00:00Z")) / 1000;
+    api(
+      (call) =>
+        call.path.endsWith("/decision") && (call.body as { decision: string }).decision === "fish"
+          ? refusal("fish_budget_exceeded", 429, { "retry-after": String(wait) })
+          : undefined,
+      { day: DAY, entries: [entry(2, "Katja")] },
+    );
+    await show();
+    await press("Send a fish");
+    expect(
+      screen.getByText(
+        "You have already sent this week's fish, and you can still like. The earliest day for the next one: 23.10.2026",
+      ),
+    ).toBeTruthy();
+    expect(heading("Katja, 32")).toBeTruthy();
+    await press("Like");
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+  });
+
+  it.each([
+    ["no wait", {}],
+    ["a wait that is no number", { "retry-after": "soon" }],
+  ] as const)(
+    "says the week's fish is sent without a day when the refusal names %s",
+    async (_what, headers) => {
+      api(
+        (call) =>
+          call.path.endsWith("/decision")
+            ? refusal("fish_budget_exceeded", 429, headers)
+            : undefined,
+        { day: DAY, entries: [entry(2, "Katja")] },
+      );
+      await show();
+      await press("Send a fish");
+      expect(
+        screen.getByText("You have already sent your fish this week. You can still like."),
+      ).toBeTruthy();
+    },
+  );
+
+  it("takes a card that was liked into a match elsewhere as liked, when its first decision here is refused", async () => {
+    api((call) =>
+      call.path === `/rounds/${DAY}/entries/1/decision` ? refusal("match_made", 409) : undefined,
+    );
+    await show();
+    await press("Pass");
+    expect(screen.getByText(/This like made a match, so it stays/)).toBeTruthy();
+    expect(heading("Katja, 32")).toBeTruthy();
+  });
+
   it("blocks from a round card, and the card leaves the screen (ADR-030 §11)", async () => {
     const sent = api();
     await show();
@@ -400,12 +489,23 @@ describe("today's round", () => {
     expect(heading("Katja, 32")).toBeTruthy();
   });
 
-  it("says nothing when a seen report fails otherwise, and the card stays", async () => {
-    api((call) => (call.path.endsWith("/seen") ? refusal("internal", 500) : undefined));
-    await show();
-    expect(heading("Henna, 31")).toBeTruthy();
-    expect(screen.queryByText("That card is no longer available.")).toBeNull();
-  });
+  it.each([
+    ["the API failed", () => refusal("internal", 500)],
+    [
+      "the network",
+      () => {
+        throw new TypeError("Network request failed");
+      },
+    ],
+  ])(
+    "says nothing when a seen report fails otherwise (%s), and the card stays",
+    async (_why, failure) => {
+      api((call) => (call.path.endsWith("/seen") ? failure() : undefined));
+      await show();
+      expect(heading("Henna, 31")).toBeTruthy();
+      expect(screen.queryByText("That card is no longer available.")).toBeNull();
+    },
+  );
 
   it("changes nothing when a seen report finds its card gone after the day was read anew", async () => {
     let gone = () => {};
@@ -495,18 +595,31 @@ describe("today's round", () => {
     },
   );
 
-  it("says why the round did not load, and reads it again on Try again", async () => {
-    let reads = 0;
-    api((call) => {
-      if (call.path !== "/rounds/today") return undefined;
-      reads += 1;
-      return reads === 1 ? refusal("internal", 500) : undefined;
-    });
-    await show();
-    expect(screen.getByText("Today's round did not load.")).toBeTruthy();
-    await press("Try again");
-    expect(heading("Henna, 31")).toBeTruthy();
-  });
+  it.each([
+    ["the API failed", () => refusal("internal", 500), "Kuutti's server had a problem."],
+    [
+      "the network",
+      () => {
+        throw new TypeError("Network request failed");
+      },
+      "Kuutti could not be reached.",
+    ],
+  ])(
+    "says why the round did not load (%s), and reads it again on Try again",
+    async (_why, failure, why) => {
+      let reads = 0;
+      api((call) => {
+        if (call.path !== "/rounds/today") return undefined;
+        reads += 1;
+        return reads === 1 ? failure() : undefined;
+      });
+      await show();
+      expect(screen.getByText("Today's round did not load.")).toBeTruthy();
+      expect(screen.getByText(new RegExp(`^${why}`))).toBeTruthy();
+      await press("Try again");
+      expect(heading("Henna, 31")).toBeTruthy();
+    },
+  );
 
   it("takes one decision at a time: both buttons are dimmed while one is on its way", async () => {
     let release = () => {};

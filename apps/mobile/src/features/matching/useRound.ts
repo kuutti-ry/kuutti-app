@@ -1,8 +1,8 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import type { RoundDecision, RoundEntry, RoundResponse } from "@kuutti/schema";
+import type { RoundChoice, RoundEntry, RoundResponse } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/api";
-import { decide, fetchRound, reportSeen } from "./client";
+import { decide, fetchRound, RoundRefusal, reportSeen } from "./client";
 
 export type RoundView =
   | { status: "loading" }
@@ -12,16 +12,22 @@ export type RoundView =
   | { status: "budget" }
   | { status: "ready"; round: RoundResponse };
 
-/** What the screen says above the round, once, after something the person did not see coming. */
-export type RoundNotice = Extract<
-  PlainMessageKey,
-  | "errors.round_expired"
-  | "errors.match_made"
-  | "errors.like_budget_exceeded"
-  | "round.gone"
-  | "round.decision.failed"
-  | "round.newDay"
->;
+/**
+ * What the screen says above the round, once, after something the person did
+ * not see coming: words, or the refused fish with the moment the next can go.
+ */
+export type RoundNotice =
+  | Extract<
+      PlainMessageKey,
+      | "errors.round_expired"
+      | "errors.match_made"
+      | "errors.like_budget_exceeded"
+      | "errors.fish_budget_exceeded"
+      | "round.gone"
+      | "round.decision.failed"
+      | "round.newDay"
+    >
+  | { fishAgain: Date };
 
 /** The card on the screen, with the day its round is of. */
 export type RoundCard = { day: string; entry: RoundEntry };
@@ -127,8 +133,9 @@ export function useRound() {
   }, [day, position, read, drop]);
 
   const choose = useCallback(
-    async ({ day, entry: { position } }: RoundCard, decision: RoundDecision) => {
-      const decided = (as: RoundDecision) =>
+    async ({ day, entry }: RoundCard, decision: RoundChoice) => {
+      const { position } = entry;
+      const decided = (as: RoundChoice) =>
         entriesWith((entries) =>
           entries.map((each) => (each.position === position ? { ...each, decision: as } : each)),
         );
@@ -141,20 +148,29 @@ export function useRound() {
         setLast(answer.match ? null : position);
         setMatch(answer.match?.conversationId ?? null);
       } catch (error) {
-        const code = codeOf(error);
+        const refusal = error instanceof RoundRefusal ? error : undefined;
+        const code = refusal?.code;
         if (code === "round_expired") {
           read("errors.round_expired");
         } else if (code === "match_made") {
-          // The like stands, and the round goes on to the next card (ADR-038 §3).
-          decided("like");
+          // The like stands, as it was, and the round goes on to the next card (ADR-038 §3).
+          decided(entry.decision ?? "like");
           setRevisit(null);
           setLast(null);
           setNotice("errors.match_made");
-        } else if (statusOf(error) === 404) {
+        } else if (refusal?.status === 404) {
           drop(position);
           setNotice("round.gone");
         } else if (code === "like_budget_exceeded") {
           setNotice("errors.like_budget_exceeded");
+        } else if (refusal?.code === "fish_budget_exceeded") {
+          // When the next fish can go, from the wait the refusal names (ADR-039 §3).
+          const wait = refusal.retryAfter;
+          setNotice(
+            wait === null
+              ? "errors.fish_budget_exceeded"
+              : { fishAgain: new Date(Date.now() + wait * 1000) },
+          );
         } else {
           setNotice("round.decision.failed");
         }

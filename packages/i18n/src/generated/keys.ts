@@ -1222,6 +1222,8 @@ export type MessageParams = {
   "round.done": Record<never, never>;
   "round.empty": Record<never, never>;
   "round.failed": Record<never, never>;
+  "round.fish": Record<never, never>;
+  "round.fish.refused": { "date": string };
   "round.gone": Record<never, never>;
   "round.home.open": Record<never, never>;
   "round.like": Record<never, never>;
@@ -1233,10 +1235,12 @@ export type MessageParams = {
   "round.newDay": Record<never, never>;
   "round.none": Record<never, never>;
   "round.pass": Record<never, never>;
+  "round.reason.fish": Record<never, never>;
   "round.reason.liked_you": Record<never, never>;
   "round.reason.matches_filters": Record<never, never>;
   "round.reason.relaxed": Record<never, never>;
   "round.reason.seen_before": Record<never, never>;
+  "round.revisit.fish": Record<never, never>;
   "round.revisit.like": Record<never, never>;
   "round.revisit.pass": Record<never, never>;
   "round.title": Record<never, never>;
