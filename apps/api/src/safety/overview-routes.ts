@@ -2,8 +2,10 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { AdminOverview, ErrorResponse } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
+import { foundThemCounts } from "../identity/index.ts";
 import { staffOf } from "../lib/admin-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
+import { finnishDay } from "../lib/finnish-day.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { queueSummary } from "../media/index.ts";
 import { AUTO_SHADOW_BAN_REVIEW_HOURS_KEY, automaticBanSummary } from "./automatic.ts";
@@ -16,6 +18,13 @@ import { reportSummary } from "./report-queue.ts";
 // with the answer, so the panel measures ages by it and not by the browser's.
 // The reports' count leaves out those the reader is a party to, as their
 // queue does (#311, ADR-030 §6).
+
+/**
+ * "Löysin hänet" (#83, ADR-040): the overview's recent window, in Finnish
+ * days, today included. A way of showing the count, not a rule of the
+ * product, so a constant and not a row.
+ */
+const FOUND_THEM_RECENT_DAYS = 30;
 
 /** matching_config: the hours the association promises to answer within (#299). */
 export const MODERATION_RESPONSE_HOURS_KEY = "moderation_response_hours";
@@ -30,7 +39,7 @@ const overviewRoute = createRoute({
   path: "/admin/overview",
   summary: "What waits for the moderators",
   description:
-    "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. Moderators and admins.",
+    "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. And the association's measure (#83): how many told Kuutti they found somebody, by reason, over the last thirty Finnish days and in all, from a count that names nobody. Moderators and admins.",
   security: [{ session: [] }],
   responses: {
     200: {
@@ -49,14 +58,18 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
 
   app.openapi(overviewRoute, async (c) => {
     const staff = staffOf(c);
-    const [reports, automatic, photos, feedback, responseHours, reviewHours] = await Promise.all([
-      reportSummary(deps.db, staff.identityId),
-      automaticBanSummary(deps.db, staff.identityId),
-      queueSummary(deps.db),
-      feedbackSummary(deps.db),
-      matchingConfigNumber(deps.db, MODERATION_RESPONSE_HOURS_KEY),
-      matchingConfigNumber(deps.db, AUTO_SHADOW_BAN_REVIEW_HOURS_KEY),
-    ]);
+    const at = now();
+    const [reports, automatic, photos, feedback, responseHours, reviewHours, recent, allTime] =
+      await Promise.all([
+        reportSummary(deps.db, staff.identityId),
+        automaticBanSummary(deps.db, staff.identityId),
+        queueSummary(deps.db),
+        feedbackSummary(deps.db),
+        matchingConfigNumber(deps.db, MODERATION_RESPONSE_HOURS_KEY),
+        matchingConfigNumber(deps.db, AUTO_SHADOW_BAN_REVIEW_HOURS_KEY),
+        foundThemCounts(deps.db, { today: finnishDay(at), days: FOUND_THEM_RECENT_DAYS }),
+        foundThemCounts(deps.db),
+      ]);
     const queue = (
       name: "reports" | "automatic_bans" | "photos" | "feedback",
       s: typeof photos,
@@ -67,7 +80,7 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
     });
     return c.json(
       {
-        now: now().toISOString(),
+        now: at.toISOString(),
         responseHours,
         reviewHours,
         queues: [
@@ -76,6 +89,7 @@ export function overviewAdminRoutes(deps: Deps, requireModerator: MiddlewareHand
           queue("photos", photos),
           queue("feedback", feedback),
         ],
+        foundThem: { days: FOUND_THEM_RECENT_DAYS, recent, allTime },
       },
       200,
     );

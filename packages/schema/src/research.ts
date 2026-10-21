@@ -8,6 +8,7 @@ import {
   MessageLengthBand,
 } from "./chat.ts";
 import { FeedbackKind } from "./feedback.ts";
+import { FoundReason } from "./found-them.ts";
 import { ROUND_ENTRIES_MAX, RoundOrdering, RoundReason, SinceSeenBand } from "./matching.ts";
 import { Gender } from "./onboarding.ts";
 import { PROFILE_FIELD_KEYS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
@@ -54,6 +55,12 @@ export const RESEARCH_EVENTS = {
   account_paused: {
     question: "How many people step away for a while rather than delete (#170)?",
     props: props({}),
+  },
+  // "Löysin hänet" (#83, ADR-040): the reason alone, never whom.
+  found_them: {
+    question:
+      "Why do people who tell Kuutti they found somebody say they did, here or elsewhere (#83)?",
+    props: props({ reason: FoundReason }),
   },
   feedback_sent: {
     question: "Which kinds of feedback come from inside the app, and how often (#171)?",

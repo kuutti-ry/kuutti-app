@@ -44,6 +44,7 @@ function accountRow(identityId: string): Account {
     genderChangedAt: null,
     seeksChangedAt: null,
     email: null,
+    foundThemAnswered: false,
     deletedAt: null,
   };
 }

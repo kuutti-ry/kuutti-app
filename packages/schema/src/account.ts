@@ -131,6 +131,8 @@ export const AccountExport = z
       seeksChangedAt: z.iso.datetime().nullable(),
       /** The optional e-mail (#148): the person's own, in their own download; null when none is set. */
       email: z.string().max(EMAIL_MAX).nullable(),
+      /** Whether the person told Kuutti they found somebody (#83); the reason is kept by no one's name. */
+      foundThemAnswered: z.boolean(),
     }),
     /** The two hard rows onboarding writes (#46): whom the person seeks and the age window. */
     preferences: PreferencesResponse,

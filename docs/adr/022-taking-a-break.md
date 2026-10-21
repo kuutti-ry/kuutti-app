@@ -1,8 +1,8 @@
 # ADR-022: Taking a break
 
-- Status: accepted, amended 2026-10-14 (§6 and the Consequences: Settings as four sections of rows, #287) and 2026-10-16 (a sanction keeps a break, #307, ADR-024 §2 and §4; see History)
+- Status: accepted, amended 2026-10-14 (§6 and the Consequences: Settings as four sections of rows, #287), 2026-10-16 (a sanction keeps a break, #307, ADR-024 §2 and §4) and 2026-10-21 (§1, §5 and the Alternatives: #83 is not a pause, ADR-040; see History)
 - Date: 2026-10-13
-- Follows: TD-7 (erasure and re-registration), ADR-007 (erasure), ADR-010 §6 (activation), ADR-013 §2 and ADR-015 §3 (who counts), issue #170; #83 shares the state
+- Follows: TD-7 (erasure and re-registration), ADR-007 (erasure), ADR-010 §6 (activation), ADR-013 §2 and ADR-015 §3 (who counts), issue #170
 
 ## Context
 
@@ -37,3 +37,4 @@ The only way to disappear for a while was "Delete everything", which costs the p
 - 2026-10-14: §6 and the Consequences amended (#287). Settings is four sections of rows, each row a title, a line saying what is chosen or what is inside, and a chevron to a screen of its own under `/settings/...` (the version alone opens nothing): Appearance and language (the theme with its contrast, the language); Legal (the two consents, a screen each with its switch, and the terms of use and the privacy text); About Kuutti (the version, the source code, the packages' licences); Account (this device, the e-mail, and "Your account"). The export, "Take a break" and "Delete everything" sit behind the "Your account" row (`/settings/account`), the deletion last; the break keeps its own screen (`/account/break`), opened from there. The Maestro flows that walk through Settings scroll to the row they need and tap it, where they scrolled to the session block before.
 - 2026-10-16 (#307, ADR-024 §2 and §4): a sanction on a person on a break keeps the break: a shadow ban or its lift writes `paused_from` and leaves `paused`; a suspension or a ban keeps the break aside in `sanctioned_from` and gives it back on a lift. The exchange's share lock on the account row (`insertSession`) now serialises a login with a sanction; it does not close §5's window, since `paused` is a live state for the guard and the insert admits it.
 - 2026-10-20 (#95, ADR-035 §1): the round builder builds no round for a paused account, at night or on a read; §5's session left by a racing login can only decide a round built before the break (ADR-034 Open 9), and the `shortcut:` in `pause.ts` now names the round screen (#379) as when it matters.
+- 2026-10-21 (#83, ADR-040): "Löysin hänet" is not a pause. The maintainer decided that day that telling Kuutti one found someone is an indication and changes nothing in the app, so §1's "the same state with an exit reason", §5's "#83's pause keeps chats" and the Alternatives' expectations of #83 (the hidden-but-present shape, its column of reasons) are withdrawn. The break stays the one pause; §5's guard keeps `paused` live for the window it describes, and the break's revocation still leaves no session.

@@ -26,11 +26,19 @@ type Queue = {
 };
 const empty = (queue: Queue["queue"]): Queue => ({ queue, waiting: 0, oldestSince: null });
 /** The front page's answer; the automatic bans' review time (#105) apart from the response time. */
-const overview = (queues: Queue[], responseHours = 24, now = NOW, reviewHours = 48) => ({
+const noneFound = { here: 0, elsewhere: 0, other: 0 };
+const overview = (
+  queues: Queue[],
+  responseHours = 24,
+  now = NOW,
+  reviewHours = 48,
+  foundThem = { days: 30, recent: noneFound, allTime: noneFound },
+) => ({
   now,
   responseHours,
   reviewHours,
   queues,
+  foundThem,
 });
 
 const json = (body: unknown, status = 200) =>
@@ -355,6 +363,37 @@ describe("the front page", () => {
       expect(await screen.findByText("Nothing waits in any queue.")).toBeInTheDocument();
       expect(screen.queryByText(/Late/)).toBeNull();
     });
+  });
+
+  it("shows how many told Kuutti they found someone, by reason, recent and in all (#83)", async () => {
+    fetchMock([
+      answer(
+        overview([empty("reports")], 24, NOW, 48, {
+          days: 30,
+          recent: { here: 3, elsewhere: 1, other: 0 },
+          allTime: { here: 12, elsewhere: 4, other: 2 },
+        }),
+      ),
+    ]);
+    show();
+    const table = await screen.findByRole("table", { name: "Told Kuutti they found someone" });
+    // A section of the page, under its title.
+    expect(
+      screen.getByRole("heading", { level: 3, name: "Told Kuutti they found someone" }),
+    ).toBeInTheDocument();
+    expect(within(table).getByRole("columnheader", { name: "Last 30 days" })).toBeTruthy();
+    const rows = within(table).getAllByRole("row");
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "ReasonLast 30 daysIn all",
+      "On Kuutti312",
+      "Elsewhere14",
+      "Another reason02",
+    ]);
+    expect(
+      screen.getByText(
+        "Counted by day and reason, with nobody's name: the count stays when an account is deleted.",
+      ),
+    ).toBeTruthy();
   });
 
   it("says the page could not be loaded when the API fails", async () => {

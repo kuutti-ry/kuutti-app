@@ -3014,6 +3014,13 @@ errors.round_expired:
   sv: "Rundan tog slut vid midnatt, så det här sparades inte."
   machine: { fi: true, sv: true }
 
+errors.found_them_answered:
+  en: "You told us already. Thank you."
+  description: "\"Löysin hänet\" (409, #83, ADR-040): this account told Kuutti before; each counts once. Nothing was counted."
+  fi: "Kerroit jo meille. Kiitos."
+  sv: "Du har redan berättat för oss. Tack."
+  machine: { fi: true, sv: true }
+
 errors.match_made:
   en: "This like made a match, so it stays. You can still end the conversation under Conversations."
   description: "Today's round (409, #100, ADR-038): a like that made a match was changed; a like that is part of a match is final (the maintainer, 20/10/2026). Conversations is the list's name (chat.list.title). Nothing was saved."
@@ -5363,6 +5370,38 @@ admin.overview.empty:
   en: "Nothing waits in any queue."
   description: "Admin panel, every queue on the front page is empty (#303)."
 
+admin.overview.foundThem.title:
+  en: "Told Kuutti they found someone"
+  description: "Admin panel, front page: the heading of the association's measure (#83, ADR-040), how many said they found somebody, by reason."
+
+admin.overview.foundThem.note:
+  en: "Counted by day and reason, with nobody's name: the count stays when an account is deleted."
+  description: "Admin panel, front page, under the found-them heading (#83): the count names no person (ADR-040)."
+
+admin.overview.foundThem.reason:
+  en: "Reason"
+  description: "Admin panel, front page: the found-them table's first column header (#83)."
+
+admin.overview.foundThem.recent:
+  en: "Last {days, plural, one {# day} other {# days}}"
+  description: "Admin panel, front page: the found-them table's column of the recent Finnish days, today included (#83)."
+
+admin.overview.foundThem.allTime:
+  en: "In all"
+  description: "Admin panel, front page: the found-them table's column of every day (#83)."
+
+admin.overview.foundThem.here:
+  en: "On Kuutti"
+  description: "Admin panel, front page: the found-them row of those who found somebody on Kuutti, the association's measure of success (#83)."
+
+admin.overview.foundThem.elsewhere:
+  en: "Elsewhere"
+  description: "Admin panel, front page: the found-them row of those who found somebody elsewhere (#83)."
+
+admin.overview.foundThem.other:
+  en: "Another reason"
+  description: "Admin panel, front page: the found-them row of another reason (#83)."
+
 admin.overview.queue.reports:
   en: "Reports"
   description: "Admin panel, the report queue's name on the front page, a link to it (#311)."
@@ -6353,7 +6392,7 @@ admin.notFound.home:
 
 account.title:
   en: Your account
-  description: "Title of the row under Account in Settings and of the screen it opens, with the data export, the break and the deletion (#287)."
+  description: "Title of the row under Account in Settings and of the screen it opens, with the data export, \"I found someone\" (#83), the break and the deletion (#287)."
   fi: Tilisi
   sv: Ditt konto
   machine: { fi: true, sv: true }
@@ -6741,6 +6780,90 @@ account.break.back:
   description: "Screen-reader label of the back arrow of the break screen."
   fi: "Takaisin"
   sv: "Tillbaka"
+  machine: { fi: true, sv: true }
+
+account.foundThem.button:
+  en: "I found someone"
+  description: "Your account: the button to \"Löysin hänet\" (#83), telling Kuutti the person found somebody. An indication only: nothing in the app changes."
+  fi: "Löysin hänet"
+  sv: "Jag hittade någon"
+  machine: { fi: true, sv: true }
+
+account.foundThem.title:
+  en: "I found someone"
+  description: "Heading of the \"Löysin hänet\" screen (#83). The Finnish is the feature's own name."
+  fi: "Löysin hänet"
+  sv: "Jag hittade någon"
+  machine: { fi: true, sv: true }
+
+account.foundThem.intro:
+  en: "Your answer tells the association whether Kuutti works. It is shown to nobody, and it is counted without your name."
+  description: "\"Löysin hänet\" (#83), above the three choices: why the association asks, and that the answer is counted anonymously (a count by day and reason, ADR-040); no person is shown it, the moderators see totals only. For those in the study the research consent already covers the event. Fits every reason, \"another reason\" too."
+  fi: "Vastauksesi kertoo yhdistykselle, toimiiko Kuutti. Sitä ei näytetä kenellekään, ja se lasketaan ilman nimeäsi."
+  sv: "Ditt svar berättar för föreningen om Kuutti fungerar. Det visas inte för någon, och det räknas utan ditt namn."
+  machine: { fi: true, sv: true }
+
+account.foundThem.unchanged:
+  en: "Nothing changes in the app: your profile, your rounds and your conversations stay as they are. To step away, take a break or delete your account under Your account."
+  description: "\"Löysin hänet\" (#83): the answer changes nothing (the maintainer, 21/10/2026); stepping away is the break or the deletion, both under Your account (account.title)."
+  fi: "Sovelluksessa mikään ei muutu: profiilisi, kierroksesi ja keskustelusi pysyvät ennallaan. Jos haluat pitää taukoa tai poistaa tilisi, löydät ne kohdasta Tilisi."
+  sv: "Inget ändras i appen: din profil, dina rundor och dina samtal är kvar som de är. Vill du ta en paus eller radera ditt konto finns det under Ditt konto."
+  machine: { fi: true, sv: true }
+
+account.foundThem.question:
+  en: "Which is it?"
+  description: "\"Löysin hänet\" (#83): the label of the three choices, a radio group, and its name for a screen reader."
+  fi: "Mikä on kyseessä?"
+  sv: "Vilket gäller?"
+  machine: { fi: true, sv: true }
+
+account.foundThem.reason.here:
+  en: "I found someone on Kuutti"
+  description: "\"Löysin hänet\" (#83), the first reason: the association's measure of success is its share."
+  fi: "Löysin jonkun Kuutista"
+  sv: "Jag hittade någon på Kuutti"
+  machine: { fi: true, sv: true }
+
+account.foundThem.reason.elsewhere:
+  en: "I found someone elsewhere"
+  description: "\"Löysin hänet\" (#83), the second reason."
+  fi: "Löysin jonkun muualta"
+  sv: "Jag hittade någon på annat håll"
+  machine: { fi: true, sv: true }
+
+account.foundThem.reason.other:
+  en: "Another reason"
+  description: "\"Löysin hänet\" (#83), the third reason. Never asks for words: the list is closed."
+  fi: "Jokin muu syy"
+  sv: "Ett annat skäl"
+  machine: { fi: true, sv: true }
+
+account.foundThem.send:
+  en: "Tell Kuutti"
+  description: "\"Löysin hänet\" (#83): sends the chosen reason; enabled once one is chosen."
+  fi: "Kerro Kuutille"
+  sv: "Berätta för Kuutti"
+  machine: { fi: true, sv: true }
+
+account.foundThem.sending:
+  en: "Sending…"
+  description: "\"Löysin hänet\" (#83): the button while the answer is on its way."
+  fi: "Lähetetään…"
+  sv: "Skickar…"
+  machine: { fi: true, sv: true }
+
+account.foundThem.failed:
+  en: "That did not go through. Your choice is kept; try again."
+  description: "\"Löysin hänet\" (#83): a failure that keeps the choice."
+  fi: "Lähetys ei onnistunut. Valintasi on tallessa; yritä uudelleen."
+  sv: "Det gick inte fram. Ditt val finns kvar; försök igen."
+  machine: { fi: true, sv: true }
+
+account.foundThem.thanks:
+  en: "Thank you for telling us."
+  description: "\"Löysin hänet\" (#83): after the answer was counted, or when this account told Kuutti before. Not congratulations: the reason may be another one."
+  fi: "Kiitos, että kerroit meille."
+  sv: "Tack för att du berättade för oss."
   machine: { fi: true, sv: true }
 
 # --- Research opt-in on the account card, and the home screen's onboarding gate (#46) ---

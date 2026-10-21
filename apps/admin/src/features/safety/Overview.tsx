@@ -1,6 +1,6 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
-import { AdminOverview, type OverviewQueue } from "@kuutti/schema";
+import { AdminOverview, type FoundReason, type OverviewQueue } from "@kuutti/schema";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { isLate, useAge } from "../../lib/age.ts";
@@ -20,6 +20,13 @@ const QUEUES: Record<OverviewQueue["queue"], { label: PlainMessageKey; path: str
   photos: { label: "admin.overview.queue.photos", path: "/photos" },
   feedback: { label: "admin.overview.queue.feedback", path: "/feedback" },
 };
+
+/** "Löysin hänet"'s reasons, the first the association's measure of success (#83). */
+const FOUND_REASONS: ReadonlyArray<{ reason: FoundReason; label: PlainMessageKey }> = [
+  { reason: "here", label: "admin.overview.foundThem.here" },
+  { reason: "elsewhere", label: "admin.overview.foundThem.elsewhere" },
+  { reason: "other", label: "admin.overview.foundThem.other" },
+];
 
 type State =
   | { kind: "loading" }
@@ -95,6 +102,29 @@ export function Overview() {
               );
             })}
           </ul>
+          {/* The association's measure (#83, ADR-040): counts by reason, nobody's name. */}
+          <h3 id="found-them-title">{t("admin.overview.foundThem.title")}</h3>
+          <p>{t("admin.overview.foundThem.note")}</p>
+          <table aria-labelledby="found-them-title">
+            <thead>
+              <tr>
+                <th scope="col">{t("admin.overview.foundThem.reason")}</th>
+                <th scope="col">
+                  {t("admin.overview.foundThem.recent", { days: state.overview.foundThem.days })}
+                </th>
+                <th scope="col">{t("admin.overview.foundThem.allTime")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FOUND_REASONS.map(({ reason, label }) => (
+                <tr key={reason}>
+                  <th scope="row">{t(label)}</th>
+                  <td>{state.overview.foundThem.recent[reason]}</td>
+                  <td>{state.overview.foundThem.allTime[reason]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </>
       )}
     </section>

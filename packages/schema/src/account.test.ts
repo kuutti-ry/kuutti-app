@@ -126,6 +126,7 @@ function anExport(): Record<string, unknown> {
       genderChangedAt: null,
       seeksChangedAt: null,
       email: null,
+      foundThemAnswered: false,
     },
     preferences: { seeks: ["man"], ageWindow: { min: 25, max: 40 } },
     dealBreakers: [{ field: "smoking", accept: ["never"], includeUnknown: true, paused: false }],

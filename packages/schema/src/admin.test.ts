@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   AdminAuthExchangeRequest,
   AdminAuthStartQuery,
+  AdminOverview,
   AdminSession,
   AdminWhoAmI,
   AuditQuery,
@@ -219,5 +220,49 @@ describe("the audit log's window (#309)", () => {
   ])("refuses %s", (_, value, code) => {
     expect(codes(AuditQuery, { from: value })).toEqual([code]);
     expect(codes(AuditQuery, { to: value })).toEqual([code]);
+  });
+});
+
+describe("the front page's count of those who found someone (#83, ADR-040)", () => {
+  const none = { here: 0, elsewhere: 0, other: 0 };
+  const overview = (foundThem: unknown) => ({
+    now: at,
+    responseHours: 24,
+    reviewHours: 24,
+    queues: [],
+    foundThem,
+  });
+
+  it("carries the window and a count per reason, recent and in all", () => {
+    const foundThem = { days: 30, recent: { here: 2, elsewhere: 1, other: 0 }, allTime: none };
+    expect(AdminOverview.parse(overview(foundThem)).foundThem).toEqual(foundThem);
+  });
+
+  it.each([
+    ["a window of no days", { days: 0, recent: none, allTime: none }, "too_small"],
+    ["a negative count", { days: 30, recent: { ...none, here: -1 }, allTime: none }, "too_small"],
+    [
+      "a count that is no whole number",
+      { days: 30, recent: none, allTime: { ...none, other: 0.5 } },
+      "invalid_type",
+    ],
+    [
+      "a reason off the list",
+      { days: 30, recent: { ...none, dating: 1 }, allTime: none },
+      "unrecognized_keys",
+    ],
+    [
+      "a person in it",
+      { days: 30, recent: none, allTime: none, accountId: photoId },
+      "unrecognized_keys",
+    ],
+  ])("refuses %s", (_case, foundThem, code) => {
+    expect(codes(AdminOverview, overview(foundThem))).toEqual([code]);
+  });
+
+  it("is required", () => {
+    expect(
+      codes(AdminOverview, { now: at, responseHours: 24, reviewHours: 24, queues: [] }),
+    ).toEqual(["invalid_type"]);
   });
 });
