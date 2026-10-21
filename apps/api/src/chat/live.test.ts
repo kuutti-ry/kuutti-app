@@ -757,9 +757,7 @@ describe("what the socket withholds", () => {
         await signedInAccount(ctx.pool),
         await signedInAccount(ctx.pool),
       ];
-      const id = await conversationBetween(ctx.pool, actor.accountId, other.accountId, {
-        messages: [{ from: "b", body: "Moi" }],
-      });
+      const id = await conversationBetween(ctx.pool, actor.accountId, other.accountId);
       const aside = {
         actor: await conversationBetween(ctx.pool, actor.accountId, third.accountId),
         other: await conversationBetween(ctx.pool, other.accountId, third.accountId),
@@ -768,6 +766,14 @@ describe("what the socket withholds", () => {
         actor: await signedIn(actor.accessToken, [{ id, seq: 0 }]),
         other: await signedIn(other.accessToken, [{ id, seq: 0 }]),
       };
+      // The other's "Moi", sent once both phones listen and heard by both
+      // before anything is recorded. Written before they connected, its
+      // notification could reach the hub after the resume and land inside
+      // what `heard` returns (seen in CI, PR #392); the listener hands the
+      // hub notifications in the order of the commits, so once both have it
+      // nothing of the setup can come after `since`.
+      expect((await send(other.headers, id, "Moi")).status).toBe(201);
+      for (const p of Object.values(phones)) await p.next(isMessage(id, 1));
       const who = { actor, other };
       const opposite = (side: "actor" | "other") => (side === "actor" ? "other" : "actor");
       if (ended) {
