@@ -13,6 +13,12 @@ name: The photo descriptions setting shows them under the photos and chooses wha
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
+# Settings can come back where the sign-in left it, scrolled down to This
+# device, and the row is in the first section: back to the top first.
+- scrollUntilVisible:
+    element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
+    direction: UP
+    timeout: 30000
 # The row says whether the descriptions are shown, which Maestro reads after its title.
 - tapOn: "(Photo descriptions|Kuvien kuvaukset|Bildbeskrivningar)(, .*)?"
 - extendedWaitUntil:

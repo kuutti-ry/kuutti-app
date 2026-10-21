@@ -13,6 +13,12 @@ name: The decision buttons setting places Like and Pass for either hand, and one
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
+# Settings can come back where the sign-in left it, scrolled down to This
+# device, and the row is in the first section: back to the top first.
+- scrollUntilVisible:
+    element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
+    direction: UP
+    timeout: 30000
 # The row says the hand, which Maestro reads after its title.
 - scrollUntilVisible:
     element: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
