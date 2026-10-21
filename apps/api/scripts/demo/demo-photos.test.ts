@@ -84,6 +84,13 @@ const photosOf = (ctx: TestContext, key: string) =>
     )
     .then((r) => r.rows);
 
+/**
+ * The tests that tell whole stories through sharp. Two seconds on a laptop,
+ * but nine of the default fifteen on CI's compose job under coverage before
+ * #379, and over it once the demo's files grew beside them: a minute each.
+ */
+const STORIES_TIMEOUT = 60_000;
+
 describe("the release in the cache", () => {
   test("is used only whole and untouched, and a story asks for what the release has", async () => {
     const { dir, manifest } = await release();
@@ -107,144 +114,148 @@ describe("the release in the cache", () => {
 });
 
 describe("the stories' photos in their conversations (#350)", () => {
-  test("give the chat's pair the story's photo, through the pipeline, once, and none without object storage", async ({
-    ctx,
-  }) => {
-    const assets = await release();
-    const { writer, store, media, logger } = await world(ctx, assets);
-    // The round's cast (#379) has no conversation: its eleven faces through
-    // the pipeline would only spend the test's time.
-    const results = await giveStories(writer, ["iida", "henna", "katja", "minna", "riikka"]);
-    await giveConversations(ctx.client, results, new Date());
-    const story = PERSONA_CONVERSATIONS.find((c) => c.photo)?.photo;
-    if (!story) throw new Error("no story with a photo");
-    const deps = { db: ctx.client, logger, media: media.deps, assets };
-    expect(await givePhotoMessages(deps, results, new Date())).toEqual({
-      sent: 1,
-      already: 0,
-      skipped: 0,
-    });
-    const sent = await ctx.client.query(
-      `SELECT m.seq, m.side, m.kind, m.body, p.purpose, p.position, p.key
+  test(
+    "give the chat's pair the story's photo, through the pipeline, once, and none without object storage",
+    async ({ ctx }) => {
+      const assets = await release();
+      const { writer, store, media, logger } = await world(ctx, assets);
+      // The round's cast (#379) has no conversation: its eleven faces through
+      // the pipeline would only spend the test's time.
+      const results = await giveStories(writer, ["iida", "henna", "katja", "minna", "riikka"]);
+      await giveConversations(ctx.client, results, new Date());
+      const story = PERSONA_CONVERSATIONS.find((c) => c.photo)?.photo;
+      if (!story) throw new Error("no story with a photo");
+      const deps = { db: ctx.client, logger, media: media.deps, assets };
+      expect(await givePhotoMessages(deps, results, new Date())).toEqual({
+        sent: 1,
+        already: 0,
+        skipped: 0,
+      });
+      const sent = await ctx.client.query(
+        `SELECT m.seq, m.side, m.kind, m.body, p.purpose, p.position, p.key
        FROM message m JOIN photo p ON p.id = m.photo_id`,
-    );
-    expect(sent.rows).toEqual([
-      {
-        seq: 7,
-        side: story.from,
-        kind: "photo",
-        body: story.caption,
-        purpose: "message",
-        position: null,
-        key: expect.any(String),
-      },
-    ]);
-    const full = store.objects.get(objectKey(sent.rows[0]?.key, "full"));
-    const meta = await sharp(Buffer.from(full as Uint8Array)).metadata();
-    expect([meta.format, meta.exif]).toEqual(["webp", undefined]);
-    // A second run is answered with the stored message.
-    expect(await givePhotoMessages(deps, results, new Date())).toEqual({
-      sent: 0,
-      already: 1,
-      skipped: 0,
-    });
-    // Without object storage, or with no pictures, none; a release without the picture is refused.
-    expect(
-      await givePhotoMessages({ db: ctx.client, logger, assets }, results, new Date()),
-    ).toEqual({ sent: 0, already: 0, skipped: 1 });
-    expect(await givePhotoMessages({ ...deps, assets: null }, results, new Date())).toEqual({
-      sent: 0,
-      already: 0,
-      skipped: 1,
-    });
-    await expect(
-      givePhotoMessages(
-        { ...deps, assets: { dir: assets.dir, manifest: [] } },
-        results,
-        new Date(),
-      ),
-    ).rejects.toThrow(/no negatives\/no-face\.jpg/);
-  });
+      );
+      expect(sent.rows).toEqual([
+        {
+          seq: 7,
+          side: story.from,
+          kind: "photo",
+          body: story.caption,
+          purpose: "message",
+          position: null,
+          key: expect.any(String),
+        },
+      ]);
+      const full = store.objects.get(objectKey(sent.rows[0]?.key, "full"));
+      const meta = await sharp(Buffer.from(full as Uint8Array)).metadata();
+      expect([meta.format, meta.exif]).toEqual(["webp", undefined]);
+      // A second run is answered with the stored message.
+      expect(await givePhotoMessages(deps, results, new Date())).toEqual({
+        sent: 0,
+        already: 1,
+        skipped: 0,
+      });
+      // Without object storage, or with no pictures, none; a release without the picture is refused.
+      expect(
+        await givePhotoMessages({ db: ctx.client, logger, assets }, results, new Date()),
+      ).toEqual({ sent: 0, already: 0, skipped: 1 });
+      expect(await givePhotoMessages({ ...deps, assets: null }, results, new Date())).toEqual({
+        sent: 0,
+        already: 0,
+        skipped: 1,
+      });
+      await expect(
+        givePhotoMessages(
+          { ...deps, assets: { dir: assets.dir, manifest: [] } },
+          results,
+          new Date(),
+        ),
+      ).rejects.toThrow(/no negatives\/no-face\.jpg/);
+    },
+    STORIES_TIMEOUT,
+  );
 });
 
 describe("the stories with their pictures", () => {
-  test("give each persona the pictures its story counts, through the pipeline, with the EXIF gone and the negatives left to the queue", async ({
-    ctx,
-  }) => {
-    const assets = await release();
-    const { writer, store } = await world(ctx, assets);
-    const results = await giveStories(writer);
-    expect(Object.fromEntries(results.map((r) => [r.key, r.photos]))).toEqual({
-      sanna: 5,
-      onni: 0,
-      noa: 6,
-      kerttu: 4,
-      tapio: 0,
-      ilona: 0,
-      helmi: 0,
-      antti: 0,
-      ville: 0,
-      elina: 0,
-      jussi: 0,
-      laura: 0,
-      emmi: 0,
-      iida: 3,
-      henna: 2,
-      katja: 2,
-      minna: 2,
-      riikka: 2,
-    });
-    const sanna = await photosOf(ctx, "sanna");
-    expect(sanna).toHaveLength(5);
-    // No check is configured in this world: the pictures wait for one, and
-    // the services writer approves nothing by hand (the container's check decides).
-    expect(sanna.every((p) => p.state === "pending" && p.blurhash.length > 0)).toBe(true);
-    const noa = await photosOf(ctx, "noa");
-    expect(noa).toHaveLength(6);
-    // Every stored variant is a WebP without EXIF, the GPS position of the negative included.
-    for (const photo of [...sanna, ...noa]) {
-      const card = store.objects.get(objectKey(photo.key, "card"));
-      expect(card, photo.id).toBeDefined();
-      const meta = await sharp(Buffer.from(card as Uint8Array)).metadata();
-      expect(meta.format).toBe("webp");
-      expect(meta.exif).toBeUndefined();
-    }
-    // A second run resumes and uploads nothing more.
-    const again = await giveStories(writer);
-    expect(again.every((r) => r.photos === 0)).toBe(true);
-    expect(await photosOf(ctx, "noa")).toHaveLength(6);
-    // Every story's pictures through sharp, the round's cast's eleven too
-    // (#379): about thirteen seconds under CI's coverage, over the default.
-  }, 60_000);
+  test(
+    "give each persona the pictures its story counts, through the pipeline, with the EXIF gone and the negatives left to the queue",
+    async ({ ctx }) => {
+      const assets = await release();
+      const { writer, store } = await world(ctx, assets);
+      const results = await giveStories(writer);
+      expect(Object.fromEntries(results.map((r) => [r.key, r.photos]))).toEqual({
+        sanna: 5,
+        onni: 0,
+        noa: 6,
+        kerttu: 4,
+        tapio: 0,
+        ilona: 0,
+        helmi: 0,
+        antti: 0,
+        ville: 0,
+        elina: 0,
+        jussi: 0,
+        laura: 0,
+        emmi: 0,
+        iida: 3,
+        henna: 2,
+        katja: 2,
+        minna: 2,
+        riikka: 2,
+      });
+      const sanna = await photosOf(ctx, "sanna");
+      expect(sanna).toHaveLength(5);
+      // No check is configured in this world: the pictures wait for one, and
+      // the services writer approves nothing by hand (the container's check decides).
+      expect(sanna.every((p) => p.state === "pending" && p.blurhash.length > 0)).toBe(true);
+      const noa = await photosOf(ctx, "noa");
+      expect(noa).toHaveLength(6);
+      // Every stored variant is a WebP without EXIF, the GPS position of the negative included.
+      for (const photo of [...sanna, ...noa]) {
+        const card = store.objects.get(objectKey(photo.key, "card"));
+        expect(card, photo.id).toBeDefined();
+        const meta = await sharp(Buffer.from(card as Uint8Array)).metadata();
+        expect(meta.format).toBe("webp");
+        expect(meta.exif).toBeUndefined();
+      }
+      // A second run resumes and uploads nothing more.
+      const again = await giveStories(writer);
+      expect(again.every((r) => r.photos === 0)).toBe(true);
+      expect(await photosOf(ctx, "noa")).toHaveLength(6);
+    },
+    STORIES_TIMEOUT,
+  );
 
-  test("the look a moderator gives, locally: the faces named are approved, the rest and other accounts untouched", async ({
-    ctx,
-  }) => {
-    const assets = await release();
-    const { writer } = await world(ctx, assets);
-    await giveStories(writer);
-    const noa = await photosOf(ctx, "noa");
-    const faces = noa.slice(0, 2).map((p) => p.id);
-    const { rows } = await ctx.client.query<{ id: string }>(
-      "SELECT account_id AS id FROM photo WHERE id = $1",
-      [faces[0]],
-    );
-    const accountId = rows[0]?.id as string;
-    expect(await approveLocally(ctx.client, accountId, faces)).toBe(2);
-    expect(await listApprovedPhotos(ctx.client, accountId)).toHaveLength(2);
-    expect((await photosOf(ctx, "noa")).map((p) => p.state)).toEqual([
-      "approved",
-      "approved",
-      "pending",
-      "pending",
-      "pending",
-      "pending",
-    ]);
-    // Somebody else's account, the same ids: nothing moves.
-    const other = await signedInAccount(ctx.client);
-    expect(await approveLocally(ctx.client, other.accountId, faces)).toBe(0);
-    expect(await approveLocally(ctx.client, accountId, [])).toBe(0);
-  });
+  test(
+    "the look a moderator gives, locally: the faces named are approved, the rest and other accounts untouched",
+    async ({ ctx }) => {
+      const assets = await release();
+      const { writer } = await world(ctx, assets);
+      await giveStories(writer);
+      const noa = await photosOf(ctx, "noa");
+      const faces = noa.slice(0, 2).map((p) => p.id);
+      const { rows } = await ctx.client.query<{ id: string }>(
+        "SELECT account_id AS id FROM photo WHERE id = $1",
+        [faces[0]],
+      );
+      const accountId = rows[0]?.id as string;
+      expect(await approveLocally(ctx.client, accountId, faces)).toBe(2);
+      expect(await listApprovedPhotos(ctx.client, accountId)).toHaveLength(2);
+      expect((await photosOf(ctx, "noa")).map((p) => p.state)).toEqual([
+        "approved",
+        "approved",
+        "pending",
+        "pending",
+        "pending",
+        "pending",
+      ]);
+      // Somebody else's account, the same ids: nothing moves.
+      const other = await signedInAccount(ctx.client);
+      expect(await approveLocally(ctx.client, other.accountId, faces)).toBe(0);
+      expect(await approveLocally(ctx.client, accountId, [])).toBe(0);
+    },
+    STORIES_TIMEOUT,
+  );
 
   test("the population's faces go through the pipeline per person, one copy per face, approved where no check decides", async ({
     ctx,
