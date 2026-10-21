@@ -53,6 +53,9 @@ const saveRoute = createRoute({
     400: errorContent("Validation failed."),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),
+    429: errorContent(
+      "change_too_soon: whom one seeks was changed within matching_config change_cadence_days; nothing was saved, and GET /onboarding's nextChange.seeks says from when.",
+    ),
   },
 });
 
