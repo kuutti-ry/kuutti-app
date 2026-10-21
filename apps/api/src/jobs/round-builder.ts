@@ -16,6 +16,7 @@ import {
   likedYouPlaces,
   type PoolPerson,
   pausedOf,
+  type RelaxedCandidate,
   relaxationsOf,
   relaxedBy,
   roundOrder,
@@ -416,7 +417,8 @@ export async function relaxationOffers(
 ): Promise<{ short: boolean; offers: RelaxationOffer[] } | null> {
   const t = await todayOf(deps, accountId);
   if (!t) return null;
-  const short = t.today.ordered < t.config.round_size;
+  // Short while the round gave fewer ordered places than round_size, an undone one counted (ADR-042 §2).
+  const short = t.today.given < t.config.round_size && t.today.last < ROUND_ENTRIES_MAX;
   if (!short) return { short, offers: [] };
   const relaxed = new Set<string>(t.today.relaxed.map((r) => r.field));
   const offers: RelaxationOffer[] = [];
@@ -460,21 +462,39 @@ export async function relaxedCandidates(
   deps: BuilderDeps,
   accountId: string,
   relaxation: Relaxation,
-): Promise<{ basis: Relaxation[]; candidateIds: string[] } | null> {
+): Promise<{ basis: Relaxation[]; candidates: RelaxedCandidate[] } | null> {
   const t = await todayOf(deps, accountId);
   if (!t) return null;
-  if (t.today.relaxed.some((r) => r.field === relaxation.field)) return null;
-  const dealBreaker = t.effective.dealBreakers.find((d) => d.field === relaxation.field);
+  // The stored deal-breaker: one relaxed today meanwhile is the writer's to refuse, under the round's lock.
+  const dealBreaker = t.owner.person.dealBreakers.find((d) => d.field === relaxation.field);
   if (!dealBreaker || pausedOf(dealBreaker.field, t.owner.person.fields)) return null;
   if (relaxation.kind === "unanswered" && dealBreaker.includeUnknown) return null;
   const wider = relaxedBy(t.effective, [relaxation]);
-  const candidateIds = orderedPlaces(
-    { ...t.owner, person: wider },
-    t.open.filter(letsIn(wider, t.effective)),
-    t.history,
-    { day: t.day, size: ROUND_ENTRIES_MAX },
-  ).map((place) => place.candidateId);
-  return { basis: t.today.relaxed, candidateIds };
+  const admitted = t.open.filter(letsIn(wider, t.effective));
+  const byId = new Map(admitted.map((subject) => [subject.id, subject.person]));
+  const all = [...t.today.relaxed, relaxation];
+  // The day's other relaxations each one needs: those without which the person's filters still keep them out.
+  const needsOf = (candidate: PoolPerson) =>
+    t.today.relaxed
+      .filter(
+        (r) =>
+          !inEachOthersPool(
+            relaxedBy(
+              t.owner.person,
+              all.filter((other) => other.field !== r.field),
+            ),
+            candidate,
+          ),
+      )
+      .map((r) => r.field);
+  const candidates = orderedPlaces({ ...t.owner, person: wider }, admitted, t.history, {
+    day: t.day,
+    size: ROUND_ENTRIES_MAX,
+  }).flatMap((place) => {
+    const person = byId.get(place.candidateId);
+    return person ? [{ candidateId: place.candidateId, needs: needsOf(person) }] : [];
+  });
+  return { basis: t.today.relaxed, candidates };
 }
 
 /** The nightly job: everybody's round for the day, after the gate has let people in. */

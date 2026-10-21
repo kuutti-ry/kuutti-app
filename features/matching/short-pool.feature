@@ -43,7 +43,7 @@ Feature: The short pool: coming back, relaxing a deal-breaker for the day, and w
   Scenario: One tap undoes a relaxation, and takes back its undecided cards only
     Given "A" relaxed smoking for today and liked one of the cards it added
     When "A" undoes it
-    Then the other cards leave the round, the liked one stays, and smoking is offered again
+    Then the other cards leave the round, the liked one stays, and their places stay given, so nothing more is offered today
 
   Scenario: Tomorrow's round is built from the deal-breakers as stored
     Given "A" relaxed smoking today

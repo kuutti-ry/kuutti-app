@@ -1,6 +1,6 @@
 # ADR-037: Liked-you in the round
 
-- Status: accepted 2026-10-20 (#97, built as written here on the maintainer's decisions of that day, #97's comments of 13/10 and 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§7: no liked-you or fish places for a shadow-banned person, the maintainer's of that day; §1: a like on a relaxed card waives the liker's deal-breaker on its field for that one person, #99, ADR-042 §7; see History)
+- Status: accepted 2026-10-20 (#97, built as written here on the maintainer's decisions of that day, #97's comments of 13/10 and 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§7: no liked-you or fish places for a shadow-banned person, the maintainer's of that day; §1: a like on a relaxed card waives the liker's deal-breakers that card came in under for that one person, #99, ADR-042 §7; see History)
 - Date: 2026-10-20
 - Follows: TD-11 (liked-you inside the round, free; the pending-like queue and its expiry), TD-12 (the reason on every card, the pass cooldown), TD-13 (the lower cap for a contested pond, waiting), ADR-022 §4 (a break stops no clock), ADR-030 §11 (Block or report on a card), ADR-034 (the round record), ADR-035 (the builder), CLAUDE.md rule 7 and Product constraints; issues #97, #95, #98, #100, #378, #379
 
@@ -41,4 +41,4 @@ The builder of ADR-035 orders the cards of a round and leaves its first places, 
 - 2026-10-20: written with #97's build, on the maintainer's decisions of that day.
 - 2026-10-20 (#378, ADR-039 §4): those whose waiting like is a fish take the first places ahead of the rest, labelled `fish`.
 - 2026-10-21: §7, no liked-you or fish places for a shadow-banned person, the maintainer's choice of that day after the audit of the first cut found that a like back told them of the ban.
-- 2026-10-21 (#99, ADR-042 §7): §1 amended, the maintainer's of that day. A like given on a relaxed card counts as the liker accepting that one person: the waiting like's place asks the pool both ways with the liker's deal-breaker on the card's field (`relaxed_field`) set aside, and every other filter of either side as always.
+- 2026-10-21 (#99, ADR-042 §7): §1 amended, the maintainer's of that day. A like given on a relaxed card counts as the liker accepting that one person: the waiting like's place asks the pool both ways with the liker's deal-breakers that card came in under (`relaxed_with`) set aside, and every other filter of either side as always.

@@ -370,11 +370,8 @@ describe("relaxing a deal-breaker for the day", () => {
       [1, null],
       [liked.position, "like"],
     ]);
-    expect(await offers(app, headers)).toMatchObject({
-      short: true,
-      offers: [{ ...UNANSWERED }, { ...ASIDE }],
-      relaxed: [],
-    });
+    // round_size 3: the card before, the liked one and the one taken back; an undo gives no room back.
+    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [] });
   });
 
   test("Tomorrow's round is built from the deal-breakers as stored", async ({ ctx }) => {
@@ -422,6 +419,50 @@ describe("relaxing a deal-breaker for the day", () => {
     expect(RelaxationUndone.parse(await undone.json()).removed).toHaveLength(2);
     expect(await roundOf(ctx.client, a)).toEqual([]);
     expect((await offers(app, headers)).relaxed).toEqual([{ field: "hasKids", kind: "aside" }]);
+  });
+
+  test("undoing the first relaxation keeps a later one's card that did not need it", async ({
+    ctx,
+  }) => {
+    const { a, of } = await pondWith(ctx, "test-short-stacked-keep", [
+      { fields: { hasKids: "yes_with_me" }, count: 1 },
+      { fields: { smoking: "never", hasKids: "no" }, count: 1 },
+    ]);
+    const [b] = of[0] ?? [];
+    const [d] = of[1] ?? [];
+    if (!b || !d) throw new Error("people not written");
+    await dealBreaker(ctx.client, a, "hasKids", ["yes_with_me"], false);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    // B needs smoking alone, D kids alone.
+    expect(await added(await relax(app, headers, UNANSWERED))).toHaveLength(1);
+    expect(
+      await added(await relax(app, headers, { field: "hasKids", kind: "aside" })),
+    ).toHaveLength(1);
+
+    await undo(app, headers, "smoking");
+
+    expect((await roundOf(ctx.client, a)).map((e) => e.candidate_id)).toEqual([d]);
+  });
+
+  test("a person whose profile no longer counts as complete is offered nothing, and relaxes nothing", async ({
+    ctx,
+  }) => {
+    const { a } = await pondWith(ctx, "test-short-incomplete", [{ fields: {}, count: 2 }]);
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    await added(await relax(app, headers, ASIDE));
+    // The profile loses what made it complete: the pond no longer counts A.
+    await ctx.client.query(
+      "UPDATE profile SET bio = NULL, bio_preset = NULL WHERE account_id = $1",
+      [a],
+    );
+
+    expect(await offers(app, headers)).toEqual({ short: false, offers: [], relaxed: [ASIDE] });
+    expect((await relax(app, headers, { field: "smoking", kind: "unanswered" })).status).toBe(409);
+    expect((await relax(app, headers, { field: "hasKids", kind: "aside" })).status).toBe(404);
   });
 
   test("a like on a card two relaxations let in reaches its person", async ({ ctx }) => {

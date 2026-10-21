@@ -1200,8 +1200,11 @@ describe("the short pool (#99, ADR-042)", () => {
     const sent = api(
       (call) => {
         if (call.path === RELAXATIONS) {
+          // An undo gives no room back (ADR-042 §5): nothing more is offered today.
           return json(
-            relaxed ? { ...offered, relaxed: [] } : { short: true, offers: [], relaxed: [] },
+            relaxed
+              ? { short: false, offers: [], relaxed: [] }
+              : { short: true, offers: [], relaxed: [{ field: "smoking", kind: "unanswered" }] },
           );
         }
         if (call.path === `${RELAXATIONS}/smoking` && call.method === "DELETE") {
@@ -1219,8 +1222,11 @@ describe("the short pool (#99, ADR-042)", () => {
 
     expect(screen.queryByRole("heading", { name: "Liisa, 35" })).toBeNull();
     expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
-    // The panel read again: smoking is offered once more.
-    await waitFor(() => expect(screen.getByRole("button", { name: INCLUDE })).toBeTruthy());
+    // The panel read again, and has nothing more to offer.
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Undo for today: Smoking" })).toBeNull(),
+    );
+    expect(screen.queryByRole("heading", { name: "Few people today" })).toBeNull();
     expect(sent.calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual([
       `${RELAXATIONS}/smoking`,
     ]);
@@ -1230,9 +1236,10 @@ describe("the short pool (#99, ADR-042)", () => {
     let undone = false;
     const sent = api((call) => {
       if (call.path === RELAXATIONS) {
+        // Another deal-breaker is still offered: the undone one's places stay given, kids' room is left.
         return json(
           undone
-            ? offered
+            ? { short: true, offers: [{ field: "hasKids", kind: "aside", more: 10 }], relaxed: [] }
             : { short: true, offers: [], relaxed: [{ field: "smoking", kind: "aside" }] },
         );
       }
@@ -1248,6 +1255,7 @@ describe("the short pool (#99, ADR-042)", () => {
     await press("Undo for today: Smoking");
 
     await waitFor(() => expect(heading("Few people today")).toBeTruthy());
+    expect(screen.queryByRole("button", { name: "Undo for today: Smoking" })).toBeNull();
     expect(sent.calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
   });
 
