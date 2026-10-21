@@ -6958,10 +6958,10 @@ account.email.title:
   machine: { fi: true, sv: true }
 
 account.email.explain:
-  en: "Optional. A way for Kuutti to reach you. Never shown to anyone, never a login, and nothing is sent to it yet."
-  description: "Explanation of the optional e-mail (#148): the honest reason, as the sheet asks; on the card under its heading."
-  fi: "Vapaaehtoinen. Tapa, jolla Kuutti voi tavoittaa sinut. Ei näytetä kenellekään, ei koskaan kirjautumista varten, eikä tänne vielä lähetetä mitään."
-  sv: "Frivilligt. Ett sätt för Kuutti att nå dig. Visas aldrig för någon, aldrig en inloggning, och inget skickas hit ännu."
+  en: "Optional. A way for Kuutti to reach you. Never shown to anyone and never a login. A code confirms the address; nothing else is sent to it without asking you first."
+  description: "Explanation of the optional e-mail (#148, #385): the honest reason, as the sheet asks, and that the only message is the code until the person agrees to more (TD-18, #196); on the card under its heading."
+  fi: "Vapaaehtoinen. Tapa, jolla Kuutti voi tavoittaa sinut. Ei näytetä kenellekään, eikä koskaan kirjautumista varten. Koodi vahvistaa osoitteen; muuta tänne ei lähetetä kysymättä ensin sinulta."
+  sv: "Frivilligt. Ett sätt för Kuutti att nå dig. Visas aldrig för någon och är aldrig en inloggning. En kod bekräftar adressen; inget annat skickas hit utan att du först tillfrågas."
   machine: { fi: true, sv: true }
 
 account.email.label:
@@ -7006,11 +7006,137 @@ account.email.failed:
   sv: "Adressen kunde inte sparas. Försök igen."
   machine: { fi: true, sv: true }
 
-account.email.set:
-  en: "An address is set."
-  description: "Said on the card while an e-mail is set; the address itself is in the input (#148)."
-  fi: "Osoite on tallennettu."
-  sv: "En adress är sparad."
+account.email.unconfirmed:
+  en: "An address is set, not confirmed yet."
+  description: "Said on the card while an e-mail is set and its code has not been typed (#148, #385); the address itself is in the input."
+  fi: "Osoite on tallennettu, mutta sitä ei ole vielä vahvistettu."
+  sv: "En adress är sparad men inte bekräftad ännu."
+  machine: { fi: true, sv: true }
+
+account.email.confirmed:
+  en: "An address is set and confirmed."
+  description: "Said on the card once the e-mail's code was typed right (#385)."
+  fi: "Osoite on tallennettu ja vahvistettu."
+  sv: "En adress är sparad och bekräftad."
+  machine: { fi: true, sv: true }
+
+account.email.codeSent:
+  en: "A code is on its way to the address. It works until {time}."
+  description: "Said on the card while a code waits (#385, ADR-043); {time} is when it stops working, as hours and minutes in the person's language."
+  fi: "Koodi on matkalla osoitteeseen. Se toimii kello {time} asti."
+  sv: "En kod är på väg till adressen. Den gäller till klockan {time}."
+  machine: { fi: true, sv: true }
+
+account.email.codeLabel:
+  en: "The code from the message"
+  description: "Label of the input for the six digits of the confirmation message (#385)."
+  fi: "Viestin koodi"
+  sv: "Koden i meddelandet"
+  machine: { fi: true, sv: true }
+
+account.email.confirm:
+  en: "Confirm the address"
+  description: "Button that sends the typed code (#385)."
+  fi: "Vahvista osoite"
+  sv: "Bekräfta adressen"
+  machine: { fi: true, sv: true }
+
+account.email.send:
+  en: "Send a code"
+  description: "Button that sends a code to an unconfirmed address when none waits (#385)."
+  fi: "Lähetä koodi"
+  sv: "Skicka en kod"
+  machine: { fi: true, sv: true }
+
+account.email.sendAgain:
+  en: "Send a new code"
+  description: "Button that sends a fresh code while one waits; the earlier one stops working (#385)."
+  fi: "Lähetä uusi koodi"
+  sv: "Skicka en ny kod"
+  machine: { fi: true, sv: true }
+
+account.email.confirmedNow:
+  en: "The address is confirmed."
+  description: "Said once, when the code was right (#385)."
+  fi: "Osoite on vahvistettu."
+  sv: "Adressen är bekräftad."
+  machine: { fi: true, sv: true }
+
+account.email.codeWrong:
+  en: "That is not the code. Check the message and try again."
+  description: "Said when the typed code is wrong and tries remain (#385, three in all); the last wrong one says account.email.codeSpent instead."
+  fi: "Tuo ei ole koodi. Tarkista viesti ja yritä uudelleen."
+  sv: "Det är inte koden. Kontrollera meddelandet och försök igen."
+  machine: { fi: true, sv: true }
+
+account.email.codeSpent:
+  en: "Too many wrong codes. Send a new one."
+  description: "Said when the last try was wrong and the code no longer works (#385)."
+  fi: "Liian monta väärää koodia. Lähetä uusi."
+  sv: "För många fel koder. Skicka en ny."
+  machine: { fi: true, sv: true }
+
+account.email.codeExpired:
+  en: "That code has expired. Send a new one."
+  description: "Said when the code was typed after its thirty minutes (#385)."
+  fi: "Koodi on vanhentunut. Lähetä uusi."
+  sv: "Koden har gått ut. Skicka en ny."
+  machine: { fi: true, sv: true }
+
+account.email.codeNone:
+  en: "No code is waiting. Send a new one."
+  description: "Said when a code is typed but none waits, for instance after the address changed on another phone (#385)."
+  fi: "Mikään koodi ei odota. Lähetä uusi."
+  sv: "Ingen kod väntar. Skicka en ny."
+  machine: { fi: true, sv: true }
+
+account.email.sendLimit:
+  en: "That is enough codes for today. You can send a new one after midnight."
+  description: "Said when the day's five codes are sent (#385); the day rolls at midnight in Finland. Said plainly, nobody is limited in silence."
+  fi: "Koodeja on lähetetty tälle päivälle tarpeeksi. Voit lähettää uuden keskiyön jälkeen."
+  sv: "Det räcker med koder för i dag. Du kan skicka en ny efter midnatt."
+  machine: { fi: true, sv: true }
+
+account.email.mailUnavailable:
+  en: "The code could not be sent just now. Try again later."
+  description: "Said when no mail could be sent (#385): the service failed, or this environment sends none."
+  fi: "Koodia ei voitu lähettää juuri nyt. Yritä myöhemmin uudelleen."
+  sv: "Koden kunde inte skickas just nu. Försök igen senare."
+  machine: { fi: true, sv: true }
+
+account.email.codeFailed:
+  en: "Something went wrong with the code. Try again."
+  description: "Said when sending or confirming a code failed for a reason the card has no words of its own for (#385)."
+  fi: "Koodin kanssa meni jotain vikaan. Yritä uudelleen."
+  sv: "Något gick fel med koden. Försök igen."
+  machine: { fi: true, sv: true }
+
+mail.emailCode.subject:
+  en: "Your code for Kuutti"
+  description: "Subject of the message that confirms the optional e-mail (#385, ADR-043). Plain text, names nobody."
+  fi: "Koodisi Kuuttiin"
+  sv: "Din kod till Kuutti"
+  machine: { fi: true, sv: true }
+
+mail.emailCode.code:
+  en: "Your code is {code}. It works for {minutes, plural, one {# minute} other {# minutes}}."
+  description: "First paragraph of the confirmation message (#385, ADR-043), plain text in the language of the request that asked for it. {code} is the six digits; {minutes} how long they work. No link (ADR-043 §3)."
+  fi: "Koodisi on {code}. Se on voimassa {minutes, plural, one {# minuutin} other {# minuutin}} ajan."
+  sv: "Din kod är {code}. Den gäller i {minutes, plural, one {# minut} other {# minuter}}."
+  machine: { fi: true, sv: true }
+
+mail.emailCode.ignore:
+  en: "Someone added this address in the Kuutti app as a way to stay in touch. If that was not you, you can ignore this message."
+  description: "Second paragraph of the confirmation message (#385): it names nobody, since the address may be somebody else's, and asks nothing but to ignore it."
+  fi: "Joku lisäsi tämän osoitteen Kuutti-sovellukseen yhteydenpitoa varten. Jos se et ollut sinä, voit jättää tämän viestin huomiotta."
+  sv: "Någon lade till den här adressen i Kuutti-appen för att hålla kontakten. Om det inte var du kan du bortse från det här meddelandet."
+  machine: { fi: true, sv: true }
+
+mail.signature:
+  en: "Kuutti ry"
+  description: "The last line of every message Kuutti sends (#385): the association's name, never an address (the maintainer, 06/10/2026)."
+  fi: "Kuutti ry"
+  sv: "Kuutti ry"
   machine: { fi: true, sv: true }
 
 account.email.done:

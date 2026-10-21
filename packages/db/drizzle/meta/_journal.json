@@ -540,6 +540,20 @@
       "when": 1792599987666,
       "tag": "0076_short_pool",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1792603362826,
+      "tag": "0077_email_confirmation",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1792603363537,
+      "tag": "0078_email_confirmation_config",
+      "breakpoints": true
     }
   ]
 }

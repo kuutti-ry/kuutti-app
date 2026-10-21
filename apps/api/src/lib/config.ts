@@ -71,6 +71,13 @@ const Env = z.object({
   // AWS (the SSM parameter `moderation`), queue everywhere else, which sends
   // every photo to a person and approves nothing by itself.
   MODERATION: z.enum(["rekognition", "queue"]).default("queue"),
+  // Mail (#385, ADR-043): ses through the instance role on AWS (the SSM
+  // parameter `mail`); log on a developer's machine and in tests, which writes
+  // the message to the log so its code can be typed; off sends nothing. Unset,
+  // it is log in development and test and off everywhere else.
+  MAIL: z.enum(["ses", "log", "off"]).optional(),
+  // The sender of every message: the SES identity kuutti.app (infra/bootstrap/mail.tf).
+  MAIL_FROM: z.string().min(1).default("Kuutti <noreply@kuutti.app>"),
   // Where a staff bank login returns to (#49): the moderation panel's origin,
   // which is also on the CORS allowlist. Vite's dev server by default.
   ADMIN_APP_URL: z.url().default("http://localhost:5173"),
@@ -188,11 +195,12 @@ export type PreviewConfig = {
 
 export type Config = Omit<
   z.infer<typeof Env>,
-  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY"
+  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY" | "MAIL"
 > & {
   RATE_LIMIT_PER_MINUTE: number;
   SIGN_IN_RATE_LIMIT_PER_MINUTE: number;
   TRUSTED_PROXY: TrustedProxy;
+  MAIL: "ses" | "log" | "off";
   databaseUrl: string;
   corsAllowedOrigins: ReadonlySet<string>;
   preview?: PreviewConfig;
@@ -289,6 +297,12 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     env.TELIA_ENCRYPTION_KEY = undefined;
     env.HETU_HMAC_KEY = undefined;
   }
+  // A deployed log is no place for a confirmation code (ADR-043 §4).
+  if (env.MAIL === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
+    throw new ConfigError(["MAIL"], [`MAIL: log is for development and test, not ${env.APP_ENV}`]);
+  }
+  const mail =
+    env.MAIL ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
   const trustedProxy: TrustedProxy =
     env.TRUSTED_PROXY ??
     (env.APP_ENV === "development" || env.APP_ENV === "test" ? "none" : "traefik");
@@ -297,6 +311,7 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     RATE_LIMIT_PER_MINUTE: rateLimit,
     SIGN_IN_RATE_LIMIT_PER_MINUTE: signInRateLimit,
     TRUSTED_PROXY: trustedProxy,
+    MAIL: mail,
     databaseUrl: preview ? withDatabase(baseUrl, preview.database) : baseUrl,
     corsAllowedOrigins: allowedOrigins(env),
     ...(preview

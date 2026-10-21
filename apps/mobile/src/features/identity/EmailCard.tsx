@@ -1,7 +1,8 @@
-import { EMAIL_MAX } from "@kuutti/schema";
+import { formatTime, type PlainMessageKey } from "@kuutti/i18n";
+import { type AccountEmailResponse, EMAIL_CODE_LENGTH, EMAIL_MAX } from "@kuutti/schema";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { AccessibilityInfo, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
@@ -12,30 +13,85 @@ import { DEAL_BREAKERS_PATH } from "@/features/profile";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
-import { clearEmail, fetchEmail, saveEmail } from "./email-client";
+import { clearEmail, confirmEmailCode, fetchEmail, saveEmail, sendEmailCode } from "./email-client";
 import { useSession } from "./session";
 
-type Notice = "saved" | "invalid" | "failed" | null;
+type Notice =
+  | "saved"
+  | "invalid"
+  | "failed"
+  | "confirmedNow"
+  | "codeWrong"
+  | "codeSpent"
+  | "codeExpired"
+  | "codeNone"
+  | "sendLimit"
+  | "mailUnavailable"
+  | "codeFailed";
+
+const NOTICE: Readonly<Record<Notice, PlainMessageKey>> = {
+  saved: "account.email.saved",
+  invalid: "account.email.invalid",
+  failed: "account.email.failed",
+  confirmedNow: "account.email.confirmedNow",
+  codeWrong: "account.email.codeWrong",
+  codeSpent: "account.email.codeSpent",
+  codeExpired: "account.email.codeExpired",
+  codeNone: "account.email.codeNone",
+  sendLimit: "account.email.sendLimit",
+  mailUnavailable: "account.email.mailUnavailable",
+  codeFailed: "account.email.codeFailed",
+};
+
+/** The code routes' refusals in the card's words (ADR-043 §3); any other says codeFailed. */
+const REFUSALS = new Map<string | undefined, Notice>([
+  ["email_code_wrong", "codeWrong"],
+  ["email_code_spent", "codeSpent"],
+  ["email_code_expired", "codeExpired"],
+  ["email_code_none", "codeNone"],
+  ["email_code_budget_exceeded", "sendLimit"],
+  ["mail_unavailable", "mailUnavailable"],
+]);
+
+/** The refusals after which no code waits: the card offers to send one again. */
+const NO_CODE_LEFT = new Set<string | undefined>([
+  "email_code_spent",
+  "email_code_expired",
+  "email_code_none",
+]);
+
+/**
+ * The refusals that say the address changed on another phone meanwhile,
+ * confirmed there or removed: the card reads it again and shows what the API
+ * holds now.
+ */
+const CHANGED_ELSEWHERE = new Set<string | undefined>(["email_confirmed", "email_none"]);
+
+/**
+ * What a call says, line by line: one of the card's notices, or that a code
+ * went and until when it works. A save that sends one says both.
+ */
+type Said = Notice | { codeSentUntil: string };
+
+type Load =
+  | { state: "loading" }
+  | { state: "unavailable"; error: unknown }
+  | { state: "ready"; email: AccountEmailResponse };
 
 /**
  * The optional e-mail (#148, TD-18) as a card: the honest reason first, the
- * address, save and remove. Never shown to anybody else and never a login;
- * the API keeps it out of every log line. On its own screen in Settings
- * (#287), and as the last of the later screens. While the address is being
- * read it says so, and a read that failed says why, with a way to read it
- * again; nothing for a signed-out device.
+ * address, save and remove, and the code that confirms it (#385, ADR-043).
+ * Never shown to anybody else and never a login; the API keeps it out of
+ * every log line. On its own screen in Settings (#287), and as the last of
+ * the later screens. While the address is being read it says so, and a read
+ * that failed says why, with a way to read it again; nothing for a
+ * signed-out device.
  */
 export function EmailCard() {
   const { t } = useT();
   const session = useSession();
-  const tap = useHapticTap();
   const signedIn = session.status === "signed-in";
-  const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
-  const [error, setError] = useState<unknown>(null);
-  const [stored, setStored] = useState<string | null>(null);
-  const [typed, setTyped] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<Notice>(null);
+  const [load, setLoad] = useState<Load>({ state: "loading" });
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -45,18 +101,13 @@ export function EmailCard() {
     };
   }, []);
   const read = useCallback(() => {
-    setState("loading");
+    setLoad({ state: "loading" });
     fetchEmail().then(
       (email) => {
-        if (!mounted.current) return;
-        setStored(email);
-        setTyped(email ?? "");
-        setState("ready");
+        if (mounted.current) setLoad({ state: "ready", email });
       },
-      (failure: unknown) => {
-        if (!mounted.current) return;
-        setError(failure);
-        setState("unavailable");
+      (error: unknown) => {
+        if (mounted.current) setLoad({ state: "unavailable", error });
       },
     );
   }, []);
@@ -65,33 +116,143 @@ export function EmailCard() {
   }, [signedIn, read]);
 
   if (!signedIn) return null;
-  if (state === "loading") {
+  if (load.state === "loading") {
     return (
       <Text variant="muted" accessibilityLiveRegion="polite">
         {t("account.email.loading")}
       </Text>
     );
   }
-  if (state === "unavailable") {
-    return <LoadFailed headline={t("account.email.loadFailed")} error={error} onRetry={read} />;
+  if (load.state === "unavailable") {
+    return (
+      <LoadFailed headline={t("account.email.loadFailed")} error={load.error} onRetry={read} />
+    );
   }
+  return <EmailForm first={load.email} />;
+}
 
-  const run = async (call: () => Promise<string | null>) => {
+/**
+ * The card once the address is read: it holds what the API last answered,
+ * whether a code waits included. The API answers none past the code's end, so
+ * a card left open past it keeps the code's field until Confirm's answer says
+ * the code expired. Every call clears the last notice and says its own, in a
+ * live region and, on iOS, aloud.
+ */
+function EmailForm({ first }: { first: AccountEmailResponse }) {
+  const { t, locale } = useT();
+  const tap = useHapticTap();
+  // Together, so an answer can tell whether the person has typed in the field
+  // since the last one.
+  const [{ stored, typed }, setForm] = useState({ stored: first, typed: first.email ?? "" });
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<readonly Said[]>([]);
+  // Which answer the notice is: each one a fresh live region, so Android says
+  // the same words again for a second code within the minute.
+  const [answers, setAnswers] = useState(0);
+  // Whole sentences one after another; nothing is inflected around them.
+  const wordsOf = (lines: readonly Said[]): string =>
+    lines
+      .map((line) =>
+        typeof line === "string"
+          ? t(NOTICE[line])
+          : t("account.email.codeSent", {
+              time: formatTime(locale, new Date(line.codeSentUntil)),
+            }),
+      )
+      .join(" ");
+
+  const run = async (call: () => Promise<readonly Said[]>) => {
+    tap();
     setBusy(true);
-    setNotice(null);
+    setSaid([]);
     try {
-      const email = await call();
-      setStored(email);
-      setTyped(email ?? "");
-      setNotice("saved");
-    } catch (error) {
-      setNotice(error instanceof ApiError && error.status === 400 ? "invalid" : "failed");
+      const next = await call();
+      setSaid(next);
+      setAnswers((n) => n + 1);
+      // iOS has no live regions; Android's speak the same words already. Said
+      // for each call, not as the words change: a second code sent within the
+      // minute has the same words as the first, and is said again.
+      if (next.length > 0 && Platform.OS === "ios") {
+        AccessibilityInfo.announceForAccessibility(wordsOf(next));
+      }
     } finally {
       setBusy(false);
     }
   };
-  const address = typed.trim();
 
+  /**
+   * An answer to a send, a confirmation or a read again becomes the card's;
+   * the field follows it while it still holds the address answered before,
+   * so another phone's change shows, and what the person typed stays.
+   */
+  const adopt = (next: AccountEmailResponse) =>
+    setForm((form) => ({
+      stored: next,
+      typed: form.typed === form.stored.email ? (next.email ?? "") : form.typed,
+    }));
+
+  /** A refused send or confirmation in words; the refusals that leave no code take the waiting one away. */
+  const refused = async (error: unknown): Promise<readonly Said[]> => {
+    const reason = error instanceof ApiError ? error.code : undefined;
+    if (CHANGED_ELSEWHERE.has(reason)) {
+      try {
+        const now = await fetchEmail();
+        adopt(now);
+        return now.confirmed ? ["confirmedNow"] : [];
+      } catch {
+        return ["codeFailed"];
+      }
+    }
+    if (NO_CODE_LEFT.has(reason)) {
+      setForm((form) => ({ ...form, stored: { ...form.stored, codeExpiresAt: null } }));
+    }
+    return [REFUSALS.get(reason) ?? "codeFailed"];
+  };
+
+  const send = async (): Promise<readonly Said[]> => {
+    let sent: AccountEmailResponse;
+    try {
+      sent = await sendEmailCode();
+    } catch (error) {
+      return refused(error);
+    }
+    adopt(sent);
+    setCode("");
+    // Narrowing only: a sent code is answered with until when it works.
+    return sent.codeExpiresAt === null ? [] : [{ codeSentUntil: sent.codeExpiresAt }];
+  };
+
+  const confirm = async (): Promise<readonly Said[]> => {
+    try {
+      adopt(await confirmEmailCode(code));
+      return ["confirmedNow"];
+    } catch (error) {
+      return refused(error);
+    } finally {
+      setCode("");
+    }
+  };
+
+  /** A save or a removal, and the one code a new address gets. */
+  const keep = async (call: () => Promise<AccountEmailResponse>): Promise<readonly Said[]> => {
+    let next: AccountEmailResponse;
+    try {
+      next = await call();
+    } catch (error) {
+      return [error instanceof ApiError && error.status === 400 ? "invalid" : "failed"];
+    }
+    setForm({ stored: next, typed: next.email ?? "" });
+    setCode("");
+    // Setting or changing an address sends its confirmation (#385). The save
+    // itself sends nothing, so a send that fails leaves the address saved:
+    // "Saved.", then what the send says (ADR-043 §2).
+    const needsCode = next.email !== null && !next.confirmed && next.codeExpiresAt === null;
+    return needsCode ? ["saved", ...(await send())] : ["saved"];
+  };
+
+  const words = said.length === 0 ? null : wordsOf(said);
+  const address = typed.trim();
   return (
     <Card className="w-full max-w-md">
       <View accessibilityLabel={t("account.email.title")} className="gap-4">
@@ -108,37 +269,44 @@ export function EmailCard() {
             autoCorrect={false}
             inputMode="email"
             onChangeText={(text) => {
-              setNotice(null);
-              setTyped(text);
+              setSaid([]);
+              setForm((form) => ({ ...form, typed: text }));
             }}
           />
-          {stored !== null && <Text variant="muted">{t("account.email.set")}</Text>}
-          {notice && (
-            <Text accessibilityLiveRegion="assertive">
-              {notice === "saved"
-                ? t("account.email.saved")
-                : notice === "invalid"
-                  ? t("account.email.invalid")
-                  : t("account.email.failed")}
+          {stored.email !== null && (
+            <Text variant="muted">
+              {stored.confirmed ? t("account.email.confirmed") : t("account.email.unconfirmed")}
             </Text>
           )}
           <Button
-            disabled={busy || address.length === 0 || address === stored}
-            onPress={() => {
-              tap();
-              void run(() => saveEmail(address));
-            }}
+            disabled={busy || address.length === 0 || address === stored.email}
+            onPress={() => void run(() => keep(() => saveEmail(address)))}
           >
             {t("account.email.save")}
           </Button>
-          {stored !== null && (
+          {stored.email !== null && !stored.confirmed && (
+            <CodeSection
+              expiresAt={stored.codeExpiresAt}
+              code={code}
+              busy={busy}
+              onCode={(text) => {
+                setSaid([]);
+                setCode(text.replace(/\D/g, "").slice(0, EMAIL_CODE_LENGTH));
+              }}
+              onConfirm={() => void run(confirm)}
+              onSend={() => void run(send)}
+            />
+          )}
+          {words !== null && (
+            <Text key={answers} accessibilityLiveRegion="assertive">
+              {words}
+            </Text>
+          )}
+          {stored.email !== null && (
             <Button
               variant="outline"
               disabled={busy}
-              onPress={() => {
-                tap();
-                void run(() => clearEmail());
-              }}
+              onPress={() => void run(() => keep(clearEmail))}
             >
               {t("account.email.clear")}
             </Button>
@@ -150,9 +318,70 @@ export function EmailCard() {
 }
 
 /**
+ * The unconfirmed address's code (#385, ADR-043 §3): while one waits, until
+ * when, its six digits and Confirm, and a new one on request; while none
+ * waits, the way to ask for one.
+ */
+function CodeSection({
+  expiresAt,
+  code,
+  busy,
+  onCode,
+  onConfirm,
+  onSend,
+}: {
+  /** Until when the waiting code works; null when none waits. */
+  expiresAt: string | null;
+  code: string;
+  busy: boolean;
+  onCode: (text: string) => void;
+  onConfirm: () => void;
+  onSend: () => void;
+}) {
+  const { t, locale } = useT();
+  if (expiresAt === null) {
+    return (
+      <Button disabled={busy} onPress={onSend}>
+        {t("account.email.send")}
+      </Button>
+    );
+  }
+  return (
+    <View className="gap-3">
+      {/* The phone's own clock, not Helsinki's as in a conversation: one reader,
+          who holds the time against the clock at the top of the same screen.
+          No live region: the card's notice says it as each code goes. */}
+      <Text>{t("account.email.codeSent", { time: formatTime(locale, new Date(expiresAt)) })}</Text>
+      <View className="gap-2">
+        <Text variant="small">{t("account.email.codeLabel")}</Text>
+        <Input
+          accessibilityLabel={t("account.email.codeLabel")}
+          value={code}
+          maxLength={EMAIL_CODE_LENGTH}
+          inputMode="numeric"
+          textContentType="oneTimeCode"
+          autoComplete="one-time-code"
+          onChangeText={onCode}
+        />
+      </View>
+      <Button disabled={busy || code.length !== EMAIL_CODE_LENGTH} onPress={onConfirm}>
+        {t("account.email.confirm")}
+      </Button>
+      <Button variant="outline" disabled={busy} onPress={onSend}>
+        {t("account.email.sendAgain")}
+      </Button>
+    </View>
+  );
+}
+
+/**
  * The e-mail as the last of the later screens (#148): the card, and the way
  * home. It scrolls, so at the largest text every line and every button can
- * still be reached (#217).
+ * still be reached (#217), and it keeps the code's field and Confirm above
+ * the keyboard as a settings screen does (SettingsPage, #103): iOS insets the
+ * scroll view itself; Android draws edge to edge, so the padding ends the
+ * scroll view at the keyboard's top. Padding on iOS too would take the
+ * keyboard's height twice.
  */
 export function EmailScreen() {
   const { t } = useT();
@@ -160,34 +389,41 @@ export function EmailScreen() {
   const tap = useHapticTap();
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView
-        contentContainerClassName="flex-grow items-center gap-6 p-6"
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior="padding"
+        enabled={Platform.OS === "android"}
       >
-        <Text variant="h1" accessibilityRole="header">
-          {t("profile.later.title")}
-        </Text>
-        <EmailCard />
-        <Text>{t("profile.later.done")}</Text>
-        {/* The deal-breakers come after the optional fields (#149): one tap, never required. */}
-        <Button
-          variant="outline"
-          onPress={() => {
-            tap();
-            router.push(DEAL_BREAKERS_PATH);
-          }}
+        <ScrollView
+          contentContainerClassName="flex-grow items-center gap-6 p-6"
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
         >
-          {t("profile.dealBreakers.open")}
-        </Button>
-        <Button
-          onPress={() => {
-            tap();
-            router.replace("/");
-          }}
-        >
-          {t("account.email.done")}
-        </Button>
-      </ScrollView>
+          <Text variant="h1" accessibilityRole="header">
+            {t("profile.later.title")}
+          </Text>
+          <EmailCard />
+          <Text>{t("profile.later.done")}</Text>
+          {/* The deal-breakers come after the optional fields (#149): one tap, never required. */}
+          <Button
+            variant="outline"
+            onPress={() => {
+              tap();
+              router.push(DEAL_BREAKERS_PATH);
+            }}
+          >
+            {t("profile.dealBreakers.open")}
+          </Button>
+          <Button
+            onPress={() => {
+              tap();
+              router.replace("/");
+            }}
+          >
+            {t("account.email.done")}
+          </Button>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

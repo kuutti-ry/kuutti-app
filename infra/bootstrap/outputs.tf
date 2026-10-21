@@ -54,3 +54,8 @@ output "dns_name_servers" {
   description = "Must equal the name servers on the domain registration (Route 53, Registered domains)."
   value       = aws_route53_zone.main.name_servers
 }
+
+output "ses_identity_arn" {
+  description = "The SES identity of the project domain (#385, ADR-043 §5). Each environment's instance role may send through it from noreply@ alone (modules/compute, SesSendAsNoreply)."
+  value       = aws_sesv2_email_identity.main.arn
+}

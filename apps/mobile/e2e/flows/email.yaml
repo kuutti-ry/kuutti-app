@@ -1,7 +1,11 @@
-# A way to stay in touch (#148 j3, ADR-009, #385): an optional e-mail
-# address. A malformed address is refused in words, a valid one is saved and
-# said to be set, and it can be removed again. Sanna has none; the flow
-# removes the one it saves.
+# A way to stay in touch (#148 j3, ADR-009, #385, ADR-043): an optional
+# e-mail address, confirmed by a code. A malformed address is refused in
+# words; a valid one is saved, said to be unconfirmed, and sent its code by
+# the card itself (the local API's mail goes to its log, MAIL=log); a wrong
+# code is refused in words; the address is removed again, its code with it.
+# Sanna has none; the flow removes the one it saves. Each run sends her one
+# code of the five a Finnish day allows (email_codes_per_day): a sixth run on
+# the same day needs `pnpm demo:reset` first.
 appId: fi.kuutti.app
 name: A malformed e-mail is refused in words, a valid one is saved, and it can be removed
 ---
@@ -25,10 +29,47 @@ name: A malformed e-mail is refused in words, a valid one is saved, and it can b
 - eraseText: 30
 - inputText: "sanna.demo@example.com"
 - tapOn: "Save the address|Tallenna osoite|Spara adressen"
+# Saved, and its code on the way without a tap of its own; the time is the
+# phone's clock, so the flow matches any.
 - extendedWaitUntil:
-    visible: "An address is set\\.|Osoite on tallennettu\\.|En adress är sparad\\."
+    visible: "A code is on its way to the address\\. It works until .*|Koodi on matkalla osoitteeseen\\. Se toimii kello .* asti\\.|En kod är på väg till adressen\\. Den gäller till klockan .*"
     timeout: 15000
+# The address's line lies above Save, so above the keyboard: a tap on it
+# closes the keyboard, and the code's part below comes into reach.
+- tapOn: "An address is set, not confirmed yet\\.|Osoite on tallennettu, mutta sitä ei ole vielä vahvistettu\\.|En adress är sparad men inte bekräftad ännu\\."
+- scrollUntilVisible:
+    element: "Confirm the address|Vahvista osoite|Bekräfta adressen"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- assertVisible:
+    text: "Confirm the address|Vahvista osoite|Bekräfta adressen"
+    enabled: false
+# The code's field, below its label of the same name; an empty field has no text to match.
+- tapOn:
+    below: "The code from the message|Viestin koodi|Koden i meddelandet"
+# Not the code the log holds, but for a chance in a million that it is: the
+# address would then be confirmed, and the wait for the refusal below fails.
+- inputText: "000000"
+# The number pad has no return key: a tap on the line above the field closes
+# it, and Confirm, below the field, is in reach again.
+- tapOn: "A code is on its way to the address\\. It works until .*|Koodi on matkalla osoitteeseen\\. Se toimii kello .* asti\\.|En kod är på väg till adressen\\. Den gäller till klockan .*"
+- scrollUntilVisible:
+    element: "Confirm the address|Vahvista osoite|Bekräfta adressen"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Confirm the address|Vahvista osoite|Bekräfta adressen"
+- extendedWaitUntil:
+    visible: "That is not the code\\. Check the message and try again\\.|Tuo ei ole koodi\\. Tarkista viesti ja yritä uudelleen\\.|Det är inte koden\\. Kontrollera meddelandet och försök igen\\."
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Remove the address|Poista osoite|Ta bort adressen"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - tapOn: "Remove the address|Poista osoite|Ta bort adressen"
 - extendedWaitUntil:
-    notVisible: "An address is set\\.|Osoite on tallennettu\\.|En adress är sparad\\."
+    notVisible: "An address is set, not confirmed yet\\.|Osoite on tallennettu, mutta sitä ei ole vielä vahvistettu\\.|En adress är sparad men inte bekräftad ännu\\."
     timeout: 15000
+- assertNotVisible: "Confirm the address|Vahvista osoite|Bekräfta adressen"

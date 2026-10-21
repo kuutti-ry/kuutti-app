@@ -82,6 +82,11 @@ jobs:
         env:
           # The alert topic's subscriber (#11): a repository variable, never a secret.
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          # Whom staging may mail (#385, ADR-043 §6): Telia's test persons are public,
+          # so staging mails the testers of the repository variable MAIL_TESTERS, a
+          # JSON list, and Kuutti's own sender while it is unset. Staging's alone:
+          # prod declares no such variable and mails anybody.
+          TF_VAR_mail_recipients: ${{ matrix.dir == 'envs/staging' && (vars.MAIL_TESTERS || '["noreply@kuutti.app"]') || '' }}
         run: |
           set +e
           tofu plan -input=false -no-color -out=plan.bin -detailed-exitcode
@@ -134,6 +139,8 @@ jobs:
         env:
           # The alert topic's subscriber (#11): a repository variable, never a secret.
           TF_VAR_alert_email: ${{ vars.ALERT_EMAIL }}
+          # Whom staging may mail, as in the plan above (#385, ADR-043 §6).
+          TF_VAR_mail_recipients: ${{ vars.MAIL_TESTERS || '["noreply@kuutti.app"]' }}
         run: |
           tofu init -input=false -no-color
           tofu plan -input=false -no-color -out=plan.bin

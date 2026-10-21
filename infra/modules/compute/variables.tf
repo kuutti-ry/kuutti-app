@@ -72,7 +72,18 @@ variable "cpu_credits" {
 }
 
 variable "domain" {
-  description = "The project domain; the box pins dokploy.<environment>.<domain> to the control plane in Traefik."
+  description = "The project domain; the box pins dokploy.<environment>.<domain> to the control plane in Traefik, and the instance role sends mail as noreply@<domain> through its SES identity (#385, ADR-043 §5)."
   type        = string
   default     = "kuutti.app"
+}
+
+variable "mail_recipients" {
+  description = "The addresses the instance role may mail, patterns such as *@example.fi allowed (#385, ADR-043 §6): staging lists its testers, since anyone can sign in there as one of Telia's test persons, whose credentials are published. Null, production's, limits nothing."
+  type        = list(string)
+  default     = null
+
+  validation {
+    condition     = var.mail_recipients == null ? true : length(var.mail_recipients) > 0
+    error_message = "mail_recipients is null (no limit) or names at least one address."
+  }
 }

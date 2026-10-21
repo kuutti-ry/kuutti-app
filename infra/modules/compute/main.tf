@@ -1,7 +1,8 @@
 # The one API box per environment (TD-4, project context §2): t4g.small, Ubuntu
 # 24.04 arm64, an Elastic IP, and an instance role that reaches exactly its own
 # SSM prefix, its own log group and its backup prefix (TD-19, TD-4 access rule).
-# The bucket (modules/media, #48) and Rekognition (#49) arrive with M3, SES with M5.
+# The bucket (modules/media, #48) and Rekognition (#49) arrived with M3, SES
+# sending with #385 (ADR-043 §5).
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -22,6 +23,9 @@ locals {
   log_group_name    = "/${var.project}/${var.environment}/api"
   session_log_group = "/${var.project}/ssm-sessions"
   backup_prefix     = "dokploy-backup/${var.environment}/"
+  # The API's MAIL_FROM default (apps/api/src/lib/config.ts) without its
+  # display name, which ses:FromAddress does not include.
+  mail_from = "noreply@${var.domain}"
 }
 
 # ---------------------------------------------------------------------------
@@ -114,6 +118,42 @@ data "aws_iam_policy_document" "api" {
       "rekognition:DetectLabels",
     ]
     resources = ["*"]
+  }
+
+  # Mail (#385, ADR-043 §5): the code that confirms an address. SESv2
+  # SendEmail with simple content is authorised as ses:SendEmail against the
+  # sending identity, so neither ses:SendRawEmail nor a configuration set is
+  # granted. The identity is the domain's (infra/bootstrap/mail.tf, in this
+  # region, the API's S3_REGION), and the From address is pinned to noreply@:
+  # a MAIL_FROM of any other address is refused here, and the API answers 503.
+  # On staging a pull request's preview runs under this role too (ADR-004 §3).
+  # Staging also names whom it may mail (#385, ADR-043 §6): every account there
+  # is one of Telia's test persons, whose credentials are published, so without
+  # the list anyone could have codes sent to addresses of their choosing once
+  # SES leaves the sandbox, signed as kuutti.app from the account and region
+  # production shares, and the complaints would reach production's reputation
+  # and suppression list. Production passes null: its accounts are people the
+  # bank verified. A recipient outside the list is AccessDenied, answered 503.
+  statement {
+    sid       = "SesSendAsNoreply"
+    effect    = "Allow"
+    actions   = ["ses:SendEmail"]
+    resources = ["arn:aws:ses:${local.region}:${local.account_id}:identity/${var.domain}"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ses:FromAddress"
+      values   = [local.mail_from]
+    }
+
+    dynamic "condition" {
+      for_each = var.mail_recipients == null ? [] : [var.mail_recipients]
+      content {
+        test     = "ForAllValues:StringLike"
+        variable = "ses:Recipients"
+        values   = condition.value
+      }
+    }
   }
 
   statement {

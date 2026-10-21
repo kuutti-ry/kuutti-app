@@ -31,8 +31,8 @@ import { ExportedSanction } from "./sanction.ts";
 /** A body, so a stray call cannot erase an account; the app shows its own confirmation first. */
 /**
  * The optional e-mail (#148, TD-18): a way for Kuutti to stay in touch
- * (#385), never a login, never shown to anybody. Validated as an address and
- * nothing else; no mail is sent until SES exists (#385).
+ * (#385), never a login, never shown to anybody. Confirmed by a code sent to
+ * it (ADR-043); an unconfirmed address is sent nothing else.
  */
 export const EMAIL_MAX = 254;
 export const AccountEmail = z
@@ -42,9 +42,33 @@ export const AccountEmail = z
 export type AccountEmail = z.infer<typeof AccountEmail>;
 
 export const AccountEmailResponse = z
-  .object({ email: z.string().max(EMAIL_MAX).nullable() })
+  .object({
+    email: z.string().max(EMAIL_MAX).nullable(),
+    confirmed: z.boolean().meta({
+      description:
+        "True once the person typed the code sent to this address; a new address is unconfirmed.",
+    }),
+    codeExpiresAt: z.iso.datetime().nullable().meta({
+      description:
+        "When the code waiting for this address stops working; null when none waits (none sent, used, spent or expired).",
+    }),
+  })
   .meta({ id: "AccountEmailResponse" });
 export type AccountEmailResponse = z.infer<typeof AccountEmailResponse>;
+
+/** The confirmation code's length (#385, ADR-043): a format the card and the message share, not a tunable. */
+export const EMAIL_CODE_LENGTH = 6;
+
+export const AccountEmailConfirmation = z
+  .object({
+    code: z
+      .string()
+      .regex(/^\d{6}$/)
+      .meta({ description: "The six digits of the message sent to the address." }),
+  })
+  .strict()
+  .meta({ id: "AccountEmailConfirmation" });
+export type AccountEmailConfirmation = z.infer<typeof AccountEmailConfirmation>;
 
 export const AccountDeletionRequest = z
   .object({
@@ -133,6 +157,8 @@ export const AccountExport = z
       email: z.string().max(EMAIL_MAX).nullable(),
       /** Whether the person told Kuutti they found somebody (#83); the reason is kept by no one's name. */
       foundThemAnswered: z.boolean(),
+      /** When the address was confirmed by its code (#385, ADR-043); null while it is not. */
+      emailConfirmedAt: z.iso.datetime().nullable(),
     }),
     /** The two hard rows onboarding writes (#46): whom the person seeks and the age window. */
     preferences: PreferencesResponse,

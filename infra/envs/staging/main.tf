@@ -41,6 +41,7 @@ module "compute" {
   permissions_boundary_arn   = local.permissions_boundary_arn
   backup_bucket              = local.state_bucket
   dokploy_version            = var.dokploy_version
+  mail_recipients            = var.mail_recipients # testers only: Telia's test persons are public (#385, ADR-043 §6)
   domain                     = var.domain
   cpu_credits                = "standard" # a pegged staging box slows down instead of costing extra
   manage_session_preferences = true
@@ -137,6 +138,10 @@ resource "aws_ssm_parameter" "config" {
     "db-preview-user" = "kuutti_preview"
     # Photo moderation through Rekognition (#49, ADR-006); the instance role allows the three calls.
     "moderation" = "rekognition"
+    # Mail through SES (#385, ADR-043 §4): the instance role sends as noreply@
+    # through the domain's identity in infra/bootstrap; the previews read this
+    # too. In SES's sandbox until production access, one for both environments.
+    "mail" = "ses"
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.
     # Both name module admin's host (#313, ADR-025 §10).

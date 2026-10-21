@@ -102,6 +102,11 @@ export const MATCHING_CONFIG_V1 = {
   // day, counted from feedback in the statement that writes the row; the
   // sixth is refused in words.
   feedback_per_day: 5,
+  // #385 (migration 0078, ADR-043): a code works thirty minutes and three
+  // wrong attempts; five codes an account a Finnish day.
+  email_code_minutes: 30,
+  email_code_attempts: 3,
+  email_codes_per_day: 5,
   moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
   // #84 (ADR-030 §4, migration 0052): reports a person may file per Finnish
   // day, counted from report in the statement that writes the row; the sixth

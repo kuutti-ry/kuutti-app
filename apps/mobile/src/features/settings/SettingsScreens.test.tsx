@@ -66,7 +66,9 @@ beforeEach(async () => {
   globalThis.fetch = jest.fn(async (input: Request | string) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/health") return json(ok);
-    if (url.pathname === "/account/email") return json({ email: null });
+    if (url.pathname === "/account/email") {
+      return json({ email: null, confirmed: false, codeExpiresAt: null });
+    }
     if (url.pathname === "/contacts") return json({ contacts: [] });
     if (url.pathname === "/consents") {
       return json({

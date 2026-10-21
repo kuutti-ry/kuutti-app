@@ -1,15 +1,24 @@
 import { ApiError } from "@/lib/api";
 import { saveSession } from "@/lib/session";
-import { clearEmail, fetchEmail, saveEmail } from "./email-client";
+import { clearEmail, confirmEmailCode, fetchEmail, saveEmail, sendEmailCode } from "./email-client";
 
-// The optional e-mail's routes (#148): what each sends, what it answers, and
-// a refusal as an ApiError with the envelope's code.
+// The optional e-mail's routes (#148, #385): what each sends, what it
+// answers, and a refusal as an ApiError with the envelope's code.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const refusal = (code: string, status: number) =>
   json({ error: { code, message: "x", requestId: "r" } }, status);
+const none = { email: null, confirmed: false, codeExpiresAt: null };
+const unconfirmed = { email: "aino@example.test", confirmed: false, codeExpiresAt: null };
+const waiting = { ...unconfirmed, codeExpiresAt: "2030-01-01T00:30:00.000Z" };
+const confirmed = { email: "aino@example.test", confirmed: true, codeExpiresAt: null };
+const sent = async (request: Request | undefined) => ({
+  method: request?.method,
+  path: new URL(request?.url ?? "").pathname,
+  body: request?.body ? JSON.parse(await request.text()) : undefined,
+});
 
 function answering(...answers: Response[]) {
   const seen: Request[] = [];
@@ -34,10 +43,12 @@ beforeEach(async () => {
 });
 
 describe("the e-mail client", () => {
-  it("reads the address, or none", async () => {
-    answering(json({ email: "aino@example.test" }), json({ email: null }));
-    expect(await fetchEmail()).toBe("aino@example.test");
-    expect(await fetchEmail()).toBeNull();
+  it("reads the address with its confirmation, or none", async () => {
+    const seen = answering(json(waiting), json(confirmed), json(none));
+    expect(await fetchEmail()).toEqual(waiting);
+    expect(await fetchEmail()).toEqual(confirmed);
+    expect(await fetchEmail()).toEqual(none);
+    expect(await sent(seen[0])).toEqual({ method: "GET", path: "/account/email", body: undefined });
   });
 
   it("fails a refused read with the code", async () => {
@@ -50,29 +61,41 @@ describe("the e-mail client", () => {
     });
   });
 
-  it("saves an address and answers it back", async () => {
-    const seen = answering(new Response(null, { status: 204 }));
-    expect(await saveEmail("aino@example.test")).toBe("aino@example.test");
-    expect(seen[0]?.method).toBe("PUT");
-    expect(new URL(seen[0]?.url ?? "").pathname).toBe("/account/email");
-    expect(JSON.parse(await (seen[0] as Request).text())).toEqual({ email: "aino@example.test" });
+  it("refuses an answer that is not the contract, an older API's bare address", async () => {
+    answering(json({ email: "aino@example.test" }));
+    await expect(fetchEmail()).rejects.toMatchObject({ name: "ZodError" });
+  });
+
+  it("saves an address and answers the state the API keeps, unconfirmed", async () => {
+    const seen = answering(json(unconfirmed));
+    expect(await saveEmail("aino@example.test")).toEqual(unconfirmed);
+    expect(await sent(seen[0])).toEqual({
+      method: "PUT",
+      path: "/account/email",
+      body: { email: "aino@example.test" },
+    });
   });
 
   it("fails a refused save with the code, and without one when the answer is not the envelope", async () => {
-    answering(refusal("validation_failed", 422), new Response("oops", { status: 500 }));
+    answering(refusal("validation_failed", 400), new Response("oops", { status: 500 }));
     await expect(saveEmail("not an address")).rejects.toMatchObject({
-      status: 422,
+      status: 400,
       code: "validation_failed",
+      message: "email save answered 400",
     });
     const error = await saveEmail("aino@example.test").catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
     expect(error).toMatchObject({ status: 500, code: undefined });
   });
 
-  it("removes the address and answers none", async () => {
+  it("removes the address and answers none, though the API answers no body", async () => {
     const seen = answering(new Response(null, { status: 204 }));
-    expect(await clearEmail()).toBeNull();
-    expect(seen[0]?.method).toBe("DELETE");
+    expect(await clearEmail()).toEqual(none);
+    expect(await sent(seen[0])).toEqual({
+      method: "DELETE",
+      path: "/account/email",
+      body: undefined,
+    });
   });
 
   it("fails a refused removal with the code", async () => {
@@ -81,6 +104,56 @@ describe("the e-mail client", () => {
       status: 500,
       code: "internal_error",
       message: "email removal answered 500",
+    });
+  });
+
+  it("asks for a code and answers until when it works", async () => {
+    const seen = answering(json(waiting));
+    expect(await sendEmailCode()).toEqual(waiting);
+    expect(await sent(seen[0])).toEqual({
+      method: "POST",
+      path: "/account/email/code",
+      body: undefined,
+    });
+  });
+
+  it("fails a refused send with the code: the day's codes, no mail, confirmed already", async () => {
+    answering(
+      refusal("email_code_budget_exceeded", 429),
+      refusal("mail_unavailable", 503),
+      refusal("email_confirmed", 409),
+    );
+    await expect(sendEmailCode()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 429,
+      code: "email_code_budget_exceeded",
+      message: "email code answered 429",
+    });
+    await expect(sendEmailCode()).rejects.toMatchObject({ status: 503, code: "mail_unavailable" });
+    await expect(sendEmailCode()).rejects.toMatchObject({ status: 409, code: "email_confirmed" });
+  });
+
+  it("confirms with the code and answers the address confirmed", async () => {
+    const seen = answering(json(confirmed));
+    expect(await confirmEmailCode("012345")).toEqual(confirmed);
+    expect(await sent(seen[0])).toEqual({
+      method: "POST",
+      path: "/account/email/confirm",
+      body: { code: "012345" },
+    });
+  });
+
+  it("fails a refused confirmation with the code, and without one when the answer is not the envelope", async () => {
+    answering(refusal("email_code_wrong", 400), new Response("oops", { status: 502 }));
+    await expect(confirmEmailCode("000000")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 400,
+      code: "email_code_wrong",
+      message: "email confirmation answered 400",
+    });
+    await expect(confirmEmailCode("000000")).rejects.toMatchObject({
+      status: 502,
+      code: undefined,
     });
   });
 });

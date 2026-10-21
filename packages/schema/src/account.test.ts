@@ -3,8 +3,10 @@ import type { z } from "zod";
 import {
   AccountDeletionRequest,
   AccountEmail,
+  AccountEmailConfirmation,
   AccountEmailResponse,
   AccountExport,
+  EMAIL_CODE_LENGTH,
   EMAIL_MAX,
   ExportedPhoto,
 } from "./account.ts";
@@ -46,13 +48,56 @@ describe("the optional e-mail", () => {
     ]);
   });
 
-  it("reads back an address or null, never more than the cap", () => {
-    expect(AccountEmailResponse.parse({ email: null })).toEqual({ email: null });
-    expect(AccountEmailResponse.parse({ email: "person@example.com" }).email).toBe(
-      "person@example.com",
-    );
-    expect(codes(AccountEmailResponse, { email: "a".repeat(255) })).toEqual(["too_big"]);
-    expect(codes(AccountEmailResponse, {})).toEqual(["invalid_type"]);
+  it("reads back an address or null, never more than the cap, with its confirmation", () => {
+    const none = { email: null, confirmed: false, codeExpiresAt: null };
+    expect(AccountEmailResponse.parse(none)).toEqual(none);
+    const waiting = { email: "person@example.com", confirmed: false, codeExpiresAt: at };
+    expect(AccountEmailResponse.parse(waiting)).toEqual(waiting);
+    expect(
+      codes(AccountEmailResponse, {
+        email: "a".repeat(255),
+        confirmed: false,
+        codeExpiresAt: null,
+      }),
+    ).toEqual(["too_big"]);
+    // Each field is required, the confirmation a boolean and the code's end ISO 8601 (#385).
+    expect(codes(AccountEmailResponse, {})).toEqual([
+      "invalid_type",
+      "invalid_type",
+      "invalid_type",
+    ]);
+    expect(codes(AccountEmailResponse, { ...none, confirmed: "yes" })).toEqual(["invalid_type"]);
+    expect(codes(AccountEmailResponse, { ...waiting, codeExpiresAt: "tomorrow" })).toEqual([
+      "invalid_format",
+    ]);
+  });
+});
+
+describe("the e-mail's confirmation code", () => {
+  it("is six digits, leading zeros kept (#385, ADR-043 §3)", () => {
+    expect(EMAIL_CODE_LENGTH).toBe(6);
+    for (const code of ["000000", "123456", "999999"]) {
+      expect(AccountEmailConfirmation.parse({ code })).toEqual({ code });
+    }
+  });
+
+  it.each([
+    ["five digits", "12345"],
+    ["seven digits", "1234567"],
+    ["a letter", "12345a"],
+    ["a space", "123 456"],
+    ["Arabic-Indic digits", "١٢٣٤٥٦"],
+    ["empty", ""],
+  ])("refuses a code of %s", (_, code) => {
+    expect(codes(AccountEmailConfirmation, { code })).toEqual(["invalid_format"]);
+  });
+
+  it("refuses a missing code, a number and an extra field", () => {
+    expect(codes(AccountEmailConfirmation, {})).toEqual(["invalid_type"]);
+    expect(codes(AccountEmailConfirmation, { code: 123456 })).toEqual(["invalid_type"]);
+    expect(codes(AccountEmailConfirmation, { code: "123456", email: "x@example.com" })).toEqual([
+      "unrecognized_keys",
+    ]);
   });
 });
 
@@ -126,6 +171,7 @@ function anExport(): Record<string, unknown> {
       genderChangedAt: null,
       seeksChangedAt: null,
       email: null,
+      emailConfirmedAt: null,
       foundThemAnswered: false,
     },
     preferences: { seeks: ["man"], ageWindow: { min: 25, max: 40 } },

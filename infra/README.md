@@ -8,12 +8,12 @@ Commands below use `tofu`. Terraform is command-compatible if you have it instea
 
 | path | contents | when |
 |---|---|---|
-| `bootstrap/` | state bucket, GitHub OIDC provider, CI roles, budget and billing alarm, the hosted zone of the project domain | once, before anything else |
-| `modules/` | `network`, `compute`, `data` (#7); `observability` (#11); `media` (#48, ADR-005: live on staging since 2026-10-09, dormant in production until its cutover below); `admin` (#313, ADR-025: the moderation panel's host, composed by staging; production with #25); `research` (#194, ADR-029: the research copy's rights, the researcher's read-only role and its access log, composed by staging with `media`; production with ADR-029's open points); email later | as the work needs them |
+| `bootstrap/` | state bucket, GitHub OIDC provider, CI roles, budget and billing alarm, the hosted zone of the project domain, the domain's SES identity (#385, ADR-043) | once, before anything else |
+| `modules/` | `network`, `compute`, `data` (#7); `observability` (#11); `media` (#48, ADR-005: live on staging since 2026-10-09, dormant in production until its cutover below); `admin` (#313, ADR-025: the moderation panel's host, composed by staging; production with #25); `research` (#194, ADR-029: the research copy's rights, the researcher's read-only role and its access log, composed by staging with `media`; production with ADR-029's open points) | as the work needs them |
 | `envs/staging`, `envs/prod` | one composition per environment: the modules plus the non-secret parameters | #7 |
 | `github/` | repository settings, branch protection, environments | not adopted; `gh api` below until the GitHub provider question is settled |
 
-Modules arrive with the work that needs them: network, compute and data (#7); observability (#11); media and delivery (#48, ADR-005); the moderation panel's host (#313, ADR-025); the research copy's access (#194, ADR-029); email when a mail channel does (TD-18). `scripts/` holds the one-time procedures that are deliberately not resources.
+Modules arrive with the work that needs them: network, compute and data (#7); observability (#11); media and delivery (#48, ADR-005); the moderation panel's host (#313, ADR-025); the research copy's access (#194, ADR-029). Mail needed no module: its SES identity belongs to the domain rather than an environment, so it went to the bootstrap, and each environment adds a statement to its instance role and a parameter (Mail, below; #385, ADR-043, TD-18). `scripts/` holds the one-time procedures that are deliberately not resources.
 
 ## Account, once (console, maintainer only)
 
@@ -334,6 +334,72 @@ infra/scripts/db-audit-owner.sh staging
 which moves the table and its trigger function to `kuutti_audit` and leaves `kuutti_app` with SELECT and INSERT. The API logs `audit boundary` at boot with `enforced: true|false` and warns on staging and production until it is true; `packages/db/src/audit-owner.test.ts` runs the same SQL as a non-superuser in the master role's position on a fresh database.
 
 A later migration that touches `audit_log` would fail as `kuutti_app`, and with it the whole migration batch and the boot. The sequence for such a change is: `db-audit-owner.sh <env> release` (ownership back to `kuutti_app`), deploy, `db-audit-owner.sh <env>` again. The pull request that carries the migration says so in its body.
+
+### Mail (#385, ADR-043)
+
+Kuutti sends one kind of message, the code that confirms the optional e-mail address, from `noreply@kuutti.app` through SES, and receives no mail (ADR-043 §1, §5). Three pieces, each in code:
+
+- **The identity**, `bootstrap/mail.tf`, since it belongs to the domain and to no environment: `kuutti.app` as an SES identity in eu-central-1, the region the API's SES client uses (`S3_REGION`); Easy DKIM with 2048-bit keys that SES holds, signing every message as `d=kuutti.app`, through three CNAMEs `<token>._domainkey`; the custom MAIL FROM `mail.kuutti.app`, an MX to `feedback-smtp.eu-central-1.amazonses.com` and the SPF `v=spf1 include:amazonses.com -all`, where SES refuses to send while it cannot see that MX rather than fall back to `amazonses.com`; and the account's suppression list for bounces and complaints. The root keeps its `-all` SPF, its null MX and its reject DMARC (`bootstrap/dns.tf`): DKIM aligns under `adkim=s`, and that carries DMARC.
+- **The permission**, `modules/compute`, statement `SesSendAsNoreply`: `ses:SendEmail` on that identity alone, with `ses:FromAddress` equal to `noreply@kuutti.app`; on staging, also every recipient within its testers (`ses:Recipients`, Staging's testers, below).
+- **The switch**, the parameter `mail=ses` under `/kuutti/<env>/`, which the API reads as `MAIL` (ADR-043 §4). Without it a deployed API sends nothing and the code route answers 503 `mail_unavailable`. A pull request's preview reads staging's parameters under staging's role, so it sends through the same identity (write access is that trust, ADR-004 §3).
+
+Staging and production are one account in one region, so they share the identity, the suppression list and the sandbox: production access is granted per account and region, and staging leaves the sandbox with production. SES bills 0.10 USD a thousand messages; the codes are a few a day.
+
+In this order, maintainer only:
+
+1. **The bootstrap.** CI never applies it, since it owns the CI roles. The plan adds the identity, its MAIL FROM, the suppression attributes and five records, and changes nothing else:
+
+   ```sh
+   cd infra/bootstrap
+   tofu plan
+   tofu apply
+   ```
+
+2. **Verification.** SES looks for the DKIM records and the MX by itself, usually within minutes; AWS gives it up to 72 hours. Ready when this prints `True SUCCESS SUCCESS`:
+
+   ```sh
+   aws sesv2 get-email-identity --email-identity kuutti.app \
+     --query '[VerifiedForSendingStatus, DkimAttributes.Status, MailFromAttributes.MailFromDomainStatus]' --output text
+   ```
+
+3. **The environments.** Merging applies `envs/staging` (the statement and the parameter), and the deploy after it reads `MAIL=ses` at boot; production follows at its next release tag. A send before step 2 is done answers 503 `mail_unavailable`, writes nothing, and logs `email code not sent` with the SDK's error name: `MessageRejected` while the domain is unverified, `MailFromDomainNotVerifiedException` while its MAIL FROM is.
+
+**The sandbox.** Until AWS grants production access, SES delivers only to verified identities (an address, or any address of a verified domain), at most 200 messages a day and one a second; a code for anybody else is refused (`MessageRejected`) and answered 503. To try it on staging, list an address of your own in `MAIL_TESTERS` (Staging's testers, below) and verify it for the while. It is a personal address, so it never enters the code; the identity is made and removed from your own session:
+
+```sh
+aws sesv2 create-email-identity --email-identity <your address>   # SES mails a link: follow it
+aws sesv2 delete-email-identity --email-identity <your address>   # when done
+```
+
+Then give the address in the app on staging and type the code. The message's `Authentication-Results` header shows `dkim=pass header.d=kuutti.app`, `spf=pass smtp.mailfrom=mail.kuutti.app` and `dmarc=pass`. In the sandbox SES can also check the sender's permission against the recipient's identity, which `SesSendAsNoreply` does not name: if the log line says `AccessDeniedException` although the address is verified and listed, that is the cause, and the identity's mail is proved from your own session instead until production access:
+
+```sh
+aws sesv2 send-email --from-email-address noreply@kuutti.app --destination ToAddresses=<your address> \
+  --content 'Simple={Subject={Data=kuutti-mail-check},Body={Text={Data=delivery-check}}}'
+```
+
+**Staging's testers.** Every account on staging is one of Telia's test persons, whose credentials are published (`docs/vendors/telia.md`), so anybody could have staging send codes to addresses of their choosing, and their complaints would count against the reputation and the suppression list production shares. Staging's role therefore mails only the addresses of its variable `mail_recipients` (ADR-043 §6), which CI fills from the repository variable `MAIL_TESTERS`, a JSON list; a pattern such as `*@example.fi` takes a whole domain. Unset, the list is `noreply@kuutti.app`, which receives nothing: staging mails nobody, and a code asked for there is answered 503 `mail_unavailable` (the log line says `AccessDeniedException`). To let testers in, set the list, then apply staging by re-running `main`'s latest infra run (GitHub re-runs a run for 30 days; past that, the next merge under `infra/` applies it):
+
+```sh
+gh variable set MAIL_TESTERS --body '["you@example.fi", "*@example.fi"]'
+gh run rerun "$(gh run list --workflow infra.yml --branch main --event push --limit 1 --json databaseId --jq '.[0].databaseId')"
+```
+
+It is a repository variable, not the `staging` environment's, because the plan job has no environment and must read the list the apply reads. IAM compares the addresses case for case, so list each as its tester types it in the app. The list is not secret: the repository is public, the plan and apply steps' logs show it, and so does a pull request's plan comment whenever the role's policy changes, so list only addresses their owners agree to show, or a pattern. A shorter list and the same re-run take a tester out; `gh variable delete MAIL_TESTERS` and the re-run close staging again. Before asking AWS for production access, read the list back (`gh variable get MAIL_TESTERS`): out of the sandbox, it is what keeps staging closed.
+
+**Production access**, once for the account and region, before the first release: the maintainer's request, which AWS reviews, usually within a day, and may ask more about in the support case it opens.
+
+```sh
+aws sesv2 put-account-details --production-access-enabled --mail-type TRANSACTIONAL \
+  --website-url https://kuutti.app --contact-language EN \
+  --additional-contact-email-addresses <project alias> \
+  --use-case-description '<the answers below>'
+aws sesv2 get-account --query '[ProductionAccessEnabled, SendQuota]'   # once granted: true, and a quota above 200 a day
+```
+
+What AWS asks, and what is true here (ADR-043 Open 5): what is sent (one plain-text message with a six-digit code, when a person asks to confirm the address they typed in the app; at most `email_codes_per_day`, five, a Finnish day per account; nothing else until #196); how the addresses are collected (each person types their own, optionally; none is bought, and none is a login); how bounces and complaints are handled (SES's account-level suppression list records every hard bounce and complaint and delivers nothing more to that address, `bootstrap/mail.tf`; #196 adds the events and Kuutti's own list); how a person stops it (removing the address in the app; an unconfirmed address receives nothing but its confirmation); and the volume, a few messages a day.
+
+Staging's personas have no address and stay unconfirmed (ADR-043 §6): one-time addresses under `kuutti.app` would need SES receiving, an MX and a receipt rule, to read their codes, for one card on the demo.
 
 ### Admin panel (#313, ADR-025)
 
@@ -706,4 +772,4 @@ A domain is associated with one app at a time: moving it from another app means 
 
 ## What is not here
 
-Dokploy's own configuration (no provider exists; `user_data` installs it, its contents are backed up from `/etc/dokploy`), the registration of the domain itself (its zone and records are code), the Amplify Hosting app for the website (above), secret values, the EAS account side (the organisation and project, credentials, the robot token; `apps/mobile/README.md`), store setup, the Telia contract, and creation of the AWS account.
+Dokploy's own configuration (no provider exists; `user_data` installs it, its contents are backed up from `/etc/dokploy`), the registration of the domain itself (its zone and records are code), the Amplify Hosting app for the website (above), SES production access and any address verified to try mail in the sandbox (Mail, above), secret values, the EAS account side (the organisation and project, credentials, the robot token; `apps/mobile/README.md`), store setup, the Telia contract, and creation of the AWS account.

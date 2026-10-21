@@ -98,6 +98,9 @@ resource "aws_ssm_parameter" "config" {
     "db-user"   = "kuutti_app"
     # Photo moderation through Rekognition (#49, ADR-006); the instance role allows the three calls.
     "moderation" = "rekognition"
+    # Mail through SES (#385, ADR-043 §4): the instance role sends as noreply@
+    # through the domain's identity in infra/bootstrap.
+    "mail" = "ses"
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.
     "admin-app-url"        = var.admin_app_url
