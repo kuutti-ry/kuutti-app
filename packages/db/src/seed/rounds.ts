@@ -7,7 +7,7 @@ import { type Queryable, transaction } from "../pool.ts";
  *
  * Two things in it no route does, written as rows, as the conversations are:
  * a like on the day before (a decision is taken on the day it is of, and the
- * day has ended), and a gate opened with a pool under `gate_k` (ADR-015 §5:
+ * day has ended), and a gate opened with a pool under `gate_k` (TD-10, ADR-015:
  * the count opens a gate at thirty people who can be shown; the stories have
  * four). The day's round itself is built by the round builder (#95) in the
  * API's demo commands, after the gates are counted, as the night builds it.

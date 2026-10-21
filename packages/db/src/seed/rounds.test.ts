@@ -8,7 +8,7 @@ import { PERSONA_ROUNDS, writeRounds } from "./rounds.ts";
 
 // The round of the stories (#379): Iida's gate opened, and Henna's like of
 // her on the day before. Whether the cast pass each other's filters is the
-// API's rule, tested beside it (apps/api/scripts/demo/demo-rounds.test.ts).
+// API's rule, tested beside it (apps/api/scripts/demo/demo-conversations.test.ts).
 
 const MIGRATIONS = resolve(import.meta.dirname, "../..", "drizzle");
 
@@ -147,14 +147,15 @@ describe("writing the round of the stories", () => {
             ["iida", iida],
             ["henna", henna],
           ]),
-          new Date("2026-03-29T10:00:00Z"),
+          // 00:30 in Finland on 30.3.2026: 24 hours back is still the 28th.
+          new Date("2026-03-29T21:30:00Z"),
         );
         expect(result).toEqual({ opened: 0, liked: 1, already: 0, missing: 0 });
         const gate = await pool.query("SELECT opened_at FROM gate WHERE account_id = $1", [iida]);
         expect(gate.rows).toEqual([{ opened_at: null }]);
-        // The day before a day of 23 hours (summer time began on 29.3.2026) is the 28th.
+        // The day before is the 29th by the calendar, a day of 23 hours (summer time began on it).
         const day = await pool.query("SELECT day::text AS day FROM rounds");
-        expect(day.rows).toEqual([{ day: "2026-03-28" }]);
+        expect(day.rows).toEqual([{ day: "2026-03-29" }]);
       } finally {
         await pool.end();
       }

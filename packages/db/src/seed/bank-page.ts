@@ -26,7 +26,7 @@ const GROUPS: ReadonlyArray<{ group: DemoPersona["group"]; title: string; lead: 
   {
     group: "history",
     title: "People with a history",
-    lead: "The same identity on every day, and, but for the three pairs of the conversations, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
+    lead: "The same identity on every day, and, but for the three pairs of the conversations and Iida, the same person as a test user of Telia's bed on staging. What Kuutti holds about them is given by pnpm demo:reset; before it has run they are newcomers too.",
   },
   {
     group: "ages",

@@ -1,8 +1,8 @@
 # The demo storyboard
 
-The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The same story runs in the simulator against the mock bank and on the staging phone against Telia's test banks; only the sign-in differs. `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
+The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The story runs in the simulator against the mock bank and, all but scene 5, on the staging phone against Telia's test banks; only the sign-in differs. Scene 5, the round, runs in the simulator only (#379; the scene says why). `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
 
-The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
+The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each persona of the other scenes is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
 
 ## Scene 1: Aino signs in (2 min)
 
@@ -47,7 +47,9 @@ Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button
 
 ## Scene 5: Today's round (3 min)
 
-Sign out and sign in as Iida Mattila (locally her button; she exists at the mock bank only, so on staging her story is given by the job and nobody signs in as her). Her story is complete: a profile, three approved photos, and her gate opened by the stories, since four people are no pool the night's count would open a gate for (`gate_k`, ADR-015). The four women of her round, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida yesterday (#379).
+Locally only. Sign out and sign in as Iida Mattila (her button). She and the four women of her round exist at the mock bank only: on staging the job gives their stories and her round too, and nobody signs in as any of them there (ADR-018 §1), so this scene has no staging version. A round on staging for a persona of Telia's bed, whom the phone can sign in as, is the maintainer's open decision (ADR-014, Open 1). Her story is complete: a profile, three approved photos (release v3 of the pictures), and her gate opened by the stories, since four people are no pool the night's count would open a gate for (`gate_k`, ADR-015). The four women of her round, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida yesterday (#379).
+
+Her round is right only on the Finnish day of the reset that built it. On a later day the builder makes her a round of Henna alone: Katja, Minna and Riikka were shown on the reset's day and wait out `shown_cooldown_days` (thirty, TD-12), and Henna's like still waits while Iida has not decided on her card (once she has, the round is empty). So the reset for this scene is run on the morning of the demo, and the morning's checks sign in as Iida (`runbook.md`).
 
 1. Home: "Matching is open for you." and under it "Today's round".
 2. The first card is Henna's, labelled "Liked you": a like waits first in the round, and never unlabelled (ADR-037). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word. On her card there is no fish: a fish would only answer her like.
@@ -56,7 +58,7 @@ Sign out and sign in as Iida Mattila (locally her button; she exists at the mock
 5. The third card: "Block or report" beside the name, the same dialog as anywhere (ADR-030 §11). Report and block, a reason, a few words, Send report; Done, and the card is gone.
 6. The last card, then "That was today's round. The next one comes tomorrow." No count, no countdown, nothing loads more.
 
-Which of Katja, Minna and Riikka comes when is the day's order (the soft matches, ties by a hash of the day, ADR-035), so tell it by the cards, not by a script. A match and a report are final: `pnpm demo:reset` gives Iida her round anew.
+Which of Katja, Minna and Riikka comes when is the day's order (the soft matches, ties by a hash of the day, ADR-035), so tell it by the cards, not by a script. Once a release carries faces for the population's pool (v2 has none), a population with faces written before the reset may put women of it whom Iida's pool takes in among them, and into her later rounds too. A match and a report are final: `pnpm demo:reset` gives Iida her round anew, for the day it runs.
 
 ## Scene 6: The moderation queue (2 min)
 

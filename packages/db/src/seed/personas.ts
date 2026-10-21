@@ -16,15 +16,16 @@ import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
  * broker sends it, and is stored nowhere; what the app calls the persona is
  * the display name the story gives.
  *
- * Six more are born on a fixed day and exist at the mock bank only: Antti
+ * Eleven more are born on a fixed day and exist at the mock bank only: Antti
  * and Ville, the pair of the chat's flows (#348, #101), Elina and Jussi, the
  * pair of the contact share's flow (#103), and Laura and Emmi, the pair of
  * the report's flow (#351), each pair with a conversation of its own so that
- * no flow changes what another reads, and Iida, the round's flow (#379), with
- * the four people of her round, who are cards and nothing more: no flow and
- * no demo signs in as them. Every test user of the bed whose code
- * the product's parser accepts is a persona already (docs/vendors/telia.md
- * 1.4), so nobody signs in as them on staging (the maintainer's choices of
+ * no flow changes what another reads; and the round's cast (#379): Iida, as
+ * whom the round's flow signs in, and the four people of her round, Henna,
+ * Katja, Minna and Riikka, who are cards and nothing more: no flow and no
+ * demo signs in as them. Every test user of the bed whose code the
+ * product's parser accepts is a persona already (docs/vendors/telia.md 1.4),
+ * so nobody signs in as them on staging (the maintainer's choices of
  * 17/10/2026 and 18/10/2026, ADR-014 §4); their stories are given there as
  * anywhere.
  *

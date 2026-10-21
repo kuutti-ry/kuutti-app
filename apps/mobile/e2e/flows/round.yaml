@@ -7,7 +7,9 @@
 # says to come back tomorrow. Which of Katja, Minna and Riikka comes when is
 # the day's order, so the flow decides by place, never by name. The stories
 # give Iida her round (packages/db/src/seed/rounds.ts); a match and a block
-# are final, so the flow runs once after each `pnpm demo:reset`.
+# are final, so the flow runs once after each `pnpm demo:reset`, on the same
+# Finnish day: on a later day the builder makes her a round of Henna alone,
+# the other three having been shown within `shown_cooldown_days`.
 # shortcut: the note is typed at the phone's own text size; ADR-030 §11's
 # 200% wants a host step between flows (simctl content_size, adb font_scale),
 # which `pnpm e2e` does not have.
@@ -37,6 +39,8 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - extendedWaitUntil:
     visible: "It's a match|Se on mätsi|Det är en match"
     timeout: 15000
+# The round keeps the match on its screen until it has the focus again, so
+# the next card comes only after Back.
 - tapOn: "Go to the conversation|Siirry keskusteluun|Gå till samtalet"
 # The conversation the match opened, with nothing in it yet but the composer.
 - extendedWaitUntil:
@@ -44,11 +48,14 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     timeout: 15000
 - assertVisible: "Henna, \\d+"
 - tapOn: "Back|Takaisin|Tillbaka"
-# Back in the round: the next card, a stranger's.
+# Back in the round: the next card, a stranger's, and Henna's name leaves
+# with the conversation's header (README: something going is waited for).
 - extendedWaitUntil:
     visible: "Matches your filters|Vastaa suodattimiasi|Matchar dina filter"
     timeout: 15000
-- assertNotVisible: "Henna, \\d+"
+- extendedWaitUntil:
+    notVisible: "Henna, \\d+"
+    timeout: 15000
 - waitForAnimationToEnd
 - tapOn: "Pass|Ohita|Hoppa över"
 # Undo brings the passed card back, and says what was decided.
@@ -64,6 +71,13 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - extendedWaitUntil:
     notVisible: "You passed on this person\\. You can change that until midnight\\.|Ohitit tämän henkilön\\. Voit muuttaa sitä keskiyöhön asti\\.|Du hoppade över den här personen\\. Du kan ändra det fram till midnatt\\."
     timeout: 15000
+# Block or report is in the card's header, below the main photo, and may sit
+# at the fold above the decisions' bar: brought to the middle first (README).
+- scrollUntilVisible:
+    element: "Block or report|Estä tai ilmoita|Blockera eller anmäl"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - waitForAnimationToEnd
 - tapOn: "Block or report|Estä tai ilmoita|Blockera eller anmäl"
 - extendedWaitUntil:

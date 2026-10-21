@@ -1,11 +1,11 @@
 import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
 import type { RoundChoice, RoundReason } from "@kuutti/schema";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import Fish from "lucide-react-native/icons/fish";
 import Heart from "lucide-react-native/icons/heart";
 import Undo2 from "lucide-react-native/icons/undo-2";
 import X from "lucide-react-native/icons/x";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Platform, ScrollView, type Text as TextNode, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -52,7 +52,7 @@ const ANSWERS_A_LIKE: ReadonlySet<RoundReason> = new Set(["liked_you", "fish"]);
  *
  * As a card, the end or a match takes the place of what had the focus, the
  * screen reader is taken to its first line; a notice is spoken where it
- * appears.
+ * appears, under the header, in sight however far the card was scrolled.
  */
 export function RoundScreen() {
   const { t, locale } = useT();
@@ -60,8 +60,24 @@ export function RoundScreen() {
   const tap = useHapticTap();
   const round = useRound();
   const { view, current, notice, match } = round;
-  // A photo URL the API refused (the day's photos, #52), for the card it was refused on.
-  const [refused, setRefused] = useState<{ position: number; code: string } | null>(null);
+  // A photo URL the API refused (the day's photos, #52), for the card it was
+  // refused on, by its day and place: a new day's card there starts without it.
+  const [refused, setRefused] = useState<{ day: string; position: number; code: string } | null>(
+    null,
+  );
+
+  // The conversation is pushed over the round, which stays mounted under it:
+  // the match stays in front of the next card until the round is in sight
+  // again, so that card is neither shown nor reported seen meanwhile (ADR-034 §2).
+  const away = useRef(false);
+  const { closeMatch } = round;
+  useFocusEffect(
+    useCallback(() => {
+      if (!away.current) return;
+      away.current = false;
+      closeMatch();
+    }, [closeMatch]),
+  );
 
   // Stable, so it runs as a line mounts rather than on every render.
   const focus = useCallback((node: TextNode | null) => {
@@ -107,12 +123,16 @@ export function RoundScreen() {
           </Button>
         )}
       </ScreenHeader>
+      {words !== null && (
+        <Text accessibilityLiveRegion="polite" className="px-6 pt-4">
+          {words}
+        </Text>
+      )}
       {/* Keyed by the card, so each one starts at its top. */}
       <ScrollView
         key={match ?? entry?.position ?? "round"}
         contentContainerClassName="flex-grow gap-4 p-6"
       >
-        {words !== null && <Text accessibilityLiveRegion="polite">{words}</Text>}
         {view.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("round.loading")}</Text>
         )}
@@ -135,7 +155,7 @@ export function RoundScreen() {
             <Button
               onPress={() => {
                 tap();
-                round.closeMatch();
+                away.current = true;
                 router.push(`/chats/${match}`);
               }}
             >
@@ -152,22 +172,29 @@ export function RoundScreen() {
             </Button>
           </View>
         )}
-        {match === null && entry && (
+        {match === null && current && (
           <View className="gap-3">
             <Text
               ref={focus}
               variant="small"
               className="self-start rounded-full bg-secondary px-3 py-1 text-secondary-foreground"
             >
-              {t(REASON[entry.reason])}
+              {t(REASON[current.entry.reason])}
             </Text>
-            {entry.decision !== null && <Text>{t(REVISIT[entry.decision])}</Text>}
+            {current.entry.decision !== null && <Text>{t(REVISIT[current.entry.decision])}</Text>}
             <ProfileCardView
-              card={entry.card}
-              onGone={() => round.drop(entry.position)}
-              onRefused={(code) => setRefused({ position: entry.position, code: code ?? "" })}
+              card={current.entry.card}
+              // No block or report while a decision is on its way: one finishing
+              // after the next card took this one's place would never take the
+              // blocked person off, and Undo would bring them back (ADR-030 §11).
+              onGone={
+                round.busy ? undefined : () => round.drop(current.day, current.entry.position)
+              }
+              onRefused={(code) =>
+                setRefused({ day: current.day, position: current.entry.position, code: code ?? "" })
+              }
             />
-            {refused?.position === entry.position && (
+            {refused?.day === current.day && refused.position === current.entry.position && (
               <Text variant="muted" accessibilityLiveRegion="polite">
                 {t(
                   refused.code === "photo_budget_exceeded"

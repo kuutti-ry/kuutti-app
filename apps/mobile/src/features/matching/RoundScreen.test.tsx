@@ -2,7 +2,7 @@ import type { ProfileCard, RoundEntry, RoundResponse } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -13,10 +13,17 @@ import { RoundScreen } from "./RoundScreen";
 // leads to the conversation, block or report from the card, the end, an
 // empty round and one not built in their own words, and every refusal of the
 // routes said: a day that ended, a card gone, the day's likes and cards used
-// up, a like that made a match.
+// up, a like that made a match. A new day's round is never touched by the old
+// day's answers, and a round left open past midnight is read anew.
 
-const { __router: router } = jest.requireMock("expo-router") as {
+const {
+  __router: router,
+  __focus: focusRound,
+  __blur: blurRound,
+} = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; back: jest.Mock };
+  __focus: () => void;
+  __blur: () => void;
 };
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -31,6 +38,8 @@ const noContent = () => new Response(null, { status: 204 });
 
 const DAY = "2026-10-20";
 const NEXT_DAY = "2026-10-21";
+/** 12:00 in Finland on DAY: a test that brings the round back in sight sets the phone's clock. */
+const NOON = Date.parse("2026-10-20T09:00:00Z");
 const CONVERSATION = "3f9a2c1e-5b7d-4f01-8a2b-1c3d4e5f6a70";
 const PHOTO = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01" as ProfileCard["photos"][number]["id"];
 
@@ -117,6 +126,20 @@ const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
 const announced = () =>
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
+/** The app's AppState listeners, while subscribed. */
+const appState = new Set<(state: string) => void>();
+const appBecomes = async (state: string) => {
+  await act(async () => {
+    for (const listener of [...appState]) listener(state);
+  });
+  await settle();
+};
+/** The kinds of node a text sits inside, its own first. */
+const ancestorsOf = (words: string) => {
+  const kinds: unknown[] = [];
+  for (let node = screen.getByText(words).parent; node; node = node.parent) kinds.push(node.type);
+  return kinds;
+};
 
 beforeEach(async () => {
   store.clear();
@@ -125,6 +148,12 @@ beforeEach(async () => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
   (AccessibilityInfo.sendAccessibilityEvent as jest.Mock).mockClear();
+  appState.clear();
+  jest.spyOn(AppState, "addEventListener").mockImplementation((_event, listener) => {
+    const each = listener as (state: string) => void;
+    appState.add(each);
+    return { remove: () => appState.delete(each) } as never;
+  });
   await clearSession();
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
@@ -248,6 +277,8 @@ describe("today's round", () => {
   });
 
   it("says that liking back a liked-you card is a match, and leads to the conversation", async () => {
+    // Back from the conversation on the round's own day, which reads nothing anew.
+    jest.spyOn(Date, "now").mockReturnValue(NOON);
     const sent = api((call) =>
       call.path === `/rounds/${DAY}/entries/1/decision`
         ? json({ match: { conversationId: CONVERSATION } })
@@ -270,7 +301,23 @@ describe("today's round", () => {
 
     await press("Go to the conversation");
     expect(router.push).toHaveBeenCalledWith(`/chats/${CONVERSATION}`);
-    // Back from the conversation, the round goes on.
+    // The conversation covers the round, which stays mounted under it: the
+    // match stays in front of the next card, neither shown nor reported seen.
+    await act(async () => blurRound());
+    await settle();
+    expect(heading("It's a match")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Katja, 32" })).toBeNull();
+    expect(sent.seen()).toEqual([1]);
+    // Back from the conversation, the round goes on, the next card reported once.
+    await act(async () => focusRound());
+    await settle();
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(sent.seen()).toEqual([1, 2]);
+    await act(async () => {
+      blurRound();
+      focusRound();
+    });
+    await settle();
     expect(heading("Katja, 32")).toBeTruthy();
     expect(sent.seen()).toEqual([1, 2]);
   });
@@ -400,6 +447,23 @@ describe("today's round", () => {
     expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
   });
 
+  it("names the right day for the next fish when the phone's clock is a minute behind", async () => {
+    // The API counts the wait from its 10:00 UTC to midnight in Finland before
+    // 23.10.; the phone thinks it is 9:59, so the wait ends at 23:59 on 22.10. by its clock.
+    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T09:59:00Z"));
+    const wait = (Date.parse("2026-10-22T21:00:00Z") - Date.parse("2026-10-20T10:00:00Z")) / 1000;
+    api(
+      (call) =>
+        call.path.endsWith("/decision")
+          ? refusal("fish_budget_exceeded", 429, { "retry-after": String(wait) })
+          : undefined,
+      { day: DAY, entries: [entry(2, "Katja")] },
+    );
+    await show();
+    await press("Send a fish");
+    expect(screen.getByText(/The earliest day for the next one: 23\.10\.2026$/)).toBeTruthy();
+  });
+
   it.each([
     ["no wait", {}],
     ["a wait that is no number", { "retry-after": "soon" }],
@@ -507,29 +571,112 @@ describe("today's round", () => {
     },
   );
 
-  it("changes nothing when a seen report finds its card gone after the day was read anew", async () => {
-    let gone = () => {};
+  /**
+   * The old day's card 1 waits on its seen report while a like finds the day
+   * ended and the new day's round, with its own card 1, is read; then the
+   * report answers.
+   */
+  const lateSeen = (late: () => Response) => {
+    let answer = () => {};
     let reads = 0;
-    api((call) => {
+    const sent = api((call) => {
       if (call.path === "/rounds/today") {
         reads += 1;
-        return reads === 1 ? undefined : new Promise<Response>(() => {});
+        return json(reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
       }
       if (call.path === `/rounds/${DAY}/entries/1/seen`) {
         return new Promise<Response>((resolve) => {
-          gone = () => resolve(refusal("not_found", 404));
+          answer = () => resolve(late());
         });
       }
-      if (call.path.endsWith("/decision")) return refusal("round_expired", 409);
+      if (call.path.startsWith(`/rounds/${DAY}/`) && call.path.endsWith("/decision")) {
+        return refusal("round_expired", 409);
+      }
       return undefined;
     });
+    return { sent, answer: () => answer() };
+  };
+
+  it("changes nothing when a seen report finds its card gone after the day was read anew", async () => {
+    const { sent, answer } = lateSeen(() => refusal("not_found", 404));
     await show();
     await press("Like");
-    expect(screen.getByText("Loading today's round…")).toBeTruthy();
-    await act(async () => gone());
+    expect(heading("Riikka, 31")).toBeTruthy();
+    await act(async () => answer());
     await settle();
-    expect(screen.getByText("Loading today's round…")).toBeTruthy();
+    // The new day's card at the same place stays.
+    expect(heading("Riikka, 31")).toBeTruthy();
+    expect(sent.reads()).toBe(2);
   });
+
+  it("reads nothing more when a seen report finds the day ended after it was read anew", async () => {
+    const { sent, answer } = lateSeen(() => refusal("round_expired", 409));
+    await show();
+    await press("Like");
+    expect(heading("Riikka, 31")).toBeTruthy();
+    await act(async () => answer());
+    await settle();
+    expect(heading("Riikka, 31")).toBeTruthy();
+    expect(screen.getByText("That round ended at midnight, so this was not saved.")).toBeTruthy();
+    // Each read serves the cards again (ADR-008).
+    expect(sent.reads()).toBe(2);
+  });
+
+  it.each([
+    ["a like recorded", () => json({ match: null })],
+    ["a like that made a match", () => json({ match: { conversationId: CONVERSATION } })],
+    ["the day ended", () => refusal("round_expired", 409)],
+    ["the card gone", () => refusal("not_found", 404)],
+    ["a failure", () => refusal("internal", 500)],
+  ])(
+    "changes nothing of the new day's round when a decision answers after it was read: %s",
+    async (_what, late) => {
+      let expire = () => {};
+      let answer = () => {};
+      let reads = 0;
+      const sent = api((call) => {
+        if (call.path === "/rounds/today") {
+          reads += 1;
+          return json(
+            reads === 1
+              ? ROUND
+              : { day: NEXT_DAY, entries: [entry(1, "Riikka"), entry(2, "Saara")] },
+          );
+        }
+        if (call.path === `/rounds/${DAY}/entries/1/seen`) {
+          return new Promise<Response>((resolve) => {
+            expire = () => resolve(refusal("round_expired", 409));
+          });
+        }
+        if (call.path === `/rounds/${DAY}/entries/1/decision`) {
+          return new Promise<Response>((resolve) => {
+            answer = () => resolve(late());
+          });
+        }
+        return undefined;
+      });
+      await show();
+      await act(async () => {
+        fireEvent.press(screen.getByRole("button", { name: "Like" }));
+      });
+      await act(async () => expire());
+      await settle();
+      expect(heading("Riikka, 31")).toBeTruthy();
+      await act(async () => answer());
+      await settle();
+      expect(heading("Riikka, 31")).toBeTruthy();
+      expect(
+        screen.getByText("Yesterday's round ended at midnight. This is today's."),
+      ).toBeTruthy();
+      expect(screen.queryByRole("heading", { name: "It's a match" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Undo your last decision" })).toBeNull();
+      expect(sent.reads()).toBe(2);
+      // The new round goes on as it would have.
+      await press("Like");
+      expect(heading("Saara, 32")).toBeTruthy();
+      expect(sent.decisions()).toEqual([`${DAY}/1 like`, `${NEXT_DAY}/1 like`]);
+    },
+  );
 
   it("says that the day's likes are used up, and keeps the card for a pass", async () => {
     const sent = api((call) =>
@@ -650,6 +797,29 @@ describe("today's round", () => {
     expect(heading("Katja, 32")).toBeTruthy();
   });
 
+  it("offers no block or report while a decision is on its way, so none races it (ADR-030 §11)", async () => {
+    let release = () => {};
+    api((call) =>
+      call.path.endsWith("/decision")
+        ? new Promise<Response>((resolve) => {
+            release = () => resolve(json({ match: null }));
+          })
+        : undefined,
+    );
+    await show();
+    expect(screen.getByRole("button", { name: "Block or report" })).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Like" }));
+    });
+    // Neither the button beside the name nor the name's own action.
+    expect(screen.queryByRole("button", { name: "Block or report" })).toBeNull();
+    expect(heading("Henna, 31").props.accessibilityActions).toBeUndefined();
+    await act(async () => release());
+    await settle();
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Block or report" })).toBeTruthy();
+  });
+
   it("reads nothing more once the screen is left, even when a decision then finds the day ended", async () => {
     let release = () => {};
     const sent = api((call) =>
@@ -688,6 +858,16 @@ describe("today's round", () => {
     expect(announced()).toEqual([]);
   });
 
+  it("keeps a notice in sight under the header, outside the scrolled card", async () => {
+    api((call) => (call.path.endsWith("/decision") ? refusal("not_found", 404) : undefined));
+    await show();
+    await press("Like");
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(ancestorsOf("That card is no longer available.")).not.toContain("RCTScrollView");
+    // The card itself scrolls.
+    expect(ancestorsOf("Matches your filters")).toContain("RCTScrollView");
+  });
+
   it.each([
     [
       "the day's photos are used up",
@@ -721,5 +901,134 @@ describe("today's round", () => {
     // The words are the card's: the next one starts without them.
     await press("Like");
     expect(screen.queryByText(words)).toBeNull();
+  });
+
+  it("keeps a photo's refusal to its day: the new day's card at the same place starts without it", async () => {
+    const withPhoto = entry(1, "Henna", "liked_you");
+    withPhoto.card.photos = [
+      {
+        id: PHOTO,
+        blurhash: "LEHV6nWB2yk8pyo0adR*.7kCMdnj",
+        width: 1200,
+        height: 1600,
+        caption: null,
+        description: null,
+      },
+    ];
+    let reads = 0;
+    api((call) => {
+      if (call.path.startsWith("/photos/")) return refusal("not_found", 404);
+      if (call.path === "/rounds/today") {
+        reads += 1;
+        return json(
+          reads === 1
+            ? { day: DAY, entries: [withPhoto] }
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")] },
+        );
+      }
+      if (call.path.endsWith("/decision")) return refusal("round_expired", 409);
+      return undefined;
+    });
+    await show();
+    await waitFor(() => expect(screen.getByText("The photo could not be shown.")).toBeTruthy());
+    await press("Like");
+    expect(heading("Riikka, 31")).toBeTruthy();
+    expect(screen.queryByText("The photo could not be shown.")).toBeNull();
+  });
+});
+
+describe("a round left open past midnight", () => {
+  // After NOON: 0:30 in Finland on 21.10., and 23:00 on 20.10.
+  const AFTER_MIDNIGHT = Date.parse("2026-10-20T21:30:00Z");
+  const LATE_EVENING = Date.parse("2026-10-20T20:00:00Z");
+  /** The first read is `first`; any later one is the next day's round. */
+  const days = (first: RoundResponse) => {
+    let reads = 0;
+    return api((call) => {
+      if (call.path !== "/rounds/today") return undefined;
+      reads += 1;
+      return json(reads === 1 ? first : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+    });
+  };
+
+  it.each([
+    [
+      "finished",
+      [entry(1, "Henna", "liked_you", "like")],
+      "That was today's round. The next one comes tomorrow.",
+    ],
+    ["empty", [], "There is nobody to show you today. Come back tomorrow."],
+    ["not built", null, "Your round is not ready yet. Come back tomorrow."],
+  ] as const)(
+    "is read anew when the app comes back on the next day, and says so: %s",
+    async (_what, entries, words) => {
+      const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
+      const sent = days({ day: DAY, entries: entries === null ? null : [...entries] });
+      await show();
+      expect(screen.getByText(words)).toBeTruthy();
+      now.mockReturnValue(AFTER_MIDNIGHT);
+      await appBecomes("background");
+      expect(sent.reads()).toBe(1);
+      await appBecomes("active");
+      expect(
+        screen.getByText("Yesterday's round ended at midnight. This is today's."),
+      ).toBeTruthy();
+      expect(heading("Riikka, 31")).toBeTruthy();
+      expect(sent.reads()).toBe(2);
+    },
+  );
+
+  it("is not read again when the app comes back on the same day", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
+    const sent = days({ day: DAY, entries: [entry(1, "Henna", "liked_you", "like")] });
+    await show();
+    now.mockReturnValue(LATE_EVENING);
+    await appBecomes("active");
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+    // Each read serves the cards again (ADR-008).
+    expect(sent.reads()).toBe(1);
+  });
+
+  it("is not read again when the phone's clock is still on the day before the API's", async () => {
+    // The API's midnight has passed; the phone says 23:59 on 20.10.
+    const now = jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T20:59:00Z"));
+    const sent = days({ day: NEXT_DAY, entries: [entry(1, "Henna", "liked_you", "like")] });
+    await show();
+    await appBecomes("active");
+    // Its clock reaches the round's day.
+    now.mockReturnValue(Date.parse("2026-10-20T21:00:30Z"));
+    await appBecomes("active");
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+    expect(sent.reads()).toBe(1);
+  });
+
+  it("is read anew as it comes back from a conversation on the next day, never under it", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
+    let reads = 0;
+    const sent = api((call) => {
+      if (call.path === "/rounds/today") {
+        reads += 1;
+        return json(reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+      }
+      if (call.path === `/rounds/${DAY}/entries/1/decision`) {
+        return json({ match: { conversationId: CONVERSATION } });
+      }
+      return undefined;
+    });
+    await show();
+    await press("Like");
+    await press("Go to the conversation");
+    await act(async () => blurRound());
+    now.mockReturnValue(AFTER_MIDNIGHT);
+    await appBecomes("active");
+    // Under the conversation, nothing is read and nothing reported seen.
+    expect(sent.reads()).toBe(1);
+    await act(async () => focusRound());
+    await settle();
+    expect(screen.getByText("Yesterday's round ended at midnight. This is today's.")).toBeTruthy();
+    expect(heading("Riikka, 31")).toBeTruthy();
+    expect(sent.reads()).toBe(2);
+    // Henna's, then Riikka's; yesterday's next card never.
+    expect(sent.seen()).toEqual([1, 1]);
   });
 });

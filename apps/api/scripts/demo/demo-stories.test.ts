@@ -406,19 +406,22 @@ describe("the stories through the services", () => {
          FROM unnest($1::uuid[]) AS id, generate_series(0, 1) n`,
       [cast],
     );
-    // Before the count nobody is let in, so no gate opens and nothing is built.
-    expect(await giveRounds({ db: ctx.client, logger, now }, [])).toEqual({
+    // Before the count Iida is not let in: her gate stays shut (the guard on
+    // `admitted_at`) and the builder refuses a round behind a shut gate, while
+    // Henna's like of the day before is written all the same.
+    expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
       opened: 0,
-      liked: 0,
+      liked: 1,
       already: 0,
-      missing: 1,
+      missing: 0,
       built: 0,
     });
     await countGates({ db: ctx.client, logger, now });
+    // After it the gate opens and the round is built; the like is the one written before.
     expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
       opened: 1,
-      liked: 1,
-      already: 0,
+      liked: 0,
+      already: 1,
       missing: 0,
       built: 1,
     });
