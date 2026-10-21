@@ -155,6 +155,60 @@ describe("deal-breakers", () => {
     ).toEqual([2, 1]);
   });
 
+  test("a paused deal-breaker sent back as it stands is kept, and the others save around it", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    expect((await answer(ctx.app, a.headers, { smoking: "never", hasKids: "no" })).status).toBe(
+      200,
+    );
+    expect(
+      (await putDealBreakers(ctx.app, a.headers, { dealBreakers: [kids, smoking] })).status,
+    ).toBe(200);
+    // The smoking answer taken back: that filter pauses, and the screen sends it back with every save.
+    expect((await answer(ctx.app, a.headers, { hasKids: "no" })).status).toBe(200);
+
+    const changedKids = { ...kids, includeUnknown: false };
+    const saved = await putDealBreakers(ctx.app, a.headers, {
+      dealBreakers: [changedKids, { ...smoking, accept: [...smoking.accept] }],
+    });
+
+    expect(saved.status).toBe(200);
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [
+        { ...changedKids, paused: false },
+        { ...smoking, paused: true },
+      ],
+      max: 2,
+    });
+  });
+
+  test.for([
+    ["its accepted answers", { ...smoking, accept: ["never", "quitting"] }],
+    ["its switch for those who did not answer", { ...smoking, includeUnknown: true }],
+  ] as const)(
+    "a paused deal-breaker's %s cannot change until its field is answered",
+    async ([, changed], { ctx }) => {
+      await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+      const a = await signedInAccount(ctx.client);
+      expect((await answer(ctx.app, a.headers, { smoking: "never" })).status).toBe(200);
+      expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [smoking] })).status).toBe(
+        200,
+      );
+      expect((await answer(ctx.app, a.headers, { hasKids: "no" })).status).toBe(200);
+
+      const refused = await putDealBreakers(ctx.app, a.headers, { dealBreakers: [changed] });
+
+      expect(refused.status).toBe(409);
+      expect(await refused.json()).toMatchObject({ error: { code: "filter_unanswered" } });
+      expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+        dealBreakers: [{ ...smoking, paused: true }],
+        max: 2,
+      });
+    },
+  );
+
   test("The deal-breakers of another account are never served", async ({ ctx }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
     const a = await signedInAccount(ctx.client);

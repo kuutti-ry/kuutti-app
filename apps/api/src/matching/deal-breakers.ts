@@ -85,12 +85,20 @@ export async function readDealBreakers(
   }));
 }
 
+/** The same filter: one field, the same accepted answers in any order, the same switch. */
+const sameFilter = (a: DealBreaker, b: DealBreaker): boolean =>
+  a.field === b.field &&
+  a.includeUnknown === b.includeUnknown &&
+  JSON.stringify([...a.accept].sort()) === JSON.stringify([...b.accept].sort());
+
 /**
  * The whole set, replaced: at most `max`, each on a distinct whitelisted
- * field the person has answered, accepting options the field has. A filter
- * on what the person will not say about themselves is refused as
- * `filter_unanswered`, with the field, so the screen can ask for the answer
- * instead. Nothing of onboarding's two rows is touched.
+ * field, accepting options the field has. A filter set or changed on what the
+ * person will not say about themselves is refused as `filter_unanswered`,
+ * with the field, so the screen can ask for the answer instead; a paused one
+ * sent back as it stands is kept, since the screen sends the whole set and a
+ * pause deletes nothing (ADR-009 §1). Nothing of onboarding's two rows is
+ * touched.
  */
 export async function saveDealBreakers(
   db: Queryable,
@@ -114,11 +122,6 @@ export async function saveDealBreakers(
         field: dealBreaker.field,
       });
     }
-    if (pausedOf(dealBreaker.field, own)) {
-      throw new AppError(409, "filter_unanswered", "Answer the field yourself first", {
-        field: dealBreaker.field,
-      });
-    }
   }
   return transaction(db, async (tx) => {
     // The lock erasure takes first (ADR-009 §8): a save racing an erasure
@@ -128,6 +131,20 @@ export async function saveDealBreakers(
       [accountId],
     );
     if (live.rows.length === 0) return false;
+    // Read under the lock, so a paused filter is compared with what is stored now.
+    const { rows } = await tx.query<DealBreakerRow>(
+      `SELECT field, value, include_unknown FROM preferences
+       WHERE account_id = $1 AND mode = 'hard' AND field = ANY($2::text[])`,
+      [accountId, WHITELIST],
+    );
+    const stored = dealBreakersFrom(rows);
+    for (const dealBreaker of update.dealBreakers) {
+      if (!pausedOf(dealBreaker.field, own)) continue;
+      if (stored.some((kept) => sameFilter(kept, dealBreaker))) continue;
+      throw new AppError(409, "filter_unanswered", "Answer the field yourself first", {
+        field: dealBreaker.field,
+      });
+    }
     await tx.query(
       `DELETE FROM preferences
        WHERE account_id = $1 AND field = ANY($2::text[]) AND NOT (field = ANY($3::text[]))`,
