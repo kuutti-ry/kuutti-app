@@ -1,6 +1,6 @@
 # ADR-035: The round builder, its first cut
 
-- Status: accepted 2026-10-20 (#95, built as written here on the maintainer's decisions of that day, #95's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change)
+- Status: accepted 2026-10-20 (#95, built as written here on the maintainer's decisions of that day, #95's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§1: a shadow-banned person's round holds no liked-you or fish places, ADR-037 §7; see History)
 - Date: 2026-10-20
 - Follows: TD-10 (the gate), TD-11 (rounds for admitted people with a complete profile), TD-12 (the reason on every card, the cooldowns), TD-13 (the archive of a silent match), TD-14 (gender-neutral rules), ADR-011 §4 (the registry), ADR-015 §1 and §5 (the pool both ways, an open gate), ADR-019 §1 and §5 (the soft count, the hidden field), ADR-024 §6 (a shadow ban withholds), ADR-031 (the conversation as the match's record), ADR-034 §3 and §8 (the day, the one writer), CLAUDE.md rules 6, 7 and 10 and Product constraints; issues #95, #97, #98, #99, #100, #378, #379
 
@@ -10,7 +10,7 @@ ADR-034 built the round record and nothing that writes it: a person whose matchi
 
 ## Decision
 
-1. **Who gets a round:** everybody whose matching has opened in the pond they live in (`gate.opened_at`, ADR-015 §5), active or shadow-banned, and complete as the gate's count reads them. A shadow-banned person's round is like anybody's: the ban withholds the person from others, not others from the person (ADR-024 §6). Paused, suspended, banned and erased accounts get none.
+1. **Who gets a round:** everybody whose matching has opened in the pond they live in (`gate.opened_at`, ADR-015 §5), active or shadow-banned, and complete as the gate's count reads them. A shadow-banned person's round is like anybody's: the ban withholds the person from others, not others from the person (ADR-024 §6); only its liked-you and fish places are left out, so that a like back making no match tells them nothing (ADR-037 §7). Paused, suspended, banned and erased accounts get none.
 2. **Whom it holds.** The pond is read as the gate reads it (`subjectsOfPond`, the count's own facts and rules), so the round and the gate's figure agree on who is somebody's pool. A candidate is:
    - seen by others (`active`) and let in (`admitted_at`), as the gate counts a pool;
    - in each other's pool, both ways (`inEachOthersPool`, rule 7);
@@ -63,3 +63,4 @@ Liked-you's forced places, its queue and its expiry (#97, next) and the fish ahe
 - 2026-10-20: written with #95's first cut, on the maintainer's decisions of that day.
 - 2026-10-20 (#97, ADR-037): the round's first places are the people whose like waits on the person; the shown cooldown spaces ordinary cards only, a recent pass and a conversation keep a like away too.
 - 2026-10-20, after the audit of the first cut: §5's lost race answers the other read's round, and the person is asked alone before the pond is read; the builder caps a round at `ROUND_ENTRIES_MAX`, the liked-you places first; the Consequences count the liked-you places of #97.
+- 2026-10-21 (ADR-037 §7): §1's shadow-banned round holds no liked-you or fish places.

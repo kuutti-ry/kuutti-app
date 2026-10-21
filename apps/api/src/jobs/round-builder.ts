@@ -32,7 +32,8 @@ import { type Subject, subjectOf, subjectsOfPond } from "./pond-gate.ts";
  * other's pool, labelled `liked_you`; no order moves them. A like the person
  * passed within `pass_cooldown_days`, or of somebody they have a
  * conversation with, never comes. Somebody whose like waits beyond the cap
- * waits for a later round and is no ordinary card meanwhile.
+ * waits for a later round and is no ordinary card meanwhile. A shadow-banned
+ * person gets none of these places, and the likes wait for the lift.
  *
  * Nothing it reads or decides is logged but how many: whose round has whom
  * in it is the round record's, and the export's (ADR-034 §7).
@@ -175,11 +176,18 @@ async function placesOf(
   // per round lifts it, should it ever happen.
   // The round's places are bounded by the contract, whatever the panel sets
   // (ROUND_ENTRIES_MAX): the liked-you places first, the ordered ones after.
-  const likedYou = likedYouPlaces(
-    owner,
-    waiting.flatMap((like) => byId.get(like.id) ?? []),
-    Math.min(round.config.liked_you_cap, ROUND_ENTRIES_MAX),
-  );
+  // A shadow-banned person's round holds no liked-you or fish places, the
+  // maintainer's of 21/10/2026 (ADR-037 §7): a like back would make no match
+  // (ADR-038 §1), and so tell them of the ban (ADR-024 §7). Those likes wait
+  // for the lift, their clock running, and their people are no ordinary
+  // cards meanwhile.
+  const likedYou = owner.visible
+    ? likedYouPlaces(
+        owner,
+        waiting.flatMap((like) => byId.get(like.id) ?? []),
+        Math.min(round.config.liked_you_cap, ROUND_ENTRIES_MAX),
+      )
+    : [];
   const waits = new Set(waiting.map((like) => like.id));
   const ordered = roundOrder(
     owner,
