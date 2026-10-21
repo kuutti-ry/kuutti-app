@@ -5542,6 +5542,18 @@ admin.automaticBans.rule.same_first_message:
   en: "Sent the same first message to {people, plural, one {# person} other {# people}} between {first} and {at}."
   description: "Admin panel, the automatic shadow bans: the rule on one first message sent to many applied it; {people} is to how many, {first} the first one's time and {at} when the rule applied the ban. The message itself is never shown (#105)."
 
+admin.automaticBans.rule.photo_fetches:
+  en: "Was handed {photos, plural, one {# URL} other {# URLs}} of other people's photos in the card and full sizes between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the velocity rule on photo fetches applied it; {photos} is how many URLs of other people's photos the account was handed, {first} the first one's time and {at} when the rule applied the ban. The photos themselves are never shown (#86)."
+
+admin.automaticBans.rule.cards_served:
+  en: "Was served the cards of {people, plural, one {# person} other {# people}} between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the velocity rule on cards served applied it; {people} is of how many different people, {first} the first card's time and {at} when the rule applied the ban (#86)."
+
+admin.automaticBans.rule.round_reads:
+  en: "Read the day's round {reads, plural, one {# time} other {# times}} between {first} and {at}."
+  description: "Admin panel, the automatic shadow bans: the velocity rule on reads of the round applied it; {reads} is how many reads, {first} the first one's time and {at} when the rule applied the ban (#86)."
+
 admin.automaticBans.hidden:
   en: "Hidden: {age}."
   description: "Admin panel, the automatic shadow bans: how long the person has been hidden, by the API's clock, {age} being one of the admin.age texts (#105)."

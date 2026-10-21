@@ -107,12 +107,19 @@ const decisionRoute = createRoute({
   },
 });
 
+/**
+ * `read` is the safety slice's velocity check after a read of the day's
+ * round (#86, ADR-041), handed in by app.ts as the chat's `opened` is;
+ * awaited after the read was served, it changes no answer. A read refused
+ * over the day's cards hands over nothing and is not checked.
+ */
 export function roundRoutes(
   deps: Deps,
   requireSession: MiddlewareHandler<AppEnv>,
   cardOf: CardOf,
   buildToday: BuildToday,
   matches: Matches,
+  read: (accountId: string) => Promise<void>,
 ) {
   const app = new OpenAPIHono<AppEnv>();
   for (const route of [todayRoute, seenRoute, decisionRoute]) {
@@ -133,6 +140,7 @@ export function roundRoutes(
       if (round.entries === null && (await buildToday(accountId))) {
         round = await readTodaysRound(rounds(), accountId, cardOf);
       }
+      await read(accountId);
       return c.json(round, 200);
     } catch (error) {
       const wait = retryAfterOf(error);

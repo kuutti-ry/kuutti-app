@@ -123,6 +123,17 @@ export const MATCHING_CONFIG_V1 = {
   auto_shadow_ban_same_first_message: 5,
   auto_shadow_ban_same_first_message_hours: 24,
   auto_shadow_ban_review_hours: 48,
+  // #86 (ADR-041, migration 0075): the velocity rules, the maintainer's of
+  // 21/10/2026. URLs of other people's photos in the card and full sizes
+  // within the minutes; different people's cards served within the minutes,
+  // off while the round bounds them; and reads of the day's round within the
+  // minutes. A threshold of 0 switches its rule off.
+  auto_shadow_ban_photo_fetches: 120,
+  auto_shadow_ban_photo_fetches_minutes: 60,
+  auto_shadow_ban_cards_served: 0,
+  auto_shadow_ban_cards_served_minutes: 60,
+  auto_shadow_ban_round_reads: 30,
+  auto_shadow_ban_round_reads_minutes: 1,
   // #348 (ADR-031 §6, migration 0054): the longest message, in characters
   // after trimming, and the messages one account may send in a minute; the
   // send reads both on each request.
