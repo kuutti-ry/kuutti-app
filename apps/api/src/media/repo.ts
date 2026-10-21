@@ -433,6 +433,50 @@ export async function insertPhotoAccess(
 }
 
 /**
+ * The photo velocity rule's count (#86, ADR-041 §1): URLs of other people's
+ * profile photos in the card and full sizes issued to the account after
+ * `since`, and the earliest. A thumb never counts (the chat list asks one
+ * per conversation on every read), nor the person's own photos, nor a
+ * conversation's (purpose message); a photo deleted since drops out with
+ * its owner unknown. Scoped by the account (rule 6).
+ */
+export async function othersPhotoFetchesSince(
+  db: Queryable,
+  accountId: string,
+  since: Date,
+): Promise<{ count: number; firstAt: Date | null }> {
+  const { rows } = await db.query<{ n: number; first_at: Date | null }>(
+    `SELECT count(*)::int AS n, min(a.at) AS first_at
+       FROM photo_access a JOIN photo p ON p.id = a.photo_id
+      WHERE a.account_id = $1 AND a.at > $2 AND a.purpose = 'profile'
+        AND a.variant IN ('card', 'full') AND p.account_id <> $1`,
+    [accountId, since],
+  );
+  return { count: rows[0]?.n ?? 0, firstAt: rows[0]?.first_at ?? null };
+}
+
+/**
+ * The cards velocity rule's count (#86, ADR-041 §1): different people whose
+ * card the account was served after `since`, and the earliest. A card that
+ * comes round again the same day writes nothing new (`recordCardServed`),
+ * so each person counts at their day's first serving. Scoped by the account
+ * (rule 6).
+ */
+export async function cardsServedSince(
+  db: Queryable,
+  accountId: string,
+  since: Date,
+): Promise<{ count: number; firstAt: Date | null }> {
+  const { rows } = await db.query<{ n: number; first_at: Date | null }>(
+    `SELECT count(DISTINCT p.account_id)::int AS n, min(s.at) AS first_at
+       FROM card_shown s JOIN photo p ON p.id = s.photo_id
+      WHERE s.account_id = $1 AND s.at > $2`,
+    [accountId, since],
+  );
+  return { count: rows[0]?.n ?? 0, firstAt: rows[0]?.first_at ?? null };
+}
+
+/**
  * A fetch-log row outside the budget (#237): the export reads the person's
  * own full-size photos on the server, and the log it returns says so, as it
  * did when the export issued URLs. The row counts against later fetches like

@@ -1,6 +1,6 @@
 # ADR-033: Automatic shadow bans
 
-- Status: accepted 2026-10-19 (#105, built as written here on the maintainer's decisions of that day, #105's comments; the points under "Open, the maintainer's" are his to confirm or change)
+- Status: accepted 2026-10-19 (#105, built as written here on the maintainer's decisions of that day, #105's comments; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§1, §2: #86's three velocity rules, ADR-041; see History)
 - Date: 2026-10-19
 - Follows: TD-5 (moderation; research events never carry text), TD-6 (what a verified stranger learns), TD-7 (shadow_banned; erasure), ADR-024 (sanctions: §3 staff, §6 a shadow ban withholds, §8 erasure, §9 the audit log), ADR-030 (§4 the report, §7 being blocked is no signal, §10 the index #105 adds), ADR-031 (§9 the socket, Open 5 the tells), CLAUDE.md rules 5, 6 and 10 and Product constraints; issues #105, #312, #86, #106
 
@@ -48,8 +48,9 @@ A moderator cannot watch everything, and the first hours of an abuser cost the m
 3. A moderator who filed a counted report may confirm the ban (ADR-030 Open 17's channel).
 4. Keeping the forty-eight hours: a runbook rhythm (#299), or notifications to moderators.
 5. An automatic ban stays on the list after an admin bans the identity, until somebody confirms it.
-6. #86's view velocity adds its own `sanction_rule` value and reuses the check, the record and the list.
+6. Settled 2026-10-21 by ADR-041: #86's velocity adds three `sanction_rule` values and reuses the check, the record and the list.
 
 ## History
 
 - 2026-10-19: written with #105's build, on the maintainer's parameters of that day.
+- 2026-10-21 (#86, ADR-041): three more rules on the same seam, `photo_fetches`, `cards_served` and `round_reads` (migrations 0074 and 0075), with the reason `scraping` where §1's three keep `other` (Open 1 taken for them alone). §2's check runs after a URL of another person's photo in the card or full size and after a served read of today's round, handed to the photo and round routes by `app.ts`; since those are reads, each is measured first without the lock, with the person's standing (`standingOf`, the statement the lock path now reads too), and takes it only when a rule is met there and the person is in sight. The round's reads are counted in memory only. Open 6 is settled.

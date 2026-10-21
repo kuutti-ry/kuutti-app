@@ -9,8 +9,8 @@ import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 import { ReviewStep } from "./Sanctions.tsx";
 
-// The automatic shadow bans (#105, ADR-033): the shadow bans a rule applied on
-// its own, oldest first, each waiting for a moderator to confirm or reverse
+// The automatic shadow bans (#105, ADR-033; #86's velocity, ADR-041): the
+// shadow bans a rule applied on its own, oldest first, each waiting for a moderator to confirm or reverse
 // it. A line says the rule in counts and times only, never a message or a
 // reporter, which is all the API sends; how long the person has been hidden
 // by the API's clock, and "Late" in words and weight past the review time,
@@ -32,6 +32,11 @@ const RULE: Record<SanctionRule, (t: TFunction, count: number, span: Span) => st
     t("admin.automaticBans.rule.first_messages", { conversations, ...span }),
   same_first_message: (t, people, span) =>
     t("admin.automaticBans.rule.same_first_message", { people, ...span }),
+  photo_fetches: (t, photos, span) =>
+    t("admin.automaticBans.rule.photo_fetches", { photos, ...span }),
+  cards_served: (t, people, span) =>
+    t("admin.automaticBans.rule.cards_served", { people, ...span }),
+  round_reads: (t, reads, span) => t("admin.automaticBans.rule.round_reads", { reads, ...span }),
 };
 
 type Decision = { ban: AutomaticBan; outcome: "keep" | "lift" };

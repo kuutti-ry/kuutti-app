@@ -96,12 +96,16 @@ export const sanctionKind = pgEnum("sanction_kind", ["warn", "shadow_ban", "susp
 /**
  * The automatic rule that applied a shadow ban (#105, ADR-033): reports by
  * different people, first messages faster than a person writes them, the
- * same first message to many. #86's view velocity would add its own.
+ * same first message to many; and #86's velocity (ADR-041): other people's
+ * photos fetched, cards served and the round read faster than a person does.
  */
 export const sanctionRule = pgEnum("sanction_rule", [
   "reports",
   "first_messages",
   "same_first_message",
+  "photo_fetches",
+  "cards_served",
+  "round_reads",
 ]);
 export const sanctionReason = pgEnum("sanction_reason", [
   "harassment",

@@ -170,8 +170,11 @@ export type MessageParams = {
   "admin.automaticBans.reverse": Record<never, never>;
   "admin.automaticBans.reverseEffect": Record<never, never>;
   "admin.automaticBans.reverseTitle": { "account": string };
+  "admin.automaticBans.rule.cards_served": { "people": number; "first": string; "at": string };
   "admin.automaticBans.rule.first_messages": { "conversations": number; "first": string; "at": string };
+  "admin.automaticBans.rule.photo_fetches": { "photos": number; "first": string; "at": string };
   "admin.automaticBans.rule.reports": { "people": number; "first": string; "at": string };
+  "admin.automaticBans.rule.round_reads": { "reads": number; "first": string; "at": string };
   "admin.automaticBans.rule.same_first_message": { "people": number; "first": string; "at": string };
   "admin.automaticBans.shown": { "shown": string };
   "admin.automaticBans.title": Record<never, never>;

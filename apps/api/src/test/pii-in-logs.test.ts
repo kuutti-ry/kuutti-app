@@ -7,6 +7,7 @@ import { createApp } from "../app.ts";
 import type { IdentityBroker } from "../identity/index.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "./account.ts";
+import { cardShown } from "./cards.ts";
 import { conversationBetween, photoMessage } from "./chat.ts";
 import {
   captureLogger,
@@ -384,6 +385,60 @@ describe("PII in logs", () => {
     expect(JSON.stringify(audit.rows)).not.toContain(FIXTURES.message);
     const events = await ctx.client.query("SELECT props FROM events");
     expect(JSON.stringify(events.rows)).not.toContain(FIXTURES.message);
+  });
+
+  // The velocity rules (#86, ADR-041): other people's photos fetched and the
+  // round read until both rules are met, every request carrying the
+  // fixtures. The checks' own lines carry the rule and its count, nothing
+  // else; no line carries a fixture, nor the photos' owners, whose photos the
+  // fetcher's lines name by id only.
+  test("No line of a velocity check names a person or carries a fixture", async ({ ctx }) => {
+    const { logger, lines } = await captureLogger();
+    let tick = Date.parse("2026-10-16T09:00:00.000Z");
+    const app = createApp({
+      config: testConfig(),
+      logger,
+      db: ctx.client,
+      now: () => new Date(tick),
+      media: testMediaDeps().deps,
+    });
+    const a = await signedInAccount(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const photo = await cardShown(
+      ctx.client,
+      a.accountId,
+      owner.accountId,
+      new Date(tick - 7_200_000),
+    );
+    await ctx.client.query(
+      `INSERT INTO photo_access (account_id, photo_id, variant, at)
+       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 119) g`,
+      [a.accountId, photo, new Date(tick)],
+    );
+    const probe = `?${new URLSearchParams({ hetu: FIXTURES.hetu, email: FIXTURES.email, text: FIXTURES.message })}`;
+    const headers = { ...a.headers, "x-probe": FIXTURES.email, cookie: `note=${FIXTURES.message}` };
+    expect((await app.request(`/photos/${photo}/card${probe}`, { headers })).status).toBe(200);
+    // A second account whose reads meet the round's rule, so both checks write their line.
+    const b = await signedInAccount(ctx.client);
+    const bHeaders = { ...b.headers, "x-probe": FIXTURES.email };
+    for (let i = 0; i < 30; i++) {
+      tick += 1000;
+      expect((await app.request(`/rounds/today${probe}`, { headers: bHeaders })).status).toBe(200);
+    }
+    const banned = lines().filter((line) => line.msg === "automatic shadow ban");
+    expect(banned.map(({ rule, count }) => ({ rule, count }))).toEqual([
+      { rule: "photo_fetches", count: 120 },
+      { rule: "round_reads", count: 30 },
+    ]);
+    for (const line of banned) {
+      expect(Object.keys(line).sort()).toEqual(
+        ["count", "hostname", "level", "msg", "pid", "rule", "time"].sort(),
+      );
+    }
+    expect(leakedFixtures(lines())).toEqual([]);
+    expect(JSON.stringify(lines())).not.toContain(owner.accountId);
+    const kept = await ctx.client.query("SELECT * FROM sanction");
+    expect(JSON.stringify(kept.rows)).not.toContain(owner.accountId);
   });
 
   // A stored contact (#103, ADR-031 §11): a phone number and a username, kept,
