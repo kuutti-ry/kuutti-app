@@ -18,6 +18,7 @@ import {
   intentsFit,
   type PoolPerson,
   passesFiltersOf,
+  relaxedBy,
 } from "./pool.ts";
 
 // features/pond/gate.feature (#94, #147, ADR-015): who is in whose pool;
@@ -597,5 +598,54 @@ describe("deal-breakers", () => {
     const again: PoolPerson = { ...paused, fields: { ...paused.fields, smoking: "sometimes" } };
     expect(inEachOthersPool(again, smoker)).toBe(false);
     expect(inEachOthersPool(smoker, again)).toBe(false);
+  });
+});
+
+describe("a person's deal-breakers relaxed for the day (#99, ADR-042 §3)", () => {
+  const relaxationArb = fc.record({
+    field: fc.constantFrom(...DEAL_BREAKER_FIELDS),
+    kind: fc.constantFrom("unanswered" as const, "aside" as const),
+  });
+
+  it("never lets in somebody whose own filters exclude the person, and never leaves out anybody", () => {
+    fc.assert(
+      fc.property(pairArb, fc.array(relaxationArb, { maxLength: 3 }), ([a, b], relaxations) => {
+        const wider = relaxedBy(a, relaxations);
+        // The other side's filters still hold: whoever passes is somebody who lets the person through.
+        if (inEachOthersPool(wider, b)) expect(passesFiltersOf(b, wider)).toBe(true);
+        expect(passesFiltersOf(b, wider)).toBe(passesFiltersOf(b, a));
+        // Loosening only ever widens.
+        if (inEachOthersPool(a, b)) expect(inEachOthersPool(wider, b)).toBe(true);
+      }),
+    );
+  });
+
+  it("changes nothing of the person but their deal-breakers", () => {
+    fc.assert(
+      fc.property(personArb, fc.array(relaxationArb, { maxLength: 3 }), (a, relaxations) => {
+        const { dealBreakers: _relaxed, ...rest } = relaxedBy(a, relaxations);
+        const { dealBreakers: _stored, ...before } = a;
+        expect(rest).toEqual(before);
+      }),
+    );
+  });
+
+  it("lets through those who did not answer, or sets the deal-breaker aside, and leaves the others as they are", () => {
+    const smoking = { field: "smoking" as const, accept: ["never"], includeUnknown: false };
+    const kids = { field: "hasKids" as const, accept: ["no"], includeUnknown: false };
+    const holder: PoolPerson = {
+      ...person("woman", 30, "woman", 25, 40),
+      dealBreakers: [smoking, kids],
+    };
+    expect(relaxedBy(holder, [{ field: "smoking", kind: "unanswered" }]).dealBreakers).toEqual([
+      { ...smoking, includeUnknown: true },
+      kids,
+    ]);
+    expect(relaxedBy(holder, [{ field: "smoking", kind: "aside" }]).dealBreakers).toEqual([kids]);
+    expect(relaxedBy(holder, [{ field: "languages", kind: "aside" }]).dealBreakers).toEqual([
+      smoking,
+      kids,
+    ]);
+    expect(relaxedBy(holder, [])).toBe(holder);
   });
 });

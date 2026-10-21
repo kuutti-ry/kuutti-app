@@ -53,6 +53,38 @@ function tieOf(day: string, ownerId: string, candidateId: string): string {
   return createHash("sha256").update(`${day}\n${ownerId}\n${candidateId}`).digest("hex");
 }
 
+/** Somebody of an earlier round who may come back (#99, ADR-042 §1): when last shown, and whether last passed. */
+export type ComingBack = RoundCandidate & { lastShown: string; passed: boolean };
+
+/**
+ * The order in which earlier people come back once nobody new is left (#99,
+ * ADR-042 §1, TD-12): those left undecided or liked first, then those passed
+ * past the cooldown, each the one shown longest ago first, equal days in the
+ * hash order; whoever of them may still meet the owner, up to the size. Pure;
+ * who is past the cooldowns is the builder's to say.
+ */
+export function comingBackOrder(
+  owner: RoundCandidate,
+  others: readonly ComingBack[],
+  round: { day: string; size: number },
+): ComingBack[] {
+  return others
+    .filter((other) => mayMeet(owner, other))
+    .map((other) => ({ other, tie: tieOf(round.day, owner.id, other.id) }))
+    .sort(
+      (a, b) =>
+        Number(a.other.passed) - Number(b.other.passed) ||
+        (a.other.lastShown < b.other.lastShown
+          ? -1
+          : a.other.lastShown > b.other.lastShown
+            ? 1
+            : 0) ||
+        (a.tie < b.tie ? -1 : 1),
+    )
+    .slice(0, Math.max(0, round.size))
+    .map(({ other }) => other);
+}
+
 export function roundOrder(
   owner: RoundCandidate,
   others: readonly RoundCandidate[],

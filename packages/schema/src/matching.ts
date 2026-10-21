@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEAL_BREAKERS_CAP, DealBreakerField } from "./deal-breakers.ts";
 import { ProfileCard } from "./profile.ts";
 
 // Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
@@ -45,9 +46,80 @@ export const RoundEntry = z
     /** Null while undecided. */
     decision: RoundChoice.nullable(),
     card: ProfileCard,
+    /** The deal-breaker a `relaxed` card came in by (#99, ADR-042 §9); absent on every other card. */
+    relaxedField: DealBreakerField.optional(),
+    /**
+     * The person's own deal-breakers, not paused, whose field the card's person
+     * left unanswered (#99, ADR-042 §8): "Did not answer: {field}". Absent on an
+     * older API.
+     */
+    notAnswered: z.array(DealBreakerField).max(DEAL_BREAKERS_CAP).optional(),
   })
   .meta({ id: "RoundEntry" });
 export type RoundEntry = z.infer<typeof RoundEntry>;
+
+/**
+ * How a person loosens one of their own deal-breakers for the day (#99,
+ * ADR-042 §3): let through those who did not answer its field, or set it
+ * aside. Mirrors the database's relaxation_kind.
+ */
+export const RelaxationKind = z.enum(["unanswered", "aside"]).meta({ id: "RelaxationKind" });
+export type RelaxationKind = z.infer<typeof RelaxationKind>;
+
+/** One deal-breaker relaxed for today, or to be. */
+export const Relaxation = z
+  .object({ field: DealBreakerField, kind: RelaxationKind })
+  .strict()
+  .meta({ id: "Relaxation" });
+export type Relaxation = z.infer<typeof Relaxation>;
+
+/**
+ * A relaxation a short round offers (ADR-042 §4), with `more`: how much it
+ * widens the person's pool, rounded down to a step of `waitlist_k` (ADR-015
+ * §6), so zero says fewer than a step. Never a count of anything else.
+ */
+export const RelaxationOffer = Relaxation.extend({ more: z.int().min(0) })
+  .strict()
+  .meta({ id: "RelaxationOffer" });
+export type RelaxationOffer = z.infer<typeof RelaxationOffer>;
+
+/**
+ * What a person may relax today and what they have (#99, ADR-042 §4): `short`
+ * when today's round has fewer ordered places than `round_size`; offers only
+ * then, each adding somebody today; the relaxations in force, each one tap to
+ * undo.
+ */
+export const RelaxationsResponse = z
+  .object({
+    short: z.boolean(),
+    offers: z.array(RelaxationOffer).max(DEAL_BREAKERS_CAP * 2),
+    relaxed: z.array(Relaxation).max(DEAL_BREAKERS_CAP),
+  })
+  .strict()
+  .meta({ id: "RelaxationsResponse" });
+export type RelaxationsResponse = z.infer<typeof RelaxationsResponse>;
+
+/** The cards a relaxation added to today's round, in order, so the phone adds them without a read (ADR-042 §5). */
+export const RelaxationAnswer = z
+  .object({ entries: z.array(RoundEntry).max(ROUND_ENTRIES_MAX) })
+  .strict()
+  .meta({ id: "RelaxationAnswer" });
+export type RelaxationAnswer = z.infer<typeof RelaxationAnswer>;
+
+/** A relaxation undone: the places of the cards it added that were still undecided, which leave the round (ADR-042 §6). */
+export const RelaxationUndone = z
+  .object({ removed: z.array(position).max(ROUND_ENTRIES_MAX) })
+  .strict()
+  .meta({ id: "RelaxationUndone" });
+export type RelaxationUndone = z.infer<typeof RelaxationUndone>;
+
+/** A round by its day: a day that has ended answers round_expired. */
+export const RoundDayParams = z.object({ day: z.iso.date() }).meta({ id: "RoundDayParams" });
+
+/** A relaxation by its round's day and its deal-breaker's field. */
+export const RelaxationParams = z
+  .object({ day: z.iso.date(), field: DealBreakerField })
+  .meta({ id: "RelaxationParams" });
 
 /**
  * Today's round: the Finnish day it is, and its cards in order; null while
@@ -111,6 +183,9 @@ export const ExportedRoundEntry = z
     position,
     reason: RoundReason,
     reasonInWords: z.string(),
+    /** The deal-breaker a relaxed card came in by (ADR-042 §10), in key and in words; null on every other card. */
+    relaxedField: DealBreakerField.nullable(),
+    relaxedFieldInWords: z.string().nullable(),
     seenAt: z.iso.datetime().nullable(),
     decision: RoundChoice.nullable(),
     decisionInWords: z.string().nullable(),
@@ -119,12 +194,24 @@ export const ExportedRoundEntry = z
   .meta({ id: "ExportedRoundEntry" });
 export type ExportedRoundEntry = z.infer<typeof ExportedRoundEntry>;
 
+/** A deal-breaker the person relaxed for the day (ADR-042 §10), in keys and in words. */
+export const ExportedRelaxation = z
+  .object({
+    field: DealBreakerField,
+    fieldInWords: z.string(),
+    kind: RelaxationKind,
+    kindInWords: z.string(),
+    at: z.iso.datetime(),
+  })
+  .meta({ id: "ExportedRelaxation" });
+
 export const ExportedRound = z
   .object({
     day: z.iso.date(),
     builtAt: z.iso.datetime(),
     openedAt: z.iso.datetime().nullable(),
     completedAt: z.iso.datetime().nullable(),
+    relaxations: z.array(ExportedRelaxation).max(DEAL_BREAKERS_CAP),
     entries: z.array(ExportedRoundEntry).max(ROUND_ENTRIES_MAX),
   })
   .meta({ id: "ExportedRound" });

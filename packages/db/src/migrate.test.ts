@@ -466,6 +466,7 @@ describe("migrate", () => {
           "report_message",
           "research_subject",
           "round_entries",
+          "round_relaxation",
           "rounds",
           "sanction",
           "session",

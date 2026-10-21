@@ -733,11 +733,14 @@ describe("erasure, the export and the events", () => {
         builtAt: T.toISOString(),
         openedAt: null,
         completedAt: expect.any(String),
+        relaxations: [],
         entries: [
           {
             position: 1,
             reason: "liked_you",
             reasonInWords: "Had liked you",
+            relaxedField: null,
+            relaxedFieldInWords: null,
             seenAt: null,
             decision: "like",
             decisionInWords: "Liked",

@@ -9,8 +9,8 @@ Feature: The day's round, built: whom it holds and in which order
   day's and the person's own. Nobody is shown again while they cool down,
   nobody with whom one has a conversation, and nothing fills a short round.
   Before those cards come the people whose like waits on the person (#97,
-  ADR-037), oldest first, up to liked_you_cap. Recycling and relaxing are
-  #99's.
+  ADR-037), oldest first, up to liked_you_cap. The order of coming back and
+  relaxing a deal-breaker for the day are short-pool.feature's (#99, ADR-042).
 
   Scenario: Everybody whose matching has opened gets a round for the day, and nobody else
     Given "A" whose matching has opened, "B" who is let in but whose matching has not opened, and "C" who waits in the line

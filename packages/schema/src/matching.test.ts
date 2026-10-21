@@ -1,8 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
+  ExportedRoundEntry,
+  Relaxation,
+  RelaxationAnswer,
+  RelaxationKind,
+  RelaxationOffer,
+  RelaxationParams,
+  RelaxationsResponse,
+  RelaxationUndone,
   ROUND_ENTRIES_MAX,
+  RoundDayParams,
   RoundDecisionUpdate,
+  RoundEntry,
   RoundEntryParams,
   RoundResponse,
   sinceSeenBand,
@@ -81,5 +91,98 @@ describe("today's round", () => {
   it("holds at most the round's most cards", () => {
     const tooMany = Array.from({ length: ROUND_ENTRIES_MAX + 1 }, () => ({}));
     expect(codes(RoundResponse, { day: "2026-10-19", entries: tooMany })).toContain("too_big");
+  });
+});
+
+describe("relaxing a deal-breaker for the day (#99, ADR-042)", () => {
+  it("has two ways, closed", () => {
+    expect(RelaxationKind.options).toEqual(["unanswered", "aside"]);
+  });
+
+  it("takes a deal-breaker field and a way, and nothing else", () => {
+    expect(Relaxation.parse({ field: "smoking", kind: "aside" })).toEqual({
+      field: "smoking",
+      kind: "aside",
+    });
+    expect(codes(Relaxation, { field: "intent", kind: "aside" })).toEqual(["invalid_value"]);
+    expect(codes(Relaxation, { field: "smoking", kind: "widen" })).toEqual(["invalid_value"]);
+    expect(codes(Relaxation, { field: "smoking", kind: "aside", note: "x" })).toEqual([
+      "unrecognized_keys",
+    ]);
+  });
+
+  it("offers a figure of the pool, whole and never negative", () => {
+    expect(RelaxationOffer.parse({ field: "smoking", kind: "aside", more: 20 }).more).toBe(20);
+    expect(codes(RelaxationOffer, { field: "smoking", kind: "aside", more: -10 })).toEqual([
+      "too_small",
+    ]);
+    expect(codes(RelaxationOffer, { field: "smoking", kind: "aside", more: 2.5 })).toEqual([
+      "invalid_type",
+    ]);
+  });
+
+  it("answers what is offered and what is relaxed, bounded by the deal-breakers' ceiling", () => {
+    const offer = { field: "smoking", kind: "aside", more: 0 } as const;
+    expect(RelaxationsResponse.parse({ short: true, offers: [offer], relaxed: [] }).offers).toEqual(
+      [offer],
+    );
+    expect(
+      codes(RelaxationsResponse, { short: true, offers: Array(11).fill(offer), relaxed: [] }),
+    ).toEqual(["too_big"]);
+    expect(codes(RelaxationsResponse, { short: true, offers: [], relaxed: [], count: 3 })).toEqual([
+      "unrecognized_keys",
+    ]);
+  });
+
+  it("answers the cards added and the places undone, each within the round's most", () => {
+    expect(RelaxationAnswer.parse({ entries: [] })).toEqual({ entries: [] });
+    expect(RelaxationUndone.parse({ removed: [2, 3] })).toEqual({ removed: [2, 3] });
+    expect(codes(RelaxationUndone, { removed: [0] })).toEqual(["too_small"]);
+    expect(codes(RelaxationUndone, { removed: [ROUND_ENTRIES_MAX + 1] })).toEqual(["too_big"]);
+  });
+
+  it("addresses a relaxation by its round's day and its field", () => {
+    expect(RelaxationParams.parse({ day: "2026-10-21", field: "languages" })).toEqual({
+      day: "2026-10-21",
+      field: "languages",
+    });
+    expect(codes(RelaxationParams, { day: "21.10.2026", field: "smoking" })).toEqual([
+      "invalid_format",
+    ]);
+    expect(codes(RoundDayParams, { day: "2026-13-01" })).toEqual(["invalid_format"]);
+  });
+
+  it("lets a card carry the field it came in by and who did not answer, or neither, as an older API sends it", () => {
+    const card = RoundEntry.shape.card;
+    const base = { position: 1, reason: "relaxed", decision: null };
+    expect(RoundEntry.shape.relaxedField.safeParse(undefined).success).toBe(true);
+    expect(RoundEntry.shape.notAnswered.safeParse(["smoking", "languages"]).success).toBe(true);
+    expect(RoundEntry.shape.notAnswered.safeParse(["intent"]).success).toBe(false);
+    expect(card).toBeDefined();
+    expect(codes(RoundEntry.omit({ card: true }), { ...base, relaxedField: "nicotine" })).toEqual([
+      "invalid_value",
+    ]);
+  });
+
+  it("names the relaxed field in the export, or nothing", () => {
+    const entry = {
+      position: 1,
+      reason: "relaxed",
+      reasonInWords: "There because you relaxed a filter",
+      relaxedField: "smoking",
+      relaxedFieldInWords: "Smoking",
+      seenAt: null,
+      decision: null,
+      decisionInWords: null,
+      decidedAt: null,
+    };
+    expect(ExportedRoundEntry.parse(entry).relaxedField).toBe("smoking");
+    expect(
+      ExportedRoundEntry.parse({ ...entry, relaxedField: null, relaxedFieldInWords: null })
+        .relaxedField,
+    ).toBeNull();
+    expect(codes(ExportedRoundEntry, { ...entry, relaxedField: undefined })).toEqual([
+      "invalid_value",
+    ]);
   });
 });

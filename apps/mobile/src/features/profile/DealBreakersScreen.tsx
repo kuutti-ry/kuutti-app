@@ -31,7 +31,8 @@ export const DEAL_BREAKERS_PATH = "/profile/deal-breakers" as const;
 
 type Row = { on: boolean; accept: string[]; includeUnknown: boolean };
 type Draft = Partial<Record<DealBreakerField, Row>>;
-const OFF: Row = { on: false, accept: [], includeUnknown: false };
+// A new deal-breaker lets through who did not answer its field until switched off (TD-12, ADR-042 §8).
+const OFF: Row = { on: false, accept: [], includeUnknown: true };
 
 const draftOf = (stored: StoredDealBreaker[]): Draft => {
   const draft: Draft = {};

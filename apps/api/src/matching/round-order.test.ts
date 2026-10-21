@@ -9,7 +9,14 @@ import {
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { inEachOthersPool, type PoolPerson } from "./pool.ts";
-import { hiddenByField, likedYouPlaces, type RoundCandidate, roundOrder } from "./round-order.ts";
+import {
+  type ComingBack,
+  comingBackOrder,
+  hiddenByField,
+  likedYouPlaces,
+  type RoundCandidate,
+  roundOrder,
+} from "./round-order.ts";
 import { softMatches } from "./soft.ts";
 
 // The order of a round's places no rule forces (#95, ADR-035;
@@ -311,5 +318,48 @@ describe("the order, for any people", () => {
         expect(ids(roundOrder(owner, [...crowd].reverse(), { day: DAY, size: 10 }))).toEqual(once);
       }),
     );
+  });
+});
+
+describe("the order people come back in (#99, ADR-042 §1)", () => {
+  const owner = woman("owner");
+  const back = (id: string, lastShown: string, passed: boolean): ComingBack => ({
+    ...man(id),
+    lastShown,
+    passed,
+  });
+
+  it("brings those left undecided or liked first, then those passed, each shown longest ago first", () => {
+    const people = [
+      back("passed-later", "2026-07-10", true),
+      back("left-later", "2026-09-10", false),
+      back("passed-earlier", "2026-06-20", true),
+      back("left-earlier", "2026-09-05", false),
+    ];
+    expect(ids(comingBackOrder(owner, people, { day: DAY, size: 10 }))).toEqual([
+      "left-earlier",
+      "left-later",
+      "passed-earlier",
+      "passed-later",
+    ]);
+  });
+
+  it("orders people shown the same day by the day's hash, the same whenever asked", () => {
+    const people = ["x", "y", "z"].map((id) => back(id, "2026-09-01", false));
+    const first = ids(comingBackOrder(owner, people, { day: DAY, size: 10 }));
+    expect(ids(comingBackOrder(owner, [...people].reverse(), { day: DAY, size: 10 }))).toEqual(
+      first,
+    );
+    expect(first.sort()).toEqual(["x", "y", "z"]);
+  });
+
+  it("stops at the size, is empty below one, and holds nobody out of the owner's pool", () => {
+    const people = [back("a", "2026-09-01", false), back("b", "2026-09-02", false)];
+    expect(ids(comingBackOrder(owner, people, { day: DAY, size: 1 }))).toEqual(["a"]);
+    expect(comingBackOrder(owner, people, { day: DAY, size: 0 })).toEqual([]);
+    expect(comingBackOrder(owner, people, { day: DAY, size: -2 })).toEqual([]);
+    const elsewhere: ComingBack = { ...back("w", "2026-08-01", false), ...woman("w") };
+    const self: ComingBack = { ...back("owner", "2026-08-01", false), ...owner };
+    expect(comingBackOrder(owner, [elsewhere, self], { day: DAY, size: 10 })).toEqual([]);
   });
 });

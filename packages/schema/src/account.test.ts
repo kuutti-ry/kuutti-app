@@ -233,11 +233,22 @@ function anExport(): Record<string, unknown> {
           builtAt: at,
           openedAt: at,
           completedAt: null,
+          relaxations: [
+            {
+              field: "smoking",
+              fieldInWords: "Smoking",
+              kind: "aside",
+              kindInWords: "Set aside for the day",
+              at,
+            },
+          ],
           entries: [
             {
               position: 1,
               reason: "matches_filters",
               reasonInWords: "Matches all your filters",
+              relaxedField: null,
+              relaxedFieldInWords: null,
               seenAt: at,
               decision: "like",
               decisionInWords: "Liked",

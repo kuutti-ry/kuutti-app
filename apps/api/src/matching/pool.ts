@@ -1,4 +1,4 @@
-import type { AgeWindow, DealBreaker, Gender, ProfileFields } from "@kuutti/schema";
+import type { AgeWindow, DealBreaker, Gender, ProfileFields, Relaxation } from "@kuutti/schema";
 import { pausedOf } from "./deal-breakers.ts";
 
 /**
@@ -73,6 +73,27 @@ export function passesFiltersOf(viewer: PoolPerson, candidate: PoolPerson): bool
         accepts(dealBreaker, candidate.fields[dealBreaker.field]),
     )
   );
+}
+
+/**
+ * The person with their own deal-breakers loosened for the day (#99, ADR-042
+ * §3): `unanswered` lets through who did not answer the field, `aside` drops
+ * the deal-breaker. Nothing else of the person changes, and nothing of anybody
+ * else: asked both ways, whoever passes is still somebody whose own filters
+ * let the person through. A like on a relaxed card waives its field so for
+ * its one person (§7).
+ */
+export function relaxedBy(person: PoolPerson, relaxations: readonly Relaxation[]): PoolPerson {
+  if (relaxations.length === 0) return person;
+  const how = new Map(relaxations.map((r) => [r.field as string, r.kind]));
+  return {
+    ...person,
+    dealBreakers: person.dealBreakers.flatMap((dealBreaker) => {
+      const kind = how.get(dealBreaker.field);
+      if (kind === "aside") return [];
+      return kind === "unanswered" ? [{ ...dealBreaker, includeUnknown: true }] : [dealBreaker];
+    }),
+  };
 }
 
 /** Both directions, which is the only way anybody is ever shown to anybody. */
