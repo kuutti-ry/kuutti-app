@@ -139,6 +139,7 @@ export async function sendEmailCode(
         to: state.email,
         subject: t("mail.emailCode.subject"),
         // Paragraphs are separate texts: a message in messages.yaml holds no line break.
+        // Plain text only for now; an HTML version in Kuutti's style is #404 (ADR-043 Open 8).
         text: [
           t("mail.emailCode.code", { code, minutes }),
           t("mail.emailCode.ignore"),
