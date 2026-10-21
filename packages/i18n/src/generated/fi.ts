@@ -884,7 +884,7 @@ export const fi: Readonly<Record<string, string>> = {
   "round.empty": "Tänään ei ole ketään näytettävää. Tule takaisin huomenna.",
   "round.failed": "Päivän kierrosta ei voitu ladata.",
   "round.fish": "Lähetä kala",
-  "round.fish.refused": "Olet jo lähettänyt tämän viikon kalan, mutta voit silti tykätä. Seuraavan kalan aikaisin päivä: {date}",
+  "round.fish.refused": "Et voi lähettää kalaa juuri nyt, mutta voit silti tykätä. Seuraavan kalan aikaisin päivä: {date}",
   "round.gone": "Kortti ei ole enää saatavilla.",
   "round.home.open": "Päivän kierros",
   "round.like": "Tykkää",

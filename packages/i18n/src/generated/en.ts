@@ -1222,7 +1222,7 @@ export const en: Readonly<Record<string, string>> = {
   "round.empty": "There is nobody to show you today. Come back tomorrow.",
   "round.failed": "Today's round did not load.",
   "round.fish": "Send a fish",
-  "round.fish.refused": "You have already sent this week's fish, and you can still like. The earliest day for the next one: {date}",
+  "round.fish.refused": "You cannot send a fish just now, but you can still like. The earliest day for the next one: {date}",
   "round.gone": "That card is no longer available.",
   "round.home.open": "Today's round",
   "round.like": "Like",

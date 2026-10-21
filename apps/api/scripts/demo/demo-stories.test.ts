@@ -407,23 +407,25 @@ describe("the stories through the services", () => {
       [cast],
     );
     // Before the count Iida is not let in: her gate stays shut (the guard on
-    // `admitted_at`) and the builder refuses a round behind a shut gate, while
-    // Henna's like of the day before is written all the same.
-    expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
+    // `admitted_at`) and the builder refuses a round behind a shut gate. Iida
+    // alone, so Henna is missing and her like waits for the commands' call.
+    const iidaOnly = results.filter((r) => r.key === "iida");
+    expect(await giveRounds({ db: ctx.client, logger, now }, iidaOnly)).toEqual({
       opened: 0,
+      liked: 0,
+      already: 0,
+      missing: 1,
+      standing: 0,
+    });
+    // The commands' order: the gates counted, then one call, which opens the
+    // gate, writes the like and builds the round on it.
+    await countGates({ db: ctx.client, logger, now });
+    expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
+      opened: 1,
       liked: 1,
       already: 0,
       missing: 0,
-      built: 0,
-    });
-    await countGates({ db: ctx.client, logger, now });
-    // After it the gate opens and the round is built; the like is the one written before.
-    expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
-      opened: 1,
-      liked: 0,
-      already: 1,
-      missing: 0,
-      built: 1,
+      standing: 1,
     });
 
     const { rows } = await ctx.client.query<{ candidate_id: string; reason: string }>(
@@ -448,8 +450,13 @@ describe("the stories through the services", () => {
       liked: 0,
       already: 1,
       missing: 0,
-      built: 0,
+      standing: 1,
     });
+    const after = await ctx.client.query(
+      "SELECT count(*)::int AS n FROM rounds WHERE account_id = $1",
+      [account("iida")],
+    );
+    expect(after.rows).toEqual([{ n: 1 }]);
   });
 
   test("the lines carry keys and counts, never a code, a name or whom one seeks", async ({

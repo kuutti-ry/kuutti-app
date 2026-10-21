@@ -439,7 +439,7 @@ describe("today's round", () => {
     await press("Send a fish");
     expect(
       screen.getByText(
-        "You have already sent this week's fish, and you can still like. The earliest day for the next one: 23.10.2026",
+        "You cannot send a fish just now, but you can still like. The earliest day for the next one: 23.10.2026",
       ),
     ).toBeTruthy();
     expect(heading("Katja, 32")).toBeTruthy();
@@ -479,9 +479,7 @@ describe("today's round", () => {
       );
       await show();
       await press("Send a fish");
-      expect(
-        screen.getByText("You have already sent your fish this week. You can still like."),
-      ).toBeTruthy();
+      expect(screen.getByText("You cannot send a fish just now. You can still like.")).toBeTruthy();
     },
   );
 

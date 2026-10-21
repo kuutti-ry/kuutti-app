@@ -54,7 +54,7 @@ Her round is right only on the Finnish day of the reset that built it. On a late
 1. Home: "Matching is open for you." and under it "Today's round".
 2. The first card is Henna's, labelled "Liked you": a like waits first in the round, and never unlabelled (ADR-037). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word. On her card there is no fish: a fish would only answer her like.
 3. Like: "It's a match", and "Go to the conversation" opens it, empty but for the composer (ADR-038). Back returns to the round.
-4. The next card says "Matches your filters". Show "Send a fish" above Like and Pass: one a week, first in the other person's round (ADR-039). Pass, then Undo in the header: the card comes back with "You passed on this person. You can change that until midnight." (ADR-034 §5). Like.
+4. The next card says "Matches your filters". Show "Send a fish" above Like and Pass: a like with a mark, first in the other person's round, few in a rolling window (ADR-039). Pass, then Undo in the header: the card comes back with "You passed on this person. You can change that until midnight." (ADR-034 §5). Like.
 5. The third card: "Block or report" beside the name, the same dialog as anywhere (ADR-030 §11). Report and block, a reason, a few words, Send report; Done, and the card is gone.
 6. The last card, then "That was today's round. The next one comes tomorrow." No count, no countdown, nothing loads more.
 

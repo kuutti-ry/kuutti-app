@@ -330,21 +330,21 @@ function accountsOf(results: readonly HistoryResult[]): Map<string, string> {
  * The round of the stories (#379), after the gates are counted: Iida's gate
  * opened and Henna's like of the day before (rows, `writeRounds`), then
  * Iida's round for the day through the round builder (#95), as the night
- * builds it, Henna first as liked you (ADR-037). `built`: rounds built now;
- * one built before is left as it is.
+ * builds it, Henna first as liked you (ADR-037). `standing`: stories whose
+ * round for the day stands now, built here or before (the builder's answer).
  */
 export async function giveRounds(
   deps: BuilderDeps,
   results: readonly HistoryResult[],
-): Promise<RoundsResult & { built: number }> {
+): Promise<RoundsResult & { standing: number }> {
   const accounts = accountsOf(results);
   const written = await writeRounds(deps.db, accounts, deps.now());
-  let built = 0;
+  let standing = 0;
   for (const story of PERSONA_ROUNDS) {
     const of = accounts.get(story.of);
-    if (of && (await buildRoundOf(deps, of))) built += 1;
+    if (of && (await buildRoundOf(deps, of))) standing += 1;
   }
-  return { ...written, built };
+  return { ...written, standing };
 }
 
 const HOUR_MS = 60 * 60 * 1000;
