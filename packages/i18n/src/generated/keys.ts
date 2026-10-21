@@ -1328,6 +1328,14 @@ export type MessageParams = {
   "settings.contacts.saved": Record<never, never>;
   "settings.contacts.saveLabel": { "kind": string };
   "settings.contacts.title": { "kind": string };
+  "settings.decisionButtons.explain": Record<never, never>;
+  "settings.decisionButtons.hand": Record<never, never>;
+  "settings.decisionButtons.label": Record<never, never>;
+  "settings.decisionButtons.left": Record<never, never>;
+  "settings.decisionButtons.oneHanded": Record<never, never>;
+  "settings.decisionButtons.oneHandedHint": Record<never, never>;
+  "settings.decisionButtons.right": Record<never, never>;
+  "settings.decisionButtons.withOneHanded": { "hand": string };
   "settings.email.label": Record<never, never>;
   "settings.group.account": Record<never, never>;
   "settings.highContrast": Record<never, never>;

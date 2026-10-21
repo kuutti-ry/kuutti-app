@@ -5,7 +5,7 @@ import Fish from "lucide-react-native/icons/fish";
 import Heart from "lucide-react-native/icons/heart";
 import Undo2 from "lucide-react-native/icons/undo-2";
 import X from "lucide-react-native/icons/x";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Platform, ScrollView, type Text as TextNode, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -14,7 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { fieldLabelKey, ProfileCardView } from "@/features/profile";
+import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
+import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 import { ShortPool } from "./ShortPool";
 import { type RoundCard, type RoundNotice, useRound } from "./useRound";
@@ -45,8 +47,10 @@ const ANSWERS_A_LIKE: ReadonlySet<RoundReason> = new Set(["liked_you", "fish"]);
  * an outlined rectangle at the left, like a filled pill at the right, each
  * with its word and its icon, no red and green; the fish (#378), a like with
  * a mark, a filled rounded square above them, on a card that answers nobody's
- * like; #82 makes the places configurable. Undo in the header brings the
- * last card back. A like that
+ * like. Undo in the header brings the last card back. Where they sit is the
+ * person's (#82): for the right hand as above, or mirrored for the left; and
+ * one-handed, Undo, the fish, Pass and Like in one column at the bottom on
+ * that side, Undo brought down from the header, within a thumb's reach. A like that
  * makes a match says so and leads to the conversation. The end of the round,
  * an empty one and one not built say to come back tomorrow, with no count
  * and no countdown, and nothing loads more; the end of a short round offers
@@ -106,6 +110,24 @@ export function RoundScreen() {
     void round.choose(card, decision);
   };
 
+  // Where the decision buttons sit (#82): for the right hand or the left,
+  // and one-handed in a column on that side with Undo among them.
+  const { settings: placement } = useDecisionButtons();
+  const undo = round.canUndo && (
+    <Button
+      variant="ghost"
+      className={cn(placement.oneHanded && "w-full")}
+      accessibilityLabel={t("round.undo.label")}
+      onPress={() => {
+        tap();
+        round.undo();
+      }}
+    >
+      <Icon as={Undo2} />
+      <Text>{t("round.undo")}</Text>
+    </Button>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScreenHeader
@@ -113,19 +135,7 @@ export function RoundScreen() {
         backLabel={t("round.back")}
         onBack={() => router.back()}
       >
-        {round.canUndo && (
-          <Button
-            variant="ghost"
-            accessibilityLabel={t("round.undo.label")}
-            onPress={() => {
-              tap();
-              round.undo();
-            }}
-          >
-            <Icon as={Undo2} />
-            <Text>{t("round.undo")}</Text>
-          </Button>
-        )}
+        {!placement.oneHanded && undo}
       </ScreenHeader>
       {words !== null && (
         <Text accessibilityLiveRegion="polite" className="px-6 pt-4">
@@ -249,47 +259,115 @@ export function RoundScreen() {
         )}
       </ScrollView>
       {match === null && current && (
-        <View className="gap-3 border-t border-border bg-background px-6 py-3">
-          {!ANSWERS_A_LIKE.has(current.entry.reason) && (
-            <Button
-              variant="secondary"
-              className="self-center rounded-lg"
-              disabled={round.busy}
-              accessibilityLabel={t("round.fish")}
-              accessibilityState={{ selected: current.entry.decision === "fish" }}
-              onPress={() => choose(current, "fish")}
-            >
-              <Icon as={Fish} />
-              <Text>{t("round.fish")}</Text>
-            </Button>
-          )}
-          <View className="flex-row gap-4">
-            <Button
-              variant="outline"
-              size="lg"
-              className="flex-1 rounded-md"
-              disabled={round.busy}
-              accessibilityLabel={t("round.pass")}
-              accessibilityState={{ selected: current.entry.decision === "pass" }}
-              onPress={() => choose(current, "pass")}
-            >
-              <Icon as={X} />
-              <Text>{t("round.pass")}</Text>
-            </Button>
-            <Button
-              size="lg"
-              className="flex-1 rounded-full"
-              disabled={round.busy}
-              accessibilityLabel={t("round.like")}
-              accessibilityState={{ selected: current.entry.decision === "like" }}
-              onPress={() => choose(current, "like")}
-            >
-              <Icon as={Heart} />
-              <Text>{t("round.like")}</Text>
-            </Button>
+        <DecisionBar
+          card={current}
+          busy={round.busy}
+          left={placement.hand === "left"}
+          oneHanded={placement.oneHanded}
+          undo={undo}
+          onChoose={choose}
+        />
+      )}
+      {/* One-handed, Undo stays at the thumb when no card is left to decide:
+          after the round's last decision it can still be taken back (ADR-034 §5). */}
+      {match === null && !current && placement.oneHanded && undo && (
+        <View className="border-t border-border bg-background px-6 py-3">
+          <View
+            testID="round-one-handed"
+            className={cn("w-2/3", placement.hand === "left" ? "self-start" : "self-end")}
+          >
+            {undo}
           </View>
         </View>
       )}
     </SafeAreaView>
+  );
+}
+
+/**
+ * Like, Pass and the fish at the bottom of the round (#82): in a row for the
+ * right hand (Pass, Like) or mirrored for the left, the fish above on the
+ * hand's side; one-handed, a column on that side, Undo first and Like last,
+ * nearest the thumb. Each keeps its shape, word and icon wherever it sits.
+ */
+function DecisionBar({
+  card,
+  busy,
+  left,
+  oneHanded,
+  undo,
+  onChoose,
+}: {
+  card: RoundCard;
+  busy: boolean;
+  left: boolean;
+  oneHanded: boolean;
+  /** Undo, which comes down from the header in one-handed mode; nothing while there is nothing to undo. */
+  undo: ReactNode;
+  onChoose: (card: RoundCard, decision: RoundChoice) => void;
+}) {
+  const { t } = useT();
+  const { entry } = card;
+  const fish = !ANSWERS_A_LIKE.has(entry.reason) && (
+    <Button
+      variant="secondary"
+      className={cn("rounded-lg", oneHanded ? "w-full" : left ? "self-start" : "self-end")}
+      disabled={busy}
+      accessibilityLabel={t("round.fish")}
+      accessibilityState={{ selected: entry.decision === "fish" }}
+      onPress={() => onChoose(card, "fish")}
+    >
+      <Icon as={Fish} />
+      <Text>{t("round.fish")}</Text>
+    </Button>
+  );
+  const pass = (
+    <Button
+      key="pass"
+      variant="outline"
+      size="lg"
+      className={cn("rounded-md", oneHanded ? "w-full" : "flex-1")}
+      disabled={busy}
+      accessibilityLabel={t("round.pass")}
+      accessibilityState={{ selected: entry.decision === "pass" }}
+      onPress={() => onChoose(card, "pass")}
+    >
+      <Icon as={X} />
+      <Text>{t("round.pass")}</Text>
+    </Button>
+  );
+  const like = (
+    <Button
+      key="like"
+      size="lg"
+      className={cn("rounded-full", oneHanded ? "w-full" : "flex-1")}
+      disabled={busy}
+      accessibilityLabel={t("round.like")}
+      accessibilityState={{ selected: entry.decision === "like" }}
+      onPress={() => onChoose(card, "like")}
+    >
+      <Icon as={Heart} />
+      <Text>{t("round.like")}</Text>
+    </Button>
+  );
+  return (
+    <View className="gap-3 border-t border-border bg-background px-6 py-3">
+      {oneHanded ? (
+        <View
+          testID="round-one-handed"
+          className={cn("w-2/3 gap-3", left ? "self-start" : "self-end")}
+        >
+          {undo}
+          {fish}
+          {pass}
+          {like}
+        </View>
+      ) : (
+        <>
+          {fish}
+          <View className="flex-row gap-4">{left ? [like, pass] : [pass, like]}</View>
+        </>
+      )}
+    </View>
   );
 }
