@@ -30,9 +30,9 @@ import { ExportedSanction } from "./sanction.ts";
 
 /** A body, so a stray call cannot erase an account; the app shows its own confirmation first. */
 /**
- * The optional e-mail (#148, TD-18): a way back in if a phone is lost, never
- * a login, never shown to anybody. Validated as an address and nothing else;
- * no mail is sent until SES exists (M5).
+ * The optional e-mail (#148, TD-18): a way for Kuutti to stay in touch
+ * (#385), never a login, never shown to anybody. Validated as an address and
+ * nothing else; no mail is sent until SES exists (#385).
  */
 export const EMAIL_MAX = 254;
 export const AccountEmail = z

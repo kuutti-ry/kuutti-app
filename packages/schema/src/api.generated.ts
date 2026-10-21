@@ -653,7 +653,7 @@ export interface paths {
         };
         /**
          * The caller's optional e-mail
-         * @description The optional e-mail of #148 (TD-18): a way back in if a phone is lost, never a login, never shown to anybody. Null when none is set.
+         * @description The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set.
          */
         get: {
             parameters: {
@@ -686,7 +686,7 @@ export interface paths {
         };
         /**
          * Set the caller's optional e-mail
-         * @description Validated as an address and nothing else; no mail is sent until SES exists (M5). The value reaches no log line and no event.
+         * @description Validated as an address and nothing else; no mail is sent until SES exists (#385). The value reaches no log line and no event.
          */
         put: {
             parameters: {
@@ -5647,7 +5647,7 @@ export interface paths {
         get?: never;
         /**
          * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like.
          */
         put: {
             parameters: {

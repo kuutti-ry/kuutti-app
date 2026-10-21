@@ -403,7 +403,7 @@ describe("when a round is built", () => {
     expect(await roundOf(ctx.client, a)).toHaveLength(1);
   });
 
-  test("buildRoundOf builds nothing for somebody erased, paused, or with a round already", async ({
+  test("buildRoundOf builds nothing for somebody erased or paused, and a round already built stands", async ({
     ctx,
   }) => {
     const { women, men } = await pondOf(ctx, "test-rounds-of", 2, 1);
@@ -412,7 +412,10 @@ describe("when a round is built", () => {
     if (!a || !paused || !b) throw new Error("people not written");
     const d = await deps(ctx.client, NOON);
     expect(await buildRoundOf(d, a)).toBe(true);
-    expect(await buildRoundOf(d, a)).toBe(false);
+    // Asked again, the round stands: true, and nothing more is written.
+    expect(await buildRoundOf(d, a)).toBe(true);
+    const { rows } = await ctx.client.query("SELECT 1 FROM rounds WHERE account_id = $1", [a]);
+    expect(rows).toHaveLength(1);
     await ctx.client.query("UPDATE account SET state = 'paused' WHERE id = $1", [paused]);
     expect(await buildRoundOf(d, paused)).toBe(false);
     expect(await buildRoundOf(d, "00000000-0000-4000-8000-000000000000")).toBe(false);
@@ -454,8 +457,118 @@ describe("when a round is built", () => {
     const [a] = women;
     if (!a) throw new Error("people not written");
     await ctx.client.query("DELETE FROM photo WHERE account_id = $1", [a]);
-    expect(await buildRoundOf(await deps(ctx.client, NOON), a)).toBe(false);
+    // The person is asked alone first: the pond is never read for them.
+    const asked: string[] = [];
+    const db: Queryable = {
+      query: ((text: string, values?: unknown[]) => {
+        asked.push(String(text));
+        return ctx.client.query(text, values);
+      }) as Queryable["query"],
+    };
+    expect(await buildRoundOf({ ...(await deps(ctx.client, NOON)), db }, a)).toBe(false);
+    expect(asked.some((text) => text.includes("SELECT id FROM account WHERE pond_id"))).toBe(false);
     expect(await roundOf(ctx.client, a)).toBeNull();
+  });
+
+  test("a read that lost the day's first build to another is answered with the round the other built", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-rounds-lost", 1, 1);
+    const [a] = women;
+    const [b] = men;
+    if (!a || !b) throw new Error("people not written");
+    const who = await signInAs(ctx.client, a);
+    // Right after this read found no round, another device's read builds it.
+    let raced = false;
+    const db: Queryable = {
+      query: (async (text: string, values?: unknown[]) => {
+        if (!raced && String(text).includes("FROM gate g JOIN account a")) {
+          raced = true;
+          expect(await buildRoundOf(await deps(ctx.client, NOON), a)).toBe(true);
+        }
+        return ctx.client.query(text, values);
+      }) as Queryable["query"],
+    };
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db, now: () => NOON });
+
+    const answer = await app.request("/rounds/today", { headers: who.headers });
+
+    expect(raced).toBe(true);
+    expect(answer.status).toBe(200);
+    expect(RoundResponse.parse(await answer.json()).entries).toHaveLength(1);
+    expect(
+      (await ctx.client.query("SELECT 1 FROM rounds WHERE account_id = $1", [a])).rows,
+    ).toHaveLength(1);
+  });
+
+  test("a read whose round another read saved first, while it built, is answered with that round", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-rounds-lost-save", 1, 1);
+    const [a] = women;
+    const [b] = men;
+    if (!a || !b) throw new Error("people not written");
+    // Both reads pass every look; the other writes first, and this one's INSERT finds its round.
+    let raced = false;
+    const db: Queryable = {
+      query: (async (text: string, values?: unknown[]) => {
+        if (!raced && String(text).includes("INSERT INTO rounds") && values?.[0] === a) {
+          raced = true;
+          expect(await buildRoundOf(await deps(ctx.client, NOON), a)).toBe(true);
+        }
+        return ctx.client.query(text, values);
+      }) as Queryable["query"],
+    };
+
+    expect(await buildRoundOf({ ...(await deps(ctx.client, NOON)), db }, a)).toBe(true);
+
+    expect(raced).toBe(true);
+    expect(candidates(await roundOf(ctx.client, a))).toEqual([b]);
+    expect(
+      (await ctx.client.query("SELECT 1 FROM rounds WHERE account_id = $1", [a])).rows,
+    ).toHaveLength(1);
+  });
+
+  test("liked-you places alone never pass ROUND_ENTRIES_MAX either, the oldest likes kept", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "liked_you_cap", 60);
+    const { women, men } = await pondOf(ctx, "test-rounds-cap-liked", 1, 55);
+    const [a] = women;
+    if (!a) throw new Error("people not written");
+    // Fifty-five likes, the first the oldest: it is in the round, the newest is not.
+    for (const [i, liker] of men.entries())
+      await shownBefore(ctx.client, liker, a, 13 - Math.floor(i / 5), "like");
+
+    await buildRounds(await deps(ctx.client));
+
+    const round = await roundOf(ctx.client, a);
+    expect(round).toHaveLength(50);
+    expect(new Set(round?.map((card) => card.reason))).toEqual(new Set(["liked_you"]));
+    expect(candidates(round)).toContain(men[0]);
+    expect(candidates(round)).not.toContain(men.at(-1));
+  });
+
+  test("a round never holds more places than the contract's ROUND_ENTRIES_MAX, the liked-you ones first", async ({
+    ctx,
+  }) => {
+    await setConfig(ctx.client, "liked_you_cap", 3);
+    await setConfig(ctx.client, "round_size", 49);
+    const { women, men } = await pondOf(ctx, "test-rounds-cap", 1, 55);
+    const [a] = women;
+    if (!a) throw new Error("people not written");
+    for (const liker of men.slice(0, 3)) await shownBefore(ctx.client, liker, a, 1, "like");
+
+    await buildRounds(await deps(ctx.client));
+
+    const round = await roundOf(ctx.client, a);
+    expect(round).toHaveLength(50);
+    expect(round?.slice(0, 3).map((card) => card.reason)).toEqual([
+      "liked_you",
+      "liked_you",
+      "liked_you",
+    ]);
   });
 
   test("one person's round failing builds everybody else's, and says how many failed", async ({

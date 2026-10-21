@@ -98,7 +98,7 @@ const emailRoute = createRoute({
   path: "/account/email",
   summary: "The caller's optional e-mail",
   description:
-    "The optional e-mail of #148 (TD-18): a way back in if a phone is lost, never a login, never shown to anybody. Null when none is set.",
+    "The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set.",
   ...bearer,
   responses: {
     200: { description: "The e-mail, or null.", ...json(AccountEmailResponse) },
@@ -111,7 +111,7 @@ const setEmailRoute = createRoute({
   path: "/account/email",
   summary: "Set the caller's optional e-mail",
   description:
-    "Validated as an address and nothing else; no mail is sent until SES exists (M5). The value reaches no log line and no event.",
+    "Validated as an address and nothing else; no mail is sent until SES exists (#385). The value reaches no log line and no event.",
   ...bearer,
   request: { body: { required: true, ...json(AccountEmail) } },
   responses: {

@@ -20,7 +20,7 @@ A round of ten cards a day (ADR-035) bounds what a person is shown; nothing yet 
    ```
 
    `like_budget_contested` and `contest_ratio_threshold` stay rows that nothing reads yet: TD-14's rule needs no migration when it comes.
-3. **A like back is free.** A like on a card whose reason is `liked_you` answers somebody's like rather than sending one: it is not counted, before or after the budget is spent, so a round that opens with liked-you cards (#97) leaves the day's likes for people who are new. A pass is never counted. The fish (#378) will be a like that counts, and a fish's card joins the free reasons.
+3. **A like back is free.** A like on a card whose reason is `liked_you` answers somebody's like rather than sending one: it is not counted, before or after the budget is spent, so a round that opens with liked-you cards (#97) leaves the day's likes for people who are new. A pass is never counted. A fish (#378, ADR-039) is a like that counts, and a like or fish on a `fish` card is free as on a `liked_you` card.
 4. **The refusal** is 429 `like_budget_exceeded`, said in the request's language ("you have used today's likes; new ones come after midnight; you can still pass"), with `Retry-After` the seconds until midnight in Finland, as the card budget's refusal is. No research event is emitted for a refused like, and nothing is logged beyond the request's own line.
 
 ## Consequences

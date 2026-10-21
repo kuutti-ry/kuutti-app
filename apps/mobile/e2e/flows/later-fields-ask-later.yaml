@@ -2,7 +2,7 @@
 # (#239) opens the first field not yet answered and walks the unanswered ones in the
 # sheet's order, one question per screen, each optional; "Ask me later" moves
 # on and writes nothing, so the count of answered fields stays. After the
-# last field comes the way back in (the e-mail) and the deal-breakers. Sanna
+# last field comes the way to stay in touch (the e-mail) and the deal-breakers. Sanna
 # has answered ten of the sixteen fields, but her smoking screen is open
 # while other nicotine is unanswered (#239), so nine screens are done; read
 # only.
@@ -65,11 +65,11 @@ name: Fill in the rest walks the unanswered fields in order, and Ask me later wr
 - assertVisible: "Corgi"
 - tapOn: "Ask me later|Kysy myöhemmin|Fråga mig senare"
 
-# After the last: the way back in, then home. Nothing was written.
+# After the last: the way to stay in touch, then home. Nothing was written.
 - extendedWaitUntil:
     visible: "That is everything\\. Thank you\\.|Siinä kaikki\\. Kiitos\\.|Det var allt\\. Tack\\."
     timeout: 15000
-- assertVisible: "A way back in|Tie takaisin sisään|En väg tillbaka in"
+- assertVisible: "A way to stay in touch|Tapa pitää yhteyttä|Ett sätt att hålla kontakten"
 - assertVisible: "Your deal-breakers|Ehdottomat rajasi|Dina absoluta gränser"
 - openLink: kuutti://profile/later/drugsAttitude
 - extendedWaitUntil:
