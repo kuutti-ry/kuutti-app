@@ -80,8 +80,8 @@ export function passesFiltersOf(viewer: PoolPerson, candidate: PoolPerson): bool
  * §3): `unanswered` lets through who did not answer the field, `aside` drops
  * the deal-breaker. Nothing else of the person changes, and nothing of anybody
  * else: asked both ways, whoever passes is still somebody whose own filters
- * let the person through. A like on a relaxed card waives its field so for
- * its one person (§7).
+ * let the person through. A like on a relaxed card waives so the fields
+ * that card came in under, for its one person (§7).
  */
 export function relaxedBy(person: PoolPerson, relaxations: readonly Relaxation[]): PoolPerson {
   if (relaxations.length === 0) return person;
