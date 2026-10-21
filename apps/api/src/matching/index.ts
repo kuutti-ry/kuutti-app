@@ -35,6 +35,7 @@ export {
   type BuildToday,
   eraseRoundsOf,
   exportRounds,
+  type RelaxedCandidate,
   relaxationsOf,
   type ShortPool,
   saveRound,

@@ -494,28 +494,45 @@ export async function decide(
  * with no round today; `candidates` whom a relaxation lets in today, in the
  * order they would come, null for one the offers would not list.
  */
+/** Somebody a relaxation lets in, with the day's other relaxations their filters still need (ADR-042 §5). */
+export type RelaxedCandidate = { candidateId: string; needs: DealBreakerField[] };
+
 export type ShortPool = {
   offers: (accountId: string) => Promise<{ short: boolean; offers: RelaxationOffer[] } | null>;
-  /** With the day's relaxations the candidates were counted under (`basis`), which the writer holds them to. */
+  /**
+   * With the day's relaxations the candidates were counted under (`basis`),
+   * which the writer holds them to, and for each the ones of them it needs.
+   */
   candidates: (
     accountId: string,
     relaxation: Relaxation,
-  ) => Promise<{ basis: Relaxation[]; candidateIds: string[] } | null>;
+  ) => Promise<{ basis: Relaxation[]; candidates: RelaxedCandidate[] } | null>;
 };
 
 /**
- * Today's relaxations of the person's round (ADR-042 §3), and how many of its
- * places are ordered ones, the liked-you and fish places left out; null with
- * no round for the day.
+ * The places of a round `r`: the highest it ever gave (`last_position`, or the
+ * highest entry of a round written before it was kept), and of those the
+ * ordered ones, every place but the liked-you and fish places, which nothing
+ * undoes. A place an undo freed stays given (ADR-042 §5), so a day's round
+ * holds at most `round_size` ordered people, as ADR-041's bound on a day's
+ * cards reads it.
+ */
+const PLACES = `greatest(r.last_position,
+           coalesce((SELECT max(e.position) FROM round_entries e WHERE e.round_id = r.id), 0))::int`;
+const GIVEN = `(${PLACES} - (SELECT count(*) FROM round_entries e
+                 WHERE e.round_id = r.id AND e.reason = ANY($3::round_reason[]))::int)`;
+
+/**
+ * Today's relaxations of the person's round (ADR-042 §3), the highest place it
+ * gave, and how many ordered places it gave; null with no round for the day.
  */
 export async function relaxationsOf(
   db: Queryable,
   accountId: string,
   day: string,
-): Promise<{ ordered: number; relaxed: Relaxation[] } | null> {
-  const { rows } = await db.query<{ ordered: number; relaxed: Relaxation[] }>(
-    `SELECT (SELECT count(*)::int FROM round_entries e
-              WHERE e.round_id = r.id AND e.reason <> ALL($3::round_reason[])) AS ordered,
+): Promise<{ last: number; given: number; relaxed: Relaxation[] } | null> {
+  const { rows } = await db.query<{ last: number; given: number; relaxed: Relaxation[] }>(
+    `SELECT ${PLACES} AS last, ${GIVEN} AS given,
             coalesce((SELECT json_agg(json_build_object('field', x.field, 'kind', x.kind)
                                       ORDER BY x.field)
                         FROM round_relaxation x WHERE x.round_id = r.id), '[]') AS relaxed
@@ -537,10 +554,11 @@ const sameRelaxations = (a: readonly Relaxation[], b: readonly Relaxation[]) => 
  * A relaxation tapped (ADR-042 §5): recorded on today's round, and the people
  * it lets in added after the highest place the round ever gave
  * (`last_position`, so a place an undo freed never names somebody else), as
- * many as the room left (`round_size` less the ordered places), in the order
- * given, reason `relaxed` with the field, and with every relaxation of the
- * day they came in under (`relaxed_with`, the tapped one first), so undoing
- * any of them takes them back and a like waives them all. Under the round's
+ * many as the room left (`round_size` less the ordered places the round ever
+ * gave, so an undo gives no room back), in the order given, reason `relaxed`
+ * with the field, and with the relaxations of the day each needs (`relaxed_with`,
+ * the tapped one first), so undoing one of them takes the card back and a
+ * like waives them all. Under the round's
  * lock, after the owner's account shared as a decision takes it; the day's
  * relaxations are held to those the candidates were counted under (`basis`),
  * so one undone or made meanwhile refuses the write, 409
@@ -556,7 +574,7 @@ export async function appendRelaxed(
     day: string;
     relaxation: Relaxation;
     basis: readonly Relaxation[];
-    candidateIds: string[];
+    candidates: readonly RelaxedCandidate[];
   },
 ): Promise<number[]> {
   const { today } = todayOrRefuse(deps, input.day);
@@ -584,16 +602,13 @@ export async function appendRelaxed(
       [roundId, input.relaxation.field, input.relaxation.kind, deps.now()],
     );
     const size = await matchingConfigNumber(tx, ROUND_SIZE_KEY);
-    const placed = await tx.query<{ ordered: number; last: number }>(
-      `SELECT count(*) FILTER (WHERE e.reason <> ALL($2::round_reason[]))::int AS ordered,
-              greatest(r.last_position, coalesce(max(e.position), 0))::int AS last
-         FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id
-        WHERE r.id = $1 GROUP BY r.last_position`,
-      [roundId, FREE_LIKES],
+    const placed = await tx.query<{ last: number; given: number }>(
+      `SELECT ${PLACES} AS last, ${GIVEN} AS given FROM rounds r WHERE r.id = $1 AND r.account_id = $2`,
+      [roundId, input.accountId, FREE_LIKES],
     );
-    const { ordered = 0, last = 0 } = placed.rows[0] ?? {};
-    const room = Math.min(size - ordered, ROUND_ENTRIES_MAX - last);
-    if (room <= 0 || input.candidateIds.length === 0) return [];
+    const { last = 0, given = 0 } = placed.rows[0] ?? {};
+    const room = Math.min(size - given, ROUND_ENTRIES_MAX - last);
+    if (room <= 0 || input.candidates.length === 0) return [];
     const taken = await tx.query<{ candidate: string }>(
       `SELECT e.candidate FROM unnest($1::uuid[]) WITH ORDINALITY AS e(candidate, ordinality)
          JOIN account c ON c.id = e.candidate
@@ -602,20 +617,24 @@ export async function appendRelaxed(
           AND e.candidate <> $2
         ORDER BY e.ordinality LIMIT $4
         FOR SHARE OF c`,
-      [input.candidateIds, input.accountId, roundId, room],
+      [input.candidates.map((c) => c.candidateId), input.accountId, roundId, room],
     );
     const positions = taken.rows.map((_, index) => last + index + 1);
     if (positions.length === 0) return [];
+    const needs = new Map(input.candidates.map((c) => [c.candidateId, c.needs]));
     await tx.query(
       `INSERT INTO round_entries (round_id, position, candidate_id, reason, relaxed_field, relaxed_with)
-       SELECT $1, e.position, e.candidate, 'relaxed', $4, $5::text[]
-         FROM unnest($2::smallint[], $3::uuid[]) AS e(position, candidate)`,
+       SELECT $1, e.position, e.candidate, 'relaxed', $4, string_to_array(e.relaxed_with, ',')
+         FROM unnest($2::smallint[], $3::uuid[], $5::text[]) AS e(position, candidate, relaxed_with)`,
       [
         roundId,
         positions,
         taken.rows.map((row) => row.candidate),
         input.relaxation.field,
-        [input.relaxation.field, ...input.basis.map((r) => r.field)],
+        // Field keys hold no comma: each card's relaxations as one text, the tapped one first.
+        taken.rows.map((row) =>
+          [input.relaxation.field, ...(needs.get(row.candidate) ?? [])].join(","),
+        ),
       ],
     );
     await tx.query(
@@ -629,9 +648,11 @@ export async function appendRelaxed(
 
 /**
  * A relaxation undone (ADR-042 §6): its row deleted, and with it today's
- * cards that came in under it and are still undecided, those of a later
- * relaxation that needed it too, under the round's lock; a decided one stays. The round is complete again when nothing that can still be shown
- * is undecided. The places removed; 404 for a field not relaxed today.
+ * cards that need it and are still undecided, a later relaxation's that
+ * needed it too, under the round's lock; a decided one stays. The round is
+ * complete again, when the person decided on something, once nothing that
+ * can still be shown is undecided. The places removed; 404 for a field not
+ * relaxed today.
  */
 export async function undoRelaxation(
   deps: RoundDeps,
@@ -659,7 +680,8 @@ export async function undoRelaxation(
     await tx.query(
       `UPDATE rounds r SET completed_at = $3
         WHERE r.id = $1 AND r.account_id = $2 AND r.completed_at IS NULL
-          AND EXISTS (SELECT 1 FROM round_entries e WHERE e.round_id = r.id)
+          AND EXISTS (SELECT 1 FROM round_entries e
+                       WHERE e.round_id = r.id AND e.decision IS NOT NULL)
           AND NOT EXISTS (SELECT 1 FROM round_entries e
                            WHERE e.round_id = r.id AND e.decision IS NULL AND ${SERVABLE})`,
       [roundId, input.accountId, at],
