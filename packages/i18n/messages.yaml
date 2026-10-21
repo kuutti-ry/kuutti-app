@@ -3028,6 +3028,20 @@ errors.match_made:
   sv: "Det här gillandet blev en match, så det står kvar. Du kan fortfarande avsluta samtalet under Samtal."
   machine: { fi: true, sv: true }
 
+errors.already_relaxed:
+  en: "You relaxed that one for today already."
+  description: "Today's round (409, #99, ADR-042 §5): the same deal-breaker relaxed twice the same day, from two devices or a tap that crossed another. Nothing was saved."
+  fi: "Joustit siitä jo tälle päivälle."
+  sv: "Du har redan släppt på den för i dag."
+  machine: { fi: true, sv: true }
+
+errors.relaxations_changed:
+  en: "Your relaxations for today changed meanwhile. Look again and choose."
+  description: "Today's round (409, #99, ADR-042 §5): another device relaxed or undid a deal-breaker between this screen's read and its tap. Nothing was saved; the panel reads the offers again."
+  fi: "Tämän päivän joustosi muuttuivat sillä välin. Katso uudelleen ja valitse."
+  sv: "Dina undantag för i dag ändrades under tiden. Titta igen och välj."
+  machine: { fi: true, sv: true }
+
 errors.fish_budget_exceeded:
   en: "You cannot send a fish just now. You can still like."
   description: "Today's round (429 with Retry-After, #378, ADR-039): the person has sent matching_config fish_budget fish within fish_window_days, rolling; Retry-After says when the next can go. Nothing was saved. Never a number or a period: both are tunables, and the window is rolling, not a calendar week."
@@ -6598,6 +6612,20 @@ account.export.round.reason.relaxed:
   sv: "Med eftersom du lättade på ett filter"
   machine: { fi: true, sv: true }
 
+account.export.round.relaxation.unanswered:
+  en: "Let through people who did not answer it, for the day"
+  description: "The data export (#99, ADR-042 §10): a deal-breaker the person relaxed for one day by letting through those who did not answer its field."
+  fi: "Päästi päiväksi läpi ne, jotka eivät vastanneet siihen"
+  sv: "Släppte för dagen igenom dem som inte svarade på den"
+  machine: { fi: true, sv: true }
+
+account.export.round.relaxation.aside:
+  en: "Set aside for the day"
+  description: "The data export (#99, ADR-042 §10): a deal-breaker the person set aside for one day."
+  fi: "Ohitettu päiväksi"
+  sv: "Bortsedd från för dagen"
+  machine: { fi: true, sv: true }
+
 account.export.round.reason.fish:
   en: "Had sent you a fish"
   description: "Inside the downloaded data file (#378), why a card was in the person's round: the card's person had sent them a fish, as the card's label said."
@@ -7214,7 +7242,7 @@ round.reason.seen_before:
 
 round.reason.relaxed:
   en: "Shown because you widened your filters"
-  description: "Why a card is in the round (TD-12, #99), above the card: the person is there because the reader relaxed a filter for a short pool. A short label."
+  description: "Why a card is in the round (TD-12, #99), above the card: the person is there because the reader relaxed a filter for a short pool, when the API names no field (an older API). A short label."
   fi: "Näytetään, koska laajensit suodattimiasi"
   sv: "Visas för att du vidgade dina filter"
   machine: { fi: true, sv: true }
@@ -7224,6 +7252,76 @@ round.reason.fish:
   description: "Why a card is in the round (TD-12, #378, ADR-039): this person sent the reader a fish, a like that goes first; liking back makes a match. The word fish is the app's own for it (ADR-039 Open 1), for the native review. A short label."
   fi: "Lähetti sinulle kalan"
   sv: "Skickade en fisk till dig"
+  machine: { fi: true, sv: true }
+
+round.reason.relaxedField:
+  en: "Relaxed for today: {field}"
+  description: "Why a card is in the round (TD-12, #99, ADR-042 §9), above the card: the reader relaxed this deal-breaker for today and this person came in by it. {field} is the field's label, after a colon so nothing is inflected. A short label."
+  fi: "Joustettu tänään: {field}"
+  sv: "Släppt på i dag: {field}"
+  machine: { fi: true, sv: true }
+
+round.notAnswered:
+  en: "Did not answer: {field}"
+  description: "Above a card of today's round (TD-12, #99, ADR-042 §8): this person left unanswered the field of one of the reader's own deal-breakers, which lets such people through. {field} is the field's label, after a colon so nothing is inflected."
+  fi: "Ei vastannut: {field}"
+  sv: "Svarade inte: {field}"
+  machine: { fi: true, sv: true }
+
+round.relaxed.undo:
+  en: "Undo for today: {field}"
+  description: "Button on a card a relaxation brought, and in the short-pool panel (#99, ADR-042 §6): one tap undoes today's relaxation of this deal-breaker and takes back the cards it brought that the reader has not decided on. {field} is the field's label, after a colon."
+  fi: "Peru tämän päivän jousto: {field}"
+  sv: "Ångra dagens undantag: {field}"
+  machine: { fi: true, sv: true }
+
+round.short.title:
+  en: "Few people today"
+  description: "Heading of the short-pool panel at the end of a short round (TD-12, #99, ADR-042 §2): the reader's deal-breakers leave few people. Never blames the reader."
+  fi: "Tänään vähän ihmisiä"
+  sv: "Få personer i dag"
+  machine: { fi: true, sv: true }
+
+round.short.explain:
+  en: "Your deal-breakers leave few people today. You can relax one for today only: tomorrow's round follows them as you set them, and one tap undoes it."
+  description: "Short-pool panel (#99, ADR-042 §3): a relaxation is for the day only, by the reader's tap, undone by one; nothing else is ever relaxed."
+  fi: "Ehdottomat rajasi jättävät tänään vähän ihmisiä. Voit joustaa yhdestä vain tämän päivän ajan: huomisen kierros noudattaa niitä niin kuin asetit ne, ja yksi napautus peruu jouston."
+  sv: "Dina absoluta gränser lämnar få personer i dag. Du kan släppa på en bara för i dag: morgondagens runda följer dem som du har ställt in dem, och ett tryck ångrar det."
+  machine: { fi: true, sv: true }
+
+round.short.unanswered:
+  en: "Include those who did not answer: {field}"
+  description: "Button of the short-pool panel (#99, ADR-042 §3): for today, let through people who left this deal-breaker's field unanswered. {field} is the field's label, after a colon."
+  fi: "Ota mukaan ne, jotka eivät vastanneet: {field}"
+  sv: "Ta med dem som inte svarade: {field}"
+  machine: { fi: true, sv: true }
+
+round.short.aside:
+  en: "Set aside for today: {field}"
+  description: "Button of the short-pool panel (#99, ADR-042 §3): set this deal-breaker aside for today only. {field} is the field's label, after a colon."
+  fi: "Ohita tänään: {field}"
+  sv: "Bortse från i dag: {field}"
+  machine: { fi: true, sv: true }
+
+round.short.more:
+  en: "{more, plural, =0 {A few more people} one {About # more person} other {About # more people}}"
+  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the gate's step (matching_config waitlist_k, ten or more, ADR-015 §6); zero means fewer than a step. Never a count of cards."
+  fi: "{more, plural, =0 {Muutama ihminen lisää} one {Noin # ihminen lisää} other {Noin # ihmistä lisää}}"
+  sv: "{more, plural, =0 {Några fler personer} one {Ungefär # person till} other {Ungefär # fler personer}}"
+  machine: { fi: true, sv: true }
+
+round.short.nobody:
+  en: "Nobody new to show today after all."
+  description: "Short-pool panel (#99, ADR-042 §5): the relaxation was made, but by the time it was tapped it found nobody to add today. It can still be undone."
+  fi: "Ketään uutta ei sittenkään ole näytettävänä tänään."
+  sv: "Det finns ingen ny att visa i dag ändå."
+  machine: { fi: true, sv: true }
+
+round.short.failed:
+  en: "That did not go through. Try again."
+  description: "Short-pool panel (#99): a relaxation or its undo failed for a reason the reader cannot act on; nothing changed."
+  fi: "Se ei onnistunut. Yritä uudelleen."
+  sv: "Det gick inte. Försök igen."
   machine: { fi: true, sv: true }
 
 round.fish:

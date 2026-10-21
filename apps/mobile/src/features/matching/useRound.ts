@@ -1,10 +1,16 @@
 import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
-import type { RoundChoice, RoundEntry, RoundResponse } from "@kuutti/schema";
+import type {
+  DealBreakerField,
+  Relaxation,
+  RoundChoice,
+  RoundEntry,
+  RoundResponse,
+} from "@kuutti/schema";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { ApiError } from "@/lib/api";
-import { decide, fetchRound, RoundRefusal, reportSeen } from "./client";
+import { decide, fetchRound, RoundRefusal, relaxToday, reportSeen, undoRelaxation } from "./client";
 
 export type RoundView =
   | { status: "loading" }
@@ -26,6 +32,11 @@ export type RoundNotice =
       | "errors.match_made"
       | "errors.like_budget_exceeded"
       | "errors.fish_budget_exceeded"
+      | "errors.already_relaxed"
+      | "errors.relaxations_changed"
+      | "errors.card_budget_exceeded"
+      | "round.short.nobody"
+      | "round.short.failed"
       | "round.gone"
       | "round.decision.failed"
       | "round.newDay"
@@ -256,6 +267,59 @@ export function useRound() {
     [rewrite, onDay, read, drop],
   );
 
+  /**
+   * A deal-breaker relaxed for today (#99, ADR-042 §5): the cards it added
+   * come after the last, without reading the round again (each read serves
+   * every card, ADR-008), and the first of them is the next on the screen.
+   */
+  const relax = useCallback(
+    async (day: string, relaxation: Relaxation) => {
+      setBusy(true);
+      setNotice(null);
+      try {
+        const added = await relaxToday(day, relaxation);
+        const round = onDay(day);
+        if (!round) return;
+        if (added.length === 0) setNotice("round.short.nobody");
+        else rewrite(round, (entries) => [...entries, ...added]);
+      } catch (error) {
+        if (!onDay(day)) return;
+        const code = codeOf(error);
+        if (code === "round_expired") read("errors.round_expired");
+        else if (code === "already_relaxed") setNotice("errors.already_relaxed");
+        // Another device relaxed or undid one meanwhile: the panel reads the offers again.
+        else if (code === "relaxations_changed") setNotice("errors.relaxations_changed");
+        // Relaxed, its cards in the round: the day's cards ran out serving them.
+        else if (code === "card_budget_exceeded") setNotice("errors.card_budget_exceeded");
+        else setNotice("round.short.failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onDay, rewrite, read],
+  );
+
+  /** Today's relaxation undone (§6): the undecided cards it brought leave the screen. */
+  const unrelax = useCallback(
+    async (day: string, field: DealBreakerField) => {
+      setBusy(true);
+      setNotice(null);
+      try {
+        const removed = new Set(await undoRelaxation(day, field));
+        const round = onDay(day);
+        if (!round) return;
+        rewrite(round, (entries) => entries.filter((entry) => !removed.has(entry.position)));
+      } catch (error) {
+        if (!onDay(day)) return;
+        if (codeOf(error) === "round_expired") read("errors.round_expired");
+        else setNotice("round.short.failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onDay, rewrite, read],
+  );
+
   const undo = useCallback(() => {
     setRevisit(last);
     setLast(null);
@@ -273,6 +337,8 @@ export function useRound() {
     choose,
     undo,
     drop,
+    relax,
+    unrelax,
     closeMatch: useCallback(() => setMatch(null), []),
     retry: useCallback(() => read(null), [read]),
   };

@@ -1,9 +1,27 @@
 import type { Queryable } from "@kuutti/db";
-import { ROUND_ENTRIES_MAX, type RoundReason } from "@kuutti/schema";
+import {
+  type Relaxation,
+  type RelaxationKind,
+  type RelaxationOffer,
+  ROUND_ENTRIES_MAX,
+  type RoundReason,
+  waitlistK,
+} from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumbers } from "../lib/matching-config.ts";
-import { likedYouPlaces, roundOrder, saveRound } from "../matching/index.ts";
+import {
+  comingBackOrder,
+  inEachOthersPool,
+  likedYouPlaces,
+  type PoolPerson,
+  pausedOf,
+  relaxationsOf,
+  relaxedBy,
+  roundOrder,
+  saveRound,
+} from "../matching/index.ts";
+import { saidInStep } from "../pond/index.ts";
 import type { NightlyJob } from "./nightly.ts";
 import { type Subject, subjectOf, subjectsOfPond } from "./pond-gate.ts";
 
@@ -48,40 +66,63 @@ const KEYS = [
   "like_expiry_days",
 ] as const;
 type BuilderConfig = Record<(typeof KEYS)[number], number>;
+/** The short pool reads the gate's step too (ADR-042 §4). */
+const SHORT_POOL_KEYS = [...KEYS, "waitlist_k"] as const;
 
 export type BuildCount = { ponds: number; built: number; cards: number; failed: number };
 
+/** Whom the owner was shown before, by the rounds they opened (ADR-042 §1). */
+type History = {
+  /** Shown within `shown_cooldown_days`: an ordinary card waits it out. */
+  cooling: Set<string>;
+  /** Passed within `pass_cooldown_days`, or in a conversation with the owner: no card at all, a like of theirs neither. */
+  refused: Set<string>;
+  /** Everybody shown before, with when last, and whether the latest decision was a pass. */
+  seen: Map<string, { lastShown: string; passed: boolean }>;
+};
+
 /**
- * Whom the owner was shown before, and of them whom they may not be shown
- * today: shown within the cooldown (an ordinary card waits it out), or
- * refused, passed within the cooldown or in a conversation with them (no
- * card at all, a like of theirs neither). Earlier days only: today's round is
- * the one being built.
+ * Earlier days only, today's round being the one built or added to; and only
+ * rounds the owner opened: a round built and never read showed nobody, so
+ * its people neither cool down nor come back as seen before (ADR-042 §1).
  */
 async function historyOf(
   db: Queryable,
   ownerId: string,
   day: string,
   config: BuilderConfig,
-): Promise<{ cooling: Set<string>; refused: Set<string>; seen: Set<string> }> {
-  const { rows } = await db.query<{ id: string; shown: boolean; refused: boolean }>(
+): Promise<History> {
+  const { rows } = await db.query<{
+    id: string;
+    shown: boolean;
+    refused: boolean;
+    last_shown: string | null;
+    passed: boolean;
+  }>(
     `SELECT e.candidate_id AS id, bool_or(r.day > $2::date - $3::int) AS shown,
-            bool_or(e.decision = 'pass' AND r.day > $2::date - $4::int) AS refused
+            bool_or(e.decision = 'pass' AND r.day > $2::date - $4::int) AS refused,
+            max(r.day)::text AS last_shown,
+            coalesce((array_agg(e.decision ORDER BY r.day DESC))[1] = 'pass', false) AS passed
        FROM rounds r JOIN round_entries e ON e.round_id = r.id
-      WHERE r.account_id = $1 AND r.day < $2::date
+      WHERE r.account_id = $1 AND r.day < $2::date AND r.opened_at IS NOT NULL
       GROUP BY e.candidate_id
      UNION ALL
-     SELECT other.account_id, false, true
+     SELECT other.account_id, false, true, NULL, false
        FROM conversation_participant mine
        JOIN conversation_participant other
          ON other.conversation_id = mine.conversation_id AND other.account_id <> mine.account_id
       WHERE mine.account_id = $1`,
     [ownerId, day, config.shown_cooldown_days, config.pass_cooldown_days],
   );
+  const seen = new Map<string, { lastShown: string; passed: boolean }>();
+  for (const row of rows) {
+    if (row.last_shown !== null)
+      seen.set(row.id, { lastShown: row.last_shown, passed: row.passed });
+  }
   return {
     cooling: new Set(rows.filter((row) => row.shown).map((row) => row.id)),
     refused: new Set(rows.filter((row) => row.refused).map((row) => row.id)),
-    seen: new Set(rows.map((row) => row.id)),
+    seen,
   };
 }
 
@@ -98,10 +139,14 @@ async function waitingOn(
   ownerId: string,
   day: string,
   config: BuilderConfig,
-): Promise<{ id: string; fish: boolean }[]> {
-  const { rows } = await db.query<{ id: string; fish: boolean }>(
-    `SELECT r.account_id AS id, bool_or(e.fish) AS fish
+): Promise<{ id: string; fish: boolean; waived: Relaxation[] }[]> {
+  // A like given on a relaxed card waives the liker's deal-breakers it came
+  // in under for the owner (ADR-042 §7): asked as those fields set aside.
+  const { rows } = await db.query<{ id: string; fish: boolean; waived: Relaxation["field"][] }>(
+    `SELECT r.account_id AS id, bool_or(e.fish) AS fish,
+            coalesce(array_agg(DISTINCT w.field) FILTER (WHERE w.field IS NOT NULL), '{}') AS waived
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
+       LEFT JOIN LATERAL unnest(e.relaxed_with) AS w(field) ON true
       WHERE e.candidate_id = $1 AND e.decision = 'like'
         AND r.day < $2::date AND r.day > $2::date - $3::int
         AND NOT EXISTS (
@@ -112,7 +157,10 @@ async function waitingOn(
       ORDER BY bool_or(e.fish) DESC, min(e.decided_at), r.account_id`,
     [ownerId, day, config.like_expiry_days],
   );
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    waived: row.waived.map((field) => ({ field, kind: "aside" as const })),
+  }));
 }
 
 /** One pond's rounds for the day: of everybody open, or of one person. */
@@ -184,12 +232,15 @@ async function placesOf(
   const likedYou = owner.visible
     ? likedYouPlaces(
         owner,
-        waiting.flatMap((like) => byId.get(like.id) ?? []),
+        waiting.flatMap((like) => {
+          const liker = byId.get(like.id);
+          return liker ? [{ ...liker, person: relaxedBy(liker.person, like.waived) }] : [];
+        }),
         Math.min(round.config.liked_you_cap, ROUND_ENTRIES_MAX),
       )
     : [];
   const waits = new Set(waiting.map((like) => like.id));
-  const ordered = roundOrder(
+  const ordered = orderedPlaces(
     owner,
     shown.filter(
       (subject) =>
@@ -197,6 +248,7 @@ async function placesOf(
         !history.cooling.has(subject.id) &&
         !waits.has(subject.id),
     ),
+    history,
     {
       day: round.day,
       size: Math.min(round.config.round_size, ROUND_ENTRIES_MAX - likedYou.length),
@@ -207,12 +259,40 @@ async function placesOf(
       candidateId: candidate.id,
       reason: fish.has(candidate.id) ? ("fish" as const) : ("liked_you" as const),
     })),
-    ...ordered.map((candidate) => ({
+    ...ordered,
+  ];
+}
+
+/**
+ * The places no rule forces (ADR-042 §1): everybody new first, by their soft
+ * matches; then, while room is left, people of earlier rounds past both
+ * cooldowns, in the order they come back.
+ */
+function orderedPlaces(
+  owner: Subject,
+  candidates: readonly Subject[],
+  history: History,
+  round: { day: string; size: number },
+): { candidateId: string; reason: "matches_filters" | "seen_before" }[] {
+  const fresh = roundOrder(
+    owner,
+    candidates.filter((subject) => !history.seen.has(subject.id)),
+    round,
+  );
+  const back = comingBackOrder(
+    owner,
+    candidates.flatMap((subject) => {
+      const before = history.seen.get(subject.id);
+      return before ? [{ ...subject, ...before }] : [];
+    }),
+    { day: round.day, size: round.size - fresh.length },
+  );
+  return [
+    ...fresh.map((candidate) => ({
       candidateId: candidate.id,
-      reason: history.seen.has(candidate.id)
-        ? ("seen_before" as const)
-        : ("matches_filters" as const),
+      reason: "matches_filters" as const,
     })),
+    ...back.map((candidate) => ({ candidateId: candidate.id, reason: "seen_before" as const })),
   ];
 }
 
@@ -272,6 +352,129 @@ export async function buildRoundOf(deps: BuilderDeps, accountId: string): Promis
   // person was paused, sanctioned or erased between the look above and the
   // write (nothing to log).
   return stands();
+}
+
+/** The day's round of the person, with what the short pool reads of it, their pond and their history (ADR-042). */
+async function todayOf(deps: BuilderDeps, accountId: string) {
+  const at = deps.now();
+  const day = finnishDay(at);
+  const today = await relaxationsOf(deps.db, accountId, day);
+  if (!today) return null;
+  const { rows } = await deps.db.query<{ pond_id: string }>(
+    `SELECT g.pond_id FROM gate g JOIN account a ON a.id = g.account_id AND a.pond_id = g.pond_id
+      WHERE g.account_id = $1 AND g.opened_at IS NOT NULL
+        AND a.state IN ('active', 'shadow_banned')`,
+    [accountId],
+  );
+  const pondId = rows[0]?.pond_id;
+  if (!pondId) return null;
+  const subjects = await subjectsOfPond(deps.db, pondId, at);
+  const owner = subjects.find((subject) => subject.id === accountId);
+  if (!owner) return null;
+  const config = await matchingConfigNumbers(deps.db, SHORT_POOL_KEYS);
+  const history = await historyOf(deps.db, accountId, day, config);
+  const placed = await deps.db.query<{ candidate_id: string }>(
+    `SELECT e.candidate_id FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND r.day = $2`,
+    [accountId, day],
+  );
+  const inRound = new Set(placed.rows.map((row) => row.candidate_id));
+  // Somebody whose like waits on the person is no ordinary card meanwhile, as in placesOf (ADR-037).
+  const waits = new Set(
+    (await waitingOn(deps.db, accountId, day, config))
+      .filter((like) => !history.refused.has(like.id))
+      .map((like) => like.id),
+  );
+  const shown = subjects.filter(
+    (subject) => subject.visible && subject.admittedAt !== null && subject.id !== accountId,
+  );
+  // Whoever a relaxation may add today: the builder's own rules, today's cards aside.
+  const open = shown.filter(
+    (subject) =>
+      !history.refused.has(subject.id) &&
+      !history.cooling.has(subject.id) &&
+      !inRound.has(subject.id) &&
+      !waits.has(subject.id),
+  );
+  const effective = relaxedBy(owner.person, today.relaxed);
+  return { day, owner, shown, open, history, today, config, effective };
+}
+
+/** Who a relaxation lets in: in each other's pool with it, and not without it (ADR-042 §3). */
+const letsIn = (wider: PoolPerson, effective: PoolPerson) => (subject: Subject) =>
+  inEachOthersPool(wider, subject.person) && !inEachOthersPool(effective, subject.person);
+
+/**
+ * What a short round may relax today (ADR-042 §4), counted now: each of the
+ * person's own deal-breakers, not paused and not relaxed today, each way it
+ * can be, with how much it widens the pool in the gate's steps, and listed
+ * only when it would add somebody today. Null with no round today.
+ */
+export async function relaxationOffers(
+  deps: BuilderDeps,
+  accountId: string,
+): Promise<{ short: boolean; offers: RelaxationOffer[] } | null> {
+  const t = await todayOf(deps, accountId);
+  if (!t) return null;
+  const short = t.today.ordered < t.config.round_size;
+  if (!short) return { short, offers: [] };
+  const relaxed = new Set<string>(t.today.relaxed.map((r) => r.field));
+  const offers: RelaxationOffer[] = [];
+  for (const dealBreaker of t.effective.dealBreakers) {
+    if (relaxed.has(dealBreaker.field) || pausedOf(dealBreaker.field, t.owner.person.fields)) {
+      continue;
+    }
+    const kinds: RelaxationKind[] = dealBreaker.includeUnknown
+      ? ["aside"]
+      : ["unanswered", "aside"];
+    for (const kind of kinds) {
+      const wider = relaxedBy(t.effective, [{ field: dealBreaker.field, kind }]);
+      const admits = letsIn(wider, t.effective);
+      const adds = roundOrder({ ...t.owner, person: wider }, t.open.filter(admits), {
+        day: t.day,
+        size: 1,
+      });
+      if (adds.length === 0) continue;
+      offers.push({
+        field: dealBreaker.field,
+        kind,
+        // The gate's step, floored at its minimum, as every pool figure is said (ADR-015 §6).
+        more: saidInStep(t.shown.filter(admits).length, waitlistK(t.config.waitlist_k)),
+      });
+    }
+  }
+  return { short, offers };
+}
+
+/**
+ * Whom a relaxation lets in today, in the order they would come (ADR-042 §5):
+ * new people first by their soft matches, then the order of coming back;
+ * with the day's relaxations they were counted under, on top of which this
+ * one loosens the person's filters.
+ * Null for a relaxation the offers would not list: no round today, a field
+ * that is no deal-breaker of the person's, a paused one, one relaxed today,
+ * or `unanswered` where those people are let through already. The writer
+ * takes as many as the room.
+ */
+export async function relaxedCandidates(
+  deps: BuilderDeps,
+  accountId: string,
+  relaxation: Relaxation,
+): Promise<{ basis: Relaxation[]; candidateIds: string[] } | null> {
+  const t = await todayOf(deps, accountId);
+  if (!t) return null;
+  if (t.today.relaxed.some((r) => r.field === relaxation.field)) return null;
+  const dealBreaker = t.effective.dealBreakers.find((d) => d.field === relaxation.field);
+  if (!dealBreaker || pausedOf(dealBreaker.field, t.owner.person.fields)) return null;
+  if (relaxation.kind === "unanswered" && dealBreaker.includeUnknown) return null;
+  const wider = relaxedBy(t.effective, [relaxation]);
+  const candidateIds = orderedPlaces(
+    { ...t.owner, person: wider },
+    t.open.filter(letsIn(wider, t.effective)),
+    t.history,
+    { day: t.day, size: ROUND_ENTRIES_MAX },
+  ).map((place) => place.candidateId);
+  return { basis: t.today.relaxed, candidateIds };
 }
 
 /** The nightly job: everybody's round for the day, after the gate has let people in. */

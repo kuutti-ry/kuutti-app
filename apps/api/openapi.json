@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.57.0",
+    "version": "0.58.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -2061,6 +2061,13 @@
             "nullable": true,
             "format": "date-time"
           },
+          "relaxations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExportedRelaxation"
+            },
+            "maxItems": 5
+          },
           "entries": {
             "type": "array",
             "items": {
@@ -2074,7 +2081,43 @@
           "builtAt",
           "openedAt",
           "completedAt",
+          "relaxations",
           "entries"
+        ]
+      },
+      "ExportedRelaxation": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "fieldInWords": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelaxationKind"
+          },
+          "kindInWords": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "field",
+          "fieldInWords",
+          "kind",
+          "kindInWords",
+          "at"
+        ]
+      },
+      "RelaxationKind": {
+        "type": "string",
+        "enum": [
+          "unanswered",
+          "aside"
         ]
       },
       "ExportedRoundEntry": {
@@ -2090,6 +2133,20 @@
           },
           "reasonInWords": {
             "type": "string"
+          },
+          "relaxedField": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DealBreakerField"
+              },
+              {
+                "nullable": true
+              }
+            ]
+          },
+          "relaxedFieldInWords": {
+            "type": "string",
+            "nullable": true
           },
           "seenAt": {
             "type": "string",
@@ -2113,6 +2170,8 @@
           "position",
           "reason",
           "reasonInWords",
+          "relaxedField",
+          "relaxedFieldInWords",
           "seenAt",
           "decision",
           "decisionInWords",
@@ -5867,6 +5926,16 @@
           },
           "card": {
             "$ref": "#/components/schemas/ProfileCard"
+          },
+          "relaxedField": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "notAnswered": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DealBreakerField"
+            },
+            "maxItems": 5
           }
         },
         "required": [
@@ -5908,6 +5977,105 @@
         },
         "required": [
           "decision"
+        ],
+        "additionalProperties": false
+      },
+      "RelaxationsResponse": {
+        "type": "object",
+        "properties": {
+          "short": {
+            "type": "boolean"
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelaxationOffer"
+            },
+            "maxItems": 10
+          },
+          "relaxed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Relaxation"
+            },
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "short",
+          "offers",
+          "relaxed"
+        ],
+        "additionalProperties": false
+      },
+      "RelaxationOffer": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelaxationKind"
+          },
+          "more": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "field",
+          "kind",
+          "more"
+        ],
+        "additionalProperties": false
+      },
+      "Relaxation": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/DealBreakerField"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelaxationKind"
+          }
+        },
+        "required": [
+          "field",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "RelaxationAnswer": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoundEntry"
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "additionalProperties": false
+      },
+      "RelaxationUndone": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "removed"
         ],
         "additionalProperties": false
       },
@@ -11495,6 +11663,254 @@
           },
           "429": {
             "description": "like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days, Retry-After the wait until the next can go. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/{day}/relaxations": {
+      "get": {
+        "summary": "What today's round may relax, and what is relaxed",
+        "description": "For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config waitlist_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The offers and today's relaxations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelaxationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no round today, or a day not begun.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Relax a deal-breaker for today",
+        "description": "One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Relaxation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Relaxed; the cards it added, perhaps none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelaxationAnswer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no round today, a day not begun, or a relaxation the offers would not list (no deal-breaker of the caller's on that field, a paused one, or unanswered where those people are let through already). Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; already_relaxed: that deal-breaker is relaxed today; relaxations_changed: another device relaxed or undid one since this tap's offers were counted. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "card_budget_exceeded: relaxed, and the cards added, but the day's cards are used up; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/rounds/{day}/relaxations/{field}": {
+      "delete": {
+        "summary": "Undo today's relaxation of a deal-breaker",
+        "description": "The relaxation goes, and with it the cards that came in under it, a later relaxation's too, that are still undecided; a decided one stays as it was decided.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "required": true,
+            "name": "day",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "$ref": "#/components/schemas/DealBreakerField"
+            },
+            "required": true,
+            "name": "field",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Undone; the places of the cards removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelaxationUndone"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no round today, a day not begun, or that field not relaxed today.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "round_expired: the day named has ended; nothing was written.",
             "content": {
               "application/json": {
                 "schema": {

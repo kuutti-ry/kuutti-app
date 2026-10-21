@@ -25,7 +25,7 @@ import {
   wellKnownRoutes,
 } from "./identity/index.ts";
 import { gateOf } from "./jobs/pond-gate.ts";
-import { buildRoundOf } from "./jobs/round-builder.ts";
+import { buildRoundOf, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -280,6 +280,14 @@ export function createApp(deps: Deps) {
       gateOf({ db: deps.db, logger: deps.logger, now: () => new Date() }, accountId),
     ),
   );
+  const builderDeps = () => ({
+    db: deps.db,
+    logger: deps.logger,
+    now: () => deps.now?.() ?? new Date(),
+  });
+  // The caller's own answers, which the deal-breakers' pause and the cards' "did not answer" read (#149, #99).
+  const ownFieldsOf = async (accountId: string) =>
+    (await exportProfile(deps.db, accountId))?.fields ?? {};
   // Today's round (#96, ADR-034) serves its cards through the profile slice's
   // builder, handed in here since profile already imports matching; a card
   // the builder refuses (404) is a card the round leaves out, and its budget's
@@ -312,26 +320,22 @@ export function createApp(deps: Deps) {
       // rounds are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and boot.ts's twin.
       deps.config.APP_ENV === "production"
         ? async () => false
-        : (accountId) =>
-            buildRoundOf(
-              { db: deps.db, logger: deps.logger, now: () => deps.now?.() ?? new Date() },
-              accountId,
-            ),
+        : (accountId) => buildRoundOf(builderDeps(), accountId),
       // A match is a conversation (#100, ADR-031): the chat slice's, handed in
       // here since the chat imports the profile, which imports matching.
       { between: conversationBetween, open: openConversation },
       roundRead,
+      // A short round's relaxations (#99, ADR-042) read the pond as the builder does.
+      {
+        offers: (accountId) => relaxationOffers(builderDeps(), accountId),
+        candidates: (accountId, relaxation) =>
+          relaxedCandidates(builderDeps(), accountId, relaxation),
+      },
+      ownFieldsOf,
     ),
   );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
-  app.route(
-    "/",
-    preferencesRoutes(
-      deps,
-      guard,
-      async (accountId) => (await exportProfile(deps.db, accountId))?.fields ?? {},
-    ),
-  );
+  app.route("/", preferencesRoutes(deps, guard, ownFieldsOf));
 
   // The bearer scheme the session routes declare (#35); the tokens themselves
   // are opaque, so the scheme is all the contract says about them.

@@ -420,10 +420,19 @@ export async function exportAccount(
         builtAt: round.builtAt.toISOString(),
         openedAt: round.openedAt?.toISOString() ?? null,
         completedAt: round.completedAt?.toISOString() ?? null,
+        relaxations: round.relaxations.map((relaxation) => ({
+          field: relaxation.field,
+          fieldInWords: t(`profile.field.${relaxation.field}`),
+          kind: relaxation.kind,
+          kindInWords: t(`account.export.round.relaxation.${relaxation.kind}`),
+          at: relaxation.createdAt.toISOString(),
+        })),
         entries: round.entries.map((entry) => ({
           position: entry.position,
           reason: entry.reason,
           reasonInWords: t(`account.export.round.reason.${entry.reason}`),
+          relaxedField: entry.relaxedField,
+          relaxedFieldInWords: entry.relaxedField ? t(`profile.field.${entry.relaxedField}`) : null,
           seenAt: entry.seenAt?.toISOString() ?? null,
           decision: entry.decision,
           decisionInWords: entry.decision

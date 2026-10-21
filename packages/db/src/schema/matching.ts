@@ -6,6 +6,7 @@ import {
   pgEnum,
   pgTable,
   smallint,
+  text,
   timestamp,
   uniqueIndex,
   uuid,
@@ -49,6 +50,8 @@ export const rounds = pgTable(
     builtAt: timestamp("built_at", { withTimezone: true }).notNull().defaultNow(),
     openedAt: timestamp("opened_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    // The highest place the round ever gave (#99, ADR-042 §5): a place an undo or an erasure freed is never given again.
+    lastPosition: smallint("last_position").notNull().default(0),
   },
   (table) => [uniqueIndex("rounds_account_day_idx").on(table.accountId, table.day)],
 );
@@ -81,6 +84,10 @@ export const roundEntries = pgTable(
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     // A fish (#378, ADR-039) is a like with a mark: every reader of a like reads it as one.
     fish: boolean("fish").notNull().default(false),
+    // The deal-breaker a relaxed card came in by, its label (#99, ADR-042 §5 and §9).
+    relaxedField: text("relaxed_field"),
+    // Every relaxation of the day it came in under, the tapped one first: undoing any takes it back, and a like on it waives them all (§6, §7).
+    relaxedWith: text("relaxed_with").array().notNull().default(sql`'{}'::text[]`),
   },
   (table) => [
     // One card per place: the read's order, the cascade, and #98's count of the day's likes.
@@ -95,5 +102,37 @@ export const roundEntries = pgTable(
       sql`(${table.decision} IS NULL) = (${table.decidedAt} IS NULL)`,
     ),
     check("round_entries_fish_check", sql`NOT ${table.fish} OR ${table.decision} = 'like'`),
+    check(
+      "round_entries_relaxed_check",
+      sql`(${table.reason} = 'relaxed') = (${table.relaxedField} IS NOT NULL)
+          AND (${table.relaxedField} IS NULL OR ${table.relaxedField} = ANY(${table.relaxedWith}))`,
+    ),
   ],
+);
+
+/**
+ * How a person loosened one of their own deal-breakers for the day (#99,
+ * ADR-042 §3): let through those who did not answer its field, or set it
+ * aside. Never another filter.
+ */
+export const relaxationKind = pgEnum("relaxation_kind", ["unanswered", "aside"]);
+
+/**
+ * A deal-breaker relaxed for one day (#99, ADR-042 §3): it hangs on the day's
+ * round, so tomorrow's is built from the filters as stored, and goes with it
+ * (erasure, the round's retention). One per field and round; undoing it
+ * deletes the row.
+ */
+export const roundRelaxation = pgTable(
+  "round_relaxation",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    roundId: uuid("round_id")
+      .notNull()
+      .references(() => rounds.id, { onDelete: "cascade" }),
+    field: text("field").notNull(),
+    kind: relaxationKind("kind").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("round_relaxation_round_field_idx").on(table.roundId, table.field)],
 );

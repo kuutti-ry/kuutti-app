@@ -1030,3 +1030,239 @@ describe("a round left open past midnight", () => {
     expect(sent.seen()).toEqual([1, 1]);
   });
 });
+
+describe("the short pool (#99, ADR-042)", () => {
+  const RELAXATIONS = `/rounds/${DAY}/relaxations`;
+  const offered = {
+    short: true,
+    offers: [
+      { field: "smoking", kind: "unanswered", more: 10 },
+      { field: "smoking", kind: "aside", more: 0 },
+    ],
+    relaxed: [],
+  };
+  const EMPTY: RoundResponse = { day: DAY, entries: [] };
+  const relaxedCard: RoundEntry = { ...entry(5, "Liisa", "relaxed"), relaxedField: "smoking" };
+  const INCLUDE = "Include those who did not answer: Smoking. About 10 more people";
+  const ASIDE = "Set aside for today: Smoking. A few more people";
+
+  it("offers to relax a deal-breaker for today at the end of a short round, with the pool's growth in steps", async () => {
+    const sent = api((call) => (call.path === RELAXATIONS ? json(offered) : undefined), EMPTY);
+    await show();
+    expect(screen.getByText("There is nobody to show you today. Come back tomorrow.")).toBeTruthy();
+    expect(heading("Few people today")).toBeTruthy();
+    expect(screen.getByRole("button", { name: INCLUDE })).toBeTruthy();
+    expect(screen.getByRole("button", { name: ASIDE })).toBeTruthy();
+    noProblems();
+    // Reading the offers relaxes nothing.
+    expect(sent.calls.filter((c) => c.method !== "GET")).toEqual([]);
+  });
+
+  it("adds the relaxation's cards after the last on a tap, the first on the screen with its deal-breaker named", async () => {
+    const sent = api((call) => {
+      if (call.path === RELAXATIONS && call.method === "GET") return json(offered);
+      if (call.path === RELAXATIONS) return json({ entries: [relaxedCard] });
+      return undefined;
+    }, EMPTY);
+    await show();
+
+    await press(INCLUDE);
+
+    expect(sent.calls.find((c) => c.method === "POST" && c.path === RELAXATIONS)?.body).toEqual({
+      field: "smoking",
+      kind: "unanswered",
+    });
+    expect(heading("Liisa, 35")).toBeTruthy();
+    expect(screen.getByText("Relaxed for today: Smoking")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Undo for today: Smoking" })).toBeTruthy();
+    noProblems();
+    expect(sent.reads()).toBe(1);
+  });
+
+  it("takes back the relaxation's undecided cards with one tap on a relaxed card", async () => {
+    let relaxed = false;
+    const sent = api(
+      (call) => {
+        if (call.path === RELAXATIONS) {
+          return json(
+            relaxed ? { ...offered, relaxed: [] } : { short: true, offers: [], relaxed: [] },
+          );
+        }
+        if (call.path === `${RELAXATIONS}/smoking` && call.method === "DELETE") {
+          relaxed = true;
+          return json({ removed: [5] });
+        }
+        return undefined;
+      },
+      { day: DAY, entries: [entry(1, "Henna", "matches_filters", "like"), relaxedCard] },
+    );
+    await show();
+    expect(heading("Liisa, 35")).toBeTruthy();
+
+    await press("Undo for today: Smoking");
+
+    expect(screen.queryByRole("heading", { name: "Liisa, 35" })).toBeNull();
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+    // The panel read again: smoking is offered once more.
+    await waitFor(() => expect(screen.getByRole("button", { name: INCLUDE })).toBeTruthy());
+    expect(sent.calls.filter((c) => c.method === "DELETE").map((c) => c.path)).toEqual([
+      `${RELAXATIONS}/smoking`,
+    ]);
+  });
+
+  it("undoes a relaxation from the panel, where nothing it brought is left undecided", async () => {
+    let undone = false;
+    const sent = api((call) => {
+      if (call.path === RELAXATIONS) {
+        return json(
+          undone
+            ? offered
+            : { short: true, offers: [], relaxed: [{ field: "smoking", kind: "aside" }] },
+        );
+      }
+      if (call.method === "DELETE") {
+        undone = true;
+        return json({ removed: [] });
+      }
+      return undefined;
+    }, EMPTY);
+    await show();
+    expect(screen.queryByRole("heading", { name: "Few people today" })).toBeNull();
+
+    await press("Undo for today: Smoking");
+
+    await waitFor(() => expect(heading("Few people today")).toBeTruthy());
+    expect(sent.calls.filter((c) => c.method === "DELETE")).toHaveLength(1);
+  });
+
+  it("names on a card the deal-breakers its person did not answer", async () => {
+    api(undefined, {
+      day: DAY,
+      entries: [{ ...entry(1, "Henna"), notAnswered: ["smoking", "languages"] }],
+    });
+    await show();
+    expect(screen.getByText("Did not answer: Smoking")).toBeTruthy();
+    expect(screen.getByText("Did not answer: Languages")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Undo for today/ })).toBeNull();
+  });
+
+  it.each([
+    ["found nobody after all", () => json({ entries: [] }), "Nobody new to show today after all."],
+    [
+      "was made already",
+      () => refusal("already_relaxed", 409),
+      "You relaxed that one for today already.",
+    ],
+    [
+      "used up the day's cards",
+      () => refusal("card_budget_exceeded", 429, { "retry-after": "600" }),
+      "You have seen many profiles today. New ones come after midnight.",
+    ],
+    ["failed", () => refusal("internal_error", 500), "That did not go through. Try again."],
+  ])("says when a relaxation %s, and offers what is left", async (_case, answer, words) => {
+    api((call) => {
+      if (call.path === RELAXATIONS && call.method === "GET") return json(offered);
+      if (call.path === RELAXATIONS) return answer();
+      return undefined;
+    }, EMPTY);
+    await show();
+
+    await press(INCLUDE);
+
+    expect(screen.getByText(words)).toBeTruthy();
+    expect(screen.getByRole("button", { name: INCLUDE })).toBeTruthy();
+  });
+
+  it("reads the round anew when a relaxation finds that the day ended", async () => {
+    const sent = api((call) => {
+      if (call.path === RELAXATIONS && call.method === "GET") return json(offered);
+      if (call.path === RELAXATIONS) return refusal("round_expired", 409);
+      return undefined;
+    }, EMPTY);
+    await show();
+
+    await press(INCLUDE);
+
+    expect(sent.reads()).toBe(2);
+    expect(screen.getByText("That round ended at midnight, so this was not saved.")).toBeTruthy();
+  });
+
+  it.each([
+    ["is not short", () => json({ short: false, offers: [], relaxed: [] })],
+    ["cannot be read", () => refusal("internal_error", 500)],
+  ])("shows no panel when the round %s", async (_case, answer) => {
+    api((call) => (call.path === RELAXATIONS ? answer() : undefined), EMPTY);
+    await show();
+    expect(screen.getByText("There is nobody to show you today. Come back tomorrow.")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Few people today" })).toBeNull();
+    expect(screen.queryAllByRole("button", { name: /Smoking/ })).toEqual([]);
+  });
+});
+
+describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
+  const RELAXATIONS = `/rounds/${DAY}/relaxations`;
+  const relaxedCard: RoundEntry = { ...entry(5, "Liisa", "relaxed"), relaxedField: "smoking" };
+  const round = (decision: RoundEntry["decision"] = null): RoundResponse => ({
+    day: DAY,
+    entries: [entry(1, "Henna", "matches_filters", "like"), { ...relaxedCard, decision }],
+  });
+
+  it.each([
+    [
+      "the day ended",
+      () => refusal("round_expired", 409),
+      "That round ended at midnight, so this was not saved.",
+    ],
+    ["it failed", () => refusal("internal_error", 500), "That did not go through. Try again."],
+  ])("keeps the card and says so when %s", async (what, answer, words) => {
+    const sent = api((call) => {
+      if (call.method === "DELETE") return answer();
+      if (call.path === RELAXATIONS) return json({ short: false, offers: [], relaxed: [] });
+      return undefined;
+    }, round());
+    await show();
+
+    await press("Undo for today: Smoking");
+
+    expect(screen.getByText(words)).toBeTruthy();
+    if (what === "the day ended") expect(sent.reads()).toBe(2);
+    else expect(heading("Liisa, 35")).toBeTruthy();
+  });
+
+  it("offers no undo on a relaxed card already decided, which Undo brought back", async () => {
+    api(
+      (call) =>
+        call.path === RELAXATIONS ? json({ short: false, offers: [], relaxed: [] }) : undefined,
+      { day: DAY, entries: [{ ...relaxedCard }, entry(6, "Saara")] },
+    );
+    await show();
+    await press("Like");
+    await press("Undo your last decision");
+    expect(heading("Liisa, 35")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Undo for today: Smoking" })).toBeNull();
+  });
+
+  it("says that the day's relaxations changed on another device, and offers what is left", async () => {
+    api(
+      (call) => {
+        if (call.path === RELAXATIONS && call.method === "GET") {
+          return json({
+            short: true,
+            offers: [{ field: "smoking", kind: "aside", more: 10 }],
+            relaxed: [],
+          });
+        }
+        if (call.path === RELAXATIONS) return refusal("relaxations_changed", 409);
+        return undefined;
+      },
+      { day: DAY, entries: [] },
+    );
+    await show();
+
+    await press("Set aside for today: Smoking. About 10 more people");
+
+    expect(
+      screen.getByText("Your relaxations for today changed meanwhile. Look again and choose."),
+    ).toBeTruthy();
+  });
+});

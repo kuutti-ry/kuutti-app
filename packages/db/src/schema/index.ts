@@ -31,7 +31,14 @@ export {
   identityStanding,
 } from "./identity.ts";
 // Today's round and its entries (#96, ADR-034).
-export { roundDecision, roundEntries, roundReason, rounds } from "./matching.ts";
+export {
+  relaxationKind,
+  roundDecision,
+  roundEntries,
+  roundReason,
+  roundRelaxation,
+  rounds,
+} from "./matching.ts";
 export { matchingConfig } from "./matching-config.ts";
 export {
   cardShown,
