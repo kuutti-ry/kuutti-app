@@ -16,9 +16,16 @@ export const SanctionReason = z
   .meta({ id: "SanctionReason" });
 export type SanctionReason = z.infer<typeof SanctionReason>;
 
-/** The automatic rule that applied a shadow ban (#105, ADR-033); mirrors the database's sanction_rule. */
+/** The automatic rule that applied a shadow ban (#105, ADR-033; #86's velocity, ADR-041); mirrors the database's sanction_rule. */
 export const SanctionRule = z
-  .enum(["reports", "first_messages", "same_first_message"])
+  .enum([
+    "reports",
+    "first_messages",
+    "same_first_message",
+    "photo_fetches",
+    "cards_served",
+    "round_reads",
+  ])
   .meta({ id: "SanctionRule" });
 export type SanctionRule = z.infer<typeof SanctionRule>;
 

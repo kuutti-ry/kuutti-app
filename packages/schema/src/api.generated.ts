@@ -7140,7 +7140,7 @@ export interface components {
             createdAt: string;
         };
         /** @enum {string} */
-        SanctionRule: "reports" | "first_messages" | "same_first_message";
+        SanctionRule: "reports" | "first_messages" | "same_first_message" | "photo_fetches" | "cards_served" | "round_reads";
         SanctionList: {
             items: components["schemas"]["SanctionEntry"][];
         };

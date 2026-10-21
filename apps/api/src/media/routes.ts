@@ -166,7 +166,17 @@ const urlRoute = createRoute({
   },
 });
 
-export function photoRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv>) {
+/**
+ * `fetched` is the safety slice's velocity check after a URL of a photo in
+ * the card or full size (#86, ADR-041), handed in by app.ts as the chat's
+ * `opened` is; awaited after the fetch-log row has committed, it changes no
+ * answer.
+ */
+export function photoRoutes(
+  deps: Deps,
+  requireSession: MiddlewareHandler<AppEnv>,
+  fetched: (accountId: string) => Promise<void>,
+) {
   const app = new OpenAPIHono<AppEnv>();
   const now = deps.now ?? (() => new Date());
 
@@ -240,12 +250,11 @@ export function photoRoutes(deps: Deps, requireSession: MiddlewareHandler<AppEnv
 
   app.openapi(urlRoute, async (c) => {
     const { id, variant } = c.req.valid("param");
+    const { accountId } = callerOf(c);
     try {
-      const url = await issuePhotoUrl(serviceDeps(), {
-        accountId: callerOf(c).accountId,
-        photoId: id,
-        variant,
-      });
+      const url = await issuePhotoUrl(serviceDeps(), { accountId, photoId: id, variant });
+      // A thumb never counts (othersPhotoFetchesSince), so it is not checked.
+      if (variant !== "thumb") await fetched(accountId);
       return c.json(url, 200);
     } catch (error) {
       if (error instanceof AppError && error.code === "photo_budget_exceeded") {
