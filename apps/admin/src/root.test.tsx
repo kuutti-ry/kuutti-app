@@ -80,7 +80,15 @@ describe("mount under a preview's base", () => {
           return json({ role: "moderator", expiresAt: staff.expiresAt });
         }
         if (key === "GET /admin/overview") {
-          return json({ now: "2026-09-25T12:00:00.000Z", responseHours: 24, queues: [] });
+          // A whole AdminOverview, so the front page renders rather than logging a parse failure.
+          const none = { here: 0, elsewhere: 0, other: 0 };
+          return json({
+            now: "2026-09-25T12:00:00.000Z",
+            responseHours: 24,
+            reviewHours: 48,
+            queues: [],
+            foundThem: { days: 30, recent: none, allTime: none },
+          });
         }
         if (key === "GET /admin/feedback") return json({ items: [], total: 0 });
         if (key === "GET /health") return json({ status: "ok" });
