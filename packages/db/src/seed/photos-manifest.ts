@@ -1,7 +1,7 @@
 import type { PhotoAsset } from "./photos.ts";
 
 // Written by `pnpm demo:assets -- --manifest <dir>` from the pictures of
-// release v2 of kuutti-ry/kuutti-app-demo-photos (#142, ADR-014 §7): every
+// release v3 of kuutti-ry/kuutti-app-demo-photos (#142, ADR-014 §7): every
 // file's path, SHA-256 and purpose. The pictures themselves are never in this
 // repository; a test refuses a binary under packages/db/src/seed. Empty until
 // the release exists: with no entry, no persona and nobody of the population
@@ -33,6 +33,31 @@ export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [
     purpose: "persona:aino",
   },
   {
+    path: "faces/henna/1.jpg",
+    sha256: "3081323f1762933acbb53cfd3f7436960a172037382098f91ed7ae3a67bb321e",
+    purpose: "persona:henna",
+  },
+  {
+    path: "faces/henna/2.jpg",
+    sha256: "1dae5db5959cb49223bed3ced110f7d665b6a9b1934a07449ac23cc95cb26618",
+    purpose: "persona:henna",
+  },
+  {
+    path: "faces/iida/1.jpg",
+    sha256: "b44959e5cad9a2f217e71cd64f605491e1ce9549961a8336f8dd8e5b2de74d4d",
+    purpose: "persona:iida",
+  },
+  {
+    path: "faces/iida/2.jpg",
+    sha256: "921354cf53811b2a1eccd4de37a8b516b6c93cf1168cacf79c765e8a1f6292d4",
+    purpose: "persona:iida",
+  },
+  {
+    path: "faces/iida/3.jpg",
+    sha256: "8b2175914879ac203da0e76b28f19ed593b55d1248b4f140dbb8d91f1c0bd0fa",
+    purpose: "persona:iida",
+  },
+  {
     path: "faces/ilona/1.jpg",
     sha256: "b5bc38a6ec4ae9a16093ca56d571aad640871a33545ba33f19158da14206191b",
     purpose: "persona:ilona",
@@ -46,6 +71,16 @@ export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [
     path: "faces/ilona/3.jpg",
     sha256: "79e5889841cdf046e1d695a30ff318990e2f521196d7cd766840df680647f4dc",
     purpose: "persona:ilona",
+  },
+  {
+    path: "faces/katja/1.jpg",
+    sha256: "68a028a7be1ed378096b5a5b9d019ac90a6d9e37e77cd9a5ab8afc94a7f655d2",
+    purpose: "persona:katja",
+  },
+  {
+    path: "faces/katja/2.jpg",
+    sha256: "841841c7cceb7c8cc01326103c04115a89e4cf35d7e7e5eefb8f36187be41177",
+    purpose: "persona:katja",
   },
   {
     path: "faces/kerttu/1.jpg",
@@ -86,6 +121,16 @@ export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [
     path: "faces/mikael/4.jpg",
     sha256: "f5bb90f4a96b4dbf2a623251923e751da100b0dfcc427382ed9a675869d93358",
     purpose: "persona:mikael",
+  },
+  {
+    path: "faces/minna/1.jpg",
+    sha256: "71cab2f39bd89d508914b575c25188b10514f41c4b1bc0b01c2b68a36563be32",
+    purpose: "persona:minna",
+  },
+  {
+    path: "faces/minna/2.jpg",
+    sha256: "f16d9e5e977cf31f774e44f62c50c7b21b9338444352bc6054317f749591f2dc",
+    purpose: "persona:minna",
   },
   {
     path: "faces/noa/1.jpg",
@@ -136,6 +181,16 @@ export const PHOTOS_MANIFEST: readonly PhotoAsset[] = [
     path: "faces/onni/8.jpg",
     sha256: "1fc1bbbd375a9b25ae1465c88352f7523b3cdf989e6e8591892cc6d3698da99a",
     purpose: "persona:onni",
+  },
+  {
+    path: "faces/riikka/1.jpg",
+    sha256: "13ff46ae0db3f6ed398ac7fe3ac15df3ab0c995e6df7a71af2926d855eb516d3",
+    purpose: "persona:riikka",
+  },
+  {
+    path: "faces/riikka/2.jpg",
+    sha256: "e28231754deee1b0ecaeabaa7e0eafbdc88ab5aaf31e34ad769ff5fb444b01b7",
+    purpose: "persona:riikka",
   },
   {
     path: "faces/sanna/1.jpg",
