@@ -57,6 +57,18 @@ describe("the provider", () => {
     );
   });
 
+  it("lets a stored choice that arrives after the provider has gone change nothing", async () => {
+    let arrive: (value: string | null) => void = () => undefined;
+    jest
+      .spyOn(SecureStore, "getItemAsync")
+      .mockReturnValueOnce(new Promise((resolve) => (arrive = resolve)));
+    const { result, unmount } = await renderHook(() => useDecisionButtons(), { wrapper });
+    expect(result.current.settings).toEqual(DEFAULT_DECISION_BUTTONS);
+    await unmount();
+    await act(async () => arrive(JSON.stringify({ hand: "left" })));
+    expect(result.current.settings).toEqual(DEFAULT_DECISION_BUTTONS);
+  });
+
   it("is needed above the hook", async () => {
     const silence = jest.spyOn(console, "error").mockImplementation(() => undefined);
     function Probe() {

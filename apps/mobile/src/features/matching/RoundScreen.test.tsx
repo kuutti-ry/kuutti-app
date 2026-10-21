@@ -1103,6 +1103,40 @@ describe("where the decision buttons sit (#82)", () => {
     },
   );
 
+  it.each([
+    ["right", /\bself-end\b/],
+    ["left", /\bself-start\b/],
+  ] as const)(
+    "keeps Undo at the thumb on the %s, one-handed, after the round's last decision, and it still takes it back",
+    async (hand, side) => {
+      store.set(KEY, JSON.stringify({ hand, oneHanded: true }));
+      api(undefined, { day: DAY, entries: [entry(2, "Katja")] });
+      await show();
+      await settle();
+      await press("Pass");
+      expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+      expect(controls()).toEqual(["Undo your last decision"]);
+      expect(inColumn("Undo your last decision")).toBe(true);
+      expect(column()?.props.className).toMatch(side);
+      noProblems();
+      await press("Undo your last decision");
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(
+        screen.getByText("You passed on this person. You can change that until midnight."),
+      ).toBeTruthy();
+    },
+  );
+
+  it("shows no Undo, one-handed, at a round's end with nothing to take back", async () => {
+    store.set(KEY, JSON.stringify({ oneHanded: true }));
+    api(undefined, { day: DAY, entries: [entry(2, "Katja", "matches_filters", "pass")] });
+    await show();
+    await settle();
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+    expect(controls()).toEqual([]);
+    expect(column()).toBeNull();
+  });
+
   it("leaves the fish out of the column on a card that answers a like", async () => {
     store.set(KEY, JSON.stringify({ oneHanded: true }));
     api(undefined, { day: DAY, entries: [entry(1, "Henna", "liked_you")] });

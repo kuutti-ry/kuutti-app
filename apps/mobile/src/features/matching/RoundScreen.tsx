@@ -229,6 +229,18 @@ export function RoundScreen() {
           onChoose={choose}
         />
       )}
+      {/* One-handed, Undo stays at the thumb when no card is left to decide:
+          after the round's last decision it can still be taken back (ADR-034 §5). */}
+      {match === null && !current && placement.oneHanded && undo && (
+        <View className="border-t border-border bg-background px-6 py-3">
+          <View
+            testID="round-one-handed"
+            className={cn("w-2/3", placement.hand === "left" ? "self-start" : "self-end")}
+          >
+            {undo}
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }

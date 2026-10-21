@@ -7287,7 +7287,7 @@ round.fish.refused:
 
 round.like:
   en: "Like"
-  description: "Decision button on a round card, at the right of the bottom bar, a filled pill with a heart (#379): the reader would like to talk to this person. One word; see the glossary's like."
+  description: "Decision button on a round card, a filled pill with a heart (#379): the reader would like to talk to this person. By default at the right of the bottom bar; the person can mirror it for the left hand or stack it last in a one-handed column (#82). One word; see the glossary's like."
   fi: "Tykkää"
   sv: "Gilla"
   max_length: 14
@@ -7295,7 +7295,7 @@ round.like:
 
 round.pass:
   en: "Pass"
-  description: "Decision button on a round card, at the left of the bottom bar, an outlined rectangle with a cross (#379): not this time. Neutral and kind, never a rejection; see the glossary's pass. One word."
+  description: "Decision button on a round card, an outlined rectangle with a cross (#379): not this time. By default at the left of the bottom bar; the person can mirror it for the left hand or stack it in a one-handed column (#82). Neutral and kind, never a rejection; see the glossary's pass. One word."
   fi: "Ohita"
   sv: "Hoppa över"
   max_length: 14
@@ -7303,7 +7303,7 @@ round.pass:
 
 round.undo:
   en: "Undo"
-  description: "Button in the round screen's header after a decision: brings the last card back to decide again (ADR-034 §5, until midnight). One word."
+  description: "Button after a decision, in the round screen's header, or first in the bottom column in one-handed mode (#82): brings the last card back to decide again (ADR-034 §5, until midnight). One word."
   fi: "Kumoa"
   sv: "Ångra"
   max_length: 12

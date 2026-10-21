@@ -9,7 +9,7 @@ import { Choice } from "./Choice";
 import { SettingsPage } from "./SettingsPage";
 
 /** The two hands, in the order they are offered; the right is the default. */
-export const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [
+const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [
   { value: "right", label: "settings.decisionButtons.right" },
   { value: "left", label: "settings.decisionButtons.left" },
 ];
