@@ -848,6 +848,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/found-them": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether the caller told Kuutti they found somebody
+         * @description "Löysin hänet" (#83, ADR-040): whether this account has answered, so the screen can thank the person instead of asking again. Never which reason: the account does not keep it.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Answered or not. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["FoundThemStatus"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Tell Kuutti you found somebody
+         * @description "Löysin hänet" (#83, ADR-040): the reason, from a closed list, counted once per account in an anonymous daily count that names nobody, and a research event for those who said yes to research. An indication only: nothing else changes, no state, no session, no round, no conversation.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["FoundThemRequest"];
+                };
+            };
+            responses: {
+                /** @description Counted. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation failed (a reason outside the list). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description found_them_answered: this account told Kuutti already; nothing was counted. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account/pause": {
         parameters: {
             query?: never;
@@ -4725,7 +4843,7 @@ export interface paths {
         };
         /**
          * What waits for the moderators
-         * @description Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. Moderators and admins.
+         * @description Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. And the association's measure (#83): how many told Kuutti they found somebody, by reason, over the last thirty Finnish days and in all, from a count that names nobody. Moderators and admins.
          */
         get: {
             parameters: {
@@ -5967,6 +6085,7 @@ export interface components {
                 /** Format: date-time */
                 seeksChangedAt: string | null;
                 email: string | null;
+                foundThemAnswered: boolean;
             };
             preferences: components["schemas"]["PreferencesResponse"];
             dealBreakers: components["schemas"]["StoredDealBreaker"][];
@@ -6552,6 +6671,14 @@ export interface components {
              */
             confirm: true;
         };
+        FoundThemStatus: {
+            answered: boolean;
+        };
+        FoundThemRequest: {
+            reason: components["schemas"]["FoundReason"];
+        };
+        /** @enum {string} */
+        FoundReason: "here" | "elsewhere" | "other";
         AccountPauseRequest: {
             /**
              * @description Must be true: the person said they understand what a break means.
@@ -7125,6 +7252,19 @@ export interface components {
             responseHours: number;
             reviewHours: number;
             queues: components["schemas"]["OverviewQueue"][];
+            foundThem: {
+                days: number;
+                recent: {
+                    here: number;
+                    elsewhere: number;
+                    other: number;
+                };
+                allTime: {
+                    here: number;
+                    elsewhere: number;
+                    other: number;
+                };
+            };
         };
         OverviewQueue: {
             /** @enum {string} */

@@ -13,7 +13,7 @@ import * as repo from "./repo.ts";
 // erasure.ts is the only delete.
 // shortcut: the login exchange takes the account row's share lock
 // (insertSession, ADR-024 §4) but admits `paused`, a live state for the guard
-// (#83), so a login that commits between the session guard and this
+// (ADR-022 §5), so a login that commits between the session guard and this
 // transaction still leaves one live session on a paused account until the
 // app's next start. The round builder (#95) builds nothing for a paused
 // account, so such a session can only decide a round built before the break

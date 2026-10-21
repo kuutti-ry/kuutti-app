@@ -3,7 +3,7 @@ import { AccountActions, useSession } from "@/features/identity";
 import { useT } from "@/lib/locale";
 import { SettingsPage } from "./SettingsPage";
 
-/** The export, the break and the deletion (#51, #170), the deletion last; signed out, the screen says so. */
+/** The export, "I found someone", the break and the deletion (#51, #83, #170), the deletion last; signed out, the screen says so. */
 export function AccountScreen() {
   const { t } = useT();
   const session = useSession();

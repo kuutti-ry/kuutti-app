@@ -344,6 +344,7 @@ export async function exportAccount(
       genderChangedAt: account.genderChangedAt?.toISOString() ?? null,
       seeksChangedAt: account.seeksChangedAt?.toISOString() ?? null,
       email: account.email,
+      foundThemAnswered: account.foundThemAnswered,
     },
     preferences,
     dealBreakers,

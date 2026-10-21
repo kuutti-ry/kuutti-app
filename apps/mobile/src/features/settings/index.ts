@@ -6,6 +6,7 @@ export { ContactsSettingsScreen } from "./ContactsSettingsScreen";
 export { DeviceScreen } from "./DeviceScreen";
 export { EmailSettingsScreen } from "./EmailSettingsScreen";
 export { FeedbackScreen } from "./FeedbackScreen";
+export { FoundThemScreen } from "./FoundThemScreen";
 export { LanguageScreen } from "./LanguageScreen";
 export { LegalScreen, legalKindOf } from "./LegalScreen";
 export { LicensesScreen } from "./LicensesScreen";

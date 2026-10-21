@@ -6,6 +6,8 @@ import {
   AccountExport,
   AccountPauseRequest,
   ErrorResponse,
+  FoundThemRequest,
+  FoundThemStatus,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
 import type { Deps } from "../app.ts";
@@ -15,6 +17,7 @@ import { AppError } from "../lib/errors.ts";
 import { tOf } from "../lib/i18n.ts";
 import { type ErasureDeps, eraseAccount } from "./erasure.ts";
 import { exportArchive } from "./export.ts";
+import { foundThemAnswered, tellFoundThem } from "./found-them.ts";
 import { pauseAccount } from "./pause.ts";
 import * as repo from "./repo.ts";
 
@@ -93,6 +96,39 @@ const pauseRoute = createRoute({
   },
 });
 
+const foundThemReadRoute = createRoute({
+  method: "get",
+  path: "/account/found-them",
+  summary: "Whether the caller told Kuutti they found somebody",
+  description:
+    '"Löysin hänet" (#83, ADR-040): whether this account has answered, so the screen can thank the person instead of asking again. Never which reason: the account does not keep it.',
+  ...bearer,
+  responses: {
+    200: { description: "Answered or not.", ...json(FoundThemStatus) },
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+  },
+});
+
+const foundThemRoute = createRoute({
+  method: "post",
+  path: "/account/found-them",
+  summary: "Tell Kuutti you found somebody",
+  description:
+    '"Löysin hänet" (#83, ADR-040): the reason, from a closed list, counted once per account in an anonymous daily count that names nobody, and a research event for those who said yes to research. An indication only: nothing else changes, no state, no session, no round, no conversation.',
+  ...bearer,
+  request: { body: { required: true, ...json(FoundThemRequest) } },
+  responses: {
+    204: { description: "Counted." },
+    400: errorContent("Validation failed (a reason outside the list)."),
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+    409: errorContent(
+      "found_them_answered: this account told Kuutti already; nothing was counted.",
+    ),
+  },
+});
+
 const emailRoute = createRoute({
   method: "get",
   path: "/account/email",
@@ -145,7 +181,16 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     now: deps.now ?? (() => new Date()),
     ...(deps.media ? { media: deps.media } : {}),
   };
-  const routes = [deleteRoute, exportRoute, pauseRoute, emailRoute, setEmailRoute, clearEmailRoute];
+  const routes = [
+    deleteRoute,
+    exportRoute,
+    pauseRoute,
+    foundThemReadRoute,
+    foundThemRoute,
+    emailRoute,
+    setEmailRoute,
+    clearEmailRoute,
+  ];
   for (const path of new Set(routes.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
@@ -180,6 +225,17 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
   app.openapi(deleteRoute, async (c) => {
     c.req.valid("json"); // confirm: true, or the validator has answered 400
     await eraseAccount(erasureDeps, callerOf(c).accountId);
+    return c.body(null, 204);
+  });
+
+  app.openapi(foundThemReadRoute, async (c) => {
+    return c.json({ answered: await foundThemAnswered(deps.db, callerOf(c).accountId) }, 200);
+  });
+
+  app.openapi(foundThemRoute, async (c) => {
+    const { reason } = c.req.valid("json");
+    // The database, the logger and the clock the erasure uses: one fallback to the present.
+    await tellFoundThem(erasureDeps, callerOf(c).accountId, reason);
     return c.body(null, 204);
   });
 

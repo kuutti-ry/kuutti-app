@@ -73,7 +73,7 @@ afterEach(async () => {
 });
 
 describe("AccountActions", () => {
-  it("shows the three labelled buttons and nothing pressable is unlabelled or too small", async () => {
+  it("shows the four labelled buttons and nothing pressable is unlabelled or too small", async () => {
     fetchMock([]);
     await show(<AccountActions />);
     expect(
@@ -84,10 +84,20 @@ describe("AccountActions", () => {
     // Its screen carries the title (#287): the card does not repeat it.
     expect(screen.queryByText("Your account")).toBeNull();
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found).toHaveLength(3);
+    expect(found).toHaveLength(4);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     // The consents are the app's settings now, not the account's (#170).
     expect(screen.queryByLabelText("Take part in research")).toBeNull();
+  });
+
+  it("opens the found-them screen from its button, and nothing happens before that (#83)", async () => {
+    const requests = fetchMock([]);
+    router.push.mockReset();
+    await show(<AccountActions />);
+    await fireEvent.press(screen.getByRole("button", { name: "I found someone" }));
+    expect(router.push).toHaveBeenCalledWith("/settings/found-them");
+    expect(requests.filter((r) => r.method !== "GET")).toHaveLength(0);
+    expect(currentSession()).not.toBeNull();
   });
 
   it("opens the break screen from its button, and nothing happens before that", async () => {

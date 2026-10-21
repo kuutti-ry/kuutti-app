@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
   pgEnum,
@@ -107,6 +108,10 @@ export const account = pgTable(
     // (#385), never a login, never shown to anybody, never in a log line or an event
     // (rules/db.md). Nulled at erasure with the rest of what is personal.
     email: text("email"),
+    // "Löysin hänet" (#83, ADR-040): whether the person told Kuutti they found
+    // somebody, so that each account counts once; never which reason, which
+    // lives only in the anonymous count (found_them_count). Cleared at erasure.
+    foundThemAnswered: boolean("found_them_answered").notNull().default(false),
     registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },

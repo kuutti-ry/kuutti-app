@@ -100,6 +100,7 @@ export const ERROR_MESSAGE_KEYS = {
   like_budget_exceeded: "errors.like_budget_exceeded",
   fish_budget_exceeded: "errors.fish_budget_exceeded",
   match_made: "errors.match_made",
+  found_them_answered: "errors.found_them_answered",
   conversation_closed: "errors.conversation_closed",
   message_too_long: "errors.message_too_long",
   contact_details: "errors.contact_details",
