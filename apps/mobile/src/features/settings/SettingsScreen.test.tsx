@@ -109,6 +109,7 @@ describe("the settings screen", () => {
       "Theme",
       "Language",
       "Photo descriptions",
+      "Decision buttons",
       "Terms of use",
       "Privacy",
       "Source code",
@@ -136,6 +137,7 @@ describe("the settings screen", () => {
       "Theme",
       "Language",
       "Photo descriptions",
+      "Decision buttons",
       "Account",
       "This device",
       "E-mail",
@@ -204,6 +206,7 @@ describe("the settings screen", () => {
       ["Theme", "/settings/theme"],
       ["Language", "/settings/language"],
       ["Photo descriptions", "/settings/photo-descriptions"],
+      ["Decision buttons", "/settings/decision-buttons"],
       ["Research", "/settings/consent/research"],
       ["Sensitive answers", "/settings/consent/special_category"],
       ["Terms of use", "/settings/legal/terms"],
@@ -297,5 +300,19 @@ describe("the settings screen", () => {
     store.set("kuutti.preference.photoDescriptions", JSON.stringify({ shown: true }));
     await renderWithTheme(<SettingsScreen />);
     expect(await screen.findByText("Shown under the photos")).toBeTruthy();
+  });
+
+  it("says the hand the decision buttons are placed for, and one-handed, as the row's value (#82)", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    expect(row("Decision buttons").props.accessibilityValue).toEqual({ text: "Right hand" });
+    store.set(
+      "kuutti.preference.decisionButtons",
+      JSON.stringify({ hand: "left", oneHanded: true }),
+    );
+    await renderWithTheme(<SettingsScreen />);
+    expect(await screen.findByText("Left hand, one-handed")).toBeTruthy();
+    expect(row("Decision buttons").props.accessibilityValue).toEqual({
+      text: "Left hand, one-handed",
+    });
   });
 });

@@ -60,6 +60,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `notification-settings` | Sanna | Settings › Notifications says nothing is sent yet; Messages switched off, kept on the server after a way round by home, then on again, so Sanna ends as she began (#176) |
 | `data-export` | Sanna | Download my data hands the zip over: the share sheet on iOS, the folder picker on Android (#237) |
 | `photo-descriptions` | Sanna | the Photo descriptions row and its screen (#296): Show under photos on, Face off, both kept when the screen is opened again, then back as found; the description itself needs Rekognition, which the local stack has none of |
+| `decision-buttons` | Sanna | Settings › Decision buttons (#82): Right hand chosen and one-handed off at first; Left hand and one-handed chosen and kept when the screen is opened again, then back to Right hand and off, so Sanna ends as she began. Where the buttons then sit on the round is the round screen's jest tests |
 | `settings-survive-relaunch` | Sanna | theme, language and session outlast closing the app |
 | `log-out-everywhere` | Sanna | signed out at once, not back on reopening |
 | `take-a-break` | Helmi | paused behind the tick, signed out with the reason, not back on reopening; the next bank login brings her back where she left off, the photos step (#170) |
