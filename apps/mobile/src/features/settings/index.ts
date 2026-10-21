@@ -3,6 +3,7 @@
 export { AccountScreen } from "./AccountScreen";
 export { ConsentScreen, consentKindOf } from "./ConsentScreen";
 export { ContactsSettingsScreen } from "./ContactsSettingsScreen";
+export { DecisionButtonsScreen } from "./DecisionButtonsScreen";
 export { DeviceScreen } from "./DeviceScreen";
 export { EmailSettingsScreen } from "./EmailSettingsScreen";
 export { FeedbackScreen } from "./FeedbackScreen";

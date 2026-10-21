@@ -18,7 +18,8 @@ export type PreferenceKey =
   | "highContrast"
   | "photoTipsSeen"
   | "photoDescriptions"
-  | "photoDescriptionsHintSeen";
+  | "photoDescriptionsHintSeen"
+  | "decisionButtons";
 
 const storageKey = (key: PreferenceKey): string => `kuutti.preference.${key}`;
 

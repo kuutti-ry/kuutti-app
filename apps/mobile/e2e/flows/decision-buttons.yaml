@@ -1,0 +1,64 @@
+# The Decision buttons setting (#82): a row in Appearance and language whose
+# screen chooses the hand the round's Like and Pass are placed for, and
+# one-handed mode, each kept on the phone. Where the buttons then sit on the
+# round is the round screen's jest tests; this flow holds the setting on a
+# device: chosen, and kept when the screen is opened again (the row's summary
+# is its hint, which Maestro does not read: README).
+# Sanna; the flow leaves the setting as it found it, right hand and two hands.
+appId: fi.kuutti.app
+name: The decision buttons setting places Like and Pass for either hand, and one-handed
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# The row says the hand, which Maestro reads after its title.
+- scrollUntilVisible:
+    element: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+- extendedWaitUntil:
+    visible: "One-handed|Yhdellä kädellä|Med en hand"
+    timeout: 15000
+- assertVisible: ".*✓.*(Right hand|Oikea käsi|Höger hand).*"
+- assertVisible:
+    text: "0|(One-handed|Yhdellä kädellä|Med en hand), off"
+    rightOf: "One-handed|Yhdellä kädellä|Med en hand"
+- tapOn: "Left hand|Vasen käsi|Vänster hand"
+- extendedWaitUntil:
+    visible: ".*✓.*(Left hand|Vasen käsi|Vänster hand).*"
+    timeout: 15000
+- tapOn: "One-handed|Yhdellä kädellä|Med en hand"
+- extendedWaitUntil:
+    visible:
+      text: "1|(One-handed|Yhdellä kädellä|Med en hand), on"
+      rightOf: "One-handed|Yhdellä kädellä|Med en hand"
+    timeout: 15000
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+    timeout: 15000
+
+# Kept when the screen is opened again; then back as it began.
+- tapOn: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+- extendedWaitUntil:
+    visible: ".*✓.*(Left hand|Vasen käsi|Vänster hand).*"
+    timeout: 15000
+- assertVisible:
+    text: "1|(One-handed|Yhdellä kädellä|Med en hand), on"
+    rightOf: "One-handed|Yhdellä kädellä|Med en hand"
+- tapOn: "Right hand|Oikea käsi|Höger hand"
+- tapOn: "One-handed|Yhdellä kädellä|Med en hand"
+- extendedWaitUntil:
+    visible:
+      text: "0|(One-handed|Yhdellä kädellä|Med en hand), off"
+      rightOf: "One-handed|Yhdellä kädellä|Med en hand"
+    timeout: 15000
+- assertVisible: ".*✓.*(Right hand|Oikea käsi|Höger hand).*"
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "(Decision buttons|Valintapainikkeet|Valknappar)(, .*)?"
+    timeout: 15000

@@ -4934,6 +4934,62 @@ photos.description.face.facialHair:
 
 # --- The Photo descriptions setting and the one-time screen-reader hint (#296 part 3) ---
 
+settings.decisionButtons.label:
+  en: "Decision buttons"
+  description: "Settings, title of the row in Appearance and language and of its screen (#82): where Like and Pass sit on today's round, for the right hand or the left, and one-handed mode."
+  fi: "Valintapainikkeet"
+  sv: "Valknappar"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.explain:
+  en: "Where Like and Pass sit on today's round. Each keeps its own word and shape wherever it is."
+  description: "Decision buttons screen, its first line (#82): what the setting moves, and that the two buttons stay told apart by word and shape, never by colour or place alone."
+  fi: "Missä Tykkää ja Ohita ovat päivän kierroksella. Kummallakin on aina oma sanansa ja muotonsa, missä se onkin."
+  sv: "Var Gilla och Hoppa över finns i dagens runda. Båda behåller sitt eget ord och sin form var de än är."
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.hand:
+  en: "Which hand"
+  description: "Decision buttons screen, the name of the radio group of the two hands (#82), heard by a screen reader."
+  fi: "Kumpi käsi"
+  sv: "Vilken hand"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.right:
+  en: "Right hand"
+  description: "Decision buttons screen, a choice (#82): Pass at the left and Like at the right, the default. Also the summary of the Settings row."
+  fi: "Oikea käsi"
+  sv: "Höger hand"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.left:
+  en: "Left hand"
+  description: "Decision buttons screen, a choice (#82): Like at the left and Pass at the right. Also the summary of the Settings row."
+  fi: "Vasen käsi"
+  sv: "Vänster hand"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.oneHanded:
+  en: "One-handed"
+  description: "Decision buttons screen, the switch's label (#82): the round's buttons in one column on the chosen hand's side."
+  fi: "Yhdellä kädellä"
+  sv: "Med en hand"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.oneHandedHint:
+  en: "Undo, the fish, Pass and Like in one column at the bottom on your hand's side, within your thumb's reach."
+  description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039)."
+  fi: "Kumoa, kala, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
+  sv: "Ångra, fisken, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.withOneHanded:
+  en: "{hand}, one-handed"
+  description: "Summary of the Decision buttons row while one-handed mode is on (#82); {hand} is the chosen hand's name (settings.decisionButtons.right or .left), in the nominative."
+  fi: "{hand}, yhdellä kädellä"
+  sv: "{hand}, med en hand"
+  machine: { fi: true, sv: true }
+
 settings.photoDescriptions.label:
   en: Photo descriptions
   description: "Settings, title of the row in Appearance and language and of its screen (#296): the automatic descriptions, shown under the photos or not, and which parts are told. Also the title of the one-time hint for screen-reader users."
@@ -7467,7 +7523,7 @@ round.fish.refused:
 
 round.like:
   en: "Like"
-  description: "Decision button on a round card, at the right of the bottom bar, a filled pill with a heart (#379): the reader would like to talk to this person. One word; see the glossary's like."
+  description: "Decision button on a round card, a filled pill with a heart (#379): the reader would like to talk to this person. By default at the right of the bottom bar; the person can mirror it for the left hand or stack it last in a one-handed column (#82). One word; see the glossary's like."
   fi: "Tykkää"
   sv: "Gilla"
   max_length: 14
@@ -7475,7 +7531,7 @@ round.like:
 
 round.pass:
   en: "Pass"
-  description: "Decision button on a round card, at the left of the bottom bar, an outlined rectangle with a cross (#379): not this time. Neutral and kind, never a rejection; see the glossary's pass. One word."
+  description: "Decision button on a round card, an outlined rectangle with a cross (#379): not this time. By default at the left of the bottom bar; the person can mirror it for the left hand or stack it in a one-handed column (#82). Neutral and kind, never a rejection; see the glossary's pass. One word."
   fi: "Ohita"
   sv: "Hoppa över"
   max_length: 14
@@ -7483,7 +7539,7 @@ round.pass:
 
 round.undo:
   en: "Undo"
-  description: "Button in the round screen's header after a decision: brings the last card back to decide again (ADR-034 §5, until midnight). One word."
+  description: "Button after a decision, in the round screen's header, or first in the bottom column in one-handed mode (#82): brings the last card back to decide again (ADR-034 §5, until midnight). One word."
   fi: "Kumoa"
   sv: "Ångra"
   max_length: 12

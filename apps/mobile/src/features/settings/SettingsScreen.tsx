@@ -8,6 +8,7 @@ import { Text } from "@/components/ui/text";
 import { type ConsentState, useConsentStates, useSession } from "@/features/identity";
 import LICENSES from "@/generated/licenses.json";
 import { buildInfo } from "@/lib/build";
+import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useLocaleSettings, useT } from "@/lib/locale";
 import { usePhotoDescriptionSettings } from "@/lib/photo-descriptions";
 import { useHapticTap } from "@/theme/haptics";
@@ -69,6 +70,13 @@ export function SettingsScreen() {
   const descriptionsSummary = usePhotoDescriptionSettings().settings.shown
     ? t("settings.photoDescriptions.shown")
     : t("settings.photoDescriptions.notShown");
+  const buttons = useDecisionButtons().settings;
+  const handName = t(
+    buttons.hand === "left" ? "settings.decisionButtons.left" : "settings.decisionButtons.right",
+  );
+  const buttonsSummary = buttons.oneHanded
+    ? t("settings.decisionButtons.withOneHanded", { hand: handName })
+    : handName;
   const { version, commit } = buildInfo();
   const signedIn = session.status === "signed-in";
   const consents = useConsentStates();
@@ -123,6 +131,13 @@ export function SettingsScreen() {
               summary: descriptionsSummary,
               value: descriptionsSummary,
               onPress: open("/settings/photo-descriptions"),
+            },
+            {
+              key: "decisionButtons",
+              title: t("settings.decisionButtons.label"),
+              summary: buttonsSummary,
+              value: buttonsSummary,
+              onPress: open("/settings/decision-buttons"),
             },
           ]}
         />

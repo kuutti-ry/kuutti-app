@@ -6,6 +6,7 @@ import * as Updates from "expo-updates";
 import { ChatLiveProvider } from "@/features/chat";
 import { SessionProvider, SignedOutToStart } from "@/features/identity";
 import { ScreenReaderHint } from "@/features/settings";
+import { DecisionButtonsProvider } from "@/lib/decision-buttons";
 import { LocaleProvider } from "@/lib/locale";
 import { PhotoDescriptionsProvider } from "@/lib/photo-descriptions";
 import { sentryOptions } from "@/lib/sentry";
@@ -21,21 +22,23 @@ function RootLayout() {
     <LocaleProvider>
       <ThemeProvider>
         <PhotoDescriptionsProvider>
-          <SessionProvider>
-            {/* The chat's socket while signed in and in front (#349). */}
-            <ChatLiveProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: "transparent" },
-                }}
-              />
-              <StatusBar style="auto" />
-              <SignedOutToStart />
-              {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
-              <ScreenReaderHint />
-            </ChatLiveProvider>
-          </SessionProvider>
+          <DecisionButtonsProvider>
+            <SessionProvider>
+              {/* The chat's socket while signed in and in front (#349). */}
+              <ChatLiveProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: "transparent" },
+                  }}
+                />
+                <StatusBar style="auto" />
+                <SignedOutToStart />
+                {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
+                <ScreenReaderHint />
+              </ChatLiveProvider>
+            </SessionProvider>
+          </DecisionButtonsProvider>
         </PhotoDescriptionsProvider>
       </ThemeProvider>
     </LocaleProvider>

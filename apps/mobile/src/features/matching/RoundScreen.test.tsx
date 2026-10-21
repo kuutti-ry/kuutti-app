@@ -1031,6 +1031,122 @@ describe("a round left open past midnight", () => {
   });
 });
 
+describe("where the decision buttons sit (#82)", () => {
+  const KEY = "kuutti.preference.decisionButtons";
+  const STRANGERS: RoundResponse = { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")] };
+  const CONTROLS = ["Undo your last decision", "Send a fish", "Pass", "Like"];
+  /** The round's own controls, in the order a screen reader meets them. */
+  const controls = () =>
+    screen
+      .getAllByRole("button")
+      .map((button) => button.props.accessibilityLabel as string)
+      .filter((label) => CONTROLS.includes(label));
+  const column = () => screen.queryByTestId("round-one-handed");
+  /** Whether a control is inside the one-handed column. */
+  const inColumn = (name: string) => {
+    for (let node = screen.getByRole("button", { name }).parent; node; node = node.parent) {
+      if (node.props.testID === "round-one-handed") return true;
+    }
+    return false;
+  };
+  const placed = async (choice: object | null) => {
+    if (choice) store.set(KEY, JSON.stringify(choice));
+    api(undefined, STRANGERS);
+    await show();
+    await settle();
+  };
+
+  it("places Pass at the left and Like at the right for the right hand, the default, with the fish above on the right", async () => {
+    await placed(null);
+    expect(controls()).toEqual(["Send a fish", "Pass", "Like"]);
+    expect(column()).toBeNull();
+    expect(screen.getByRole("button", { name: "Send a fish" }).props.className).toMatch(
+      /\bself-end\b/,
+    );
+    await press("Pass");
+    // Undo stays in the header, above the card, as before.
+    expect(controls()).toEqual(["Undo your last decision", "Send a fish", "Pass", "Like"]);
+    expect(inColumn("Undo your last decision")).toBe(false);
+    noProblems();
+  });
+
+  it("mirrors them for the left hand: Like at the left, Pass at the right, the fish on the left", async () => {
+    await placed({ hand: "left" });
+    expect(controls()).toEqual(["Send a fish", "Like", "Pass"]);
+    expect(screen.getByRole("button", { name: "Send a fish" }).props.className).toMatch(
+      /\bself-start\b/,
+    );
+    // Each keeps its own shape: Like the pill, Pass the rectangle.
+    expect(screen.getByRole("button", { name: "Like" }).props.className).toMatch(
+      /\brounded-full\b/,
+    );
+    expect(screen.getByRole("button", { name: "Pass" }).props.className).toMatch(/\brounded-md\b/);
+    noProblems();
+  });
+
+  it.each([
+    ["right", /\bself-end\b/],
+    ["left", /\bself-start\b/],
+  ] as const)(
+    "puts Undo, the fish, Pass and Like in one column on the %s, one-handed, Undo down from the header",
+    async (hand, side) => {
+      await placed({ hand, oneHanded: true });
+      expect(column()?.props.className).toMatch(side);
+      expect(controls()).toEqual(["Send a fish", "Pass", "Like"]);
+      await press("Pass");
+      expect(controls()).toEqual(["Undo your last decision", "Send a fish", "Pass", "Like"]);
+      for (const name of CONTROLS) expect(inColumn(name)).toBe(true);
+      noProblems();
+      // And it still undoes.
+      await press("Undo your last decision");
+      expect(heading("Katja, 32")).toBeTruthy();
+    },
+  );
+
+  it.each([
+    ["right", /\bself-end\b/],
+    ["left", /\bself-start\b/],
+  ] as const)(
+    "keeps Undo at the thumb on the %s, one-handed, after the round's last decision, and it still takes it back",
+    async (hand, side) => {
+      store.set(KEY, JSON.stringify({ hand, oneHanded: true }));
+      api(undefined, { day: DAY, entries: [entry(2, "Katja")] });
+      await show();
+      await settle();
+      await press("Pass");
+      expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+      expect(controls()).toEqual(["Undo your last decision"]);
+      expect(inColumn("Undo your last decision")).toBe(true);
+      expect(column()?.props.className).toMatch(side);
+      noProblems();
+      await press("Undo your last decision");
+      expect(heading("Katja, 32")).toBeTruthy();
+      expect(
+        screen.getByText("You passed on this person. You can change that until midnight."),
+      ).toBeTruthy();
+    },
+  );
+
+  it("shows no Undo, one-handed, at a round's end with nothing to take back", async () => {
+    store.set(KEY, JSON.stringify({ oneHanded: true }));
+    api(undefined, { day: DAY, entries: [entry(2, "Katja", "matches_filters", "pass")] });
+    await show();
+    await settle();
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+    expect(controls()).toEqual([]);
+    expect(column()).toBeNull();
+  });
+
+  it("leaves the fish out of the column on a card that answers a like", async () => {
+    store.set(KEY, JSON.stringify({ oneHanded: true }));
+    api(undefined, { day: DAY, entries: [entry(1, "Henna", "liked_you")] });
+    await show();
+    await settle();
+    expect(controls()).toEqual(["Pass", "Like"]);
+    expect(inColumn("Like")).toBe(true);
+  });
+});
+
 describe("the short pool (#99, ADR-042)", () => {
   const RELAXATIONS = `/rounds/${DAY}/relaxations`;
   const offered = {

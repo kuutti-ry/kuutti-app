@@ -28,6 +28,7 @@ import RoundRoute from "../app/round";
 import AccountSettingsRoute from "../app/settings/account";
 import ConsentRoute from "../app/settings/consent/[kind]";
 import ContactsSettingsRoute from "../app/settings/contacts";
+import DecisionButtonsRoute from "../app/settings/decision-buttons";
 import DeviceRoute from "../app/settings/device";
 import EmailSettingsRoute from "../app/settings/email";
 import FeedbackRoute from "../app/settings/feedback";
@@ -133,6 +134,7 @@ jest.mock("@/features/settings", () => {
     LegalScreen: probe("LegalScreen"),
     legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
     LicensesScreen: probe("LicensesScreen"),
+    DecisionButtonsScreen: probe("DecisionButtonsScreen"),
     PhotoDescriptionsScreen: probe("PhotoDescriptionsScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
     SettingsScreen: probe("SettingsScreen"),
@@ -192,6 +194,7 @@ describe("the screens without params", () => {
     ["/settings/source", SourceRoute, "SourceScreen"],
     ["/settings/theme", ThemeRoute, "ThemeScreen"],
     ["/settings/photo-descriptions", PhotoDescriptionsRoute, "PhotoDescriptionsScreen"],
+    ["/settings/decision-buttons", DecisionButtonsRoute, "DecisionButtonsScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);
