@@ -91,9 +91,10 @@ function rateLimited(response: Response): boolean {
  * for the rate, whether as a 429 or as a start sent back with
  * error=auth_rate_limited. The personas' own calls are counted per person and
  * leave the address's count (ADR-026 §2); what a reset spends of its address
- * is its starts, some eight of the sign-in doors' sixty a minute in
- * development (§4, §5), so about the eighth reset within one minute would
- * otherwise stop half way.
+ * is its starts, nineteen of the sign-in doors' sixty a minute in
+ * development (§4, §5), and the requests before a persona is signed in, about
+ * seventy of the address's window, so a second reset within one minute would
+ * otherwise stop half way (docs/demo/runbook.md).
  */
 async function patient(context: BankContext, input: URL, init?: RequestInit): Promise<Response> {
   const first = await context.fetch(input, init);

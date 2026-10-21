@@ -1,11 +1,12 @@
 /**
- * Returns the nineteen personas to where they begin (#73, ADR-014 §12; on
+ * Returns the twenty-four personas to where they begin (#73, ADR-014 §12; on
  * staging #141, ADR-018): everybody erased through the erasure path and
- * forgotten, then the thirteen with a history given it anew, with their
- * conversations (#348).
+ * forgotten, then the eighteen with a history given it anew, with their
+ * conversations (#348) and, once the gates are counted, Iida's round for the
+ * day (#379).
  *
  *   pnpm demo:reset                  reset, then the histories
- *   pnpm demo:reset -- --bare        reset only: all nineteen are newcomers
+ *   pnpm demo:reset -- --bare        reset only: all twenty-four are newcomers
  *   pnpm demo:reset -- --api http://localhost:3000
  *   pnpm demo:reset -- --objects-lost   although the store does not hold the photos
  *   node dist/demo-reset.js --env staging   inside the API's container on staging
@@ -49,6 +50,7 @@ import {
   giveConversations,
   giveHistory,
   givePhotoMessages,
+  giveRounds,
   type HistoryResult,
   viaRoutes,
 } from "./demo/histories.ts";
@@ -96,8 +98,17 @@ if (envArg !== undefined && process.env.APP_ENV !== undefined && envArg !== proc
   fail(`refusing: --env is "${envArg}" and APP_ENV is "${process.env.APP_ENV}"`);
 }
 
-/** The counter and the gates after the people changed: the same two steps locally and on staging. */
-async function recount(pool: ReturnType<typeof createPool>, logger: Logger, now: () => Date) {
+/**
+ * The counter and the gates after the people changed, then the round of the
+ * stories, which needs the gates counted (#379): the same steps locally and
+ * on staging.
+ */
+async function recount(
+  pool: ReturnType<typeof createPool>,
+  logger: Logger,
+  now: () => Date,
+  results: readonly HistoryResult[],
+) {
   // The ponds have other people in them now: the counter of #54 is counted
   // anew, as after a write of the population (demo-population.ts says why).
   await pool.query("DELETE FROM waitlist_snapshot");
@@ -106,6 +117,9 @@ async function recount(pool: ReturnType<typeof createPool>, logger: Logger, now:
   // And the gates (#94): who is let into each pond, and for whom matching is open.
   const gates = await countGates({ db: pool, logger, now });
   console.log(JSON.stringify({ msg: "demo reset: gates counted", ...gates }));
+  if (results.length === 0) return;
+  const rounds = await giveRounds({ db: pool, logger, now }, results);
+  console.log(JSON.stringify({ msg: "demo reset: rounds", ...rounds }));
 }
 
 function sparedOrThrow(reset: ResetResult): void {
@@ -212,6 +226,7 @@ async function localReset(): Promise<void> {
     });
     console.log(JSON.stringify({ msg: "demo reset: personas forgotten", ...reset }));
 
+    const results: HistoryResult[] = [];
     if (!bare) {
       // The release's pictures, where the cache holds them (#142): the faces of the stories and the queue's negatives.
       const assets = loadAssets();
@@ -225,7 +240,6 @@ async function localReset(): Promise<void> {
         db: pool,
         ...(assets ? { assets } : {}),
       });
-      const results: HistoryResult[] = [];
       for (const history of PERSONA_HISTORIES) {
         if (reset.spared.includes(history.key)) continue;
         const given = await giveHistory(history, writer);
@@ -241,7 +255,7 @@ async function localReset(): Promise<void> {
       );
       console.log(JSON.stringify({ msg: "demo reset: photos in conversations", ...photos }));
     }
-    await recount(pool, logger, now);
+    await recount(pool, logger, now, results);
     sparedOrThrow(reset);
   } finally {
     await pool.end();
@@ -283,6 +297,7 @@ async function stagingReset(): Promise<void> {
       personas,
     });
     console.log(JSON.stringify({ msg: "demo reset: personas forgotten", ...reset }));
+    let results: HistoryResult[] = [];
     if (!bare) {
       // As the stories job: without an object store, no pictures, and the line says why.
       const assets = media.deps ? loadAssets() : null;
@@ -301,7 +316,7 @@ async function stagingReset(): Promise<void> {
         media: media.deps,
         ...(assets ? { assets } : {}),
       });
-      const results = await giveStories(writer, reset.spared);
+      results = await giveStories(writer, reset.spared);
       for (const given of results) {
         console.log(JSON.stringify({ msg: "demo reset: history", ...given }));
       }
@@ -314,7 +329,7 @@ async function stagingReset(): Promise<void> {
       );
       console.log(JSON.stringify({ msg: "demo reset: photos in conversations", ...photos }));
     }
-    await recount(pool, logger, now);
+    await recount(pool, logger, now, results);
     sparedOrThrow(reset);
   } finally {
     await pool.end();

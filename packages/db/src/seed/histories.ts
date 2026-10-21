@@ -2,7 +2,7 @@ import type { Gender, ProfileUpdate } from "@kuutti/schema";
 import { DEMO_PERSONAS, type DemoPersona } from "./personas.ts";
 
 /**
- * What the thirteen personas "with a history" have done before the demo begins
+ * What the eighteen personas "with a history" have done before the demo begins
  * (#73, ADR-014 §12). The ages follow the codes of Telia's test persons
  * (#140), and each age window holds its persona's own age (a test says so).
  * Data only: `pnpm demo:reset` gives a persona its history by logging it in
@@ -343,6 +343,127 @@ export const PERSONA_HISTORIES: readonly PersonaHistory[] = [
       prompts: [],
     },
     photos: 0,
+    afterwards: "nothing",
+  },
+  // The round's cast (#379): five women who seek women, so that each is let
+  // in at once (ADR-015 §10: seeking one's own gender is no contest), all in
+  // each other's pool both ways and in no other persona's (a test says so):
+  // 36 and 37, above the report's pair's windows and below Kerttu.
+  // Iida's round holds the other four, Henna first, who liked her yesterday
+  // (rounds.ts). Complete profiles: the release's faces of them (#142).
+  {
+    key: "iida",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 34, max: 44 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Iida",
+      bio: "Farmaseutti, joka pyöräilee töihin ympäri vuoden ja leipoo viikonloppuisin ruisleipää. Laulan kuorossa ja kaipaan jotakuta, jonka kanssa jakaa hitaat aamut.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["cycling", "baking", "making_music"],
+      },
+      prompts: [],
+    },
+    photos: 3,
+    afterwards: "nothing",
+  },
+  {
+    key: "henna",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 34, max: 44 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Henna",
+      bio: "Meribiologi, joka viettää kesät kajakissa saariston reunalla. Talvella kirjoitan raportteja ja haaveilen kesästä. Etsin jotakuta, joka tulee mukaan aamuvarhain.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "sv", "en"],
+        intent: "long_term",
+        hobbies: ["sailing", "swimming", "baking"],
+      },
+      prompts: [],
+    },
+    photos: 2,
+    afterwards: "nothing",
+  },
+  {
+    key: "katja",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 34, max: 45 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Katja",
+      bio: "Musiikinopettaja ja sellisti, jonka koira vie lenkille säällä kuin säällä. Metsässä hiljenen, konsertissa en. Etsin jotakuta, joka nauttii molemmista.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi", "en"],
+        intent: "long_term",
+        hobbies: ["making_music", "dogs", "forest_walks"],
+      },
+      prompts: [],
+    },
+    photos: 2,
+    afterwards: "nothing",
+  },
+  {
+    key: "minna",
+    locale: "en",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 34, max: 42 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Minna",
+      bio: "Game designer by day, winter runner by choice. I make a very good chai and a passable pulla. Looking for someone to explore new cafés with.",
+      bioPreset: null,
+      fields: {
+        languages: ["en", "fi"],
+        intent: "open_to_either",
+        hobbies: ["running", "video_games", "coffee"],
+      },
+      prompts: [],
+    },
+    photos: 2,
+    afterwards: "nothing",
+  },
+  {
+    key: "riikka",
+    locale: "fi",
+    onboarding: {
+      gender: "woman",
+      seeks: ["woman"],
+      ageWindow: { min: 35, max: 45 },
+      pond: "paakaupunkiseutu",
+    },
+    profile: {
+      displayName: "Riikka",
+      bio: "Puuseppä, joka korjaa vanhoja huonekaluja ja keittää parhaan lohikeiton, jonka tiedän. Viikonloppuisin kirpputoreilla. Etsin jotakuta, jolla on aikaa jutella.",
+      bioPreset: null,
+      fields: {
+        languages: ["fi"],
+        intent: "long_term",
+        hobbies: ["diy", "cooking", "sauna"],
+      },
+      prompts: [],
+    },
+    photos: 2,
     afterwards: "nothing",
   },
 ];

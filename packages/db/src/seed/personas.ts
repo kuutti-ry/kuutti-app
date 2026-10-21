@@ -1,7 +1,7 @@
 import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
 
 /**
- * The people of the mock bank (#73, #140, ADR-014): nineteen named persons the
+ * The people of the mock bank (#73, #140, ADR-014): twenty-four named persons the
  * local identity provider can log in as with one tap, so that a demo or a
  * test of the first ten minutes does not start with typing claims into a
  * form. The whole product path runs for them as for anybody: the OIDC
@@ -16,13 +16,16 @@ import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
  * broker sends it, and is stored nowhere; what the app calls the persona is
  * the display name the story gives.
  *
- * Six more are born on a fixed day and exist at the mock bank only: Antti
+ * Eleven more are born on a fixed day and exist at the mock bank only: Antti
  * and Ville, the pair of the chat's flows (#348, #101), Elina and Jussi, the
  * pair of the contact share's flow (#103), and Laura and Emmi, the pair of
  * the report's flow (#351), each pair with a conversation of its own so that
- * no flow changes what another reads. Every test user of the bed whose code
- * the product's parser accepts is a persona already (docs/vendors/telia.md
- * 1.4), so nobody signs in as them on staging (the maintainer's choices of
+ * no flow changes what another reads; and the round's cast (#379): Iida, as
+ * whom the round's flow signs in, and the four people of her round, Henna,
+ * Katja, Minna and Riikka, who are cards and nothing more: no flow and no
+ * demo signs in as them. Every test user of the bed whose code the
+ * product's parser accepts is a persona already (docs/vendors/telia.md 1.4),
+ * so nobody signs in as them on staging (the maintainer's choices of
  * 17/10/2026 and 18/10/2026, ADR-014 §4); their stories are given there as
  * anywhere.
  *
@@ -70,10 +73,11 @@ export type DemoPersona = {
   born: FixedBirth | RelativeBirth;
   /** 900 to 999: artificial, not given to a person by the population register. */
   individual: number;
-  group: "walkthrough" | "history" | "ages";
+  /** `cards`: people a round shows and nobody signs in as (#379); off the page's list of names. */
+  group: "walkthrough" | "history" | "ages" | "cards";
   /** What the persona is for, shown under the name. */
   note: string;
-  /** Where the same person is on Telia's bed; absent for the ages and the three pairs of the conversations, who exist at the mock bank only. */
+  /** Where the same person is on Telia's bed; absent for the ages, the three pairs of the conversations and the round's cast, who exist at the mock bank only. */
   bank?: TestBank;
 };
 
@@ -232,6 +236,51 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     individual: 967,
     group: "history",
     note: "Onboarded without photos: a conversation with Laura, which the report's flow ends; she finds it ended and can still report it (#351).",
+  },
+  {
+    key: "iida",
+    given: "Iida",
+    family: "Mattila",
+    born: { year: 1990, month: 3, day: 11 },
+    individual: 968,
+    group: "history",
+    note: "Onboarded, with a complete profile: her gate open and a round for the day, four cards, the first of them Henna, who liked her. The round's flow likes, passes, likes back and blocks as her (#379).",
+  },
+  {
+    key: "henna",
+    given: "Henna",
+    family: "Laaksonen",
+    born: { year: 1989, month: 5, day: 27 },
+    individual: 969,
+    group: "cards",
+    note: "A card in Iida's round: she liked Iida yesterday, so she comes first, and Iida's like back is a match.",
+  },
+  {
+    key: "katja",
+    given: "Katja",
+    family: "Rautio",
+    born: { year: 1989, month: 11, day: 19 },
+    individual: 970,
+    group: "cards",
+    note: "A card in Iida's round.",
+  },
+  {
+    key: "minna",
+    given: "Minna",
+    family: "Peltonen",
+    born: { year: 1990, month: 1, day: 8 },
+    individual: 971,
+    group: "cards",
+    note: "A card in Iida's round.",
+  },
+  {
+    key: "riikka",
+    given: "Riikka",
+    family: "Kivelä",
+    born: { year: 1989, month: 8, day: 30 },
+    individual: 972,
+    group: "cards",
+    note: "A card in Iida's round.",
   },
   {
     key: "eetu",

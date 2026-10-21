@@ -6,9 +6,12 @@ import {
   MOCK_BANK_AMR,
   OLDER_TERMS_VERSION,
   PERSONA_CONVERSATIONS,
+  PERSONA_ROUNDS,
   type PersonaHistory,
   personaOf,
+  type RoundsResult,
   writeConversations,
+  writeRounds,
 } from "@kuutti/db/demo";
 import type { AuthExchangeResponse } from "@kuutti/schema";
 import {
@@ -21,6 +24,7 @@ import {
   SessionResponse,
 } from "@kuutti/schema";
 import { sendPhoto } from "../../src/chat/index.ts";
+import { type BuilderDeps, buildRoundOf } from "../../src/jobs/round-builder.ts";
 import type { Logger } from "../../src/lib/logger.ts";
 import type { MediaDeps } from "../../src/media/index.ts";
 import { applySanction } from "../../src/safety/index.ts";
@@ -312,9 +316,35 @@ export async function giveHistory(
  * persona whose story ended in a refusal, or that was left alone, has none.
  */
 export function giveConversations(db: Queryable, results: readonly HistoryResult[], at: Date) {
+  return writeConversations(db, accountsOf(results), at);
+}
+
+/** The accounts the stories were given to, by persona key. */
+function accountsOf(results: readonly HistoryResult[]): Map<string, string> {
   const accounts = new Map<string, string>();
   for (const { key, accountId } of results) if (accountId) accounts.set(key, accountId);
-  return writeConversations(db, accounts, at);
+  return accounts;
+}
+
+/**
+ * The round of the stories (#379), after the gates are counted: Iida's gate
+ * opened and Henna's like of the day before (rows, `writeRounds`), then
+ * Iida's round for the day through the round builder (#95), as the night
+ * builds it, Henna first as liked you (ADR-037). `standing`: stories whose
+ * round for the day stands now, built here or before (the builder's answer).
+ */
+export async function giveRounds(
+  deps: BuilderDeps,
+  results: readonly HistoryResult[],
+): Promise<RoundsResult & { standing: number }> {
+  const accounts = accountsOf(results);
+  const written = await writeRounds(deps.db, accounts, deps.now());
+  let standing = 0;
+  for (const story of PERSONA_ROUNDS) {
+    const of = accounts.get(story.of);
+    if (of && (await buildRoundOf(deps, of))) standing += 1;
+  }
+  return { ...written, standing };
 }
 
 const HOUR_MS = 60 * 60 * 1000;

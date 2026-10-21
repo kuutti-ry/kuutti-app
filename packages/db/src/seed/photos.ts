@@ -15,7 +15,7 @@ import { createRandom } from "./rng.ts";
  * the real upload pipeline (rule 4).
  */
 export const PHOTOS_REPO = "kuutti-ry/kuutti-app-demo-photos";
-export const PHOTOS_RELEASE = "v2";
+export const PHOTOS_RELEASE = "v3";
 
 /** `persona:<key>` the persona's own set, `pool` a face of the population, `negative:<name>` a picture the check refuses. */
 export type AssetPurpose = `persona:${string}` | "pool" | `negative:${string}`;

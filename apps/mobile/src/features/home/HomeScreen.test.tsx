@@ -110,6 +110,30 @@ describe("HomeScreen", () => {
     expect(screen.queryByText(/more people are needed/)).toBeNull();
   });
 
+  it("leads to today's round from the gate card once matching is open, and not before (#379)", async () => {
+    await renderWithTheme(<HomeScreen />);
+    expect(
+      await screen.findByText("About 20 more people are needed before matching opens for you."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Today's round" })).toBeNull();
+
+    (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname === "/waitlist") return json(waitlist);
+      if (url.pathname === "/gate")
+        return json({ state: "open", within: null, needed: null, step: 10 });
+      return json({ error: { code: "not_found" } }, 404);
+    });
+    await renderWithTheme(<HomeScreen />);
+    const round = await screen.findByRole("button", { name: "Today's round" });
+    expect(screen.getByText("Matching is open for you.")).toBeTruthy();
+    await userEvent.setup().press(round);
+    expect(router.push).toHaveBeenCalledWith("/round");
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+  });
+
   it("says that it is checking while the status is in flight", async () => {
     mockGate = { status: "checking" };
     await renderWithTheme(<HomeScreen />);

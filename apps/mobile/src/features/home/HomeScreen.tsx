@@ -11,6 +11,7 @@ import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
+import { RoundButton } from "@/features/matching";
 import { Notices } from "@/features/notifications";
 import { GateCard, WaitlistCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
@@ -101,9 +102,10 @@ export function HomeScreen() {
           <View className="w-full max-w-md gap-4">
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
-            {/* How the person's own pond is filling up (#54), and where they stand themselves (#94). */}
+            {/* How the person's own pond is filling up (#54), and where they stand themselves (#94);
+                once matching is open, the way to today's round (#379). */}
             {gate.pond && <WaitlistCard pond={gate.pond} />}
-            {gate.pond && <GateCard />}
+            {gate.pond && <GateCard whenOpen={<RoundButton />} />}
             <Button
               variant="outline"
               accessibilityLabel={t("profile.home.open")}

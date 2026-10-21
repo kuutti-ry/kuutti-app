@@ -1,8 +1,8 @@
 # The demo storyboard
 
-The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The same story runs in the simulator against the mock bank and on the staging phone against Telia's test banks; only the sign-in differs. `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
+The first ten minutes of Kuutti, shown with the demo personas (#144, ADR-014, ADR-018). The story runs in the simulator against the mock bank and, all but scene 5, on the staging phone against Telia's test banks; only the sign-in differs. Scene 5, the round, runs in the simulator only (#379; the scene says why). `runbook.md` says how to prepare either. What a screen says is quoted from the catalogue as of 09/10/2026 (English); the app follows the phone's language.
 
-The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
+The personas and their banks: `services/mock-idp/README.md`. Locally every persona is a button on the mock bank's page; on staging each persona of the other scenes is a test user of a bank (`docs/vendors/telia.md` 1.4), and the stories were written by the job of ADR-018.
 
 ## Scene 1: Aino signs in (2 min)
 
@@ -45,7 +45,22 @@ Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button
 - Home: "Matching is open for you."
 - "Your profile" → the eye, "See your card": the card as others see it (#150): the first photo, "Sanna, 49", "Woman", the pond, one prompt answer, the other photos, the fields that are information (languages named in the reader's language, "Something long-term", the hobbies, "171 cm"), nothing that is a setting or a soft preference.
 
-## Scene 5: The moderation queue (2 min)
+## Scene 5: Today's round (3 min)
+
+Locally only. Sign out and sign in as Iida Mattila (her button). She and the four women of her round exist at the mock bank only: on staging the job gives their stories and her round too, and nobody signs in as any of them there (ADR-018 §1), so this scene has no staging version. A round on staging for a persona of Telia's bed, whom the phone can sign in as, is the maintainer's open decision (ADR-014, Open 1). Her story is complete: a profile, three approved photos (release v3 of the pictures), and her gate opened by the stories, since four people are no pool the night's count would open a gate for (`gate_k`, ADR-015). The four women of her round, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida yesterday (#379).
+
+Her round is right only on the Finnish day of the reset that built it. On a later day the builder makes her a round of Henna alone: Katja, Minna and Riikka were shown on the reset's day and wait out `shown_cooldown_days` (thirty, TD-12), and Henna's like still waits while Iida has not decided on her card (once she has, the round is empty). So the reset for this scene is run on the morning of the demo, and the morning's checks sign in as Iida (`runbook.md`).
+
+1. Home: "Matching is open for you." and under it "Today's round".
+2. The first card is Henna's, labelled "Liked you": a like waits first in the round, and never unlabelled (ADR-037). Like and Pass are buttons at the bottom, never a swipe: Pass an outlined rectangle at the left, Like a filled pill at the right, each with its word. On her card there is no fish: a fish would only answer her like.
+3. Like: "It's a match", and "Go to the conversation" opens it, empty but for the composer (ADR-038). Back returns to the round.
+4. The next card says "Matches your filters". Show "Send a fish" above Like and Pass: a like with a mark, first in the other person's round, few in a rolling window (ADR-039). Pass, then Undo in the header: the card comes back with "You passed on this person. You can change that until midnight." (ADR-034 §5). Like.
+5. The third card: "Block or report" beside the name, the same dialog as anywhere (ADR-030 §11). Report and block, a reason, a few words, Send report; Done, and the card is gone.
+6. The last card, then "That was today's round. The next one comes tomorrow." No count, no countdown, nothing loads more.
+
+Which of Katja, Minna and Riikka comes when is the day's order (the soft matches, ties by a hash of the day, ADR-035), so tell it by the cards, not by a script. Once a release carries faces for the population's pool (v2 has none), a population with faces written before the reset may put women of it whom Iida's pool takes in among them, and into her later rounds too. A match and a report are final: `pnpm demo:reset` gives Iida her round anew, for the day it runs.
+
+## Scene 6: The moderation queue (2 min)
 
 Noa Salmi's story uploaded two faces and four more pictures for the check (#142): no face, several people, text, and one whose EXIF carried a location (which the pipeline stripped, so it is a face like any other). On staging the check decides all of them itself (ADR-006 §2, #206, #253): the landscape, the page of text and the group picture are rejected with the reason in words, the faces and the EXIF one approved, and the queue stays empty, which is the point. Locally, where the check queues everything, the queue holds all but her first face: show the queue there.
 
@@ -53,14 +68,14 @@ Noa Salmi's story uploaded two faces and four more pictures for the check (#142)
 2. The queue lists Noa's pictures: what the check saw (labels, faces), the picture, "Approve" and "Reject" with a reason from the list (no person, several people, text with contact details, and so on). Reject the one without a face as "no person".
 3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your profile" → "Photos" shows the rejection with its reason in her language; on staging her three pictures say the same kind of thing without anybody having looked ("A profile photo has to show you", "A profile photo shows you alone"). On staging her card shows her faces and the EXIF one, and her profile is complete; locally her card shows the one approved face and the gate says her profile still lacks something (one of two).
 
-## Scene 6: Refusals (1 min)
+## Scene 7: Refusals (1 min)
 
 Two logins the product refuses, by the code that refuses anybody (TD-7).
 
 - Ilona Öhman (locally her button; on staging Aktia, prefilled): she deleted her account in her story. The sign-in says "You deleted your account recently. The earliest day for a new one: …" with the day thirty days after her story was written, as d.M.yyyy (#150).
 - Tapio Heikkinen (locally his button; on staging OP, prefilled): banned. "This person may not use Kuutti."
 
-## Scene 7: The person's data (1 min)
+## Scene 8: The person's data (1 min)
 
 As Aino again: Settings → the account card.
 
@@ -71,4 +86,4 @@ Then `pnpm demo:reset` (locally) or the reset in the container (staging): everyb
 
 ## What is deliberately not shown
 
-No swipes, no scores, no streaks, no "people who liked you", no feed (CLAUDE.md, Product constraints). Rounds and likes are the Match milestone, chat the Chat milestone; the demo ends at the gate.
+No swipes, no scores, no streaks, no list of "people who liked you" (a like shows as a labelled card in the round, nothing more), no feed, no count of cards or likes (CLAUDE.md, Product constraints).

@@ -1,0 +1,256 @@
+import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
+import type { RoundChoice, RoundReason } from "@kuutti/schema";
+import { useFocusEffect, useRouter } from "expo-router";
+import Fish from "lucide-react-native/icons/fish";
+import Heart from "lucide-react-native/icons/heart";
+import Undo2 from "lucide-react-native/icons/undo-2";
+import X from "lucide-react-native/icons/x";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AccessibilityInfo, Platform, ScrollView, type Text as TextNode, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LoadFailed } from "@/components/LoadFailed";
+import { ScreenHeader } from "@/components/ScreenHeader";
+import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+import { Text } from "@/components/ui/text";
+import { ProfileCardView } from "@/features/profile";
+import { useT } from "@/lib/locale";
+import { useHapticTap } from "@/theme/haptics";
+import { type RoundCard, type RoundNotice, useRound } from "./useRound";
+
+/** Why a card is in the round, in words (TD-12): the label every card carries, never a score. */
+const REASON: Readonly<Record<RoundReason, PlainMessageKey>> = {
+  matches_filters: "round.reason.matches_filters",
+  liked_you: "round.reason.liked_you",
+  seen_before: "round.reason.seen_before",
+  relaxed: "round.reason.relaxed",
+  fish: "round.reason.fish",
+};
+
+/** The line above a card Undo brought back, by the decision it holds (ADR-034 §5). */
+const REVISIT: Readonly<Record<RoundChoice, PlainMessageKey>> = {
+  like: "round.revisit.like",
+  pass: "round.revisit.pass",
+  fish: "round.revisit.fish",
+};
+
+/** A card that answers somebody's like takes a like back, never a fish (ADR-039 §2). */
+const ANSWERS_A_LIKE: ReadonlySet<RoundReason> = new Set(["liked_you", "fish"]);
+
+/**
+ * Today's round (#379, ADR-034): one card at a time through the card others
+ * see (#47), with why it is there above it, and Block or report on it
+ * (ADR-030 §11). Like and pass are buttons at the bottom, never a swipe: pass
+ * an outlined rectangle at the left, like a filled pill at the right, each
+ * with its word and its icon, no red and green; the fish (#378), a like with
+ * a mark, a filled rounded square above them, on a card that answers nobody's
+ * like; #82 makes the places configurable. Undo in the header brings the
+ * last card back. A like that
+ * makes a match says so and leads to the conversation. The end of the round,
+ * an empty one and one not built say to come back tomorrow, with no count
+ * and no countdown, and nothing loads more.
+ *
+ * As a card, the end or a match takes the place of what had the focus, the
+ * screen reader is taken to its first line; a notice is spoken where it
+ * appears, under the header, in sight however far the card was scrolled.
+ */
+export function RoundScreen() {
+  const { t, locale } = useT();
+  const router = useRouter();
+  const tap = useHapticTap();
+  const round = useRound();
+  const { view, current, notice, match } = round;
+  // A photo URL the API refused (the day's photos, #52), for the card it was
+  // refused on, by its day and place: a new day's card there starts without it.
+  const [refused, setRefused] = useState<{ day: string; position: number; code: string } | null>(
+    null,
+  );
+
+  // The conversation is pushed over the round, which stays mounted under it:
+  // the match stays in front of the next card until the round is in sight
+  // again, so that card is neither shown nor reported seen meanwhile (ADR-034 §2).
+  const away = useRef(false);
+  const { closeMatch } = round;
+  useFocusEffect(
+    useCallback(() => {
+      if (!away.current) return;
+      away.current = false;
+      closeMatch();
+    }, [closeMatch]),
+  );
+
+  // Stable, so it runs as a line mounts rather than on every render.
+  const focus = useCallback((node: TextNode | null) => {
+    if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
+  }, []);
+  const say = (said: RoundNotice) =>
+    typeof said === "string"
+      ? t(said)
+      : t("round.fish.refused", {
+          date: formatDate(locale, said.fishAgain, { timeZone: "Europe/Helsinki" }),
+        });
+  const words = notice === null ? null : say(notice);
+  // iOS has no live regions; Android's speak the same words already.
+  useEffect(() => {
+    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
+  }, [words]);
+
+  const entries = view.status === "ready" ? view.round.entries : undefined;
+  const entry = current?.entry;
+  const choose = (card: RoundCard, decision: RoundChoice) => {
+    tap();
+    void round.choose(card, decision);
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-background">
+      <ScreenHeader
+        title={t("round.title")}
+        backLabel={t("round.back")}
+        onBack={() => router.back()}
+      >
+        {round.canUndo && (
+          <Button
+            variant="ghost"
+            accessibilityLabel={t("round.undo.label")}
+            onPress={() => {
+              tap();
+              round.undo();
+            }}
+          >
+            <Icon as={Undo2} />
+            <Text>{t("round.undo")}</Text>
+          </Button>
+        )}
+      </ScreenHeader>
+      {words !== null && (
+        <Text accessibilityLiveRegion="polite" className="px-6 pt-4">
+          {words}
+        </Text>
+      )}
+      {/* Keyed by the card, so each one starts at its top. */}
+      <ScrollView
+        key={match ?? entry?.position ?? "round"}
+        contentContainerClassName="flex-grow gap-4 p-6"
+      >
+        {view.status === "loading" && (
+          <Text accessibilityLiveRegion="polite">{t("round.loading")}</Text>
+        )}
+        {view.status === "failed" && (
+          <LoadFailed headline={t("round.failed")} error={view.error} onRetry={round.retry} />
+        )}
+        {view.status === "budget" && (
+          <Text ref={focus} accessibilityLiveRegion="polite">
+            {t("errors.card_budget_exceeded")}
+          </Text>
+        )}
+        {entries === null && <Text ref={focus}>{t("round.none")}</Text>}
+        {entries?.length === 0 && <Text ref={focus}>{t("round.empty")}</Text>}
+        {match !== null && (
+          <View className="gap-4">
+            <Text ref={focus} variant="h2" accessibilityLiveRegion="polite">
+              {t("round.match.title")}
+            </Text>
+            <Text>{t("round.match.body")}</Text>
+            <Button
+              onPress={() => {
+                tap();
+                away.current = true;
+                router.push(`/chats/${match}`);
+              }}
+            >
+              {t("round.match.open")}
+            </Button>
+            <Button
+              variant="outline"
+              onPress={() => {
+                tap();
+                round.closeMatch();
+              }}
+            >
+              {t("round.match.continue")}
+            </Button>
+          </View>
+        )}
+        {match === null && current && (
+          <View className="gap-3">
+            <Text
+              ref={focus}
+              variant="small"
+              className="self-start rounded-full bg-secondary px-3 py-1 text-secondary-foreground"
+            >
+              {t(REASON[current.entry.reason])}
+            </Text>
+            {current.entry.decision !== null && <Text>{t(REVISIT[current.entry.decision])}</Text>}
+            <ProfileCardView
+              card={current.entry.card}
+              // No block or report while a decision is on its way: one finishing
+              // after the next card took this one's place would never take the
+              // blocked person off, and Undo would bring them back (ADR-030 §11).
+              onGone={
+                round.busy ? undefined : () => round.drop(current.day, current.entry.position)
+              }
+              onRefused={(code) =>
+                setRefused({ day: current.day, position: current.entry.position, code: code ?? "" })
+              }
+            />
+            {refused?.day === current.day && refused.position === current.entry.position && (
+              <Text variant="muted" accessibilityLiveRegion="polite">
+                {t(
+                  refused.code === "photo_budget_exceeded"
+                    ? "photos.error.photo_budget_exceeded"
+                    : "photos.error.notShown",
+                )}
+              </Text>
+            )}
+          </View>
+        )}
+        {match === null && !entry && entries && entries.length > 0 && (
+          <Text ref={focus}>{t("round.done")}</Text>
+        )}
+      </ScrollView>
+      {match === null && current && (
+        <View className="gap-3 border-t border-border bg-background px-6 py-3">
+          {!ANSWERS_A_LIKE.has(current.entry.reason) && (
+            <Button
+              variant="secondary"
+              className="self-center rounded-lg"
+              disabled={round.busy}
+              accessibilityLabel={t("round.fish")}
+              accessibilityState={{ selected: current.entry.decision === "fish" }}
+              onPress={() => choose(current, "fish")}
+            >
+              <Icon as={Fish} />
+              <Text>{t("round.fish")}</Text>
+            </Button>
+          )}
+          <View className="flex-row gap-4">
+            <Button
+              variant="outline"
+              size="lg"
+              className="flex-1 rounded-md"
+              disabled={round.busy}
+              accessibilityLabel={t("round.pass")}
+              accessibilityState={{ selected: current.entry.decision === "pass" }}
+              onPress={() => choose(current, "pass")}
+            >
+              <Icon as={X} />
+              <Text>{t("round.pass")}</Text>
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1 rounded-full"
+              disabled={round.busy}
+              accessibilityLabel={t("round.like")}
+              accessibilityState={{ selected: current.entry.decision === "like" }}
+              onPress={() => choose(current, "like")}
+            >
+              <Icon as={Heart} />
+              <Text>{t("round.like")}</Text>
+            </Button>
+          </View>
+        </View>
+      )}
+    </SafeAreaView>
+  );
+}

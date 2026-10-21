@@ -25,6 +25,8 @@ import {
   NotArtificialError,
   REREGISTER_COOLDOWN_DAYS,
 } from "../../src/identity/index.ts";
+import { countGates } from "../../src/jobs/pond-gate.ts";
+import { finnishDay } from "../../src/lib/finnish-day.ts";
 import { staffSession } from "../../src/test/account.ts";
 import {
   captureLogger,
@@ -34,7 +36,7 @@ import {
   type TestContext,
   test,
 } from "../../src/test/harness.ts";
-import { giveConversations } from "./histories.ts";
+import { giveConversations, giveRounds } from "./histories.ts";
 import { resetPersonas } from "./reset.ts";
 import { giveStories, personaHashes, viaServices } from "./services.ts";
 
@@ -250,6 +252,11 @@ describe("the stories through the services", () => {
       ["jussi", "resumed"],
       ["laura", "resumed"],
       ["emmi", "resumed"],
+      ["iida", "resumed"],
+      ["henna", "resumed"],
+      ["katja", "resumed"],
+      ["minna", "resumed"],
+      ["riikka", "resumed"],
     ]);
     const after = await ctx.client.query<{ n: string }>("SELECT count(*) AS n FROM account");
     expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
@@ -378,6 +385,78 @@ describe("the stories through the services", () => {
       already: 0,
       missing: 0,
     });
+  });
+
+  test("leave Iida a round for the day, Henna first, who liked her the day before, and a second run changes nothing (#379)", async ({
+    ctx,
+  }) => {
+    const { logger, writer, now } = await world(ctx);
+    const results = await giveStories(writer);
+    const account = (key: string) => {
+      const id = results.find((r) => r.key === key)?.accountId;
+      if (!id) throw new Error(`no account for ${key}`);
+      return id;
+    };
+    const cast = ["iida", "henna", "katja", "minna", "riikka"].map(account);
+    // The release's faces are no part of a test: two approved photos each, as
+    // the loader leaves them where a moderator approves (#142).
+    await ctx.client.query(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       SELECT id, md5(id::text || n::text), 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved', n
+         FROM unnest($1::uuid[]) AS id, generate_series(0, 1) n`,
+      [cast],
+    );
+    // Before the count Iida is not let in: her gate stays shut (the guard on
+    // `admitted_at`) and the builder refuses a round behind a shut gate. Iida
+    // alone, so Henna is missing and her like waits for the commands' call.
+    const iidaOnly = results.filter((r) => r.key === "iida");
+    expect(await giveRounds({ db: ctx.client, logger, now }, iidaOnly)).toEqual({
+      opened: 0,
+      liked: 0,
+      already: 0,
+      missing: 1,
+      standing: 0,
+    });
+    // The commands' order: the gates counted, then one call, which opens the
+    // gate, writes the like and builds the round on it.
+    await countGates({ db: ctx.client, logger, now });
+    expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
+      opened: 1,
+      liked: 1,
+      already: 0,
+      missing: 0,
+      standing: 1,
+    });
+
+    const { rows } = await ctx.client.query<{ candidate_id: string; reason: string }>(
+      `SELECT e.candidate_id, e.reason FROM rounds r JOIN round_entries e ON e.round_id = r.id
+        WHERE r.account_id = $1 AND r.day = $2 ORDER BY e.position`,
+      [account("iida"), finnishDay(now())],
+    );
+    // Henna's like waits first (ADR-037); the other three as anybody's cards, in the order of the soft matches.
+    expect(rows[0]).toEqual({ candidate_id: account("henna"), reason: "liked_you" });
+    expect(rows.slice(1).map((r) => r.reason)).toEqual([
+      "matches_filters",
+      "matches_filters",
+      "matches_filters",
+    ]);
+    expect(new Set(rows.slice(1).map((r) => r.candidate_id))).toEqual(
+      new Set(["katja", "minna", "riikka"].map(account)),
+    );
+
+    // Staging's job runs again without a reset: the round and the like stay as they were.
+    expect(await giveRounds({ db: ctx.client, logger, now }, results)).toEqual({
+      opened: 0,
+      liked: 0,
+      already: 1,
+      missing: 0,
+      standing: 1,
+    });
+    const after = await ctx.client.query(
+      "SELECT count(*)::int AS n FROM rounds WHERE account_id = $1",
+      [account("iida")],
+    );
+    expect(after.rows).toEqual([{ n: 1 }]);
   });
 
   test("the lines carry keys and counts, never a code, a name or whom one seeks", async ({
