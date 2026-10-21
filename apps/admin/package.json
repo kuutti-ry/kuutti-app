@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/admin",
-  "version": "0.54.3",
+  "version": "0.55.0",
   "private": true,
   "type": "module",
   "description": "Moderation panel. Vite + React, a static build behind CloudFront at admin.<domain>, previews under /pr-<n>/ (ADR-025).",
