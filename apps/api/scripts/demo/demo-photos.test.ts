@@ -112,7 +112,9 @@ describe("the stories' photos in their conversations (#350)", () => {
   }) => {
     const assets = await release();
     const { writer, store, media, logger } = await world(ctx, assets);
-    const results = await giveStories(writer);
+    // The round's cast (#379) has no conversation: its eleven faces through
+    // the pipeline would only spend the test's time.
+    const results = await giveStories(writer, ["iida", "henna", "katja", "minna", "riikka"]);
     await giveConversations(ctx.client, results, new Date());
     const story = PERSONA_CONVERSATIONS.find((c) => c.photo)?.photo;
     if (!story) throw new Error("no story with a photo");
@@ -211,7 +213,9 @@ describe("the stories with their pictures", () => {
     const again = await giveStories(writer);
     expect(again.every((r) => r.photos === 0)).toBe(true);
     expect(await photosOf(ctx, "noa")).toHaveLength(6);
-  });
+    // Every story's pictures through sharp, the round's cast's eleven too
+    // (#379): about thirteen seconds under CI's coverage, over the default.
+  }, 60_000);
 
   test("the look a moderator gives, locally: the faces named are approved, the rest and other accounts untouched", async ({
     ctx,
