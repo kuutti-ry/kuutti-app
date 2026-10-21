@@ -96,11 +96,14 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - tapOn:
     below: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
     above: "Send report|Lähetä ilmoitus|Skicka anmälan"
-- inputText: "Kysyi heti puhelinnumeroani"
-# A tap on the label, which is no button, closes the keyboard (README).
+- inputText: "Kysyi numeroa"
+# A tap on the label, which is no button, closes the keyboard (README). The
+# field carries the label's words as its name, so the label is the first of
+# the two: found by what was typed, it was not, since a simulator's keyboard
+# can garble a long word as it is typed (a run of 21/10/2026).
 - tapOn:
     text: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
-    above: "(.* )?puhelinnumeroani"
+    index: 0
 - tapOn: "Send report|Lähetä ilmoitus|Skicka anmälan"
 - extendedWaitUntil:
     visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
