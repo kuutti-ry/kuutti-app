@@ -25,7 +25,7 @@ import {
   wellKnownRoutes,
 } from "./identity/index.ts";
 import { gateOf } from "./jobs/pond-gate.ts";
-import { buildRoundOf } from "./jobs/round-builder.ts";
+import { buildRoundOf, relaxationOffers, relaxedCandidates } from "./jobs/round-builder.ts";
 import { requireAdmin } from "./lib/admin-middleware.ts";
 import { requireSession } from "./lib/auth-middleware.ts";
 import type { Config } from "./lib/config.ts";
@@ -53,12 +53,14 @@ import {
   accountAdminRoutes,
   auditAdminRoutes,
   checkFirstMessage,
+  checkPhotoFetches,
   configAdminRoutes,
   feedbackAdminRoutes,
   feedbackRoutes,
   overviewAdminRoutes,
   reportAdminRoutes,
   reportRoutes,
+  roundReadRule,
   sanctionAdminRoutes,
   staffAdminRoutes,
 } from "./safety/index.ts";
@@ -209,11 +211,21 @@ export function createApp(deps: Deps) {
     limit: perPerson,
   });
 
+  // The automatic rules' clock and connection (#105, ADR-033), and the round
+  // reads one of them counts in memory, once for this app (#86, ADR-041).
+  const ruleDeps = { db: deps.db, logger: deps.logger, now: deps.now ?? (() => new Date()) };
+  const roundRead = roundReadRule(ruleDeps);
+
   app.route("/", healthRoutes(deps));
   app.route("/", authRoutes(deps, guard, anyStaff));
   app.route("/", accountRoutes(deps, guard));
   app.route("/", wellKnownRoutes(deps));
-  app.route("/", photoRoutes(deps, guard));
+  // A URL of somebody else's photo is checked by the velocity rule (#86,
+  // ADR-041): the safety slice decides, the media slice only issues.
+  app.route(
+    "/",
+    photoRoutes(deps, guard, (accountId) => checkPhotoFetches(ruleDeps, accountId)),
+  );
   app.route("/", photoAdminRoutes(deps, moderators));
   app.route("/", profileRoutes(deps, guard));
   app.route("/", onboardingRoutes(deps, guard));
@@ -228,10 +240,7 @@ export function createApp(deps: Deps) {
   app.route(
     "/",
     chatRoutes(deps, guard, (accountId, conversationId) =>
-      checkFirstMessage(
-        { db: deps.db, logger: deps.logger, now: deps.now ?? (() => new Date()) },
-        { accountId, conversationId },
-      ),
+      checkFirstMessage(ruleDeps, { accountId, conversationId }),
     ),
   );
   // ...and what changes in them, live over one socket (#349, ADR-031 §5).
@@ -271,11 +280,20 @@ export function createApp(deps: Deps) {
       gateOf({ db: deps.db, logger: deps.logger, now: () => new Date() }, accountId),
     ),
   );
+  const builderDeps = () => ({
+    db: deps.db,
+    logger: deps.logger,
+    now: () => deps.now?.() ?? new Date(),
+  });
+  // The caller's own answers, which the deal-breakers' pause and the cards' "did not answer" read (#149, #99).
+  const ownFieldsOf = async (accountId: string) =>
+    (await exportProfile(deps.db, accountId))?.fields ?? {};
   // Today's round (#96, ADR-034) serves its cards through the profile slice's
   // builder, handed in here since profile already imports matching; a card
   // the builder refuses (404) is a card the round leaves out, and its budget's
   // 429 goes through. A day's first read with no round builds it through the
   // round builder, which reads across slices and lives with the jobs (#95).
+  // A read is checked by the velocity rules after it (#86, ADR-041).
   app.route(
     "/",
     roundRoutes(
@@ -302,25 +320,22 @@ export function createApp(deps: Deps) {
       // rounds are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and boot.ts's twin.
       deps.config.APP_ENV === "production"
         ? async () => false
-        : (accountId) =>
-            buildRoundOf(
-              { db: deps.db, logger: deps.logger, now: () => deps.now?.() ?? new Date() },
-              accountId,
-            ),
+        : (accountId) => buildRoundOf(builderDeps(), accountId),
       // A match is a conversation (#100, ADR-031): the chat slice's, handed in
       // here since the chat imports the profile, which imports matching.
       { between: conversationBetween, open: openConversation },
+      roundRead,
+      // A short round's relaxations (#99, ADR-042) read the pond as the builder does.
+      {
+        offers: (accountId) => relaxationOffers(builderDeps(), accountId),
+        candidates: (accountId, relaxation) =>
+          relaxedCandidates(builderDeps(), accountId, relaxation),
+      },
+      ownFieldsOf,
     ),
   );
   // The deal-breakers need the caller's own answers (#149): the profile slice reads them, handed in here.
-  app.route(
-    "/",
-    preferencesRoutes(
-      deps,
-      guard,
-      async (accountId) => (await exportProfile(deps.db, accountId))?.fields ?? {},
-    ),
-  );
+  app.route("/", preferencesRoutes(deps, guard, ownFieldsOf));
 
   // The bearer scheme the session routes declare (#35); the tokens themselves
   // are opaque, so the scheme is all the contract says about them.

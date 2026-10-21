@@ -12,6 +12,7 @@ import {
   PhotoPurpose,
   PhotoRejectionReason,
   PhotoState,
+  RelaxationKind,
   ReportMessageSide,
   ReportOutcome,
   ReportSource,
@@ -73,8 +74,9 @@ describe("the tables", () => {
       "report",
       "report_message",
       "research_subject",
-      // Today's round and its entries (#96, ADR-034).
+      // Today's round and its entries (#96, ADR-034), and a day's relaxations (#99, ADR-042).
       "round_entries",
+      "round_relaxation",
       "rounds",
       "sanction",
       "session",
@@ -143,8 +145,9 @@ describe("the foreign keys", () => {
       "photo_review.photo_id -> photo.id cascade",
       // A report's frozen copy goes with the report, twelve months from filing (#351).
       "report_message.report_id -> report.id cascade",
-      // A round's entries go with their round (#96).
+      // A round's entries go with their round (#96), and its relaxations (#99).
       "round_entries.round_id -> rounds.id cascade",
+      "round_relaxation.round_id -> rounds.id cascade",
     ]);
   });
 
@@ -278,6 +281,7 @@ describe("the indexes", () => {
     ["report_message", "report_message_seq_idx", ["report_id", "seq"]],
     ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
     ["found_them_count", "found_them_count_day_reason_idx", ["day", "reason"]],
+    ["round_relaxation", "round_relaxation_round_field_idx", ["round_id", "field"]],
   ])("keep %s unique by %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(true);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -407,6 +411,8 @@ describe("the enums", () => {
     // Why a card is in a round, and what was decided about it (#96).
     expect(enums.round_reason).toEqual(RoundReason.options);
     expect(enums.round_decision).toEqual(RoundDecision.options);
+    // How a deal-breaker is relaxed for the day (#99).
+    expect(enums.relaxation_kind).toEqual(RelaxationKind.options);
     expect(enums.report_outcome).toEqual(ReportOutcome.options);
     // Where a report was made: a card, or a conversation (#351).
     expect(enums.report_source).toEqual(ReportSource.options);

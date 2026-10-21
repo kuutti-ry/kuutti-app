@@ -31,8 +31,10 @@ export {
   uploadPhoto,
 } from "./photos.ts";
 export {
+  cardsServedSince,
   listApprovedPhotos,
   listPhotos,
+  othersPhotoFetchesSince,
   queueSummary,
   recordCardServed,
   wasShown,

@@ -5846,6 +5846,235 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/rounds/{day}/relaxations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What today's round may relax, and what is relaxed
+         * @description For a short round (fewer ordered places than matching_config round_size, the liked-you and fish places aside), every deal-breaker of the caller's that is not paused and not relaxed today, each way it can be relaxed for the day: unanswered (let through those who did not answer its field) and aside (set it aside), each listed only when it would add somebody today, with more: how much it widens the caller's pool, rounded down to a step of matching_config waitlist_k. Counted on asking. Also the relaxations in force today. Never another filter (ADR-042).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The offers and today's relaxations. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RelaxationsResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no round today, or a day not begun. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Relax a deal-breaker for today
+         * @description One of the caller's own deal-breakers loosened for the day only: the people it lets in today are added after the round's last place, as many as the room left (round_size less the ordered places), new people first, reason relaxed with the field. Tomorrow's round is built from the filters as stored. The answer is the cards added, served as the round's read serves them (ADR-008).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["Relaxation"];
+                };
+            };
+            responses: {
+                /** @description Relaxed; the cards it added, perhaps none. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RelaxationAnswer"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no round today, a day not begun, or a relaxation the offers would not list (no deal-breaker of the caller's on that field, a paused one, or unanswered where those people are let through already). Nothing was written. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; already_relaxed: that deal-breaker is relaxed today; relaxations_changed: another device relaxed or undid one since this tap's offers were counted. Nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description card_budget_exceeded: relaxed, and the cards added, but the day's cards are used up; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rounds/{day}/relaxations/{field}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo today's relaxation of a deal-breaker
+         * @description The relaxation goes, and with it the cards that came in under it, a later relaxation's too, that are still undecided; a decided one stays as it was decided.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    day: string;
+                    field: components["schemas"]["DealBreakerField"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Undone; the places of the cards removed. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["RelaxationUndone"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no round today, a day not begun, or that field not relaxed today. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description round_expired: the day named has ended; nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/preferences/deal-breakers": {
         parameters: {
             query?: never;
@@ -6534,12 +6763,25 @@ export interface components {
             openedAt: string | null;
             /** Format: date-time */
             completedAt: string | null;
+            relaxations: components["schemas"]["ExportedRelaxation"][];
             entries: components["schemas"]["ExportedRoundEntry"][];
         };
+        ExportedRelaxation: {
+            field: components["schemas"]["DealBreakerField"];
+            fieldInWords: string;
+            kind: components["schemas"]["RelaxationKind"];
+            kindInWords: string;
+            /** Format: date-time */
+            at: string;
+        };
+        /** @enum {string} */
+        RelaxationKind: "unanswered" | "aside";
         ExportedRoundEntry: {
             position: number;
             reason: components["schemas"]["RoundReason"];
             reasonInWords: string;
+            relaxedField: components["schemas"]["DealBreakerField"] & unknown;
+            relaxedFieldInWords: string | null;
             /** Format: date-time */
             seenAt: string | null;
             decision: components["schemas"]["RoundChoice"];
@@ -7140,7 +7382,7 @@ export interface components {
             createdAt: string;
         };
         /** @enum {string} */
-        SanctionRule: "reports" | "first_messages" | "same_first_message";
+        SanctionRule: "reports" | "first_messages" | "same_first_message" | "photo_fetches" | "cards_served" | "round_reads";
         SanctionList: {
             items: components["schemas"]["SanctionEntry"][];
         };
@@ -7519,6 +7761,8 @@ export interface components {
             reason: components["schemas"]["RoundReason"];
             decision: components["schemas"]["RoundChoice"];
             card: components["schemas"]["ProfileCard"];
+            relaxedField?: components["schemas"]["DealBreakerField"];
+            notAnswered?: components["schemas"]["DealBreakerField"][];
         };
         RoundDecisionAnswer: {
             match: {
@@ -7528,6 +7772,26 @@ export interface components {
         };
         RoundDecisionUpdate: {
             decision: components["schemas"]["RoundChoice"];
+        };
+        RelaxationsResponse: {
+            short: boolean;
+            offers: components["schemas"]["RelaxationOffer"][];
+            relaxed: components["schemas"]["Relaxation"][];
+        };
+        RelaxationOffer: {
+            field: components["schemas"]["DealBreakerField"];
+            kind: components["schemas"]["RelaxationKind"];
+            more: number;
+        };
+        Relaxation: {
+            field: components["schemas"]["DealBreakerField"];
+            kind: components["schemas"]["RelaxationKind"];
+        };
+        RelaxationAnswer: {
+            entries: components["schemas"]["RoundEntry"][];
+        };
+        RelaxationUndone: {
+            removed: number[];
         };
         DealBreakersResponse: {
             dealBreakers: components["schemas"]["StoredDealBreaker"][];

@@ -1,7 +1,14 @@
 import {
+  type ApiComponents,
+  type DealBreakerField,
   ErrorResponse,
+  type Relaxation,
+  RelaxationAnswer,
+  RelaxationsResponse,
+  RelaxationUndone,
   type RoundChoice,
   RoundDecisionAnswer,
+  type RoundEntry,
   RoundResponse,
 } from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
@@ -61,4 +68,33 @@ export async function decide(
   });
   if (!data) throw failed(response, error, "decision");
   return RoundDecisionAnswer.parse(data);
+}
+
+/** What a short round may relax today, and what is relaxed (#99, ADR-042 §4); counted when asked. */
+export async function fetchRelaxations(day: string): Promise<RelaxationsResponse> {
+  const { data, error, response } = await api.GET("/rounds/{day}/relaxations", {
+    params: { path: { day } },
+  });
+  if (!data) throw failed(response, error, "relaxations");
+  return RelaxationsResponse.parse(data);
+}
+
+/** One deal-breaker relaxed for today: the cards it added, to append without reading the round again (§5). */
+export async function relaxToday(day: string, relaxation: Relaxation): Promise<RoundEntry[]> {
+  const { data, error, response } = await api.POST("/rounds/{day}/relaxations", {
+    params: { path: { day } },
+    // The contract's field is the deal-breakers' enum; zod's type of it is the wider field key.
+    body: relaxation as ApiComponents["schemas"]["Relaxation"],
+  });
+  if (!data) throw failed(response, error, "relax");
+  return RelaxationAnswer.parse(data).entries;
+}
+
+/** Today's relaxation undone: the places of the undecided cards it took back (§6). */
+export async function undoRelaxation(day: string, field: DealBreakerField): Promise<number[]> {
+  const { data, error, response } = await api.DELETE("/rounds/{day}/relaxations/{field}", {
+    params: { path: { day, field: field as ApiComponents["schemas"]["DealBreakerField"] } },
+  });
+  if (!data) throw failed(response, error, "undo relaxation");
+  return RelaxationUndone.parse(data).removed;
 }

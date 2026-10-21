@@ -13,11 +13,12 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Text } from "@/components/ui/text";
-import { ProfileCardView } from "@/features/profile";
+import { fieldLabelKey, ProfileCardView } from "@/features/profile";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
+import { ShortPool } from "./ShortPool";
 import { type RoundCard, type RoundNotice, useRound } from "./useRound";
 
 /** Why a card is in the round, in words (TD-12): the label every card carries, never a score. */
@@ -52,7 +53,10 @@ const ANSWERS_A_LIKE: ReadonlySet<RoundReason> = new Set(["liked_you", "fish"]);
  * that side, Undo brought down from the header, within a thumb's reach. A like that
  * makes a match says so and leads to the conversation. The end of the round,
  * an empty one and one not built say to come back tomorrow, with no count
- * and no countdown, and nothing loads more.
+ * and no countdown, and nothing loads more; the end of a short round offers
+ * to relax a deal-breaker for today (#99, ADR-042), each relaxed card says
+ * the deal-breaker it came in by and undoes it in one tap, and every card
+ * names the person's deal-breakers its person did not answer.
  *
  * As a card, the end or a match takes the place of what had the focus, the
  * screen reader is taken to its first line; a notice is spoken where it
@@ -189,8 +193,34 @@ export function RoundScreen() {
               variant="small"
               className="self-start rounded-full bg-secondary px-3 py-1 text-secondary-foreground"
             >
-              {t(REASON[current.entry.reason])}
+              {current.entry.relaxedField
+                ? t("round.reason.relaxedField", {
+                    field: t(fieldLabelKey(current.entry.relaxedField)),
+                  })
+                : t(REASON[current.entry.reason])}
             </Text>
+            {(current.entry.notAnswered ?? []).map((field) => (
+              <Text key={field} variant="muted">
+                {t("round.notAnswered", { field: t(fieldLabelKey(field)) })}
+              </Text>
+            ))}
+            {current.entry.relaxedField && current.entry.decision === null && (
+              <Button
+                variant="ghost"
+                className="self-start"
+                disabled={round.busy}
+                accessibilityLabel={t("round.relaxed.undo", {
+                  field: t(fieldLabelKey(current.entry.relaxedField)),
+                })}
+                onPress={() => {
+                  tap();
+                  const field = current.entry.relaxedField;
+                  if (field) void round.unrelax(current.day, field);
+                }}
+              >
+                {t("round.relaxed.undo", { field: t(fieldLabelKey(current.entry.relaxedField)) })}
+              </Button>
+            )}
             {current.entry.decision !== null && <Text>{t(REVISIT[current.entry.decision])}</Text>}
             <ProfileCardView
               card={current.entry.card}
@@ -217,6 +247,15 @@ export function RoundScreen() {
         )}
         {match === null && !entry && entries && entries.length > 0 && (
           <Text ref={focus}>{t("round.done")}</Text>
+        )}
+        {/* A short or empty round's end offers to relax a deal-breaker for today (#99, ADR-042), after the line the reader is taken to. */}
+        {match === null && !entry && entries && view.status === "ready" && (
+          <ShortPool
+            day={view.round.day}
+            busy={round.busy}
+            onRelax={(relaxation) => round.relax(view.round.day, relaxation)}
+            onUndo={(field) => round.unrelax(view.round.day, field)}
+          />
         )}
       </ScrollView>
       {match === null && current && (

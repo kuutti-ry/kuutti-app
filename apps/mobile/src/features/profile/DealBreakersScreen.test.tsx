@@ -203,6 +203,10 @@ describe("DealBreakersScreen", () => {
     ).toBe(true);
     await press(screen.getByRole("button", { name: "Never" }));
     await press(screen.getByRole("button", { name: "Quitting" }));
+    // On from the start (ADR-042 §8), switched off here.
+    expect(
+      screen.getByLabelText("Also people who did not answer").props.accessibilityState?.checked,
+    ).toBe(true);
     await press(screen.getByLabelText("Also people who did not answer"));
     await press(screen.getByLabelText("Deal-breaker: Kids"));
     await press(screen.getByRole("button", { name: "No kids" }));
@@ -216,10 +220,11 @@ describe("DealBreakersScreen", () => {
     ).toBe(false);
     await press(screen.getByRole("button", { name: "Save the deal-breakers" }));
     await waitFor(() => expect(screen.getByText("Saved.")).toBeTruthy());
+    // A new deal-breaker lets through who did not answer until switched off (ADR-042 §8): smoking's was.
     expect(puts).toEqual([
       [
-        { field: "hasKids", accept: ["no"], includeUnknown: false },
-        { field: "smoking", accept: ["never", "quitting"], includeUnknown: true },
+        { field: "hasKids", accept: ["no"], includeUnknown: true },
+        { field: "smoking", accept: ["never", "quitting"], includeUnknown: false },
       ],
     ]);
   });

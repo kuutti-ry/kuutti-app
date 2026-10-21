@@ -97,6 +97,13 @@ describe("seed", () => {
           auto_shadow_ban_same_first_message: 5,
           auto_shadow_ban_same_first_message_hours: 24,
           auto_shadow_ban_review_hours: 48,
+          // #86: the velocity rules, the maintainer's of 21/10/2026.
+          auto_shadow_ban_photo_fetches: 120,
+          auto_shadow_ban_photo_fetches_minutes: 60,
+          auto_shadow_ban_cards_served: 0,
+          auto_shadow_ban_cards_served_minutes: 60,
+          auto_shadow_ban_round_reads: 30,
+          auto_shadow_ban_round_reads_minutes: 1,
           message_max_length: 2000,
           message_photo_attempts_per_day: 30,
           message_photos_per_day: 10,

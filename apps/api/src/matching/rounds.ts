@@ -1,6 +1,12 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import {
+  type DealBreaker,
+  type DealBreakerField,
   type ProfileCard,
+  type Relaxation,
+  type RelaxationOffer,
+  type RelaxationsResponse,
+  ROUND_ENTRIES_MAX,
   type RoundChoice,
   type RoundDecision,
   type RoundEntry,
@@ -132,10 +138,11 @@ export async function saveRound(
   const builtAt = deps.now();
   const saved = await transaction(deps.db, async (tx) => {
     const { rows } = await tx.query<{ id: string }>(
-      `INSERT INTO rounds (account_id, day, built_at)
-       SELECT id, $2, $3 FROM account WHERE id = $1 AND state IN ('active', 'shadow_banned') FOR SHARE
+      `INSERT INTO rounds (account_id, day, built_at, last_position)
+       SELECT id, $2, $3, $4 FROM account WHERE id = $1 AND state IN ('active', 'shadow_banned') FOR SHARE
        ON CONFLICT (account_id, day) DO NOTHING RETURNING id`,
-      [input.accountId, input.day, builtAt],
+      // The places are the entries' order: the highest a dropped candidate leaves empty is still given.
+      [input.accountId, input.day, builtAt, input.entries.length],
     );
     const id = rows[0]?.id;
     if (!id) return null;
@@ -174,29 +181,64 @@ export async function saveRound(
   return { roundId: saved.id };
 }
 
+/** A row of a round's entry as the read takes it. */
+type EntryRow = {
+  position: number | null;
+  candidate_id: string | null;
+  reason: RoundReason | null;
+  decision: RoundDecision | null;
+  fish: boolean | null;
+  relaxed_field: DealBreakerField | null;
+};
+
 /**
- * Today's round as the person opens it: its cards in order, each through the
- * card builder, which writes the shown record and counts the day's cards
- * (ADR-008); a card it refuses (a block either way, a sanction, a profile no
- * longer complete) is left out. Null entries before the round is built. The
- * first read that finds the round stamps `opened_at`.
+ * The entries' cards in order, each through the card builder, which writes
+ * the shown record and counts the day's cards (ADR-008); a card it refuses (a
+ * block either way, a sanction, a profile no longer complete) is left out.
+ * Each says which of the person's own deal-breakers, not paused, its person
+ * left unanswered (ADR-042 §8): every deal-breaker field is a card field, and
+ * the card leaves an unanswered one out.
+ */
+async function entriesOf(
+  accountId: string,
+  rows: readonly EntryRow[],
+  cardOf: CardOf,
+  dealBreakers: readonly DealBreaker[],
+): Promise<RoundEntry[]> {
+  const entries: RoundEntry[] = [];
+  for (const row of rows) {
+    if (row.position === null || row.candidate_id === null || row.reason === null) continue;
+    const card = await cardOf(accountId, row.candidate_id);
+    if (!card) continue;
+    entries.push({
+      position: row.position,
+      reason: row.reason,
+      decision: choiceOf(row.decision, row.fish === true),
+      card,
+      ...(row.relaxed_field ? { relaxedField: row.relaxed_field } : {}),
+      notAnswered: dealBreakers
+        .filter((dealBreaker) => card.fields[dealBreaker.field] === undefined)
+        .map((dealBreaker) => dealBreaker.field),
+    });
+  }
+  return entries;
+}
+
+/**
+ * Today's round as the person opens it: its cards in order (`entriesOf`).
+ * Null entries before the round is built. The first read that finds the
+ * round stamps `opened_at`. `dealBreakers` are the person's own, not paused.
  */
 export async function readTodaysRound(
   deps: RoundDeps,
   accountId: string,
   cardOf: CardOf,
+  dealBreakers: readonly DealBreaker[] = [],
 ): Promise<RoundResponse> {
   const at = deps.now();
   const day = finnishDay(at);
-  const { rows } = await deps.db.query<{
-    id: string;
-    position: number | null;
-    candidate_id: string | null;
-    reason: RoundReason | null;
-    decision: RoundDecision | null;
-    fish: boolean | null;
-  }>(
-    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish
+  const { rows } = await deps.db.query<EntryRow & { id: string }>(
+    `SELECT r.id, e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field
        FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id
       WHERE r.account_id = $1 AND r.day = $2
       ORDER BY e.position`,
@@ -208,19 +250,7 @@ export async function readTodaysRound(
     "UPDATE rounds SET opened_at = $3 WHERE id = $1 AND account_id = $2 AND opened_at IS NULL",
     [round.id, accountId, at],
   );
-  const entries: RoundEntry[] = [];
-  for (const row of rows) {
-    if (row.position === null || row.candidate_id === null || row.reason === null) continue;
-    const card = await cardOf(accountId, row.candidate_id);
-    if (!card) continue;
-    entries.push({
-      position: row.position,
-      reason: row.reason,
-      decision: choiceOf(row.decision, row.fish === true),
-      card,
-    });
-  }
-  return { day, entries };
+  return { day, entries: await entriesOf(accountId, rows, cardOf, dealBreakers) };
 }
 
 /** The day named, checked against today before anything is read: an ended day's round answers round_expired, a later one is nobody's yet. */
@@ -458,6 +488,246 @@ export async function decide(
 }
 
 /**
+ * The short pool's side that reads across slices (#99, ADR-042 §4, §5): the
+ * round builder's, which lives with the jobs and reads the pond as it does,
+ * handed in by app.ts. `offers` is what a short round may relax today, null
+ * with no round today; `candidates` whom a relaxation lets in today, in the
+ * order they would come, null for one the offers would not list.
+ */
+export type ShortPool = {
+  offers: (accountId: string) => Promise<{ short: boolean; offers: RelaxationOffer[] } | null>;
+  /** With the day's relaxations the candidates were counted under (`basis`), which the writer holds them to. */
+  candidates: (
+    accountId: string,
+    relaxation: Relaxation,
+  ) => Promise<{ basis: Relaxation[]; candidateIds: string[] } | null>;
+};
+
+/**
+ * Today's relaxations of the person's round (ADR-042 §3), and how many of its
+ * places are ordered ones, the liked-you and fish places left out; null with
+ * no round for the day.
+ */
+export async function relaxationsOf(
+  db: Queryable,
+  accountId: string,
+  day: string,
+): Promise<{ ordered: number; relaxed: Relaxation[] } | null> {
+  const { rows } = await db.query<{ ordered: number; relaxed: Relaxation[] }>(
+    `SELECT (SELECT count(*)::int FROM round_entries e
+              WHERE e.round_id = r.id AND e.reason <> ALL($3::round_reason[])) AS ordered,
+            coalesce((SELECT json_agg(json_build_object('field', x.field, 'kind', x.kind)
+                                      ORDER BY x.field)
+                        FROM round_relaxation x WHERE x.round_id = r.id), '[]') AS relaxed
+       FROM rounds r WHERE r.account_id = $1 AND r.day = $2`,
+    [accountId, day, FREE_LIKES],
+  );
+  return rows[0] ?? null;
+}
+
+const ROUND_SIZE_KEY = "round_size";
+
+/** The same relaxations, whatever their order. */
+const sameRelaxations = (a: readonly Relaxation[], b: readonly Relaxation[]) => {
+  const key = (r: Relaxation) => `${r.field}:${r.kind}`;
+  return JSON.stringify(a.map(key).sort()) === JSON.stringify(b.map(key).sort());
+};
+
+/**
+ * A relaxation tapped (ADR-042 §5): recorded on today's round, and the people
+ * it lets in added after the highest place the round ever gave
+ * (`last_position`, so a place an undo freed never names somebody else), as
+ * many as the room left (`round_size` less the ordered places), in the order
+ * given, reason `relaxed` with the field, and with every relaxation of the
+ * day they came in under (`relaxed_with`, the tapped one first), so undoing
+ * any of them takes them back and a like waives them all. Under the round's
+ * lock, after the owner's account shared as a decision takes it; the day's
+ * relaxations are held to those the candidates were counted under (`basis`),
+ * so one undone or made meanwhile refuses the write, 409
+ * `relaxations_changed`; each candidate is asked where it is written to be
+ * still active, with no block between the two, and not in the round yet.
+ * `completed_at` is cleared when a place is added. The places written, in
+ * order; 409 `already_relaxed` for a field relaxed today, nothing written.
+ */
+export async function appendRelaxed(
+  deps: RoundDeps,
+  input: {
+    accountId: string;
+    day: string;
+    relaxation: Relaxation;
+    basis: readonly Relaxation[];
+    candidateIds: string[];
+  },
+): Promise<number[]> {
+  const { today } = todayOrRefuse(deps, input.day);
+  return transaction(deps.db, async (tx) => {
+    await tx.query("SELECT 1 FROM account WHERE id = $1 FOR SHARE", [input.accountId]);
+    const round = await tx.query<{ id: string }>(
+      "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
+      [input.accountId, today],
+    );
+    const roundId = round.rows[0]?.id;
+    if (!roundId) throw noRound();
+    const standing = await tx.query<Relaxation>(
+      "SELECT field, kind FROM round_relaxation WHERE round_id = $1",
+      [roundId],
+    );
+    if (standing.rows.some((r) => r.field === input.relaxation.field)) {
+      throw new AppError(409, "already_relaxed", "That deal-breaker is relaxed today");
+    }
+    if (!sameRelaxations(standing.rows, input.basis)) {
+      throw new AppError(409, "relaxations_changed", "The day's relaxations changed meanwhile");
+    }
+    // Read under the round's lock above, so the same field cannot have come in meanwhile.
+    await tx.query(
+      "INSERT INTO round_relaxation (round_id, field, kind, created_at) VALUES ($1, $2, $3, $4)",
+      [roundId, input.relaxation.field, input.relaxation.kind, deps.now()],
+    );
+    const size = await matchingConfigNumber(tx, ROUND_SIZE_KEY);
+    const placed = await tx.query<{ ordered: number; last: number }>(
+      `SELECT count(*) FILTER (WHERE e.reason <> ALL($2::round_reason[]))::int AS ordered,
+              greatest(r.last_position, coalesce(max(e.position), 0))::int AS last
+         FROM rounds r LEFT JOIN round_entries e ON e.round_id = r.id
+        WHERE r.id = $1 GROUP BY r.last_position`,
+      [roundId, FREE_LIKES],
+    );
+    const { ordered = 0, last = 0 } = placed.rows[0] ?? {};
+    const room = Math.min(size - ordered, ROUND_ENTRIES_MAX - last);
+    if (room <= 0 || input.candidateIds.length === 0) return [];
+    const taken = await tx.query<{ candidate: string }>(
+      `SELECT e.candidate FROM unnest($1::uuid[]) WITH ORDINALITY AS e(candidate, ordinality)
+         JOIN account c ON c.id = e.candidate
+        WHERE c.state = 'active' AND NOT blocked_between($2, e.candidate)
+          AND NOT EXISTS (SELECT 1 FROM round_entries x WHERE x.round_id = $3 AND x.candidate_id = e.candidate)
+          AND e.candidate <> $2
+        ORDER BY e.ordinality LIMIT $4
+        FOR SHARE OF c`,
+      [input.candidateIds, input.accountId, roundId, room],
+    );
+    const positions = taken.rows.map((_, index) => last + index + 1);
+    if (positions.length === 0) return [];
+    await tx.query(
+      `INSERT INTO round_entries (round_id, position, candidate_id, reason, relaxed_field, relaxed_with)
+       SELECT $1, e.position, e.candidate, 'relaxed', $4, $5::text[]
+         FROM unnest($2::smallint[], $3::uuid[]) AS e(position, candidate)`,
+      [
+        roundId,
+        positions,
+        taken.rows.map((row) => row.candidate),
+        input.relaxation.field,
+        [input.relaxation.field, ...input.basis.map((r) => r.field)],
+      ],
+    );
+    await tx.query(
+      `UPDATE rounds SET completed_at = NULL, last_position = $3
+        WHERE id = $1 AND account_id = $2`,
+      [roundId, input.accountId, last + positions.length],
+    );
+    return positions;
+  });
+}
+
+/**
+ * A relaxation undone (ADR-042 §6): its row deleted, and with it today's
+ * cards that came in under it and are still undecided, those of a later
+ * relaxation that needed it too, under the round's lock; a decided one stays. The round is complete again when nothing that can still be shown
+ * is undecided. The places removed; 404 for a field not relaxed today.
+ */
+export async function undoRelaxation(
+  deps: RoundDeps,
+  input: { accountId: string; day: string; field: DealBreakerField },
+): Promise<number[]> {
+  const { at, today } = todayOrRefuse(deps, input.day);
+  return transaction(deps.db, async (tx) => {
+    await tx.query("SELECT 1 FROM account WHERE id = $1 FOR SHARE", [input.accountId]);
+    const round = await tx.query<{ id: string }>(
+      "SELECT id FROM rounds WHERE account_id = $1 AND day = $2 FOR UPDATE",
+      [input.accountId, today],
+    );
+    const roundId = round.rows[0]?.id;
+    if (!roundId) throw noRound();
+    const undone = await tx.query(
+      "DELETE FROM round_relaxation WHERE round_id = $1 AND field = $2",
+      [roundId, input.field],
+    );
+    if (undone.rowCount !== 1) throw new AppError(404, "not_found", "Not relaxed today");
+    const removed = await tx.query<{ position: number }>(
+      `DELETE FROM round_entries WHERE round_id = $1 AND $2 = ANY(relaxed_with) AND decision IS NULL
+       RETURNING position`,
+      [roundId, input.field],
+    );
+    await tx.query(
+      `UPDATE rounds r SET completed_at = $3
+        WHERE r.id = $1 AND r.account_id = $2 AND r.completed_at IS NULL
+          AND EXISTS (SELECT 1 FROM round_entries e WHERE e.round_id = r.id)
+          AND NOT EXISTS (SELECT 1 FROM round_entries e
+                           WHERE e.round_id = r.id AND e.decision IS NULL AND ${SERVABLE})`,
+      [roundId, input.accountId, at],
+    );
+    return removed.rows.map((row) => row.position).sort((a, b) => a - b);
+  });
+}
+
+const noRound = () => new AppError(404, "not_found", "No round today");
+
+/**
+ * What the person may relax today and what they have (ADR-042 §4), for the
+ * day named: an ended day answers round_expired, a day with no round 404.
+ */
+export async function readRelaxations(
+  deps: RoundDeps,
+  shortPool: ShortPool,
+  input: { accountId: string; day: string },
+): Promise<RelaxationsResponse> {
+  const { today } = todayOrRefuse(deps, input.day);
+  const now = await relaxationsOf(deps.db, input.accountId, today);
+  if (!now) throw noRound();
+  const offered = await shortPool.offers(input.accountId);
+  return { short: offered?.short ?? false, offers: offered?.offers ?? [], relaxed: now.relaxed };
+}
+
+/**
+ * A relaxation tapped (ADR-042 §5): 409 `already_relaxed` for a field relaxed
+ * today, 404 for one the offers would not list; otherwise the people it lets
+ * in, added (`appendRelaxed`). The places written.
+ */
+export async function relax(
+  deps: RoundDeps,
+  shortPool: ShortPool,
+  input: { accountId: string; day: string; relaxation: Relaxation },
+): Promise<number[]> {
+  const { today } = todayOrRefuse(deps, input.day);
+  const now = await relaxationsOf(deps.db, input.accountId, today);
+  if (!now) throw noRound();
+  if (now.relaxed.some((r) => r.field === input.relaxation.field)) {
+    throw new AppError(409, "already_relaxed", "That deal-breaker is relaxed today");
+  }
+  const found = await shortPool.candidates(input.accountId, input.relaxation);
+  if (!found) throw new AppError(404, "not_found", "No such relaxation to offer");
+  return appendRelaxed(deps, { ...input, day: today, ...found });
+}
+
+/** The cards at these places of today's round, as the read gives them (`entriesOf`), for the answer of a relaxation. */
+export async function readAdded(
+  deps: RoundDeps,
+  accountId: string,
+  day: string,
+  positions: readonly number[],
+  cardOf: CardOf,
+  dealBreakers: readonly DealBreaker[],
+): Promise<RoundEntry[]> {
+  if (positions.length === 0) return [];
+  const { rows } = await deps.db.query<EntryRow>(
+    `SELECT e.position, e.candidate_id, e.reason, e.decision, e.fish, e.relaxed_field
+       FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND r.day = $2 AND e.position = ANY($3::smallint[])
+      ORDER BY e.position`,
+    [accountId, day, positions],
+  );
+  return entriesOf(accountId, rows, cardOf, dealBreakers);
+}
+
+/**
  * Erasure's part (TD-7, ADR-007 §4), inside its transaction: the entries in
  * which the person is somebody's card, others' decisions on them included,
  * and the person's own rounds, their entries with them.
@@ -478,9 +748,12 @@ export type OwnRound = {
   builtAt: Date;
   openedAt: Date | null;
   completedAt: Date | null;
+  /** The day's relaxations (ADR-042 §10), the oldest first. */
+  relaxations: { field: DealBreakerField; kind: Relaxation["kind"]; createdAt: Date }[];
   entries: {
     position: number;
     reason: RoundReason;
+    relaxedField: DealBreakerField | null;
     seenAt: Date | null;
     decision: RoundChoice | null;
     decidedAt: Date | null;
@@ -509,15 +782,28 @@ export async function exportRounds(
     round_id: string;
     position: number;
     reason: RoundReason;
+    relaxed_field: DealBreakerField | null;
     seen_at: Date | null;
     decision: RoundDecision | null;
     fish: boolean;
     decided_at: Date | null;
   }>(
-    `SELECT e.round_id, e.position, e.reason, e.seen_at, e.decision, e.fish, e.decided_at
+    `SELECT e.round_id, e.position, e.reason, e.relaxed_field, e.seen_at, e.decision, e.fish, e.decided_at
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
       WHERE r.account_id = $1 AND r.id = ANY($2::uuid[])
       ORDER BY e.position`,
+    [accountId, rows.map((row) => row.id)],
+  );
+  const relaxations = await db.query<{
+    round_id: string;
+    field: DealBreakerField;
+    kind: Relaxation["kind"];
+    created_at: Date;
+  }>(
+    `SELECT x.round_id, x.field, x.kind, x.created_at
+       FROM round_relaxation x JOIN rounds r ON r.id = x.round_id
+      WHERE r.account_id = $1 AND r.id = ANY($2::uuid[])
+      ORDER BY x.created_at, x.field`,
     [accountId, rows.map((row) => row.id)],
   );
   return rows.map((row) => ({
@@ -525,11 +811,19 @@ export async function exportRounds(
     builtAt: row.built_at,
     openedAt: row.opened_at,
     completedAt: row.completed_at,
+    relaxations: relaxations.rows
+      .filter((relaxation) => relaxation.round_id === row.id)
+      .map((relaxation) => ({
+        field: relaxation.field,
+        kind: relaxation.kind,
+        createdAt: relaxation.created_at,
+      })),
     entries: entries.rows
       .filter((entry) => entry.round_id === row.id)
       .map((entry) => ({
         position: entry.position,
         reason: entry.reason,
+        relaxedField: entry.relaxed_field,
         seenAt: entry.seen_at,
         decision: choiceOf(entry.decision, entry.fish),
         decidedAt: entry.decided_at,

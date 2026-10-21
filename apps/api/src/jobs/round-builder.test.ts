@@ -100,13 +100,17 @@ const candidates = (round: Card[] | null) => (round ?? []).map((card) => card.ca
 const daysBefore = (days: number) =>
   finnishDay(new Date(NIGHT.getTime() - days * 24 * 3600 * 1000));
 
-/** An earlier round of `owner` with `candidate` in it, decided as said. */
+/**
+ * An earlier round of `owner` with `candidate` in it, opened, and decided as
+ * said; `opened` false for a round built and never read (ADR-042 §1).
+ */
 async function shownBefore(
   db: Queryable,
   owner: string,
   candidate: string,
   days: number,
   decision: "like" | "pass" | null,
+  opened = true,
 ) {
   const earlier = new Date(NIGHT.getTime() - days * 24 * 3600 * 1000);
   const built = await saveRound(await deps(db, earlier), {
@@ -116,6 +120,9 @@ async function shownBefore(
     entries: [{ candidateId: candidate, reason: "matches_filters" }],
   });
   if (!built) throw new Error("earlier round not written");
+  if (opened) {
+    await db.query("UPDATE rounds SET opened_at = $2 WHERE id = $1", [built.roundId, earlier]);
+  }
   if (decision) {
     await db.query("UPDATE round_entries SET decision = $2, decided_at = $3 WHERE round_id = $1", [
       built.roundId,
