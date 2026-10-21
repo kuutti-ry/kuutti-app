@@ -1,6 +1,6 @@
 # ADR-037: Liked-you in the round
 
-- Status: accepted 2026-10-20 (#97, built as written here on the maintainer's decisions of that day, #97's comments of 13/10 and 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change)
+- Status: accepted 2026-10-20 (#97, built as written here on the maintainer's decisions of that day, #97's comments of 13/10 and 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§7: no liked-you or fish places for a shadow-banned person, the maintainer's of that day; see History)
 - Date: 2026-10-20
 - Follows: TD-11 (liked-you inside the round, free; the pending-like queue and its expiry), TD-12 (the reason on every card, the pass cooldown), TD-13 (the lower cap for a contested pond, waiting), ADR-022 §4 (a break stops no clock), ADR-030 §11 (Block or report on a card), ADR-034 (the round record), ADR-035 (the builder), CLAUDE.md rule 7 and Product constraints; issues #97, #95, #98, #100, #378, #379
 
@@ -16,6 +16,7 @@ The builder of ADR-035 orders the cards of a round and leaves its first places, 
 4. **An expired like is nobody's to see.** Past `like_expiry_days` it is gone from every round, the liker may come again as an ordinary card, and nobody is told. The liker learns nothing from any route of what became of the like (TD-11): their own round and their rounds' history read the same whether it was seen, passed, left or expired.
 5. **Free, and a break stops no clock.** Liking back a liked-you card is free (ADR-036 §3). A like keeps running out during the person's break as at any other time (ADR-022 §4), and the break screen says so: the line that said everything comes back as it was now says a waiting like can run out meanwhile, without naming the time, which is a row.
 6. **Nothing new to erase.** A like is its liker's round entry: an erasure of the liker takes it (their rounds), an erasure of the person takes the entries in which they are a card (ADR-034 §7). The export lists the likes a person gave as decisions of their own rounds, never a like received.
+7. **None while shadow-banned** (the maintainer, 21/10/2026). A shadow-banned person's round holds no liked-you or fish places. Their like back would make no match (ADR-038 §1: none is made while the decider is shadow-banned), where everybody else's always does, and so tell them of the ban, which a shadow ban never may (ADR-024 §7). The likes wait for the lift with their clock running (§1), and their people are no ordinary cards meanwhile (§2), so none of them is met unlabelled. An automatic one is reviewed within two days (ADR-033), well inside `like_expiry_days`; a like that runs out during a longer ban is gone, as during a break (ADR-022 §4). What is left: a like given today, by somebody who is the shadow-banned person's ordinary card, and answered the same day, still makes no match; it needs both likes on one day and is accepted as a rare tell.
 
 ## Consequences
 
@@ -39,3 +40,4 @@ The builder of ADR-035 orders the cards of a round and leaves its first places, 
 
 - 2026-10-20: written with #97's build, on the maintainer's decisions of that day.
 - 2026-10-20 (#378, ADR-039 §4): those whose waiting like is a fish take the first places ahead of the rest, labelled `fish`.
+- 2026-10-21: §7, no liked-you or fish places for a shadow-banned person, the maintainer's choice of that day after the audit of the first cut found that a like back told them of the ban.

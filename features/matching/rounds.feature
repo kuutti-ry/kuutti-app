@@ -118,6 +118,11 @@ Feature: The day's round, built: whom it holds and in which order
     When the night builds the rounds
     Then neither "B" nor "C" is in "A"'s round
 
+  Scenario: A shadow-banned person's round holds no liked-you places, and the likes wait for the lift
+    Given "B" liked "A" yesterday, and "A" is shadow-banned
+    When the night builds the rounds, and again the night after the ban is lifted
+    Then "A"'s first round holds "B" in no place, and the second opens with "B", labelled liked you
+
   Scenario: The sender learns nothing of what became of a like
     Given "B" liked "A" yesterday, and the night built both rounds
     When "A" passes "B"

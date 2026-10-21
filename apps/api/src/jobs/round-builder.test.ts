@@ -777,6 +777,31 @@ describe("liked-you (#97, ADR-037)", () => {
     expect(await roundOf(ctx.client, a)).toEqual([{ candidate_id: kept, reason: "liked_you" }]);
   });
 
+  test("A shadow-banned person's round holds no liked-you places, and the likes wait for the lift", async ({
+    ctx,
+  }) => {
+    const { women, men } = await pondOf(ctx, "test-liked-shadow", 1, 2);
+    const [a] = women;
+    const [b, c] = men;
+    if (!a || !b || !c) throw new Error("people not written");
+    await shownBefore(ctx.client, b, a, 1, "like");
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [a]);
+
+    await buildRounds(await deps(ctx.client));
+
+    // A like back would make no match and tell A of the ban (ADR-024 §7): B is in no place.
+    expect(await roundOf(ctx.client, a)).toEqual([{ candidate_id: c, reason: "matches_filters" }]);
+
+    // The ban lifted, the next night's round opens with B's like, still within its days.
+    await ctx.client.query("UPDATE account SET state = 'active' WHERE id = $1", [a]);
+    const nextNight = new Date(NIGHT.getTime() + 24 * 3600 * 1000);
+    await buildRounds(await deps(ctx.client, nextNight));
+    expect((await roundOf(ctx.client, a, finnishDay(nextNight)))?.[0]).toEqual({
+      candidate_id: b,
+      reason: "liked_you",
+    });
+  });
+
   test("The sender learns nothing of what became of a like", async ({ ctx }) => {
     const { women, men } = await pondOf(ctx, "test-liked-silent", 1, 1);
     const [a] = women;
