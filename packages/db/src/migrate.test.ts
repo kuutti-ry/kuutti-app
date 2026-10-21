@@ -441,6 +441,7 @@ describe("migrate", () => {
           "conversation_participant",
           "events",
           "feedback",
+          "found_them_count",
           "gate",
           "identity",
           "matching_config",

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.54.3",
+    "version": "0.55.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -81,6 +81,9 @@
                 "type": "string",
                 "nullable": true,
                 "maxLength": 254
+              },
+              "foundThemAnswered": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -94,7 +97,8 @@
               "pond",
               "genderChangedAt",
               "seeksChangedAt",
-              "email"
+              "email",
+              "foundThemAnswered"
             ]
           },
           "preferences": {
@@ -2473,6 +2477,38 @@
         ],
         "additionalProperties": false
       },
+      "FoundThemStatus": {
+        "type": "object",
+        "properties": {
+          "answered": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answered"
+        ],
+        "additionalProperties": false
+      },
+      "FoundThemRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "$ref": "#/components/schemas/FoundReason"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "FoundReason": {
+        "type": "string",
+        "enum": [
+          "here",
+          "elsewhere",
+          "other"
+        ]
+      },
       "AccountPauseRequest": {
         "type": "object",
         "properties": {
@@ -4773,13 +4809,75 @@
               "$ref": "#/components/schemas/OverviewQueue"
             },
             "maxItems": 10
+          },
+          "foundThem": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "recent": {
+                "type": "object",
+                "properties": {
+                  "here": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "elsewhere": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "other": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "here",
+                  "elsewhere",
+                  "other"
+                ],
+                "additionalProperties": false
+              },
+              "allTime": {
+                "type": "object",
+                "properties": {
+                  "here": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "elsewhere": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "other": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "here",
+                  "elsewhere",
+                  "other"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "days",
+              "recent",
+              "allTime"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
           "now",
           "responseHours",
           "reviewHours",
-          "queues"
+          "queues",
+          "foundThem"
         ]
       },
       "OverviewQueue": {
@@ -6569,6 +6667,113 @@
           },
           "404": {
             "description": "No live account: a second deletion that passed the session guard before the first committed (not_found).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/found-them": {
+      "get": {
+        "summary": "Whether the caller told Kuutti they found somebody",
+        "description": "\"Löysin hänet\" (#83, ADR-040): whether this account has answered, so the screen can thank the person instead of asking again. Never which reason: the account does not keep it.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Answered or not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FoundThemStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Tell Kuutti you found somebody",
+        "description": "\"Löysin hänet\" (#83, ADR-040): the reason, from a closed list, counted once per account in an anonymous daily count that names nobody, and a research event for those who said yes to research. An indication only: nothing else changes, no state, no session, no round, no conversation.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FoundThemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Counted."
+          },
+          "400": {
+            "description": "Validation failed (a reason outside the list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "found_them_answered: this account told Kuutti already; nothing was counted.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10315,7 +10520,7 @@
     "/admin/overview": {
       "get": {
         "summary": "What waits for the moderators",
-        "description": "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. Moderators and admins.",
+        "description": "Per queue (reports not decided that the reader is no party to, the automatic shadow bans nobody has confirmed or reversed but the reader's own, photos waiting for a person, feedback not handled), how many wait and since when the oldest; the API's clock; matching_config moderation_response_hours, past which the oldest is late, and auto_shadow_ban_review_hours, the automatic bans' own. And the association's measure (#83): how many told Kuutti they found somebody, by reason, over the last thirty Finnish days and in all, from a count that names nobody. Moderators and admins.",
         "security": [
           {
             "session": []

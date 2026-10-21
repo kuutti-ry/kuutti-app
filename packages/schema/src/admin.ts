@@ -54,6 +54,11 @@ export const OverviewQueue = z
   .meta({ id: "OverviewQueue" });
 export type OverviewQueue = z.infer<typeof OverviewQueue>;
 
+/** The anonymous count of "Löysin hänet", one number per reason (#83). */
+const FoundThemCounts = z
+  .object({ here: z.int().min(0), elsewhere: z.int().min(0), other: z.int().min(0) })
+  .strict();
+
 /** The front page (#303): every queue, the API's clock to measure ages by, and the response time promised. */
 export const AdminOverview = z
   .object({
@@ -63,6 +68,18 @@ export const AdminOverview = z
     /** matching_config auto_shadow_ban_review_hours: the automatic bans' own deadline (#105). */
     reviewHours: z.number().min(0),
     queues: z.array(OverviewQueue).max(10),
+    /**
+     * "Löysin hänet" (#83, ADR-040): how many told Kuutti they found somebody,
+     * by reason, over the last `days` Finnish days and in all, from the
+     * anonymous count; no person is in it.
+     */
+    foundThem: z
+      .object({
+        days: z.int().min(1),
+        recent: FoundThemCounts,
+        allTime: FoundThemCounts,
+      })
+      .strict(),
   })
   .meta({ id: "AdminOverview" });
 export type AdminOverview = z.infer<typeof AdminOverview>;

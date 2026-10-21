@@ -18,6 +18,8 @@ export function Choice(props: {
   label: string;
   flag?: string;
   chosen: boolean;
+  /** Not pressable for now, as while the group's answer is on its way. */
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const { t } = useT();
@@ -31,6 +33,7 @@ export function Choice(props: {
       aria-checked={props.chosen}
       accessibilityLabel={name}
       className="grow"
+      disabled={props.disabled}
       onPress={props.onPress}
     >
       {props.flag ? `${props.flag} ${name}` : name}

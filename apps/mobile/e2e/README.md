@@ -39,6 +39,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `identity-label-on-card` *once* | Eetu | the label chosen after non-binary shows on the card after the gender |
 | `terms-asked-again` *once* | Kerttu | an older wording of the terms asked again, nothing else but research |
 | `sensitive-answers-withdrawal` | Noa | the consent withdrawn asks whom one seeks again, not the ages and not research; Anyone is all three |
+| `found-them` *once* | Aino | from Your account, Tell Kuutti off until a reason is ticked in words, the answer thanked; opened again it thanks at once and asks nothing (#83). Each account answers once; her account-deletion flow, after it, erases the answer with her |
 | `account-deletion` *once* | Aino | asked first, signed out, the next login refused for the cooldown |
 | `deal-breakers-limit` | Sanna | an accepted answer before saving; two at most, the third refused |
 | `deal-breakers-own-answer` | Noa | only on what she answered; Answer it opens the field |

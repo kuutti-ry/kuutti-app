@@ -9,6 +9,7 @@ export * from "./contact.ts";
 export * from "./deal-breakers.ts";
 export { ErrorResponse } from "./errors.ts";
 export * from "./feedback.ts";
+export * from "./found-them.ts";
 export * from "./gate.ts";
 export { HealthResponse } from "./health.ts";
 export * from "./identity.ts";

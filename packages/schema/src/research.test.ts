@@ -82,6 +82,8 @@ function valid(name: (typeof RESEARCH_EVENT_NAMES)[number]): Record<string, unkn
       return {};
     case "account_resumed":
       return { afterDays: 3 };
+    case "found_them":
+      return { reason: "here" };
     case "feedback_sent":
       return { kind: "bug" };
     case "message_sent":

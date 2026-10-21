@@ -49,6 +49,12 @@ const overview = {
     { queue: "photos", waiting: 0, oldestSince: null },
     { queue: "feedback", waiting: 0, oldestSince: null },
   ],
+  // Nobody has told Kuutti they found someone yet (#83).
+  foundThem: {
+    days: 30,
+    recent: { here: 0, elsewhere: 0, other: 0 },
+    allTime: { here: 0, elsewhere: 0, other: 0 },
+  },
 };
 
 /** A person's page (#306): an account with nothing on it yet. */

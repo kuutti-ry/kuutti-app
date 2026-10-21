@@ -1,0 +1,56 @@
+# "Löysin hänet" (#83, ADR-040): from Your account, the person tells Kuutti
+# they found someone and why, from three reasons in words; Tell Kuutti waits
+# for a choice, the answer is thanked, and the screen opened again thanks at
+# once and asks nothing. It is an indication only: nothing else in the app
+# changes, which the API's tests hold. Aino: each account answers once, so
+# the flow runs once per `pnpm demo:reset`, and her account-deletion flow,
+# which runs after it, erases the answer with her (the day's count stays).
+appId: fi.kuutti.app
+name: I found someone tells Kuutti the reason once, thanks the person, and asks no more
+---
+- runFlow:
+    file: ../common/sign-in.yaml
+    env:
+      PERSONA: Aino Virtanen
+# Settings is reachable before onboarding is done.
+- openLink: kuutti://settings
+# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
+- scrollUntilVisible:
+    element: "Your account|Tilisi|Ditt konto"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Your account|Tilisi|Ditt konto"
+- extendedWaitUntil:
+    visible: "I found someone|Löysin hänet|Jag hittade någon"
+    timeout: 15000
+- tapOn: "I found someone|Löysin hänet|Jag hittade någon"
+- extendedWaitUntil:
+    visible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
+    timeout: 15000
+- assertVisible: "Nothing changes in the app.*|Sovelluksessa mikään ei muutu.*|Inget ändras i appen.*"
+- assertVisible:
+    text: "Tell Kuutti|Kerro Kuutille|Berätta för Kuutti"
+    enabled: false
+
+# The reason is a radio button whose label ticks it in words, never a colour alone.
+- tapOn: "I found someone on Kuutti|Löysin jonkun Kuutista|Jag hittade någon på Kuutti"
+- assertVisible: "✓ I found someone on Kuutti|✓ Löysin jonkun Kuutista|✓ Jag hittade någon på Kuutti"
+- tapOn: "Tell Kuutti|Kerro Kuutille|Berätta för Kuutti"
+- extendedWaitUntil:
+    visible: "Thank you for telling us\\.|Kiitos, että kerroit meille\\.|Tack för att du berättade för oss\\."
+    timeout: 15000
+- assertNotVisible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
+
+# Opened again: thanked at once, nothing asked.
+- tapOn: "Back|Takaisin|Tillbaka"
+- extendedWaitUntil:
+    visible: "Delete my account|Poista tilini|Ta bort mitt konto"
+    timeout: 15000
+- tapOn: "I found someone|Löysin hänet|Jag hittade någon"
+- extendedWaitUntil:
+    visible: "Thank you for telling us\\.|Kiitos, että kerroit meille\\.|Tack för att du berättade för oss\\."
+    timeout: 15000
+- assertNotVisible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
+- tapOn: "Back|Takaisin|Tillbaka"
+- assertVisible: "Delete my account|Poista tilini|Ta bort mitt konto"

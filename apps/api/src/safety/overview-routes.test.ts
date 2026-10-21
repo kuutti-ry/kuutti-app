@@ -144,6 +144,11 @@ describe("GET /admin/overview", () => {
         { queue: "photos", waiting: 2, oldestSince: "2026-10-15T20:00:00.000Z" },
         { queue: "feedback", waiting: 1, oldestSince: "2026-10-15T12:34:56.789Z" },
       ],
+      foundThem: {
+        days: 30,
+        recent: { here: 0, elsewhere: 0, other: 0 },
+        allTime: { here: 0, elsewhere: 0, other: 0 },
+      },
     });
   });
 
@@ -212,6 +217,48 @@ describe("GET /admin/overview", () => {
         { queue: "photos", waiting: 0, oldestSince: null },
         { queue: "feedback", waiting: 0, oldestSince: null },
       ],
+      foundThem: {
+        days: 30,
+        recent: { here: 0, elsewhere: 0, other: 0 },
+        allTime: { here: 0, elsewhere: 0, other: 0 },
+      },
+    });
+  });
+
+  test("the found-them counts are the last thirty Finnish days and all of them, with no person (#83)", async ({
+    ctx,
+    app,
+  }) => {
+    const staff = await staffSession(ctx.client);
+    // Today is 2026-10-16: the thirtieth day back is 2026-09-17, the thirty-first is not counted.
+    await ctx.client.query(
+      `INSERT INTO found_them_count (day, reason, count) VALUES
+         ('2026-10-16', 'here', 2), ('2026-09-17', 'elsewhere', 1),
+         ('2026-09-16', 'here', 5), ('2026-01-02', 'other', 3)`,
+    );
+    expect((await read(app, staff.headers)).foundThem).toEqual({
+      days: 30,
+      recent: { here: 2, elsewhere: 1, other: 0 },
+      allTime: { here: 7, elsewhere: 1, other: 3 },
+    });
+  });
+
+  test("the thirty days are calendar days, so a change of the clocks in them moves no day (#83)", async ({
+    ctx,
+  }) => {
+    const staff = await staffSession(ctx.client);
+    // 00:30 on 11 April 2027 in Finland, two weeks after the clocks went forward on
+    // 28 March: the thirtieth day back is 13 March, and 12 March is not counted,
+    // though thirty times twenty-four hours back from now falls on it.
+    const app = await appOn(ctx.client, () => new Date("2027-04-10T21:30:00.000Z"));
+    await ctx.client.query(
+      `INSERT INTO found_them_count (day, reason, count) VALUES
+         ('2027-04-11', 'here', 1), ('2027-03-13', 'elsewhere', 1), ('2027-03-12', 'other', 4)`,
+    );
+    expect((await read(app, staff.headers)).foundThem).toEqual({
+      days: 30,
+      recent: { here: 1, elsewhere: 1, other: 0 },
+      allTime: { here: 1, elsewhere: 1, other: 4 },
     });
   });
 

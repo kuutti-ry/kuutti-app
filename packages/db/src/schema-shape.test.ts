@@ -2,6 +2,7 @@ import {
   AccountState,
   CONSENT_KINDS,
   ConversationCloseKind,
+  FoundReason,
   GENDERS,
   MessageKind,
   ModeratorRole,
@@ -53,6 +54,8 @@ describe("the tables", () => {
       "conversation",
       "conversation_participant",
       "feedback",
+      // "Löysin hänet": a count by day and reason, naming nobody (#83, ADR-040).
+      "found_them_count",
       "gate",
       "identity",
       "matching_config",
@@ -274,6 +277,7 @@ describe("the indexes", () => {
     ["report", "report_open_pair_idx", ["reporter_account_id", "reported_account_id"]],
     ["report_message", "report_message_seq_idx", ["report_id", "seq"]],
     ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
+    ["found_them_count", "found_them_count_day_reason_idx", ["day", "reason"]],
   ])("keep %s unique by %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(true);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -414,6 +418,8 @@ describe("the enums", () => {
     expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
     expect(enums.conversation_side).toEqual(["a", "b"]);
     expect(enums.message_kind).toEqual(MessageKind.options);
+    // Why a person told Kuutti they found someone (#83).
+    expect(enums.found_reason).toEqual(FoundReason.options);
   });
 
   it("are all exported, so drizzle-kit generates them", () => {

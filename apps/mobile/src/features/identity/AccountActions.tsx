@@ -79,9 +79,9 @@ export async function shareExport(
 
 /**
  * The account card (#51, ADR-007; #170, ADR-022), on its own screen behind
- * the "Your account" row of Settings (#287): the data export, the break and
- * the deletion. The break has a
- * screen of its own with its consequences; deletion is a button behind a
+ * the "Your account" row of Settings (#287): the data export, "Löysin hänet"
+ * (#83, ADR-040), the break and the deletion. "Löysin hänet" and the break
+ * have screens of their own; deletion is a button behind a
  * confirmation that names the cooldown; never a swipe, never colour alone
  * (CLAUDE.md Accessibility).
  */
@@ -156,6 +156,18 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
             onPress={() => void exportData()}
           >
             <Text>{t("account.export.button")}</Text>
+          </Button>
+          {/* "Löysin hänet" (#83): telling Kuutti one found somebody, which changes nothing else. */}
+          <Button
+            variant="outline"
+            accessibilityLabel={t("account.foundThem.button")}
+            disabled={busy.kind !== "idle"}
+            onPress={() => {
+              tap();
+              router.push("/settings/found-them");
+            }}
+          >
+            <Text>{t("account.foundThem.button")}</Text>
           </Button>
           {/* Taking a break (#170): the screen says what happens before anything does. */}
           <Button
