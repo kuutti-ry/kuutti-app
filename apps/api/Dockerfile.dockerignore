@@ -1,0 +1,7 @@
+# Named for the Dockerfile beside it: BuildKit reads <Dockerfile>.dockerignore,
+# or .dockerignore at the context's root, which is the repository's (build.yml).
+# A plain apps/api/.dockerignore was never read (#420).
+**/node_modules
+**/dist
+**/.git
+**/*.test.ts
