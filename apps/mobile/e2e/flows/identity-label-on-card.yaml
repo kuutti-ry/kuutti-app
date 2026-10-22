@@ -10,13 +10,9 @@ name: A label chosen after non-binary shows on the card after the gender
     file: ../common/sign-in.yaml
     env:
       PERSONA: Eetu Laine
-- scrollUntilVisible:
-    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
-# A friend's invitation code, offered once after the welcome, skipped (#107).
+# The welcome step when it comes (#418), then the invitation code.
+- runFlow: ../common/welcome-step.yaml
+# A friend's invitation code, offered once to a newcomer before the name, skipped (#107).
 - extendedWaitUntil:
     visible: "Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
     timeout: 15000

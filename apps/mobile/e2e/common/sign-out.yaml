@@ -2,6 +2,34 @@
 # Runs after open-app.yaml.
 appId: fi.kuutti.app
 ---
+# The app's lock over it (#418, ADR-045), left on by a flow that stopped
+# half-way: left through the bank, which signs this phone out and turns the
+# lock off, so no flow is ever kept out by another's lock. It is seldom
+# there, so its absence is asked as `notVisible`, in half a second, and it is
+# left behind a flag the condition clears (README). Signed out that way, the
+# check after it finds no signed-in screen and goes nowhere near Settings.
+- evalScript: ${output.locked = true}
+- runFlow:
+    when:
+      notVisible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
+    commands:
+      - evalScript: ${output.locked = false}
+- runFlow:
+    when:
+      true: ${output.locked}
+    commands:
+      # The passcode's field takes the focus as the lock shows: a tap on the
+      # title, which is no button, closes the keyboard over the way out (README).
+      - tapOn: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
+      - scrollUntilVisible:
+          element: "Sign in with the bank instead|Kirjaudu mieluummin pankkitunnuksilla|Logga in med banken i stället"
+          direction: DOWN
+          centerElement: true
+          timeout: 60000
+      - tapOn: "Sign in with the bank instead|Kirjaudu mieluummin pankkitunnuksilla|Logga in med banken i stället"
+      - extendedWaitUntil:
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Before you sign in|Ennen kuin kirjaudut|Innan du loggar in"
+          timeout: 15000
 - runFlow:
     when:
       visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
@@ -22,8 +50,10 @@ appId: fi.kuutti.app
           commands:
             - tapOn: "Log out|Kirjaudu ulos|Logga ut"
       # Opened over an onboarding step, Settings stays on screen after the logout
-      # ("No session on this device"): the root route is the sign-in screen.
+      # ("No session on this device"): the root route is the sign-in screen, or
+      # on a phone that has not recorded the current wordings the screens
+      # before the bank (#418), which bank-login.yaml taps through.
       - openLink: kuutti://
       - extendedWaitUntil:
-          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank|Before you sign in|Ennen kuin kirjaudut|Innan du loggar in"
           timeout: 15000

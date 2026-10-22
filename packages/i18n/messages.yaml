@@ -3336,6 +3336,265 @@ signIn.paused.body:
   sv: "Logga in med din bank när du vill komma tillbaka. Allt är som du lämnade det."
   machine: { fi: true, sv: true }
 
+signIn.agreements.title:
+  en: "Before you sign in"
+  description: "Heading of the screens before the bank login (#418, ADR-010 §15): first the norms with the terms and the privacy summary, which must be accepted before the bank button can be reached; then the research question, which never blocks."
+  fi: "Ennen kuin kirjaudut"
+  sv: "Innan du loggar in"
+  machine: { fi: true, sv: true }
+
+signIn.agreements.research:
+  en: "Either answer takes you on to your bank."
+  description: "Before the bank login, under the research question (#418): a yes and a no both lead on to the sign-in, and a no costs nothing (GDPR art. 7(4))."
+  fi: "Kumpi tahansa vastaus vie sinut eteenpäin pankkiin."
+  sv: "Vilket svar du än ger går du vidare till din bank."
+  machine: { fi: true, sv: true }
+
+signIn.lock.title:
+  en: "Signed out by the lock"
+  description: "Sign-in screen, card shown right after the person left the app's lock through the bank, or typed a wrong passcode too many times (#418, ADR-045): this phone's session was dropped."
+  fi: "Lukitus kirjasi sinut ulos"
+  sv: "Låset loggade ut dig"
+  machine: { fi: true, sv: true }
+
+signIn.lock.body:
+  en: "Sign in with your bank to come back. Nothing on your account changed. The lock is off until you turn it on again in Settings."
+  description: "Sign-in screen, under the lock card's title (#418)."
+  fi: "Kirjaudu pankkitunnuksilla palataksesi. Tilillesi ei muuttunut mitään. Lukitus on pois päältä, kunnes otat sen taas käyttöön asetuksista."
+  sv: "Logga in med din bank för att komma tillbaka. Ingenting ändrades på ditt konto. Låset är av tills du slår på det igen i inställningarna."
+  machine: { fi: true, sv: true }
+
+lock.title:
+  en: "Kuutti is locked"
+  description: "Heading of the lock screen, shown over the app at a cold start and after the chosen time in the background, when the person has turned the lock on (#418, ADR-045)."
+  fi: "Kuutti on lukittu"
+  sv: "Kuutti är låst"
+  machine: { fi: true, sv: true }
+
+lock.cover:
+  en: "Kuutti"
+  description: "The app's name on the plain cover drawn over the app while it is in the app switcher or in the background, when the lock is on (#418): the snapshot shows this, not the last screen."
+  fi: "Kuutti"
+  sv: "Kuutti"
+  machine: { fi: true, sv: true }
+
+lock.unlock.face:
+  en: "Unlock with your face"
+  description: "Lock screen, the button that asks the phone's face recognition (#418); the phone has face recognition only."
+  fi: "Avaa kasvoillasi"
+  sv: "Lås upp med ansiktet"
+  machine: { fi: true, sv: true }
+
+lock.unlock.fingerprint:
+  en: "Unlock with your fingerprint"
+  description: "Lock screen, the button that asks the phone's fingerprint reader (#418); the phone has a fingerprint reader only."
+  fi: "Avaa sormenjäljelläsi"
+  sv: "Lås upp med fingeravtrycket"
+  machine: { fi: true, sv: true }
+
+lock.unlock.biometrics:
+  en: "Unlock with your face or fingerprint"
+  description: "Lock screen, the button that asks the phone's biometrics (#418) when it has both kinds, or does not say which."
+  fi: "Avaa kasvoillasi tai sormenjäljelläsi"
+  sv: "Lås upp med ansiktet eller fingeravtrycket"
+  machine: { fi: true, sv: true }
+
+lock.biometrics.prompt:
+  en: "Unlock Kuutti"
+  description: "The title of the phone's own face or fingerprint prompt (#418)."
+  fi: "Avaa Kuutti"
+  sv: "Lås upp Kuutti"
+  machine: { fi: true, sv: true }
+
+lock.biometrics.cancel:
+  en: "Cancel"
+  description: "The cancel button of the phone's own face or fingerprint prompt (#418); the lock screen stays."
+  fi: "Peruuta"
+  sv: "Avbryt"
+  machine: { fi: true, sv: true }
+
+lock.biometrics.failed:
+  en: "Your face or fingerprint did not unlock Kuutti. Try again, or use another way below."
+  description: "Lock screen, after the phone's biometric prompt refused or could not run (#418); a cancel says nothing."
+  fi: "Kasvosi tai sormenjälkesi eivät avanneet Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
+  sv: "Ditt ansikte eller fingeravtryck låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
+lock.passcode.label:
+  en: "Your Kuutti passcode"
+  description: "Lock screen, the label of the six-digit field (#418); Kuutti's own passcode, not the phone's."
+  fi: "Kuutin pääsykoodisi"
+  sv: "Din lösenkod för Kuutti"
+  machine: { fi: true, sv: true }
+
+lock.passcode.wrong:
+  en: "Wrong passcode. {left, plural, one {# try left} other {# tries left}}."
+  description: "Lock screen, after a wrong passcode (#418); {left} is how many tries remain before this phone is signed out."
+  fi: "Väärä pääsykoodi. {left, plural, one {# yritys jäljellä} other {# yritystä jäljellä}}."
+  sv: "Fel lösenkod. {left, plural, one {# försök kvar} other {# försök kvar}}."
+  machine: { fi: true, sv: true }
+
+lock.passcode.choose:
+  en: "Choose a passcode of six digits"
+  description: "Setting the lock's passcode, the label of the first field (#418)."
+  fi: "Valitse kuusinumeroinen pääsykoodi"
+  sv: "Välj en lösenkod med sex siffror"
+  machine: { fi: true, sv: true }
+
+lock.passcode.repeat:
+  en: "Type the same six digits again"
+  description: "Setting the lock's passcode, the label of the second field (#418)."
+  fi: "Kirjoita samat kuusi numeroa uudelleen"
+  sv: "Skriv samma sex siffror igen"
+  machine: { fi: true, sv: true }
+
+lock.passcode.mismatch:
+  en: "The two did not match. Choose the passcode again."
+  description: "Setting the lock's passcode, when the second entry differs from the first (#418); the first field is shown again."
+  fi: "Koodit eivät täsmänneet. Valitse pääsykoodi uudelleen."
+  sv: "Koderna stämde inte överens. Välj lösenkoden igen."
+  machine: { fi: true, sv: true }
+
+lock.passcode.cancel:
+  en: "Cancel"
+  description: "Setting the lock's passcode: stop without changing anything (#418)."
+  fi: "Peruuta"
+  sv: "Avbryt"
+  machine: { fi: true, sv: true }
+
+lock.bank:
+  en: "Sign in with the bank instead"
+  description: "Lock screen, the way out that is always there (#418, ADR-045): it signs this phone out, as Log out does, and turns the lock off; the person then signs in with the bank."
+  fi: "Kirjaudu mieluummin pankkitunnuksilla"
+  sv: "Logga in med banken i stället"
+  machine: { fi: true, sv: true }
+
+lock.bank.explain:
+  en: "This signs Kuutti out of this phone and turns the lock off. Nothing on your account changes."
+  description: "Lock screen, above the button that leaves through the bank (#418)."
+  fi: "Tämä kirjaa Kuutin ulos tältä puhelimelta ja poistaa lukituksen. Tililläsi ei muutu mitään."
+  sv: "Det här loggar ut Kuutti från den här telefonen och stänger av låset. Ingenting ändras på ditt konto."
+  machine: { fi: true, sv: true }
+
+lock.settings.explain:
+  en: "Lock Kuutti on this phone, so that somebody else holding it cannot open your matches and conversations. The lock stays on this phone, and logging out turns it off."
+  description: "The lock's settings screen and its offer among the later screens, the paragraph at the top (#418, ADR-045)."
+  fi: "Lukitse Kuutti tällä puhelimella, jotta kukaan muu puhelinta pitelevä ei pääse matcheihisi ja keskusteluihisi. Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen."
+  sv: "Lås Kuutti på den här telefonen, så att ingen annan som håller i den kan öppna dina matcher och samtal. Låset gäller bara den här telefonen, och när du loggar ut stängs det av."
+  machine: { fi: true, sv: true }
+
+lock.settings.biometrics:
+  en: "Face or fingerprint"
+  description: "The lock's settings, the switch that lets the phone's face or fingerprint unlock Kuutti (#418); turning it on asks for the face or finger once."
+  fi: "Kasvot tai sormenjälki"
+  sv: "Ansikte eller fingeravtryck"
+  machine: { fi: true, sv: true }
+
+lock.settings.biometricsMissing:
+  en: "This phone has no face or fingerprint unlock set up. A passcode works without one."
+  description: "The lock's settings, instead of the biometrics switch when the phone has none enrolled (#418)."
+  fi: "Tähän puhelimeen ei ole asetettu kasvojen- tai sormenjäljentunnistusta. Pääsykoodi toimii ilman sitä."
+  sv: "Den här telefonen har ingen upplåsning med ansikte eller fingeravtryck. En lösenkod fungerar utan."
+  machine: { fi: true, sv: true }
+
+lock.settings.biometricsFailed:
+  en: "Your face or fingerprint was not confirmed, so it was not turned on."
+  description: "The lock's settings, when the confirming prompt for turning biometrics on did not succeed (#418)."
+  fi: "Kasvojasi tai sormenjälkeäsi ei vahvistettu, joten sitä ei otettu käyttöön."
+  sv: "Ditt ansikte eller fingeravtryck bekräftades inte, så det slogs inte på."
+  machine: { fi: true, sv: true }
+
+lock.settings.setPasscode:
+  en: "Set a passcode"
+  description: "The lock's settings, the button that starts choosing Kuutti's own six-digit passcode (#418)."
+  fi: "Aseta pääsykoodi"
+  sv: "Välj en lösenkod"
+  machine: { fi: true, sv: true }
+
+lock.settings.changePasscode:
+  en: "Change the passcode"
+  description: "The lock's settings, while a passcode is set (#418)."
+  fi: "Vaihda pääsykoodi"
+  sv: "Byt lösenkod"
+  machine: { fi: true, sv: true }
+
+lock.settings.removePasscode:
+  en: "Remove the passcode"
+  description: "The lock's settings, while a passcode is set (#418); with face or fingerprint off too, the lock is off."
+  fi: "Poista pääsykoodi"
+  sv: "Ta bort lösenkoden"
+  machine: { fi: true, sv: true }
+
+lock.settings.passcodeSet:
+  en: "A passcode is set."
+  description: "The lock's settings, said when a passcode was saved and shown while one is set (#418)."
+  fi: "Pääsykoodi on asetettu."
+  sv: "En lösenkod är vald."
+  machine: { fi: true, sv: true }
+
+lock.settings.grace:
+  en: "Lock again after Kuutti has been in the background"
+  description: "The lock's settings, the heading of the four choices of how long the app may be in the background before it locks again (#418); it always locks when it starts."
+  fi: "Lukitse uudelleen, kun Kuutti on ollut taustalla"
+  sv: "Lås igen när Kuutti har varit i bakgrunden"
+  machine: { fi: true, sv: true }
+
+lock.settings.graceNow:
+  en: "Straight away"
+  description: "The lock's settings, the choice that locks as soon as the app leaves the screen (#418)."
+  fi: "Heti"
+  sv: "Direkt"
+  machine: { fi: true, sv: true }
+
+lock.settings.graceMinutes:
+  en: "{minutes, plural, one {# minute} other {# minutes}}"
+  description: "The lock's settings, a choice of how many minutes in the background before the app locks again (#418)."
+  fi: "{minutes, plural, one {# minuutti} other {# minuuttia}}"
+  sv: "{minutes, plural, one {# minut} other {# minuter}}"
+  machine: { fi: true, sv: true }
+
+lock.settings.always:
+  en: "Kuutti always locks when it starts."
+  description: "The lock's settings, under the background choices (#418)."
+  fi: "Kuutti lukittuu aina käynnistyessään."
+  sv: "Kuutti låses alltid när den startar."
+  machine: { fi: true, sv: true }
+
+lock.offer.title:
+  en: "Lock Kuutti on this phone?"
+  description: "The lock offered once among the later screens, after the e-mail (#418, ADR-045); never required."
+  fi: "Lukitaanko Kuutti tällä puhelimella?"
+  sv: "Vill du låsa Kuutti på den här telefonen?"
+  machine: { fi: true, sv: true }
+
+lock.offer.notNow:
+  en: "Not now"
+  description: "The lock's offer, the plain way past it (#418): the lock stays off, and Settings has it."
+  fi: "Ei nyt"
+  sv: "Inte nu"
+  machine: { fi: true, sv: true }
+
+lock.offer.done:
+  en: "Done"
+  description: "The lock's offer once the lock is on (#418): home."
+  fi: "Valmis"
+  sv: "Klar"
+  machine: { fi: true, sv: true }
+
+settings.lock.label:
+  en: "Lock"
+  description: "Settings, the row and the heading of the app lock's screen (#418): face or fingerprint, a passcode, and when it locks again."
+  fi: "Lukitus"
+  sv: "Lås"
+  machine: { fi: true, sv: true }
+
+native.ios.NSFaceIDUsageDescription:
+  en: "Kuutti uses Face ID to unlock the app when you have turned the lock on."
+  description: "iOS asks this before Kuutti first uses Face ID (#418): the purpose string in Info.plist, written per language by app.config.ts from native.json. No double quotes or backslashes."
+  fi: "Kuutti käyttää Face ID:tä sovelluksen avaamiseen, kun olet ottanut lukituksen käyttöön."
+  sv: "Kuutti använder Face ID för att låsa upp appen när du har slagit på låset."
+  machine: { fi: true, sv: true }
+
 signIn.error.auth_cooldown:
   en: "You deleted your account recently. The earliest day for a new one: {date}"
   description: Sign-in screen, inside the deletion cooldown; {date} is the day the cooldown ends, formatted for the locale (after a colon, so no language inflects it).
@@ -3639,21 +3898,21 @@ onboarding.consents.outdatedApp:
 
 onboarding.research.title:
   en: "Help us learn how matching works"
-  description: "Research opt-in heading."
+  description: "Research opt-in heading, on the screen before the bank login (#418, ADR-010 §15); Settings keeps the switch."
   fi: "Auta meitä oppimaan, miten yhdistäminen toimii"
   sv: "Hjälp oss lära hur matchningen fungerar"
   machine: { fi: true, sv: true }
 
 onboarding.research.yes:
   en: "Yes, I take part"
-  description: "Gives the research consent."
+  description: "Before the bank login (#418): the research yes, recorded right after the sign-in; then on to the bank."
   fi: "Kyllä, osallistun"
   sv: "Ja, jag deltar"
   machine: { fi: true, sv: true }
 
 onboarding.research.no:
   en: "Not now"
-  description: "Skips the research opt-in."
+  description: "Before the bank login (#418): the research no, which records nothing and withdraws nothing; then on to the bank."
   fi: "Ei nyt"
   sv: "Inte nu"
   machine: { fi: true, sv: true }
@@ -3674,7 +3933,7 @@ onboarding.done:
 
 onboarding.welcome.title:
   en: "How we do things here"
-  description: "Heading of the welcome screen, the first after the bank login (#146): the norms and the two consents on one screen."
+  description: "Heading of the norms with the two consents: first on the screen before the bank login (#418, ADR-010 §15), and again on the welcome step after it when a wording changed or the rows did not land (#146)."
   fi: "Näin täällä toimitaan"
   sv: "Så här gör vi här"
   machine: { fi: true, sv: true }
@@ -3709,7 +3968,7 @@ onboarding.welcome.norm4:
 
 onboarding.welcome.accept:
   en: "I'm in, and I accept both"
-  description: "The one button of the welcome screen: it records the terms and the privacy consent (#146, ADR-010 §9)."
+  description: "The one button under the norms and the two consents: before the bank login it leads on, and the consents are recorded right after the sign-in (#418, ADR-010 §15); on the welcome step after the bank login it records them (#146, ADR-010 §9)."
   fi: "Olen mukana ja hyväksyn molemmat"
   sv: "Jag är med och godkänner båda"
   machine: { fi: true, sv: true }

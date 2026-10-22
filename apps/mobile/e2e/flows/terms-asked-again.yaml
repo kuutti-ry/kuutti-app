@@ -1,9 +1,16 @@
 # A consent names the version of the text it is for (ADR-010 §4): Kerttu
 # accepted an older wording of the terms, so the app asks her to accept the
-# current one, and nothing she has answered is asked again; research, which
-# she never answered, is offered once. Her profile is finished (four approved
-# photos, two prompts), so home does not say it lacks anything. One run per
-# `pnpm demo:reset`: afterwards she has accepted the current wording.
+# current one, and nothing she has answered is asked again. Where it is asked
+# depends on the phone (#418, ADR-010 §15). On a phone that recorded the
+# current wordings at an earlier sign-in, the screens before the bank are
+# skipped and onboarding's welcome step asks her again, counting no step, and
+# accepting it leads home. On a fresh phone bank-login.yaml accepts them before
+# the bank, they land right after the exchange, and no welcome step comes.
+# CI takes the first way: an earlier flow of the same job has signed in on its
+# phone. Research is asked before the bank, never after it, so home follows.
+# Her profile is finished (four approved photos, two prompts), so home does
+# not say it lacks anything. One run per `pnpm demo:reset`: afterwards she has
+# accepted the current wording.
 appId: fi.kuutti.app
 name: A person who accepted an older wording of the terms is asked for the current one, and nothing else is asked again
 ---
@@ -12,23 +19,32 @@ name: A person who accepted an older wording of the terms is asked for the curre
     env:
       PERSONA: Kerttu Åkerlund
 - extendedWaitUntil:
-    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här"
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Your area|Alueesi|Ditt område"
     timeout: 15000
-- assertVisible: "Step 1 of 10|Vaihe 1 / 10|Steg 1 av 10"
-- scrollUntilVisible:
-    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+# The welcome step, on a phone that remembered: asked as `notVisible`, in half
+# a second, and accepted behind a flag the condition clears (README).
+- evalScript: ${output.welcomeStep = true}
+- runFlow:
+    when:
+      notVisible: "How we do things here|Näin täällä toimitaan|Så här gör vi här"
+    commands:
+      - evalScript: ${output.welcomeStep = false}
+- runFlow:
+    when:
+      true: ${output.welcomeStep}
+    commands:
+      # Under onboarding's title, with no step line: nothing else is asked.
+      - assertVisible: "Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
+      - assertNotVisible: "Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
+      - scrollUntilVisible:
+          element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+          direction: DOWN
+          centerElement: true
+          timeout: 60000
+      - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
 
-# Straight to research: the name, the gender, whom she seeks and the rest stand.
-- extendedWaitUntil:
-    visible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
-    timeout: 15000
-- assertVisible: "Step 10 of 10|Vaihe 10 / 10|Steg 10 av 10"
-- tapOn: "Not now|Ei nyt|Inte nu"
-
+# Home either way, nothing else asked: the name, the gender, whom she seeks
+# and the rest stand, and research is no step of onboarding.
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område"
     timeout: 15000

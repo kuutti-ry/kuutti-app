@@ -5,6 +5,7 @@ import RootLayout from "../app/_layout";
 import { redirectSystemPath } from "../app/+native-intent";
 import NotFoundRoute from "../app/+not-found";
 import EmailRoute from "../app/account/email";
+import LockOfferRoute from "../app/account/lock";
 import AuthReturnRoute from "../app/auth";
 import ConversationRoute from "../app/chats/[id]";
 import ConversationsRoute from "../app/chats/index";
@@ -38,6 +39,7 @@ import InviteSettingsRoute from "../app/settings/invite";
 import LanguageRoute from "../app/settings/language";
 import LegalRoute from "../app/settings/legal/[kind]";
 import LicensesRoute from "../app/settings/licenses";
+import LockSettingsRoute from "../app/settings/lock";
 import NotificationsSettingsRoute from "../app/settings/notifications";
 import PhotoDescriptionsRoute from "../app/settings/photo-descriptions";
 import SourceRoute from "../app/settings/source";
@@ -52,28 +54,34 @@ import TechRoute from "../app/tech";
 
 // The stylesheet is NativeWind's, compiled by Metro; the test runner has no use for it.
 jest.mock("../global.css", () => ({}));
+// The root layout's providers stand in as views named after themselves, so a
+// test can read which one holds which.
 jest.mock("@/features/identity", () => {
-  const { createElement, Fragment } = require("react") as typeof import("react");
-  const { Text } = require("react-native") as typeof import("react-native");
+  const { createElement } = require("react") as typeof import("react");
+  const { Text, View } = require("react-native") as typeof import("react-native");
   const probe = (name: string) => (props: object) =>
     createElement(Text, { testID: name }, JSON.stringify(props));
+  const provider =
+    (name: string) =>
+    ({ children }: { children: React.ReactNode }) =>
+      createElement(View, { testID: name }, children);
   return {
     EmailScreen: probe("EmailScreen"),
+    LockProvider: provider("LockProvider"),
     OnboardingScreen: probe("OnboardingScreen"),
     SignInScreen: probe("SignInScreen"),
     SignedOutToStart: probe("SignedOutToStart"),
-    SessionProvider: ({ children }: { children: React.ReactNode }) =>
-      createElement(Fragment, null, children),
+    SessionProvider: provider("SessionProvider"),
   };
 });
 jest.mock("@/features/chat", () => {
-  const { createElement, Fragment } = require("react") as typeof import("react");
-  const { Text } = require("react-native") as typeof import("react-native");
+  const { createElement } = require("react") as typeof import("react");
+  const { Text, View } = require("react-native") as typeof import("react-native");
   const probe = (name: string) => (props: object) =>
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
     ChatLiveProvider: ({ children }: { children: React.ReactNode }) =>
-      createElement(Fragment, null, children),
+      createElement(View, { testID: "ChatLiveProvider" }, children),
     ChatPhotoScreen: probe("ChatPhotoScreen"),
     ConversationScreen: probe("ConversationScreen"),
     ConversationsScreen: probe("ConversationsScreen"),
@@ -136,6 +144,8 @@ jest.mock("@/features/settings", () => {
     LegalScreen: probe("LegalScreen"),
     legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
     LicensesScreen: probe("LicensesScreen"),
+    LockOfferScreen: probe("LockOfferScreen"),
+    LockSettingsScreen: probe("LockSettingsScreen"),
     DecisionButtonsScreen: probe("DecisionButtonsScreen"),
     PhotoDescriptionsScreen: probe("PhotoDescriptionsScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
@@ -176,6 +186,7 @@ describe("the screens without params", () => {
   it.each([
     ["/", IndexRoute, "HomeRoute"],
     ["/account/email", EmailRoute, "EmailScreen"],
+    ["/account/lock", LockOfferRoute, "LockOfferScreen"],
     ["/chats", ConversationsRoute, "ConversationsScreen"],
     ["/onboarding", OnboardingRoute, "OnboardingScreen"],
     ["/photos", PhotosRoute, "PhotosScreen"],
@@ -194,6 +205,7 @@ describe("the screens without params", () => {
     ["/settings/invite", InviteSettingsRoute, "InvitationsSettingsScreen"],
     ["/settings/language", LanguageRoute, "LanguageScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
+    ["/settings/lock", LockSettingsRoute, "LockSettingsScreen"],
     ["/settings/source", SourceRoute, "SourceScreen"],
     ["/settings/theme", ThemeRoute, "ThemeScreen"],
     ["/settings/photo-descriptions", PhotoDescriptionsRoute, "PhotoDescriptionsScreen"],
@@ -449,6 +461,23 @@ describe("the root layout", () => {
     });
     expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
     expect(screen.getByTestId("ScreenReaderHint")).toBeTruthy();
+  });
+
+  it("holds the lock inside the session and around the chat's socket and every screen (#418)", async () => {
+    await render(<RootLayout />);
+    /** The providers around an element, innermost first. */
+    const providersAround = (testID: string) => {
+      const names: string[] = [];
+      for (let node = screen.getByTestId(testID).parent; node; node = node.parent) {
+        const id = node.props.testID;
+        if (typeof id === "string" && id.endsWith("Provider")) names.push(id);
+      }
+      return names;
+    };
+    const around = ["ChatLiveProvider", "LockProvider", "SessionProvider"];
+    for (const inside of ["Stack", "SignedOutToStart", "ScreenReaderHint"]) {
+      expect([inside, providersAround(inside)]).toEqual([inside, around]);
+    }
   });
 });
 

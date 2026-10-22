@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react-native";
 import type * as React from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { SessionProvider } from "@/features/identity";
+import { LockProvider, SessionProvider } from "@/features/identity";
 import { DecisionButtonsProvider } from "@/lib/decision-buttons";
 import { LocaleProvider } from "@/lib/locale";
 import { PhotoDescriptionsProvider } from "@/lib/photo-descriptions";
@@ -12,7 +12,7 @@ const METRICS = {
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
 };
 
-/** The providers the root layout supplies: safe area, language, theme, the photo descriptions and decision buttons settings, and session. */
+/** The providers the root layout supplies: safe area, language, theme, the photo descriptions and decision buttons settings, session, and the lock. */
 export function underProviders(ui: React.ReactElement) {
   return (
     <SafeAreaProvider initialMetrics={METRICS}>
@@ -20,7 +20,9 @@ export function underProviders(ui: React.ReactElement) {
         <ThemeProvider>
           <PhotoDescriptionsProvider>
             <DecisionButtonsProvider>
-              <SessionProvider>{ui}</SessionProvider>
+              <SessionProvider>
+                <LockProvider>{ui}</LockProvider>
+              </SessionProvider>
             </DecisionButtonsProvider>
           </PhotoDescriptionsProvider>
         </ThemeProvider>

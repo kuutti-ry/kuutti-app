@@ -12,6 +12,8 @@ export { InvitationsSettingsScreen } from "./InvitationsSettingsScreen";
 export { LanguageScreen } from "./LanguageScreen";
 export { LegalScreen, legalKindOf } from "./LegalScreen";
 export { LicensesScreen } from "./LicensesScreen";
+export { LockOfferScreen } from "./LockOfferScreen";
+export { LockSettingsScreen } from "./LockSettingsScreen";
 export { NotificationsSettingsScreen } from "./NotificationsSettingsScreen";
 export { PhotoDescriptionsScreen } from "./PhotoDescriptionsScreen";
 export { ScreenReaderHint } from "./ScreenReaderHint";

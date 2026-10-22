@@ -295,6 +295,11 @@
     "license": "MIT"
   },
   {
+    "name": "expo-local-authentication",
+    "version": "57.0.3",
+    "license": "MIT"
+  },
+  {
     "name": "expo-localization",
     "version": "57.0.2",
     "license": "MIT"

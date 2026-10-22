@@ -1,0 +1,36 @@
+# A newcomer's first onboarding screen after the bank login, up to a friend's
+# invitation code, which a newcomer is offered next, before the name (#107,
+# ADR-044; #418, ADR-010 §15). The norms with the terms and the privacy summary come
+# before the bank on a phone that has not recorded them, and bank-login.yaml
+# accepts them there: they land right after the exchange and onboarding starts
+# at the invitation code. On a phone that has, the account still lacks them, and
+# onboarding's welcome step asks them, counting no step: accepted here. Which
+# of the two comes depends on what ran on the phone before, so the step is
+# waited for with the code's, asked as `notVisible`, in half a second, and
+# tapped behind a flag the condition clears (README). Runs after sign-in.yaml.
+appId: fi.kuutti.app
+---
+- extendedWaitUntil:
+    visible: "How we do things here|Näin täällä toimitaan|Så här gör vi här|Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
+    timeout: 15000
+- evalScript: ${output.welcomeStep = true}
+- runFlow:
+    when:
+      notVisible: "How we do things here|Näin täällä toimitaan|Så här gör vi här"
+    commands:
+      - evalScript: ${output.welcomeStep = false}
+- runFlow:
+    when:
+      true: ${output.welcomeStep}
+    commands:
+      - assertNotVisible: "Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
+      # Below the norms and both texts, under the fold on a phone.
+      - scrollUntilVisible:
+          element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+          direction: DOWN
+          centerElement: true
+          timeout: 60000
+      - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+- extendedWaitUntil:
+    visible: "Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
+    timeout: 15000

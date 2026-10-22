@@ -3,9 +3,9 @@
 # person back to whom they seek, which waits for the consent again on the same
 # screen. The age window is no sensitive answer and stays, so the ages are not
 # asked again (ADR-010 §13, #219). Noa seeks everyone; she answers the same
-# again, which is no change (#147). Research is not offered again: with whom
-# she seeks the one step open, every step was walked before (#250). The flow
-# ends where it began: consent given, everyone sought.
+# again, which is no change (#147). Research is not offered: it is asked
+# before the bank, never in onboarding (#250, #418). The flow ends where it
+# began: consent given, everyone sought.
 appId: fi.kuutti.app
 name: Withdrawing the sensitive-answers consent asks whom one seeks again with the consent, and keeps the age window
 ---
@@ -42,7 +42,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
 - extendedWaitUntil:
     visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
     timeout: 15000
-- assertVisible: "Step 4 of 10|Vaihe 4 / 10|Steg 4 av 10"
+- assertVisible: "Step 3 of 8|Vaihe 3 / 8|Steg 3 av 8"
 - assertVisible:
     text: "Anyone|Kenet tahansa|Vem som helst"
     selected: false
@@ -88,7 +88,7 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     timeout: 60000
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# Not the ages: the window stayed. Not research either (#250): straight home.
+# Not the ages: the window stayed. Not research either (#250, #418): straight home.
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område"
     timeout: 15000

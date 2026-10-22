@@ -1,20 +1,37 @@
 import { formatTime } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
+import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
 import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { EmailCard, EmailScreen } from "./EmailCard";
+import { markLockOffered } from "./lock/LockProvider";
 
 // The optional e-mail's card (#148) and its confirmation by a code (#385,
 // ADR-043): every state the card shows, what each call answers in words, and
 // the one code a new address gets by itself.
 
+// NativeWind's colour-scheme setter needs its compiled stylesheet, which the
+// test runner has none of: the web preview's theme effect calls it, seen, not applied.
+jest.mock("nativewind", () => ({
+  ...jest.requireActual("nativewind"),
+  useColorScheme: () => ({ colorScheme: "light", setColorScheme: jest.fn() }),
+}));
+
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock };
 };
+const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+const auth = jest.requireMock("expo-local-authentication") as Record<
+  | "hasHardwareAsync"
+  | "isEnrolledAsync"
+  | "supportedAuthenticationTypesAsync"
+  | "authenticateAsync",
+  jest.Mock
+>;
 const refusal = (code: string, status: number) =>
   new Response(JSON.stringify({ error: { code, message: "x", requestId: "r" } }), {
     status,
@@ -130,6 +147,9 @@ beforeEach(async () => {
   router.push.mockReset();
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  // Nothing of the lock on this phone (#418): neither offered nor on.
+  store.delete("kuutti.preference.lockOffered");
+  store.delete("kuutti.lock");
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -702,13 +722,64 @@ describe("EmailCard, saving and removing", () => {
 });
 
 describe("EmailScreen", () => {
-  it("as the last of the later screens, leads home", async () => {
+  it("leads on to the lock's one offer while it is due (#418)", async () => {
     fakeApi({ email: "aino@example.fi", confirmed: true });
     await show(<EmailScreen />);
     await waitFor(() => expect(screen.getByText(TEXT.confirmed)).toBeTruthy());
     expect(screen.getByText("That is everything. Thank you.")).toBeTruthy();
     await press(button("Done"));
-    expect(router.replace).toHaveBeenCalledWith("/");
+    expect(router.replace).toHaveBeenCalledWith("/account/lock");
+    expect(router.replace).toHaveBeenCalledTimes(1);
+  });
+
+  it("The lock is offered once after the e-mail", async () => {
+    fakeApi();
+    await show(<EmailScreen />);
+    await press(button("Done"));
+    expect(router.replace).toHaveBeenLastCalledWith("/account/lock");
+    // The offer's screen marks it offered as it shows (LockOfferScreen).
+    await act(() => markLockOffered());
+    expect(store.get("kuutti.preference.lockOffered")).toBe("true");
+    await show(<EmailScreen />);
+    await press(button("Done"));
+    expect(router.replace).toHaveBeenLastCalledWith("/");
+    expect(router.replace).toHaveBeenCalledTimes(2);
+  });
+
+  describe("leads home without the offer", () => {
+    afterEach(() => {
+      // Back to the phone of jest.setup.js: neither face nor fingerprint.
+      auth.hasHardwareAsync.mockResolvedValue(false);
+      auth.isEnrolledAsync.mockResolvedValue(false);
+      auth.supportedAuthenticationTypesAsync.mockResolvedValue([]);
+      auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    });
+
+    it("while the lock is on already", async () => {
+      // A lock the face opens as the app starts, as one set in Settings before the offer.
+      auth.hasHardwareAsync.mockResolvedValue(true);
+      auth.isEnrolledAsync.mockResolvedValue(true);
+      auth.supportedAuthenticationTypesAsync.mockResolvedValue([2]);
+      auth.authenticateAsync.mockResolvedValue({ success: true });
+      store.set(
+        "kuutti.lock",
+        JSON.stringify({ biometrics: true, passcode: null, graceMinutes: 1 }),
+      );
+      fakeApi();
+      await show(<EmailScreen />);
+      expect(screen.queryByText("Kuutti is locked")).toBeNull();
+      await press(button("Done"));
+      expect(router.replace).toHaveBeenCalledWith("/");
+      expect(store.has("kuutti.preference.lockOffered")).toBe(false);
+    });
+
+    it("on the web preview, which has no lock", async () => {
+      jest.replaceProperty(Platform, "OS", "web");
+      fakeApi();
+      await show(<EmailScreen />);
+      await press(button("Done"));
+      expect(router.replace).toHaveBeenCalledWith("/");
+    });
   });
 
   it("as the last of the later screens, scrolls, so at the largest text every line is in reach (#217)", async () => {
