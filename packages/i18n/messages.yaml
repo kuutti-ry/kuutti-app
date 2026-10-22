@@ -3439,6 +3439,10 @@ admin.source.unavailable:
   en: Source code (AGPL-3.0). The API cannot be reached, so the address of this deployment's source is not known right now.
   description: Moderation panel footer when the health request failed.
 
+admin.licenses.link:
+  en: Licences of the packages
+  description: Moderation panel footer, in every state (#416). The link to licenses.txt, the copyright lines and licence texts of the open-source packages the panel's code is built from.
+
 # --- Onboarding (#46) ---
 
 onboarding.title:
@@ -8491,6 +8495,48 @@ tech.licenses.other:
   description: "Licences screen (#376): the heading of the last group, every package outside the named families (Expo, React Native, React, Sentry, FormatJS), whose headings are their own names and are not translated."
   fi: "Muut paketit"
   sv: "Övriga paket"
+  machine: { fi: true, sv: true }
+
+tech.licenses.version:
+  en: "Version {version}, {license}"
+  description: "Licences screen (#416): under each package's name in the list, heard as the row's value, and at the top of the package's own screen. {version} is the package's version number, {license} the SPDX identifier of its licence (MIT, Apache-2.0, MIT AND Apache-2.0), which stays as it is."
+  fi: "Versio {version}, {license}"
+  sv: "Version {version}, {license}"
+  machine: { fi: true, sv: true }
+
+tech.licenses.licence:
+  en: "Licence"
+  description: "A package's licence screen (#416): the heading over its copyright lines and licence text, which follow in English as the package wrote them."
+  fi: "Lisenssi"
+  sv: "Licens"
+  machine: { fi: true, sv: true }
+
+tech.licenses.licenceAt:
+  en: "Licence {place, number}"
+  description: "A package's licence screen (#416): the heading over each of its licences when it carries more than one (the code's and a font's, or its own and a bundled copy's). {place} is the licence's number on the screen, from 1."
+  fi: "Lisenssi {place, number}"
+  sv: "Licens {place, number}"
+  machine: { fi: true, sv: true }
+
+tech.licenses.notice:
+  en: "Notice"
+  description: "A package's licence screen (#416): the heading over the text of the package's NOTICE file, the attributions an Apache-2.0 package asks to be shown with it. The text follows in English as the package wrote it."
+  fi: "Huomautukset"
+  sv: "Meddelanden"
+  machine: { fi: true, sv: true }
+
+tech.licenses.from:
+  en: "The package carries no licence file of its own; the lines and the text above are from its upstream repository. Address: {address}"
+  description: "A package's licence screen (#416), under a licence the package itself does not carry, which Kuutti took from the package's upstream repository. {address} is a web address, shown as text."
+  fi: "Paketissa ei ole omaa lisenssitiedostoa; yllä olevat rivit ja teksti ovat sen lähdekoodivarastosta. Osoite: {address}"
+  sv: "Paketet har ingen egen licensfil; raderna och texten ovan kommer från dess källkodsförråd. Adress: {address}"
+  machine: { fi: true, sv: true }
+
+tech.licenses.unknown:
+  en: "This build's list has no such package."
+  description: "A package's licence screen (#416) opened by a link that names no package of this build; only a link typed by hand gets here. The back arrow above returns."
+  fi: "Tämän koontiversion luettelossa ei ole tällaista pakettia."
+  sv: "Det här byggets lista har inget sådant paket."
   machine: { fi: true, sv: true }
 
 settings.section.appearance:

@@ -8,9 +8,11 @@ export { apiUrl };
 type State = { kind: "loading" } | { kind: "ok"; health: HealthResponse } | { kind: "unknown" };
 
 /**
- * The source-code offer of AGPL-3.0 section 13 for the panel's users (#16):
- * the address the running API names in /health, with its commit. Parsed with
- * the shared contract, which admits https addresses only.
+ * The panel's footer: the source-code offer of AGPL-3.0 section 13 for the
+ * panel's users (#16), the address the running API names in /health with its
+ * commit, parsed with the shared contract, which admits https addresses only;
+ * and in every state the licences of the packages the panel is built from
+ * (#416).
  */
 export function SourceOffer() {
   const { t } = useT();
@@ -31,14 +33,38 @@ export function SourceOffer() {
     return () => controller.abort();
   }, []);
 
-  if (state.kind === "loading") return <footer aria-busy="true" />;
-  if (state.kind === "unknown") return <footer>{t("admin.source.unavailable")}</footer>;
+  // A plain link: a static file beside the build, outside the router, under
+  // the build's base (/pr-<n>/ for a preview).
+  const licences = (
+    <p>
+      <a href={`${import.meta.env.BASE_URL}licenses.txt`}>{t("admin.licenses.link")}</a>
+    </p>
+  );
+  if (state.kind === "loading") {
+    return (
+      <footer>
+        <p aria-busy="true" />
+        {licences}
+      </footer>
+    );
+  }
+  if (state.kind === "unknown") {
+    return (
+      <footer>
+        <p>{t("admin.source.unavailable")}</p>
+        {licences}
+      </footer>
+    );
+  }
   return (
     <footer>
-      {t("admin.source.offer", { commit: state.health.commit })}{" "}
-      <a href={state.health.source} rel="noreferrer noopener" target="_blank">
-        {state.health.source}
-      </a>
+      <p>
+        {t("admin.source.offer", { commit: state.health.commit })}{" "}
+        <a href={state.health.source} rel="noreferrer noopener" target="_blank">
+          {state.health.source}
+        </a>
+      </p>
+      {licences}
     </footer>
   );
 }

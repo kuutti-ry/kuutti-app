@@ -38,6 +38,7 @@ import InviteSettingsRoute from "../app/settings/invite";
 import LanguageRoute from "../app/settings/language";
 import LegalRoute from "../app/settings/legal/[kind]";
 import LicensesRoute from "../app/settings/licenses";
+import PackageLicenseRoute from "../app/settings/licenses/[id]";
 import NotificationsSettingsRoute from "../app/settings/notifications";
 import PhotoDescriptionsRoute from "../app/settings/photo-descriptions";
 import SourceRoute from "../app/settings/source";
@@ -136,6 +137,7 @@ jest.mock("@/features/settings", () => {
     LegalScreen: probe("LegalScreen"),
     legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
     LicensesScreen: probe("LicensesScreen"),
+    PackageLicenseScreen: probe("PackageLicenseScreen"),
     DecisionButtonsScreen: probe("DecisionButtonsScreen"),
     PhotoDescriptionsScreen: probe("PhotoDescriptionsScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
@@ -212,6 +214,23 @@ describe("the screens without params", () => {
   it("sends a link it has no screen for to the start", async () => {
     await render(<NotFoundRoute />);
     expect(screen.getByTestId("Redirect").props.children).toBe("/");
+  });
+});
+
+describe("a package's licence, /settings/licenses/[id] (#416)", () => {
+  it.each([
+    ["its place", { id: "7" }, 7],
+    ["the first", { id: "0" }, 0],
+    ["the first of a repeated place", { id: ["3", "4"] }, 3],
+    ["no place, without one", {}, -1],
+    ["no place for a word", { id: "zod" }, -1],
+    ["no place for a fraction", { id: "1.5" }, -1],
+    ["no place for a negative", { id: "-2" }, -1],
+    ["no place for an empty one", { id: "" }, -1],
+  ] as const)("hands the screen %s", async (_what, given, index) => {
+    params(given);
+    await render(<PackageLicenseRoute />);
+    expect(propsOf("PackageLicenseScreen")).toEqual({ index });
   });
 });
 

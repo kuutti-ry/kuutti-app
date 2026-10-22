@@ -13,6 +13,7 @@ export { LanguageScreen } from "./LanguageScreen";
 export { LegalScreen, legalKindOf } from "./LegalScreen";
 export { LicensesScreen } from "./LicensesScreen";
 export { NotificationsSettingsScreen } from "./NotificationsSettingsScreen";
+export { PackageLicenseScreen } from "./PackageLicenseScreen";
 export { PhotoDescriptionsScreen } from "./PhotoDescriptionsScreen";
 export { ScreenReaderHint } from "./ScreenReaderHint";
 export { SettingsScreen } from "./SettingsScreen";

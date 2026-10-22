@@ -15,6 +15,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `packages/db` | Drizzle schema, generated migrations, seed | `.claude/rules/db.md` |
 | `packages/i18n` | `messages.yaml`, typed `t()`, i18next + ICU | `.claude/rules/i18n.md` |
 | `packages/tunnistus-oidc` | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; MIT, ADR-017 | `docs/vendors/telia.md` |
+| `packages/notices` | the third-party packages a bundle ships, from its source maps or esbuild's metafile, with their copyright lines, licence texts and NOTICE files: the app's licences screen and the API image's `THIRD_PARTY_NOTICES` (#416) | `packages/notices/README.md` |
 | `services/mock-idp` | navikt/mock-oauth2-server with FTN-shaped claims for local dev; its login page names the twenty-four demo personas (ADR-014) | `.claude/rules/infra.md` |
 | `docs/` | security checklist, accessibility checklist, `adr/` | |
 | `features/` | Gherkin specs for the rules layer, one directory per slice | `.claude/rules/layout.md` |

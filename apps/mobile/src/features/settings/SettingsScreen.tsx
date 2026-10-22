@@ -6,7 +6,6 @@ import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
 import { type ConsentState, useConsentStates, useSession } from "@/features/identity";
-import LICENSES from "@/generated/licenses.json";
 import { buildInfo } from "@/lib/build";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useLocaleSettings, useT } from "@/lib/locale";
@@ -15,6 +14,7 @@ import { useHapticTap } from "@/theme/haptics";
 import { useTheme } from "@/theme/ThemeProvider";
 import { SCHEMES } from "./Choice";
 import { CONSENT_TITLE } from "./ConsentScreen";
+import { LICENCES } from "./licences";
 
 /** A heading and its rows. */
 function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
@@ -228,7 +228,7 @@ export function SettingsScreen() {
             {
               key: "licenses",
               title: t("settings.licenses.label"),
-              summary: t("settings.licenses.summary", { packages: LICENSES.length }),
+              summary: t("settings.licenses.summary", { packages: LICENCES.packages.length }),
               onPress: open("/settings/licenses"),
             },
           ]}

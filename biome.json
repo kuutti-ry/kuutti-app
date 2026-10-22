@@ -17,6 +17,7 @@
       "!apps/api/openapi.json",
       "!packages/schema/src/api.generated.ts",
       "!packages/i18n/src/generated",
+      "!apps/mobile/src/generated",
       "!apps/mobile/assets/glyphs"
     ]
   },
