@@ -87,4 +87,25 @@ describe("a preview's build", () => {
     // No path of an asset outside the preview's prefix.
     expect(code).not.toMatch(/(?<!\/pr-7)\/assets\//);
   });
+
+  it("writes the bundled packages' licences at its root, which its footer links under the preview (#416)", () => {
+    const licences = readFileSync(join(outDir, "licenses.txt"), "utf8");
+    for (const name of [
+      "react",
+      "react-dom",
+      "react-router",
+      "zod",
+      "i18next",
+      "intl-messageformat",
+    ]) {
+      expect(licences).toMatch(new RegExp(`^## ${name} - \\d`, "m"));
+    }
+    expect(licences).toContain("Copyright (c) Meta Platforms, Inc. and affiliates.");
+    expect(licences).toContain(
+      "Redistribution and use of this software in source and binary forms",
+    );
+    // Our own packages are the repository's licence, not a third party's.
+    expect(licences).not.toMatch(/^## @kuutti\//m);
+    expect([...emitted.values()].join("\n")).toContain("/pr-7/licenses.txt");
+  });
 });

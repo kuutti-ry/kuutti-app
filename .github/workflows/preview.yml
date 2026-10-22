@@ -406,9 +406,10 @@ jobs:
       - if: steps.open.outputs.open == 'true'
         run: .github/scripts/aws-oidc.sh
 
-      # As main's build is written (build.yml): the assets, then index.html,
-      # then the assets of the push before go. The trailing slash keeps
-      # pr-1/ from reaching pr-12/.
+      # As main's build is written (build.yml): the assets, then the
+      # licences and index.html, uncached under their fixed names, then the
+      # assets of the push before go. The trailing slash keeps pr-1/ from
+      # reaching pr-12/.
       - name: Write the build to pr-<n>/
         if: steps.open.outputs.open == 'true'
         env:
@@ -416,9 +417,10 @@ jobs:
         run: |
           prefix="s3://$BUCKET/pr-$PR_NUMBER/"
           immutable='public, max-age=31536000, immutable'
-          aws s3 sync dist "$prefix" --exclude index.html --cache-control "$immutable"
+          aws s3 sync dist "$prefix" --exclude index.html --exclude licenses.txt --cache-control "$immutable"
+          aws s3 cp dist/licenses.txt "${prefix}licenses.txt" --cache-control no-cache --content-type 'text/plain; charset=utf-8'
           aws s3 cp dist/index.html "${prefix}index.html" --cache-control no-cache
-          aws s3 sync dist "$prefix" --exclude index.html --cache-control "$immutable" --delete
+          aws s3 sync dist "$prefix" --exclude index.html --exclude licenses.txt --cache-control "$immutable" --delete
 
       # The preview's root and a page by its path both answer this build's
       # index.html (the CloudFront Function, ADR-025 §6), and the files it
@@ -441,6 +443,16 @@ jobs:
             [ "$ok" = true ] || { echo "::error::$URL$path does not answer this build's index.html"; exit 1; }
             echo "$URL$path answers this build's index.html"
           done
+          # The licences the footer links (#416), uncached like index.html.
+          ok=false
+          for _ in $(seq 1 12); do
+            if curl -fsS --max-time 10 -o "$RUNNER_TEMP/licenses.txt" "${URL}licenses.txt" && cmp -s "$RUNNER_TEMP/licenses.txt" dist/licenses.txt; then
+              ok=true; break
+            fi
+            sleep 5
+          done
+          [ "$ok" = true ] || { echo "::error::${URL}licenses.txt is not this build's licences"; exit 1; }
+          echo "${URL}licenses.txt answers this build's licences"
           origin="${URL%/pr-"$PR_NUMBER"/}"
           # Byte for byte: a file the bucket lacks answers 200 with the root's
           # index.html (the fallback, ADR-025 §2), so a status says nothing.

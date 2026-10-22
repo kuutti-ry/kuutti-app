@@ -11,6 +11,12 @@ export default defineConfig({
     // data: URL, which the host's CSP refuses (img-src 'self' and the API's
     // origin, ADR-025 §3).
     assetsInlineLimit: 0,
+    // The copyright lines and licence texts of the bundled packages (#416), at
+    // the build's root: not Vite's default .vite/license.md, since
+    // upload-artifact leaves hidden directories behind and the host answers a
+    // missing key with the panel's index.html. The deploys upload it uncached,
+    // a fixed name being no immutable asset; the footer links it.
+    license: { fileName: "licenses.txt" },
   },
   test: {
     environment: "jsdom",

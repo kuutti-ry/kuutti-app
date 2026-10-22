@@ -164,8 +164,12 @@ describe("App", () => {
   it("says so when the API cannot be reached, and never links an address that is not https", async () => {
     renderApp(async () => json({ ...health, source: "javascript:alert(1)" }));
     expect(await screen.findByText(/The API cannot be reached/)).toBeInTheDocument();
-    // The skip link is the page's own; the footer links nothing.
-    expect(within(screen.getByRole("contentinfo")).queryByRole("link")).toBeNull();
+    // The skip link is the page's own; the footer links only the panel's licences (#416).
+    expect(
+      within(screen.getByRole("contentinfo"))
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href")),
+    ).toEqual(["/licenses.txt"]);
   });
 
   it("is busy while a sign-in is being completed", () => {

@@ -14,13 +14,17 @@ COPY packages/schema/package.json packages/schema/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
 COPY packages/tunnistus-oidc/package.json packages/tunnistus-oidc/
+COPY packages/notices/package.json packages/notices/
 RUN pnpm install --frozen-lockfile --filter @kuutti/api...
 COPY tsconfig.base.json ./
 COPY packages/schema packages/schema
 COPY packages/db packages/db
 COPY packages/i18n packages/i18n
 COPY packages/tunnistus-oidc packages/tunnistus-oidc
+COPY packages/notices packages/notices
 COPY apps/api apps/api
+# tsup, then dist/THIRD_PARTY_NOTICES from what it bundled and node_modules/@img
+# (scripts/notices.ts, #416): a package with no licence text fails here.
 RUN pnpm --filter @kuutti/api build
 
 FROM node:22-bookworm-slim AS runtime
@@ -35,11 +39,15 @@ ENV APP_VERSION=$APP_VERSION GIT_COMMIT=$GIT_COMMIT BUILT_AT=$BUILT_AT
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/api/dist ./dist
 COPY --from=build --chown=node:node /repo/packages/db/drizzle ./drizzle
-# sharp's prebuilt addon and libvips for linux-arm64 (#48): the only packages
-# outside the bundle (tsup.config.ts). The build stage installed exactly the
-# platform's pair, so this is two directories; the API loads sharp at boot, so
-# a missing or wrong binary fails the smoke test in build.yml, not an upload.
+# sharp's prebuilt addon and libvips for linux-arm64 (#48), and @img/colour: the
+# only packages outside the bundle (tsup.config.ts). The build stage installed
+# exactly the platform's pair, so this is three directories (ADR-005); the API
+# loads sharp at boot, so a missing or wrong binary fails the smoke test in
+# build.yml, not an upload. Their notices are in dist/THIRD_PARTY_NOTICES.
 COPY --from=build --chown=node:node /repo/node_modules/@img ./node_modules/@img
+# The image is a copy of the API: its own licence goes with it, as the
+# packages' go with theirs (#416).
+COPY --chown=node:node LICENSE LICENSE-EXCEPTION ./
 COPY --chown=node:node apps/api/certs ./certs
 USER node
 EXPOSE 3000

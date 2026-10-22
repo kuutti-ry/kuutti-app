@@ -1,6 +1,6 @@
 # ADR-025: The moderation panel's host
 
-- Status: accepted (the open points at the end are the maintainer's)
+- Status: accepted, amended 2026-10-22 (§2 and §4: the licences file, #416; see History) (the open points at the end are the maintainer's)
 - Date: 2026-10-16
 - Follows: TD-2 (free tiers), ADR-004 §3 (the trust of the `preview` environment: write access), ADR-005 (the media distribution, signed photo URLs on the API's name), ADR-006 §7 (the panel had no host yet), ADR-012 (the preview sweep, which never waits for a person), ADR-014 §1 (no bank on a preview API), ADR-018 (staging is the demo, its data invented), rules/admin.md ("a static SPA built to S3 behind CloudFront on `admin.<domain>`; PR previews are a bucket prefix"), rules/infra.md; issues #313, #302, #106
 
@@ -58,3 +58,7 @@ Four things are not settled by that line. Since #302 the panel has a page per pa
 
 - A preview's login lands at the root: a small change to the panel's return path could send the person back into `/pr-<n>/` after the bank. It touches the delivery of the one-time code, so it waits for its own change and the security review.
 - Whether `http://localhost:5173` stays in staging's CORS list for a developer pointing a local panel at staging's API without signing in.
+
+## History
+
+- 2026-10-22 (#416): the build writes `licenses.txt` at its root, Vite's `build.license`: the copyright lines and licence texts of the bundled packages, which the footer links in each of its states, under the build's base. A second path with a dot that is not an asset: a missing one answers the panel's `index.html` with 200, as §2 says of an asset, so both deploys compare the served file with the build's byte for byte. Its name does not change from build to build, so it goes up as `index.html` does, `no-cache` beside the immutable assets (§4), with its type and charset (`text/plain; charset=utf-8`); Vite's default place, `.vite/`, would be left out of the build's artifact, which leaves hidden directories behind.
