@@ -17,12 +17,15 @@ export default defineConfig({
       // The command entries and the server's process shell (src/index.ts) run
       // as processes of their own, which coverage of the test workers cannot
       // see; they are tested by spawning them, the boot itself in boot.test.ts.
+      // The libvips gathering's needs the network and is the maintainer's to
+      // run; what it does is scripts/notices/libvips.ts, tested on fixtures (#421).
       exclude: [
         "**/*.test.ts",
         "src/test/**",
         "src/index.ts",
         "scripts/demo-*.ts",
         "scripts/notices.ts",
+        "scripts/notices-libvips.ts",
         "scripts/openapi.ts",
       ],
       reporter: ["text", "json-summary"],
