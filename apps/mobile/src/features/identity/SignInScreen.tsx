@@ -1,7 +1,7 @@
 import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Linking, Platform, ScrollView, View } from "react-native";
+import { AppState, Linking, Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,17 @@ import { ApiError, apiBaseUrl } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { markLoginStarted, takeLoginStarted } from "@/lib/session";
 import { useHapticTap } from "@/theme/haptics";
+import {
+  agreedOnThisPhone,
+  bindAgreements,
+  dropAgreements,
+  dropUnboundAgreements,
+  heldAgreements,
+  holdAgreements,
+  recordAgreements,
+  takeAgreements,
+} from "./agreements";
+import { BeforeSignIn } from "./BeforeSignIn";
 import { useSession } from "./session";
 import { challengeOf, newVerifier } from "./verifier";
 
@@ -55,6 +66,10 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
  * verifier kept with the mark, and the exchange sends the verifier, so a code
  * another app reads off the link is refused without it (ADR-027).
  * The API's language follows the browser's, which follows the phone.
+ * The bank is reached only past the terms and the privacy summary (#418,
+ * ADR-010 §15): until this phone has recorded the versions it carries, the
+ * screens before the bank stand where the button would, and their answers
+ * become the account's rows right after the exchange.
  */
 export function SignInScreen({ code, error, until }: SignInParams) {
   const { t, locale } = useT();
@@ -67,12 +82,39 @@ export function SignInScreen({ code, error, until }: SignInParams) {
   // A code is exchanged once, however often the screen re-renders with it.
   const exchanged = useRef<string | null>(null);
   const { signIn } = session;
+  // Whether the bank may be reached: answers held from this run, or the
+  // versions this phone recorded before; null while the phone is asked.
+  const [agreed, setAgreed] = useState<boolean | null>(() =>
+    heldAgreements() !== null ? true : null,
+  );
+  useEffect(() => {
+    if (agreed !== null) return;
+    let live = true;
+    void agreedOnThisPhone().then((yes) => {
+      if (live) setAgreed(yes);
+    });
+    return () => {
+      live = false;
+    };
+  }, [agreed]);
+  // Answers not yet carried to the bank end when the app leaves the screen.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "background" && dropUnboundAgreements()) setAgreed(null);
+    });
+    return () => subscription.remove();
+  }, []);
 
   // A refusal can arrive while this screen is shown: "Try again" opens the
   // browser from here, and the link comes back to the same screen with its
   // answer. The first state alone would go on saying that the bank is open.
+  // A refusal also ends the answers held for that attempt (#418): the phone
+  // is asked again whether it has recorded them.
   useEffect(() => {
-    if (error) setPhase({ kind: "error", code: error, until });
+    if (!error) return;
+    setPhase({ kind: "error", code: error, until });
+    dropAgreements();
+    setAgreed(null);
   }, [error, until]);
 
   const status = session.status;
@@ -88,6 +130,9 @@ export function SignInScreen({ code, error, until }: SignInParams) {
       }
       try {
         await signIn(code, verifier);
+        // Before the status is read: onboarding then finds them given.
+        const agreements = takeAgreements(challengeOf(verifier));
+        if (agreements) await recordAgreements(agreements);
         setPhase({ kind: "done" });
         router.replace("/");
       } catch (failure: unknown) {
@@ -95,12 +140,21 @@ export function SignInScreen({ code, error, until }: SignInParams) {
           kind: "error",
           code: failure instanceof ApiError && failure.code ? failure.code : "generic",
         });
+        dropAgreements();
+        setAgreed(null);
       }
     })();
   }, [code, status, signIn, router]);
 
   const open = async () => {
     tap();
+    // Never past the screens before the bank: the answers of this run, or
+    // the versions this phone recorded, or back to the screens.
+    if (heldAgreements() === null && !(await agreedOnThisPhone())) {
+      setAgreed(false);
+      setPhase({ kind: "idle" });
+      return;
+    }
     setPhase({ kind: "opening" });
     // What the last link said is put away, so that the next one is news even
     // when it says the same: the same refusal twice is two refusals.
@@ -109,7 +163,15 @@ export function SignInScreen({ code, error, until }: SignInParams) {
       // A verifier for this attempt alone: a second tap replaces the first's,
       // and a code from the first's browser tab is refused (ADR-027).
       const verifier = newVerifier();
-      await markLoginStarted(verifier);
+      const now = Date.now();
+      // The answers go with this attempt; carried into another already, they
+      // are asked again, and so is the bank's button on a phone that recorded them.
+      if (heldAgreements() !== null && !bindAgreements(challengeOf(verifier), now)) {
+        setAgreed(null);
+        setPhase({ kind: "idle" });
+        return;
+      }
+      await markLoginStarted(verifier, now);
       // The bank's chooser in the app's language, which can differ from the
       // phone's and so from the browser's (#55); en-XA asks for English.
       const bankLocale = locale === "fi" || locale === "sv" ? locale : "en";
@@ -138,6 +200,17 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     return t(REFUSALS.get(failure.code) ?? "signIn.error.generic");
   };
 
+  if (Platform.OS !== "web" && agreed === false && phase.kind === "idle") {
+    return (
+      <BeforeSignIn
+        onAgreed={(agreements) => {
+          holdAgreements(agreements);
+          setAgreed(true);
+        }}
+      />
+    );
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-background">
       <ScrollView contentContainerClassName="flex-grow items-center justify-center gap-4 p-6">
@@ -147,6 +220,18 @@ export function SignInScreen({ code, error, until }: SignInParams) {
         <Text className="w-full max-w-md text-center">{t("signIn.explain")}</Text>
 
         {/* Right after a break began on this device (#170): why the sign-in is back, and that nothing is lost. */}
+        {/* Right after the lock signed this phone out (#418): why, and that the lock is off now. */}
+        {session.status === "signed-out" && session.notice === "lock" && (
+          <Card className="w-full max-w-md">
+            <View accessibilityLabel={t("signIn.lock.title")} className="gap-6">
+              <CardHeader>
+                <CardTitle>{t("signIn.lock.title")}</CardTitle>
+                <CardDescription>{t("signIn.lock.body")}</CardDescription>
+              </CardHeader>
+            </View>
+          </Card>
+        )}
+
         {session.status === "signed-out" && session.notice === "paused" && (
           <Card className="w-full max-w-md">
             <View accessibilityLabel={t("signIn.paused.title")} className="gap-6">
@@ -190,15 +275,22 @@ export function SignInScreen({ code, error, until }: SignInParams) {
           <Text className="w-full max-w-md text-center">{t("signIn.unavailable")}</Text>
         )}
 
-        {Platform.OS !== "web" && phase.kind !== "exchanging" && phase.kind !== "done" && (
-          <Button
-            accessibilityLabel={phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")}
-            className="w-full max-w-md"
-            onPress={() => void open()}
-          >
-            <Text>{phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")}</Text>
-          </Button>
-        )}
+        {Platform.OS !== "web" &&
+          agreed !== null &&
+          phase.kind !== "exchanging" &&
+          phase.kind !== "done" && (
+            <Button
+              accessibilityLabel={
+                phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")
+              }
+              className="w-full max-w-md"
+              // Never past the screens before the bank: a refusal shown on a
+              // phone that has not answered them goes back to them first.
+              onPress={() => (agreed ? void open() : setPhase({ kind: "idle" }))}
+            >
+              <Text>{phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")}</Text>
+            </Button>
+          )}
       </ScrollView>
     </SafeAreaView>
   );

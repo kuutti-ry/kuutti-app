@@ -8,9 +8,11 @@ import { Platform } from "react-native";
  * for the current main photo (#297), the photo descriptions setting and
  * whether its one-time hint was seen (#296; both stay on the device, never
  * sent anywhere, since whether a person uses a screen reader is theirs
- * alone). expo-secure-store is already in the binary, so no storage module
+ * alone), the versions of the terms and the privacy summary this phone
+ * recorded after a bank login and whether the app's lock was offered here
+ * (#418). expo-secure-store is already in the binary, so no storage module
  * is added for a few strings; the web preview uses localStorage. Session
- * tokens do not go through here (rules/mobile.md).
+ * tokens and the lock itself do not go through here (rules/mobile.md).
  */
 export type PreferenceKey =
   | "locale"
@@ -19,7 +21,9 @@ export type PreferenceKey =
   | "photoTipsSeen"
   | "photoDescriptions"
   | "photoDescriptionsHintSeen"
-  | "decisionButtons";
+  | "decisionButtons"
+  | "agreedVersions"
+  | "lockOffered";
 
 const storageKey = (key: PreferenceKey): string => `kuutti.preference.${key}`;
 

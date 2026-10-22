@@ -35,6 +35,8 @@ import {
 import { fetchInvitations, InvitationStep } from "@/features/rewards";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { rememberAgreed } from "../agreements";
+import { NormsAndConsents } from "../BeforeSignIn";
 import { LegalTextLink } from "../LegalTextLink";
 import { consentLocale, declareGender, giveConsent, savePreferences } from "./client";
 import { useOnboarding } from "./useOnboarding";
@@ -51,23 +53,18 @@ type Step =
   | "pond"
   | "photos"
   | "prompts"
-  | "research"
   | "stuck"
   | "done";
 
-/** The screens, for "Step x of n"; the invitation code shares the welcome's number, the identity label the gender's. The pond is asked only where there is more than one (#174). */
-const STEPS: Step[] = [
-  "welcome",
-  "name",
-  "gender",
-  "seeks",
-  "intent",
-  "age",
-  "pond",
-  "photos",
-  "prompts",
-  "research",
-];
+/**
+ * The screens, for "Step x of n"; the identity label shares the gender's
+ * number. The pond is asked only where there is more than one (#174). The
+ * welcome step and a friend's invitation code count no number: the consents
+ * come before the bank login (#418), and the welcome step asks them again
+ * only when they did not land or a wording changed since; the code is
+ * offered once and never required (#107).
+ */
+const STEPS: Step[] = ["name", "gender", "seeks", "intent", "age", "pond", "photos", "prompts"];
 
 /**
  * A friend's invitation code (#107): not asked yet, asked of the API and
@@ -78,7 +75,6 @@ type InvitationOffer = "unasked" | "offered" | "done";
 
 /** What the screen keeps between two status reads: what the API's status does not say. */
 type LocalAnswers = {
-  researchOffered: boolean;
   invitation: InvitationOffer;
   /** A non-binary gender was just declared: the label is offered once, before the next step. */
   labelPending: boolean;
@@ -88,9 +84,11 @@ type LocalAnswers = {
  * The next question, from what the API says is missing, in the sheet's
  * order (#146, ADR-010 §10): the welcome screen with both consents first,
  * so nothing personal is asked before the person has read what happens to
- * it (ADR-010 §9); a friend's invitation code once, right after it, never
- * required (#107); then the name, the gender, whom one seeks, the intent,
- * the age window, the photos, the prompts; research once, never required.
+ * it (ADR-010 §9), though since #418 they are given before the bank login
+ * and the welcome step is the fallback (ADR-010 §15); a friend's invitation
+ * code once, before the name, never required (#107); then the name, the
+ * gender, whom one seeks, the intent, the age window, the photos, the
+ * prompts. Research is asked before the bank and kept in Settings.
  * A step the screen cannot ask (a pond without a default) is "stuck".
  */
 function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
@@ -109,7 +107,6 @@ function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   if (missing.has("pond")) return "pond";
   if (missing.has("photos")) return "photos";
   if (missing.has("prompts_or_bio")) return "prompts";
-  if (!status.consents.research && !local.researchOffered) return "research";
   if (missing.size > 0) return "stuck";
   return "done";
 }
@@ -166,8 +163,8 @@ function Chip({
 /**
  * The first minutes after the bank login (#46, #146, ADR-010): one question
  * per screen in the field sheet's order, every answer a button, the consents
- * shown as the exact version the person accepts, the article 9 consent on
- * the screen that collects whom one seeks, the research opt-in on its own.
+ * shown as the exact version the person accepts when they are asked again,
+ * the article 9 consent on the screen that collects whom one seeks.
  * The API decides what is still missing; this screen asks the next thing and
  * leaves when nothing is. The profile's own draft carries the name, the
  * label, the intent and the prompts (#47).
@@ -178,28 +175,13 @@ export function OnboardingScreen() {
   const tap = useHapticTap();
   const { state, busy, failed, failedCode, reload, step } = useOnboarding();
   const profile = useProfile();
-  const [researchOffered, setResearchOffered] = useState(false);
   const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
   const [seeks, setSeeks] = useState<Gender[]>([]);
   const [labelPending, setLabelPending] = useState(false);
   const [gender, setGender] = useState<Gender | null>(null);
   const [ages, setAges] = useState<{ min: number; max: number } | null>(null);
-  // Research put before (#146, #219), which this screen's memory, gone with the
-  // screen, cannot say but the status can: research is asked only once nothing
-  // else is open, so whom one seeks open alone means every step after it was
-  // answered and research put, and the sensitive-answers consent withdrawn or
-  // its wording changed since (ADR-010 §10, §13). Withdrawn halfway through a
-  // first walk, the later steps are open too, and research still comes after them.
-  useEffect(() => {
-    if (state.status !== "ready") return;
-    const { missing } = state.onboarding;
-    if (missing.length === 1 && missing[0] === "seeks") setResearchOffered(true);
-  }, [state]);
-
   const current: Step | null =
-    state.status === "ready"
-      ? nextStep(state.onboarding, { researchOffered, invitation, labelPending })
-      : null;
+    state.status === "ready" ? nextStep(state.onboarding, { invitation, labelPending }) : null;
   // Whether a code may still be typed, asked once the consents are given,
   // which the API's answer needs (ADR-044 §6): offered if so, and otherwise,
   // or when the read fails, the walk goes on without it.
@@ -297,10 +279,7 @@ export function OnboardingScreen() {
   }
   const { onboarding } = state;
   const { draft, update } = profile;
-  const position =
-    STEPS.indexOf(
-      current === "identityLabel" ? "gender" : current === "invitation" ? "welcome" : current,
-    ) + 1;
+  const position = STEPS.indexOf(current === "identityLabel" ? "gender" : current) + 1;
   const specialConsented =
     onboarding.consents.specialCategory === bundledVersion("special_category");
   const specialOutdated =
@@ -317,7 +296,7 @@ export function OnboardingScreen() {
         <Text variant="h1" accessibilityRole="header">
           {t("onboarding.title")}
         </Text>
-        {current !== "done" && (
+        {current !== "done" && current !== "welcome" && current !== "invitation" && (
           <Text variant="muted" accessibilityLiveRegion="polite">
             {t("onboarding.progress", { step: position, total: STEPS.length })}
           </Text>
@@ -342,30 +321,7 @@ export function OnboardingScreen() {
 
         {current === "welcome" && (
           <View className="gap-4">
-            <Text variant="h2">{t("onboarding.welcome.title")}</Text>
-            <View className="gap-2">
-              <Text>{t("onboarding.welcome.norm1")}</Text>
-              <Text>{t("onboarding.welcome.norm2")}</Text>
-              <Text>{t("onboarding.welcome.norm3")}</Text>
-              <Text>{t("onboarding.welcome.norm4")}</Text>
-            </View>
-            <Text>{t("onboarding.consents.explain")}</Text>
-            {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
-            {(["terms", "privacy"] as const).map((kind) => (
-              <Card key={kind}>
-                <CardHeader>
-                  <CardTitle>
-                    {t(kind === "terms" ? "legal.terms.title" : "legal.privacy.title")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="gap-2">
-                  <Text>
-                    {t(kind === "terms" ? "legal.terms.summary" : "legal.privacy.summary")}
-                  </Text>
-                  <LegalTextLink kind={kind} />
-                </CardContent>
-              </Card>
-            ))}
+            <NormsAndConsents />
             {(["terms", "privacy"] as const).some(
               (kind) => bundledVersion(kind) !== onboarding.currentVersions[kind],
             ) ? (
@@ -379,6 +335,8 @@ export function OnboardingScreen() {
                     for (const kind of ["terms", "privacy"] as ConsentKind[]) {
                       await giveConsent(kind, bundledVersion(kind), consentLocale(locale));
                     }
+                    // This phone has them now: the next sign-in here goes straight to the bank (#418).
+                    await rememberAgreed();
                   });
                 }}
               >
@@ -545,7 +503,7 @@ export function OnboardingScreen() {
                       disabled={busy || specialConsented}
                       onCheckedChange={(on) => {
                         tap();
-                        // Recorded as soon as it is given, like the research opt-in; the account card withdraws it.
+                        // Recorded as soon as it is given; Settings withdraws it, as it does the research opt-in.
                         if (on && !specialConsented) {
                           void step(() =>
                             giveConsent(
@@ -728,49 +686,6 @@ export function OnboardingScreen() {
               }}
             >
               {t("onboarding.prompts.save")}
-            </Button>
-          </View>
-        )}
-
-        {current === "research" && (
-          <View className="gap-4">
-            <Text variant="h2">{t("onboarding.research.title")}</Text>
-            {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
-            <Card>
-              <CardHeader>
-                <CardTitle>{t("legal.research.title")}</CardTitle>
-              </CardHeader>
-              <CardContent className="gap-2">
-                <Text>{t("legal.research.summary")}</Text>
-                <LegalTextLink kind="research" />
-              </CardContent>
-            </Card>
-            <Text variant="muted">{t("onboarding.research.later")}</Text>
-            {bundledVersion("research") !== onboarding.currentVersions.research ? (
-              <Text accessibilityLiveRegion="polite">{t("onboarding.consents.outdatedApp")}</Text>
-            ) : (
-              <Button
-                disabled={busy}
-                onPress={() => {
-                  tap();
-                  // A recorded yes shows up in the status; only "Not now" marks the offer as made.
-                  void step(() =>
-                    giveConsent("research", bundledVersion("research"), consentLocale(locale)),
-                  );
-                }}
-              >
-                {t("onboarding.research.yes")}
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              disabled={busy}
-              onPress={() => {
-                tap();
-                setResearchOffered(true);
-              }}
-            >
-              {t("onboarding.research.no")}
             </Button>
           </View>
         )}

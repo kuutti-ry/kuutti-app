@@ -1,4 +1,6 @@
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { useLocales } from "expo-localization";
 import type * as React from "react";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -219,9 +221,15 @@ const consented = (kind: string) => ({
   locale: "en",
 });
 
+const { __store: store } = jest.requireMock("expo-secure-store") as {
+  __store: Map<string, string>;
+};
+const AGREED = "kuutti.preference.agreedVersions";
+
 beforeEach(async () => {
   router.replace.mockReset();
   router.push.mockReset();
+  store.delete(AGREED);
   await saveSession({
     sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
     accessToken: token("access"),
@@ -233,26 +241,14 @@ beforeEach(async () => {
 
 describe("OnboardingScreen", () => {
   it("walks a registered account through the sheet's steps with buttons and leaves when nothing is missing", async () => {
+    // The terms and the privacy summary became rows right after the bank login (#418):
+    // the first question is the name, the first of eight numbered steps.
     const { server, calls } = fakeApi();
+    server.consents.push(consented("terms"), consented("privacy"));
     await show(<OnboardingScreen />);
-    // The welcome screen first: the norms and both consents, before anything personal is asked.
-    await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
-    expect(screen.getByText(/One round a day/)).toBeTruthy();
-    expect(screen.getByText("Terms of use")).toBeTruthy();
-    // Each summary's version links to the full text on the website (#208).
-    expect(
-      screen.getAllByRole("link", {
-        name: `Read the full text on kuutti.app (version ${VERSION})`,
-      }),
-    ).toHaveLength(2);
-    checkA11y();
-    await press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
-    await flush();
     await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
-    expect(server.consents.map((c) => [c.kind, c.version, c.locale])).toEqual([
-      ["terms", VERSION, "en"],
-      ["privacy", VERSION, "en"],
-    ]);
+    expect(screen.queryByText("How we do things here")).toBeNull();
+    expect(screen.getByText("Step 1 of 8")).toBeTruthy();
     checkA11y();
     await type(screen.getByLabelText("Name on your card"), "Aino");
     await press(screen.getByRole("button", { name: "Continue" }));
@@ -260,10 +256,12 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
     expect(server.profile?.displayName).toBe("Aino");
     checkA11y();
+    expect(screen.getByText("Step 2 of 8")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Woman" }));
     await press(screen.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
     expect(server.gender).toBe("woman");
+    expect(screen.getByText("Step 3 of 8")).toBeTruthy();
     checkA11y();
     await press(screen.getByRole("button", { name: "Men" }));
     await press(screen.getByRole("button", { name: "Non-binary people" }));
@@ -301,12 +299,13 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["man", "non_binary"]);
     expect(server.ageWindow).toEqual({ min: 30, max: 42 });
     checkA11y();
-    expect(screen.getByText("Step 8 of 10")).toBeTruthy();
+    // The pond is a step only where there is a choice (#174): its number stays, unshown here.
+    expect(screen.getByText("Step 7 of 8")).toBeTruthy();
     await press(screen.getByRole("button", { name: "Add photos" }));
     // The photos screen says the same step as every other one (#146).
     expect(router.push).toHaveBeenCalledWith({
       pathname: "/photos",
-      params: { step: "8", total: "10" },
+      params: { step: "7", total: "8" },
     });
     // Back from the photos screen with three photos: the focus reads the status again.
     server.photos = 3;
@@ -315,6 +314,7 @@ describe("OnboardingScreen", () => {
       await settle(120);
     });
     await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    expect(screen.getByText("Step 8 of 8")).toBeTruthy();
     checkA11y();
     await type(
       screen.getByLabelText("About you"),
@@ -322,17 +322,10 @@ describe("OnboardingScreen", () => {
     );
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await flush();
-    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
-    expect(
-      screen.getByRole("link", { name: `Read the full text on kuutti.app (version ${VERSION})` }),
-    ).toBeTruthy();
-    checkA11y();
-    await press(screen.getByRole("button", { name: "Not now" }));
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText("Help us learn how matching works")).toBeNull();
     expect(server.consents.map((c) => c.kind)).toEqual(["terms", "privacy", "special_category"]);
     expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual([
-      "/consents",
-      "/consents",
       "/profile",
       "/account/gender",
       "/consents",
@@ -347,18 +340,19 @@ describe("OnboardingScreen", () => {
     ]);
   });
 
-  it("offers a friend's invitation code once, right after the welcome, at the welcome's number, and Skip goes on to the name (#107)", async () => {
+  it("offers a friend's invitation code once, right after the welcome, counting no step, and Skip goes on to the name (#107, #418)", async () => {
     const { calls } = fakeApi({ redeemable: true });
     await show(<OnboardingScreen />);
     await press(await screen.findByRole("button", { name: "I'm in, and I accept both" }));
     await flush();
     await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
-    expect(screen.getByText("Step 1 of 10")).toBeTruthy();
+    // Offered once and never required: no number, as the welcome step has none.
+    expect(screen.queryByText(/^Step \d+ of \d+$/)).toBeNull();
     expect(screen.getByLabelText("Invitation code")).toBeTruthy();
     checkA11y();
     await press(screen.getByRole("button", { name: "Skip" }));
     await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
-    expect(screen.getByText("Step 2 of 10")).toBeTruthy();
+    expect(screen.getByText("Step 1 of 8")).toBeTruthy();
     // Once a walk: the status read again on focus does not bring it back.
     await act(async () => {
       focus();
@@ -621,6 +615,85 @@ describe("OnboardingScreen", () => {
     ]);
   });
 
+  it("The welcome step asks for the terms and the privacy summary when they are missing after the sign-in", async () => {
+    // The answers before the bank did not become rows (lost with the process, or a failed post).
+    const { server, calls } = fakeApi();
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
+    expect(screen.getByText(/One round a day/)).toBeTruthy();
+    expect(screen.getByText("Terms of use")).toBeTruthy();
+    expect(screen.getByText("Privacy")).toBeTruthy();
+    // English is a translation: the Finnish text is the binding one.
+    expect(screen.getByText(/The Finnish text is the one that counts/)).toBeTruthy();
+    // Each summary's version links to the full text on the website (#208).
+    expect(
+      screen.getAllByRole("link", {
+        name: `Read the full text on kuutti.app (version ${VERSION})`,
+      }),
+    ).toHaveLength(2);
+    // A step outside the count: nothing personal is numbered before the name.
+    expect(screen.queryByText(/^Step \d+ of \d+$/)).toBeNull();
+    expect(screen.queryByText("Help us learn how matching works")).toBeNull();
+    checkA11y();
+    await press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+    expect(screen.getByText("Step 1 of 8")).toBeTruthy();
+    expect(server.consents.map((c) => [c.kind, c.version, c.locale])).toEqual([
+      ["terms", VERSION, "en"],
+      ["privacy", VERSION, "en"],
+    ]);
+    expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual([
+      "/consents",
+      "/consents",
+    ]);
+    // This phone has them now: its next sign-in goes straight to the bank.
+    expect(JSON.parse(String(store.get(AGREED)))).toEqual({
+      terms: CONSENT_VERSIONS.terms,
+      privacy: CONSENT_VERSIONS.privacy,
+    });
+  });
+
+  it("gives the welcome step's consents in Finnish on a Finnish phone, with no line about a binding text", async () => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: "fi-FI" }]);
+    try {
+      const { server } = fakeApi();
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("Näin täällä toimitaan")).toBeTruthy());
+      expect(screen.queryByText(/Suomenkielinen teksti on sitova/)).toBeNull();
+      await press(screen.getByRole("button", { name: "Olen mukana ja hyväksyn molemmat" }));
+      await flush();
+      expect(server.consents.map((c) => [c.kind, c.locale])).toEqual([
+        ["terms", "fi"],
+        ["privacy", "fi"],
+      ]);
+      expect(store.has(AGREED)).toBe(true);
+    } finally {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+    }
+  });
+
+  it("stays at the welcome step, remembering nothing, when a consent there is refused", async () => {
+    const { server } = fakeApi();
+    const api = failingUntilOk("/consents");
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("How we do things here")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
+    await flush();
+    await waitFor(() =>
+      expect(screen.getByText("Something did not load. Try again.")).toBeTruthy(),
+    );
+    expect(screen.getByText("How we do things here")).toBeTruthy();
+    expect(server.consents).toEqual([]);
+    expect(store.has(AGREED)).toBe(false);
+    // Pressed again once the API takes it: both land, and only then is the phone remembered.
+    api.ok();
+    await press(screen.getByRole("button", { name: "I'm in, and I accept both" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+    expect(store.has(AGREED)).toBe(true);
+  });
+
   it("asks for an app update instead of recording a consent for a wording it did not show", async () => {
     const { server, calls } = fakeApi({ version: "2026-11-final-1" });
     await show(<OnboardingScreen />);
@@ -629,10 +702,11 @@ describe("OnboardingScreen", () => {
     expect(screen.queryByRole("button", { name: "I'm in, and I accept both" })).toBeNull();
     expect(calls.filter((c) => c.method === "POST")).toEqual([]);
     expect(server.consents).toEqual([]);
+    expect(store.has(AGREED)).toBe(false);
   });
 
-  /** Everything answered but the research question, the one step never required. */
-  function atResearch(server: ReturnType<typeof fakeApi>["server"]) {
+  /** Everything answered: nothing is missing, and research is no step of onboarding (#418). */
+  function allAnswered(server: ReturnType<typeof fakeApi>["server"]) {
     server.consents.push(consented("terms"), consented("privacy"), consented("special_category"));
     server.gender = "woman";
     server.seeks = ["man"];
@@ -665,24 +739,11 @@ describe("OnboardingScreen", () => {
     };
   }
 
-  it("records the research consent for the wording it showed when the person says yes, and leaves", async () => {
+  it("leaves once whom one seeks is answered anew after a withdrawal, asking nothing else (#146)", async () => {
+    // Onboarding walked once; then the sensitive-answers consent was withdrawn in
+    // Settings, and whom one seeks with it. The withdrawn row stays (ADR-010 §4).
     const { server } = fakeApi();
-    atResearch(server);
-    await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
-    // English is a translation: the Finnish text is the binding one.
-    expect(screen.getByText(/The Finnish text is the one that counts/)).toBeTruthy();
-    await press(screen.getByRole("button", { name: "Yes, I take part" }));
-    await flush();
-    expect(server.consents.at(-1)).toEqual(consented("research"));
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
-  });
-
-  it("does not offer research again when whom one seeks is asked anew after a withdrawal (#146)", async () => {
-    // Onboarding walked once, research declined; then the sensitive-answers consent was
-    // withdrawn in Settings, and whom one seeks with it. The withdrawn row stays (ADR-010 §4).
-    const { server } = fakeApi();
-    atResearch(server);
+    allAnswered(server);
     server.consents = server.consents.map((c) =>
       c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
     );
@@ -698,58 +759,28 @@ describe("OnboardingScreen", () => {
     expect(server.seeks).toEqual(["man"]);
   });
 
-  it("does not offer research again however long the consent history behind the withdrawal (#250)", async () => {
-    // A hundred research changes since (ten a day at most, ADR-010 §4): the list
-    // of consents no longer reaches the withdrawn row.
-    const { server } = fakeApi();
-    atResearch(server);
-    server.consents = server.consents.map((c) =>
-      c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
-    );
-    for (let i = 0; i < 100; i++) {
-      server.consents.push({ ...consented("research"), withdrawnAt: "2026-10-01T10:00:00.000Z" });
-    }
-    server.seeks = null;
+  it("Onboarding leaves after the last profile step without asking about research", async () => {
+    // A first walk with no research answer at all: the status says none was given.
+    const { server, calls } = fakeApi();
+    atWords(server);
     await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Men" }));
-    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
-    await press(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByText("A few words")).toBeTruthy());
+    expect(screen.getByText("Step 8 of 8")).toBeTruthy();
+    await type(screen.getByLabelText("About you"), "x".repeat(50));
+    await press(screen.getByRole("button", { name: "Save and continue" }));
     await flush();
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
     expect(screen.queryByText("Help us learn how matching works")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Yes, I take part" })).toBeNull();
+    expect(screen.getByText("All set. Your place in line is on the home screen.")).toBeTruthy();
+    // The words are the last thing saved; research is the screens before the bank's, and Settings'.
+    expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual(["/profile"]);
+    expect(server.consents.some((c) => c.kind === "research")).toBe(false);
   });
 
-  it("offers research once in a first walk where the consent was withdrawn before the research step (#250)", async () => {
-    // Settings reached halfway (a deep link, a status read that failed): the
-    // withdrawn row is there, but the photos step, and research after it, never were.
-    const { server } = fakeApi();
-    atResearch(server);
-    server.consents = server.consents.map((c) =>
-      c.kind === "special_category" ? { ...c, withdrawnAt: "2026-10-01T10:00:00.000Z" } : c,
-    );
-    server.seeks = null;
-    server.photos = 0;
-    await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("Whom are you looking for?")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Men" }));
-    await press(screen.getByLabelText("I consent to Kuutti storing whom I seek"));
-    await press(screen.getByRole("button", { name: "Continue" }));
-    await flush();
-    await waitFor(() => expect(screen.getByText("Two photos of you")).toBeTruthy());
-    server.photos = 3;
-    await act(async () => {
-      focus();
-      await settle(120);
-    });
-    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
-    await press(screen.getByRole("button", { name: "Not now" }));
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
-  });
-
-  it("asks for an app update instead of recording research for a wording it did not show", async () => {
+  it("is not held up by a research wording newer than the app's, since it asks none", async () => {
     const { server, calls } = fakeApi();
-    atResearch(server);
+    allAnswered(server);
     const answers = globalThis.fetch;
     globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
       const response = await answers(input, init);
@@ -759,11 +790,10 @@ describe("OnboardingScreen", () => {
       return json({ ...body, currentVersions: { ...body.currentVersions, research: "2027-01" } });
     }) as unknown as typeof fetch;
     await show(<OnboardingScreen />);
-    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
-    expect(screen.getByText(/Update the app to continue/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Yes, I take part" })).toBeNull();
-    await press(screen.getByRole("button", { name: "Not now" }));
-    expect(calls.filter((c) => c.method === "POST")).toEqual([]);
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
+    expect(screen.queryByText(/Update the app to continue/)).toBeNull();
+    expect(screen.queryByText("Help us learn how matching works")).toBeNull();
+    expect(calls.filter((c) => c.method !== "GET")).toEqual([]);
   });
 
   it("says the status could not be read, and reads it again on request", async () => {
@@ -784,7 +814,7 @@ describe("OnboardingScreen", () => {
 
   it("says the areas could not be read, and reads them again on request", async () => {
     const { server } = fakeApi();
-    atResearch(server);
+    allAnswered(server);
     server.pond = null;
     const api = failingUntilOk("/ponds");
     await show(<OnboardingScreen />);
@@ -841,7 +871,7 @@ describe("OnboardingScreen", () => {
 
   it("keeps no bio when the one typed is cleared again", async () => {
     const { server } = fakeApi();
-    atResearch(server);
+    allAnswered(server);
     server.profile = {
       displayName: "Aino",
       bio: null,
@@ -860,7 +890,7 @@ describe("OnboardingScreen", () => {
 
   it("finishes the step for words of one's own with a ready line alone (#239)", async () => {
     const { server } = fakeApi();
-    atResearch(server);
+    allAnswered(server);
     server.profile = {
       displayName: "Aino",
       bio: null,
@@ -876,7 +906,7 @@ describe("OnboardingScreen", () => {
     await press(screen.getByRole("button", { name: "Save and continue" }));
     await flush();
     expect(server.profile).toMatchObject({ bio: null, bioPreset: "photos_speak", prompts: [] });
-    await waitFor(() => expect(screen.getByText("Help us learn how matching works")).toBeTruthy());
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/"));
   });
 
   it("asks for an app update instead of recording the sensitive-answers consent for a newer wording", async () => {
