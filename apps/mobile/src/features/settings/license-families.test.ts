@@ -1,4 +1,4 @@
-import LICENSES from "@/generated/licenses.json";
+import { LICENCES } from "./licences";
 import { type LicenseEntry, licenseGroups } from "./license-families";
 
 const entry = (name: string): LicenseEntry => ({ name, version: "1.0.0", license: "MIT" });
@@ -54,10 +54,10 @@ describe("the licences in families (#376)", () => {
   });
 
   it("keeps every package of this build once, with its licence", () => {
-    const groups = licenseGroups(LICENSES);
+    const groups = licenseGroups(LICENCES.packages);
     const flat = groups.flatMap((g) => g.entries);
-    expect(flat).toHaveLength(LICENSES.length);
-    expect(new Set(flat)).toEqual(new Set(LICENSES));
+    expect(flat).toHaveLength(LICENCES.packages.length);
+    expect(new Set(flat)).toEqual(new Set(LICENCES.packages));
     expect(groups.at(-1)?.family).toBeNull();
   });
 });

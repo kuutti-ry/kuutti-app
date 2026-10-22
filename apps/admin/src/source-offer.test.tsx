@@ -1,11 +1,12 @@
 import { I18nProvider } from "@kuutti/i18n/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "./i18n.ts";
 import { SourceOffer } from "./source-offer.tsx";
 
 // The footer's source-code offer (AGPL-3.0 section 13, #16): what the running
-// API names in /health, and nothing when it cannot be asked.
+// API names in /health, and nothing when it cannot be asked; and in every state
+// the licences of the panel's packages (#416).
 
 const health = {
   status: "ok",
@@ -34,7 +35,7 @@ afterEach(() => {
 });
 
 describe("SourceOffer", () => {
-  it("is a busy, empty footer while the API has not answered", () => {
+  it("holds a busy, empty offer while the API has not answered, and the licences", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() => new Promise<Response>(() => {})),
@@ -43,8 +44,17 @@ describe("SourceOffer", () => {
     // ...and never says the API is unreachable while it is merely slow.
     expect(screen.queryByText(/The API cannot be reached/)).toBeNull();
     const footer = screen.getByRole("contentinfo");
-    expect(footer).toHaveAttribute("aria-busy", "true");
-    expect(footer).toBeEmptyDOMElement();
+    const offer = footer.querySelector('[aria-busy="true"]');
+    expect(offer).toBeEmptyDOMElement();
+    // The link stays out of the busy part, so a screen reader reaches it while the API is slow.
+    expect(offer?.contains(screen.getByRole("link", { name: "Licences of the packages" }))).toBe(
+      false,
+    );
+    expect(
+      within(footer)
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href")),
+    ).toEqual(["/licenses.txt"]);
   });
 
   it("asks the API's /health and links the source it names, opening outside the panel", async () => {
@@ -57,6 +67,10 @@ describe("SourceOffer", () => {
     expect(link).toHaveAttribute("rel", "noreferrer noopener");
     expect(screen.getByRole("contentinfo")).toHaveTextContent("runs commit abc1234");
     expect(fetch).toHaveBeenCalledWith("http://localhost:3000/health", expect.anything());
+    expect(screen.getByRole("link", { name: "Licences of the packages" })).toHaveAttribute(
+      "href",
+      "/licenses.txt",
+    );
   });
 
   it("says the source is unknown when the request fails outright", async () => {
@@ -68,7 +82,10 @@ describe("SourceOffer", () => {
     );
     show();
     expect(await screen.findByText(/The API cannot be reached/)).toBeInTheDocument();
-    expect(screen.queryByRole("link")).toBeNull();
+    // The licences are the panel's own file, not the API's: linked all the same.
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual([
+      "/licenses.txt",
+    ]);
   });
 
   it("says the source is unknown when the answer is not the health contract", async () => {

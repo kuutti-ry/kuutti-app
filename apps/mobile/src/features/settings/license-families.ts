@@ -33,16 +33,16 @@ const FAMILIES: ReadonlyArray<{ name: string; owns: (pkg: string) => boolean }> 
   { name: "FormatJS", owns: (pkg) => pkg.startsWith("@formatjs/") },
 ];
 
-export type LicenseGroup = {
+export type LicenseGroup<T extends LicenseEntry = LicenseEntry> = {
   /** The family's name, or null for the packages of no family, which come last. */
   family: string | null;
-  entries: LicenseEntry[];
+  entries: T[];
 };
 
 /** The packages in their families, each in the list's own order; a family with none is left out. */
-export function licenseGroups(entries: readonly LicenseEntry[]): LicenseGroup[] {
-  const groups: LicenseGroup[] = [
-    ...FAMILIES.map(({ name }) => ({ family: name, entries: [] as LicenseEntry[] })),
+export function licenseGroups<T extends LicenseEntry>(entries: readonly T[]): LicenseGroup<T>[] {
+  const groups: LicenseGroup<T>[] = [
+    ...FAMILIES.map(({ name }) => ({ family: name, entries: [] as T[] })),
     { family: null, entries: [] },
   ];
   for (const entry of entries) {

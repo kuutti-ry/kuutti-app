@@ -234,6 +234,7 @@ export type MessageParams = {
   "admin.feedback.total": { "total": number };
   "admin.forbidden": Record<never, never>;
   "admin.late": { "hours": string };
+  "admin.licenses.link": Record<never, never>;
   "admin.nav.accounts": Record<never, never>;
   "admin.nav.audit": Record<never, never>;
   "admin.nav.automaticBans": Record<never, never>;
@@ -1521,8 +1522,14 @@ export type MessageParams = {
   "tech.environment": { "environment": string };
   "tech.errorTest.send": Record<never, never>;
   "tech.errorTest.sent": Record<never, never>;
+  "tech.licenses.from": { "address": string };
+  "tech.licenses.licence": Record<never, never>;
+  "tech.licenses.licenceAt": { "place": number };
+  "tech.licenses.notice": Record<never, never>;
   "tech.licenses.other": Record<never, never>;
   "tech.licenses.title": Record<never, never>;
+  "tech.licenses.unknown": Record<never, never>;
+  "tech.licenses.version": { "version": string; "license": string };
   "tech.title": Record<never, never>;
   "tech.unavailable": Record<never, never>;
 };

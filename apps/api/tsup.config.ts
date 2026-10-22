@@ -23,6 +23,9 @@ export default defineConfig({
   noExternal: [/.*/],
   external: ["pg-native", "pino-pretty", /^@img\//],
   sourcemap: true,
+  // The inputs of each output, which scripts/notices.ts reads for the image's
+  // THIRD_PARTY_NOTICES and then removes (#416).
+  metafile: true,
   clean: true,
   minify: false,
   // CommonJS dependencies (pg, pino) call require() at runtime; an ESM bundle has

@@ -15,6 +15,7 @@ export { LicensesScreen } from "./LicensesScreen";
 export { LockOfferScreen } from "./LockOfferScreen";
 export { LockSettingsScreen } from "./LockSettingsScreen";
 export { NotificationsSettingsScreen } from "./NotificationsSettingsScreen";
+export { PackageLicenseScreen } from "./PackageLicenseScreen";
 export { PhotoDescriptionsScreen } from "./PhotoDescriptionsScreen";
 export { ScreenReaderHint } from "./ScreenReaderHint";
 export { SettingsScreen } from "./SettingsScreen";
