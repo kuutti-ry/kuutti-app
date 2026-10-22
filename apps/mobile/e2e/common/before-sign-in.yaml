@@ -1,0 +1,48 @@
+# The screens before the bank (#418, ADR-010 §15), when they stand where the
+# sign-in button would: the norms with the terms and the privacy summary, then
+# the research question; both accepted, research Not now, which records
+# nothing, so no persona's research answer changes. The phone remembers them
+# after its first sign-in, so most logins never see them; the first flow on a
+# fresh phone (each CI job's) always does, and so does every try after a
+# refusal until a sign-in records them, since the app drops the answers of a
+# refused attempt. Asked as `notVisible`, in half a second, and tapped behind a
+# flag the condition clears (README); each screen is told by its heading or by
+# a button the flow's own scroll leaves in view, so a try that stopped halfway
+# goes on from where it is. Ends at the sign-in button, with
+# `output.beforeSignIn` saying whether the screens came. Runs from bank-login.yaml.
+appId: fi.kuutti.app
+---
+- evalScript: ${output.beforeSignIn = true}
+- runFlow:
+    when:
+      notVisible: "Before you sign in|Ennen kuin kirjaudut|Innan du loggar in|I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda|Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar|Yes, I take part|Kyllä, osallistun|Ja, jag deltar|Not now|Ei nyt|Inte nu"
+    commands:
+      - evalScript: ${output.beforeSignIn = false}
+- runFlow:
+    when:
+      true: ${output.beforeSignIn}
+    commands:
+      # Below the norms and both texts, under the fold on a phone; skipped
+      # when the research question is already there.
+      - runFlow:
+          when:
+            notVisible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar|Yes, I take part|Kyllä, osallistun|Ja, jag deltar|Not now|Ei nyt|Inte nu"
+          commands:
+            - scrollUntilVisible:
+                element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+                direction: DOWN
+                centerElement: true
+                timeout: 60000
+            - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+            - extendedWaitUntil:
+                visible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
+                timeout: 15000
+      - scrollUntilVisible:
+          element: "Not now|Ei nyt|Inte nu"
+          direction: DOWN
+          centerElement: true
+          timeout: 60000
+      - tapOn: "Not now|Ei nyt|Inte nu"
+      - extendedWaitUntil:
+          visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+          timeout: 15000

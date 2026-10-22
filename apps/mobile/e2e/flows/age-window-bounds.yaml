@@ -10,13 +10,9 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
     file: ../common/sign-in.yaml
     env:
       PERSONA: Siiri Koskinen
-- scrollUntilVisible:
-    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
-# A friend's invitation code, offered once after the welcome, skipped (#107).
+# The welcome step when it comes (#418), then the invitation code.
+- runFlow: ../common/welcome-step.yaml
+# A friend's invitation code, offered once to a newcomer before the name, skipped (#107).
 - extendedWaitUntil:
     visible: "Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
     timeout: 15000
@@ -98,4 +94,4 @@ name: At 99 the age window starts at 94 to 99 and neither end can leave the boun
 - extendedWaitUntil:
     visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
     timeout: 15000
-- assertVisible: "Step 8 of 10|Vaihe 8 / 10|Steg 8 av 10"
+- assertVisible: "Step 7 of 8|Vaihe 7 / 8|Steg 7 av 8"

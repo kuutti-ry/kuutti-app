@@ -1,7 +1,8 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { act, fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -26,6 +27,13 @@ const mockBuild = jest.fn((): { version: string | null; commit: string | null } 
 jest.mock("@/lib/build", () => ({ buildInfo: () => mockBuild() }));
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+const auth = jest.requireMock("expo-local-authentication") as Record<
+  | "hasHardwareAsync"
+  | "isEnrolledAsync"
+  | "supportedAuthenticationTypesAsync"
+  | "authenticateAsync",
+  jest.Mock
+>;
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { back: jest.Mock; push: jest.Mock };
 };
@@ -99,6 +107,7 @@ describe("the settings screen", () => {
     for (const name of headings) expect(screen.getByRole("heading", { name })).toBeTruthy();
     // This device's screen says there is no session; the rest of the account needs a person.
     expect(row("This device")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Lock" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Research" })).toBeNull();
     expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Your contacts" })).toBeNull();
@@ -141,6 +150,7 @@ describe("the settings screen", () => {
       "Decision buttons",
       "Account",
       "This device",
+      "Lock",
       "E-mail",
       "Your contacts",
       "Notifications",
@@ -181,6 +191,9 @@ describe("the settings screen", () => {
     // The rows with a value keep it under the title: the theme, the language, a version, the count.
     expect(row("Theme").props.accessibilityValue?.text).toBe("System");
     expect(row("Language").props.accessibilityValue?.text).toBe("Phone's language");
+    // The lock's state is its value, heard once: not again as a hint.
+    expect(row("Lock").props.accessibilityValue).toEqual({ text: "Off" });
+    expect(row("Lock").props.accessibilityHint).toBeUndefined();
     expect(row("Terms of use").props.accessibilityHint).toMatch(/^Version /);
     expect(row("Licences").props.accessibilityHint).toMatch(/packages this build is made of$/);
   });
@@ -217,6 +230,7 @@ describe("the settings screen", () => {
       ["Source code", "/settings/source"],
       ["Licences", "/settings/licenses"],
       ["This device", "/settings/device"],
+      ["Lock", "/settings/lock"],
       ["E-mail", "/settings/email"],
       ["Your contacts", "/settings/contacts"],
       ["Notifications", "/settings/notifications"],
@@ -278,8 +292,12 @@ describe("the settings screen", () => {
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
     expect(row("Research").props.accessibilityValue?.text).toBeUndefined();
-    expect(screen.queryByText("On")).toBeNull();
-    expect(screen.queryByText("Off")).toBeNull();
+    expect(row("Sensitive answers").props.accessibilityValue?.text).toBeUndefined();
+    // Scoped to the consents' rows: the lock's row says its own state beside them.
+    for (const name of ["Research", "Sensitive answers"]) {
+      expect(within(row(name)).queryByText("On")).toBeNull();
+      expect(within(row(name)).queryByText("Off")).toBeNull();
+    }
   });
 
   it("names the version without a build, and a question mark when the build names none", async () => {
@@ -318,5 +336,52 @@ describe("the settings screen", () => {
     expect(row("Decision buttons").props.accessibilityValue).toEqual({
       text: "Left hand, one-handed",
     });
+  });
+});
+
+describe("the lock's row (#418)", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    // Back to the phone of jest.setup.js: neither face nor fingerprint.
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    auth.supportedAuthenticationTypesAsync.mockResolvedValue([]);
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+  });
+
+  it("stands after This device for a person on the phone, says Off until the lock is on, and opens its screen", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    expect(row("Lock").props.accessibilityValue).toEqual({ text: "Off" });
+    expect(within(row("Lock")).getByText("Off")).toBeTruthy();
+    await press(row("Lock"));
+    expect(router.push).toHaveBeenLastCalledWith("/settings/lock");
+  });
+
+  it("says On while the lock is on, read once the face has opened it", async () => {
+    auth.authenticateAsync.mockClear();
+    auth.hasHardwareAsync.mockResolvedValue(true);
+    auth.isEnrolledAsync.mockResolvedValue(true);
+    auth.supportedAuthenticationTypesAsync.mockResolvedValue([2]);
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    store.set("kuutti.lock", JSON.stringify({ biometrics: true, passcode: null, graceMinutes: 1 }));
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Kuutti is locked")).toBeNull();
+    expect(row("Lock").props.accessibilityValue).toEqual({ text: "On" });
+    expect(within(row("Lock")).getByText("On")).toBeTruthy();
+  });
+
+  it("is not there on the web preview, which has no lock", async () => {
+    jest.replaceProperty(Platform, "OS", "web");
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    expect(row("This device")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Lock" })).toBeNull();
   });
 });

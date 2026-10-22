@@ -902,6 +902,21 @@
       "notices": []
     },
     {
+      "name": "expo-local-authentication",
+      "version": "57.0.3",
+      "license": "MIT",
+      "licences": [
+        {
+          "file": "LICENSE",
+          "copyright": [
+            "Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)"
+          ],
+          "text": "bccaa8b6c09f"
+        }
+      ],
+      "notices": []
+    },
+    {
       "name": "expo-localization",
       "version": "57.0.2",
       "license": "MIT",

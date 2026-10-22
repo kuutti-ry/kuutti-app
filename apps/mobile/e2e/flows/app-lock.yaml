@@ -1,0 +1,110 @@
+# The app's lock (#418, ADR-045) with a passcode of Kuutti's own: set in
+# Settings › Lock, typed twice, with "Straight away" for the time in the
+# background; a cold start shows the lock, a wrong passcode is refused in
+# words with the tries left, the right one opens home; back from the
+# background the lock stands again, and "Sign in with the bank instead" signs
+# the phone out, which the sign-in screen then says. Face and fingerprint are
+# a device's to check by hand: Maestro has no biometrics. Sanna, read only:
+# the lock lives in this phone's secure store and changes nothing on her
+# account, so her flows' rule of leaving the account as found holds. The flow
+# ends signed out with the lock off, and the next flow signs in as ever; a run
+# that stops with the lock on is no matter either, since sign-out.yaml leaves
+# the lock through the bank.
+appId: fi.kuutti.app
+name: A passcode set in Settings locks the app at a cold start and back from the background, and the bank is the way out
+---
+- runFlow: ../common/sign-in.yaml
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# The lock's row is this device's, under its session's row (#287) below the
+# fold on a phone; it says On or Off after its title.
+- scrollUntilVisible:
+    element: "(Lock|Lukitus|Lås)(, .*)?"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "(Lock|Lukitus|Lås)(, .*)?"
+- extendedWaitUntil:
+    visible: "Lock Kuutti on this phone, so that somebody else holding it cannot open your matches and conversations\\. The lock stays on this phone, and logging out turns it off\\.|Lukitse Kuutti tällä puhelimella, jotta kukaan muu puhelinta pitelevä ei pääse matcheihisi ja keskusteluihisi\\. Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen\\.|Lås Kuutti på den här telefonen, så att ingen annan som håller i den kan öppna dina matcher och samtal\\. Låset gäller bara den här telefonen, och när du loggar ut stängs det av\\."
+    timeout: 15000
+- waitForAnimationToEnd
+- tapOn: "Set a passcode|Aseta pääsykoodi|Välj en lösenkod"
+
+# Six digits, typed twice; the sixth moves on, there is no button. The field
+# takes the focus as it opens, and lies below its label of the same name.
+- extendedWaitUntil:
+    visible: "Choose a passcode of six digits|Valitse kuusinumeroinen pääsykoodi|Välj en lösenkod med sex siffror"
+    timeout: 15000
+- tapOn:
+    below: "Choose a passcode of six digits|Valitse kuusinumeroinen pääsykoodi|Välj en lösenkod med sex siffror"
+- inputText: "246810"
+- extendedWaitUntil:
+    visible: "Type the same six digits again|Kirjoita samat kuusi numeroa uudelleen|Skriv samma sex siffror igen"
+    timeout: 15000
+- tapOn:
+    below: "Type the same six digits again|Kirjoita samat kuusi numeroa uudelleen|Skriv samma sex siffror igen"
+- inputText: "246810"
+- extendedWaitUntil:
+    visible: "A passcode is set\\.|Pääsykoodi on asetettu\\.|En lösenkod är vald\\."
+    timeout: 15000
+# A tap on the line, which is no button, closes the keyboard (README); the
+# time in the background shows once the lock is on, after one minute at first.
+- tapOn: "A passcode is set\\.|Pääsykoodi on asetettu\\.|En lösenkod är vald\\."
+- scrollUntilVisible:
+    element: "Straight away|Heti|Direkt"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Straight away|Heti|Direkt"
+# The chosen one is marked in its words, never by colour alone.
+- extendedWaitUntil:
+    visible: ".*✓.*(Straight away|Heti|Direkt).*"
+    timeout: 15000
+
+# A cold start: the lock over everything, its passcode's field below its label.
+- stopApp
+- runFlow: ../common/open-app.yaml
+- extendedWaitUntil:
+    visible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
+    timeout: 15000
+# No tap on the field: it has the focus as the lock shows (no face or finger
+# here), and the number pad is up, so a tap "below" the label lands on a key
+# (CI, 22/10/2026: its "1"). Typed once the screen has settled and focused it.
+- waitForAnimationToEnd
+- inputText: "111111"
+- extendedWaitUntil:
+    visible: "Wrong passcode\\. 4 tries left\\.|Väärä pääsykoodi\\. 4 yritystä jäljellä\\.|Fel lösenkod\\. 4 försök kvar\\."
+    timeout: 15000
+# The field keeps the focus and the number pad stays up after a wrong try.
+- inputText: "246810"
+# The lock goes, and home is there; it lay below the lock all along, so the
+# lock's going is what is waited for.
+- extendedWaitUntil:
+    notVisible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Your area|Alueesi|Ditt område"
+    timeout: 15000
+
+# Back from the background with no time allowed: locked again.
+- pressKey: Home
+- openLink: kuutti://
+- extendedWaitUntil:
+    visible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
+    timeout: 15000
+# The bank is always the way out. A tap on the title, which is no button,
+# closes the keyboard the passcode's field opened (README).
+- tapOn: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
+- scrollUntilVisible:
+    element: "Sign in with the bank instead|Kirjaudu mieluummin pankkitunnuksilla|Logga in med banken i stället"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- tapOn: "Sign in with the bank instead|Kirjaudu mieluummin pankkitunnuksilla|Logga in med banken i stället"
+# Signed out, and the sign-in screen says why.
+- extendedWaitUntil:
+    visible: "Signed out by the lock|Lukitus kirjasi sinut ulos|Låset loggade ut dig"
+    timeout: 15000
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"

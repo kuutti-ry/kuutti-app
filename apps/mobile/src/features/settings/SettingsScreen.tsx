@@ -1,11 +1,11 @@
 import { CONSENT_VERSIONS, LOCALE_NAMES } from "@kuutti/i18n";
 import { useRouter } from "expo-router";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type Row, RowGroup } from "@/components/RowGroup";
 import { ScreenHeader } from "@/components/ScreenHeader";
 import { Text } from "@/components/ui/text";
-import { type ConsentState, useConsentStates, useSession } from "@/features/identity";
+import { type ConsentState, useConsentStates, useLock, useSession } from "@/features/identity";
 import { buildInfo } from "@/lib/build";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useLocaleSettings, useT } from "@/lib/locale";
@@ -33,17 +33,17 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
  * sections the way the profile's front page is one (#227, #287), each row a
  * screen of its own, in the order of #376. Appearance and language (the OS's
  * and the phone's by default, kept across restarts, and the photo
- * descriptions of #296); the account, this device, the e-mail, the contacts
- * to share in a conversation (#103), the notifications (#176), the
- * invitations (#107), the feedback to the moderators (#171), and the export,
- * the break and the deletion last (#51, #148, #170); the legal part, the two
- * consents (#46, #146) and the texts they refer to; about Kuutti, the
- * version, the source offer of AGPL-3.0 section 13 (visible to everybody) and
- * the licences. A row's second line is its value (the theme, a consent on or
- * off, a version), never a description of the row its title already names
- * (#376). The tech config screen keeps what is technical beyond the version
- * (the API, the native build, a test error) and exists outside production
- * only.
+ * descriptions of #296); the account, this device and its lock (#418), the
+ * e-mail, the contacts to share in a conversation (#103), the notifications
+ * (#176), the invitations (#107), the feedback to the moderators (#171), and
+ * the export, the break and the deletion last (#51, #148, #170); the legal
+ * part, the two consents (#46, #146) and the texts they refer to; about
+ * Kuutti, the version, the source offer of AGPL-3.0 section 13 (visible to
+ * everybody) and the licences. A row's second line is its value (the theme, a
+ * consent on or off, a version), never a description of the row its title
+ * already names (#376). The tech config screen keeps what is technical beyond
+ * the version (the API, the native build, a test error) and exists outside
+ * production only.
  */
 export function SettingsScreen() {
   const { t } = useT();
@@ -80,6 +80,7 @@ export function SettingsScreen() {
     : handName;
   const { version, commit } = buildInfo();
   const signedIn = session.status === "signed-in";
+  const lockWords = useLock().settings === null ? t("settings.state.off") : t("settings.state.on");
   const consents = useConsentStates();
   /** A consent's state in words, for its row; nothing while it is unknown. */
   const consentWords = (state: ConsentState): string | undefined =>
@@ -152,6 +153,18 @@ export function SettingsScreen() {
               title: t("settings.session.label"),
               onPress: open("/settings/device"),
             },
+            // The lock is this phone's, beside its session (#418); the web preview has none.
+            ...(signedIn && Platform.OS !== "web"
+              ? [
+                  {
+                    key: "lock",
+                    title: t("settings.lock.label"),
+                    summary: lockWords,
+                    value: lockWords,
+                    onPress: open("/settings/lock"),
+                  },
+                ]
+              : []),
             ...(signedIn
               ? [
                   {

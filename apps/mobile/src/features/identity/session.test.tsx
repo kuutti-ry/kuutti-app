@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 import { ApiError } from "@/lib/api";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { exportFileName, SessionProvider, useSession } from "./session";
@@ -64,6 +65,22 @@ describe("SessionProvider: starting", () => {
     const { result } = await session();
     expect(result.current).toMatchObject({ status: "signed-in", sessionId: SESSION_ID });
     expect(result.current).not.toHaveProperty("outcome");
+  });
+
+  it("lets a read of the stored session that ends after the provider has gone change nothing", async () => {
+    await saveSession(tokens());
+    serve({});
+    let answer: (stored: string | null) => void = () => undefined;
+    const getItem = jest
+      .spyOn(SecureStore, "getItemAsync")
+      .mockImplementationOnce(() => new Promise((resolve) => (answer = resolve)));
+    const error = jest.spyOn(console, "error");
+    const view = await renderHook(() => useSession(), { wrapper: SessionProvider });
+    expect(view.result.current.status).toBe("loading");
+    expect(getItem).toHaveBeenCalledWith("kuutti.session");
+    await view.unmount();
+    await act(async () => answer(null));
+    expect(error).not.toHaveBeenCalled();
   });
 
   it("follows a store change made elsewhere, such as a refused refresh signing the device out", async () => {
@@ -137,6 +154,8 @@ describe("SessionProvider: signing out", () => {
     await act(async () => result.current.signOut());
     expect(seen.map((s) => s.path)).toEqual(["/auth/logout"]);
     expect(result.current.status).toBe("signed-out");
+    // A plain log out has nothing for the sign-in screen to say.
+    expect(result.current).not.toHaveProperty("notice");
     expect(currentSession()).toBeNull();
   });
 
@@ -146,6 +165,67 @@ describe("SessionProvider: signing out", () => {
     const { result } = await session();
     await act(async () => result.current.signOut());
     expect(result.current.status).toBe("signed-out");
+    expect(result.current).not.toHaveProperty("notice");
+  });
+
+  it("names the lock as the reason when the lock's way out signs the device out (#418)", async () => {
+    await saveSession(tokens());
+    const seen = serve({ "POST /auth/logout": () => new Response(null, { status: 204 }) });
+    const { result } = await session();
+    await act(async () => result.current.signOut("lock"));
+    // The same log out as any other: the API's session ends, and the device's.
+    expect(seen.map((s) => `${s.method} ${s.path}`)).toEqual(["POST /auth/logout"]);
+    expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
+    expect(currentSession()).toBeNull();
+  });
+
+  it("keeps the lock's notice when the API cannot be reached, signed out all the same", async () => {
+    await saveSession(tokens());
+    serve({});
+    const { result } = await session();
+    await act(async () => result.current.signOut("lock"));
+    expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
+    expect(currentSession()).toBeNull();
+  });
+
+  it("signs the device out within five seconds when the API never answers the logout", async () => {
+    await saveSession(tokens());
+    const { result } = await session();
+    jest.useFakeTimers();
+    try {
+      globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+      let done = false;
+      await act(async () => {
+        void result.current.signOut("lock").then(() => {
+          done = true;
+        });
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(4_999);
+      });
+      expect(done).toBe(false);
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(done).toBe(true);
+      expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
+      expect(currentSession()).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("drops an earlier notice at the next sign-in", async () => {
+    await saveSession(tokens());
+    serve({ "POST /auth/exchange": () => json({ ...tokens("b"), outcome: "resumed" }) });
+    const { result } = await session();
+    await act(async () => result.current.signOut("lock"));
+    expect(result.current).toMatchObject({ notice: "lock" });
+    await act(async () => {
+      await result.current.signIn(token("code"), VERIFIER);
+    });
+    expect(result.current).toMatchObject({ status: "signed-in", outcome: "resumed" });
+    expect(result.current).not.toHaveProperty("notice");
   });
 
   it("ends every session of the account, and treats one already over as done", async () => {

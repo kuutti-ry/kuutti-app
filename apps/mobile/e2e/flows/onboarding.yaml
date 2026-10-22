@@ -1,15 +1,19 @@
 # Onboarding from the bank login to the home screen, one question per screen
 # in the field sheet's order, every answer a button (#146, ADR-010 §9 to §13):
-# the norms and both texts on one button; a friend's invitation code, offered
-# once and skipped (#107); the name; the gender, and the label only after
-# non-binary; whom one seeks, which waits for the article 9 consent on the
-# same screen; the intent; the ages as two steppers around the person's own
-# age; the area, one button per pond (#174); three photos; a bio; research,
-# optional. The app is closed after whom one seeks and opens again at the
-# intent with the answer kept (#219), the invitation code not offered again.
-# Onni (26) is registered and never onboarded after `pnpm demo:reset`; the
-# photos are his from the release of pictures, which the local check queues,
-# so home says the profile still lacks something.
+# the name; the gender, and the label only after non-binary; whom one seeks,
+# which waits for the article 9 consent on the same screen; the intent; the
+# ages as two steppers around the person's own age; the area, one button per
+# pond (#174); three photos; a bio; home. The norms with both texts, and
+# research, come before the bank (#418, ADR-010 §15): on a fresh phone
+# bank-login.yaml accepts them there; on a phone that recorded them at an
+# earlier sign-in, the welcome step asks Onni for the texts, counting no step
+# (welcome-step.yaml). Then a friend's invitation code, offered once, with no
+# step number either, and skipped (#107). The app is closed after whom one
+# seeks and opens again at the intent with the answer kept (#219), the
+# invitation code not offered again. Onni (26) is registered and never
+# onboarded after `pnpm demo:reset`; the photos are his from the release of
+# pictures, which the local check queues, so home says the profile still
+# lacks something.
 appId: fi.kuutti.app
 name: A registered person is taken through onboarding one question per screen, and resumes at the intent after the app is closed
 ---
@@ -22,53 +26,46 @@ name: A registered person is taken through onboarding one question per screen, a
     env:
       PERSONA: Onni Korhonen
 
-# 1: the norms and both texts, accepted with one button.
-- assertVisible: "How we do things here|Näin täällä toimitaan|Så här gör vi här"
-- assertVisible: "Step 1 of 10|Vaihe 1 / 10|Steg 1 av 10"
-- scrollUntilVisible:
-    element: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+# The welcome step when it comes, then the invitation code.
+- runFlow: ../common/welcome-step.yaml
 
-# 1, still: a friend's invitation code, offered once right after the welcome,
-# at the welcome's number, and skipped (#107; using one is the API's test).
+# A friend's invitation code, offered once before the name, counting no step
+# (#418), and skipped (#107; using one is the API's test).
 - extendedWaitUntil:
     visible: "Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
     timeout: 15000
-- assertVisible: "Step 1 of 10|Vaihe 1 / 10|Steg 1 av 10"
+- assertNotVisible: "Step \\d+ of \\d+|Vaihe \\d+ / \\d+|Steg \\d+ av \\d+"
 - tapOn: "Skip|Ohita|Hoppa över"
 
-# 2: the name, typed, never the bank's.
+# 1: the name, typed, never the bank's.
 - extendedWaitUntil:
     visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
     timeout: 15000
-- assertVisible: "Step 2 of 10|Vaihe 2 / 10|Steg 2 av 10"
+- assertVisible: "Step 1 of 8|Vaihe 1 / 8|Steg 1 av 8"
 - tapOn: "Name on your card|Nimi kortillasi|Namn på ditt kort"
 - inputText: "Onni"
 # A tap on the question, which is no button, closes the keyboard (README, the keyboard).
 - tapOn: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# 3: the gender; non-binary opens the label, still step 3, and it can be skipped.
+# 2: the gender; non-binary opens the label, still step 2, and it can be skipped.
 - extendedWaitUntil:
     visible: "How do you describe yourself\\?|Miten kuvailet itseäsi\\?|Hur beskriver du dig själv\\?"
     timeout: 15000
-- assertVisible: "Step 3 of 10|Vaihe 3 / 10|Steg 3 av 10"
+- assertVisible: "Step 2 of 8|Vaihe 2 / 8|Steg 2 av 8"
 - tapOn: "Non-binary|Muunsukupuolinen|Icke-binär"
 - tapOn: "Continue|Jatka|Fortsätt"
 - extendedWaitUntil:
     visible: "A word for it, if you like|Sana sille, jos haluat|Ett ord för det, om du vill"
     timeout: 15000
-- assertVisible: "Step 3 of 10|Vaihe 3 / 10|Steg 3 av 10"
+- assertVisible: "Step 2 of 8|Vaihe 2 / 8|Steg 2 av 8"
 - tapOn: "Skip|Ohita|Hoppa över"
 
-# 4: whom one seeks; nothing moves on before the article 9 consent on this screen.
+# 3: whom one seeks; nothing moves on before the article 9 consent on this screen.
 - extendedWaitUntil:
     visible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
     timeout: 15000
-- assertVisible: "Step 4 of 10|Vaihe 4 / 10|Steg 4 av 10"
+- assertVisible: "Step 3 of 8|Vaihe 3 / 8|Steg 3 av 8"
 - tapOn: "Anyone|Kenet tahansa|Vem som helst"
 - scrollUntilVisible:
     element: "I consent to Kuutti storing whom I seek|Annan Kuutille luvan tallentaa, kenen seuraa etsin|Jag samtycker till att Kuutti lagrar vem jag söker"
@@ -97,7 +94,7 @@ name: A registered person is taken through onboarding one question per screen, a
     timeout: 60000
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# 5: the intent. Closed here and opened again: the screen's memory is gone,
+# 4: the intent. Closed here and opened again: the screen's memory is gone,
 # whom one seeks was saved on leaving its screen.
 - extendedWaitUntil:
     visible: "What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?"
@@ -107,16 +104,16 @@ name: A registered person is taken through onboarding one question per screen, a
 - extendedWaitUntil:
     visible: "What are you here for\\?|Mitä etsit täältä\\?|Vad är du här för\\?"
     timeout: 15000
-- assertVisible: "Step 5 of 10|Vaihe 5 / 10|Steg 5 av 10"
+- assertVisible: "Step 4 of 8|Vaihe 4 / 8|Steg 4 av 8"
 - assertNotVisible: "Whom are you looking for\\?|Ketä etsit\\?|Vem söker du\\?"
 - tapOn: "Something long-term|Jotain pitkäaikaista|Något långvarigt"
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# 6: the ages start five years either side of 26 and move by buttons.
+# 5: the ages start five years either side of 26 and move by buttons.
 - extendedWaitUntil:
     visible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
     timeout: 15000
-- assertVisible: "Step 6 of 10|Vaihe 6 / 10|Steg 6 av 10"
+- assertVisible: "Step 5 of 8|Vaihe 5 / 8|Steg 5 av 8"
 - assertVisible: "21"
 - assertVisible: "31"
 - tapOn: "Oldest, one year older|Vanhin, vuotta vanhempi|Äldsta, ett år äldre"
@@ -124,19 +121,19 @@ name: A registered person is taken through onboarding one question per screen, a
 - assertVisible: "33"
 - tapOn: "Continue|Jatka|Fortsätt"
 
-# 7: two ponds without a parent, so the area is the person's choice (#174).
+# 6: two ponds without a parent, so the area is the person's choice (#174).
 - extendedWaitUntil:
     visible: "Where do you live\\?|Missä asut\\?|Var bor du\\?"
     timeout: 15000
-- assertVisible: "Step 7 of 10|Vaihe 7 / 10|Steg 7 av 10"
+- assertVisible: "Step 6 of 8|Vaihe 6 / 8|Steg 6 av 8"
 - assertVisible: "Finland|Suomi"
 - tapOn: "Capital Area|Pääkaupunkiseutu|Huvudstadsregionen"
 
-# 8: three photos, the reason first, through the system picker one at a time.
+# 7: three photos, the reason first, through the system picker one at a time.
 - extendedWaitUntil:
     visible: "Two photos of you|Kaksi kuvaa sinusta|Två bilder på dig"
     timeout: 15000
-- assertVisible: "Step 8 of 10|Vaihe 8 / 10|Steg 8 av 10"
+- assertVisible: "Step 7 of 8|Vaihe 7 / 8|Steg 7 av 8"
 - tapOn: "Add photos|Lisää kuvia|Lägg till bilder"
 - extendedWaitUntil:
     visible: "Your photos|Kuvasi|Dina foton"
@@ -163,11 +160,11 @@ name: A registered person is taken through onboarding one question per screen, a
     timeout: 60000
 - tapOn: "Done|Valmis|Klar"
 
-# 9: a bio of at least 50 characters instead of two prompts.
+# 8: a bio of at least 50 characters instead of two prompts.
 - extendedWaitUntil:
     visible: "A few words|Muutama sana|Några ord"
     timeout: 15000
-- assertVisible: "Step 9 of 10|Vaihe 9 / 10|Steg 9 av 10"
+- assertVisible: "Step 8 of 8|Vaihe 8 / 8|Steg 8 av 8"
 # The field, below its label of the same name; an empty field has no text to match.
 - tapOn:
     below: "About you|Sinusta|Om dig"
@@ -180,14 +177,8 @@ name: A registered person is taken through onboarding one question per screen, a
     timeout: 60000
 - tapOn: "Save and continue|Tallenna ja jatka|Spara och fortsätt"
 
-# 10: research, optional, on its own screen.
-- extendedWaitUntil:
-    visible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
-    timeout: 15000
-- assertVisible: "Step 10 of 10|Vaihe 10 / 10|Steg 10 av 10"
-- tapOn: "Not now|Ei nyt|Inte nu"
-
-# Home: the chosen area's counter; the photos wait in the local queue, so matching waits for them.
+# Home straight after the bio: research was asked before the bank. The chosen
+# area's counter; the photos wait in the local queue, so matching waits for them.
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område"
     timeout: 15000

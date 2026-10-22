@@ -18,16 +18,25 @@ import {
  */
 type AuthOutcome = AuthExchangeResponse["outcome"];
 
+export type SignedOutNotice = "paused" | "lock";
+
 export type SessionState =
   | { status: "loading" }
-  /** `notice` is what the sign-in screen says next: "paused" right after a break began on this device (#170). */
-  | { status: "signed-out"; notice?: "paused" }
+  /**
+   * `notice` is what the sign-in screen says next: "paused" right after a
+   * break began on this device (#170), "lock" right after the app's lock
+   * signed it out (#418).
+   */
+  | { status: "signed-out"; notice?: SignedOutNotice }
   | { status: "signed-in"; sessionId: string; outcome?: AuthOutcome };
 
 /** The export as the API answers it (#237): a zip, named by the API, nothing about the person in the name. */
 export type ExportFile = { name: string; bytes: Uint8Array };
 
 const DEFAULT_EXPORT_NAME = "kuutti-data.zip";
+
+/** How long a logout waits for the API before the phone signs out anyway. */
+const LOGOUT_WAIT_MS = 5_000;
 
 /**
  * The name from `Content-Disposition: attachment; filename="..."`, or the
@@ -42,7 +51,8 @@ export function exportFileName(disposition: string | null): string {
 
 type SessionApi = SessionState & {
   signIn: (code: string, verifier: string) => Promise<AuthOutcome>;
-  signOut: () => Promise<void>;
+  /** Log out on this device; the lock's way out names itself, for the sign-in screen to say (#418). */
+  signOut: (notice?: "lock") => Promise<void>;
   signOutEverywhere: () => Promise<void>;
   /** Everything Kuutti holds about the person (#51), as the API answers it: the zip and its name. */
   exportData: () => Promise<ExportFile>;
@@ -88,11 +98,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return outcome;
   }, []);
 
-  // Ending the session locally does not wait for the API: a phone without
-  // network still signs out, and the row expires or is swept later.
-  const signOut = React.useCallback(async () => {
-    await api.POST("/auth/logout").catch(() => undefined);
+  // Ending the session locally waits for the API a few seconds at most: a
+  // phone without network still signs out, and the row expires or is swept
+  // later. The lock's way out counts on it ending (ADR-045 §3, §6).
+  const signOut = React.useCallback(async (notice?: "lock") => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      api.POST("/auth/logout").catch(() => undefined),
+      new Promise<void>((done) => {
+        timer = setTimeout(done, LOGOUT_WAIT_MS);
+      }),
+    ]);
+    clearTimeout(timer);
     await clearSession();
+    if (notice) setState({ status: "signed-out", notice });
   }, []);
 
   const signOutEverywhere = React.useCallback(async () => {

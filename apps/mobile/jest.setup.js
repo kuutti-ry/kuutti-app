@@ -19,6 +19,15 @@ jest.mock("expo-secure-store", () => {
     deleteItemAsync: jest.fn(async (key) => void store.delete(key)),
   };
 });
+// The phone's face and fingerprint (#418) are native: a phone with neither
+// enrolled, unless a test says otherwise through these mocks.
+jest.mock("expo-local-authentication", () => ({
+  AuthenticationType: { FINGERPRINT: 1, FACIAL_RECOGNITION: 2, IRIS: 3 },
+  hasHardwareAsync: jest.fn(async () => false),
+  isEnrolledAsync: jest.fn(async () => false),
+  supportedAuthenticationTypesAsync: jest.fn(async () => []),
+  authenticateAsync: jest.fn(async () => ({ success: false, error: "not_available" })),
+}));
 
 // The Sentry SDK is native and ships ESM; tests get a stand-in and can assert
 // on what was reported (never the stored value, only the error).

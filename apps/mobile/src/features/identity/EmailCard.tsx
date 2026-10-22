@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { clearEmail, confirmEmailCode, fetchEmail, saveEmail, sendEmailCode } from "./email-client";
+import { useLockOfferDue } from "./lock/LockProvider";
 import { useSession } from "./session";
 
 type Notice =
@@ -375,8 +376,8 @@ function CodeSection({
 }
 
 /**
- * The e-mail as the last of the later screens (#148): the card, and the way
- * home. It scrolls, so at the largest text every line and every button can
+ * The e-mail among the later screens (#148): the card, and the way on, to
+ * the lock's one offer (#418) or home. It scrolls, so at the largest text every line and every button can
  * still be reached (#217), and it keeps the code's field and Confirm above
  * the keyboard as a settings screen does (SettingsPage, #103): iOS insets the
  * scroll view itself; Android draws edge to edge, so the padding ends the
@@ -387,6 +388,8 @@ export function EmailScreen() {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
+  // The lock comes after the e-mail, once (#418); home when it was offered or is on.
+  const lockOfferDue = useLockOfferDue();
   return (
     <SafeAreaView className="flex-1 bg-background">
       <KeyboardAvoidingView
@@ -417,7 +420,7 @@ export function EmailScreen() {
           <Button
             onPress={() => {
               tap();
-              router.replace("/");
+              router.replace(lockOfferDue ? "/account/lock" : "/");
             }}
           >
             {t("account.email.done")}

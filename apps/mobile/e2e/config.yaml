@@ -20,7 +20,7 @@ executionOrder:
     - A person who accepted an older wording of the terms is asked for the current one, and nothing else is asked again
     - Once there are kids, the future-kids answers read want more, no more, not sure anymore
     # Sanna: her profile and photos, the later fields, the deal-breakers, home,
-    # Settings, the sign-in links, and logging out everywhere last.
+    # Settings, the app's lock, the sign-in links, and logging out everywhere last.
     - The card leads with the photo, the name and the age, and shows the information fields but nothing soft
     - A section saves on going back, and the card shows what it saved
     - A phone number in the bio is refused on leaving with the reason, and the stored bio stays
@@ -42,6 +42,7 @@ executionOrder:
     - The photo descriptions setting shows them under the photos and chooses what they tell
     - The decision buttons setting places Like and Pass for either hand, and one-handed
     - The session, the theme and the language survive closing and reopening the app
+    - A passcode set in Settings locks the app at a cold start and back from the background, and the bank is the way out
     - A sign-in link not asked for is refused without touching the session, and every refusal is said in its own words
     - Log out everywhere ends this device's session, and reopening the app does not bring it back
     # Helmi, who takes a break and comes back.
