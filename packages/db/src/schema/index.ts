@@ -65,6 +65,8 @@ export {
 } from "./preferences.ts";
 export { profile } from "./profile.ts";
 export { researchSubject } from "./research.ts";
+// Invitations and the reward ledger they earn into (#107, ADR-044).
+export { invitation, reward, rewardKind } from "./rewards.ts";
 export {
   auditLog,
   block,

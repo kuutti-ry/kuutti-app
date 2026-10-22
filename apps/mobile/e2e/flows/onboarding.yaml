@@ -1,13 +1,15 @@
 # Onboarding from the bank login to the home screen, one question per screen
 # in the field sheet's order, every answer a button (#146, ADR-010 §9 to §13):
-# the norms and both texts on one button; the name; the gender, and the label
-# only after non-binary; whom one seeks, which waits for the article 9 consent
-# on the same screen; the intent; the ages as two steppers around the person's
-# own age; the area, one button per pond (#174); three photos; a bio; research,
-# optional. The app is closed after whom one seeks and opens again at the intent
-# with the answer kept (#219). Onni (26) is registered and never onboarded after
-# `pnpm demo:reset`; the photos are his from the release of pictures, which the
-# local check queues, so home says the profile still lacks something.
+# the norms and both texts on one button; a friend's invitation code, offered
+# once and skipped (#107); the name; the gender, and the label only after
+# non-binary; whom one seeks, which waits for the article 9 consent on the
+# same screen; the intent; the ages as two steppers around the person's own
+# age; the area, one button per pond (#174); three photos; a bio; research,
+# optional. The app is closed after whom one seeks and opens again at the
+# intent with the answer kept (#219), the invitation code not offered again.
+# Onni (26) is registered and never onboarded after `pnpm demo:reset`; the
+# photos are his from the release of pictures, which the local check queues,
+# so home says the profile still lacks something.
 appId: fi.kuutti.app
 name: A registered person is taken through onboarding one question per screen, and resumes at the intent after the app is closed
 ---
@@ -29,6 +31,14 @@ name: A registered person is taken through onboarding one question per screen, a
     centerElement: true
     timeout: 60000
 - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+
+# 1, still: a friend's invitation code, offered once right after the welcome,
+# at the welcome's number, and skipped (#107; using one is the API's test).
+- extendedWaitUntil:
+    visible: "Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
+    timeout: 15000
+- assertVisible: "Step 1 of 10|Vaihe 1 / 10|Steg 1 av 10"
+- tapOn: "Skip|Ohita|Hoppa över"
 
 # 2: the name, typed, never the bank's.
 - extendedWaitUntil:

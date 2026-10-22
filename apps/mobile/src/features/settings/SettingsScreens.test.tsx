@@ -12,6 +12,7 @@ import { ConsentScreen, consentKindOf } from "./ConsentScreen";
 import { ContactsSettingsScreen } from "./ContactsSettingsScreen";
 import { DeviceScreen } from "./DeviceScreen";
 import { EmailSettingsScreen } from "./EmailSettingsScreen";
+import { InvitationsSettingsScreen } from "./InvitationsSettingsScreen";
 import { LanguageScreen } from "./LanguageScreen";
 import { LegalScreen, legalKindOf } from "./LegalScreen";
 import { LicensesScreen } from "./LicensesScreen";
@@ -70,6 +71,16 @@ beforeEach(async () => {
       return json({ email: null, confirmed: false, codeExpiresAt: null });
     }
     if (url.pathname === "/contacts") return json({ contacts: [] });
+    if (url.pathname === "/invitations") {
+      return json({
+        canInvite: true,
+        redeemable: false,
+        reward: { fish: 1, likes: 0 },
+        open: [],
+        counted: 0,
+        earned: { fish: 0, likes: 0 },
+      });
+    }
     if (url.pathname === "/consents") {
       return json({
         consents: [],
@@ -336,6 +347,21 @@ describe("the e-mail and the account screens", () => {
     await settle();
     expect(screen.getByText("No session on this device.")).toBeTruthy();
     expect(screen.queryByText("Loading your choices…")).toBeNull();
+  });
+
+  it("hold the invitations for a person (#107)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<InvitationsSettingsScreen />);
+    expect(await screen.findByRole("button", { name: "Make an invitation" })).toBeTruthy();
+    expectPinnedHeader("Invitations", "Back");
+    noProblems();
+  });
+
+  it("say there is no session on the invitations screen of a signed-out device (#107)", async () => {
+    await renderWithTheme(<InvitationsSettingsScreen />);
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByText("Loading your invitations…")).toBeNull();
   });
 
   it("say there is no session on the contacts screen of a signed-out device (#103)", async () => {

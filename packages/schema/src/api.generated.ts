@@ -3151,7 +3151,7 @@ export interface paths {
         };
         /**
          * The caller's notices in the app
-         * @description What must reach the person even without a push, newest first, at most 20: today a moderator's warning, with its reason, until it is lifted. A notice holds no text of its own; the app says it.
+         * @description What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.
          */
         get: {
             parameters: {
@@ -3238,6 +3238,262 @@ export interface paths {
                 };
                 /** @description not_found: no such notice of the caller's. */
                 404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's invitations
+         * @description Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The caller's invitations. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Invitations"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: the account was erased while the request was on its way. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /**
+         * Make an invitation
+         * @description A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Made; the code is not shown again. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["InvitationCreated"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: the account was erased while the request was on its way. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw an open invitation */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Withdrawn: its code works no more. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: the id is not a uuid. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no open invitation of the caller's: redeemed, another's or none. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/redeem": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Use an invitation code
+         * @description A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["InvitationRedeemRequest"];
+                };
+            };
+            responses: {
+                /** @description Redeemed: the invitation counts the night the caller's profile passes the test. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: no code, too long, not a code, or an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description invitation_unknown: no open invitation has that code; one used or the caller's own answers the same. not_found: the account was erased meanwhile. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description invitation_tries_exceeded: the day's tries are used; Retry-After is the wait until midnight in Finland. */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -5939,7 +6195,7 @@ export interface paths {
         get?: never;
         /**
          * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day.
          */
         put: {
             parameters: {
@@ -6002,7 +6258,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days, Retry-After the wait until the next can go. Nothing was written. */
+                /** @description like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days and no earned fish is left, Retry-After the wait until the next can go. Nothing was written. */
                 429: {
                     headers: {
                         [name: string]: unknown;
@@ -6560,6 +6816,7 @@ export interface components {
             contacts: components["schemas"]["StoredContact"][];
             notifications: components["schemas"]["ExportedNotifications"];
             rounds: components["schemas"]["ExportedRounds"];
+            invitations: components["schemas"]["ExportedInvitations"];
         };
         /** @enum {string|null} */
         Gender: "woman" | "man" | "non_binary" | null;
@@ -6924,7 +7181,7 @@ export interface components {
         /** @enum {string} */
         NotificationKind: "round" | "message" | "match" | "moderation";
         /** @enum {string} */
-        NoticeKind: "warning";
+        NoticeKind: "warning" | "invitation_counted";
         ExportedRounds: {
             /** @description What this part is, in the request's language. */
             about: string;
@@ -6969,6 +7226,32 @@ export interface components {
         RoundReason: "matches_filters" | "liked_you" | "seen_before" | "relaxed" | "fish";
         /** @enum {string|null} */
         RoundChoice: "like" | "pass" | "fish" | null;
+        ExportedInvitations: {
+            made: {
+                /** Format: date-time */
+                createdAt: string;
+                state: components["schemas"]["InvitationState"];
+                /** Format: date-time */
+                countedAt: string | null;
+            }[];
+            used: {
+                /** Format: date-time */
+                redeemedAt: string;
+                /** Format: date-time */
+                countedAt: string | null;
+            } | null;
+            rewards: {
+                kind: components["schemas"]["RewardKind"];
+                /** Format: date-time */
+                earnedAt: string;
+                /** Format: date-time */
+                spentAt: string | null;
+            }[];
+        };
+        /** @enum {string} */
+        InvitationState: "open" | "redeemed" | "counted";
+        /** @enum {string} */
+        RewardKind: "like" | "fish";
         HealthResponse: {
             /**
              * @description ok when the database answers and migrations are current; degraded otherwise.
@@ -7413,15 +7696,74 @@ export interface components {
         Notices: {
             notices: components["schemas"]["Notice"][];
         };
-        Notice: {
+        Notice: components["schemas"]["WarningNotice"] | components["schemas"]["InvitationCountedNotice"];
+        WarningNotice: {
             /** Format: uuid */
             id: string;
-            kind: components["schemas"]["NoticeKind"];
             /** Format: date-time */
             at: string;
             /** Format: date-time */
             readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "warning";
             reason: components["schemas"]["SanctionReason"];
+        };
+        InvitationCountedNotice: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: date-time */
+            readAt: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "invitation_counted";
+            reward: components["schemas"]["RewardUnits"];
+        };
+        RewardUnits: {
+            fish: number;
+            likes: number;
+        };
+        Invitations: {
+            /** @description True once the person's profile has passed the pond gate's test. */
+            canInvite: boolean;
+            /** @description True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased. */
+            redeemable: boolean;
+            /** @description What an invitation earns today (matching_config invitation_reward), for the app's words. */
+            reward: {
+                fish: number;
+                likes: number;
+            };
+            open: components["schemas"]["OpenInvitation"][];
+            counted: number;
+            /** @description What the person's invitations earned that is not used yet. */
+            earned: {
+                fish: number;
+                likes: number;
+            };
+        };
+        OpenInvitation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        InvitationCreated: {
+            /** Format: uuid */
+            id: string;
+            /** @description Two groups of five; shown once, here. Kuutti keeps only its hash. */
+            code: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        InvitationRedeemRequest: {
+            /** @description As typed: case, spaces and hyphens do not matter, and O reads as 0, I and L as 1. */
+            code: string;
         };
         ConversationList: {
             open: components["schemas"]["ConversationSummary"][];

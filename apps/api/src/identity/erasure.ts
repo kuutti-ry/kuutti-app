@@ -23,6 +23,7 @@ import { eraseNotificationsOf, exportNotifications } from "../notifications/inde
 import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
+import { eraseInvitationsOf, exportInvitations } from "../rewards/index.ts";
 import {
   closerLookOf,
   deleteFeedbackOfAccount,
@@ -75,6 +76,13 @@ import { visibleState } from "./standing.ts";
 // stored pieces, and in each conversation the person's own shares.
 // The notification choices and the notices go (#176, ADR-032); the export
 // carries both.
+// The invitations the person made go while open, and the units they earned
+// and their notices go with the account (#107, ADR-044 §10); a redeemed one
+// stays for its redeemer, the link to the person cut. The invitation the
+// person joined with goes until it counts, and once counted stays for its
+// inviter without the person; one that would name nobody goes. The export
+// carries the invitations made, the one used by its two times, and the
+// units; never a code and never the other person.
 
 export type ErasureDeps = {
   db: Queryable;
@@ -118,6 +126,16 @@ export type ErasureSummary = {
   /** The notification choices the person switched, and the notices in the app (#176). */
   notificationChoices: number;
   notices: number;
+  /** The invitations the person made that went: the open ones, and any whose redeemer was erased before (#107). */
+  madeInvitationsDeleted: number;
+  /** The invitations the person made that somebody redeemed, kept for their redeemers without the person (#107). */
+  madeInvitationsKept: number;
+  /** The units of the reward ledger the person's invitations earned (#107). */
+  rewardUnits: number;
+  /** 0 or 1: the invitation the person joined with, gone because it had not counted or its inviter was erased before (#107). */
+  usedInvitationsDeleted: number;
+  /** 0 or 1: the same once counted, kept for its inviter without the person (#107). */
+  usedInvitationsKept: number;
   photos: number;
   /** Photos a report's copy names, kept for its twelve months (#351); the night's prune deletes them. */
   heldPhotos: number;
@@ -172,6 +190,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     );
     // Before the sanctions: a warning's notice points at its warning (#176).
     const notifications = await eraseNotificationsOf(tx, accountId);
+    // After the notices, so the summary counts a counted invitation's notice there.
+    const invitations = await eraseInvitationsOf(tx, accountId);
     const sanctions = await deleteSanctionsOfAccount(tx, accountId);
     // Kept: the reports either way and the blocks on the identity (ADR-030 §8).
     // The place at the pond gate (#94): where the person stood is theirs, and goes.
@@ -196,6 +216,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
       feedback,
       sanctions,
       notifications,
+      invitations,
       researchSubjects,
       chat,
       heldPhotos: held.length,
@@ -227,6 +248,11 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     contacts: result.chat.contacts,
     notificationChoices: result.notifications.choices,
     notices: result.notifications.notices,
+    madeInvitationsDeleted: result.invitations.madeDeleted,
+    madeInvitationsKept: result.invitations.madeKept,
+    rewardUnits: result.invitations.units,
+    usedInvitationsDeleted: result.invitations.usedDeleted,
+    usedInvitationsKept: result.invitations.usedKept,
     photos: result.photos.photos,
     heldPhotos: result.heldPhotos,
     accessRows: result.photos.accessRows,
@@ -305,6 +331,7 @@ export async function exportAccount(
     contacts,
     notifications,
     rounds,
+    invitations,
   ] = await Promise.all([
     findPondOfAccount(deps.db, accountId),
     readPreferences(deps.db, accountId),
@@ -330,6 +357,7 @@ export async function exportAccount(
     exportContacts(deps, accountId),
     exportNotifications(deps.db, accountId),
     exportRounds(deps.db, accountId, EXPORT_HISTORY_LIMIT),
+    exportInvitations(deps.db, accountId),
   ]);
   const document: AccountExport = {
     exportedAt: deps.now().toISOString(),
@@ -446,6 +474,8 @@ export async function exportAccount(
         })),
       })),
     },
+    // The invitations made and the one used, and the units (#107, ADR-044 §10); never a code or whom.
+    invitations,
   };
   return { document, files: photos.files };
 }

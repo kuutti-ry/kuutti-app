@@ -2,9 +2,11 @@ import type { Queryable } from "@kuutti/db";
 import {
   type ExportedNotifications,
   NOTICES_MAX,
+  type Notice,
   type Notices,
   type NotificationChoice,
   NotificationKind,
+  type SanctionReason,
 } from "@kuutti/schema";
 import { AppError } from "../lib/errors.ts";
 import * as repo from "./repo.ts";
@@ -13,7 +15,8 @@ import * as repo from "./repo.ts";
 // choice is the person's switch per kind, on until switched off; nothing is
 // sent from here: the senders come later and read the choice (#102 the
 // message). A notice is what must reach the person even without a push, the
-// first of them a moderator's warning (ADR-024 §7).
+// first of them a moderator's warning (ADR-024 §7), the second an invitation
+// of theirs that counted (#107, ADR-044 §9).
 
 /** Every kind in its order, each on unless the person switched it off. */
 export async function choicesOf(db: Queryable, accountId: string): Promise<NotificationChoice[]> {
@@ -34,18 +37,20 @@ export async function setChoice(
   return choicesOf(deps.db, input.accountId);
 }
 
+/** One notice as the contract has it: a warning with its reason, a counted invitation with what it earned. */
+function noticeOf(row: repo.NoticeRow): Notice {
+  const base = { id: row.id, at: row.at.toISOString(), readAt: row.readAt?.toISOString() ?? null };
+  if (row.kind === "invitation_counted") {
+    return { ...base, kind: row.kind, reward: { fish: row.fish, likes: row.likes } };
+  }
+  // A warning holds its sanction (notice_warning_check), so its reason is there.
+  return { ...base, kind: row.kind, reason: row.reason as SanctionReason };
+}
+
 /** The caller's newest notices. */
 export async function noticesOf(db: Queryable, accountId: string): Promise<Notices> {
   const rows = await repo.listNotices(db, accountId, NOTICES_MAX);
-  return {
-    notices: rows.map((row) => ({
-      id: row.id,
-      kind: row.kind,
-      at: row.at.toISOString(),
-      readAt: row.readAt?.toISOString() ?? null,
-      reason: row.reason,
-    })),
-  };
+  return { notices: rows.map(noticeOf) };
 }
 
 /** Marks one of the caller's notices read; one not theirs is 404. */
@@ -64,6 +69,14 @@ export async function recordWarningNotice(
   input: { accountId: string; sanctionId: string; at: Date },
 ): Promise<void> {
   await repo.insertWarningNotice(db, input);
+}
+
+/** A counted invitation tells its inviter (ADR-044 §9), in the night's count's transaction. */
+export async function recordInvitationNotices(
+  db: Queryable,
+  input: { counted: ReadonlyArray<{ accountId: string; invitationId: string }>; at: Date },
+): Promise<void> {
+  await repo.insertInvitationNotices(db, input);
 }
 
 /** The person's part of the export (ADR-007 §3): the choices as they stand and every notice. */

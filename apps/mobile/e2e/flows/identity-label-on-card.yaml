@@ -16,6 +16,11 @@ name: A label chosen after non-binary shows on the card after the gender
     centerElement: true
     timeout: 60000
 - tapOn: "I'm in, and I accept both|Olen mukana ja hyväksyn molemmat|Jag är med och godkänner båda"
+# A friend's invitation code, offered once after the welcome, skipped (#107).
+- extendedWaitUntil:
+    visible: "Did a friend invite you\\?|Kutsuiko ystävä sinut\\?|Bjöd en vän in dig\\?"
+    timeout: 15000
+- tapOn: "Skip|Ohita|Hoppa över"
 - extendedWaitUntil:
     visible: "What should we call you\\?|Miksi sinua kutsutaan\\?|Vad ska vi kalla dig\\?"
     timeout: 15000

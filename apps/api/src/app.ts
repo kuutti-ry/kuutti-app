@@ -50,6 +50,7 @@ import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./m
 import { notificationRoutes } from "./notifications/index.ts";
 import { pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
+import { invitationRoutes } from "./rewards/index.ts";
 import {
   accountAdminRoutes,
   auditAdminRoutes,
@@ -237,6 +238,8 @@ export function createApp(deps: Deps) {
   app.route("/", reportRoutes(deps, guard));
   // What a person chose to be notified of, and the notices in the app (#176, ADR-032).
   app.route("/", notificationRoutes(deps, guard));
+  // Invitations and the reward they earn (#107, ADR-044).
+  app.route("/", invitationRoutes(deps, guard));
   // The conversations a match opens and their text messages (#348, ADR-031).
   // A conversation's first message is checked by the automatic rules (#105,
   // ADR-033): the safety slice decides, the chat only measures.

@@ -170,3 +170,26 @@ Feature: Account deletion per the erasure table
     When "A" exports the account, and then deletes it
     Then the export carries every kind with its state and the notice with when it was read
     And the erasure takes the choices and the notices
+
+  Scenario: An erased inviter's open invitations go, their units and notices with the account, and the redeemed ones stay for their redeemers
+    Given "A" made an open invitation, one that "B" used and that has counted, earning "A" a fish and a notice, and one that "C" used and has not finished
+    When "A" deletes the account
+    Then A's open invitation, units and notices are gone, and B's and C's invitations stay theirs, naming no inviter
+    And neither "B" nor "C" may type another code, and each one's export still says when they typed theirs
+
+  Scenario: An invitation whose inviter was erased never counts
+    Given "C" used a code of "A"'s and has not finished, and "A" deleted the account
+    When C's profile passes the test and the night counts
+    Then C's invitation stays uncounted, and nobody gets a unit or a notice for it
+
+  Scenario: An erased redeemer's invitation goes until it counts, and once counted stays for its inviter without them
+    Given "B" used a code of "A"'s and has not finished, and "C" used another that has counted
+    When "B" and then "C" delete their accounts
+    Then B's invitation is gone, C's stays counted naming nobody, and "A" keeps the count and the fish it earned
+
+  Scenario: The export lists the invitations made, the one used and the units, never a code or the other person
+    Given "A" made an open invitation and one that "B" used and that has counted, and "A" used the fish it earned
+    When "A" and "B" export their accounts
+    Then A's export lists both invitations with their state, none used, and the fish with when it was earned and used
+    And B's lists when B typed the code and when it counted
+    And neither carries a code, its hash or the other's account id

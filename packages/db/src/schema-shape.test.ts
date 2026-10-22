@@ -16,6 +16,7 @@ import {
   ReportMessageSide,
   ReportOutcome,
   ReportSource,
+  RewardKind,
   RoundDecision,
   RoundReason,
   SanctionKind,
@@ -62,6 +63,8 @@ describe("the tables", () => {
       "found_them_count",
       "gate",
       "identity",
+      // An invitation, and the units it earned its inviter (#107, ADR-044).
+      "invitation",
       "matching_config",
       "message",
       "moderator_roles",
@@ -77,6 +80,7 @@ describe("the tables", () => {
       "report",
       "report_message",
       "research_subject",
+      "reward",
       // Today's round and its entries (#96, ADR-034), and a day's relaxations (#99, ADR-042).
       "round_entries",
       "round_relaxation",
@@ -135,7 +139,7 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, and from a sanction to its notice; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction or an invitation to its notice, and from an invitation to what it earned; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
       // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
@@ -143,11 +147,15 @@ describe("the foreign keys", () => {
       "contact_share.conversation_id -> conversation.id cascade",
       "conversation_participant.conversation_id -> conversation.id cascade",
       "message.conversation_id -> conversation.id cascade",
+      // A counted invitation's notice goes with its invitation (#107).
+      "notice.invitation_id -> invitation.id cascade",
       // A warning's notice goes with its warning (#176).
       "notice.sanction_id -> sanction.id cascade",
       "photo_review.photo_id -> photo.id cascade",
       // A report's frozen copy goes with the report, twelve months from filing (#351).
       "report_message.report_id -> report.id cascade",
+      // The units an invitation earned go with it (#107, ADR-044).
+      "reward.invitation_id -> invitation.id cascade",
       // A round's entries go with their round (#96), and its relaxations (#99).
       "round_entries.round_id -> rounds.id cascade",
       "round_relaxation.round_id -> rounds.id cascade",
@@ -172,6 +180,10 @@ describe("the foreign keys", () => {
       "email_send",
       "feedback",
       "gate",
+      // The inviter and the redeemer of an invitation (#107): at either's
+      // erasure the row goes, or that side's link is cut to null.
+      "invitation",
+      "invitation",
       // A notice and the notification choices (#176), erased with the account.
       "notice",
       "notification_preference",
@@ -183,6 +195,8 @@ describe("the foreign keys", () => {
       "report",
       "report",
       "research_subject",
+      // The units the person earned (#107), deleted at erasure.
+      "reward",
       // The entries in which the person is somebody's card, and the person's own rounds (#96).
       "round_entries",
       "rounds",
@@ -260,6 +274,26 @@ describe("the foreign keys", () => {
     ]);
   });
 
+  it("let an invitation outlive its inviter once redeemed and its redeemer once counted, and a spent unit its round entry, without the link (#107, ADR-044)", () => {
+    expect(references.filter((reference) => reference.startsWith("invitation.")).sort()).toEqual([
+      "invitation.inviter_account_id -> account.id no action",
+      "invitation.redeemed_by_account_id -> account.id no action",
+    ]);
+    // Both people's links may be cut to null by an erasure (ADR-044 §10).
+    expect(
+      byName
+        .get("invitation")
+        ?.columns.filter((column) => !column.notNull)
+        .map((column) => column.name)
+        .sort(),
+    ).toEqual(["counted_at", "inviter_account_id", "redeemed_at", "redeemed_by_account_id"]);
+    expect(references.filter((reference) => reference.startsWith("reward.")).sort()).toEqual([
+      "reward.account_id -> account.id no action",
+      "reward.invitation_id -> invitation.id cascade",
+      "reward.spent_entry_id -> round_entries.id set null",
+    ]);
+  });
+
   it("make the ponds a tree", () => {
     expect(references).toContain("ponds.parent_id -> ponds.id no action");
   });
@@ -288,6 +322,9 @@ describe("the indexes", () => {
     ["notification_preference", "notification_preference_kind_idx", ["account_id", "kind"]],
     ["found_them_count", "found_them_count_day_reason_idx", ["day", "reason"]],
     ["round_relaxation", "round_relaxation_round_field_idx", ["round_id", "field"]],
+    // One invitation per code, and one redeemed per person (#107).
+    ["invitation", "invitation_code_hash_idx", ["code_hash"]],
+    ["invitation", "invitation_redeemed_by_idx", ["redeemed_by_account_id"]],
   ])("keep %s unique by %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(true);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -309,6 +346,10 @@ describe("the indexes", () => {
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
     ["notice", "notice_account_created_idx", ["account_id", "created_at"]],
+    ["invitation", "invitation_inviter_created_idx", ["inviter_account_id", "created_at"]],
+    ["reward", "reward_account_kind_idx", ["account_id", "kind"]],
+    ["reward", "reward_invitation_idx", ["invitation_id"]],
+    ["reward", "reward_spent_entry_idx", ["spent_entry_id"]],
   ])("serve the lookups of %s with %s", (table, name, columns) => {
     expect(index(table, name)?.unique).toBe(false);
     expect(columnsOf(index(table, name))).toEqual(columns);
@@ -321,6 +362,11 @@ describe("the indexes", () => {
   it("read only what is still open when settling a sanction (#307)", () => {
     expect(index("sanction", "sanction_identity_open_idx")?.where).toBeDefined();
     expect(index("sanction", "sanction_account_created_idx")?.where).toBeUndefined();
+  });
+
+  it("read only spent units for what an entry was paid with (#107)", () => {
+    expect(index("reward", "reward_spent_entry_idx")?.where).toBeDefined();
+    expect(index("reward", "reward_account_kind_idx")?.where).toBeUndefined();
   });
 
   it("hold one open report per pair, and a block once per direction (#84)", () => {
@@ -396,6 +442,27 @@ describe("the checks", () => {
   });
 });
 
+describe("the checks of invitations and their notices (#107, ADR-044)", () => {
+  const checks = (table: string) =>
+    byName
+      .get(table)
+      ?.checks.map((check) => check.name)
+      .sort();
+
+  it("hold an invitation open, redeemed or counted, never by its own inviter and always somebody's, and a spent unit to when it was spent", () => {
+    expect(checks("invitation")).toEqual([
+      "invitation_named_check",
+      "invitation_not_self_check",
+      "invitation_redeemed_check",
+    ]);
+    expect(checks("reward")).toEqual(["reward_spent_check"]);
+  });
+
+  it("hold a warning to its sanction and a counted invitation's notice to its invitation", () => {
+    expect(checks("notice")).toEqual(["notice_invitation_check", "notice_warning_check"]);
+  });
+});
+
 describe("the enums", () => {
   const enums = Object.fromEntries(
     exported.filter(isPgEnum).map((pgEnum) => [pgEnum.enumName, [...pgEnum.enumValues]]),
@@ -427,6 +494,8 @@ describe("the enums", () => {
     // What a person may be notified of, and what a notice is about (#176).
     expect(enums.notification_kind).toEqual(NotificationKind.options);
     expect(enums.notice_kind).toEqual(NoticeKind.options);
+    // What one unit of the reward ledger is (#107).
+    expect(enums.reward_kind).toEqual(RewardKind.options);
     expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
     expect(enums.conversation_side).toEqual(["a", "b"]);
     expect(enums.message_kind).toEqual(MessageKind.options);

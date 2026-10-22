@@ -20,6 +20,7 @@ import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboa
 import { ProfileDocument } from "./profile.ts";
 import { ExportedBlocks, ExportedReports } from "./report.ts";
 import { ResearchExport } from "./research.ts";
+import { ExportedInvitations } from "./rewards.ts";
 import { ExportedSanction } from "./sanction.ts";
 
 /**
@@ -224,6 +225,8 @@ export const AccountExport = z
     notifications: ExportedNotifications,
     /** The person's own rounds (#96, ADR-034): places, reasons and their own decisions; never whom, and never a round in which the person was somebody's card. */
     rounds: ExportedRounds,
+    /** The invitations the person made and the one they joined with, and what theirs earned (#107, ADR-044 §10); never a code and never the other person. */
+    invitations: ExportedInvitations,
   })
   .meta({ id: "AccountExport" });
 export type AccountExport = z.infer<typeof AccountExport>;

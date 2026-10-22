@@ -294,6 +294,153 @@ describe("migrate", () => {
     });
   });
 
+  it("migration 0079 holds an invitation open, redeemed or counted, a unit to its spending, and a notice to what it is about, from an empty database in one transaction (#107)", async () => {
+    // The whole folder in one transaction, as the migrator applies it: the
+    // notice's check names the old kind, so the kind 0079 adds is never used
+    // before its commit (ADR-044 §3).
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 1 });
+      try {
+        await migrate(pool, MIGRATIONS);
+        const accountOf = async (n: string) => {
+          const { rows } = await pool.query<{ id: string }>(
+            `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id)
+             INSERT INTO account (identity_id) SELECT id FROM i RETURNING id`,
+            [n.repeat(64)],
+          );
+          return rows[0]?.id as string;
+        };
+        const [inviter, friend, other] = [
+          await accountOf("6"),
+          await accountOf("7"),
+          await accountOf("8"),
+        ];
+        let codes = 0;
+        const invite = (row: Record<string, unknown> = {}) => {
+          codes += 1;
+          const full = {
+            inviter_account_id: inviter,
+            code_hash: String(codes).padStart(64, "0"),
+            ...row,
+          };
+          const columns = Object.keys(full);
+          return pool.query<{ id: string }>(
+            `INSERT INTO invitation (${columns.join(", ")})
+             VALUES (${columns.map((_, i) => `$${i + 1}`).join(", ")}) RETURNING id`,
+            Object.values(full),
+          );
+        };
+
+        // Open is nothing set; redeemed is when and by whom; counted only once redeemed.
+        await invite();
+        for (const half of [
+          { redeemed_by_account_id: friend },
+          { redeemed_at: AT },
+          { counted_at: AT },
+          { redeemed_by_account_id: friend, counted_at: AT },
+        ]) {
+          await expect(invite(half)).rejects.toMatchObject(refused("invitation_redeemed_check"));
+        }
+        await expect(
+          invite({ redeemed_by_account_id: inviter, redeemed_at: AT }),
+        ).rejects.toMatchObject(refused("invitation_not_self_check"));
+        const used = await invite({
+          redeemed_by_account_id: friend,
+          redeemed_at: AT,
+          counted_at: AT,
+        });
+        const usedId = used.rows[0]?.id as string;
+        // A person redeems one invitation, ever, and a code names one invitation.
+        await expect(
+          invite({ redeemed_by_account_id: friend, redeemed_at: AT }),
+        ).rejects.toMatchObject({ code: "23505", constraint: "invitation_redeemed_by_idx" });
+        await expect(
+          pool.query("INSERT INTO invitation (inviter_account_id, code_hash) VALUES ($1, $2)", [
+            other,
+            "1".padStart(64, "0"),
+          ]),
+        ).rejects.toMatchObject({ code: "23505", constraint: "invitation_code_hash_idx" });
+        // A counted one keeps its count when its redeemer is erased.
+        await pool.query("UPDATE invitation SET redeemed_by_account_id = NULL WHERE id = $1", [
+          usedId,
+        ]);
+        // A redeemed one stays for its redeemer when its inviter is erased, the
+        // self check passing on the null; an open one, or one naming nobody, does not.
+        const joined = await invite({ redeemed_by_account_id: other, redeemed_at: AT });
+        await pool.query("UPDATE invitation SET inviter_account_id = NULL WHERE id = $1", [
+          joined.rows[0]?.id,
+        ]);
+        await expect(invite({ inviter_account_id: null })).rejects.toMatchObject(
+          refused("invitation_named_check"),
+        );
+        await expect(
+          pool.query("UPDATE invitation SET inviter_account_id = NULL WHERE id = $1", [usedId]),
+        ).rejects.toMatchObject(refused("invitation_named_check"));
+        await pool.query("DELETE FROM invitation WHERE id = $1", [joined.rows[0]?.id]);
+
+        // A unit spent on an entry has its time, and outlives the entry without the link.
+        const { rows: rounds } = await pool.query<{ id: string }>(
+          "INSERT INTO rounds (account_id, day) VALUES ($1, '2026-10-22') RETURNING id",
+          [inviter],
+        );
+        const { rows: entries } = await pool.query<{ id: string }>(
+          `INSERT INTO round_entries (round_id, position, candidate_id, reason, decision, decided_at)
+           VALUES ($1, 1, $2, 'matches_filters', 'like', $3) RETURNING id`,
+          [rounds[0]?.id, other, AT],
+        );
+        const entryId = entries[0]?.id;
+        await expect(
+          pool.query(
+            "INSERT INTO reward (account_id, kind, invitation_id, spent_entry_id) VALUES ($1, 'like', $2, $3)",
+            [inviter, usedId, entryId],
+          ),
+        ).rejects.toMatchObject(refused("reward_spent_check"));
+        await pool.query(
+          `INSERT INTO reward (account_id, kind, invitation_id, spent_at, spent_entry_id)
+           VALUES ($1, 'like', $2, $3, $4), ($1, 'fish', $2, NULL, NULL)`,
+          [inviter, usedId, AT, entryId],
+        );
+        await expect(
+          pool.query(
+            "INSERT INTO reward (account_id, kind, invitation_id) VALUES ($1, 'boost', $2)",
+            [inviter, usedId],
+          ),
+        ).rejects.toMatchObject({ code: "22P02" });
+        await pool.query("DELETE FROM round_entries WHERE id = $1", [entryId]);
+        const spent = await pool.query<{ kind: string; spent: boolean; entry: string | null }>(
+          `SELECT kind, spent_at IS NOT NULL AS spent, spent_entry_id AS entry FROM reward ORDER BY kind`,
+        );
+        // In the enum's order: like, then fish.
+        expect(spent.rows).toEqual([
+          { kind: "like", spent: true, entry: null },
+          { kind: "fish", spent: false, entry: null },
+        ]);
+
+        // A counted invitation's notice points at its invitation, and only it does.
+        const notice = (kind: string, invitationId: string | null) =>
+          pool.query("INSERT INTO notice (account_id, kind, invitation_id) VALUES ($1, $2, $3)", [
+            inviter,
+            kind,
+            invitationId,
+          ]);
+        await expect(notice("invitation_counted", null)).rejects.toMatchObject(
+          refused("notice_invitation_check"),
+        );
+        await expect(notice("warning", usedId)).rejects.toMatchObject({ code: "23514" });
+        await notice("invitation_counted", usedId);
+
+        // The units and the notice go with their invitation.
+        await pool.query("DELETE FROM invitation WHERE id = $1", [usedId]);
+        const left = await pool.query<{ rewards: string; notices: string }>(
+          `SELECT (SELECT count(*) FROM reward) AS rewards, (SELECT count(*) FROM notice) AS notices`,
+        );
+        expect(left.rows).toEqual([{ rewards: "0", notices: "0" }]);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   /**
    * A copy of the migrations folder whose journal ends just before `tag`, so a
    * database can be brought to the state a deployed one had before it.
@@ -335,7 +482,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -363,6 +510,9 @@ describe("migrate", () => {
             "email_code_minutes",
             "email_code_attempts",
             "email_codes_per_day",
+            "invitation_reward",
+            "invitations_open",
+            "invitation_tries_per_day",
           ]);
           // A key's second version a later migration writes (0069, #95; 0070, #98) is not there yet either.
           const laterVersions = new Set(["round_size", "like_budget_balanced"]);
@@ -455,6 +605,7 @@ describe("migrate", () => {
           "found_them_count",
           "gate",
           "identity",
+          "invitation",
           "matching_config",
           "message",
           "moderator_roles",
@@ -470,6 +621,7 @@ describe("migrate", () => {
           "report",
           "report_message",
           "research_subject",
+          "reward",
           "round_entries",
           "round_relaxation",
           "rounds",

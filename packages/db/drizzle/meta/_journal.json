@@ -554,6 +554,20 @@
       "when": 1792603363537,
       "tag": "0078_email_confirmation_config",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1792654750368,
+      "tag": "0079_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1792654755279,
+      "tag": "0080_invitations_config",
+      "breakpoints": true
     }
   ]
 }

@@ -103,6 +103,7 @@ describe("the settings screen", () => {
     expect(screen.queryByRole("button", { name: "E-mail" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Your contacts" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Notifications" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Invitations" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Your account" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Give feedback" })).toBeNull();
     for (const name of [
@@ -143,6 +144,7 @@ describe("the settings screen", () => {
       "E-mail",
       "Your contacts",
       "Notifications",
+      "Invitations",
       "Give feedback",
       "Your account",
       "Legal",
@@ -168,6 +170,7 @@ describe("the settings screen", () => {
       "E-mail",
       "Your contacts",
       "Notifications",
+      "Invitations",
       "Give feedback",
       "Your account",
       "Source code",
@@ -217,6 +220,7 @@ describe("the settings screen", () => {
       ["E-mail", "/settings/email"],
       ["Your contacts", "/settings/contacts"],
       ["Notifications", "/settings/notifications"],
+      ["Invitations", "/settings/invite"],
       ["Give feedback", "/settings/feedback"],
       ["Your account", "/settings/account"],
     ];
