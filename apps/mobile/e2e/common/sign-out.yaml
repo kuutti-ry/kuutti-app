@@ -6,20 +6,12 @@ appId: fi.kuutti.app
     when:
       visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
     commands:
-      - openLink: kuutti://settings
-      - extendedWaitUntil:
-          visible: "Settings|Asetukset|Inställningar"
-          timeout: 15000
-      # This device's session has a screen of its own, behind its row under
-      # "Account" (#287), below the fold on a phone: scrolled to, then tapped.
-      # The row is there whatever the session is; its screen says when there
-      # is none.
-      - scrollUntilVisible:
-          element: "This device|Tämä laite|Den här enheten"
-          direction: DOWN
-          centerElement: true
-          timeout: 60000
-      - tapOn: "This device|Tämä laite|Den här enheten"
+      # This device's session has a screen of its own (#287), opened by its
+      # link rather than scrolled to: a swipe through Settings could pass over
+      # its row once the list grew (#107's Invitations row did), and the flows
+      # that test the row itself scroll to it. The screen says when there is
+      # no session.
+      - openLink: kuutti://settings/device
       - extendedWaitUntil:
           visible: "Log out|Kirjaudu ulos|Logga ut|No session on this device\\.|Tällä laitteella ei ole istuntoa\\.|Ingen session på den här enheten\\."
           timeout: 15000
