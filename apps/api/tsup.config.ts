@@ -4,9 +4,12 @@ import { defineConfig } from "tsup";
 // so the runtime image carries dist/index.js, the demo commands of ADR-018
 // beside it (each a file of its own: nothing of the demo is on the API's own
 // import graph, ADR-014 §10), the migrations folder and sharp's native binary,
-// nothing else. pg-native is an optional native binding pg probes for;
-// pino-pretty is dev only; @img/* are sharp's prebuilt libvips and addon for
-// the platform (#48), which a bundler cannot inline and the Dockerfile copies.
+// nothing else. pg-native is an optional native binding pg probes for and is
+// never installed; pino-pretty is dev only and never installed in the image,
+// which never asks for it (NODE_ENV=production, src/lib/logger.ts); @img/* are
+// sharp's prebuilt libvips and addon for the platform (#48), which a bundler
+// cannot inline, and the colour parser sharp requires beside them, all copied
+// by the Dockerfile.
 export default defineConfig({
   entry: {
     index: "src/index.ts",
@@ -21,7 +24,11 @@ export default defineConfig({
   bundle: true,
   splitting: false,
   noExternal: [/.*/],
-  external: ["pg-native", "pino-pretty", /^@img\//],
+  // Given to esbuild itself: tsup's own `external` is never consulted for a
+  // path that matches `noExternal`, and /.*/ matches every path (#420).
+  esbuildOptions(options) {
+    options.external = ["pg-native", "pino-pretty", "@img/*"];
+  },
   sourcemap: true,
   // The inputs of each output, which scripts/notices.ts reads for the image's
   // THIRD_PARTY_NOTICES and then removes (#416).
