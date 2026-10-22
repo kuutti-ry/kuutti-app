@@ -35,10 +35,11 @@ ENV APP_VERSION=$APP_VERSION GIT_COMMIT=$GIT_COMMIT BUILT_AT=$BUILT_AT
 WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/api/dist ./dist
 COPY --from=build --chown=node:node /repo/packages/db/drizzle ./drizzle
-# sharp's prebuilt addon and libvips for linux-arm64 (#48): the only packages
-# outside the bundle (tsup.config.ts). The build stage installed exactly the
-# platform's pair, so this is two directories; the API loads sharp at boot, so
-# a missing or wrong binary fails the smoke test in build.yml, not an upload.
+# sharp's prebuilt addon and libvips for linux-arm64 (#48), and @img/colour: the
+# only packages outside the bundle (tsup.config.ts). The build stage installed
+# exactly the platform's pair, so this is three directories; the API loads sharp
+# at boot, so a missing or wrong binary fails the smoke test in build.yml, not an
+# upload.
 COPY --from=build --chown=node:node /repo/node_modules/@img ./node_modules/@img
 COPY --chown=node:node apps/api/certs ./certs
 USER node
