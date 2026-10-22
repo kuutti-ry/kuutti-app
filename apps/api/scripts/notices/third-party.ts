@@ -148,10 +148,11 @@ type Library = {
  * node_modules/@img that holds it, the build that made it, the versions that
  * build names, the keys of the LGPL-3.0, GPL-3.0 and MPL-2.0 texts, every
  * library built in with the licence it is used under and where it was read,
- * and the texts. Gathered by hand from sharp-libvips' release and each
- * library's own at the version it names (22/10/2026); a sharp that brings
- * another libvips fails the build until it is gathered again, as
- * notices/README.md says.
+ * and the texts. Gathered from sharp-libvips' release and each library's
+ * own at the version it names, by hand on 22/10/2026 and since by
+ * `pnpm --filter @kuutti/api notices:libvips` (notices/libvips.ts, #421); a
+ * sharp that brings another libvips fails the build until it is gathered
+ * again, as notices/README.md says.
  */
 export type LibvipsPart = {
   package: string;
@@ -191,7 +192,7 @@ export function checkLibvips(part: LibvipsPart, root: string): void {
       JSON.stringify(Object.entries(part.versions).sort());
   if (!same) {
     throw new Error(
-      `notices/libvips.json is of ${part.package} ${part.version}, the install holds ${installed ? `${installed.name} ${installed.version}` : "no libvips"}: gather its libraries' texts again (apps/api/notices/README.md)`,
+      `notices/libvips.json is of ${part.package} ${part.version}, the install holds ${installed ? `${installed.name} ${installed.version}` : "no libvips"}: gather its libraries' texts again (pnpm --filter @kuutti/api notices:libvips, apps/api/notices/README.md)`,
     );
   }
 }
