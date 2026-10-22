@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/mobile",
-  "version": "0.61.1",
+  "version": "0.62.0",
   "private": true,
   "main": "expo-router/entry",
   "description": "Expo app. Routes under app/ stay thin; features live under src/features/<slice>/.",
@@ -61,6 +61,7 @@
   },
   "devDependencies": {
     "@expo/fingerprint": "0.20.13",
+    "@kuutti/notices": "workspace:*",
     "@react-native/jest-preset": "^0.86.3",
     "@testing-library/react-native": "^14.0.1",
     "@types/jest": "29.5.14",

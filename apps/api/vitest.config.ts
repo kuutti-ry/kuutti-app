@@ -22,6 +22,7 @@ export default defineConfig({
         "src/test/**",
         "src/index.ts",
         "scripts/demo-*.ts",
+        "scripts/notices.ts",
         "scripts/openapi.ts",
       ],
       reporter: ["text", "json-summary"],

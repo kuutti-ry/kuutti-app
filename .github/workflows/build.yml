@@ -151,6 +151,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Every copy of the image carries its own licence and the notices of what
+      # it carries, written by the API's build for this platform (#416, ADR-005).
+      - name: The image carries its licence and the third-party notices
+        if: steps.reuse.outputs.reused != 'true'
+        run: |
+          docker run --rm --entrypoint sh kuutti-api:ci -c '
+            test -s /app/LICENSE && test -s /app/LICENSE-EXCEPTION &&
+            grep -q "^@img/sharp-linux-arm64 " /app/dist/THIRD_PARTY_NOTICES &&
+            grep -q "^LIBVIPS AND THE LIBRARIES BUILT INTO IT$" /app/dist/THIRD_PARTY_NOTICES' \
+            || { echo "::error::the image lacks its licence or its THIRD_PARTY_NOTICES"; exit 1; }
+          echo "the image carries /app/LICENSE, /app/LICENSE-EXCEPTION and dist/THIRD_PARTY_NOTICES"
+
       - name: Image starts, migrates, and answers /health with db ok
         if: steps.reuse.outputs.reused != 'true'
         run: |
@@ -356,16 +368,19 @@ jobs:
       # The hashed assets first, then index.html, which names them, and only
       # then the assets of the build before: a page loaded in between finds
       # every file it asks for. index.html is revalidated on every load, the
-      # assets never change under their names (ADR-025 §4). pr-* holds the
+      # assets never change under their names (ADR-025 §4); licenses.txt, the
+      # bundled packages' licences the footer links (#416), keeps its name
+      # from build to build, so it is revalidated too. pr-* holds the
       # previews of open pull requests (§6): --delete must never reach it.
       - name: Write the build to the bucket's root, never under pr-
         env:
           ADMIN_BUCKET: ${{ vars.ADMIN_BUCKET }}
         run: |
           immutable='public, max-age=31536000, immutable'
-          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude 'pr-*' --cache-control "$immutable"
+          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude licenses.txt --exclude 'pr-*' --cache-control "$immutable"
+          aws s3 cp dist/licenses.txt "s3://$ADMIN_BUCKET/licenses.txt" --cache-control no-cache --content-type 'text/plain; charset=utf-8'
           aws s3 cp dist/index.html "s3://$ADMIN_BUCKET/index.html" --cache-control no-cache
-          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude 'pr-*' --cache-control "$immutable" --delete
+          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude licenses.txt --exclude 'pr-*' --cache-control "$immutable" --delete
 
       # /* is one path of the thousand free each month. Waited for, so the
       # checks below read this build and not an edge's copy of the last one.
@@ -381,8 +396,8 @@ jobs:
       # What #313 asks of the host, read from outside: every header of the
       # panel's policy, exactly as ADR-025 §3 has it, on the root and on a
       # page's own path (the fallback, §2); that path answers this build's
-      # panel (#302); and the API answers the panel's origin and no other
-      # (§10). The API reads its parameters at boot: a refused origin right
+      # panel (#302), and licenses.txt this build's licences (#416); and the
+      # API answers the panel's origin and no other (§10). The API reads its parameters at boot: a refused origin right
       # after the parameter changed wants the API restarted once.
       - name: The panel is served with its headers, and the API lets it in
         env:
@@ -414,6 +429,12 @@ jobs:
             echo "::error::$ADMIN_URL/photos answered $code, not this build's index.html"; exit 1
           fi
           echo "$ADMIN_URL/photos answers 200 with this build's index.html"
+          # Byte for byte: a key the bucket lacks answers 200 with index.html (§2).
+          code=$(curl -sS -o "$RUNNER_TEMP/licenses.txt" -w '%{http_code}' "$ADMIN_URL/licenses.txt")
+          if [ "$code" != 200 ] || ! cmp -s "$RUNNER_TEMP/licenses.txt" dist/licenses.txt; then
+            echo "::error::$ADMIN_URL/licenses.txt answered $code, not this build's licences"; exit 1
+          fi
+          echo "$ADMIN_URL/licenses.txt answers this build's licences"
           allowed() {
             curl -fsS -o /dev/null -D - -X OPTIONS -H "Origin: $1" -H 'Access-Control-Request-Method: GET' "$API_URL/health" \
               | tr -d '\r' | grep -i '^access-control-allow-origin:' | cut -d' ' -f2-
