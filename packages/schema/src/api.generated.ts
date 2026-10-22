@@ -653,7 +653,7 @@ export interface paths {
         };
         /**
          * The caller's optional e-mail
-         * @description The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set.
+         * @description The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set; whether it is confirmed, and until when a code waits for it (ADR-043).
          */
         get: {
             parameters: {
@@ -664,7 +664,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description The e-mail, or null. */
+                /** @description The e-mail, or null, and its confirmation. */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -682,11 +682,20 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
             };
         };
         /**
          * Set the caller's optional e-mail
-         * @description Validated as an address and nothing else; no mail is sent until SES exists (#385). The value reaches no log line and no event.
+         * @description Validated as an address. A different address than the one stored is unconfirmed, and a code waiting for the old one goes; the same address again changes nothing. Nothing is sent: the app asks for a code with POST /account/email/code (ADR-043). The value reaches no log line and no event.
          */
         put: {
             parameters: {
@@ -701,12 +710,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Set. */
-                204: {
+                /** @description Set; the address and its confirmation. */
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["AccountEmailResponse"];
+                    };
                 };
                 /** @description Validation failed: not an address. */
                 400: {
@@ -775,6 +786,169 @@ export interface paths {
                 };
             };
         };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/email/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a code to the caller's unconfirmed e-mail
+         * @description Six digits to the stored address, in the request's language (#385, ADR-043), replacing any code that waits, good for matching_config email_code_minutes and email_code_attempts. At most email_codes_per_day per Finnish day. Neither the address nor the code reaches a log line.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Sent; until when the code works. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccountEmailResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description email_none: no address is set; email_confirmed: the address is confirmed already. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description email_code_budget_exceeded: the day's codes are sent; Retry-After is the wait until the day rolls. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description mail_unavailable: no mail is sent in this environment, or the send failed; nothing was counted. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/email/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the caller's e-mail with its code
+         * @description The six digits of the last code sent (#385, ADR-043). Right, the address is confirmed and the code goes; the same answer when it is confirmed already.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AccountEmailConfirmation"];
+                };
+            };
+            responses: {
+                /** @description Confirmed. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccountEmailResponse"];
+                    };
+                };
+                /** @description validation_failed: not six digits; email_code_wrong: not the code, and a try remains. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description No live account (erased meanwhile). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description email_none: no address is set; email_code_none: no code waits (none sent, or the address changed); email_code_expired: past its minutes; email_code_spent: its last attempt was wrong. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -6324,6 +6498,8 @@ export interface components {
                 seeksChangedAt: string | null;
                 email: string | null;
                 foundThemAnswered: boolean;
+                /** Format: date-time */
+                emailConfirmedAt: string | null;
             };
             preferences: components["schemas"]["PreferencesResponse"];
             dealBreakers: components["schemas"]["StoredDealBreaker"][];
@@ -6910,10 +7086,21 @@ export interface components {
         };
         AccountEmailResponse: {
             email: string | null;
+            /** @description True once the person typed the code sent to this address; a new address is unconfirmed. */
+            confirmed: boolean;
+            /**
+             * Format: date-time
+             * @description When the code waiting for this address stops working; null when none waits (none sent, used, spent or expired).
+             */
+            codeExpiresAt: string | null;
         };
         AccountEmail: {
             /** Format: email */
             email: string;
+        };
+        AccountEmailConfirmation: {
+            /** @description The six digits of the message sent to the address. */
+            code: string;
         };
         AccountDeletionRequest: {
             /**

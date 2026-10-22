@@ -1,3 +1,4 @@
+export { emailCode, emailSend } from "./account-email.ts";
 export { accountExport } from "./account-export.ts";
 export {
   adminSession,

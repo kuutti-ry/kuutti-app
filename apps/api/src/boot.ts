@@ -17,6 +17,7 @@ import { roundsJob } from "./jobs/round-builder.ts";
 import { ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
+import { mailerFor } from "./lib/mail.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
@@ -203,6 +204,9 @@ export async function boot({
     logger,
     socketsPerAccount: config.WS_SOCKETS_PER_ACCOUNT,
   });
+  // Mail (#385, ADR-043): SES on AWS, the log locally, none where MAIL is off.
+  const mailer = mailerFor(config, logger);
+  logger.info({ mail: config.MAIL }, "mail");
   const app = createApp({
     live,
     config,
@@ -211,6 +215,7 @@ export async function boot({
     ...(reporting ? { report: sentryReporter() } : {}),
     ...(broker ? { broker } : {}),
     ...(media.deps ? { media: media.deps } : {}),
+    ...(mailer ? { mailer } : {}),
   });
   // Nightly housekeeping inside the process (rules/api.md): ended sessions and
   // stale login attempts (#35).

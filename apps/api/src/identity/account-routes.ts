@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import {
   AccountDeletionRequest,
   AccountEmail,
+  AccountEmailConfirmation,
   AccountEmailResponse,
   AccountExport,
   AccountPauseRequest,
@@ -15,11 +16,17 @@ import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import { tOf } from "../lib/i18n.ts";
+import {
+  confirmEmailCode,
+  type EmailDeps,
+  readEmail,
+  sendEmailCode,
+  setAccountEmail,
+} from "./email.ts";
 import { type ErasureDeps, eraseAccount } from "./erasure.ts";
 import { exportArchive } from "./export.ts";
 import { foundThemAnswered, tellFoundThem } from "./found-them.ts";
 import { pauseAccount } from "./pause.ts";
-import * as repo from "./repo.ts";
 
 const errorContent = (description: string) => ({
   description,
@@ -134,11 +141,15 @@ const emailRoute = createRoute({
   path: "/account/email",
   summary: "The caller's optional e-mail",
   description:
-    "The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set.",
+    "The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set; whether it is confirmed, and until when a code waits for it (ADR-043).",
   ...bearer,
   responses: {
-    200: { description: "The e-mail, or null.", ...json(AccountEmailResponse) },
+    200: {
+      description: "The e-mail, or null, and its confirmation.",
+      ...json(AccountEmailResponse),
+    },
     401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
   },
 });
 
@@ -147,14 +158,58 @@ const setEmailRoute = createRoute({
   path: "/account/email",
   summary: "Set the caller's optional e-mail",
   description:
-    "Validated as an address and nothing else; no mail is sent until SES exists (#385). The value reaches no log line and no event.",
+    "Validated as an address. A different address than the one stored is unconfirmed, and a code waiting for the old one goes; the same address again changes nothing. Nothing is sent: the app asks for a code with POST /account/email/code (ADR-043). The value reaches no log line and no event.",
   ...bearer,
   request: { body: { required: true, ...json(AccountEmail) } },
   responses: {
-    204: { description: "Set." },
+    200: { description: "Set; the address and its confirmation.", ...json(AccountEmailResponse) },
     400: errorContent("Validation failed: not an address."),
     401: unauthenticated,
     404: errorContent("No live account (erased meanwhile)."),
+  },
+});
+
+const sendCodeRoute = createRoute({
+  method: "post",
+  path: "/account/email/code",
+  summary: "Send a code to the caller's unconfirmed e-mail",
+  description:
+    "Six digits to the stored address, in the request's language (#385, ADR-043), replacing any code that waits, good for matching_config email_code_minutes and email_code_attempts. At most email_codes_per_day per Finnish day. Neither the address nor the code reaches a log line.",
+  ...bearer,
+  responses: {
+    200: { description: "Sent; until when the code works.", ...json(AccountEmailResponse) },
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+    409: errorContent(
+      "email_none: no address is set; email_confirmed: the address is confirmed already.",
+    ),
+    429: errorContent(
+      "email_code_budget_exceeded: the day's codes are sent; Retry-After is the wait until the day rolls.",
+    ),
+    503: errorContent(
+      "mail_unavailable: no mail is sent in this environment, or the send failed; nothing was counted.",
+    ),
+  },
+});
+
+const confirmRoute = createRoute({
+  method: "post",
+  path: "/account/email/confirm",
+  summary: "Confirm the caller's e-mail with its code",
+  description:
+    "The six digits of the last code sent (#385, ADR-043). Right, the address is confirmed and the code goes; the same answer when it is confirmed already.",
+  ...bearer,
+  request: { body: { required: true, ...json(AccountEmailConfirmation) } },
+  responses: {
+    200: { description: "Confirmed.", ...json(AccountEmailResponse) },
+    400: errorContent(
+      "validation_failed: not six digits; email_code_wrong: not the code, and a try remains.",
+    ),
+    401: unauthenticated,
+    404: errorContent("No live account (erased meanwhile)."),
+    409: errorContent(
+      "email_none: no address is set; email_code_none: no code waits (none sent, or the address changed); email_code_expired: past its minutes; email_code_spent: its last attempt was wrong.",
+    ),
   },
 });
 
@@ -181,6 +236,12 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     now: deps.now ?? (() => new Date()),
     ...(deps.media ? { media: deps.media } : {}),
   };
+  const emailDeps: EmailDeps = {
+    db: deps.db,
+    logger: deps.logger,
+    now: deps.now ?? (() => new Date()),
+    ...(deps.mailer ? { mailer: deps.mailer } : {}),
+  };
   const routes = [
     deleteRoute,
     exportRoute,
@@ -190,36 +251,44 @@ export function accountRoutes(deps: Deps, requireSession: MiddlewareHandler<AppE
     emailRoute,
     setEmailRoute,
     clearEmailRoute,
+    sendCodeRoute,
+    confirmRoute,
   ];
   for (const path of new Set(routes.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
 
-  app.openapi(emailRoute, async (c) => {
-    const account = await repo.findAccountById(deps.db, callerOf(c).accountId);
-    if (!account || account.state === "deleted") {
-      throw new AppError(404, "not_found", "No live account");
-    }
-    return c.json({ email: account.email }, 200);
-  });
+  app.openapi(emailRoute, async (c) =>
+    c.json(await readEmail(emailDeps, callerOf(c).accountId), 200),
+  );
 
   app.openapi(setEmailRoute, async (c) => {
-    const { accountId } = callerOf(c);
-    if (!(await repo.setEmail(deps.db, accountId, c.req.valid("json").email))) {
-      throw new AppError(404, "not_found", "No live account");
-    }
-    // The address stays out of the log (rules/api.md): this line says only that one was set.
-    deps.logger.info({ accountId }, "email set");
-    return c.body(null, 204);
+    const { email } = c.req.valid("json");
+    return c.json(await setAccountEmail(emailDeps, callerOf(c).accountId, email), 200);
   });
 
   app.openapi(clearEmailRoute, async (c) => {
-    const { accountId } = callerOf(c);
-    if (!(await repo.setEmail(deps.db, accountId, null))) {
-      throw new AppError(404, "not_found", "No live account");
-    }
-    deps.logger.info({ accountId }, "email cleared");
+    await setAccountEmail(emailDeps, callerOf(c).accountId, null);
     return c.body(null, 204);
+  });
+
+  app.openapi(sendCodeRoute, async (c) => {
+    try {
+      return c.json(await sendEmailCode(emailDeps, callerOf(c).accountId, tOf(c)), 200);
+    } catch (error) {
+      // The wait until the day rolls, as the export and the feedback say it.
+      if (error instanceof AppError && error.code === "email_code_budget_exceeded") {
+        const wait = (error.detail as { retryAfterSeconds?: number } | undefined)
+          ?.retryAfterSeconds;
+        c.header("Retry-After", String(wait ?? 1));
+      }
+      throw error;
+    }
+  });
+
+  app.openapi(confirmRoute, async (c) => {
+    const { code } = c.req.valid("json");
+    return c.json(await confirmEmailCode(emailDeps, callerOf(c).accountId, code), 200);
   });
 
   app.openapi(deleteRoute, async (c) => {

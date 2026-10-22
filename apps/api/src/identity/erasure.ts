@@ -161,6 +161,9 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // the version they were written under; nothing is left to prove.
     const consents = await repo.deleteConsentsOfAccount(tx, accountId);
     const exports = await repo.deleteExportsOfAccount(tx, accountId);
+    // The code waiting for the address and the day's sends (#385, ADR-043); the
+    // tombstone nulls the address and its confirmation. Not in the summary.
+    await repo.deleteEmailRows(tx, accountId);
     const feedback = await deleteFeedbackOfAccount(tx, accountId);
     // Before the sanctions go: what an open shadow ban withheld is known by it (ADR-031 §5).
     const chat = await eraseConversationsOf(
@@ -345,6 +348,7 @@ export async function exportAccount(
       seeksChangedAt: account.seeksChangedAt?.toISOString() ?? null,
       email: account.email,
       foundThemAnswered: account.foundThemAnswered,
+      emailConfirmedAt: account.emailConfirmedAt?.toISOString() ?? null,
     },
     preferences,
     dealBreakers,

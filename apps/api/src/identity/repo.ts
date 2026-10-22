@@ -52,6 +52,7 @@ const accountFrom = (r: Row): Account => ({
   seeksChangedAt: (r.seeks_changed_at as Date | null) ?? null,
   email: (r.email as string | null) ?? null,
   foundThemAnswered: r.found_them_answered === true,
+  emailConfirmedAt: (r.email_confirmed_at as Date | null) ?? null,
   registeredAt: r.registered_at as Date,
   deletedAt: (r.deleted_at as Date | null) ?? null,
 });
@@ -812,8 +813,8 @@ export async function tombstoneAccount(
   const result = await db.query(
     `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
        birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL,
-       gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL, sanctioned_from = NULL,
-       found_them_answered = false
+       gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL, email_confirmed_at = NULL,
+       sanctioned_from = NULL, found_them_answered = false
      WHERE id = $1 AND state <> 'deleted'`,
     [accountId, at],
   );
@@ -910,19 +911,157 @@ export async function lockGender(
 
 /**
  * The optional e-mail (#148, TD-18), set or cleared; a tombstone takes none.
- * The value is in the statement and nowhere else: not in the log line the
- * caller writes, not in an event (rules/api.md).
+ * A different address is unconfirmed and the code waiting for the old one
+ * goes (#385, ADR-043 §2); the same address again changes nothing. The value
+ * is in the statement and nowhere else: not in the log line the caller
+ * writes, not in an event (rules/api.md). Null when there is no live account.
  */
 export async function setEmail(
   db: Queryable,
   accountId: string,
   email: string | null,
-): Promise<boolean> {
-  const result = await db.query(
-    "UPDATE account SET email = $2 WHERE id = $1 AND state <> 'deleted'",
-    [accountId, email],
+): Promise<{ changed: boolean } | null> {
+  return transaction(db, async (tx) => {
+    const { rows } = await tx.query<{ changed: boolean }>(
+      `WITH old AS (SELECT email FROM account WHERE id = $1 AND state <> 'deleted' FOR UPDATE)
+       UPDATE account a SET email = $2::text,
+         email_confirmed_at = CASE WHEN old.email IS NOT DISTINCT FROM $2::text
+                                   THEN a.email_confirmed_at END
+       FROM old WHERE a.id = $1
+       RETURNING old.email IS DISTINCT FROM $2::text AS changed`,
+      [accountId, email],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    if (row.changed) await tx.query("DELETE FROM email_code WHERE account_id = $1", [accountId]);
+    return { changed: row.changed };
+  });
+}
+
+/** The address, its confirmation and the code waiting for it (#385). */
+export type EmailState = {
+  email: string | null;
+  confirmedAt: Date | null;
+  codeExpiresAt: Date | null;
+};
+
+/**
+ * The caller's own address and what waits for it (rule 6); undefined for no
+ * live account. With `lock`, the account row is held for the transaction:
+ * every change to the address, its confirmation and its code takes the same
+ * lock first, so a send, a confirmation and a change of address never cross.
+ * A read that waited for the lock sees the account's row as the holder left
+ * it but the joined code as it was before the wait: decide on the code only
+ * after reading it again (`findEmailCode`).
+ */
+export async function findEmailState(
+  db: Queryable,
+  accountId: string,
+  options: { lock?: boolean } = {},
+): Promise<EmailState | undefined> {
+  const { rows } = await db.query<{
+    email: string | null;
+    email_confirmed_at: Date | null;
+    expires_at: Date | null;
+  }>(
+    `SELECT a.email, a.email_confirmed_at, c.expires_at
+     FROM account a LEFT JOIN email_code c ON c.account_id = a.id
+     WHERE a.id = $1 AND a.state <> 'deleted'${options.lock ? " FOR UPDATE OF a" : ""}`,
+    [accountId],
   );
-  return result.rowCount === 1;
+  const row = rows[0];
+  if (!row) return undefined;
+  return { email: row.email, confirmedAt: row.email_confirmed_at, codeExpiresAt: row.expires_at };
+}
+
+/**
+ * A new code for the address (ADR-043 §3), under the account's lock
+ * (`findEmailState` with `lock`): the sends of earlier days go, the day's are
+ * counted, and only under `limit` is a send recorded and the code written over
+ * any earlier one, its wrong attempts back at none. Only the code's hash.
+ */
+export async function recordEmailCode(
+  db: Queryable,
+  input: {
+    accountId: string;
+    codeHash: string;
+    at: Date;
+    expiresAt: Date;
+    /** Start of the day's count; sends before it neither count nor stay. */
+    since: Date;
+    limit: number;
+  },
+): Promise<{ used: number; recorded: boolean }> {
+  await db.query("DELETE FROM email_send WHERE account_id = $1 AND at < $2", [
+    input.accountId,
+    input.since,
+  ]);
+  const { rows } = await db.query<{ n: number }>(
+    "SELECT count(*)::int AS n FROM email_send WHERE account_id = $1",
+    [input.accountId],
+  );
+  const used = rows[0]?.n ?? 0;
+  if (used >= input.limit) return { used, recorded: false };
+  await db.query("INSERT INTO email_send (account_id, at) VALUES ($1, $2)", [
+    input.accountId,
+    input.at,
+  ]);
+  await db.query(
+    `INSERT INTO email_code (account_id, code_hash, expires_at, attempts, created_at)
+     VALUES ($1, $2, $3, 0, $4)
+     ON CONFLICT (account_id) DO UPDATE
+       SET code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at, attempts = 0,
+           created_at = EXCLUDED.created_at`,
+    [input.accountId, input.codeHash, input.expiresAt, input.at],
+  );
+  return { used, recorded: true };
+}
+
+/** The code waiting for the caller's address, as stored: its hash, its end and its wrong attempts. */
+export async function findEmailCode(
+  db: Queryable,
+  accountId: string,
+): Promise<{ codeHash: string; expiresAt: Date; attempts: number } | undefined> {
+  const { rows } = await db.query<{ code_hash: string; expires_at: Date; attempts: number }>(
+    "SELECT code_hash, expires_at, attempts FROM email_code WHERE account_id = $1",
+    [accountId],
+  );
+  const row = rows[0];
+  return row
+    ? { codeHash: row.code_hash, expiresAt: row.expires_at, attempts: row.attempts }
+    : undefined;
+}
+
+/** One more wrong code for the waiting one. */
+export async function setEmailCodeAttempts(
+  db: Queryable,
+  accountId: string,
+  attempts: number,
+): Promise<void> {
+  await db.query("UPDATE email_code SET attempts = $2 WHERE account_id = $1", [
+    accountId,
+    attempts,
+  ]);
+}
+
+/** The waiting code goes: expired, spent by its wrong attempts, or used. */
+export async function deleteEmailCode(db: Queryable, accountId: string): Promise<void> {
+  await db.query("DELETE FROM email_code WHERE account_id = $1", [accountId]);
+}
+
+/** The address is confirmed (ADR-043 §3); a tombstone and an account without one take nothing. */
+export async function confirmEmail(db: Queryable, accountId: string, at: Date): Promise<void> {
+  await db.query(
+    `UPDATE account SET email_confirmed_at = $2
+     WHERE id = $1 AND state <> 'deleted' AND email IS NOT NULL`,
+    [accountId, at],
+  );
+}
+
+/** Erasure's share (ADR-007): the waiting code and the day's sends go with the account. */
+export async function deleteEmailRows(db: Queryable, accountId: string): Promise<void> {
+  await db.query("DELETE FROM email_code WHERE account_id = $1", [accountId]);
+  await db.query("DELETE FROM email_send WHERE account_id = $1", [accountId]);
 }
 
 /**

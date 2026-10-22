@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.59.0",
+    "version": "0.60.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -84,6 +84,11 @@
               },
               "foundThemAnswered": {
                 "type": "boolean"
+              },
+              "emailConfirmedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
               }
             },
             "required": [
@@ -98,7 +103,8 @@
               "genderChangedAt",
               "seeksChangedAt",
               "email",
-              "foundThemAnswered"
+              "foundThemAnswered",
+              "emailConfirmedAt"
             ]
           },
           "preferences": {
@@ -2500,10 +2506,22 @@
             "type": "string",
             "nullable": true,
             "maxLength": 254
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "True once the person typed the code sent to this address; a new address is unconfirmed."
+          },
+          "codeExpiresAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the code waiting for this address stops working; null when none waits (none sent, used, spent or expired)."
           }
         },
         "required": [
-          "email"
+          "email",
+          "confirmed",
+          "codeExpiresAt"
         ]
       },
       "AccountEmail": {
@@ -2517,6 +2535,20 @@
         },
         "required": [
           "email"
+        ],
+        "additionalProperties": false
+      },
+      "AccountEmailConfirmation": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "description": "The six digits of the message sent to the address."
+          }
+        },
+        "required": [
+          "code"
         ],
         "additionalProperties": false
       },
@@ -6676,7 +6708,7 @@
     "/account/email": {
       "get": {
         "summary": "The caller's optional e-mail",
-        "description": "The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set.",
+        "description": "The optional e-mail of #148 (TD-18): a way for Kuutti to stay in touch (#385), never a login, never shown to anybody. Null when none is set; whether it is confirmed, and until when a code waits for it (ADR-043).",
         "security": [
           {
             "session": []
@@ -6684,7 +6716,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The e-mail, or null.",
+            "description": "The e-mail, or null, and its confirmation.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6702,12 +6734,22 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       },
       "put": {
         "summary": "Set the caller's optional e-mail",
-        "description": "Validated as an address and nothing else; no mail is sent until SES exists (#385). The value reaches no log line and no event.",
+        "description": "Validated as an address. A different address than the one stored is unconfirmed, and a code waiting for the old one goes; the same address again changes nothing. Nothing is sent: the app asks for a code with POST /account/email/code (ADR-043). The value reaches no log line and no event.",
         "security": [
           {
             "session": []
@@ -6724,8 +6766,15 @@
           }
         },
         "responses": {
-          "204": {
-            "description": "Set."
+          "200": {
+            "description": "Set; the address and its confirmation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountEmailResponse"
+                }
+              }
+            }
           },
           "400": {
             "description": "Validation failed: not an address.",
@@ -6782,6 +6831,152 @@
           },
           "404": {
             "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/email/code": {
+      "post": {
+        "summary": "Send a code to the caller's unconfirmed e-mail",
+        "description": "Six digits to the stored address, in the request's language (#385, ADR-043), replacing any code that waits, good for matching_config email_code_minutes and email_code_attempts. At most email_codes_per_day per Finnish day. Neither the address nor the code reaches a log line.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sent; until when the code works.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountEmailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "email_none: no address is set; email_confirmed: the address is confirmed already.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "email_code_budget_exceeded: the day's codes are sent; Retry-After is the wait until the day rolls.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "mail_unavailable: no mail is sent in this environment, or the send failed; nothing was counted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/account/email/confirm": {
+      "post": {
+        "summary": "Confirm the caller's e-mail with its code",
+        "description": "The six digits of the last code sent (#385, ADR-043). Right, the address is confirmed and the code goes; the same answer when it is confirmed already.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountEmailConfirmation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountEmailResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "validation_failed: not six digits; email_code_wrong: not the code, and a try remains.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live account (erased meanwhile).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "email_none: no address is set; email_code_none: no code waits (none sent, or the address changed); email_code_expired: past its minutes; email_code_spent: its last attempt was wrong.",
             "content": {
               "application/json": {
                 "schema": {

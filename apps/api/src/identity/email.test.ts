@@ -5,7 +5,8 @@ import { exportOf } from "../test/export.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
 
 // features/identity/erasure.feature (#148, TD-18): the optional e-mail, a way
-// back in and nothing else. Real Postgres in a rolled-back transaction.
+// to stay in touch and nothing else; its confirmation is
+// email-confirmation.test.ts (#385). Real Postgres in a rolled-back transaction.
 
 async function appWith(ctx: TestContext) {
   const { logger, lines } = await captureLogger();
@@ -22,7 +23,8 @@ const putEmail = (app: App, headers: Headers, body: unknown) =>
     body: JSON.stringify(body),
   });
 const readEmail = async (app: App, headers: Headers) =>
-  (await (await app.request("/account/email", { headers })).json()) as { email: string | null };
+  ((await (await app.request("/account/email", { headers })).json()) as { email: string | null })
+    .email;
 
 describe("the optional e-mail", () => {
   test("The optional e-mail is set, cleared, exported and erased, and reaches no log line", async ({
@@ -30,9 +32,9 @@ describe("the optional e-mail", () => {
   }) => {
     const { app, logs } = await appWith(ctx);
     const a = await signedInAccount(ctx.client);
-    expect(await readEmail(app, a.headers)).toEqual({ email: null });
-    expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(204);
-    expect(await readEmail(app, a.headers)).toEqual({ email: ADDRESS });
+    expect(await readEmail(app, a.headers)).toBeNull();
+    expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(200);
+    expect(await readEmail(app, a.headers)).toBe(ADDRESS);
     // The person's own download carries it; nothing else does.
     const exported = await exportOf(app, a.headers);
     expect(exported.account.email).toBe(ADDRESS);
@@ -40,13 +42,13 @@ describe("the optional e-mail", () => {
     for (const body of [{ email: "aino" }, { email: "" }, { email: "a@b", extra: 1 }, {}]) {
       expect((await putEmail(app, a.headers, body)).status, JSON.stringify(body)).toBe(400);
     }
-    expect(await readEmail(app, a.headers)).toEqual({ email: ADDRESS });
+    expect(await readEmail(app, a.headers)).toBe(ADDRESS);
     expect(
       (await app.request("/account/email", { method: "DELETE", headers: a.headers })).status,
     ).toBe(204);
-    expect(await readEmail(app, a.headers)).toEqual({ email: null });
+    expect(await readEmail(app, a.headers)).toBeNull();
     // Erasure takes it with the rest of what is personal.
-    expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(204);
+    expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(200);
     const deleted = await app.request("/account/delete", {
       method: "POST",
       headers: { ...a.headers, "content-type": "application/json" },
@@ -73,11 +75,11 @@ describe("the optional e-mail", () => {
     }
     const a = await signedInAccount(ctx.client, "a");
     const b = await signedInAccount(ctx.client, "b");
-    expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(204);
-    expect(await readEmail(app, b.headers)).toEqual({ email: null });
+    expect((await putEmail(app, a.headers, { email: ADDRESS })).status).toBe(200);
+    expect(await readEmail(app, b.headers)).toBeNull();
     expect(
       (await app.request("/account/email", { method: "DELETE", headers: b.headers })).status,
     ).toBe(204);
-    expect(await readEmail(app, a.headers)).toEqual({ email: ADDRESS });
+    expect(await readEmail(app, a.headers)).toBe(ADDRESS);
   });
 });

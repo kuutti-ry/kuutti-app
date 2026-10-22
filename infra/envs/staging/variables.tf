@@ -42,6 +42,12 @@ variable "alert_email" {
   default     = null
 }
 
+variable "mail_recipients" {
+  description = "Whom staging may mail (#385, ADR-043 §6): its testers alone, since every staging account is one of Telia's test persons, whose credentials are published. CI passes the repository variable MAIL_TESTERS, a JSON list of addresses (patterns such as *@example.fi allowed), as TF_VAR_mail_recipients. The default is Kuutti's own sender, which receives nothing: until the maintainer lists the testers, staging mails nobody."
+  type        = list(string)
+  default     = ["noreply@kuutti.app"]
+}
+
 variable "admin_app_url" {
   description = "Where the staff login returns to and the moderation panel lives (#49, ADR-006): /kuutti/staging/admin-app-url. The panel's own host, static behind CloudFront (module admin, #313, ADR-025). A preview's panel under /pr-<n>/ has no login of its own: staff sign in here and open it in the same tab (ADR-025 §6)."
   type        = string

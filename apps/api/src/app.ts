@@ -41,6 +41,7 @@ import {
 } from "./lib/errors.ts";
 import { requestLocale, servedLocales } from "./lib/i18n.ts";
 import { type Logger, requestLogger } from "./lib/logger.ts";
+import type { Mailer } from "./lib/mail.ts";
 import { servedDocument } from "./lib/openapi.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
@@ -82,6 +83,8 @@ export type Deps = {
   now?: () => Date;
   /** The chat's live sockets (#349): boot hands in the one its listener feeds; absent, the app makes its own. */
   live?: Live;
+  /** Mail out (#385, ADR-043): SES or the development log; absent where MAIL is off, and a code answers 503. */
+  mailer?: Mailer;
 };
 
 const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);

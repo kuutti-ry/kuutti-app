@@ -8,6 +8,15 @@ name: The session, the theme and the language survive closing and reopening the 
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+# Settings can come back where the sign-in left it, scrolled down to This
+# device, and the row is in the first section: back to the top first.
+- scrollUntilVisible:
+    element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
+    direction: UP
+    timeout: 30000
 # Each row says what is chosen, which Maestro reads after its title; the
 # chosen option itself is ticked on the row's screen.
 - extendedWaitUntil:

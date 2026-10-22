@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { describe, expect, it } from "vitest";
-import { ConfigError, parseConfig, ssmPrefix } from "./config.ts";
+import { type AppEnv, ConfigError, parseConfig, ssmPrefix } from "./config.ts";
 import { parameterNameToEnvKey } from "./ssm.ts";
 
 describe("parseConfig", () => {
@@ -197,6 +197,80 @@ describe("parseConfig for the sign-in doors (ADR-026 §5)", () => {
     expect(
       parameterNameToEnvKey("/kuutti/prod/rate-limit-per-minute", ssmPrefix("production")),
     ).toBe("RATE_LIMIT_PER_MINUTE");
+  });
+});
+
+describe("parseConfig for mail (#385, ADR-043 §4)", () => {
+  // The least each environment boots with; a Record over AppEnv, so an
+  // environment the schema gains is a compile error here until it is listed.
+  const environments: Record<AppEnv, Record<string, string>> = {
+    development: { DATABASE_URL: "postgres://x", APP_ENV: "development" },
+    test: { DATABASE_URL: "postgres://x", APP_ENV: "test" },
+    preview: { DATABASE_URL: "postgres://x", APP_ENV: "preview", PR_NUMBER: "1" },
+    staging: { DATABASE_URL: "postgres://x", APP_ENV: "staging" },
+    production: {
+      DATABASE_URL: "postgres://x",
+      APP_ENV: "production",
+      ADMIN_APP_URL: "https://admin.kuutti.app",
+    },
+  };
+  const each = Object.entries(environments) as Array<[AppEnv, Record<string, string>]>;
+  const local = new Set<AppEnv>(["development", "test"]);
+
+  it.each(each)("unset in %s, sends through the log on a developer's machine only", (name, raw) => {
+    expect(parseConfig(raw).MAIL).toBe(local.has(name) ? "log" : "off");
+  });
+
+  it("unset with APP_ENV unset too, is the development log", () => {
+    expect(parseConfig({ DATABASE_URL: "postgres://x" }).MAIL).toBe("log");
+  });
+
+  it.each(each.filter(([name]) => !local.has(name)))(
+    "refuses the log in %s, where a code would sit in a deployed log, and names MAIL",
+    (name, raw) => {
+      try {
+        parseConfig({ ...raw, MAIL: "log" });
+        throw new Error("expected ConfigError");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigError);
+        expect((error as ConfigError).missing).toEqual(["MAIL"]);
+        expect((error as ConfigError).issues).toEqual([
+          `MAIL: log is for development and test, not ${name}`,
+        ]);
+      }
+    },
+  );
+
+  it.each(each)("takes ses and off as set in %s, and the log where it is allowed", (name, raw) => {
+    expect(parseConfig({ ...raw, MAIL: "ses" }).MAIL).toBe("ses");
+    expect(parseConfig({ ...raw, MAIL: "off" }).MAIL).toBe("off");
+    if (local.has(name)) expect(parseConfig({ ...raw, MAIL: "log" }).MAIL).toBe("log");
+  });
+
+  it.each(["smtp", "SES", "", "ses "])("refuses %j and names MAIL", (value) => {
+    try {
+      parseConfig({ ...environments.staging, MAIL: value });
+      throw new Error("expected ConfigError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigError);
+      expect((error as ConfigError).issues.join("\n")).toMatch(/^MAIL: /);
+    }
+  });
+
+  it("sends as Kuutti's noreply unless the sender is set, and refuses an empty one", () => {
+    expect(parseConfig(environments.production).MAIL_FROM).toBe("Kuutti <noreply@kuutti.app>");
+    expect(
+      parseConfig({ ...environments.staging, MAIL_FROM: "Kuutti Staging <noreply@kuutti.app>" })
+        .MAIL_FROM,
+    ).toBe("Kuutti Staging <noreply@kuutti.app>");
+    expect(() => parseConfig({ ...environments.staging, MAIL_FROM: "" })).toThrow(/MAIL_FROM/);
+  });
+
+  it("is read from the parameters mail and mail-from", () => {
+    expect(parameterNameToEnvKey("/kuutti/prod/mail", ssmPrefix("production"))).toBe("MAIL");
+    expect(parameterNameToEnvKey("/kuutti/staging/mail-from", ssmPrefix("preview"))).toBe(
+      "MAIL_FROM",
+    );
   });
 });
 

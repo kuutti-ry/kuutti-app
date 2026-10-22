@@ -9,6 +9,7 @@ import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import type { Mailer, MailMessage } from "../lib/mail.ts";
 import { signedInAccount, signInAs } from "../test/account.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, type TestContext, test, testConfig } from "../test/harness.ts";
@@ -103,12 +104,18 @@ function broker(whileAnswering?: () => Promise<unknown>): IdentityBroker & { cal
 
 async function appOn(
   db: Queryable,
-  options: { bank?: boolean; whileTheBankAnswers?: () => Promise<unknown> } = {},
+  options: { bank?: boolean; whileTheBankAnswers?: () => Promise<unknown>; mailer?: Mailer } = {},
 ) {
   const { logger, lines } = await captureLogger();
   const config = options.bank ? testConfig({ HETU_HMAC_KEY: KEY_HEX }) : testConfig();
   const bank = broker(options.whileTheBankAnswers);
-  const app = createApp({ config, logger, db, ...(options.bank ? { broker: bank } : {}) });
+  const app = createApp({
+    config,
+    logger,
+    db,
+    ...(options.bank ? { broker: bank } : {}),
+    ...(options.mailer ? { mailer: options.mailer } : {}),
+  });
   return { app, logs: lines, bankCalls: bank.calls };
 }
 
@@ -148,6 +155,8 @@ describe("an erasure that commits between the session guard and the handler", ()
       { method: "GET", path: "/account/email" },
       { method: "PUT", path: "/account/email", body: { email: "race.probe@example.fi" } },
       { method: "DELETE", path: "/account/email" },
+      { method: "POST", path: "/account/email/code" },
+      { method: "POST", path: "/account/email/confirm", body: { code: "123456" } },
       { method: "POST", path: "/account/delete", body: { confirm: true } },
     ];
     for (const call of calls) {
@@ -155,7 +164,9 @@ describe("an erasure that commits between the session guard and the handler", ()
       const db = interleaved(ctx.client, { after: GUARD_LOOKUP }, () =>
         eraseOnOtherDevice(ctx, me.accountId),
       );
-      const { app, logs } = await appOn(db);
+      // With a mailer, so the send reaches its account's lock and not the 503 of no mail.
+      const sent: MailMessage[] = [];
+      const { app, logs } = await appOn(db, { mailer: { send: async (m) => void sent.push(m) } });
       const res = await send(app, me.headers, call);
       const label = `${call.method} ${call.path}`;
       expect(db.ran(), label).toBe(true);
@@ -165,10 +176,18 @@ describe("an erasure that commits between the session guard and the handler", ()
         state: "deleted",
         email: null,
       });
-      // The handler's own success lines never appear: nothing was set, cleared or erased twice.
+      expect(sent, label).toEqual([]);
+      // The handler's own success lines never appear: nothing was set, cleared,
+      // sent, confirmed or erased twice.
       expect(
         logs().filter((l) =>
-          ["email set", "email cleared", "account erased"].includes(l.msg ?? ""),
+          [
+            "email set",
+            "email cleared",
+            "email code sent",
+            "email confirmed",
+            "account erased",
+          ].includes(l.msg ?? ""),
         ),
         label,
       ).toEqual([]);

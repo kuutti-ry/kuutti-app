@@ -5,6 +5,7 @@ import type { QueryResultRow } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import type { IdentityBroker } from "../identity/index.ts";
+import { type Mailer, type MailMessage, sesMailer } from "../lib/mail.ts";
 import { addressOf, TRUSTED_PROXIES, type TrustedProxy } from "../lib/rate-limit.ts";
 import { signedInAccount, staffSession, withMatchingConfig } from "./account.ts";
 import { cardShown } from "./cards.ts";
@@ -695,6 +696,60 @@ describe("PII in logs", () => {
     for (const secret of [hetu, code, tokens.accessToken, tokens.refreshToken]) {
       expect(out).not.toContain(secret);
     }
+  });
+
+  // The sweep's fake session never reaches the e-mail's handlers (#385,
+  // ADR-043 §7): a person's own address through a send SES refuses with the
+  // address in its message, a send that works, a wrong code, the right one
+  // and the removal. Neither the address nor the code reaches a log line.
+  test("no address or code reaches a log line through the e-mail's confirmation", async ({
+    ctx,
+  }) => {
+    const { logger, lines } = await captureLogger();
+    const refused = Object.assign(
+      new Error(
+        `Email address is not verified. The following identities failed: ${FIXTURES.email}`,
+      ),
+      { name: "MessageRejected", $metadata: { httpStatusCode: 400 } },
+    );
+    const sent: MailMessage[] = [];
+    const build = (mailer: Mailer) =>
+      createApp({ config: testConfig(), logger, db: ctx.client, mailer });
+    const failing = build(
+      sesMailer({ send: () => Promise.reject(refused) } as Parameters<typeof sesMailer>[0], "x"),
+    );
+    const working = build({ send: async (message) => void sent.push(message) });
+    const a = await signedInAccount(ctx.client);
+    const call = (app: ReturnType<typeof createApp>, method: string, path: string, body?: object) =>
+      app.request(path, {
+        method,
+        headers: { ...a.headers, "content-type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+
+    expect((await call(working, "PUT", "/account/email", { email: FIXTURES.email })).status).toBe(
+      200,
+    );
+    expect((await call(failing, "POST", "/account/email/code")).status).toBe(503);
+    expect((await call(working, "POST", "/account/email/code")).status).toBe(200);
+    const code = /\b\d{6}\b/.exec(sent[0]?.text ?? "")?.[0] ?? "";
+    expect(code).toMatch(/^\d{6}$/);
+    const wrong = code === "000000" ? "000001" : "000000";
+    const confirm = (c: string) => call(working, "POST", "/account/email/confirm", { code: c });
+    expect((await confirm(wrong)).status).toBe(400);
+    expect((await confirm(code)).status).toBe(200);
+    expect((await call(working, "DELETE", "/account/email")).status).toBe(204);
+
+    // Each step left its line, so the absence below is not for want of lines.
+    const said = lines().map((l) => l.msg);
+    for (const msg of ["email set", "email code not sent", "email code sent", "email confirmed"]) {
+      expect(said).toContain(msg);
+    }
+    expect(leakedFixtures(lines())).toEqual([]);
+    // The code as a value anywhere in a line; a quoted match, since six digits
+    // can occur by chance inside an id or a time.
+    expect(JSON.stringify(lines())).not.toContain(`"${code}"`);
+    expect(JSON.stringify(lines())).not.toContain(` ${code}`);
   });
 
   it("would catch a route that logs its request body", async () => {

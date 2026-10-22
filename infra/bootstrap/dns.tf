@@ -7,7 +7,8 @@
 # points at. The import block stays, so a rebuilt state adopts it again.
 # Records live with the environment that owns their target (envs/*/dns.tf)
 # and look the zone up by name. Domain-wide records that belong to no
-# environment (CAA, the mail-refusing SPF, DMARC and null MX below) live here.
+# environment live here: CAA, the root's SPF, DMARC and null MX below, and
+# the records SES sends mail by (mail.tf).
 # ---------------------------------------------------------------------------
 
 import {
@@ -25,13 +26,19 @@ resource "aws_route53_zone" "main" {
 }
 
 # ---------------------------------------------------------------------------
-# Domain-wide policy records. Nothing sends mail as @kuutti.app yet, and
-# nothing should be able to: a "-all" SPF, a reject DMARC and a null MX say so
-# to every receiver, which is what stops the domain being spoofed while it
-# has no mailbox. CAA limits who may issue certificates for the domain to the
-# two issuers in use: ACM (Amplify Hosting, later CloudFront) and Let's
-# Encrypt (Traefik on the boxes). No issuewild: wildcards are not used. When
-# the project has a mailbox, add an iodef record and replace the SPF.
+# Domain-wide policy records. Kuutti sends as noreply@kuutti.app through SES
+# and receives no mail at all (mail.tf, #385, ADR-043 §5). SES signs every
+# message with DKIM as d=kuutti.app, and its envelope sender is
+# mail.kuutti.app, whose own SPF names SES. So the root keeps its "-all" SPF
+# (nothing sends with kuutti.app itself in the envelope) and its null MX
+# (nothing receives here), and the reject DMARC holds: DKIM aligns under
+# adkim=s, while SPF, checked for mail.kuutti.app, does not align under
+# aspf=s and need not. Mail that SES did not sign fails DMARC and receivers
+# that honour it reject it, which is what stops the domain being spoofed. CAA
+# limits who may issue certificates for the domain to the two issuers in use:
+# ACM (Amplify Hosting, later CloudFront) and Let's Encrypt (Traefik on the
+# boxes). No issuewild: wildcards are not used. When the project has a
+# mailbox, add an iodef record and replace the SPF and the null MX.
 # ---------------------------------------------------------------------------
 
 resource "aws_route53_record" "caa" {

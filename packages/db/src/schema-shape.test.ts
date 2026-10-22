@@ -54,6 +54,9 @@ describe("the tables", () => {
       "contact_share",
       "conversation",
       "conversation_participant",
+      // The code waiting for the optional e-mail and the day's sends (#385, ADR-043).
+      "email_code",
+      "email_send",
       "feedback",
       // "Löysin hänet": a count by day and reason, naming nobody (#83, ADR-040).
       "found_them_count",
@@ -164,6 +167,9 @@ describe("the foreign keys", () => {
       "contact",
       // The person's place in a conversation, cut to null at erasure (#348).
       "conversation_participant",
+      // The e-mail's waiting code and the day's sends, deleted at erasure (#385).
+      "email_code",
+      "email_send",
       "feedback",
       "gate",
       // A notice and the notification choices (#176), erased with the account.
