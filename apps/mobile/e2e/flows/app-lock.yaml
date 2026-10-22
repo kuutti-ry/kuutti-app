@@ -69,14 +69,15 @@ name: A passcode set in Settings locks the app at a cold start and back from the
 - extendedWaitUntil:
     visible: "Kuutti is locked|Kuutti on lukittu|Kuutti är låst"
     timeout: 15000
-- tapOn:
-    below: "Your Kuutti passcode|Kuutin pääsykoodisi|Din lösenkod för Kuutti"
+# No tap on the field: it has the focus as the lock shows (no face or finger
+# here), and the number pad is up, so a tap "below" the label lands on a key
+# (CI, 22/10/2026: its "1"). Typed once the screen has settled and focused it.
+- waitForAnimationToEnd
 - inputText: "111111"
 - extendedWaitUntil:
     visible: "Wrong passcode\\. 4 tries left\\.|Väärä pääsykoodi\\. 4 yritystä jäljellä\\.|Fel lösenkod\\. 4 försök kvar\\."
     timeout: 15000
-- tapOn:
-    below: "Your Kuutti passcode|Kuutin pääsykoodisi|Din lösenkod för Kuutti"
+# The field keeps the focus and the number pad stays up after a wrong try.
 - inputText: "246810"
 # The lock goes, and home is there; it lay below the lock all along, so the
 # lock's going is what is waited for.
