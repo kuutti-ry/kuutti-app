@@ -4,6 +4,7 @@ import { join } from "node:path";
 import fc from "fast-check";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  blocksOf,
   collectNotices,
   licenseOf,
   normaliseText,
@@ -123,6 +124,45 @@ describe("a text as its file has it", () => {
   it("leaves a clean text as it is, and an empty one empty", () => {
     expect(normaliseText("a\n\n  b")).toBe("a\n\n  b");
     expect(normaliseText(" \n \n")).toBe("");
+  });
+});
+
+describe("the paragraphs of a text", () => {
+  it("are the runs of lines between blank ones, a line of spaces blank too, none empty", () => {
+    expect(blocksOf("\n\na\nb\n\n \t \n\nc\n  d\n\n")).toEqual(["a\nb", "c\n  d"]);
+    expect(blocksOf("one")).toEqual(["one"]);
+    expect(blocksOf("")).toEqual([]);
+    expect(blocksOf("\n \n")).toEqual([]);
+  });
+
+  it("are read as the old split on blank lines read them", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.constantFrom("a", "b c", "", " ", "\t", "  d"), { maxLength: 12 }),
+        (lines) => {
+          const text = lines.join("\n");
+          const old = text.split(/\n\s*\n/).map((b) =>
+            b
+              .split("\n")
+              .filter((l) => l.trim() !== "")
+              .join("\n"),
+          );
+          expect(blocksOf(text)).toEqual(old.filter(Boolean));
+        },
+      ),
+    );
+  });
+});
+
+describe("a text of many newlines (CodeQL js/polynomial-redos)", () => {
+  // A hundred thousand newlines before a word: each step is linear, so this runs at once.
+  const many = `${"\n".repeat(100_000)}x${"\n".repeat(100_000)}`;
+
+  it("is normalised, split and keyed as any other", () => {
+    expect(normaliseText(many)).toBe("x");
+    expect(splitNotice(`Copyright X${many}`)).toEqual({ copyright: ["Copyright X"], body: "x" });
+    expect(blocksOf(many)).toEqual(["x"]);
+    expect(textKey(many)).toBe(textKey("x"));
   });
 });
 

@@ -44,6 +44,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 import {
+  blocksOf,
   collectNotices,
   licenseOf,
   type Manifest,
@@ -205,8 +206,7 @@ const SHORT = 40;
  * file broke on purpose. The words stay the file's, in its order.
  */
 export function paragraphs(text: string): string[] {
-  return text
-    .split(/\n\s*\n/)
+  return blocksOf(text)
     .map((block) => {
       const lines = block
         .split("\n")

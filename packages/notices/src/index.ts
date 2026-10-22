@@ -67,15 +67,44 @@ export function shippedPackageDirs(sources: Iterable<string>, root: string): str
   return [...dirs].sort();
 }
 
+/**
+ * A text without the newlines at either end. A scan, not a regex: /\n+$/
+ * retries from every newline of a long run, which a file of untrusted
+ * contents can make quadratic (CodeQL js/polynomial-redos).
+ */
+function trimNewlines(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === "\n") start += 1;
+  while (end > start && text[end - 1] === "\n") end -= 1;
+  return text.slice(start, end);
+}
+
 /** A text as its file has it, without a byte-order mark, Windows line ends, spaces at line ends or blank lines at either end. */
 export function normaliseText(text: string): string {
-  return text
-    .replace(/^﻿/, "")
-    .replace(/\r\n?/g, "\n")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n")
-    .replace(/^\n+|\n+$/g, "");
+  return trimNewlines(
+    text
+      .replace(/^\uFEFF/, "")
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .join("\n"),
+  );
+}
+
+/** The paragraphs of a text, each the run of lines between blank ones (a line of spaces is blank), in order; line by line, so in time linear in the text. */
+export function blocksOf(text: string): string[] {
+  const blocks: string[] = [];
+  let block: string[] = [];
+  for (const line of text.split("\n")) {
+    if (line.trim() !== "") block.push(line);
+    else if (block.length > 0) {
+      blocks.push(block.join("\n"));
+      block = [];
+    }
+  }
+  if (block.length > 0) blocks.push(block.join("\n"));
+  return blocks;
 }
 
 /** A licence or NOTICE file of a package: its name as the package ships it, and its text. */
@@ -129,10 +158,7 @@ export function splitNotice(text: string): { copyright: string[]; body: string }
       break;
     }
   }
-  const body = lines
-    .slice(at)
-    .join("\n")
-    .replace(/^\n+|\n+$/g, "");
+  const body = trimNewlines(lines.slice(at).join("\n"));
   return copyright.length > 0 && body !== "" ? { copyright, body } : null;
 }
 
@@ -142,10 +168,8 @@ export function splitNotice(text: string): { copyright: string[]; body: string }
  * otherwise is not.
  */
 export function textKey(text: string): string {
-  const words = text
-    .split(/\n\s*\n/)
+  const words = blocksOf(text)
     .map((paragraph) => paragraph.split(/\s+/).filter(Boolean).join(" "))
-    .filter(Boolean)
     .join("\n\n");
   return createHash("sha256").update(words).digest("hex").slice(0, 12);
 }
