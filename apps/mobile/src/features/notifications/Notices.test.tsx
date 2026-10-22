@@ -7,8 +7,9 @@ import { renderWithTheme } from "@/test/render";
 import { Notices } from "./Notices";
 
 // The home screen's notices (#176, ADR-032): the unread ones under a heading,
-// a warning with its reason in words, Got it marking it read and taking it
-// off, a failure said and the notice kept, nothing at all without one.
+// a warning with its reason in words, an invitation that counted with what it
+// earned and never who (#107), Got it marking it read and taking it off, a
+// failure said and the notice kept, nothing at all without one.
 
 const { __focus: focus } = jest.requireMock("expo-router") as { __focus: () => void };
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
@@ -25,6 +26,13 @@ const notice = (n: number, readAt: string | null = null) => ({
   reason: "harassment",
 });
 const BODY = "Reason: Harassment. A warning by itself changes nothing in how you use the app.";
+const counted = (n: number, reward: { fish: number; likes: number }) => ({
+  id: `00000000-0000-4000-8000-00000000001${n}`,
+  kind: "invitation_counted",
+  at: "2026-10-22T03:00:00.000Z",
+  readAt: null,
+  reward,
+});
 
 function api(notices: unknown[], read: () => Response = () => new Response(null, { status: 204 })) {
   const seen: string[] = [];
@@ -64,6 +72,40 @@ describe("Notices", () => {
     expect(seen).toContain(`POST /notices/${notice(1).id}/read`);
     expect(screen.queryByText("A warning from a moderator")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Notices" })).toBeNull();
+  });
+
+  it("shows an invitation that counted with what it earned, never who, beside a warning", async () => {
+    const seen = api([counted(1, { fish: 1, likes: 0 }), notice(1)]);
+    await renderWithTheme(<Notices />);
+    expect(await screen.findByText("An invitation of yours counted")).toBeTruthy();
+    expect(
+      screen.getByText("Somebody you invited has finished their profile. You earned a fish."),
+    ).toBeTruthy();
+    expect(screen.getByText(BODY)).toBeTruthy();
+    // The invitation's notice first, as the API ordered them.
+    const flat = JSON.stringify(screen.toJSON());
+    expect(flat.indexOf("An invitation of yours counted")).toBeLessThan(
+      flat.indexOf("A warning from a moderator"),
+    );
+    noProblems();
+    const first = screen.getAllByRole("button", { name: "Got it" })[0];
+    await act(async () => fireEvent.press(first as ReturnType<typeof screen.getByRole>));
+    await settle();
+    expect(seen).toContain(`POST /notices/${counted(1, { fish: 1, likes: 0 }).id}/read`);
+    expect(screen.queryByText("An invitation of yours counted")).toBeNull();
+    expect(screen.getByText(BODY)).toBeTruthy();
+  });
+
+  it.each([
+    [{ fish: 0, likes: 3 }, "You earned 3 extra likes."],
+    [{ fish: 2, likes: 1 }, "You earned 2 fish and an extra like."],
+    [{ fish: 0, likes: 0 }, "Thank you for inviting them."],
+  ])("says what a counted invitation earned, %j", async (reward, words) => {
+    api([counted(2, reward)]);
+    await renderWithTheme(<Notices />);
+    expect(
+      await screen.findByText(`Somebody you invited has finished their profile. ${words}`),
+    ).toBeTruthy();
   });
 
   it("keeps a notice whose mark failed, says so, and tells VoiceOver", async () => {

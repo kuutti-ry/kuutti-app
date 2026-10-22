@@ -1,12 +1,12 @@
 # ADR-039: The fish, a like that says a little more
 
-- Status: accepted 2026-10-20 (#378, built as written there on the maintainer's decisions of that day; the points under "Open, the maintainer's" are his to confirm or change)
+- Status: accepted 2026-10-20 (#378, built as written there on the maintainer's decisions of that day; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§7 and the Context: an invitation that counted may earn a fish, the maintainer's of that day, #107, ADR-044 §8; see History)
 - Date: 2026-10-20
 - Follows: TD-11 (a like stays scarce), TD-12 (the reason on every card), TD-15 (nothing purchasable, rewards earned), ADR-011 (the research events), ADR-034 §5 (a decision changes until the day ends), ADR-036 (the day's likes), ADR-037 (liked-you), ADR-038 (the match), CLAUDE.md rule 10 and Product constraints; issues #378, #95, #97, #98, #100, #379
 
 ## Context
 
-The matching document of 7 October gave the round's forced places to "kielo senders, then liked-you" and left the kielo undefined (#95). On 20/10/2026 the maintainer defined it as the first cut's super-like and named it the fish: one a week, a like for every rule, first in the other person's liked-you places, never bought, earned or counted.
+The matching document of 7 October gave the round's forced places to "kielo senders, then liked-you" and left the kielo undefined (#95). On 20/10/2026 the maintainer defined it as the first cut's super-like and named it the fish: one a week, a like for every rule, first in the other person's liked-you places, never bought or counted. On 22/10/2026 he let an invitation that counted earn one (§7, ADR-044).
 
 ## Decision
 
@@ -16,7 +16,7 @@ The matching document of 7 October gave the round's forced places to "kielo send
 4. **First in the other person's round.** The builder reads the waiting likes as ADR-037 says and orders those with a fish first, each group the oldest like first, up to `liked_you_cap`, labelled `fish` (one more value of `round_reason`, in 0071). No order moves them.
 5. **The events.** `like` carries `fish`, and `round_built` counts its `fish` places; nothing else. Keyed by `research_id` as every event.
 6. **What nobody learns.** The sender learns of a fish what they learn of a like: a match or nothing. No route counts the fish a person received; there is no list of them and no notification of its own: it arrives with the round, as every like does.
-7. **Never bought, never earned.** No reward (#85) adds a fish or buys one (TD-15).
+7. **Never bought; earned by an invitation alone.** Nothing buys a fish (TD-15). An invitation that counted may earn its inviter fish, as many as `invitation_reward` says (one by default, the maintainer's of 22/10/2026; ADR-044 §8), and nothing else earns one. An earned fish waits until the window's own are sent and is then used by itself by the next fish, which §3 refuses only when none waits. §3's count leaves out the fish an earned one paid for, so a banked fish never takes next week's place.
 
 ## Consequences
 
@@ -37,3 +37,4 @@ The matching document of 7 October gave the round's forced places to "kielo send
 ## History
 
 - 2026-10-20: written with #378's build, on the maintainer's decisions of that day.
+- 2026-10-22 (#107, ADR-044 §8): §7 and the Context amended, the maintainer's of that day. An invitation that counted may earn its inviter a fish; "never earned" is withdrawn. An earned fish is used once the window's fish are sent, and a fish it paid for is not counted in the window.

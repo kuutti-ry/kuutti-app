@@ -34,9 +34,9 @@ Each flow has a persona to itself where it changes something that another flow r
 |---|---|---|
 | `sign-in-refusals` | Tapio, Ilona, Lauri, Venla, Eetu, Siiri | banned, cooldown and under-18 refused in their words; 18 and 99 let in |
 | `sign-in-links` | Sanna | a forged return link refused without touching the session; an unknown route goes home; every refusal code's text |
-| `onboarding` *once* | Onni | the ten steps in order; the label after non-binary; the consent on the seek screen; closed at the intent and resumed there (#219); the steppers; two areas; three photos; bio; research; home |
-| `age-window-bounds` *once* | Siiri | 94 to 99 at 99, neither end leaves the bounds; no label for a woman; two areas |
-| `identity-label-on-card` *once* | Eetu | the label chosen after non-binary shows on the card after the gender |
+| `onboarding` *once* | Onni | the ten steps in order; a friend's invitation code offered after the welcome at its number and skipped (#107); the label after non-binary; the consent on the seek screen; closed at the intent and resumed there (#219); the steppers; two areas; three photos; bio; research; home |
+| `age-window-bounds` *once* | Siiri | the invitation code skipped; 94 to 99 at 99, neither end leaves the bounds; no label for a woman; two areas |
+| `identity-label-on-card` *once* | Eetu | the invitation code skipped; the label chosen after non-binary shows on the card after the gender |
 | `terms-asked-again` *once* | Kerttu | an older wording of the terms asked again, nothing else but research |
 | `sensitive-answers-withdrawal` | Noa | the consent withdrawn asks whom one seeks again, not the ages and not research; Anyone is all three |
 | `found-them` *once* | Aino | from Your account, Tell Kuutti off until a reason is ticked in words, the answer thanked; opened again it thanks at once and asks nothing (#83). Each account answers once; her account-deletion flow, after it, erases the answer with her |
@@ -58,6 +58,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `email` | Sanna | malformed refused; valid saved, said unconfirmed and sent its code by the card itself (the local API's mail goes to its log, `MAIL=log`); a wrong code refused in words; removed, its code with it (#385, ADR-043). Each run sends Sanna one of the five codes of a Finnish day (`email_codes_per_day`): after five runs in a day, `pnpm demo:reset` first |
 | `research-switch` | Sanna | the opt-in recorded and withdrawn |
 | `notification-settings` | Sanna | Settings › Notifications says nothing is sent yet; Messages switched off, kept on the server after a way round by home, then on again, so Sanna ends as she began (#176) |
+| `invite` | Sanna | Settings › Invitations (#107, ADR-044): what an invitation earns in words (one fish); Make an invitation shows the code once, in two groups or, where Maestro reads the label, a character at a time, with the line that it is shown only now; Share the code hands the message to the share sheet on iOS or the chooser on Android, closed again with no failure line; the invitation just made withdrawn after the dialog asks, its code gone with it, so Sanna ends as she began. A run that stops half-way leaves an invitation open: after five such (`invitations_open`), `pnpm demo:reset` first. Using a code and the night's count are the API's tests |
 | `data-export` | Sanna | Download my data hands the zip over: the share sheet on iOS, the folder picker on Android (#237) |
 | `photo-descriptions` | Sanna | the Photo descriptions row and its screen (#296): Show under photos on, Face off, both kept when the screen is opened again, then back as found; the description itself needs Rekognition, which the local stack has none of |
 | `decision-buttons` | Sanna | Settings › Decision buttons (#82): Right hand chosen and one-handed off at first; Left hand and one-handed chosen and kept when the screen is opened again, then back to Right hand and off, so Sanna ends as she began. Where the buttons then sit on the round is the round screen's jest tests |

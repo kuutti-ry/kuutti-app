@@ -32,6 +32,7 @@ import {
   profileErrorText,
   useProfile,
 } from "@/features/profile";
+import { fetchInvitations, InvitationStep } from "@/features/rewards";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { LegalTextLink } from "../LegalTextLink";
@@ -40,6 +41,7 @@ import { useOnboarding } from "./useOnboarding";
 
 type Step =
   | "welcome"
+  | "invitation"
   | "name"
   | "gender"
   | "identityLabel"
@@ -53,7 +55,7 @@ type Step =
   | "stuck"
   | "done";
 
-/** The screens, for "Step x of n"; the identity label shares the gender's number. The pond is asked only where there is more than one (#174). */
+/** The screens, for "Step x of n"; the invitation code shares the welcome's number, the identity label the gender's. The pond is asked only where there is more than one (#174). */
 const STEPS: Step[] = [
   "welcome",
   "name",
@@ -67,9 +69,17 @@ const STEPS: Step[] = [
   "research",
 ];
 
+/**
+ * A friend's invitation code (#107): not asked yet, asked of the API and
+ * offered, or done with for this walk (skipped, used, not for this person, or
+ * a read that failed, which Settings makes up for).
+ */
+type InvitationOffer = "unasked" | "offered" | "done";
+
 /** What the screen keeps between two status reads: what the API's status does not say. */
 type LocalAnswers = {
   researchOffered: boolean;
+  invitation: InvitationOffer;
   /** A non-binary gender was just declared: the label is offered once, before the next step. */
   labelPending: boolean;
 };
@@ -78,13 +88,17 @@ type LocalAnswers = {
  * The next question, from what the API says is missing, in the sheet's
  * order (#146, ADR-010 §10): the welcome screen with both consents first,
  * so nothing personal is asked before the person has read what happens to
- * it (ADR-010 §9); then the name, the gender, whom one seeks, the intent,
+ * it (ADR-010 §9); a friend's invitation code once, right after it, never
+ * required (#107); then the name, the gender, whom one seeks, the intent,
  * the age window, the photos, the prompts; research once, never required.
  * A step the screen cannot ask (a pond without a default) is "stuck".
  */
 function nextStep(status: OnboardingStatus, local: LocalAnswers): Step {
   const missing = new Set(status.missing);
   if (missing.has("terms") || missing.has("privacy")) return "welcome";
+  // Right after the welcome, while the name is still to come: a walk resumed
+  // further on goes on where it was, and Settings takes the code (ADR-044).
+  if (missing.has("name") && local.invitation !== "done") return "invitation";
   if (missing.has("name")) return "name";
   if (missing.has("gender")) return "gender";
   if (local.labelPending) return "identityLabel";
@@ -165,6 +179,7 @@ export function OnboardingScreen() {
   const { state, busy, failed, failedCode, reload, step } = useOnboarding();
   const profile = useProfile();
   const [researchOffered, setResearchOffered] = useState(false);
+  const [invitation, setInvitation] = useState<InvitationOffer>("unasked");
   const [seeks, setSeeks] = useState<Gender[]>([]);
   const [labelPending, setLabelPending] = useState(false);
   const [gender, setGender] = useState<Gender | null>(null);
@@ -182,7 +197,22 @@ export function OnboardingScreen() {
   }, [state]);
 
   const current: Step | null =
-    state.status === "ready" ? nextStep(state.onboarding, { researchOffered, labelPending }) : null;
+    state.status === "ready"
+      ? nextStep(state.onboarding, { researchOffered, invitation, labelPending })
+      : null;
+  // Whether a code may still be typed, asked once the consents are given,
+  // which the API's answer needs (ADR-044 §6): offered if so, and otherwise,
+  // or when the read fails, the walk goes on without it.
+  useEffect(() => {
+    if (current !== "invitation" || invitation !== "unasked") return;
+    let live = true;
+    fetchInvitations()
+      .then((answer) => live && setInvitation(answer.redeemable ? "offered" : "done"))
+      .catch(() => live && setInvitation("done"));
+    return () => {
+      live = false;
+    };
+  }, [current, invitation]);
   useEffect(() => {
     if (current === "done") router.replace("/");
   }, [current, router]);
@@ -267,7 +297,10 @@ export function OnboardingScreen() {
   }
   const { onboarding } = state;
   const { draft, update } = profile;
-  const position = STEPS.indexOf(current === "identityLabel" ? "gender" : current) + 1;
+  const position =
+    STEPS.indexOf(
+      current === "identityLabel" ? "gender" : current === "invitation" ? "welcome" : current,
+    ) + 1;
   const specialConsented =
     onboarding.consents.specialCategory === bundledVersion("special_category");
   const specialOutdated =
@@ -354,6 +387,13 @@ export function OnboardingScreen() {
             )}
           </View>
         )}
+
+        {current === "invitation" &&
+          (invitation === "offered" ? (
+            <InvitationStep onDone={() => setInvitation("done")} />
+          ) : (
+            <Text accessibilityLiveRegion="polite">{t("onboarding.loading")}</Text>
+          ))}
 
         {current === "name" && (
           <View className="gap-4">

@@ -304,6 +304,12 @@ function anExport(): Record<string, unknown> {
         },
       ],
     },
+    // The invitations made and used, and what they earned (#107), never a code or whom.
+    invitations: {
+      made: [{ createdAt: at, state: "counted", countedAt: at }],
+      used: null,
+      rewards: [{ kind: "fish", earnedAt: at, spentAt: null }],
+    },
   };
 }
 
@@ -319,6 +325,14 @@ describe("the account export", () => {
     // The reports filed and the blocks set (#84), never whom.
     expect(parsed.reports.items[0]).toMatchObject({ reason: "harassment", outcome: null });
     expect(parsed.blocks.items).toEqual([{ at }]);
+    // The invitations (#107).
+    expect(parsed.invitations.made[0]?.state).toBe("counted");
+    expect(parsed.invitations.rewards).toEqual([{ kind: "fish", earnedAt: at, spentAt: null }]);
+  });
+
+  it("refuses an export without the invitations, a part every export carries (#107)", () => {
+    const { invitations: _invitations, ...without } = anExport();
+    expect(codes(AccountExport, without)).toEqual(["invalid_type"]);
   });
 
   it("drops a key it does not define, so a stray hetu_hmac or research_id never reaches the file", () => {

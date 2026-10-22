@@ -11,6 +11,7 @@ import {
   sweepSessions,
   teliaKeyIds,
 } from "./identity/index.ts";
+import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
 import { gateJob } from "./jobs/pond-gate.ts";
 import { roundsJob } from "./jobs/round-builder.ts";
@@ -252,6 +253,8 @@ export async function boot({
     waitlistJob({ db: pool, logger, now }),
     // Who is let into each pond, and for whom matching opens (#94).
     gateJob({ db: pool, logger, now }),
+    // The invitations whose redeemer's profile the gate's count has seen tonight (#107, ADR-044 §7).
+    invitationCountJob({ db: pool, logger, now }),
     // The day's round for everybody whose matching is open, after the gate (#95, ADR-035).
     // shortcut: none in production until the maintainer has set how long rounds
     // are kept (ADR-034 Open 2, ADR-035 Open 1); his answer lifts this and app.ts's twin.

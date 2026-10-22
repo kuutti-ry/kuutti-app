@@ -57,8 +57,15 @@ type Profile = {
   prompts: { key: string; answer: string }[];
 };
 
-/** A tiny server: the status is computed from what the steps wrote, as the API does (#146). */
-function fakeApi(options: { version?: string; age?: number } = {}) {
+/**
+ * A tiny server: the status is computed from what the steps wrote, as the API
+ * does (#146). It answers the invitations (#107) only when a test says whether
+ * a code may be typed; otherwise their read is a 404, which onboarding passes
+ * over without a word.
+ */
+function fakeApi(
+  options: { version?: string; age?: number; redeemable?: boolean; redeem?: () => Response } = {},
+) {
   const current = options.version ?? VERSION;
   const server: {
     gender: string | null;
@@ -137,6 +144,19 @@ function fakeApi(options: { version?: string; age?: number } = {}) {
     const body = request.method === "GET" ? undefined : await request.json();
     calls.push({ method: request.method, path, body });
     if (path === "/onboarding") return json(status());
+    if (path === "/invitations" && options.redeemable !== undefined) {
+      return json({
+        canInvite: false,
+        redeemable: options.redeemable,
+        reward: { fish: 1, likes: 0 },
+        open: [],
+        counted: 0,
+        earned: { fish: 0, likes: 0 },
+      });
+    }
+    if (path === "/invitations/redeem") {
+      return options.redeem?.() ?? new Response(null, { status: 204 });
+    }
     if (path === "/profile" && request.method === "GET") return json(profileResponse());
     if (path === "/profile") {
       const b = body as Profile;
@@ -325,6 +345,89 @@ describe("OnboardingScreen", () => {
       { method: "PUT", path: "/preferences", body: { seeks: ["man", "non_binary"] } },
       { method: "PUT", path: "/preferences", body: { ageWindow: { min: 30, max: 42 } } },
     ]);
+  });
+
+  it("offers a friend's invitation code once, right after the welcome, at the welcome's number, and Skip goes on to the name (#107)", async () => {
+    const { calls } = fakeApi({ redeemable: true });
+    await show(<OnboardingScreen />);
+    await press(await screen.findByRole("button", { name: "I'm in, and I accept both" }));
+    await flush();
+    await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
+    expect(screen.getByText("Step 1 of 10")).toBeTruthy();
+    expect(screen.getByLabelText("Invitation code")).toBeTruthy();
+    checkA11y();
+    await press(screen.getByRole("button", { name: "Skip" }));
+    await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+    expect(screen.getByText("Step 2 of 10")).toBeTruthy();
+    // Once a walk: the status read again on focus does not bring it back.
+    await act(async () => {
+      focus();
+      await settle(120);
+    });
+    expect(screen.getByText("What should we call you?")).toBeTruthy();
+    expect(calls.filter((c) => c.path === "/invitations")).toHaveLength(1);
+    expect(calls.filter((c) => c.path === "/invitations/redeem")).toEqual([]);
+  });
+
+  it("takes a code that works, thanks the person, and Continue goes on to the name (#107)", async () => {
+    const { server, calls } = fakeApi({ redeemable: true });
+    server.consents.push(consented("terms"), consented("privacy"));
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
+    await type(screen.getByLabelText("Invitation code"), "abcde-fghjk");
+    await press(screen.getByRole("button", { name: "Use the code" }));
+    expect(calls.filter((c) => c.path === "/invitations/redeem")).toEqual([
+      { method: "POST", path: "/invitations/redeem", body: { code: "abcde-fghjk" } },
+    ]);
+    expect(
+      screen.getByText(
+        "The code is in. Your friend's invitation counts once your profile is complete.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Skip" })).toBeNull();
+    checkA11y();
+    await press(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+  });
+
+  it("says a refused code in the API's words and stays at the step until it is skipped (#107)", async () => {
+    const { server } = fakeApi({
+      redeemable: true,
+      redeem: () =>
+        json({ error: { code: "invitation_unknown", message: "x", requestId: "r" } }, 404),
+    });
+    server.consents.push(consented("terms"), consented("privacy"));
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("Did a friend invite you?")).toBeTruthy());
+    await type(screen.getByLabelText("Invitation code"), "ABCDE FGHJK");
+    await press(screen.getByRole("button", { name: "Use the code" }));
+    expect(screen.getByText("That code does not work. Check it and try again.")).toBeTruthy();
+    // The step's own words, not onboarding's: nothing in onboarding failed.
+    expect(screen.queryByText("Something did not load. Try again.")).toBeNull();
+    expect(screen.getByText("Did a friend invite you?")).toBeTruthy();
+    await press(screen.getByRole("button", { name: "Skip" }));
+    await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+  });
+
+  it.each([
+    ["the API says no code may be typed", false],
+    ["the invitations cannot be read", undefined],
+  ])("goes straight on to the name when %s (#107)", async (_why, redeemable) => {
+    const { server, calls } = fakeApi({ redeemable });
+    server.consents.push(consented("terms"), consented("privacy"));
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
+    expect(screen.queryByText("Did a friend invite you?")).toBeNull();
+    expect(calls.filter((c) => c.path === "/invitations")).toHaveLength(1);
+  });
+
+  it("does not offer the code to a walk resumed past the name, and asks nothing about it (#107)", async () => {
+    const { server, calls } = fakeApi({ redeemable: true });
+    server.consents.push(consented("terms"), consented("privacy"));
+    server.profile = { displayName: "Onni", bio: null, bioPreset: null, fields: {}, prompts: [] };
+    await show(<OnboardingScreen />);
+    await waitFor(() => expect(screen.getByText("How do you describe yourself?")).toBeTruthy());
+    expect(calls.filter((c) => c.path === "/invitations")).toEqual([]);
   });
 
   it("resumes at the intent with whom one seeks kept when the app closed before the ages", async () => {

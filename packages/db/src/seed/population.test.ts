@@ -594,6 +594,80 @@ describe("writing the population", () => {
     });
   });
 
+  it("takes a person's invitations with what they earned and their notices, on either side of them, and nobody else's (#107)", async () => {
+    await withTemporaryDatabase(async (url) => {
+      const pool = createPool({ connectionString: url, max: 2 });
+      const at = new Date("2026-10-22T09:00:00Z");
+      type Person = { id: string; identity_id: string };
+      const accountOf = async (subject: string) => {
+        const { rows } = await pool.query<Person>(
+          `SELECT a.id, a.identity_id FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject = $1`,
+          [subject],
+        );
+        const row = rows[0];
+        if (!row) throw new Error(`no account of ${subject}`);
+        return row;
+      };
+      // An invitation as the night's count leaves it: counted, one fish to the inviter, and its notice.
+      const counted = async (inviter: Person, redeemer: Person, code: string) => {
+        const { rows } = await pool.query<{ id: string }>(
+          `INSERT INTO invitation (inviter_account_id, code_hash, created_at, redeemed_by_account_id, redeemed_at, counted_at)
+           VALUES ($1, $2, $4, $3, $4, $4) RETURNING id`,
+          [inviter.id, code.repeat(64), redeemer.id, at],
+        );
+        const id = rows[0]?.id as string;
+        await pool.query(
+          "INSERT INTO reward (account_id, kind, invitation_id, earned_at) VALUES ($1, 'fish', $2, $3)",
+          [inviter.id, id, at],
+        );
+        await pool.query(
+          "INSERT INTO notice (account_id, kind, invitation_id) VALUES ($1, 'invitation_counted', $2)",
+          [inviter.id, id],
+        );
+        return id;
+      };
+      try {
+        await migrate(pool, MIGRATIONS);
+        await seed(pool);
+        await writePopulation(pool, generatePopulation({ size: 40 }), VERSIONS);
+        // Somebody the seed made, and somebody who signed up: both stay.
+        const { rows: seeded } = await pool.query<Person>(
+          `SELECT a.id, a.identity_id FROM account a JOIN identity i ON i.id = a.identity_id
+           WHERE i.broker_subject IS NULL OR i.broker_subject NOT LIKE $1 LIMIT 1`,
+          [`${DEMO_SUBJECT_PREFIX}%`],
+        );
+        const { rows: signedUp } = await pool.query<Person>(
+          `WITH i AS (INSERT INTO identity (hetu_hmac) VALUES ('kuutti test: signed up') RETURNING id)
+           INSERT INTO account (identity_id, state, birth_year, birth_month)
+           SELECT id, 'active', 1990, 6 FROM i RETURNING id, identity_id`,
+        );
+        const [kept, other] = [seeded[0], signedUp[0]] as [Person, Person];
+        const live = await accountOf(`${DEMO_SUBJECT_PREFIX}demo-0001`);
+        // Each way between a synthetic person and a kept one, one between the kept two, and one still open.
+        await counted(live, kept, "a");
+        await counted(kept, live, "b");
+        const between = await counted(kept, other, "c");
+        await pool.query("INSERT INTO invitation (inviter_account_id, code_hash) VALUES ($1, $2)", [
+          live.id,
+          "d".repeat(64),
+        ]);
+
+        expect(await removePopulation(pool)).toEqual({ removed: 40, spared: 0 });
+        const { rows: invitations } = await pool.query("SELECT id FROM invitation");
+        expect(invitations).toEqual([{ id: between }]);
+        const { rows: rewards } = await pool.query("SELECT account_id, invitation_id FROM reward");
+        expect(rewards).toEqual([{ account_id: kept.id, invitation_id: between }]);
+        const { rows: notices } = await pool.query(
+          "SELECT account_id, invitation_id FROM notice WHERE kind = 'invitation_counted'",
+        );
+        expect(notices).toEqual([{ account_id: kept.id, invitation_id: between }]);
+      } finally {
+        await pool.end();
+      }
+    });
+  });
+
   it("refuses anybody who is not synthetic, and a pond the seed has not made", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });

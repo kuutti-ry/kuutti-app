@@ -3056,6 +3056,41 @@ errors.like_budget_exceeded:
   sv: "Du har använt dagens gillanden. Nya kommer efter midnatt, men du kan fortfarande hoppa över."
   machine: { fi: true, sv: true }
 
+errors.invitation_not_yet:
+  en: "You can invite friends once your profile is complete."
+  description: "Invitations (409, #107, ADR-044 §1): only a person whose profile has passed the pond gate's completeness test may make an invitation. Nothing was saved."
+  fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
+  sv: "Du kan bjuda in vänner när din profil är klar."
+  machine: { fi: true, sv: true }
+
+errors.invitations_full:
+  en: "You have as many invitations waiting as you can have. Withdraw one, or wait until a friend uses one."
+  description: "Invitations (409, #107, ADR-044 §5): the person holds matching_config invitations_open invitations nobody has used yet. Never a number: the limit is a tunable. Withdraw is the open invitation's own button. Nothing was saved."
+  fi: "Sinulla on jo niin monta odottavaa kutsua kuin voi olla. Peru jokin niistä tai odota, että ystävä käyttää sen."
+  sv: "Du har redan så många väntande inbjudningar som du kan ha. Dra tillbaka en, eller vänta tills en vän använder den."
+  machine: { fi: true, sv: true }
+
+errors.invitation_not_for_you:
+  en: "This account cannot use an invitation code. A code is for someone new, before their profile is complete, and works once."
+  description: "Typing an invitation code (409, #107, ADR-044 §6): the person cannot use one: their profile has passed the gate's test already, they used a code before, the current terms are not accepted, or their identity had an account deleted before. Must not say which, and says nothing of the code, which was not looked up."
+  fi: "Tällä tilillä ei voi käyttää kutsukoodia. Koodi on uudelle käyttäjälle ennen kuin profiili on valmis, ja se toimii vain kerran."
+  sv: "Det här kontot kan inte använda en inbjudningskod. En kod är för någon ny, innan profilen är klar, och fungerar bara en gång."
+  machine: { fi: true, sv: true }
+
+errors.invitation_unknown:
+  en: "That code does not work. Check it and try again."
+  description: "Typing an invitation code (404, #107, ADR-044 §6): no open invitation has that code. A code used already and the person's own get the same words (ADR-027 §3's one answer), so they must not say which."
+  fi: "Koodi ei toimi. Tarkista se ja yritä uudelleen."
+  sv: "Koden fungerar inte. Kontrollera den och försök igen."
+  machine: { fi: true, sv: true }
+
+errors.invitation_tries_exceeded:
+  en: "You have tried enough codes for today. You can try again after midnight."
+  description: "Typing an invitation code (429 with Retry-After, #107, ADR-044 §6): matching_config invitation_tries_per_day tries a Finnish day, whatever their answer. Never a number: the limit is a tunable. The day rolls at midnight in Finland."
+  fi: "Olet kokeillut tänään jo tarpeeksi koodeja. Voit yrittää uudelleen keskiyön jälkeen."
+  sv: "Du har provat tillräckligt många koder i dag. Du kan försöka igen efter midnatt."
+  machine: { fi: true, sv: true }
+
 errors.conversation_closed:
   en: "This conversation has ended, so the message was not sent."
   description: "Send (409, #348, ADR-031 §3): the conversation is closed, a block stands between the two, or the other person deleted their account. Must not say which: a block reads as an ended conversation (ADR-030 §6)."
@@ -8645,6 +8680,296 @@ notices.readFailed:
   description: "The home screen's notices (#176), a mark the API did not take; the notice stays."
   fi: "Tiedotetta ei voitu merkitä luetuksi. Yritä uudelleen."
   sv: "Notisen kunde inte markeras som läst. Försök igen."
+  machine: { fi: true, sv: true }
+
+notices.invitationCounted.title:
+  en: "An invitation of yours counted"
+  description: "The home screen's notices (#107, ADR-044 §9): somebody the person invited finished their profile, counted at night. Never who: the person may have invited several. Short."
+  fi: "Yksi kutsuistasi laskettiin"
+  sv: "En av dina inbjudningar räknades"
+  machine: { fi: true, sv: true }
+
+notices.invitationCounted.body:
+  en: "Somebody you invited has finished their profile. {reward, select, fish {You earned {fish, plural, one {a fish} other {# fish}}.} likes {You earned {likes, plural, one {an extra like} other {# extra likes}}.} both {You earned {fish, plural, one {a fish} other {# fish}} and {likes, plural, one {an extra like} other {# extra likes}}.} other {Thank you for inviting them.}}"
+  description: "The home screen's notices (#107, ADR-044 §9), under the title: what the counted invitation earned. reward is fish, likes, both, or anything else when it earned nothing (matching_config invitation_reward switched off); fish and likes are the units it earned. Never who was invited, never when they joined. Fish is the app's super-like (ADR-039), an extra like one used by itself on a day the likes run out."
+  fi: "Joku kutsumasi on saanut profiilinsa valmiiksi. {reward, select, fish {Ansaitsit {fish, plural, one {kalan} other {# kalaa}}.} likes {Ansaitsit {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}.} both {Ansaitsit {fish, plural, one {kalan} other {# kalaa}} ja {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}.} other {Kiitos, että kutsuit hänet.}}"
+  sv: "Någon du bjöd in har gjort klart sin profil. {reward, select, fish {Du fick {fish, plural, one {en fisk} other {# fiskar}}.} likes {Du fick {likes, plural, one {ett extra gillande} other {# extra gillanden}}.} both {Du fick {fish, plural, one {en fisk} other {# fiskar}} och {likes, plural, one {ett extra gillande} other {# extra gillanden}}.} other {Tack för att du bjöd in.}}"
+  machine: { fi: true, sv: true }
+
+# --- Invitations (#107, ADR-044): a code for one friend, made and withdrawn in Settings, typed by the friend after the bank login ---
+
+settings.invite.label:
+  en: "Invitations"
+  description: "Title of the row under Account in Settings and of the screen it opens (#107): invitation codes for friends, and a code from a friend. Not the profile's invitation to answer the later questions. Short."
+  fi: "Kutsut"
+  sv: "Inbjudningar"
+  max_length: 24
+  machine: { fi: true, sv: true }
+
+settings.invite.loading:
+  en: "Loading your invitations…"
+  description: "The Invitations screen while the person's invitations are read (#107)."
+  fi: "Ladataan kutsujasi…"
+  sv: "Laddar dina inbjudningar…"
+  machine: { fi: true, sv: true }
+
+settings.invite.loadFailed:
+  en: "Your invitations could not be loaded."
+  description: "The Invitations screen when the read failed (#107); the reason and Try again follow (load.failed.*)."
+  fi: "Kutsujasi ei voitu ladata."
+  sv: "Dina inbjudningar kunde inte laddas."
+  machine: { fi: true, sv: true }
+
+settings.invite.intro:
+  en: "Invite a friend with a code. They get the app at kuutti.app, sign in with their bank and type the code before their profile is complete. Each code works once."
+  description: "The Invitations screen, the opening line for a person who may invite (#107, ADR-044 §1, §2): the friend types the code after the bank login, before their profile passes the gate's test; single use."
+  fi: "Kutsu ystävä koodilla. Hän lataa sovelluksen osoitteesta kuutti.app, kirjautuu pankkitunnuksillaan ja kirjoittaa koodin ennen kuin hänen profiilinsa on valmis. Jokainen koodi toimii kerran."
+  sv: "Bjud in en vän med en kod. Vännen hämtar appen på kuutti.app, loggar in med sina bankkoder och skriver in koden innan profilen är klar. Varje kod fungerar en gång."
+  machine: { fi: true, sv: true }
+
+settings.invite.earns:
+  en: "{reward, select, fish {When a friend you invite finishes their profile, you get {fish, plural, one {a fish} other {# fish}}. An earned fish is used by itself once your own fish are used up.} likes {When a friend you invite finishes their profile, you get {likes, plural, one {an extra like} other {# extra likes}}. An extra like is used by itself on a day your likes run out.} both {When a friend you invite finishes their profile, you get {fish, plural, one {a fish} other {# fish}} and {likes, plural, one {an extra like} other {# extra likes}}. They are used by themselves once your own fish or likes run out.} other {Invitations earn nothing just now, but every friend you bring is welcome.}}"
+  description: "The Invitations screen, what an invitation earns today (#107, ADR-044 §4, §8), from matching_config invitation_reward: reward is fish, likes, both, or anything else when both are 0; fish and likes are the units. Earned units wait and are used by themselves once the person's own are used up; never a number of days or a period (tunables)."
+  fi: "{reward, select, fish {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {fish, plural, one {kalan} other {# kalaa}}. Ansaittu kala käytetään automaattisesti, kun omat kalasi on käytetty.} likes {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}. Ylimääräinen tykkäys käytetään automaattisesti päivänä, jona tykkäyksesi loppuvat.} both {Kun kutsumasi ystävä saa profiilinsa valmiiksi, saat {fish, plural, one {kalan} other {# kalaa}} ja {likes, plural, one {ylimääräisen tykkäyksen} other {# ylimääräistä tykkäystä}}. Ne käytetään automaattisesti, kun omat kalasi tai tykkäyksesi loppuvat.} other {Kutsut eivät juuri nyt tuo mitään, mutta jokainen tuomasi ystävä on tervetullut.}}"
+  sv: "{reward, select, fish {När en vän du bjuder in gör klart sin profil får du {fish, plural, one {en fisk} other {# fiskar}}. En intjänad fisk används automatiskt när dina egna fiskar är slut.} likes {När en vän du bjuder in gör klart sin profil får du {likes, plural, one {ett extra gillande} other {# extra gillanden}}. Ett extra gillande används automatiskt en dag då dina gillanden tar slut.} both {När en vän du bjuder in gör klart sin profil får du {fish, plural, one {en fisk} other {# fiskar}} och {likes, plural, one {ett extra gillande} other {# extra gillanden}}. De används automatiskt när dina egna fiskar eller gillanden tar slut.} other {Inbjudningar ger ingenting just nu, men varje vän du tar med är välkommen.}}"
+  machine: { fi: true, sv: true }
+
+settings.invite.notYet:
+  en: "You can invite friends once your profile is complete."
+  description: "The Invitations screen for a person whose profile has not passed the pond gate's test yet (#107, ADR-044 §1): no Make an invitation until then."
+  fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
+  sv: "Du kan bjuda in vänner när din profil är klar."
+  machine: { fi: true, sv: true }
+
+settings.invite.make:
+  en: "Make an invitation"
+  description: "The Invitations screen, the button that makes a new code (#107, ADR-044 §5). A button in a row: short."
+  fi: "Tee kutsu"
+  sv: "Skapa en inbjudan"
+  max_length: 24
+  machine: { fi: true, sv: true }
+
+settings.invite.made:
+  en: "Your invitation is ready. Its code is below."
+  description: "The Invitations screen after Make an invitation (#107), said in a live region; the code follows."
+  fi: "Kutsusi on valmis. Sen koodi on alla."
+  sv: "Din inbjudan är klar. Koden finns nedan."
+  machine: { fi: true, sv: true }
+
+settings.invite.makeFailed:
+  en: "The invitation could not be made. Try again."
+  description: "The Invitations screen when Make an invitation failed for a reason the app has no words of its own for (#107)."
+  fi: "Kutsua ei voitu tehdä. Yritä uudelleen."
+  sv: "Inbjudan kunde inte skapas. Försök igen."
+  machine: { fi: true, sv: true }
+
+settings.invite.code.label:
+  en: "Your invitation code"
+  description: "The Invitations screen, the heading over a code just made (#107, ADR-044 §2)."
+  fi: "Kutsukoodisi"
+  sv: "Din inbjudningskod"
+  machine: { fi: true, sv: true }
+
+settings.invite.code.spoken:
+  en: "Invitation code: {characters}"
+  description: "The Invitations screen, what a screen reader says for the code just made (#107): characters is the code one character at a time with spaces between, the two groups of five separated by a comma, so each letter and digit is read alone. After a colon."
+  fi: "Kutsukoodi: {characters}"
+  sv: "Inbjudningskod: {characters}"
+  machine: { fi: true, sv: true }
+
+settings.invite.code.once:
+  en: "Kuutti shows this code only now and keeps no copy of it. Share it with one friend, or write it down."
+  description: "The Invitations screen, under a code just made (#107, ADR-044 §2): only its hash is kept, so it is never shown again."
+  fi: "Kuutti näyttää tämän koodin vain nyt eikä säilytä siitä kopiota. Jaa se yhdelle ystävälle tai kirjoita se muistiin."
+  sv: "Kuutti visar den här koden bara nu och sparar ingen kopia av den. Dela den med en vän, eller skriv upp den."
+  machine: { fi: true, sv: true }
+
+settings.invite.share:
+  en: "Share the code"
+  description: "The Invitations screen, the button under a code just made that opens the phone's share sheet with the invitation's message (#107). Short."
+  fi: "Jaa koodi"
+  sv: "Dela koden"
+  max_length: 24
+  machine: { fi: true, sv: true }
+
+settings.invite.shareFailed:
+  en: "The share did not open. You can copy the code above instead."
+  description: "The Invitations screen when the phone's share sheet did not open (#107); the code stays on the screen as selectable text."
+  fi: "Jakaminen ei avautunut. Voit sen sijaan kopioida koodin yltä."
+  sv: "Delningen öppnades inte. Du kan kopiera koden ovan i stället."
+  machine: { fi: true, sv: true }
+
+settings.invite.open.title:
+  en: "Waiting to be used"
+  description: "The Invitations screen, the heading over the person's invitations nobody has used yet (#107), newest first."
+  fi: "Odottaa käyttöä"
+  sv: "Väntar på att användas"
+  machine: { fi: true, sv: true }
+
+settings.invite.open.made:
+  en: "Made {date}"
+  description: "The Invitations screen, one open invitation (#107): date is when it was made, d.M.yyyy with the time (formatDateTime). Its code is never shown again."
+  fi: "Tehty {date}"
+  sv: "Skapad {date}"
+  machine: { fi: true, sv: true }
+
+settings.invite.open.withdraw:
+  en: "Withdraw"
+  description: "The Invitations screen, the button beside an open invitation that withdraws it after asking (#107, ADR-044 §5). One word if the language allows."
+  fi: "Peru"
+  sv: "Dra tillbaka"
+  max_length: 16
+  machine: { fi: true, sv: true }
+
+settings.invite.open.withdrawLabel:
+  en: "Withdraw the invitation made {date}"
+  description: "Screen-reader label of an open invitation's Withdraw button (#107): date as in settings.invite.open.made, so two buttons are told apart."
+  fi: "Peru kutsu, joka on tehty {date}"
+  sv: "Dra tillbaka inbjudan skapad {date}"
+  machine: { fi: true, sv: true }
+
+settings.invite.withdraw.title:
+  en: "Withdraw this invitation?"
+  description: "Title of the dialog that asks before an open invitation is withdrawn (#107)."
+  fi: "Perutaanko tämä kutsu?"
+  sv: "Dra tillbaka den här inbjudan?"
+  machine: { fi: true, sv: true }
+
+settings.invite.withdraw.body:
+  en: "Its code stops working at once. A friend who has it can no longer use it."
+  description: "The withdraw dialog's text (#107, ADR-044 §5): the invitation is deleted, so its code works no more."
+  fi: "Sen koodi lakkaa toimimasta heti. Ystävä, jolla koodi on, ei voi enää käyttää sitä."
+  sv: "Koden slutar fungera direkt. En vän som har den kan inte längre använda den."
+  machine: { fi: true, sv: true }
+
+settings.invite.withdraw.cancel:
+  en: "Keep it"
+  description: "The withdraw dialog's button that closes it and keeps the invitation (#107). Short."
+  fi: "Pidä se"
+  sv: "Behåll den"
+  max_length: 24
+  machine: { fi: true, sv: true }
+
+settings.invite.withdraw.confirm:
+  en: "Withdraw the invitation"
+  description: "The withdraw dialog's button that withdraws it (#107). Must differ from the row's Withdraw (settings.invite.open.withdraw)."
+  fi: "Peru kutsu"
+  sv: "Dra tillbaka inbjudan"
+  max_length: 28
+  machine: { fi: true, sv: true }
+
+settings.invite.withdraw.close:
+  en: "Close"
+  description: "The withdraw dialog, screen-reader label of the close control (#107)."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
+settings.invite.withdrawn:
+  en: "The invitation was withdrawn. Its code no longer works."
+  description: "The Invitations screen after a withdrawal (#107), said in a live region; the invitation has left the list."
+  fi: "Kutsu peruttiin. Sen koodi ei enää toimi."
+  sv: "Inbjudan drogs tillbaka. Koden fungerar inte längre."
+  machine: { fi: true, sv: true }
+
+settings.invite.withdrawFailed:
+  en: "The invitation could not be withdrawn. Try again."
+  description: "The Invitations screen when a withdrawal failed (#107); the list is read again, so one used meanwhile is gone from it."
+  fi: "Kutsua ei voitu perua. Yritä uudelleen."
+  sv: "Inbjudan kunde inte dras tillbaka. Försök igen."
+  machine: { fi: true, sv: true }
+
+settings.invite.counted:
+  en: "{friends, plural, =0 {No friend you invited has finished their profile yet.} one {One friend you invited has finished their profile.} other {# friends you invited have finished their profiles.}}"
+  description: "The Invitations screen (#107, ADR-044 §1): friends is how many of the person's invitations have counted, ever. Never who, and nothing of an invitation used and not counted."
+  fi: "{friends, plural, =0 {Yksikään kutsumasi ystävä ei ole vielä saanut profiiliaan valmiiksi.} one {Yksi kutsumasi ystävä on saanut profiilinsa valmiiksi.} other {# kutsumaasi ystävää on saanut profiilinsa valmiiksi.}}"
+  sv: "{friends, plural, =0 {Ingen vän du bjudit in har gjort klart sin profil än.} one {En vän du bjudit in har gjort klart sin profil.} other {# vänner du bjudit in har gjort klart sina profiler.}}"
+  machine: { fi: true, sv: true }
+
+settings.invite.earned.fish:
+  en: "{fish, plural, one {You have an earned fish waiting.} other {You have # earned fish waiting.}}"
+  description: "The Invitations screen (#107, ADR-044 §8): fish is how many fish the person's invitations earned that are not used yet; shown only when there is one."
+  fi: "{fish, plural, one {Sinulla on yksi ansaittu kala odottamassa.} other {Sinulla on # ansaittua kalaa odottamassa.}}"
+  sv: "{fish, plural, one {Du har en intjänad fisk som väntar.} other {Du har # intjänade fiskar som väntar.}}"
+  machine: { fi: true, sv: true }
+
+settings.invite.earned.likes:
+  en: "{likes, plural, one {You have an extra like waiting.} other {You have # extra likes waiting.}}"
+  description: "The Invitations screen (#107, ADR-044 §8): likes is how many extra likes the person's invitations earned that are not used yet; shown only when there is one."
+  fi: "{likes, plural, one {Sinulla on yksi ylimääräinen tykkäys odottamassa.} other {Sinulla on # ylimääräistä tykkäystä odottamassa.}}"
+  sv: "{likes, plural, one {Du har ett extra gillande som väntar.} other {Du har # extra gillanden som väntar.}}"
+  machine: { fi: true, sv: true }
+
+invite.redeem.title:
+  en: "Have an invitation code?"
+  description: "The Invitations screen, the heading over the field for a code from a friend (#107, ADR-044 §6), for a person who may still use one."
+  fi: "Onko sinulla kutsukoodi?"
+  sv: "Har du en inbjudningskod?"
+  machine: { fi: true, sv: true }
+
+invite.redeem.explain:
+  en: "If a friend gave you a code, type it here. Their invitation counts once your profile is complete."
+  description: "The Invitations screen, under Have an invitation code? (#107, ADR-044 §7): the friend's invitation counts the night the person's profile first passes the gate's test."
+  fi: "Jos ystävä antoi sinulle koodin, kirjoita se tähän. Hänen kutsunsa lasketaan, kun profiilisi on valmis."
+  sv: "Om en vän gav dig en kod, skriv in den här. Vännens inbjudan räknas när din profil är klar."
+  machine: { fi: true, sv: true }
+
+invite.redeem.label:
+  en: "Invitation code"
+  description: "Label of the field for a code from a friend (#107), in Settings and in onboarding; case, spaces and hyphens do not matter."
+  fi: "Kutsukoodi"
+  sv: "Inbjudningskod"
+  machine: { fi: true, sv: true }
+
+invite.redeem.button:
+  en: "Use the code"
+  description: "The button that sends the code typed (#107, ADR-044 §6), dimmed until it reads as a code. Short."
+  fi: "Käytä koodi"
+  sv: "Använd koden"
+  max_length: 24
+  machine: { fi: true, sv: true }
+
+invite.redeem.done:
+  en: "The code is in. Your friend's invitation counts once your profile is complete."
+  description: "After a code that worked (#107), said in a live region, in Settings and in onboarding."
+  fi: "Koodi on vastaanotettu. Ystäväsi kutsu lasketaan, kun profiilisi on valmis."
+  sv: "Koden är mottagen. Din väns inbjudan räknas när din profil är klar."
+  machine: { fi: true, sv: true }
+
+invite.redeem.failed:
+  en: "The code could not be checked. Try again."
+  description: "When sending a code failed for a reason the app has no words of its own for (#107); the refusals have theirs (errors.invitation_*)."
+  fi: "Koodia ei voitu tarkistaa. Yritä uudelleen."
+  sv: "Koden kunde inte kontrolleras. Försök igen."
+  machine: { fi: true, sv: true }
+
+invite.step.title:
+  en: "Did a friend invite you?"
+  description: "Onboarding, the optional step right after the welcome (#107), offered once to a person who may still use a code."
+  fi: "Kutsuiko ystävä sinut?"
+  sv: "Bjöd en vän in dig?"
+  machine: { fi: true, sv: true }
+
+invite.step.explain:
+  en: "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete."
+  description: "Onboarding's invitation step, under its title (#107): optional; Settings › Invitations takes the code until the profile passes the gate's test."
+  fi: "Jos ystävä antoi sinulle kutsukoodin, kirjoita se tähän. Voit myös ohittaa tämän ja kirjoittaa koodin myöhemmin asetuksissa, kunnes profiilisi on valmis."
+  sv: "Om en vän gav dig en inbjudningskod, skriv in den här. Du kan också hoppa över det här och skriva in koden senare i inställningarna, tills din profil är klar."
+  machine: { fi: true, sv: true }
+
+invite.step.skip:
+  en: "Skip"
+  description: "Onboarding's invitation step, the button that moves on without a code (#107). One word."
+  fi: "Ohita"
+  sv: "Hoppa över"
+  max_length: 16
+  machine: { fi: true, sv: true }
+
+invite.share.message:
+  en: "You're invited to Kuutti, a free dating app for Finland where everyone signs in with their bank ID. Get the app at https://kuutti.app/ and type this code after signing in: {code}"
+  description: "The message the phone's share sheet sends with an invitation (#107, ADR-044 Context 5), to somebody who may not know Kuutti: free, bank-verified, Finland's; the website's address as it is, and the code (XXXXX-XXXXX) after a colon at the end. Nothing about the sender, no link into the app."
+  fi: "Sinut on kutsuttu: Kuutti on ilmainen suomalainen deittisovellus, jossa jokainen kirjautuu pankkitunnuksillaan. Lataa sovellus osoitteesta https://kuutti.app/ ja kirjoita tämä koodi kirjautumisen jälkeen: {code}"
+  sv: "Du är inbjuden till Kuutti, en gratis dejtingapp för Finland där alla loggar in med sina bankkoder. Hämta appen på https://kuutti.app/ och skriv in den här koden efter inloggningen: {code}"
   machine: { fi: true, sv: true }
 
 settings.contacts.intro:

@@ -21,6 +21,7 @@ import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
 import { track } from "../research/index.ts";
+import { entriesPaidBy, releaseEarned, spendEarned } from "../rewards/index.ts";
 
 // Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
 // Finnish calendar day, each card with why it is there, when the phone
@@ -83,7 +84,9 @@ const notFound = () => new AppError(404, "not_found", "No such card in today's r
  * budget for everybody, whatever their pond's contest (TD-14's two budgets
  * wait for the research partner). A like on the card of somebody who liked
  * the person answers a like rather than sending one, and is free; a pass is
- * never counted.
+ * never counted. Past the budget a like an invitation earned is used by
+ * itself (#107, ADR-044 §8, ADR-036 §5), and the likes it paid for are left
+ * out of the count.
  */
 const LIKE_BUDGET_KEY = "like_budget_balanced";
 const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
@@ -94,7 +97,9 @@ const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
  * from the person's standing fish under the round's lock, so one changed
  * back the same day is given back. A fish is a like for every other rule:
  * the day's likes, the expiry, the match. On a card of somebody whose like or
- * fish waits on the person it would answer a like, and is a like.
+ * fish waits on the person it would answer a like, and is a like. Past the
+ * window's budget a fish an invitation earned is used by itself (#107,
+ * ADR-044 §8), and the fish it paid for are left out of the window.
  */
 const FISH_BUDGET_KEY = "fish_budget";
 const FISH_WINDOW_KEY = "fish_window_days";
@@ -313,6 +318,11 @@ export async function markSeen(
  * not changed, and its place in the day's likes stays spent; any other like
  * may still be taken back until midnight. No match is made while the person
  * is shadow-banned, nor with a block between the two.
+ *
+ * A like or a fish past its budget spends a unit the person's invitations
+ * earned, in this transaction, and a change of it gives the unit back (#107,
+ * ADR-044 §8); the reward table is the rewards slice's, reached through its
+ * index.ts.
  */
 export async function decide(
   deps: RoundDeps,
@@ -374,32 +384,61 @@ export async function decide(
     // Counted under the round's lock from the day's standing decisions, so a
     // like taken back gives its place back and two devices cannot both pass
     // the count; the refusal writes nothing. A like made a fish was counted.
+    // A like an earned like paid for is not counted; past the budget the like
+    // takes the oldest one left, and is refused only with none.
     if (decision === "like" && entry.decision !== "like" && !FREE_LIKES.includes(entry.reason)) {
       const budget = await matchingConfigNumber(tx, LIKE_BUDGET_KEY);
       const liked = await tx.query<{ n: number }>(
         `SELECT count(*)::int AS n FROM round_entries
-          WHERE round_id = $1 AND decision = 'like' AND reason <> ALL($2::round_reason[])`,
-        [roundId, FREE_LIKES],
+          WHERE round_id = $1 AND decision = 'like' AND reason <> ALL($2::round_reason[])
+            AND id <> ALL($3::uuid[])`,
+        [roundId, FREE_LIKES, await entriesPaidBy(tx, input.accountId, "like")],
       );
-      if ((liked.rows[0]?.n ?? 0) >= budget) {
+      if (
+        (liked.rows[0]?.n ?? 0) >= budget &&
+        !(await spendEarned(tx, {
+          accountId: input.accountId,
+          kind: "like",
+          entryId: entry.id,
+          at,
+        }))
+      ) {
         throw new AppError(429, "like_budget_exceeded", "The day's likes are used up", {
           retryAfterSeconds: secondsUntil(dayWindow(at).end, at),
         });
       }
     }
-    // The person's fish of the last fish_window_days, this card's aside, under
-    // the round's lock; the next comes back when the oldest leaves the window.
+    // The person's fish of the last fish_window_days, this card's aside and
+    // those an earned fish paid for, under the round's lock; past the budget
+    // the fish takes an earned one, and with none the next comes back when the
+    // oldest leaves the window.
     if (fish && !entry.fish) {
       const budget = await matchingConfigNumber(tx, FISH_BUDGET_KEY);
       const window = await matchingConfigNumber(tx, FISH_WINDOW_KEY);
       const sent = await tx.query<{ n: number; oldest: string | null }>(
         `SELECT count(*)::int AS n, min(r.day)::text AS oldest
            FROM round_entries e JOIN rounds r ON r.id = e.round_id
-          WHERE r.account_id = $1 AND e.fish AND e.id <> $2 AND r.day > $3::date - $4::int`,
-        [input.accountId, entry.id, today, window],
+          WHERE r.account_id = $1 AND e.fish AND e.id <> $2 AND r.day > $3::date - $4::int
+            AND e.id <> ALL($5::uuid[])`,
+        [
+          input.accountId,
+          entry.id,
+          today,
+          window,
+          await entriesPaidBy(tx, input.accountId, "fish"),
+        ],
       );
       const [row] = sent.rows;
-      if (row && row.n >= budget) {
+      if (
+        row &&
+        row.n >= budget &&
+        !(await spendEarned(tx, {
+          accountId: input.accountId,
+          kind: "fish",
+          entryId: entry.id,
+          at,
+        }))
+      ) {
         // With a budget of none there is no oldest, and nothing before the day rolls.
         const back = row.oldest
           ? dayWindow(new Date(`${addDays(row.oldest, window)}T12:00:00Z`)).start
@@ -408,6 +447,16 @@ export async function decide(
           retryAfterSeconds: secondsUntil(back, at),
         });
       }
+    }
+    // What a changed like used is given back (ADR-044 §8): a pass gives back
+    // every unit the card's like or fish took, a fish made a like its fish's;
+    // a like made a fish keeps its like's.
+    if (entry.decision === "like" && (decision === "pass" || (entry.fish && !fish))) {
+      await releaseEarned(tx, {
+        accountId: input.accountId,
+        entryId: entry.id,
+        kinds: decision === "pass" ? ["like", "fish"] : ["fish"],
+      });
     }
     // The predicate again where it writes: a block or an erasure that
     // committed since the read leaves nothing written.

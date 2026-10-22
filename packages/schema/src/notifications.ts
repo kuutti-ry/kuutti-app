@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { RewardUnits } from "./rewards.ts";
 import { SanctionReason } from "./sanction.ts";
 
 // Notification choices and the notices in the app (#176, ADR-032): what a
@@ -36,26 +37,37 @@ export const PutNotificationChoice = z
 export type PutNotificationChoice = z.infer<typeof PutNotificationChoice>;
 
 /** What a notice is about. Mirrors the database's enum; #312 and M5 add theirs. */
-export const NoticeKind = z.enum(["warning"]).meta({ id: "NoticeKind" });
+export const NoticeKind = z.enum(["warning", "invitation_counted"]).meta({ id: "NoticeKind" });
 export type NoticeKind = z.infer<typeof NoticeKind>;
 
 /** The newest notices the home screen is given; fewer than a screen, never a feed. */
 export const NOTICES_MAX = 20;
 
+const NoticeBase = z.object({
+  id: z.uuid(),
+  at: z.iso.datetime(),
+  /** Null until the person has read it. */
+  readAt: z.iso.datetime().nullable(),
+});
+
+/** A moderator's warning (ADR-024 §7): its reason, which the app words; one lifted since is not shown. */
+export const WarningNotice = NoticeBase.extend({
+  kind: z.literal("warning"),
+  reason: SanctionReason,
+}).meta({ id: "WarningNotice" });
+
 /**
- * A notice in the app: no text of its own, the app says it from the kind and
- * what it points at. A warning (ADR-024 §7) carries its reason, which the app
- * words; one lifted since is not shown.
+ * An invitation of the person's that counted (#107, ADR-044 §9): what it
+ * earned, from its own units. Never who was invited.
  */
+export const InvitationCountedNotice = NoticeBase.extend({
+  kind: z.literal("invitation_counted"),
+  reward: RewardUnits,
+}).meta({ id: "InvitationCountedNotice" });
+
+/** A notice in the app: no text of its own, the app says it from the kind and what it points at. */
 export const Notice = z
-  .object({
-    id: z.uuid(),
-    kind: NoticeKind,
-    at: z.iso.datetime(),
-    /** Null until the person has read it. */
-    readAt: z.iso.datetime().nullable(),
-    reason: SanctionReason,
-  })
+  .discriminatedUnion("kind", [WarningNotice, InvitationCountedNotice])
   .meta({ id: "Notice" });
 export type Notice = z.infer<typeof Notice>;
 

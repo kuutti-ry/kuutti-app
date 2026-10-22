@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.60.0",
+    "version": "0.61.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -333,6 +333,9 @@
           },
           "rounds": {
             "$ref": "#/components/schemas/ExportedRounds"
+          },
+          "invitations": {
+            "$ref": "#/components/schemas/ExportedInvitations"
           }
         },
         "required": [
@@ -359,7 +362,8 @@
           "conversations",
           "contacts",
           "notifications",
-          "rounds"
+          "rounds",
+          "invitations"
         ]
       },
       "Gender": {
@@ -2023,7 +2027,8 @@
       "NoticeKind": {
         "type": "string",
         "enum": [
-          "warning"
+          "warning",
+          "invitation_counted"
         ]
       },
       "ExportedRounds": {
@@ -2202,6 +2207,102 @@
           "pass",
           "fish",
           null
+        ]
+      },
+      "ExportedInvitations": {
+        "type": "object",
+        "properties": {
+          "made": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "state": {
+                  "$ref": "#/components/schemas/InvitationState"
+                },
+                "countedAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "createdAt",
+                "state",
+                "countedAt"
+              ]
+            },
+            "maxItems": 1000
+          },
+          "used": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "redeemedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "countedAt": {
+                "type": "string",
+                "nullable": true,
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "redeemedAt",
+              "countedAt"
+            ]
+          },
+          "rewards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "$ref": "#/components/schemas/RewardKind"
+                },
+                "earnedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "spentAt": {
+                  "type": "string",
+                  "nullable": true,
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "kind",
+                "earnedAt",
+                "spentAt"
+              ]
+            },
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "made",
+          "used",
+          "rewards"
+        ]
+      },
+      "InvitationState": {
+        "type": "string",
+        "enum": [
+          "open",
+          "redeemed",
+          "counted"
+        ]
+      },
+      "RewardKind": {
+        "type": "string",
+        "enum": [
+          "like",
+          "fish"
         ]
       },
       "HealthResponse": {
@@ -3798,14 +3899,28 @@
         ]
       },
       "Notice": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/WarningNotice"
+          },
+          {
+            "$ref": "#/components/schemas/InvitationCountedNotice"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "kind",
+          "mapping": {
+            "warning": "#/components/schemas/WarningNotice",
+            "invitation_counted": "#/components/schemas/InvitationCountedNotice"
+          }
+        }
+      },
+      "WarningNotice": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/NoticeKind"
           },
           "at": {
             "type": "string",
@@ -3816,17 +3931,199 @@
             "nullable": true,
             "format": "date-time"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "warning"
+            ]
+          },
           "reason": {
             "$ref": "#/components/schemas/SanctionReason"
           }
         },
         "required": [
           "id",
-          "kind",
           "at",
           "readAt",
+          "kind",
           "reason"
         ]
+      },
+      "InvitationCountedNotice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "invitation_counted"
+            ]
+          },
+          "reward": {
+            "$ref": "#/components/schemas/RewardUnits"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "readAt",
+          "kind",
+          "reward"
+        ]
+      },
+      "RewardUnits": {
+        "type": "object",
+        "properties": {
+          "fish": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "likes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "fish",
+          "likes"
+        ]
+      },
+      "Invitations": {
+        "type": "object",
+        "properties": {
+          "canInvite": {
+            "type": "boolean",
+            "description": "True once the person's profile has passed the pond gate's test."
+          },
+          "redeemable": {
+            "type": "boolean",
+            "description": "True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased."
+          },
+          "reward": {
+            "type": "object",
+            "properties": {
+              "fish": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10
+              },
+              "likes": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50
+              }
+            },
+            "required": [
+              "fish",
+              "likes"
+            ],
+            "additionalProperties": false,
+            "description": "What an invitation earns today (matching_config invitation_reward), for the app's words."
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenInvitation"
+            },
+            "maxItems": 20
+          },
+          "counted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "earned": {
+            "type": "object",
+            "properties": {
+              "fish": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "likes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "fish",
+              "likes"
+            ],
+            "description": "What the person's invitations earned that is not used yet."
+          }
+        },
+        "required": [
+          "canInvite",
+          "redeemable",
+          "reward",
+          "open",
+          "counted",
+          "earned"
+        ]
+      },
+      "OpenInvitation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt"
+        ]
+      },
+      "InvitationCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$",
+            "description": "Two groups of five; shown once, here. Kuutti keeps only its hash."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "createdAt"
+        ]
+      },
+      "InvitationRedeemRequest": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "As typed: case, spaces and hyphens do not matter, and O reads as 0, I and L as 1."
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": false
       },
       "ConversationList": {
         "type": "object",
@@ -8996,7 +9293,7 @@
     "/notices": {
       "get": {
         "summary": "The caller's notices in the app",
-        "description": "What must reach the person even without a push, newest first, at most 20: today a moderator's warning, with its reason, until it is lifted. A notice holds no text of its own; the app says it.",
+        "description": "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.",
         "security": [
           {
             "session": []
@@ -9071,6 +9368,232 @@
           },
           "404": {
             "description": "not_found: no such notice of the caller's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invitations": {
+      "get": {
+        "summary": "The caller's invitations",
+        "description": "Whether the caller may invite (their profile has passed the pond gate's test) and may still type a code, what an invitation earns today (matching_config invitation_reward), their open invitations newest first, how many of theirs have counted, and what those earned that is not used yet. Never a code, and nothing of anybody invited.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's invitations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Invitations"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: the account was erased while the request was on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Make an invitation",
+        "description": "A code for one friend, in two groups of five, shown here once: Kuutti keeps only its hash. For a caller whose profile has passed the pond gate's test; at most matching_config invitations_open open at once. The night the friend's profile first passes the same test, the invitation counts and the caller earns matching_config invitation_reward.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Made; the code is not shown again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: the account was erased while the request was on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invitation_not_yet: the caller's profile has not passed the pond gate's test; invitations_full: as many invitations open as matching_config invitations_open allows. Nothing was written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invitations/{id}": {
+      "delete": {
+        "summary": "Withdraw an open invitation",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Withdrawn: its code works no more."
+          },
+          "400": {
+            "description": "validation_failed: the id is not a uuid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no open invitation of the caller's: redeemed, another's or none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/invitations/redeem": {
+      "post": {
+        "summary": "Use an invitation code",
+        "description": "A code typed by the caller, before their profile first passes the pond gate's test: case, spaces and hyphens do not matter. The caller is checked before the code is looked up. At most matching_config invitation_tries_per_day tries a Finnish day, whatever their answer.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationRedeemRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Redeemed: the invitation counts the night the caller's profile passes the test."
+          },
+          "400": {
+            "description": "validation_failed: no code, too long, not a code, or an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "invitation_unknown: no open invitation has that code; one used or the caller's own answers the same. not_found: the account was erased meanwhile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invitation_not_for_you: the caller cannot use a code: their profile has passed the test, they used one already, the current terms and privacy consents are not given, or their identity had an account erased before.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "invitation_tries_exceeded: the day's tries are used; Retry-After is the wait until midnight in Finland.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11768,7 +12291,7 @@
     "/rounds/{day}/entries/{position}/decision": {
       "put": {
         "summary": "Like or pass a card",
-        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like.",
+        "description": "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day.",
         "security": [
           {
             "session": []
@@ -11857,7 +12380,7 @@
             }
           },
           "429": {
-            "description": "like_budget_exceeded: the day's likes are used up, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days, Retry-After the wait until the next can go. Nothing was written.",
+            "description": "like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days and no earned fish is left, Retry-After the wait until the next can go. Nothing was written.",
             "content": {
               "application/json": {
                 "schema": {

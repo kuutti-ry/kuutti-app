@@ -34,6 +34,7 @@ import EmailSettingsRoute from "../app/settings/email";
 import FeedbackRoute from "../app/settings/feedback";
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
+import InviteSettingsRoute from "../app/settings/invite";
 import LanguageRoute from "../app/settings/language";
 import LegalRoute from "../app/settings/legal/[kind]";
 import LicensesRoute from "../app/settings/licenses";
@@ -130,6 +131,7 @@ jest.mock("@/features/settings", () => {
     EmailSettingsScreen: probe("EmailSettingsScreen"),
     FeedbackScreen: probe("FeedbackScreen"),
     FoundThemScreen: probe("FoundThemScreen"),
+    InvitationsSettingsScreen: probe("InvitationsSettingsScreen"),
     LanguageScreen: probe("LanguageScreen"),
     LegalScreen: probe("LegalScreen"),
     legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
@@ -189,6 +191,7 @@ describe("the screens without params", () => {
     ["/settings/email", EmailSettingsRoute, "EmailSettingsScreen"],
     ["/settings/feedback", FeedbackRoute, "FeedbackScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
+    ["/settings/invite", InviteSettingsRoute, "InvitationsSettingsScreen"],
     ["/settings/language", LanguageRoute, "LanguageScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
     ["/settings/source", SourceRoute, "SourceScreen"],

@@ -1,6 +1,6 @@
 # ADR-036: The day's likes, their first cut
 
-- Status: accepted 2026-10-20 (#98's budget half, built as written here on the maintainer's decisions of that day, #98's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change)
+- Status: accepted 2026-10-20 (#98's budget half, built as written here on the maintainer's decisions of that day, #98's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§5: a like earned by an invitation extends the day's budget, #107, ADR-044 §8; see History)
 - Date: 2026-10-20
 - Follows: TD-11 (a like stays scarce), TD-14 (budgets that name no gender), TD-15 (a reward may raise a budget), ADR-034 §5 (a decision changes until the day ends, under the round's lock), ADR-035 (the first cut's round), CLAUDE.md rule 10 and Product constraints; issues #98, #97, #378, #85
 
@@ -22,10 +22,11 @@ A round of ten cards a day (ADR-035) bounds what a person is shown; nothing yet 
    `like_budget_contested` and `contest_ratio_threshold` stay rows that nothing reads yet: TD-14's rule needs no migration when it comes.
 3. **A like back is free.** A like on a card whose reason is `liked_you` answers somebody's like rather than sending one: it is not counted, before or after the budget is spent, so a round that opens with liked-you cards (#97) leaves the day's likes for people who are new. A pass is never counted. A fish (#378, ADR-039) is a like that counts, and a like or fish on a `fish` card is free as on a `liked_you` card.
 4. **The refusal** is 429 `like_budget_exceeded`, said in the request's language ("you have used today's likes; new ones come after midnight; you can still pass"), with `Retry-After` the seconds until midnight in Finland, as the card budget's refusal is. No research event is emitted for a refused like, and nothing is logged beyond the request's own line.
+5. **A like earned by an invitation extends the day** (#107, ADR-044 §8, the maintainer's of 22/10/2026). A like past the budget takes the person's oldest earned like not used yet and is written; with none, §4's refusal stands. §1's count leaves out the likes an earned like paid for, and a like taken back the same day gives its earned like back. While `like_budget_balanced` is not below `round_size`, as with today's ten and ten, the budget never binds and earned likes wait; the maintainer accepted that.
 
 ## Consequences
 
-- At most ten likes a person a day, wherever they live; liking back and passing are never limited.
+- At most ten likes a person a day, wherever they live, and one more for each like the person's invitations earned (§5); liking back and passing are never limited.
 - The research events of a like are unchanged: a refused like is no event.
 
 ## Alternatives considered
@@ -46,3 +47,4 @@ TD-14's contest rule and its two budgets, the research buckets, approach 2's wei
 
 - 2026-10-20: written with #98's budget half, on the maintainer's decisions of that day.
 - 2026-10-20 (#378, ADR-039 §2, §3): a fish counts against the day's likes as a like; a like on a `fish` card is free as one on a `liked_you` card.
+- 2026-10-22 (#107, ADR-044 §8): §5 added, the maintainer's of that day. A like earned by an invitation is used by itself once the day's likes are spent, and the day's count leaves out the likes it paid for. #85's explicit "five more likes" is still for later.

@@ -52,6 +52,8 @@ const ACCOUNT_TABLES = [
   "sanction",
   // A warning's notice and the notification choices (#176), had a story or staff written any.
   "notice",
+  // The units an invitation earned (#107); those of the accounts' own invitations went with them.
+  "reward",
   "notification_preference",
   "photo",
   "research_subject",
@@ -126,6 +128,12 @@ export async function deleteIdentities(
   // The entries in which the accounts are somebody's card (#96); their own
   // rounds go with ACCOUNT_TABLES, their entries by the cascade.
   await tx.query("DELETE FROM round_entries WHERE candidate_id = ANY($1)", [accounts]);
+  // Invitations on either side (#107): those the accounts made, and the one
+  // each redeemed, whoever made it, with the units and notices they hold.
+  await tx.query(
+    "DELETE FROM invitation WHERE inviter_account_id = ANY($1) OR redeemed_by_account_id = ANY($1)",
+    [accounts],
+  );
   for (const table of ACCOUNT_TABLES) {
     await tx.query(`DELETE FROM ${table} WHERE account_id = ANY($1)`, [accounts]);
   }

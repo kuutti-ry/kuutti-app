@@ -89,6 +89,10 @@ describe("seed", () => {
           email_code_minutes: 30,
           email_code_attempts: 3,
           email_codes_per_day: 5,
+          // #107: the invitations, the reward the maintainer's of 22/10/2026.
+          invitation_reward: { fish: 1, likes: 0 },
+          invitations_open: 5,
+          invitation_tries_per_day: 5,
           moderation_response_hours: 24,
           reports_per_day: 5,
           report_after_close_days: 30,

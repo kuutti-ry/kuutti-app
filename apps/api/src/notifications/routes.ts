@@ -60,7 +60,7 @@ const noticesRoute = createRoute({
   path: "/notices",
   summary: "The caller's notices in the app",
   description:
-    "What must reach the person even without a push, newest first, at most 20: today a moderator's warning, with its reason, until it is lifted. A notice holds no text of its own; the app says it.",
+    "What must reach the person even without a push, newest first, at most 20: a moderator's warning, with its reason, until it is lifted, and an invitation of the person's that counted, with what it earned and never who was invited. A notice holds no text of its own; the app says it.",
   ...bearer,
   responses: {
     200: { description: "The notices.", ...json(Notices) },

@@ -4,8 +4,9 @@ import type { NoticeKind, NotificationKind, SanctionReason } from "@kuutti/schem
 // The notification choices and the notices (#176, ADR-032). Raw
 // parameterised SQL, as in the other slices; every statement names the
 // caller's account (rule 6). A warning's notice reads its sanction, the
-// safety slice's row, for the reason and whether it was lifted: the notice
-// holds nothing of its own.
+// safety slice's row, for the reason and whether it was lifted; a counted
+// invitation's reads the units it earned, the rewards slice's rows (#107,
+// ADR-044 §9): the notice holds nothing of its own.
 
 type Row = Record<string, unknown>;
 
@@ -48,21 +49,33 @@ export type NoticeRow = {
   kind: NoticeKind;
   at: Date;
   readAt: Date | null;
-  reason: SanctionReason;
+  /** A warning's; null for any other kind. */
+  reason: SanctionReason | null;
+  /** The units a counted invitation earned; nought for any other kind. */
+  fish: number;
+  likes: number;
 };
 
-/** The person's notices, newest first; a warning lifted since is not one any more. */
+/**
+ * The person's notices, newest first; a warning lifted since is not one any
+ * more, and the filter is a warning's alone: another kind has no sanction.
+ */
 export async function listNotices(
   db: Queryable,
   accountId: string,
   limit: number,
 ): Promise<NoticeRow[]> {
   const { rows } = await db.query<Row>(
-    `SELECT n.id, n.kind, n.created_at, n.read_at, s.reason
-     FROM notice n JOIN sanction s ON s.id = n.sanction_id
-     WHERE n.account_id = $1 AND s.lifted_at IS NULL
-     ORDER BY n.created_at DESC, n.id DESC
-     LIMIT $2`,
+    `SELECT n.id, n.kind, n.created_at, n.read_at, s.reason,
+            count(r.id) FILTER (WHERE r.kind = 'fish')::int AS fish,
+            count(r.id) FILTER (WHERE r.kind = 'like')::int AS likes
+       FROM notice n
+       LEFT JOIN sanction s ON s.id = n.sanction_id
+       LEFT JOIN reward r ON r.invitation_id = n.invitation_id AND r.account_id = n.account_id
+      WHERE n.account_id = $1 AND (n.sanction_id IS NULL OR s.lifted_at IS NULL)
+      GROUP BY n.id, s.reason
+      ORDER BY n.created_at DESC, n.id DESC
+      LIMIT $2`,
     [accountId, limit],
   );
   return rows.map((r) => ({
@@ -70,7 +83,9 @@ export async function listNotices(
     kind: r.kind as NoticeKind,
     at: r.created_at as Date,
     readAt: (r.read_at as Date | null) ?? null,
-    reason: r.reason as SanctionReason,
+    reason: (r.reason as SanctionReason | null) ?? null,
+    fish: r.fish as number,
+    likes: r.likes as number,
   }));
 }
 
@@ -94,6 +109,19 @@ export async function insertWarningNotice(
   await db.query(
     "INSERT INTO notice (account_id, kind, sanction_id, created_at) VALUES ($1, 'warning', $2, $3)",
     [input.accountId, input.sanctionId, input.at],
+  );
+}
+
+/** Each counted invitation's notice for its inviter, in the night's count's transaction (#107, ADR-044 §7). */
+export async function insertInvitationNotices(
+  db: Queryable,
+  input: { counted: ReadonlyArray<{ accountId: string; invitationId: string }>; at: Date },
+): Promise<void> {
+  await db.query(
+    `INSERT INTO notice (account_id, kind, invitation_id, created_at)
+     SELECT c.account, 'invitation_counted', c.invitation, $3
+       FROM unnest($1::uuid[], $2::uuid[]) AS c(account, invitation)`,
+    [input.counted.map((c) => c.accountId), input.counted.map((c) => c.invitationId), input.at],
   );
 }
 

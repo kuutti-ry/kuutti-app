@@ -107,6 +107,13 @@ export const MATCHING_CONFIG_V1 = {
   email_code_minutes: 30,
   email_code_attempts: 3,
   email_codes_per_day: 5,
+  // #107 (ADR-044, migration 0080): what an invitation that counted earns its
+  // inviter, one fish and no likes, 0 switching a kind off; the unredeemed
+  // invitations a person may hold at once; the codes a person may try a
+  // Finnish day.
+  invitation_reward: { fish: 1, likes: 0 },
+  invitations_open: 5,
+  invitation_tries_per_day: 5,
   moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
   // #84 (ADR-030 §4, migration 0052): reports a person may file per Finnish
   // day, counted from report in the statement that writes the row; the sixth
