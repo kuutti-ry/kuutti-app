@@ -4,7 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
 import { ChatLiveProvider } from "@/features/chat";
-import { SessionProvider, SignedOutToStart } from "@/features/identity";
+import { LockProvider, SessionProvider, SignedOutToStart } from "@/features/identity";
 import { ScreenReaderHint } from "@/features/settings";
 import { DecisionButtonsProvider } from "@/lib/decision-buttons";
 import { LocaleProvider } from "@/lib/locale";
@@ -24,19 +24,22 @@ function RootLayout() {
         <PhotoDescriptionsProvider>
           <DecisionButtonsProvider>
             <SessionProvider>
-              {/* The chat's socket while signed in and in front (#349). */}
-              <ChatLiveProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: "transparent" },
-                  }}
-                />
-                <StatusBar style="auto" />
-                <SignedOutToStart />
-                {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
-                <ScreenReaderHint />
-              </ChatLiveProvider>
+              {/* The app's lock over everything while it is on (#418); off by default. */}
+              <LockProvider>
+                {/* The chat's socket while signed in and in front (#349). */}
+                <ChatLiveProvider>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: { backgroundColor: "transparent" },
+                    }}
+                  />
+                  <StatusBar style="auto" />
+                  <SignedOutToStart />
+                  {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
+                  <ScreenReaderHint />
+                </ChatLiveProvider>
+              </LockProvider>
             </SessionProvider>
           </DecisionButtonsProvider>
         </PhotoDescriptionsProvider>

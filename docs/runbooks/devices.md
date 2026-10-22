@@ -68,3 +68,19 @@ Checking, once the native batch is installed:
 
 - Android: `adb shell pm get-app-links fi.kuutti.app` shows `verified` for the API's host; `adb shell pm verify-app-links --re-verify fi.kuutti.app` asks again. Google's checker: `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://api.staging.kuutti.app&relation=delegate_permission/common.handle_all_urls`.
 - iOS: Apple's CDN fetches the AASA on install; `curl -s https://app-site-association.cdn-apple.com/a/v1/api.staging.kuutti.app` shows what Apple has. Settings → Developer → Universal Links → Diagnostics names the reason when a link does not open.
+
+## The lock's face and fingerprint (#418, ADR-045)
+
+Maestro has no biometric command, so the lock's face and fingerprint are checked by hand, on a real iPhone and a real Android phone, once a build with `expo-local-authentication` is installed (the native batch, ADR-045 §8; the tech config screen names the native build). jest covers the rest with the module mocked. Sign in as Sanna; enrol a face or a finger in the phone's own settings first.
+
+On each phone:
+
+1. **Turning it on.** Settings › Lock, Face or fingerprint on. On an iPhone with Face ID, iOS first asks whether Kuutti may use Face ID, with the purpose in the phone's language: check it once each in Finnish, Swedish and English. Then the prompt; a face or finger that passes turns the switch on, and a cancel leaves it off with the line that says so.
+2. **No fallback to the phone's code.** Fail the prompt until it gives up (look away, or the wrong finger). iOS shows no Enter Password; Android's prompt offers no PIN, pattern or password. The lock screen says the face or finger did not unlock, and the passcode (if set) and Sign in with the bank instead are still there.
+3. **When it locks.** Straight away chosen: home, then back, and the lock asks for the face or finger at once. One minute chosen: back within it, no lock. Close the app and open it again: locked.
+4. **The cover.** Open the app switcher (iOS) or recents (Android): the app's name on its background, never the last screen. On Android the thumbnail can be taken before the cover is drawn (ADR-045 §4): note what the phone shows.
+5. **Android's face.** On a phone whose face unlock is class 2 (most camera face unlocks, Xiaomi's among them), with only a face enrolled: the switch is offered, and the prompt takes the face.
+6. **Refused by the phone.** iPhone: Settings, Face ID & Passcode, Other Apps, Kuutti off. The lock then offers no face, or its button says it did not unlock, and the passcode or the bank still opens the app.
+7. **The way out.** Sign in with the bank instead: the sign-in screen says the lock signed this phone out; after the bank, Settings › Lock reads Off.
+
+A comment on the issue of the check names each phone, its system version, the build, and any step that failed. For a quick look before a phone is at hand, the iOS Simulator has Features › Face ID (Enrolled, Matching Face, Non-matching Face), and an Android emulator with a fingerprint enrolled in its settings takes `adb -e emu finger touch 1`; neither stands in for the check, since neither has the phone's own classes or prompts.

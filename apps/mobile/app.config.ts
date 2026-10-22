@@ -12,7 +12,21 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
  * The fingerprint skips `extra` (fingerprint.config.js): a new commit or a
  * new counted version is never a native change and never spends a build;
  * app.json's own `version` is the store's and moves with native batches.
+ *
+ * It also adds what the phone's own system says for the app, from
+ * messages.yaml's `native.*` keys through the i18n build's native.json
+ * (#418): English in Info.plist, where the lock's plugin finds the Face ID
+ * purpose, and every language in `locales`, which iOS shows by the phone's
+ * language (app.json's CFBundleAllowMixedLocalizations). Those are native:
+ * a changed text moves the fingerprint, as it must.
  */
+type NativeStrings = Record<string, { ios?: Record<string, string> }>;
+
+function nativeStrings(): NativeStrings {
+  return JSON.parse(
+    readFileSync(join(__dirname, "../../packages/i18n/src/generated/native.json"), "utf8"),
+  ) as NativeStrings;
+}
 function countedVersion(): string {
   const root = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf8")) as {
     version?: unknown;
@@ -31,7 +45,14 @@ function commit(): string {
   }
 }
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
-  ...(config as ExpoConfig),
-  extra: { ...config.extra, commit: commit(), version: countedVersion() },
-});
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const strings = nativeStrings();
+  return {
+    ...(config as ExpoConfig),
+    ios: { ...config.ios, infoPlist: { ...config.ios?.infoPlist, ...strings.en?.ios } },
+    locales: Object.fromEntries(
+      Object.entries(strings).map(([locale, platforms]) => [locale, { ios: platforms.ios ?? {} }]),
+    ),
+    extra: { ...config.extra, commit: commit(), version: countedVersion() },
+  };
+};

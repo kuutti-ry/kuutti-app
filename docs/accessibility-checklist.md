@@ -45,25 +45,31 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 | The screen-reader hint (#296) | any, on the first launch with the reader on | the dialog over the first screen: its title and text, the close and both buttons named; dismissed, it never shows again on that phone: Android forgets it when the app's storage is cleared, but iOS keeps it in the Keychain through a reinstall, so on an iPhone it is walked the first time it shows | | |
 | A screen that did not load | any (`LoadFailed`), with the network off | the screen's own line, the reason in words, and the way out (Try again, or the update) as a named button | | |
 | Leave without saving? | a section after a refused save, a later question or the deal-breakers with a change unsaved | the dialog takes the focus; keep editing and leave named; Android's back key asks too | | |
+| The lock screen (#418) | any, signed in with the lock on: a cold start, or back after the grace time (Sanna, after setting a passcode and the face or finger in Settings › Lock) | Kuutti is locked a header; the phone's face or finger prompt asked once as the lock shows, where chosen, and Unlock with your face (or fingerprint) named after it; the field named Your Kuutti passcode, the number pad, focused at once when no face or finger is chosen; a wrong passcode said with the tries left (VoiceOver told, TalkBack reading the region), each one again, nothing shaking; the line about the bank, then Sign in with the bank instead named; nothing of the app under it reached, and Android's back key stays on the lock; in the app switcher a cover with the app's name, never the last screen (on Android the thumbnail may be taken first, ADR-045 §4) | | |
 
 ### Signing in
 
+The screens before the bank (#418, ADR-010 §15) show on a phone that has not recorded the current versions of the terms and the privacy summary: on its first sign-in, or after a wording changed. Android forgets the versions when the app's storage is cleared, but iOS keeps them in the Keychain through a reinstall, so on an iPhone they are walked the first time they show.
+
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
-| Start, signed out | `/` | the loading line said; the title a header; the explanation; Sign in with your bank | | |
+| Before you sign in: the norms and the consents (#418) | `/` (Aino, on a phone's first sign-in) | Before you sign in a header; the four lines on how Kuutti does things; the explanation; outside Finnish the line that the Finnish text counts; the terms and privacy cards, each title, summary and version link in order; I'm in, and I accept both named; no bank button anywhere before it | | |
+| Before you sign in: research (#418) | `/`, after accepting both | the screen read from its top, the header first; the research card with its version link; the line that it can be changed later; the line that either answer goes on to the bank; Yes, I take part and Not now named, neither heard as selected; after either, the bank button | | |
+| Start, signed out | `/` | the loading line said; the title a header; the explanation; Sign in with your bank, straight away on a phone that has recorded the current versions | | |
 | Back from the bank | `/auth?code=…` | the system browser and the bank's pages are not ours, so the walk resumes at the return; opening, signing in and done said as they change | | |
 | Refused | `/auth?error=…` (Tapio, Ilona, Lauri, Venla) | the card's title and its sentence, with the date where there is one; Try again named | | |
 | Right after a break | `/` (Helmi, after Take a break) | the sign-in with the paused card: its title and text | | |
+| Signed out by the lock (#418) | `/` (Sanna, after Sign in with the bank instead on the lock screen, or five wrong passcodes) | the sign-in with the lock's card: its title and text, that the lock is off now; then Sign in with your bank | | |
 
 ### Onboarding
 
-`/onboarding`, Aino (ADR-010). On every step: the title a header, "Step x of n" said as it changes, a refused step said, and Continue heard as dimmed until the step is answered.
+`/onboarding`, Aino (ADR-010). On every step but the welcome: the title a header, "Step x of n" said as it changes, a refused step said, and Continue heard as dimmed until the step is answered.
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
 | Loading, or not loaded | `/onboarding` | the loading line said; the failure and Try again | | |
-| Welcome | `/onboarding` | the four lines on how Kuutti does things; the terms and privacy cards with their versions in order; the accept button, and the step asked again for a wording accepted before (Kerttu); the line that says the app is older than the wording shows only on a build older than the API's wording, so a current build does not meet it | | |
-| Invitation code (#107) | `/onboarding`, right after Welcome, for a newcomer who may still use a code (Aino after a reset) | "Step 1 of 10" still, the welcome's number; the title a header; the field named Invitation code; Use the code heard as dimmed until the code reads as one; a refused code said in words (VoiceOver is told, TalkBack reads the region); after a code that works, the thanks said and Continue named; Skip named; not offered again on the same walk, nor on a walk resumed past the name | | |
+| Welcome, the fallback (#418) | `/onboarding` (Kerttu, signed in on a phone that has already passed the screens before the bank, so it goes straight to the bank) | no "Step x of n" line; the four lines on how Kuutti does things; the terms and privacy cards with their versions in order; the accept button, and the step asked again for a wording accepted before (Kerttu); the line that says the app is older than the wording shows only on a build older than the API's wording, so a current build does not meet it | | |
+| Invitation code (#107) | `/onboarding`, first for a newcomer who may still use a code, after Welcome when that comes (Aino after a reset) | no "Step x of n" line, as on Welcome (#418); the title a header; the field named Invitation code; Use the code heard as dimmed until the code reads as one; a refused code said in words (VoiceOver is told, TalkBack reads the region); after a code that works, the thanks said and Continue named; Skip named; not offered again on the same walk, nor on a walk resumed past the name | | |
 | Name | `/onboarding` | the field named as the display name | | |
 | Gender | `/onboarding` | three choices, the chosen one heard as selected | | |
 | Identity label | `/onboarding`, after non-binary only | the label's choices; Continue and the skip | | |
@@ -72,8 +78,7 @@ A cell holds the date (dd/mm/yyyy) and the walker's name; a check that failed is
 | Age window | `/onboarding` | two steppers: each value heard in years as it changes, the four buttons named, dimmed at a bound | | |
 | Area | `/onboarding`, only where more than one area exists | each area a named button; loading and the failed line said, Try again | | |
 | Photos | `/onboarding` | one button to the photos screen (Photos, below), and back to this step | | |
-| A few words | `/onboarding` | the bio field and its ready lines; the prompts, each picked and answered; the save heard as dimmed until the words count | | |
-| Research | `/onboarding` | the card and its version; Yes and Not now named; then the done line, and home | | |
+| A few words | `/onboarding` | the bio field and its ready lines; the prompts, each picked and answered; the save heard as dimmed until the words count; then the done line, and home, with no research step (#418: it is asked before the bank, and Settings keeps it) | | |
 
 ### Home
 
@@ -157,7 +162,8 @@ Sanna; Helmi and Noa where it says.
 | Politics | `/profile/later/politics` | the parties, and "none of them", which stands alone | | |
 | Religion | `/profile/later/religion` | the choices, one selected | | |
 | Star sign | `/profile/later/zodiac` | the choices, one selected | | |
-| E-mail, the last | `/account/email` | the e-mail card (as in Settings), the deal-breakers button, Done | | |
+| E-mail | `/account/email` | the e-mail card (as in Settings), the deal-breakers button, Done, which leads on to the lock's offer the first time on a phone, and home after that | | |
+| The lock's offer, the last (#418) | `/account/lock` (Aino, after the e-mail's Done, once a phone) | While you wait a header, then Lock Kuutti on this phone? heard as one; the explanation; the face or finger switch, on or off, or the line that the phone has none; turning it on brings the phone's prompt, and a refusal said; Set a passcode, then the field named Choose a passcode of six digits, the number pad, the second field named Type the same six digits again after the sixth digit, a mismatch said, Cancel named; once something is on, the four times as a radio group, the chosen one heard as selected; Not now, which becomes Done once something is on; never offered again on that phone | | |
 
 ### Photos
 
@@ -189,6 +195,7 @@ Sanna; Helmi and Noa where it says.
 | Licences | `/settings/licenses` | the whole list reachable to its end; the families' names headers; each package a button by its name, its version and licence heard once, as the value (#416) | | |
 | A package's licence (#416) | `/settings/licenses/<n>` | back named; the package's name the header; its version and licence; each licence a header (Licence, or Licence 1 and Licence 2), its copyright lines and its text heard a paragraph at a time, in English as written, at the largest text size too; Notice a header where there is one; the upstream address said as text where the package carries no licence file | | |
 | This device | `/settings/device` | Log out and Log out everywhere named | | |
+| Lock (#418) | `/settings/lock` (Sanna; not in the web preview) | the row in Settings heard with On or Off; the explanation; the face or finger switch, on or off, or the line that the phone has none, and a refused prompt said; Set a passcode, its two fields named in turn with the number pad, a mismatch said, A passcode is set said once saved; Change the passcode and Remove the passcode named; while on, Lock again after Kuutti has been in the background as a radio group of four (Straight away, 1, 5 and 15 minutes), the chosen one heard as selected; the line that Kuutti always locks when it starts; with both ways off, the times gone and the row heard as Off | | |
 | E-mail | `/settings/email` | the field named; save and remove; a malformed address refused in words; the address heard as confirmed or not yet; a code on its way said with until when, the code's field named, the number pad and the phone's offer of the code from the message, Confirm dimmed until six digits, Send a new code; a wrong, spent or expired code and a refused send said in words (iOS aloud, Android by its live region), and Send a code after one that leaves none; no code asked once confirmed; the loading and the failed read said | | |
 | Your contacts (#103) | `/settings/contacts` | the line that nobody sees them until one is shared; four cards, each title a header with what to type under it; each field named by its kind ("Your phone number"), the number pad for the two numbers; Save and Remove heard with the kind, Save dimmed while empty or unchanged, Remove only while one is kept; saved, removed, a refusal in words for the kind and a failure said, the words kept; the loading and the failed read said | | |
 | Notifications (#176) | `/settings/notifications` | the line that nothing is sent to the phone yet; the four kinds as switches, each by its name with its line after it, on or off; a switch heard as dimmed while a change is on its way; a failed change said, the switch as it was; the loading and the failed read said, Try again named | | |

@@ -1,0 +1,17 @@
+{
+  "en": {
+    "ios": {
+      "NSFaceIDUsageDescription": "Kuutti uses Face ID to unlock the app when you have turned the lock on."
+    }
+  },
+  "fi": {
+    "ios": {
+      "NSFaceIDUsageDescription": "Kuutti käyttää Face ID:tä sovelluksen avaamiseen, kun olet ottanut lukituksen käyttöön."
+    }
+  },
+  "sv": {
+    "ios": {
+      "NSFaceIDUsageDescription": "Kuutti använder Face ID för att låsa upp appen när du har slagit på låset."
+    }
+  }
+}

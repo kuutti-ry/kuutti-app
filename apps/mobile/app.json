@@ -14,7 +14,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "fi.kuutti.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleAllowMixedLocalizations": true
       }
     },
     "android": {
@@ -36,6 +37,7 @@
       "expo-router",
       "expo-updates",
       "./plugins/withNoForceDark.js",
+      "expo-local-authentication",
       [
         "expo-image-picker",
         {

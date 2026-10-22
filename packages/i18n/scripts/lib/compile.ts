@@ -96,11 +96,44 @@ function consentModule(messages: Messages): string {
 }
 
 /**
+ * The strings the phone's own system shows for the app, outside JavaScript
+ * (#418): `native.<platform>.<key>` becomes `{ <locale>: { <platform>: { <key>: text } } }`,
+ * which app.config.ts hands to Expo's `locales` (iOS writes each language's
+ * InfoPlist.strings from it). Expo writes a text between double quotes as it
+ * is, so a quote or a backslash in one is refused here rather than breaking a
+ * native build.
+ */
+function nativeModule(messages: Messages): string {
+  const out: Record<string, Record<string, Record<string, string>>> = {};
+  for (const [key, message] of Object.entries(messages).sort(([a], [b]) => a.localeCompare(b))) {
+    const [head, platform, name, ...rest] = key.split(".");
+    if (head !== "native") continue;
+    if (!platform || !name || rest.length > 0) {
+      throw new Error(`${key}: a native string is native.<platform>.<key>`);
+    }
+    for (const locale of ["en", "fi", "sv"] as const) {
+      const text = message[locale];
+      if (text === undefined) continue;
+      if (/["\\]/.test(text)) {
+        throw new Error(
+          `${key}: ${locale} carries a double quote or a backslash, which a native strings file cannot`,
+        );
+      }
+      const platforms = out[locale] ?? {};
+      platforms[platform] = { ...platforms[platform], [name]: text };
+      out[locale] = platforms;
+    }
+  }
+  return `${JSON.stringify(out, null, 2)}\n`;
+}
+
+/**
  * messages.yaml compiled to the modules the runtimes import: one catalogue per
  * locale (a translation that is missing falls back to en at run time), the
  * en-XA pseudo-locale, and the key type that makes t() fail on a typo.
  * TypeScript modules rather than JSON: Metro, Vite, tsx, jest and vitest all
- * load them without a loader or an import attribute.
+ * load them without a loader or an import attribute. The native strings are
+ * the one JSON file, since app.config.ts reads them with fs at build time.
  */
 export function compile(messages: Messages): Record<string, string> {
   const pick = (locale: "en" | "fi" | "sv"): Record<string, string> =>
@@ -121,5 +154,6 @@ export function compile(messages: Messages): Record<string, string> {
     "en-XA.ts": catalogModule("enXA", pseudo),
     "keys.ts": keysModule(messages),
     "consent.ts": consentModule(messages),
+    "native.json": nativeModule(messages),
   };
 }

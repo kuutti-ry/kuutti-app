@@ -1,3 +1,4 @@
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import type { GateResponse, PondSummary, WaitlistResponse } from "@kuutti/schema";
 import { fireEvent, screen, userEvent } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
@@ -142,10 +143,29 @@ describe("HomeScreen", () => {
 });
 
 describe("HomeRoute", () => {
+  const { __store: store } = jest.requireMock("expo-secure-store") as {
+    __store: Map<string, string>;
+  };
+  const AGREED = "kuutti.preference.agreedVersions";
+  afterEach(() => store.delete(AGREED));
+
   it("is the sign-in screen for a signed-out person: one button and the bank", async () => {
+    // A phone that recorded the wordings it carries after an earlier bank login (#418).
+    store.set(
+      AGREED,
+      JSON.stringify({ terms: CONSENT_VERSIONS.terms, privacy: CONSENT_VERSIONS.privacy }),
+    );
     await renderWithTheme(<HomeRoute />);
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Kuutti" })).toBeNull();
+  });
+
+  it("is the screens before the bank for a signed-out person on a phone that never answered them", async () => {
+    await renderWithTheme(<HomeRoute />);
+    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "I'm in, and I accept both" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Kuutti" })).toBeNull();
   });
 
@@ -189,9 +209,18 @@ describe("HomeRoute", () => {
   });
 
   it("shows only that it is loading while the stored session is read", async () => {
-    (SecureStore.getItemAsync as jest.Mock).mockReturnValueOnce(new Promise(() => undefined));
-    await renderWithTheme(<HomeRoute />);
-    expect(screen.getByText("Loading…")).toBeTruthy();
-    expect(screen.queryByRole("button")).toBeNull();
+    // The session's read alone never answers: the lock and the preferences read the same store.
+    const getItem = SecureStore.getItemAsync as jest.Mock;
+    const original = getItem.getMockImplementation() as (key: string) => Promise<string | null>;
+    getItem.mockImplementation((key: string) =>
+      key === "kuutti.session" ? new Promise(() => undefined) : original(key),
+    );
+    try {
+      await renderWithTheme(<HomeRoute />);
+      expect(screen.getByText("Loading…")).toBeTruthy();
+      expect(screen.queryByRole("button")).toBeNull();
+    } finally {
+      getItem.mockImplementation(original);
+    }
   });
 });
