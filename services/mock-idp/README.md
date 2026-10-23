@@ -87,4 +87,4 @@ On purpose: no signed request object, no `private_key_jwt` client authentication
 
 ## Checking it
 
-`node services/mock-idp/verify.ts` runs the whole code flow against the running container: the login page names every persona, each persona's claims come back in the ID token as posted (names with å, ä and ö included), and so do the claims of somebody else. CI runs it on every push.
+`node services/mock-idp/verify.ts` runs the whole code flow against the running container: the login page names every persona, each persona's claims come back in the ID token as posted (names with å, ä and ö included), and so do the claims of somebody else. One more login goes through the Telia kit's client (`@kuutti-ry/tunnistus-oidc`) in its plain dialect, the way the API logs in here, and the typed identity it returns is checked against the persona's claims (#426): the kit's own test of the plain dialect skips where no mock runs, so this is where CI proves it against the real mock. CI's compose job runs the script on every pull request and push to `main`.
