@@ -1,5 +1,5 @@
 import { AdminSession, ErrorResponse } from "@kuutti/schema";
-import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
+import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
 import { staffSession } from "../test/account.ts";

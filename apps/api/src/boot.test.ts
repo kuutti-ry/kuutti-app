@@ -7,13 +7,13 @@ import {
   discoverProvider,
   keyIdOf,
   type ProviderMetadata,
-} from "@kuutti/tunnistus-oidc";
+} from "@kuutti-ry/tunnistus-oidc";
 import {
   type FakeTelia,
   fakeTelia,
   TELIA_AUTHORIZATION_ENDPOINT,
   TELIA_ISSUER,
-} from "@kuutti/tunnistus-oidc/testing";
+} from "@kuutti-ry/tunnistus-oidc/testing";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { type BootOptions, boot } from "./boot.ts";
 import { type IdentityBroker, OidcBroker } from "./identity/index.ts";

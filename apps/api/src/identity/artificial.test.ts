@@ -1,4 +1,4 @@
-import { checkCharacter, generateHetu, parseHetu } from "@kuutti/tunnistus-oidc/hetu";
+import { checkCharacter, generateHetu, parseHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { type TestContext, test } from "../test/harness.ts";

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
-import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
+import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse } from "@kuutti/schema";
-import { generateHetu } from "@kuutti/tunnistus-oidc/hetu";
+import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";

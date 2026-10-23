@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/api",
-  "version": "0.63.1",
+  "version": "0.64.0",
   "private": true,
   "type": "module",
   "description": "Hono on Node. One process: HTTP routes, WebSockets, nightly jobs.",
@@ -31,7 +31,7 @@
     "@kuutti/db": "workspace:*",
     "@kuutti/i18n": "workspace:*",
     "@kuutti/schema": "workspace:*",
-    "@kuutti/tunnistus-oidc": "workspace:*",
+    "@kuutti-ry/tunnistus-oidc": "^0.1.0",
     "@sentry/node": "^11.5.0",
     "blurhash": "^2.0.5",
     "fflate": "^0.8.3",

@@ -114,7 +114,7 @@ AWS rotates this secret on its own schedule. Neither the schedule nor an on-dema
 
 ## 4. Telia signing and encryption keys
 
-Two RSA pairs per environment, `sig` and `enc` (`docs/vendors/telia.md`). The API signs request objects and client assertions with the first and decrypts the ID token with the second. It holds exactly one of each (`createTunnistusClient` in `packages/tunnistus-oidc/src/client.ts`).
+Two RSA pairs per environment, `sig` and `enc` (`docs/vendors/telia.md`). The API signs request objects and client assertions with the first and decrypts the ID token with the second. It holds exactly one of each (`createTunnistusClient` of `@kuutti-ry/tunnistus-oidc`).
 
 **Who:** the maintainer, who is Telia's technical contact (Appendix 4 of the agreement). Only the technical contact may exchange keys with Telia. For production keys Telia also asks the contact to sign the offered keys through its e-signature service with strong identification.
 

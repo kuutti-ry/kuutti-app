@@ -1,4 +1,4 @@
-import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
+import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
 
 /**
  * The people of the mock bank (#73, #140, ADR-014): twenty-four named persons the
@@ -147,7 +147,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     bank: {
       name: "Säästöpankki",
       user: "22222222",
-      note: "password 123456; POP, OmaSP and Handelsbanken return the same person",
+      note: "password 123456; POP and OmaSP return the same person",
     },
   },
   {

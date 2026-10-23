@@ -5,12 +5,12 @@ import {
   type TunnistusClient,
   type TunnistusClientOptions,
   TunnistusError,
-} from "@kuutti/tunnistus-oidc";
+} from "@kuutti-ry/tunnistus-oidc";
 import type { Config } from "../lib/config.ts";
 import { BrokerError, type BrokerIdentity, type IdentityBroker } from "./broker.ts";
 
 /**
- * The Telia client of `@kuutti/tunnistus-oidc` behind the login's seam (#33,
+ * The Telia client of `@kuutti-ry/tunnistus-oidc` behind the login's seam (#33,
  * ADR-017). What the adapter adds is Kuutti's: the bank every time
  * (`prompt=login`, ADR-016); the answer reduced to what the callback may
  * hold, the code for deriving and the event's references, never a name or a
@@ -26,7 +26,7 @@ export type OidcBrokerOptions = {
   /** PEM (PKCS#8). Both required for a Telia issuer, both ignored for the mock. */
   signingKeyPem: string | null;
   encryptionKeyPem: string | null;
-  /** Tests hand in the fake Telia's fetch (`@kuutti/tunnistus-oidc/testing`); production leaves it unset. */
+  /** Tests hand in the fake Telia's fetch (`@kuutti-ry/tunnistus-oidc/testing`); production leaves it unset. */
   fetch?: TunnistusClientOptions["fetch"];
 };
 

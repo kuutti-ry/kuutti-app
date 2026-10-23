@@ -89,9 +89,9 @@ function installed(): Map<string, { name: string; license: string }> {
   const found = new Map<string, { name: string; license: string }>();
   const visit = (dir: string): void => {
     // A symlink under node_modules is a workspace package: ours, AGPL-3.0 with
-    // the store exception (LICENSE), or MIT for packages/tunnistus-oidc
-    // (ADR-017). Recognised by what it is, not by its name,
-    // so a registry package called @kuutti/anything is checked like any other.
+    // the store exception (LICENSE). Recognised by what it is, not by its
+    // name, so a registry package called @kuutti/anything is checked like any
+    // other, the association's own @kuutti-ry/tunnistus-oidc (MIT, ADR-017 §6) too.
     if (lstatSync(dir).isSymbolicLink()) return;
     const manifestPath = join(dir, "package.json");
     if (!existsSync(manifestPath)) return;

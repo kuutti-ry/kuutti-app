@@ -13,7 +13,7 @@ import {
   type ProfileFields,
   type PromptAnswer,
 } from "@kuutti/schema";
-import { ageFromYearMonth } from "@kuutti/tunnistus-oidc/hetu";
+import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { createRandom, type Random } from "./rng.ts";
 import { BIOS, type Language, NAMES, OCCUPATION_TITLES, PROMPT_ANSWERS } from "./words.ts";
 
