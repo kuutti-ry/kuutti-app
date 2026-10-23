@@ -14,3 +14,5 @@ Two purposes share the table (#350, ADR-031 §10): `profile`, ordered and on the
 - `tips.ts`: the advisory tips of #56 and #253, `tips` and `fishSpecies` pure over a snapshot, and `photoTips`, which gathers it (the photos, their `photo_review` signals, the `matching_config` thresholds); answered on the photo list, `GET /photos` and `PUT /photos/order`, since #287. Advice only: never a moderation, completeness or matching decision. Tests: `tips.test.ts`, and the routes in `routes.test.ts`.
 - `admin-routes.ts`: the queue, the card URL and the decision for staff, behind `requireAdmin` with an audit row per view and decision (`safety/audit.ts`).
 - Tests: `moderation.test.ts` (the decision as a Scenario Outline, the upload path with a scripted moderator), `admin-routes.test.ts`; specs in `features/media/moderation.feature`.
+
+Flows, from the person's side (#395): [Photos](../../../../docs/flows/photos.md), [Chat](../../../../docs/flows/chat.md), [Deleting the account and downloading one's data](../../../../docs/flows/erasure-and-export.md).

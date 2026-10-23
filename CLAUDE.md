@@ -17,7 +17,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `@kuutti-ry/tunnistus-oidc` (npm) | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; its own repository, kuutti-ry/tunnistus-oidc, MIT, ADR-017 §6 | `docs/vendors/telia.md` |
 | `packages/notices` | the third-party packages a bundle ships, from its source maps or esbuild's metafile, with their copyright lines, licence texts and NOTICE files: the app's licences screen and the API image's `THIRD_PARTY_NOTICES` (#416) | `packages/notices/README.md` |
 | `services/mock-idp` | navikt/mock-oauth2-server with FTN-shaped claims for local dev; its login page names the twenty-four demo personas (ADR-014) | `.claude/rules/infra.md` |
-| `docs/` | security checklist, accessibility checklist, `adr/` | |
+| `docs/` | security checklist, accessibility checklist, `flows/` (each user flow as a diagram, its steps and its history, #395), `adr/` | |
 | `features/` | Gherkin specs for the rules layer, one directory per slice | `.claude/rules/layout.md` |
 
 Inside each app, code is organised by vertical slice (identity, profile, media, pond, matching, chat, safety, research, rewards, notifications), never by layer; see `.claude/rules/layout.md`. Rules in `.claude/rules/` load automatically when you work on matching paths.
@@ -101,6 +101,7 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 - A bug fix goes to the root cause. Look at every caller of the function you are about to change, and fix it once, where they all pass through.
 - A deliberate shortcut with a known ceiling carries a comment that starts `shortcut:` and names the ceiling and what would lift it (`// shortcut: one global lock; per-account locks if throughput matters`). `git grep -E '(//|#) shortcut:'` lists what was put off.
 - A pull request names what was left out on purpose and what would make it needed.
+- A change to the steps of a flow in `docs/flows/` redraws its diagram, rewrites its steps and adds a line to its History, in that pull request (#395, `docs/flows/README.md`).
 - Prefer the vendor's agent docs over training data for API details: Expo through the official Claude Code plugin and MCP (`claude plugin install expo@claude-plugins-official`), then `https://hono.dev/llms.txt`, `https://orm.drizzle.team/llms.txt`, `https://zod.dev/llms.txt`, `https://www.nativewind.dev/llms.txt`, `https://docs.dokploy.com/llms.txt`, `https://docs.sentry.io/llms.txt`, `https://www.i18next.com/llms.txt`.
 
 ## Testing
