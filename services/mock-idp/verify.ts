@@ -2,18 +2,28 @@
  * Drives the authorization-code flow against the local mock IdP without a
  * browser: the login page is ours and names every persona, a persona's claims
  * come back in the ID token as the bank would say them, and so do the claims
- * of anybody else typed into the form.
+ * of anybody else typed into the form. One more login goes through the Telia
+ * kit's client in its plain dialect, the way the API logs in here (#426): the
+ * kit's own test of that skips where no mock runs, so CI's compose job is
+ * where the dialect meets the real mock on every pull request.
  *
  *   node services/mock-idp/verify.ts [issuer]   (default http://127.0.0.1:8080/ftn)
  *
- * No dependencies but the personas themselves. Exit 1 on any mismatch.
+ * No dependencies but the personas and the kit. Exit 1 on any mismatch.
  */
-import { DEMO_PERSONAS, personaClaims } from "../../packages/db/src/seed/personas.ts";
+import { randomBytes } from "node:crypto";
+import { createTunnistusClient, FTN_CLAIMS } from "@kuutti-ry/tunnistus-oidc";
+import {
+  DEMO_PERSONAS,
+  MOCK_BANK_ACR,
+  personaClaims,
+} from "../../packages/db/src/seed/personas.ts";
 
 const issuer = (process.argv[2] ?? process.env.OIDC_ISSUER ?? "http://127.0.0.1:8080/ftn").replace(
   /\/$/,
   "",
 );
+// The client as env.example gives it to the API.
 const clientId = "kuutti-local";
 const redirectUri = "http://localhost:3000/auth/callback";
 // The claim names the Telia broker uses for a Finnish user (docs/vendors/telia.md,
@@ -85,14 +95,16 @@ if (
   fail("the login page does not say it is UTF-8");
 console.log(`✔ login page: ${DEMO_PERSONAS.length} personas`);
 
-/** Step 2 and 3: post the form as the page does, then trade the code for the ID token. */
-async function login(
+/**
+ * The browser's part: the mock's login form, posted back as the page does it,
+ * with the claims of the person. The answer is the redirect to the callback.
+ */
+async function postLoginForm(
+  authorize: URL,
   username: string,
   claims: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const state = `state-${username}`;
-  const nonce = `nonce-${username}`;
-  const posted = await fetch(authorizeUrl(state, nonce), {
+): Promise<URL> {
+  const posted = await fetch(authorize, {
     method: "POST",
     redirect: "manual",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -100,9 +112,19 @@ async function login(
   });
   if (posted.status < 300 || posted.status >= 400)
     fail(`${username}: login did not redirect: ${posted.status} ${await posted.text()}`);
-  const location = posted.headers.get("location") ?? fail("login redirect has no Location");
-  const code = new URL(location).searchParams.get("code") ?? fail(`no code in ${location}`);
-  if (new URL(location).searchParams.get("state") !== state) fail(`${username}: state mismatch`);
+  return new URL(posted.headers.get("location") ?? fail("login redirect has no Location"));
+}
+
+/** Step 2 and 3: post the form, then trade the code for the ID token and read it raw. */
+async function login(
+  username: string,
+  claims: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const state = `state-${username}`;
+  const nonce = `nonce-${username}`;
+  const back = await postLoginForm(authorizeUrl(state, nonce), username, claims);
+  const code = back.searchParams.get("code") ?? fail(`no code in ${back.href}`);
+  if (back.searchParams.get("state") !== state) fail(`${username}: state mismatch`);
 
   const token = await fetch(discovery.token_endpoint, {
     method: "POST",
@@ -145,4 +167,53 @@ console.log(`✔ personas: ${DEMO_PERSONAS.map((p) => p.key).join(", ")}`);
 const payload = await login("testi", somebody);
 console.log(
   `✔ somebody else: ${Object.keys(somebody).join(", ")} (iss ${String(payload.iss)}, sub ${String(payload.sub)})`,
+);
+
+// Step 4: one login through the Telia kit's client, in the plain dialect the
+// mock's http issuer selects (ADR-017 §3): the kit discovers the mock, builds
+// the authorization URL, exchanges the code, verifies the ID token against the
+// mock's JWKS and types the FTN claims. The level is the one env.example has
+// the API ask for, which the personas answer.
+const kit = await createTunnistusClient({
+  issuer,
+  clientId,
+  redirectUri,
+  acrValues: MOCK_BANK_ACR,
+  signingKeyPem: null,
+  encryptionKeyPem: null,
+});
+if (kit.dialect !== "plain") fail(`the kit took the ${kit.dialect} dialect for ${issuer}`);
+// Kerttu: a name with Å, so the typed answer is checked for UTF-8 as well.
+const persona = DEMO_PERSONAS.find((p) => p.key === "kerttu") ?? fail("no persona kerttu");
+const claims = personaClaims(persona, today);
+const state = randomBytes(24).toString("base64url");
+const nonce = randomBytes(24).toString("base64url");
+const authorize = await kit.startLogin({ state, nonce, uiLocales: "fi", prompt: "login" });
+const back = await postLoginForm(authorize, persona.key, claims);
+const identity = await kit
+  .completeLogin({ callbackUrl: back, state, nonce })
+  .catch((error: unknown) =>
+    fail(
+      `${persona.key} through the kit: ${error instanceof Error ? error.message : String(error)}`,
+    ),
+  );
+const expected = {
+  personalIdentityCode: claims[FTN_CLAIMS.personalIdentityCode],
+  dateOfBirth: claims[FTN_CLAIMS.dateOfBirth],
+  givenNames: claims[FTN_CLAIMS.givenNames],
+  surname: claims[FTN_CLAIMS.surname],
+  displayName: claims[FTN_CLAIMS.displayName],
+  acr: claims.acr,
+  amr: claims.amr,
+  subject: persona.key,
+};
+for (const [key, value] of Object.entries(expected)) {
+  const actual = identity[key as keyof typeof expected];
+  if (JSON.stringify(actual) !== JSON.stringify(value))
+    fail(
+      `${persona.key} through the kit: ${key}: expected ${JSON.stringify(value)}, got ${JSON.stringify(actual)}`,
+    );
+}
+console.log(
+  `✔ the kit's client, plain dialect: ${persona.key} (acr ${identity.acr}, amr ${identity.amr.join(" ")})`,
 );
