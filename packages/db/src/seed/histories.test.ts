@@ -1,4 +1,4 @@
-import { ageFromYearMonth } from "@kuutti/tunnistus-oidc/hetu";
+import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
 import { PERSONA_HISTORIES, personaOf } from "./histories.ts";
 import { personaBirth } from "./personas.ts";

@@ -305,6 +305,9 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.6.3
         version: 1.6.3(hono@4.13.13)(zod@4.6.5)
+      '@kuutti-ry/tunnistus-oidc':
+        specifier: workspace:*
+        version: link:../../packages/tunnistus-oidc
       '@kuutti/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -314,9 +317,6 @@ importers:
       '@kuutti/schema':
         specifier: workspace:*
         version: link:../../packages/schema
-      '@kuutti/tunnistus-oidc':
-        specifier: workspace:*
-        version: link:../../packages/tunnistus-oidc
       '@sentry/node':
         specifier: ^11.5.0
         version: 11.5.0
@@ -571,12 +571,12 @@ importers:
 
   packages/db:
     dependencies:
+      '@kuutti-ry/tunnistus-oidc':
+        specifier: workspace:*
+        version: link:../tunnistus-oidc
       '@kuutti/schema':
         specifier: workspace:*
         version: link:../schema
-      '@kuutti/tunnistus-oidc':
-        specifier: workspace:*
-        version: link:../tunnistus-oidc
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(pg@8.23.1)

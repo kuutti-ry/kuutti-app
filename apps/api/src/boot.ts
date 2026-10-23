@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { createPool, migrate, type Pool, seed } from "@kuutti/db";
-import { discoverProvider, type ProviderMetadata } from "@kuutti/tunnistus-oidc";
+import { discoverProvider, type ProviderMetadata } from "@kuutti-ry/tunnistus-oidc";
 import { type App, createApp } from "./app.ts";
 import { archiveJob, createLive, type Live } from "./chat/index.ts";
 import {

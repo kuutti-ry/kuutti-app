@@ -13,14 +13,12 @@ COPY apps/api/package.json apps/api/
 COPY packages/schema/package.json packages/schema/
 COPY packages/db/package.json packages/db/
 COPY packages/i18n/package.json packages/i18n/
-COPY packages/tunnistus-oidc/package.json packages/tunnistus-oidc/
 COPY packages/notices/package.json packages/notices/
 RUN pnpm install --frozen-lockfile --filter @kuutti/api...
 COPY tsconfig.base.json ./
 COPY packages/schema packages/schema
 COPY packages/db packages/db
 COPY packages/i18n packages/i18n
-COPY packages/tunnistus-oidc packages/tunnistus-oidc
 COPY packages/notices packages/notices
 COPY apps/api apps/api
 # tsup, then dist/THIRD_PARTY_NOTICES from what it bundled and node_modules/@img

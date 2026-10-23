@@ -15,7 +15,7 @@ import {
   personaOf,
 } from "@kuutti/db/demo";
 import { SanctionList } from "@kuutti/schema";
-import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
+import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
 import {
   decideRegistration,
   deriveArtificialIdentity,

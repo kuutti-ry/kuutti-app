@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { hetuProblem, parseHetu } from "@kuutti/tunnistus-oidc/hetu";
+import { hetuProblem, parseHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { type DerivedIdentity, deriveIdentity, InvalidHetuError } from "./hetu.ts";
 import { decideRegistration } from "./registration.ts";
 import * as repo from "./repo.ts";

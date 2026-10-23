@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
-import { ACR_LOATEST2, keyIdOf } from "@kuutti/tunnistus-oidc";
-import { checkCharacter } from "@kuutti/tunnistus-oidc/hetu";
+import { ACR_LOATEST2, keyIdOf } from "@kuutti-ry/tunnistus-oidc";
+import { checkCharacter } from "@kuutti-ry/tunnistus-oidc/hetu";
 import {
   type FakeTelia,
   fakeTelia,
   TELIA_ISSUER,
   TELIA_TOKEN_ENDPOINT,
-} from "@kuutti/tunnistus-oidc/testing";
+} from "@kuutti-ry/tunnistus-oidc/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
@@ -16,7 +16,8 @@ import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
 import { brokerOptionsFromConfig, OidcBroker, teliaKeyIds } from "./oidc-broker.ts";
 
 // What the adapter adds to the kit (ADR-017): the dialect itself is proven in
-// packages/tunnistus-oidc; here only Kuutti's part of a login is checked.
+// the kit's own repository, kuutti-ry/tunnistus-oidc; here only Kuutti's part
+// of a login is checked.
 
 const random = () => randomBytes(24).toString("base64url");
 
@@ -40,7 +41,7 @@ async function login(broker: OidcBroker, telia: FakeTelia) {
   return broker.completeLogin({ callbackUrl: back, state, nonce });
 }
 
-describe("OidcBroker, the adapter over @kuutti/tunnistus-oidc", () => {
+describe("OidcBroker, the adapter over @kuutti-ry/tunnistus-oidc", () => {
   let telia: FakeTelia;
   beforeEach(async () => {
     telia = await fakeTelia();

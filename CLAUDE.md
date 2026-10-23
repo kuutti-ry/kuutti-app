@@ -14,7 +14,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `packages/schema` | zod contracts shared by all apps; research event registry | `.claude/rules/schema.md` |
 | `packages/db` | Drizzle schema, generated migrations, seed | `.claude/rules/db.md` |
 | `packages/i18n` | `messages.yaml`, typed `t()`, i18next + ICU | `.claude/rules/i18n.md` |
-| `packages/tunnistus-oidc` | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; MIT, ADR-017 | `docs/vendors/telia.md` |
+| `@kuutti-ry/tunnistus-oidc` (npm) | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; its own repository, kuutti-ry/tunnistus-oidc, MIT, ADR-017 §6 | `docs/vendors/telia.md` |
 | `packages/notices` | the third-party packages a bundle ships, from its source maps or esbuild's metafile, with their copyright lines, licence texts and NOTICE files: the app's licences screen and the API image's `THIRD_PARTY_NOTICES` (#416) | `packages/notices/README.md` |
 | `services/mock-idp` | navikt/mock-oauth2-server with FTN-shaped claims for local dev; its login page names the twenty-four demo personas (ADR-014) | `.claude/rules/infra.md` |
 | `docs/` | security checklist, accessibility checklist, `adr/` | |
@@ -109,7 +109,7 @@ From TD-1, TD-6, TD-7. A change that violates one is wrong regardless of who ask
 - Tests at every level that applies (ADR-021): unit, integration, contract (the client-server boundary and every vendor's, both directions), property-based, the rules specifications, end-to-end. A package that could leave the repository carries its levels inside itself.
 - Inputs vary: equivalence classes and their boundaries, empty, missing, wrong type, too long, each locale where text is the output. Every reachable branch and every error has a test that asserts its outcome, not one that only runs it. Where it makes sense: no test for a re-export or a constant, no contortion for a branch that cannot run.
 - Every route: `app.request()` tests for the happy path, each validation rule with a distinct answer, unauthenticated (each variant the code tells apart), wrong user, and each of its error branches. Real Postgres, transaction rolled back per test, never a mocked database. Concurrency by deterministic interleaving, never by sleeping.
-- Every exported function in `apps/api/src/identity` and `packages/tunnistus-oidc` has tests. hetu parsing and HMAC derivation get property-based tests with fast-check.
+- Every exported function in `apps/api/src/identity` has tests, and so does the kit's in its own repository. hetu parsing and HMAC derivation get property-based tests with fast-check.
 - Coverage floors per package, branches first (ADR-021): each package's `vitest.config.ts`, the app's `jest.config.js`; identity's is the strictest. CI's compose job and `test-mobile` enforce them. A floor goes up when the code allows; a pull request that lowers one says why.
 - Code nothing uses is removed, once indirect use is ruled out (names in strings, routes called from outside, files loaded by convention); an unreachable branch stays only in ADR-021 §7's four cases. A bug a test finds gets its own change, with the test that failed first.
 - A test fails on PII patterns in log output.

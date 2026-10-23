@@ -40,7 +40,7 @@ The code is licensed under the GNU Affero General Public License, version 3, see
 
 The licence covers the code, not the name or the look: a fork needs its own name and emblem, see [TRADEMARKS.md](TRADEMARKS.md). Whoever runs the code as a service offers its source to the users of that service (AGPL section 13): the API names it in `GET /health` (`source`, with the running `commit`), and the app and the moderation panel show both. A modified deployment sets `SOURCE_URL` to its own repository.
 
-One directory is licensed differently: `packages/tunnistus-oidc`, the Telia Tunnistus relying-party kit, is MIT (its own `LICENSE`; ADR-017), so that any Finnish relying party can take it.
+The Telia Tunnistus relying-party kit is a repository of its own, [kuutti-ry/tunnistus-oidc](https://github.com/kuutti-ry/tunnistus-oidc), MIT, published as `@kuutti-ry/tunnistus-oidc` (ADR-017 §6), so that any Finnish relying party can take it; this repository takes it from npm.
 
 Dependencies stay within the licences listed in [scripts/license-policy.json](scripts/license-policy.json), so that nothing copyleft without an equivalent store permission ends up in the app (`pnpm check:licenses`).
 

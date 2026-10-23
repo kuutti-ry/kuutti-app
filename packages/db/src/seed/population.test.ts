@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { Gender, PreferencesUpdate, ProfileUpdate } from "@kuutti/schema";
-import { ageFromYearMonth } from "@kuutti/tunnistus-oidc/hetu";
+import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
 import { migrate } from "../migrate.ts";
 import { createPool } from "../pool.ts";
