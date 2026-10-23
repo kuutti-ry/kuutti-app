@@ -102,3 +102,9 @@ auditConfig:
 # SDK 57 pins ~4.26. Patching the package moves the dev client's fingerprint.
 patchedDependencies:
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
+
+# The kit's first release, approved at the prompt on 2026-10-23, the day it
+# was published: the one exception the maintainer took to the day above. It
+# expires by itself: the next bump of the kit meets the quarantine again.
+minimumReleaseAgeExclude:
+  - "@kuutti-ry/tunnistus-oidc@0.1.0"
