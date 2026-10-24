@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/admin",
-  "version": "0.64.1",
+  "version": "0.64.2",
   "private": true,
   "type": "module",
   "description": "Moderation panel. Vite + React, a static build behind CloudFront at admin.<domain>, previews under /pr-<n>/ (ADR-025).",
@@ -19,7 +19,7 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-router": "8.4.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",
