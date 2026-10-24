@@ -48,7 +48,9 @@ post() { api -X POST "$url/api/$1" --data "$2"; }
 # --- project -----------------------------------------------------------------
 project_id=$(get project.all | jq -r --arg n "$env" '.[] | select(.name == $n) | .projectId' | head -1)
 if [ -z "$project_id" ]; then
-  project_id=$(post project.create "$(jq -cn --arg n "$env" '{name: $n, description: "The \($n) environment (infra/envs/\($n))"}')" | jq -r '.projectId // .id')
+  # Dokploy v0.30.6 answers { project, environment }; the id is the project's.
+  project_id=$(post project.create "$(jq -cn --arg n "$env" '{name: $n, description: "The \($n) environment (infra/envs/\($n))"}')" | jq -r '.project.projectId // empty')
+  [ -n "$project_id" ] || { echo "project.create answered without .project.projectId (has Dokploy's answer changed?); the project may exist now, so run again: it is found by name" >&2; exit 1; }
   echo "created project $env ($project_id)"
 else
   echo "project $env exists ($project_id)"
@@ -63,7 +65,8 @@ environment_id=$(get "project.one?projectId=$project_id" | jq -r '(.environments
 app_id=$(get "environment.one?environmentId=$environment_id" | jq -r '.applications[] | select(.name == "api") | .applicationId' | head -1)
 if [ -z "$app_id" ]; then
   app_id=$(post application.create "$(jq -cn --arg env "$environment_id" \
-    '{name: "api", appName: "api", description: "The Kuutti API, deployed by deploy.yml from GHCR", environmentId: $env, sourceType: "docker"}')" | jq -r .applicationId)
+    '{name: "api", appName: "api", description: "The Kuutti API, deployed by deploy.yml from GHCR", environmentId: $env, sourceType: "docker"}')" | jq -r '.applicationId // empty')
+  [ -n "$app_id" ] || { echo "application.create answered without .applicationId (has Dokploy's answer changed?); the application may exist now, so run again: it is found by name" >&2; exit 1; }
   echo "created application api ($app_id)"
 else
   echo "application api exists ($app_id)"
