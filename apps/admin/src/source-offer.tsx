@@ -5,6 +5,10 @@ import { API_URL, apiUrl } from "./lib/api.ts";
 
 export { apiUrl };
 
+/** Under the screen, quiet: small and muted, its links underlined (ADR-047). */
+const FOOTER =
+  "mx-auto w-full max-w-6xl space-y-1 border-t px-4 py-6 text-xs text-muted-foreground md:px-8 [&_a]:break-all";
+
 type State = { kind: "loading" } | { kind: "ok"; health: HealthResponse } | { kind: "unknown" };
 
 /**
@@ -42,7 +46,7 @@ export function SourceOffer() {
   );
   if (state.kind === "loading") {
     return (
-      <footer>
+      <footer className={FOOTER}>
         <p aria-busy="true" />
         {licences}
       </footer>
@@ -50,14 +54,14 @@ export function SourceOffer() {
   }
   if (state.kind === "unknown") {
     return (
-      <footer>
+      <footer className={FOOTER}>
         <p>{t("admin.source.unavailable")}</p>
         {licences}
       </footer>
     );
   }
   return (
-    <footer>
+    <footer className={FOOTER}>
       <p>
         {t("admin.source.offer", { commit: state.health.commit })}{" "}
         <a href={state.health.source} rel="noreferrer noopener" target="_blank">

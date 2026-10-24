@@ -9,8 +9,14 @@ import {
   type Sanction,
   type SanctionKind,
 } from "@kuutti/schema";
+import { ArrowLeft, Image } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
+import { Alert } from "../../components/ui/alert.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Card, CardContent, CardTitle } from "../../components/ui/card.tsx";
+import { DescriptionList } from "../../components/ui/description-list.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
 import { Dialog } from "../../lib/dialog.tsx";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
@@ -30,7 +36,7 @@ import { outcomeOf, type Refusals, useSend } from "./use-send.ts";
 // closes the report as acted on in the same move; a sanction applied since
 // the filing; or dismissed. No age and no "Late" here: the queue shows both,
 // by the API's clock. A 403 is the shell's to say (#302). English only
-// (TD-17); plain HTML, keyboard first.
+// (TD-17); keyboard first.
 
 /** The decision's refusals in words. */
 const REFUSALS: Refusals = {
@@ -92,14 +98,17 @@ export function ReportPage() {
   }, [id]);
 
   return (
-    <section aria-labelledby="report-title" className="person">
+    <section aria-labelledby="report-title" className="space-y-6">
       <ScreenTitle id="report-title">{t("admin.report.title", { report: short(id) })}</ScreenTitle>
-      {state.kind === "loading" && <p aria-busy="true">{t("admin.report.loading")}</p>}
-      {state.kind === "error" && <p role="alert">{t("admin.report.error")}</p>}
-      {state.kind === "missing" && <p>{t("admin.report.missing")}</p>}
+      {state.kind === "loading" && <Loading>{t("admin.report.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.report.error")}</Alert>}
+      {state.kind === "missing" && (
+        <p className="text-muted-foreground">{t("admin.report.missing")}</p>
+      )}
       {state.kind === "ready" && <ReportBody opened={state.report} />}
       <p>
-        <Link className="target" to="/reports">
+        <Link className="inline-flex min-h-11 items-center gap-2" to="/reports">
+          <ArrowLeft aria-hidden="true" className="size-4" />
           {t("admin.report.back")}
         </Link>
       </p>
@@ -199,166 +208,189 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
   };
 
   return (
-    <>
-      <h3>{t("admin.report.factsTitle")}</h3>
-      <dl>
-        <dt>{t("admin.report.reason")}</dt>
-        <dd>{t(REASON[report.reason])}</dd>
-        <dt>{t("admin.report.source")}</dt>
-        <dd>{t(SOURCE[report.source])}</dd>
-        <dt>{t("admin.report.filed")}</dt>
-        <dd>{when(report.createdAt)}</dd>
-        <dt>{t("admin.report.state")}</dt>
-        <dd>
-          {decision ? (
-            <>
-              {t("admin.report.decided", {
-                outcome: t(OUTCOME[decision.outcome]),
-                time: when(decision.decidedAt),
-                who: short(decision.decidedBy),
-              })}
-              {report.sanctionId && (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardContent>
+          <CardTitle>{t("admin.report.factsTitle")}</CardTitle>
+          <DescriptionList>
+            <dt>{t("admin.report.reason")}</dt>
+            <dd>{t(REASON[report.reason])}</dd>
+            <dt>{t("admin.report.source")}</dt>
+            <dd>{t(SOURCE[report.source])}</dd>
+            <dt>{t("admin.report.filed")}</dt>
+            <dd>{when(report.createdAt)}</dd>
+            <dt>{t("admin.report.state")}</dt>
+            <dd>
+              {decision ? (
                 <>
-                  {" · "}
-                  <Link to={`/accounts/${reported}`}>
-                    {t("admin.report.withSanction", { sanction: short(report.sanctionId) })}
-                  </Link>
+                  {t("admin.report.decided", {
+                    outcome: t(OUTCOME[decision.outcome]),
+                    time: when(decision.decidedAt),
+                    who: short(decision.decidedBy),
+                  })}
+                  {report.sanctionId && (
+                    <>
+                      {" · "}
+                      <Link to={`/accounts/${reported}`}>
+                        {t("admin.report.withSanction", { sanction: short(report.sanctionId) })}
+                      </Link>
+                    </>
+                  )}
                 </>
+              ) : elsewhere ? (
+                t("admin.report.error.report_decided")
+              ) : (
+                t("admin.report.waiting")
               )}
-            </>
-          ) : elsewhere ? (
-            t("admin.report.error.report_decided")
+            </dd>
+          </DescriptionList>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <CardTitle>{t("admin.report.peopleTitle")}</CardTitle>
+          <ul className="grid gap-2">
+            <li className="text-muted-foreground">
+              <Link className="target" to={`/accounts/${report.reporter.accountId}`}>
+                {t("admin.reports.reporter", { account: short(report.reporter.accountId) })}
+              </Link>
+              {" · "}
+              {t("admin.reports.history.reporter", {
+                filed: report.reporter.filed,
+                upheld: String(report.reporter.upheld),
+              })}
+            </li>
+            <li className="text-muted-foreground">
+              <Link className="target" to={`/accounts/${reported}`}>
+                {t("admin.reports.reported", { account: short(reported) })}
+              </Link>
+              {" · "}
+              {t("admin.reports.history.reported", {
+                received: report.reported.received,
+                sanctions: report.reported.sanctions,
+              })}
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <CardContent>
+          <CardTitle>{t("admin.report.noteTitle")}</CardTitle>
+          {report.note === null ? (
+            <p className="text-muted-foreground">{t("admin.report.noNote")}</p>
           ) : (
-            t("admin.report.waiting")
+            <blockquote className="border-s-4 ps-4 whitespace-pre-wrap wrap-anywhere">
+              {report.note}
+            </blockquote>
           )}
-        </dd>
-      </dl>
-
-      <h3>{t("admin.report.peopleTitle")}</h3>
-      <ul>
-        <li>
-          <Link className="target" to={`/accounts/${report.reporter.accountId}`}>
-            {t("admin.reports.reporter", { account: short(report.reporter.accountId) })}
-          </Link>
-          {" · "}
-          {t("admin.reports.history.reporter", {
-            filed: report.reporter.filed,
-            upheld: String(report.reporter.upheld),
-          })}
-        </li>
-        <li>
-          <Link className="target" to={`/accounts/${reported}`}>
-            {t("admin.reports.reported", { account: short(reported) })}
-          </Link>
-          {" · "}
-          {t("admin.reports.history.reported", {
-            received: report.reported.received,
-            sanctions: report.reported.sanctions,
-          })}
-        </li>
-      </ul>
-
-      <h3>{t("admin.report.noteTitle")}</h3>
-      {report.note === null ? (
-        <p>{t("admin.report.noNote")}</p>
-      ) : (
-        <blockquote className="said">{report.note}</blockquote>
-      )}
+        </CardContent>
+      </Card>
 
       {report.copy && (
-        <>
-          <h3>{t("admin.report.copyTitle")}</h3>
-          {report.copy.length === 0 ? (
-            <p>{t("admin.report.copyEmpty")}</p>
-          ) : (
-            <ol className="copy">
-              {report.copy.map((line) => (
-                <CopyLine key={line.seq} reportId={report.id} line={line} />
-              ))}
-            </ol>
-          )}
-        </>
+        <Card className="lg:col-span-2">
+          <CardContent>
+            <CardTitle>{t("admin.report.copyTitle")}</CardTitle>
+            {report.copy.length === 0 ? (
+              <p className="text-muted-foreground">{t("admin.report.copyEmpty")}</p>
+            ) : (
+              <ol className="grid gap-2">
+                {report.copy.map((line) => (
+                  <CopyLine key={line.seq} reportId={report.id} line={line} />
+                ))}
+              </ol>
+            )}
+          </CardContent>
+        </Card>
       )}
 
-      <h3>{t("admin.report.decisionTitle")}</h3>
-      {decision === null && !elsewhere && !closing && (
-        <>
-          <p>{t("admin.report.reportedFor", { reason: t(REASON[report.reason]) })}</p>
-          <SanctionActions
-            accountId={reported}
-            legend={t("admin.report.act")}
-            also={t("admin.report.actAlso")}
-            onOpen={() => setSaid(null)}
-            onApplied={actOn}
-          />
-          {report.actable.length > 0 && (
+      <Card className="lg:col-span-2">
+        <CardContent>
+          <CardTitle>{t("admin.report.decisionTitle")}</CardTitle>
+          {decision === null && !elsewhere && !closing && (
             <>
-              <h4>{t("admin.report.closeWithTitle")}</h4>
-              <ul className="sanctions">
-                {report.actable.map((s) => {
-                  const line = `${ids}-${s.id}`;
-                  return (
-                    <li key={s.id}>
-                      <p id={line}>
-                        <strong>{t(KIND_WORDS[s.kind])}</strong> · {t(REASON[s.reason])} ·{" "}
-                        {when(s.createdAt)}
-                        {s.liftedAt && ` · ${t("admin.report.lifted")}`}
-                      </p>
-                      <button
-                        type="button"
-                        aria-describedby={line}
-                        onClick={() => opening({ kind: "close", item: s })}
-                      >
-                        {t("admin.report.closeWith")}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+              <p>{t("admin.report.reportedFor", { reason: t(REASON[report.reason]) })}</p>
+              <SanctionActions
+                accountId={reported}
+                legend={t("admin.report.act")}
+                also={t("admin.report.actAlso")}
+                onOpen={() => setSaid(null)}
+                onApplied={actOn}
+              />
+              {report.actable.length > 0 && (
+                <>
+                  <h4 className="font-semibold">{t("admin.report.closeWithTitle")}</h4>
+                  <ul className="grid gap-2">
+                    {report.actable.map((s) => {
+                      const line = `${ids}-${s.id}`;
+                      return (
+                        <li
+                          key={s.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2"
+                        >
+                          <p id={line}>
+                            <strong>{t(KIND_WORDS[s.kind])}</strong> · {t(REASON[s.reason])} ·{" "}
+                            {when(s.createdAt)}
+                            {s.liftedAt && ` · ${t("admin.report.lifted")}`}
+                          </p>
+                          <Button
+                            variant="outline"
+                            aria-describedby={line}
+                            onClick={() => opening({ kind: "close", item: s })}
+                          >
+                            {t("admin.report.closeWith")}
+                          </Button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
+              <div className="flex flex-wrap gap-3 border-t pt-4">
+                <Button variant="outline" onClick={() => opening({ kind: "dismiss" })}>
+                  {t("admin.report.dismiss")}
+                </Button>
+              </div>
             </>
           )}
-          <div className="actions">
-            <button type="button" className="apart" onClick={() => opening({ kind: "dismiss" })}>
-              {t("admin.report.dismiss")}
-            </button>
-          </div>
-        </>
-      )}
-      <p ref={status} role="status" tabIndex={-1}>
-        {said?.text}
-        {said?.person && (
-          <>
-            {" "}
-            <Link to={`/accounts/${said.person}`}>{t("admin.report.personPage")}</Link>
-          </>
-        )}
-      </p>
-      {step?.kind === "close" && (
-        <DecideStep
-          title={t("admin.report.closeTitle")}
-          effect={t("admin.report.closeEffect", {
-            kind: t(KIND_WORDS[step.item.kind]),
-            time: when(step.item.createdAt),
-          })}
-          confirm={t("admin.report.closeConfirm")}
-          request={() => decide(report.id, { outcome: "acted", sanctionId: step.item.id })}
-          onCancel={() => setStep(null)}
-          onDone={async (answer) => finish(answer, t("admin.report.done.acted"))}
-          onDecidedElsewhere={decidedElsewhere}
-        />
-      )}
-      {step?.kind === "dismiss" && (
-        <DecideStep
-          title={t("admin.report.dismissTitle")}
-          effect={t("admin.report.dismissEffect")}
-          confirm={t("admin.report.dismissConfirm")}
-          request={() => decide(report.id, { outcome: "dismissed" })}
-          onCancel={() => setStep(null)}
-          onDone={async (answer) => finish(answer, t("admin.report.done.dismissed"))}
-          onDecidedElsewhere={decidedElsewhere}
-        />
-      )}
-    </>
+          <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
+            {said?.text}
+            {said?.person && (
+              <>
+                {" "}
+                <Link to={`/accounts/${said.person}`}>{t("admin.report.personPage")}</Link>
+              </>
+            )}
+          </p>
+          {step?.kind === "close" && (
+            <DecideStep
+              title={t("admin.report.closeTitle")}
+              effect={t("admin.report.closeEffect", {
+                kind: t(KIND_WORDS[step.item.kind]),
+                time: when(step.item.createdAt),
+              })}
+              confirm={t("admin.report.closeConfirm")}
+              request={() => decide(report.id, { outcome: "acted", sanctionId: step.item.id })}
+              onCancel={() => setStep(null)}
+              onDone={async (answer) => finish(answer, t("admin.report.done.acted"))}
+              onDecidedElsewhere={decidedElsewhere}
+            />
+          )}
+          {step?.kind === "dismiss" && (
+            <DecideStep
+              title={t("admin.report.dismissTitle")}
+              effect={t("admin.report.dismissEffect")}
+              confirm={t("admin.report.dismissConfirm")}
+              request={() => decide(report.id, { outcome: "dismissed" })}
+              onCancel={() => setStep(null)}
+              onDone={async (answer) => finish(answer, t("admin.report.done.dismissed"))}
+              onDecidedElsewhere={decidedElsewhere}
+            />
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -397,15 +429,17 @@ function DecideStep({
   });
   return (
     <Dialog title={title} onClose={onCancel}>
-      <div className="actions">
+      <div className="grid gap-4">
         <p>{effect}</p>
-        {refused && <p role="alert">{t(refused)}</p>}
-        <button type="button" aria-busy={sending || undefined} onClick={() => void send(request)}>
-          {confirm}
-        </button>
-        <button type="button" onClick={onCancel}>
-          {t("admin.report.cancel")}
-        </button>
+        {refused && <Alert>{t(refused)}</Alert>}
+        <div className="flex flex-wrap gap-3">
+          <Button aria-busy={sending || undefined} onClick={() => void send(request)}>
+            {confirm}
+          </Button>
+          <Button variant="outline" onClick={onCancel}>
+            {t("admin.report.cancel")}
+          </Button>
+        </div>
       </div>
     </Dialog>
   );
@@ -417,16 +451,16 @@ function CopyLine({ reportId, line }: { reportId: string; line: ReportCopyLine }
   const head = useId();
   const time = formatDateTime(locale, new Date(line.createdAt));
   return (
-    <li>
-      <p id={head}>
-        <strong>{t(SIDE[line.side])}</strong> · {time}
+    <li className="space-y-1 rounded-lg border px-3 py-2">
+      <p id={head} className="text-xs text-muted-foreground">
+        <strong className="text-foreground">{t(SIDE[line.side])}</strong> · {time}
       </p>
-      {line.body !== null && <p className="said">{line.body}</p>}
+      {line.body !== null && <p className="whitespace-pre-wrap wrap-anywhere">{line.body}</p>}
       {line.kind === "photo" &&
         (line.photo ? (
           <CopyPhoto reportId={reportId} line={line} time={time} describedBy={head} />
         ) : (
-          <p>{t("admin.report.photoRemoved")}</p>
+          <p className="text-muted-foreground italic">{t("admin.report.photoRemoved")}</p>
         ))}
     </li>
   );
@@ -455,7 +489,7 @@ function CopyPhoto({
       <img
         ref={picture}
         tabIndex={-1}
-        className="full"
+        className="block h-auto max-w-full rounded-md"
         src={url}
         alt={t("admin.report.image", { side: line.side, time })}
       />
@@ -463,15 +497,16 @@ function CopyPhoto({
   }
   return (
     <>
-      {failed && <p role="alert">{t("admin.report.photoFailed")}</p>}
-      <button
-        type="button"
+      {failed && <Alert>{t("admin.report.photoFailed")}</Alert>}
+      <Button
+        variant="outline"
         aria-describedby={describedBy}
         aria-busy={pending || undefined}
         onClick={() => void show()}
       >
+        <Image aria-hidden="true" />
         {t("admin.report.showPhoto")}
-      </button>
+      </Button>
     </>
   );
 }

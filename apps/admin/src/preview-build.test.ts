@@ -97,6 +97,11 @@ describe("a preview's build", () => {
       "zod",
       "i18next",
       "intl-messageformat",
+      // shadcn/ui's runtime (ADR-047).
+      "class-variance-authority",
+      "clsx",
+      "tailwind-merge",
+      "lucide-react",
     ]) {
       expect(licences).toMatch(new RegExp(`^## ${name} - \\d`, "m"));
     }
@@ -107,5 +112,17 @@ describe("a preview's build", () => {
     // Our own packages are the repository's licence, not a third party's.
     expect(licences).not.toMatch(/^## @kuutti\//m);
     expect([...emitted.values()].join("\n")).toContain("/pr-7/licenses.txt");
+  });
+
+  it("ships one stylesheet, Tailwind's, which keeps its licence line and names no font or image (ADR-047)", () => {
+    const sheets = [...emitted.keys()].filter((name) => name.endsWith(".css"));
+    expect(sheets).toHaveLength(1);
+    const css = emitted.get(sheets[0] ?? "") ?? "";
+    // The preflight and utilities are Tailwind's, under MIT: the notice travels with them.
+    expect(css).toMatch(
+      /^\/\*! tailwindcss v4\.\d+\.\d+ \| MIT License \| https:\/\/tailwindcss\.com \*\//,
+    );
+    // The CSP fetches no font and no image a stylesheet names (default-src 'none').
+    expect(css).not.toMatch(/@font-face|url\(/);
   });
 });

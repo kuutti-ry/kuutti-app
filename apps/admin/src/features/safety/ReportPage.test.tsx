@@ -416,7 +416,8 @@ describe("a photo of the conversation", () => {
       name: `Photo sent by the reported person. Sent: ${when(SAID(3))}`,
     });
     expect(image).toHaveAttribute("src", photoUrl(3));
-    expect(image).toHaveClass("full");
+    // Held to the page's width, whatever its aspect.
+    expect(image).toHaveClass("max-w-full");
     await waitFor(() => expect(image).toHaveFocus());
     expect(asked(calls)).toEqual([`GET ${REPORT}`, `GET ${photoOf(3)}`]);
     expect(screen.queryByRole("button", { name: "Show photo" })).toBeNull();
@@ -819,7 +820,6 @@ describe("dismissing the report", () => {
       show();
       await loaded();
       const button = screen.getByRole("button", { name: "Dismiss" });
-      expect(button).toHaveClass("apart");
       const dialog = press(button);
       expect(
         within(dialog).getByRole("heading", { name: "Dismiss the report" }),

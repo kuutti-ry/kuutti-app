@@ -1,8 +1,14 @@
 import { formatDateTime, type TFunction } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { type AutomaticBan, AutomaticBanQueue, type SanctionRule } from "@kuutti/schema";
+import { Clock, RefreshCw } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Link } from "react-router";
+import { Alert } from "../../components/ui/alert.tsx";
+import { badgeVariants } from "../../components/ui/badge.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Card, CardContent, CardTitle } from "../../components/ui/card.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
 import { isLate, useAge } from "../../lib/age.ts";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
@@ -83,25 +89,28 @@ export function AutomaticBans() {
   };
 
   return (
-    <section aria-labelledby="automatic-bans-title">
+    <section aria-labelledby="automatic-bans-title" className="space-y-6">
       <ScreenTitle id="automatic-bans-title">{t("admin.automaticBans.title")}</ScreenTitle>
       {state.kind === "ready" && (
-        <p>{t("admin.automaticBans.explain", { hours: state.reviewHours })}</p>
+        <p className="max-w-prose text-muted-foreground">
+          {t("admin.automaticBans.explain", { hours: state.reviewHours })}
+        </p>
       )}
-      <div className="row">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         {state.kind === "ready" && (
-          <p aria-live="polite">
+          <p aria-live="polite" className="text-muted-foreground">
             {t("admin.automaticBans.total", { total: state.total })}
             {state.items.length < state.total && (
               <> {t("admin.automaticBans.shown", { shown: String(state.items.length) })}</>
             )}
           </p>
         )}
-        <button type="button" className="apart" onClick={() => void reload()}>
+        <Button variant="outline" className="ms-auto" onClick={() => void reload()}>
+          <RefreshCw aria-hidden="true" />
           {t("admin.automaticBans.refresh")}
-        </button>
+        </Button>
       </div>
-      <p ref={status} role="status" tabIndex={-1}>
+      <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
         {done?.outcome === "keep" && (
           <>
             {t("admin.automaticBans.done.confirm", { account: short(done.ban.accountId) })}{" "}
@@ -113,10 +122,10 @@ export function AutomaticBans() {
         {done?.outcome === "lift" &&
           t("admin.automaticBans.done.reverse", { account: short(done.ban.accountId) })}
       </p>
-      {state.kind === "loading" && <p aria-busy="true">{t("admin.automaticBans.loading")}</p>}
-      {state.kind === "error" && <p role="alert">{t("admin.automaticBans.error")}</p>}
+      {state.kind === "loading" && <Loading>{t("admin.automaticBans.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.automaticBans.error")}</Alert>}
       {state.kind === "ready" && (
-        <ul className="queue">
+        <ul className="grid gap-4">
           {state.items.map((ban) => (
             <BanLine
               key={ban.id}
@@ -168,41 +177,48 @@ function BanLine({
   const heading = useId();
   const when = (at: string) => formatDateTime(locale, new Date(at));
   return (
-    <li className="group">
-      <h3 id={heading}>
-        <Link className="target" to={`/accounts/${ban.accountId}`}>
-          {t("admin.automaticBans.account", { account: short(ban.accountId) })}
-        </Link>
-      </h3>
-      <p id={facts}>
-        {RULE[ban.rule](t, ban.count, { first: when(ban.firstAt), at: when(ban.createdAt) })}
-      </p>
-      <p>
-        {t("admin.automaticBans.hidden", { age: ageOf(ban.createdAt, now) })}
-        {isLate(ban.createdAt, now, reviewHours) && (
-          <>
-            {" "}
-            <strong>{t("admin.late", { hours: String(reviewHours) })}</strong>
-          </>
-        )}
-      </p>
-      {/* Each button is described by whose ban it is and what the rule counted, so a screen reader says which. */}
-      <div className="actions">
-        <button
-          type="button"
-          aria-describedby={`${heading} ${facts}`}
-          onClick={() => onDecide("keep")}
-        >
-          {t("admin.automaticBans.confirm")}
-        </button>
-        <button
-          type="button"
-          aria-describedby={`${heading} ${facts}`}
-          onClick={() => onDecide("lift")}
-        >
-          {t("admin.automaticBans.reverse")}
-        </button>
-      </div>
+    <li>
+      <Card>
+        <CardContent>
+          <CardTitle id={heading}>
+            <Link className="target" to={`/accounts/${ban.accountId}`}>
+              {t("admin.automaticBans.account", { account: short(ban.accountId) })}
+            </Link>
+          </CardTitle>
+          <p id={facts}>
+            {RULE[ban.rule](t, ban.count, { first: when(ban.firstAt), at: when(ban.createdAt) })}
+          </p>
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground">
+            {t("admin.automaticBans.hidden", { age: ageOf(ban.createdAt, now) })}
+            {isLate(ban.createdAt, now, reviewHours) && (
+              <>
+                {" "}
+                <strong className={badgeVariants({ variant: "destructive" })}>
+                  <Clock aria-hidden="true" />
+                  {t("admin.late", { hours: String(reviewHours) })}
+                </strong>
+              </>
+            )}
+          </p>
+          {/* Each button is described by whose ban it is and what the rule counted, so a screen reader says which. */}
+          <div className="flex flex-wrap gap-3 border-t pt-3">
+            <Button
+              variant="outline"
+              aria-describedby={`${heading} ${facts}`}
+              onClick={() => onDecide("keep")}
+            >
+              {t("admin.automaticBans.confirm")}
+            </Button>
+            <Button
+              variant="outline"
+              aria-describedby={`${heading} ${facts}`}
+              onClick={() => onDecide("lift")}
+            >
+              {t("admin.automaticBans.reverse")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </li>
   );
 }

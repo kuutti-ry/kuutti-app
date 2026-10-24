@@ -460,10 +460,10 @@ describe("the audit log", () => {
     expect(document.body).toHaveFocus();
     fireEvent.click(older());
     const second = await screen.findByText("page 2");
-    await waitFor(() => expect(second.closest(".page")).toHaveFocus());
+    await waitFor(() => expect(second.closest('[tabindex="-1"]')).toHaveFocus());
     fireEvent.click(newer());
     const first = await screen.findByText("page 1");
-    await waitFor(() => expect(first.closest(".page")).toHaveFocus());
+    await waitFor(() => expect(first.closest('[tabindex="-1"]')).toHaveFocus());
   });
 
   it("leaves a superseded request's failure unsaid: the rows of the filters applied stay", async () => {

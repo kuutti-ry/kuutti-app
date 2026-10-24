@@ -343,6 +343,22 @@ describe("App", () => {
     expect(calls).toContain("GET /admin/feedback");
   });
 
+  it("on a narrow screen, scrolls the current screen's link into the menu's row (ADR-047)", async () => {
+    window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
+    renderApp(staffApi("admin"));
+    const menu = await screen.findByRole("navigation", { name: "Screens" });
+    const row = within(menu).getByRole("list");
+    // jsdom lays nothing out: the row is made 320 px wide and its links 960 px long, the staff link 800 px in.
+    Object.defineProperty(row, "clientWidth", { configurable: true, value: 320 });
+    Object.defineProperty(row, "scrollWidth", { configurable: true, value: 960 });
+    const link = within(menu).getByRole("link", { name: "Staff" });
+    vi.spyOn(link, "getBoundingClientRect").mockReturnValue(new DOMRect(800, 0, 100, 44));
+    fireEvent.click(link);
+    await screen.findByRole("heading", { level: 2, name: "Staff" });
+    // Brought in to the row's start, past its 16 px gutter.
+    await waitFor(() => expect(row.scrollLeft).toBe(784));
+  });
+
   it("opens the automatic shadow bans from the menu, right after the reports, asking for them only then (#105)", async () => {
     window.sessionStorage.setItem("kuutti.admin.session", JSON.stringify(staff));
     const calls: string[] = [];

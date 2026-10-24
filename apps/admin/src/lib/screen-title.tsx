@@ -39,7 +39,7 @@ export function ScreenTitle({ id, children }: { id: string; children: string }) 
     };
   }, [children, t]);
   return (
-    <h2 id={id} ref={ref} tabIndex={-1}>
+    <h2 id={id} ref={ref} tabIndex={-1} className="text-2xl font-semibold tracking-tight">
       {children}
     </h2>
   );

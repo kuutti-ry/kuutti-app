@@ -96,7 +96,7 @@ function show() {
 /** The box of one person reported, found by its heading's link. */
 async function groupOf(account: string) {
   const link = await screen.findByRole("link", { name: `About account ${account.slice(0, 8)}` });
-  const box = link.closest("li.group");
+  const box = link.closest("li");
   if (!(box instanceof HTMLElement)) throw new Error(`no box for ${account}`);
   return box;
 }
