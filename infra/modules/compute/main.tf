@@ -2,8 +2,8 @@
 # 24.04 arm64, an Elastic IP, and an instance role that reaches exactly its own
 # SSM prefix, its own log group and its backup prefix (TD-19, TD-4 access rule).
 # The bucket (modules/media, #48) and Rekognition (#49) arrived with M3, SES
-# sending with #385 (ADR-043 §5), the box's swap, Dokploy's memory limit and
-# its free-memory metric with #77 (ADR-046).
+# sending with #385 (ADR-043 §5), the box's swap and its free-memory metric
+# with #77 (ADR-046).
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -35,10 +35,9 @@ locals {
   # One text for first boot (user_data) and for a running box (the Run
   # Command document below), #77, ADR-046.
   headroom = templatefile("${path.module}/templates/headroom.sh.tpl", {
-    region            = local.region
-    namespace         = local.metric_namespace
-    swap_mb           = var.swap_mb
-    dokploy_memory_mb = var.dokploy_memory_mb
+    region    = local.region
+    namespace = local.metric_namespace
+    swap_mb   = var.swap_mb
   })
 }
 
@@ -364,10 +363,10 @@ resource "aws_ssm_document" "preview_database" {
 
 # ---------------------------------------------------------------------------
 # Headroom on a running box (#77, ADR-046). user_data gives a new box its
-# swap, Dokploy's memory limit and the free-memory metric at first boot, and
+# swap and the free-memory metric at first boot, and
 # ignore_changes keeps a running box from ever seeing an edit of it. So the
 # maintainer sends this document, the same text, to a box that predates the
-# change, and again after a change of swap_mb or dokploy_memory_mb
+# change, and again after a change of swap_mb
 # (infra/README.md, The box's headroom). A second run changes nothing.
 # Nothing in CI sends it.
 # ---------------------------------------------------------------------------
@@ -379,7 +378,7 @@ resource "aws_ssm_document" "headroom" {
 
   content = jsonencode({
     schemaVersion = "2.2"
-    description   = "Swap, a memory limit on Dokploy's service and the free-memory metric on ${local.name} (#77). Sent by the maintainer; a second run changes nothing."
+    description   = "Swap and the free-memory metric on ${local.name} (#77). Sent by the maintainer; a second run changes nothing."
     mainSteps = [{
       action = "aws:runShellScript"
       name   = "headroom"

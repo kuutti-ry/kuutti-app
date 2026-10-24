@@ -53,17 +53,6 @@ variable "swap_mb" {
   }
 }
 
-variable "dokploy_memory_mb" {
-  description = "Memory limit of Dokploy's own Swarm service (the dokploy service alone, not its Postgres or Traefik), in MiB (#77, ADR-046). Dokploy idles at about 0.8 GB, and Node.js inside it sizes its heap at half the limit. A new box gets it at first boot; a running box when the headroom document is sent again."
-  type        = number
-  default     = 1024
-
-  validation {
-    condition     = var.dokploy_memory_mb >= 1024 && floor(var.dokploy_memory_mb) == var.dokploy_memory_mb
-    error_message = "dokploy_memory_mb is a whole number of MiB, at least 1024: below it an idle Dokploy (about 0.8 GB, its heap at half the limit) would restart in a loop."
-  }
-}
-
 variable "root_volume_gb" {
   type    = number
   default = 30

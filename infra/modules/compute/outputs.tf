@@ -28,7 +28,7 @@ output "backup_prefix" {
 }
 
 output "headroom_document" {
-  description = "Name of the Run Command document that gives a running box its swap, Dokploy's memory limit and the free-memory metric (#77, ADR-046); infra/README.md, The box's headroom."
+  description = "Name of the Run Command document that gives a running box its swap and the free-memory metric (#77, ADR-046); infra/README.md, The box's headroom."
   value       = aws_ssm_document.headroom.name
 }
 

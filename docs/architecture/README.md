@@ -15,7 +15,7 @@ How Kuutti is built and where it runs, from the system's side: which apps and se
 
 ## How a view is drawn
 
-**What is drawn.** What is deployed: the code, `infra/` and the workflows on `main`. What is planned is drawn dashed, and its label says "not built yet" or "planned" with its issue: push (#102), CloudFront-only ingress (#198), the box's swap and memory limit (#77), production's apply (#25), further mail (#196), signed updates (ADR-004 §4). What waits on a step outside the repository says so: the SES identity of `infra/bootstrap` (#385), which the maintainer applies. What is open is labelled open, since both questions are the maintainer's (CLAUDE.md, Decisions): the box's deploy tool is "Dokploy (current; Kamal open)", and #86's app attestation and iOS screenshot detection are undecided.
+**What is drawn.** What is deployed: the code, `infra/` and the workflows on `main`. What is planned is drawn dashed, and its label says "not built yet" or "planned" with its issue: push (#102), CloudFront-only ingress (#198), production's apply (#25), further mail (#196), signed updates (ADR-004 §4). What waits on a step outside the repository says so: the SES identity of `infra/bootstrap` (#385), which the maintainer applies. What is open is labelled open, since both questions are the maintainer's (CLAUDE.md, Decisions): the box's deploy tool is "Dokploy (current; Kamal open)", and #86's app attestation and iOS screenshot detection are undecided.
 
 **Where two sources disagree**, the code and its ADR, rule or README, the step is drawn neither way, or as the code with the other named, and the file's Open says which.
 
