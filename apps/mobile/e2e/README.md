@@ -98,4 +98,4 @@ Mikael is left out: given the moderator role on a machine, he is spared by `pnpm
 
 ## Not here yet
 
-The admin panel (Playwright), so the moderator's decision on Noa's photos and the gate opening; iOS in CI (macOS runners have no Docker); a dev-only sign-in link should the system browser prove flaky under Maestro; the 15-minute token refresh and the two-device logout; Larger Text and dark mode as a whole-app pass, which only a screenshot judges. ADR-020 lists them.
+A flow across both apps, the moderator's decision on Noa's photos seen in the app and the gate opening (the panel's own flows are Playwright's, `apps/admin/e2e`, and ADR-051 lists this one among what it left out); iOS in CI (macOS runners have no Docker); a dev-only sign-in link should the system browser prove flaky under Maestro; the 15-minute token refresh and the two-device logout; Larger Text and dark mode as a whole-app pass, which only a screenshot judges. ADR-020 lists the rest.
