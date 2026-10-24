@@ -1,5 +1,22 @@
 # The bank login
 
+<!-- draws
+apps/api/src/identity/routes.ts
+apps/api/src/identity/login.ts
+apps/api/src/identity/hetu.ts
+apps/api/src/identity/oidc-broker.ts
+apps/api/src/identity/broker.ts
+apps/api/src/identity/registration.ts
+apps/api/src/identity/codes.ts
+apps/api/src/identity/sessions.ts
+apps/api/src/identity/admin-session.ts
+apps/mobile/src/features/identity/verifier.ts
+apps/mobile/src/features/identity/session.tsx
+apps/mobile/src/lib/session.ts
+apps/mobile/app/auth.tsx
+apps/admin/src/features/identity/session.tsx
+-->
+
 How the system signs a person in: the app, the phone's browser, the API, the database and Telia's broker, from the tap on "Sign in with your bank" to a session on the phone, and the staff's sign-in to the admin panel, which takes the same callback. It is written for a contributor or a reviewer who is about to touch the identity slice, the Telia kit or the sign-in screens, and wants the whole exchange before reading `login.ts`. The person's side of the same flow, with every screen and refusal text, is drawn in #395 (`docs/flows/sign-in.md` once it lands). It draws TD-1 and TD-7, ADR-016 (the bank every time), ADR-017 (the Telia kit), ADR-026 §4, §6 and §8 (the sign-in doors, the attempts table, a callback answered once), ADR-027 (the code bound to the phone), ADR-006 §5 (staff are identities with a role) and ADR-025 (the panel's host). What is drawn is staging's: production is not applied yet.
 
 In the sequences a solid arrow is a request or an action and a dotted arrow is an answer or a redirect. The numbers on the arrows are the steps under each part, and they run on from one part to the next.

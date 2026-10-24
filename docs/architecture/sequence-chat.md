@@ -1,5 +1,17 @@
 # Chat, step by step
 
+<!-- draws
+apps/api/src/chat/ws.ts
+apps/api/src/chat/live.ts
+apps/api/src/chat/presence.ts
+apps/api/src/chat/listen.ts
+apps/api/src/chat/messages.ts
+apps/api/src/lib/auth-middleware.ts
+packages/schema/src/chat-frames.ts
+apps/mobile/src/features/chat/socket.ts
+apps/mobile/src/features/chat/store.tsx
+-->
+
 How a message gets from one phone to the other, from the system's side: the phone opening its socket and catching up, a message sent over HTTP and stored under the conversation's lock, its delivery through Postgres's `LISTEN/NOTIFY` on the channel `kuutti_chat` to the other person's live sockets, read marks, presence, ends, and a lost connection. It is written for a contributor or a reviewer who works on the chat, the socket or anything that writes to a conversation. A match opens the conversation (ADR-038); this view starts after that. It draws ADR-031 §3, §8 and §9, ADR-030 §6 and §12, and ADR-026.
 
 In these diagrams a solid arrow is built. The one dotted arrow is not built yet, and its label says so with its issue. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and an issue's `#` is written `#35;` there, which draws as `#`, since a bare `#` ends a label (`README.md`, How a view is drawn).

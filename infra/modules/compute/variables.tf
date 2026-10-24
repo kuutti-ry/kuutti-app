@@ -39,7 +39,7 @@ variable "backup_bucket" {
 }
 
 variable "dokploy_version" {
-  description = "Git tag of the Dokploy release whose install script runs at first boot. Pinned so a rebuilt box gets the same version as the last one. A bump checks ADR-047's two points of Dokploy's code: no default router when dokploy.yml exists, and a router added when Dokploy's domain is assigned."
+  description = "Git tag of the Dokploy release whose install script runs at first boot. Pinned so a rebuilt box gets the same version as the last one. A bump checks ADR-048's two points of Dokploy's code: no default router when dokploy.yml exists, and a router added when Dokploy's domain is assigned."
   type        = string
 }
 

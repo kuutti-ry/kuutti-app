@@ -37,6 +37,7 @@
     "version:bump": "node scripts/bump-version.ts",
     "check:licenses": "node scripts/check-licenses.ts",
     "check:adr-index": "node scripts/check-adr-index.ts",
+    "check:docs": "node scripts/check-docs.ts",
     "check:legal-versions": "node packages/i18n/scripts/check-legal-versions.ts",
     "demo:bank": "node packages/db/src/cli/demo-bank.ts",
     "demo:population": "pnpm --filter @kuutti/api run demo:population",

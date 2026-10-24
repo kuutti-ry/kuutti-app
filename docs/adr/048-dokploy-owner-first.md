@@ -1,4 +1,4 @@
-# ADR-047: Nothing public reaches Dokploy before it has its owner
+# ADR-048: Nothing public reaches Dokploy before it has its owner
 
 - Status: proposed (#437, built as written here; a change to user data reaches only a box built after it, so production's first boot, #25, is the first to run it, and the two checks of `infra/README.md`, After the first apply, step 2, are the maintainer's then)
 - Date: 2026-10-24

@@ -44,7 +44,7 @@ cat > /etc/docker/daemon.json <<'JSON'
 }
 JSON
 
-# Nothing public reaches Dokploy before it has its owner (#437, ADR-047): until
+# Nothing public reaches Dokploy before it has its owner (#437, ADR-048): until
 # the admin account exists, whoever opens the UI first becomes the owner, and
 # at its first start Dokploy writes dokploy.yml with a router from
 # Host(`dokploy.docker.localhost`) on port 80 to the UI, unless the file

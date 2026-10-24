@@ -1,5 +1,11 @@
 # The night's jobs, step by step
 
+<!-- draws
+apps/api/src/jobs/nightly.ts
+apps/api/src/boot.ts
+infra/modules/observability/
+-->
+
 What the API does at night, from the system's side: the timer that runs inside the API's own process at 04:00 in Helsinki, the fifteen jobs it runs one after another, what each reads and writes, and how a failed job reaches the maintainer's mailbox through the log and an alarm. It is written for a contributor who adds or changes a job, and for whoever answers the alarm. There is no cron and no second process: the jobs are listed in the API's boot and run by a timer in the same process as HTTP and the socket. This view draws ADR-006 §2, ADR-011 §6 and §9, ADR-013, ADR-015, ADR-024 §5, ADR-029, ADR-030 §8, ADR-031 §8, ADR-035 and ADR-044 §7.
 
 In these diagrams every arrow is built. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and they name an environment as `{env}`, staging or prod.

@@ -10,7 +10,7 @@
 # INSTANCE_ID (tofu output instance_id in infra/envs/<env>) is required: the
 # script writes the Traefik control-plane routers on the box through Run
 # Command, and nothing else writes them, since first boot routes nothing to
-# Dokploy before it has its owner (ADR-047).
+# Dokploy before it has its owner (ADR-048).
 # DOKPLOY_URL is the port-forward while Dokploy has no domain of its own, the
 # real https://dokploy.<env>.<domain> afterwards. The token comes from Profile
 # in the UI and is exported in your shell; this script never prints it.
@@ -103,14 +103,14 @@ fi
 # --- Traefik: pin the control-plane hosts (#9 trust) ----------------------
 # A Dokploy member token may attach any host to a preview application; these
 # priority routers keep dokploy.<env> and api.<env> with their owners. A run
-# that cannot write them stops before the deployment (ADR-047).
+# that cannot write them stops before the deployment (ADR-048).
 app_name=$(get "application.one?applicationId=$app_id" | jq -r .appName)
 if [ -z "$app_name" ] || [ "$app_name" = null ]; then
   echo "application api has no appName; control-plane routers not written" >&2
   exit 1
 fi
 file=$(cat <<YAML
-# Written by infra/scripts/dokploy-setup.sh once Dokploy has its owner; first boot writes none (ADR-047).
+# Written by infra/scripts/dokploy-setup.sh once Dokploy has its owner; first boot writes none (ADR-048).
 http:
   routers:
     control-plane-dokploy:
