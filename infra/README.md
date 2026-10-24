@@ -55,7 +55,7 @@ tofu init
 tofu apply
 ```
 
-Fill in the two GitHub IDs and the billing alias in `terraform.tfvars` before the apply. This runs with local state, because the bucket it creates is where state will live. The apply also creates the monthly budget (TD-4: 50 EUR, expressed as `monthly_budget_usd` because the billing metric is USD-only), the CloudWatch billing alarm in us-east-1, and the SNS topic both notify. AWS mails a subscription confirmation to the billing alias: confirm it, then send the test notification:
+Fill in the two GitHub IDs and the billing alias in `terraform.tfvars` before the apply. This runs with local state, because the bucket it creates is where state will live. The apply also creates the monthly budget (TD-4: 50 EUR, expressed as `monthly_budget_usd` because the billing metric is USD-only; 110 USD, counted before credits, since production runs beside staging, ADR-049), the CloudWatch billing alarm in us-east-1, and the SNS topic both notify. AWS mails a subscription confirmation to the billing alias: confirm it, then send the test notification:
 
 ```sh
 aws sns publish --region us-east-1 --topic-arn "$(tofu output -raw billing_topic_arn)" \
@@ -589,7 +589,7 @@ Sentry (TD-19, the one vendor besides AWS, Expo, GitHub and Telia), maintainer o
 
 ### Cost
 
-TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, database, address, storage); both together are around 65 EUR, above the budget alert. Decision (2026-09-14): staging is applied now, prod when there is a first release; raising `monthly_budget_usd` in the bootstrap is the deliberate step that goes with it. The panel's host adds about nothing (ADR-025): CloudFront's free tier covers 1 TB out, 10 million requests and 2 million function invocations a month, the certificate and the alias queries are free, and the bucket holds a few megabytes.
+TD-4 budgets 50 EUR a month. One environment is roughly 30 EUR (instance, database, address, storage); with production's larger database both together come to about 90 to 95 USD at list price, before VAT. Decision (2026-09-14): staging is applied now, prod when there is a first release; raising `monthly_budget_usd` in the bootstrap is the deliberate step that goes with it. Changed on 2026-10-24 (ADR-049): production is applied before the first release, as a rehearsal of #25 without bank identification, and stays up; the budget is 110 USD, counted before credits, so the association's AWS credit does not hide what the two environments use. The panel's host adds about nothing (ADR-025): CloudFront's free tier covers 1 TB out, 10 million requests and 2 million function invocations a month, the certificate and the alias queries are free, and the bucket holds a few megabytes.
 
 ### After the first apply, once per environment
 

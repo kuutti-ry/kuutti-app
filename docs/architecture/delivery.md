@@ -176,7 +176,7 @@ flowchart TB
 33. Job `release`: `release.yml`, with `contents: write`, drafts a GitHub release with notes generated from the commits since the last tag and the image's digest. The maintainer reads the draft and publishes it.
 34. `infra-prod.yml`: plan and apply of `envs/prod` as `kuutti-ci-apply` in the environment `prod`, after the reviewer. It has its own concurrency group and shares no cache with pull-request runs.
 35. `eas-build.yml` on the tag: its release check of the Finnish texts first, in a job without an environment, so that it answers before the reviewer is asked; then the `production` profile for both platforms in the environment `prod`, with `prod`'s `EXPO_TOKEN`.
-36. Planned, #25: production waits for the first release (ADR-001), and the first release tag runs steps 29 to 35 for the first time. The maintainer raises the AWS budget with it (`infra/README.md`, Cost).
+36. Planned, #25: production is applied before the first release by a rehearsal tag `v<version>-rehearsal.<n>` (ADR-049), whose run of `infra-prod.yml` is the first. On that tag the release gate stops `build.yml` and `eas-build.yml` while Finnish texts wait for review, so steps 29 to 35 run in full only at the first release proper. The budget is raised with it (`infra/README.md`, Cost).
 
 ## What each job may touch
 
