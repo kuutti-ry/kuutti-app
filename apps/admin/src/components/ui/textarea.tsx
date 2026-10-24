@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Textarea, Vega style (ADR-047): as the Input, at least two lines tall.
+// shadcn/ui's Textarea, Vega style (ADR-050): as the Input, at least two lines tall.
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {
   return (
     <textarea

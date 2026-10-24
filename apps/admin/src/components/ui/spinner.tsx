@@ -1,6 +1,6 @@
 import { LoaderCircle } from "lucide-react";
 
-// shadcn/ui's Spinner (ADR-047) with the words it waits for: a busy line, its
+// shadcn/ui's Spinner (ADR-050) with the words it waits for: a busy line, its
 // icon decorative and still when the system asks for reduced motion.
 export function Loading({ children }: { children: string }) {
   return (

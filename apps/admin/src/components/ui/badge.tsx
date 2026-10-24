@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Badge, Vega style (ADR-047), on a plain element. A badge says
+// shadcn/ui's Badge, Vega style (ADR-050), on a plain element. A badge says
 // its meaning in its word; the colour only repeats it ("Late" is a word and
 // weight, never red alone, rules/admin.md).
 export const badgeVariants = cva(

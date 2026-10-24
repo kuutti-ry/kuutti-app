@@ -1,5 +1,5 @@
 /*
- * The panel's design tokens (ADR-047): shadcn/ui's semantic names, the app's
+ * The panel's design tokens (ADR-050): shadcn/ui's semantic names, the app's
  * palette (apps/mobile/src/theme/tokens.css), with the page and the card
  * swapped so the panel's cards stand on a tinted page. Components never name
  * a colour; they use the Tailwind names styles.css maps to these variables.

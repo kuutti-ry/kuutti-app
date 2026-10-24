@@ -1,5 +1,5 @@
 /*
- * The panel's look (ADR-047): Tailwind v4 and shadcn/ui's components
+ * The panel's look (ADR-050): Tailwind v4 and shadcn/ui's components
  * (src/components/ui), compiled at build into one stylesheet of the panel's
  * own, so the host's style-src 'self' holds: nothing writes a <style> element
  * at run time. System fonts only; the CSP fetches no font.

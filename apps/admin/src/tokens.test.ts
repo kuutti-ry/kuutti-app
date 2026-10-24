@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-// The panel's four token sets (tokens.css, ADR-047) held to WCAG (CLAUDE.md
+// The panel's four token sets (tokens.css, ADR-050) held to WCAG (CLAUDE.md
 // Accessibility): text on its surface 4.5:1, 7:1 in the high-contrast sets;
 // the outline of a control and the focus ring 3:1 (WCAG 1.4.11). The file is
 // read as the stylesheet ships it.

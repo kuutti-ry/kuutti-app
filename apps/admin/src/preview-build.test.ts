@@ -97,7 +97,7 @@ describe("a preview's build", () => {
       "zod",
       "i18next",
       "intl-messageformat",
-      // shadcn/ui's runtime (ADR-047).
+      // shadcn/ui's runtime (ADR-050).
       "class-variance-authority",
       "clsx",
       "tailwind-merge",
@@ -114,7 +114,7 @@ describe("a preview's build", () => {
     expect([...emitted.values()].join("\n")).toContain("/pr-7/licenses.txt");
   });
 
-  it("ships one stylesheet, Tailwind's, which keeps its licence line and names no font or image (ADR-047)", () => {
+  it("ships one stylesheet, Tailwind's, which keeps its licence line and names no font or image (ADR-050)", () => {
     const sheets = [...emitted.keys()].filter((name) => name.endsWith(".css"));
     expect(sheets).toHaveLength(1);
     const css = emitted.get(sheets[0] ?? "") ?? "";

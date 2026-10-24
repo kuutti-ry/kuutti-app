@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Button, Vega style (ADR-047), on a plain <button>: no primitive
+// shadcn/ui's Button, Vega style (ADR-050), on a plain <button>: no primitive
 // library until a widget needs one. Every size keeps the 44 px target
 // (CLAUDE.md), the label may wrap on a narrow screen, and the focus ring is
 // the stylesheet's own outline. The transparent border shows in forced colours.
