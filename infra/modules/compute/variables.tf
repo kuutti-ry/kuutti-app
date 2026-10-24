@@ -39,7 +39,7 @@ variable "backup_bucket" {
 }
 
 variable "dokploy_version" {
-  description = "Git tag of the Dokploy release whose install script runs at first boot. Pinned so a rebuilt box gets the same version as the last one."
+  description = "Git tag of the Dokploy release whose install script runs at first boot. Pinned so a rebuilt box gets the same version as the last one. A bump checks ADR-048's two points of Dokploy's code: no default router when dokploy.yml exists, and a router added when Dokploy's domain is assigned."
   type        = string
 }
 
@@ -82,7 +82,7 @@ variable "cpu_credits" {
 }
 
 variable "domain" {
-  description = "The project domain; the box pins dokploy.<environment>.<domain> to the control plane in Traefik, and the instance role sends mail as noreply@<domain> through its SES identity (#385, ADR-043 §5)."
+  description = "The project domain; the instance role sends mail as noreply@<domain> through its SES identity (#385, ADR-043 §5)."
   type        = string
   default     = "kuutti.app"
 }

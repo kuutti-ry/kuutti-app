@@ -433,8 +433,6 @@ resource "aws_instance" "api" {
   # so what runs as root at first boot is exactly what was reviewed here.
   user_data = templatefile("${path.module}/templates/user_data.sh.tpl", {
     hostname        = local.name
-    environment     = var.environment
-    domain          = var.domain
     region          = local.region
     log_group       = local.log_group_name
     backup_bucket   = var.backup_bucket
