@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/mobile",
-  "version": "0.65.1",
+  "version": "0.66.0",
   "private": true,
   "main": "expo-router/entry",
   "description": "Expo app. Routes under app/ stay thin; features live under src/features/<slice>/.",
@@ -44,6 +44,7 @@
     "expo-localization": "~57.0.2",
     "expo-router": "~57.0.25",
     "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.10",
     "expo-status-bar": "~57.0.1",
     "expo-updates": "~57.0.25",
     "lucide-react-native": "1.52.0",

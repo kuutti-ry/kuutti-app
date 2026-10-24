@@ -21,7 +21,7 @@
     "android": {
       "package": "fi.kuutti.app",
       "adaptiveIcon": {
-        "backgroundColor": "#1D4FD7",
+        "backgroundColor": "#232323",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -36,6 +36,19 @@
     "plugins": [
       "expo-router",
       "expo-updates",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 176,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "dark": {
+            "image": "./assets/splash-icon-dark.png",
+            "backgroundColor": "#0A111E"
+          }
+        }
+      ],
       "./plugins/withNoForceDark.js",
       "expo-local-authentication",
       [
@@ -58,7 +71,7 @@
         "@sentry/react-native/expo",
         {
           "url": "https://de.sentry.io/",
-          "organization": "kuutti-fi",
+          "organization": "kuutti-ry",
           "project": "mobile"
         }
       ]
