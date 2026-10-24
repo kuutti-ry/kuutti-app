@@ -16,7 +16,7 @@ packages/i18n/src/legal.ts
 infra/bootstrap/
 -->
 
-Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production composes the same services less a few, and is not applied yet ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041 and ADR-043.
+Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041 and ADR-043.
 
 ## Part 1: the people and what their devices reach
 

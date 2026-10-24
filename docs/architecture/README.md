@@ -8,14 +8,14 @@ How Kuutti is built and where it runs, from the system's side: which apps and se
 |---|---|---|
 | [1. Context](context.md) | The people who use Kuutti, the outside services it depends on, and what travels between them | ADR-001, ADR-016, ADR-025, ADR-029, ADR-043 |
 | [2. Components](components.md) | The three apps, the packages, the Telia kit and the mock bank; inside the API's one process; the ten slices and which app holds which; the import boundary | ADR-003, ADR-017 §6, ADR-031 §9 |
-| [3. Deployment](deployment.md) | A developer's machine, staging and the services around its box, a pull request's previews, production as composed, the website | ADR-001, ADR-005, ADR-012, ADR-025 |
+| [3. Deployment](deployment.md) | A developer's machine, staging and the services around its box, a pull request's previews, production as applied, the website | ADR-001, ADR-005, ADR-012, ADR-025 |
 | [4. Delivery](delivery.md) | What a pull request, a merge and a release tag set off, workflow by workflow, and what each job may touch | ADR-004, ADR-012, ADR-028 |
 | 5. Sequences: [the bank login](sequence-login.md), [the photo upload](sequence-upload.md), [chat](sequence-chat.md), [the night's jobs](sequence-night.md) | Step by step, between the app, the API, the database and the outside services | ADR-016, ADR-027; ADR-005, ADR-006; ADR-031; ADR-029, ADR-035 |
 | [6. Data and trust boundaries](trust.md) | Where a person's data lives and what crosses each boundary: the hetu, the secrets, photos, research events, logs; the security checklist's four surfaces | ADR-001, ADR-008, ADR-011, ADR-027 |
 
 ## How a view is drawn
 
-**What is drawn.** What is deployed: the code, `infra/` and the workflows on `main`. What is planned is drawn dashed, and its label says "not built yet" or "planned" with its issue: push (#102), CloudFront-only ingress (#198), production's apply (#25), further mail (#196), signed updates (ADR-004 §4). What waits on a step outside the repository says so: the SES identity of `infra/bootstrap` (#385), which the maintainer applies. What is open is labelled open, since both questions are the maintainer's (CLAUDE.md, Decisions): the box's deploy tool is "Dokploy (current; Kamal open)", and #86's app attestation and iOS screenshot detection are undecided.
+**What is drawn.** What is deployed: the code, `infra/` and the workflows on `main`. What is planned is drawn dashed, and its label says "not built yet" or "planned" with its issue: push (#102), CloudFront-only ingress (#198), a full release tag through CI (#25), further mail (#196), signed updates (ADR-004 §4). What waits on a step outside the repository says so: the SES identity of `infra/bootstrap` (#385), which the maintainer applies. What is open is labelled open, since both questions are the maintainer's (CLAUDE.md, Decisions): the box's deploy tool is "Dokploy (current; Kamal open)", and #86's app attestation and iOS screenshot detection are undecided.
 
 **Where two sources disagree**, the code and its ADR, rule or README, the step is drawn neither way, or as the code with the other named, and the file's Open says which.
 

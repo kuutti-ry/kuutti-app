@@ -4,7 +4,7 @@ How each key, password and token the service uses is replaced, who may do it, ho
 
 Every step here is the maintainer's, or an organisation owner's where it says so. An agent working in this repository runs none of them: signing in is the maintainer's (CLAUDE.md, Commands; `infra/README.md`, Tools).
 
-There is no rotation calendar. Rotate when a value may have been seen by someone who should not have it, when a person who could read it leaves (below), and at the yearly custody review if the maintainer wants a rehearsal. `<env>` is `staging` or `prod`; production exists from #25, and until then every `prod` line is for later.
+There is no rotation calendar. Rotate when a value may have been seen by someone who should not have it, when a person who could read it leaves (below), and at the yearly custody review if the maintainer wants a rehearsal. `<env>` is `staging` or `prod`; production exists since 2026-10-24 (ADR-049), without bank identification and photos, so its Telia, HMAC and CloudFront lines are for later.
 
 ## Before any rotation
 

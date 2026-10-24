@@ -16,7 +16,7 @@ apps/mobile/src/features/media/client.ts
 infra/modules/media/
 -->
 
-How a profile photo gets from the phone to the media bucket and back to the people who may see it: the app's preparation, the API's pipeline, the automatic check by Rekognition, and the signed CloudFront URL a photo is fetched by. It is written for a contributor or a reviewer who is about to touch the media slice, the photo screens or the media infrastructure. The person's side of the same flow, with the queue and the moderators, is drawn in #395 (`docs/flows/photos.md` once it lands). It draws rule 4, TD-2, TD-6 and TD-8, ADR-005 (the pipeline and delivery), ADR-006 (the check and the queue), ADR-008 (the exposure budget and the shown record) and ADR-041 (velocity). What is drawn is staging's: production is not applied yet.
+How a profile photo gets from the phone to the media bucket and back to the people who may see it: the app's preparation, the API's pipeline, the automatic check by Rekognition, and the signed CloudFront URL a photo is fetched by. It is written for a contributor or a reviewer who is about to touch the media slice, the photo screens or the media infrastructure. The person's side of the same flow, with the queue and the moderators, is drawn in #395 (`docs/flows/photos.md` once it lands). It draws rule 4, TD-2, TD-6 and TD-8, ADR-005 (the pipeline and delivery), ADR-006 (the check and the queue), ADR-008 (the exposure budget and the shown record) and ADR-041 (velocity). What is drawn is staging's: production has run since 2026-10-24 with photos off until its media cutover (ADR-049).
 
 In the sequences a solid arrow is a request or an action and a dotted arrow is an answer. The numbers on the arrows are the steps under each part, and they run on from one part to the next.
 
@@ -153,4 +153,4 @@ sequenceDiagram
 - **Fifteen minutes.** #397 says signed URLs last 15 minutes. That holds for this route, for a conversation's thumb and for the staff's views (`URL_TTL_MS`). A photo sent in a conversation (#350) is signed to the next five-minute mark plus fifteen minutes, so its URLs live 15 to 20 minutes (ADR-005, History of 2026-10-18). That path is the chat's and is not drawn here: it checks the full size, not the card, before anything is stored, and refuses rather than queues.
 - **The phone's own check** is a seam with a pass-through (step 2) until the native batch, #184.
 - **Rekognition and AWS's use of content.** AWS may use what its AI services are sent to improve them unless the account opts out, and the opt-out waits for the account to sit under the association's organisation (ADR-006 §1).
-- **Production.** Not applied yet: production's media module is dormant until its cutover (`infra/README.md`, Layout and Media).
+- **Production.** Running since 2026-10-24, with photos off: production's media module is dormant until its cutover (`infra/README.md`, Layout and Media).
