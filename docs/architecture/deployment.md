@@ -294,7 +294,7 @@ flowchart TB
 59. Production composes no host for the panel; it comes with #25, at `admin.kuutti.app`, the address production's parameters already name.
 60. The research copy: production composes neither the module nor the copy until the maintainer has answered ADR-029's ninety days and its other open points.
 
-Production is applied by `infra-prod.yml` on a release tag, behind the `prod` environment's reviewer ([Delivery](delivery.md), part 3). Staging was applied first and production waits for the first release (ADR-001; `infra/README.md`, Cost).
+Production is applied by `infra-prod.yml` on a release tag, behind the `prod` environment's reviewer ([Delivery](delivery.md), part 3). Staging was applied first. Production is applied before the first release, as a rehearsal of #25 without bank identification, from a tag `v<version>-rehearsal.<n>`, and this part is redrawn as built in the change after that apply (ADR-049; `infra/README.md`, Cost).
 
 ## Part 6: the website
 
