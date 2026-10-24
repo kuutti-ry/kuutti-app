@@ -1,5 +1,19 @@
 # Deployment
 
+<!-- draws
+docker-compose.yml
+scripts/dev-env.ts
+infra/envs/
+infra/modules/
+infra/bootstrap/
+infra/scripts/dokploy-setup.sh
+infra/scripts/db-app-role.sh
+.github/workflows/preview.yml
+.github/workflows/preview-cleanup.yml
+.github/scripts/dokploy-preview.sh
+apps/api/src/lib/preview-database.ts
+-->
+
 Where each part of Kuutti runs, environment by environment: a developer's machine, staging and the services around its box, a pull request's previews, production as the code composes it, and the website. It is for a contributor who wants to know what a change will land on, and for a reviewer of `infra/`. Everything here is read from `infra/`, the workflows and the compose file on `main`; what is planned is dashed and names its issue. The deploy tool is drawn as it runs today, Dokploy, while Dokploy versus Kamal stays open. The view draws ADR-001, ADR-005, ADR-008, ADR-012, ADR-014, ADR-018, ADR-025, ADR-029 and ADR-043.
 
 ## Part 1: a developer's machine

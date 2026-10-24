@@ -1,5 +1,21 @@
 # The photo upload
 
+<!-- draws
+apps/api/src/media/routes.ts
+apps/api/src/media/photos.ts
+apps/api/src/media/pipeline.ts
+apps/api/src/media/store.ts
+apps/api/src/media/moderation.ts
+apps/api/src/media/description.ts
+apps/api/src/media/urls.ts
+apps/api/src/media/budget.ts
+apps/api/src/media/wiring.ts
+apps/mobile/src/features/media/pick.ts
+apps/mobile/src/features/media/localCheck.ts
+apps/mobile/src/features/media/client.ts
+infra/modules/media/
+-->
+
 How a profile photo gets from the phone to the media bucket and back to the people who may see it: the app's preparation, the API's pipeline, the automatic check by Rekognition, and the signed CloudFront URL a photo is fetched by. It is written for a contributor or a reviewer who is about to touch the media slice, the photo screens or the media infrastructure. The person's side of the same flow, with the queue and the moderators, is drawn in #395 (`docs/flows/photos.md` once it lands). It draws rule 4, TD-2, TD-6 and TD-8, ADR-005 (the pipeline and delivery), ADR-006 (the check and the queue), ADR-008 (the exposure budget and the shown record) and ADR-041 (velocity). What is drawn is staging's: production is not applied yet.
 
 In the sequences a solid arrow is a request or an action and a dotted arrow is an answer. The numbers on the arrows are the steps under each part, and they run on from one part to the next.

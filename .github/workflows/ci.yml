@@ -179,6 +179,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The pull request's own commits, whose messages may say a drawing
+          # is still true (ADR-047).
+          fetch-depth: 0
       # The checkers have no dependencies, so there is nothing to install.
       - uses: ./.github/actions/pnpm
         with:
@@ -187,6 +190,14 @@ jobs:
         run: pnpm check:scenarios --list
       - name: Every ADR is in docs/adr/README.md with its status (#203)
         run: pnpm check:adr-index --self-test
+      # A pull request is compared with its base as merged, the merge commit's
+      # first parent; on main the blocks alone are checked. Dependabot cannot
+      # write a Still-true line, and its pins change nothing a view draws.
+      - name: A drawing whose files changed is redrawn or still true (ADR-047)
+        if: github.actor != 'dependabot[bot]'
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && 'HEAD^1' || 'HEAD' }}
+        run: pnpm check:docs --self-test --base "$BASE"
 
   schema-drift:
     name: schema-drift

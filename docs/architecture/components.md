@@ -1,5 +1,19 @@
 # Components
 
+<!-- draws
+apps/api/src/index.ts
+apps/api/src/jobs/nightly.ts
+apps/api/src/chat/ws.ts
+apps/api/src/chat/listen.ts
+apps/api/scripts/openapi.ts
+apps/mobile/src/lib/api.ts
+apps/admin/src/lib/api.ts
+packages/db/src/migrate.ts
+biome.json
+docker-compose.yml
+.claude/rules/layout.md
+-->
+
 What Kuutti is made of, as the repository holds it: the three apps, the four packages, the Telia kit from npm and the mock bank; what is inside the API's one process; the ten slices and which app holds which; and the import boundary between slices. It is written for a contributor or a reviewer who wants the whole before reading the code. Where each part runs is the deployment view, and the outside services are the context view. This view draws ADR-003 (the generated client), ADR-017 §6 (the kit in its own repository), ADR-031 §9 (the socket in the same process) and the layout rules of `.claude/rules/layout.md`.
 
 ## Part 1: the workspace

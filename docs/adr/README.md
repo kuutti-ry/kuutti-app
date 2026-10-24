@@ -9,7 +9,7 @@ Every record opens with the same list: `Status`, `Date` (when it was written), `
 - **amended** on a date or over a range of dates, **by ADR-NNN**, or **by §N** (a numbered amendment): points were changed or added later, in this record; the parenthesis names them, with their issue where there is one, and the History or the point itself says how.
 - **superseded by ADR-NNN**: replaced, and kept for its reasoning. No record is, so far.
 
-A record that changes what a view of `docs/architecture/` draws (a module, an environment, a flow across the system, a trust boundary) redraws that view in the same pull request (#397).
+A record that changes what a view of `docs/architecture/` draws (a module, an environment, a flow across the system, a trust boundary) redraws that view in the same pull request (#397, ADR-047).
 
 The TD numbers are the technical decisions log, TD-1 to TD-19, which lives in the maintainers' private planning documents (CLAUDE.md); where a record and the log disagree, the log wins. The repository cannot show the log, so this page maps each TD number to the public records that cite it, in their `Follows` line or their text: a reader of "TD-6" in CLAUDE.md finds here what to read. A TD that no record cites says "no ADR", with where the repository names it.
 
@@ -65,6 +65,7 @@ The TD numbers are the technical decisions log, TD-1 to TD-19, which lives in th
 | [ADR-044](044-invitations.md) | Invitations, and the reward they earn | accepted 2026-10-22 (#107, built as written here on the maintainer's decisions of that day; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-22 (§12: the code in onboarding counts no step, #418; see History) | 2026-10-22 | TD-5, TD-7, TD-10, TD-11, TD-15 | The first cut of #85's ledger, earned by invitations alone; the waitlist bump is dropped, and links to the app wait for #184. |
 | [ADR-045](045-app-lock.md) | The app lock | accepted 2026-10-22 (#418's lock half, built as written here on the maintainer's answers of that day; a native module, so it ships with #184's native batch or before it, §8; the points under "Open, the maintainer's" are his to confirm or change) | 2026-10-22 | TD-1, TD-2 | On the phone only; the face and the finger wait for a check by hand on devices once the native build is installed. |
 | [ADR-046](046-box-headroom.md) | Headroom on the one box: swap, and its free memory watched | proposed (#77, built as written here and on staging since 2026-10-24, the alarm in OK; #77's alarm test is the maintainer's, `infra/README.md`, The box's headroom; swap in production waits for his answer under "Open, the maintainer's"), amended 2026-10-24 (§2: no memory limit on Dokploy's service, which crashed in a loop under one; see History) | 2026-10-24 | TD-2, TD-4, TD-19 | Applied to staging on 2026-10-24, the alarm in OK. Production has no swap until rule 1's question is answered. |
+| [ADR-047](047-docs-follow-the-code.md) | The drawings follow the code: what a view draws is redrawn in the change, or said still true | proposed (built as written here for `docs/architecture/`; #395's flows and #396's register join as they land; accepting it, and the lists' breadth, are the maintainer's) | 2026-10-24 | | `pnpm check:docs` in CI's `scenarios` job. |
 
 ## The TD numbers
 

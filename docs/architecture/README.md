@@ -34,6 +34,14 @@ How Kuutti is built and where it runs, from the system's side: which apps and se
 
 ## Keeping them true
 
-A change to what a view draws redraws it, and its steps, in the same pull request: a module, an environment, a workflow's step or rights, an outside service, a flow across the system, a trust boundary (`.claude/rules/infra.md`, `docs/adr/README.md`). Something planned stays dashed until the change that lands it redraws it.
+A change to what a view draws redraws it, and its steps, in the same pull request: a module, an environment, a workflow's step or rights, an outside service, a flow across the system, a trust boundary. Something planned stays dashed until the change that lands it redraws it.
+
+Each view names the files it draws in a `<!-- draws` block under its title, one path per line, a trailing `/` for a folder: the files whose change would change the drawing, not the whole of its "Where it lives". A pull request that touches one of them touches the view too, or says in a commit message that the view is still true:
+
+```
+Still-true: docs/architecture/sequence-chat.md (the send's limiter only)
+```
+
+`pnpm check:docs` (in CI's `scenarios` job) fails otherwise, and on a block naming a file that is gone: a rename or a removal is redrawn with its block (ADR-047). It cannot see whether a drawing is right; review does.
 
 The views were checked against `main` at `ea372faa` on 2026-10-24, every fact by its path and line, and every diagram drawn with Mermaid 11.

@@ -1,5 +1,21 @@
 # Context
 
+<!-- draws
+apps/api/src/lib/ssm.ts
+apps/api/src/lib/s3.ts
+apps/api/src/lib/mail.ts
+apps/api/src/lib/sentry.ts
+apps/api/src/identity/oidc-broker.ts
+apps/api/src/media/wiring.ts
+apps/api/src/research/copy-store.ts
+apps/mobile/app.json
+apps/mobile/eas.json
+apps/mobile/src/lib/api-url.ts
+apps/mobile/src/lib/sentry.ts
+packages/i18n/src/legal.ts
+infra/bootstrap/
+-->
+
 Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production composes the same services less a few, and is not applied yet ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041 and ADR-043.
 
 ## Part 1: the people and what their devices reach
