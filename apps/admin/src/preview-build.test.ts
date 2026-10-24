@@ -118,7 +118,7 @@ describe("a preview's build", () => {
     expect([...emitted.values()].join("\n")).toContain("/pr-7/licenses.txt");
   });
 
-  it("ships one stylesheet, Tailwind's, which keeps its licence line and names no font or image (ADR-050)", () => {
+  it("ships one stylesheet, Tailwind's, which keeps its licence line and names Saiga's faces and no image (ADR-050, ADR-052)", () => {
     const sheets = [...emitted.keys()].filter((name) => name.endsWith(".css"));
     expect(sheets).toHaveLength(1);
     const css = emitted.get(sheets[0] ?? "") ?? "";
@@ -126,7 +126,14 @@ describe("a preview's build", () => {
     expect(css).toMatch(
       /^\/\*! tailwindcss v4\.\d+\.\d+ \| MIT License \| https:\/\/tailwindcss\.com \*\//,
     );
-    // The CSP fetches no font and no image a stylesheet names (default-src 'none').
-    expect(css).not.toMatch(/@font-face|url\(/);
+    // The CSP's font-src 'self' takes Saiga's faces from the origin's root,
+    // where the maintainer puts them (ADR-052): the same for a preview under
+    // /pr-7/. Nothing else a stylesheet names, and no image (default-src 'none').
+    expect(css.match(/@font-face/g)).toHaveLength(4);
+    expect([...css.matchAll(/url\(([^)]*)\)/g)].map(([, url]) => url)).toEqual(
+      ["Regular", "Italic", "Medium", "Bold"].map(
+        (face) => `/fonts/saiga-1.002/Saiga-${face}.woff2`,
+      ),
+    );
   });
 });

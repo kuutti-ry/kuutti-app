@@ -76,6 +76,15 @@ expo-env.d.ts
 # Where a withdrawn update signing key (ADR-004) may still sit on a developer's machine.
 apps/mobile/keys/
 
+# --- Fonts: none is ever committed (ADR-052). Saiga lives in a private
+# repository and ~/.cache/kuutti-fonts; scripts/check-fonts.ts reads content. ---
+*.otf
+*.ttf
+*.ttc
+*.woff
+*.woff2
+*.eot
+
 # --- End-to-end flows: the copy of the cached pictures scripts/e2e.ts makes ---
 apps/mobile/e2e/media
 # The panel's flows: their build, the stack's logs and Playwright's results (apps/admin/e2e/run.ts)

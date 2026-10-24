@@ -18,8 +18,9 @@ const config: KnipConfig = {
       entry: [
         // Read by @expo/fingerprint by convention (e2e.yml, deploy.yml).
         "fingerprint.config.js",
-        // An Expo config plugin that app.json names by its path.
+        // Expo config plugins that app.json names by their paths.
         "plugins/withNoForceDark.js",
+        "plugins/withSaiga.js",
         // Metro's platform resolution takes it over intl-polyfill.ts on a phone;
         // it is what the two @formatjs packages are for.
         "src/lib/intl-polyfill.native.ts",

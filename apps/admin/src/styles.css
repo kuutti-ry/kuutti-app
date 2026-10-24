@@ -2,10 +2,59 @@
  * The panel's look (ADR-050): Tailwind v4 and shadcn/ui's components
  * (src/components/ui), compiled at build into one stylesheet of the panel's
  * own, so the host's style-src 'self' holds: nothing writes a <style> element
- * at run time. System fonts only; the CSP fetches no font.
+ * at run time. Saiga from the panel's own origin, the CSP's font-src 'self',
+ * with the system's fonts behind it (ADR-052).
  */
 @import "tailwindcss";
 @import "./tokens.css";
+
+/*
+ * Saiga, Kuutti's typeface (ADR-052). Its files are never in the repository
+ * nor on a GitHub runner: the maintainer puts the faces in each environment's
+ * bucket by hand (`pnpm fonts -- --upload <bucket>`), at the origin's root,
+ * where a pull request's preview finds them too, and the dev server answers
+ * them from this computer's ~/.cache/kuutti-fonts (vite.config.ts). Where they
+ * are missing the panel is in the system's font.
+ */
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: Saiga, ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  /* Saiga has no 600: Bold, as on the website (its decision 18) and in the app. */
+  --font-weight-semibold: 700;
+  /* The stack behind Saiga, for what Saiga does not have. */
+  --font-system: ui-sans-serif, system-ui, sans-serif;
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -73,5 +122,13 @@
   code {
     font-size: 0.875em;
     overflow-wrap: anywhere;
+  }
+}
+
+/* Saiga has no tabular figures (no tnum, digits of their own widths), so a
+   number set to line up keeps the system's font (ADR-052). */
+@layer utilities {
+  .tabular-nums {
+    font-family: var(--font-system);
   }
 }
