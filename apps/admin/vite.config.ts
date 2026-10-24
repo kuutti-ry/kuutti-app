@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  // Tailwind compiles src/styles.css into the build's one stylesheet (ADR-047).
+  // Tailwind compiles src/styles.css into the build's one stylesheet (ADR-050).
   plugins: [react(), tailwindcss()],
   build: {
     outDir: "dist",

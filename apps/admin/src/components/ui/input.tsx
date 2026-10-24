@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Input, Vega style (ADR-047), on the platform's own control: 44
+// shadcn/ui's Input, Vega style (ADR-050), on the platform's own control: 44
 // px tall, outlined in --input (3:1 against the page, tokens.test.ts), the
 // focus ring the stylesheet's outline.
 export function Input({ className, ...props }: ComponentProps<"input">) {

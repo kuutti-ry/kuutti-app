@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// The panel's own, in shadcn/ui's manner (ADR-047): a term and its value side
+// The panel's own, in shadcn/ui's manner (ADR-050): a term and its value side
 // by side on a wide screen, one under the other on a phone, the value
 // wrapping anywhere. A <div> around a pair (a prompt, a field) lays out as if
 // it were not there.

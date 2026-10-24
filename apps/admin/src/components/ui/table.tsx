@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Table, Vega style (ADR-047): the table scrolls on its own on a
+// shadcn/ui's Table, Vega style (ADR-050): the table scrolls on its own on a
 // narrow screen, and its caption, which names it, sits at the top.
 
 export function Table({ className, ...props }: ComponentProps<"table">) {

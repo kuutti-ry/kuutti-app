@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's NativeSelect, Vega style (ADR-047): the platform's own <select>,
+// shadcn/ui's NativeSelect, Vega style (ADR-050): the platform's own <select>,
 // its list and keyboard the browser's, drawn as the Input with a chevron. The
 // wrapper takes the width; every other prop is the select's.
 export function NativeSelect({ className, ...props }: ComponentProps<"select">) {

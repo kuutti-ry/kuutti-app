@@ -5,7 +5,7 @@ import { API_URL, apiUrl } from "./lib/api.ts";
 
 export { apiUrl };
 
-/** Under the screen, quiet: small and muted, its links underlined (ADR-047). */
+/** Under the screen, quiet: small and muted, its links underlined (ADR-050). */
 const FOOTER =
   "mx-auto w-full max-w-6xl space-y-1 border-t px-4 py-6 text-xs text-muted-foreground md:px-8 [&_a]:break-all";
 

@@ -2,7 +2,7 @@ import { CircleAlert } from "lucide-react";
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Alert, Vega style, destructive (ADR-047), as one line of the
+// shadcn/ui's Alert, Vega style, destructive (ADR-050), as one line of the
 // panel: a paragraph with role="alert", its icon decorative, its words the
 // failure or refusal, said in red and in words.
 export function Alert({ className, children, ...props }: ComponentProps<"p">) {

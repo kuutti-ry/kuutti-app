@@ -43,7 +43,7 @@ import { SourceOffer } from "./source-offer.tsx";
 // The moderation panel (#49, #302, rules/admin.md): a staff bank login, then
 // one screen per path with a menu of what the role opens. English only by
 // decision (TD-17); react-router's declarative routes, and shadcn/ui's
-// components on Tailwind (ADR-047, the component decision of rules/admin.md):
+// components on Tailwind (ADR-050, the component decision of rules/admin.md):
 // a header, the menu beside the screen on a wide window and above it on a
 // narrow one, the footer under the screen.
 

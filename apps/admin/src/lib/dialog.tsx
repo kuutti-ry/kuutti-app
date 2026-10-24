@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 // stays inside (Tab and Shift+Tab wrap around; a press on the backdrop keeps
 // it; focus moved out any other way comes back), Escape closes it wherever
 // the focus is, and on closing the focus goes back to what had it before.
-// Drawn as shadcn/ui's Dialog (ADR-047), but kept our own: Radix's dialog
+// Drawn as shadcn/ui's Dialog (ADR-050), but kept our own: Radix's dialog
 // writes a <style> element the CSP refuses, and this one needs no library.
 
 const FOCUSABLE =

@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { cn } from "../../lib/utils.ts";
 
-// shadcn/ui's Card, Vega style (ADR-047), tighter on a phone. Its title is a
+// shadcn/ui's Card, Vega style (ADR-050), tighter on a phone. Its title is a
 // heading, the screen's h2 above it, so the page's outline stays one.
 
 export function Card({ className, ...props }: ComponentProps<"div">) {
