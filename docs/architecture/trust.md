@@ -1,5 +1,24 @@
 # Data and trust boundaries
 
+<!-- draws
+apps/api/src/identity/login.ts
+apps/api/src/identity/hetu.ts
+apps/api/src/identity/oidc-broker.ts
+apps/api/src/identity/sessions.ts
+apps/api/src/lib/auth-middleware.ts
+apps/api/src/lib/ssm.ts
+apps/api/src/lib/cors.ts
+apps/api/src/lib/sentry.ts
+apps/api/src/research/track.ts
+apps/mobile/src/lib/session.ts
+packages/db/src/schema/research.ts
+scripts/check-schema-words.ts
+infra/modules/network/
+infra/modules/data/
+infra/modules/media/
+infra/modules/research/
+-->
+
 Where a person's data lives, who can read it, and what crosses from one place to another: the phone, Telia, the box, the database and AWS's managed services. Part 1 follows the person's identity and the secrets that guard it; part 2 follows photos, research events and what leaves the box for logs and error reports. It is written for a reviewer of a change to identity, uploads, signed URLs, events or infrastructure, and for the `security-reviewer` agent, as the map behind `docs/security-checklist.md` and its four surfaces: the OIDC exchange with Telia, the hetu HMAC, session tokens, and signed URL issuance. It draws rules 1 to 6 and 8, TD-1, ADR-001 (secrets are never resources), ADR-005 (media delivery), ADR-006 (the check, staff, the audit), ADR-008 (the exposure budget), ADR-011 (research events), ADR-017 (the Telia kit), ADR-025 (the panel's host and CORS), ADR-027 (the bound code) and ADR-029 (the research copy). What is drawn is staging's: production is not applied yet.
 
 ## Part 1: the person's identity and the secrets

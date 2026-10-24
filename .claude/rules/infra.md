@@ -25,7 +25,7 @@ One AWS account, everything in eu-central-1. Vendor list: AWS, Expo/EAS, GitHub,
 - GitHub issues immutable subject claims for this repository (created after 15 July 2026), so the OIDC sub is `repo:kuutti-ry@<owner_id>/kuutti-app@<repo_id>:...`. Trust policies key on the `repository_id` and `repository_owner_id` claims. A name-based `sub` condition copied from older examples will not match.
 - Dokploy's own configuration is not in code and cannot be: `user_data` installs it, its contents are backed up from `/etc/dokploy`. That manual step in the recovery path is a live argument in the Dokploy versus Kamal question.
 - Run `tofu fmt` before committing. Adding or changing a module needs an ADR or a citation of the TD it follows.
-- `docs/architecture/` draws what is deployed (#397): a change to what one of its views draws (a module, an environment, a workflow's step or rights, an outside service) redraws that view and its steps in the same pull request, and something planned stays dashed with its issue until it lands.
+- `docs/architecture/` draws what is deployed (#397): a change to what one of its views draws (a module, an environment, a workflow's step or rights, an outside service) redraws that view and its steps in the same pull request, or a commit message says `Still-true: <view>`, and something planned stays dashed with its issue until it lands. Each view's `<!-- draws` block names its files, and `pnpm check:docs` holds a change to them (ADR-047).
 
 ## AWS
 

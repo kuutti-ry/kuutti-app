@@ -1,5 +1,25 @@
 # Delivery
 
+<!-- draws
+.github/workflows/build.yml
+.github/workflows/deploy.yml
+.github/workflows/release.yml
+.github/workflows/preview.yml
+.github/workflows/preview-cleanup.yml
+.github/workflows/infra.yml
+.github/workflows/infra-prod.yml
+.github/workflows/infra-oidc.yml
+.github/workflows/eas-build.yml
+.github/workflows/ci.yml
+.github/workflows/dco.yml
+.github/workflows/secret-scan.yml
+.github/workflows/e2e.yml
+.github/workflows/auto-approve.yml
+.github/scripts/
+apps/mobile/eas.json
+infra/bootstrap/main.tf
+-->
+
 How a change travels from a pull request to the staging box, the phones and, at a release, production: which workflow does what, in which order, and what each step may touch, by its GitHub environment, its AWS role and its secrets, named and never shown. It is for a contributor who wants to know what their pull request sets off, and for a reviewer of `.github/workflows`. The checks of `ci.yml` and `e2e.yml` appear only as far as they gate delivery. The view draws ADR-001, ADR-004, ADR-012, ADR-020, ADR-025 and ADR-028.
 
 Three roles reach AWS, all made by `infra/bootstrap` and assumed by a job's GitHub OIDC token (the third, `kuutti-ci-export`, is the weekly export's, delivers nothing and is not drawn); no AWS credential exists in any secret. `kuutti-ci-plan` is AWS's read-only access less every data read and decryption, and trusts any pull request of this repository and `main`. `kuutti-ci-apply` is power-user access with scoped IAM, and trusts only a job in the GitHub environment `staging` or `prod`. The four GitHub environments: `staging` takes deployments from `main` alone, with no reviewer; `prod` takes `v*` tags alone, behind the maintainer as reviewer; `preview` takes any branch of this repository, with no reviewer since 2026-10-08 (ADR-004 §3); `preview-cleanup` takes `main` alone, with no reviewer (ADR-012 §9).
