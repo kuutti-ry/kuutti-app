@@ -4,10 +4,13 @@
 # account, its 2FA and the API key). Idempotent: run it again after a change
 # and it updates what exists.
 #
-#   DOKPLOY_URL=http://localhost:3000 DOKPLOY_TOKEN=<api key> INSTANCE_ID=<i-…> infra/scripts/dokploy-setup.sh staging
+#   read -rs DOKPLOY_TOKEN && export DOKPLOY_TOKEN    # the API key, never on a command line
+#   DOKPLOY_URL=http://localhost:3000 INSTANCE_ID=<i-…> infra/scripts/dokploy-setup.sh staging
 #
-# INSTANCE_ID (tofu output instance_id in infra/envs/<env>) lets the script
-# write the Traefik control-plane routers on the box through Run Command.
+# INSTANCE_ID (tofu output instance_id in infra/envs/<env>) is required: the
+# script writes the Traefik control-plane routers on the box through Run
+# Command, and nothing else writes them, since first boot routes nothing to
+# Dokploy before it has its owner (ADR-048).
 # DOKPLOY_URL is the port-forward while Dokploy has no domain of its own, the
 # real https://dokploy.<env>.<domain> afterwards. The token comes from Profile
 # in the UI and is exported in your shell; this script never prints it.
@@ -21,13 +24,20 @@ set -euo pipefail
 env="${1:?usage: dokploy-setup.sh <staging|prod>}"
 : "${DOKPLOY_URL:?export DOKPLOY_URL (http://localhost:3000 through the tunnel)}"
 : "${DOKPLOY_TOKEN:?export DOKPLOY_TOKEN (API key from Settings, Profile)}"
-for tool in curl jq; do command -v "$tool" >/dev/null || { echo "$tool is not installed" >&2; exit 1; }; done
+: "${INSTANCE_ID:?export INSTANCE_ID (tofu output -raw instance_id in infra/envs/<env>)}"
+for tool in curl jq aws; do command -v "$tool" >/dev/null || { echo "$tool is not installed" >&2; exit 1; }; done
 
 case "$env" in
   staging) app_env=staging; api_host=api.staging.kuutti.app; dokploy_host=dokploy.staging.kuutti.app ;;
   prod)    app_env=production; api_host=api.kuutti.app; dokploy_host=dokploy.kuutti.app ;;
   *) echo "environment must be staging or prod" >&2; exit 2 ;;
 esac
+
+# Staging and production share the account, so Run Command would take either
+# box's id; the Name tag (modules/compute) says whose it is. This also proves
+# the AWS session before anything in Dokploy changes.
+box=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query 'Reservations[0].Instances[0].Tags[?Key==`Name`]|[0].Value' --output text)
+[ "$box" = "kuutti-$env" ] || { echo "INSTANCE_ID $INSTANCE_ID is $box, not kuutti-$env" >&2; exit 1; }
 image="ghcr.io/kuutti-ry/kuutti-api:main"
 url="${DOKPLOY_URL%/}"
 
@@ -92,23 +102,27 @@ fi
 
 # --- Traefik: pin the control-plane hosts (#9 trust) ----------------------
 # A Dokploy member token may attach any host to a preview application; these
-# priority routers keep dokploy.<env> and api.<env> with their owners.
+# priority routers keep dokploy.<env> and api.<env> with their owners. A run
+# that cannot write them stops before the deployment (ADR-048).
 app_name=$(get "application.one?applicationId=$app_id" | jq -r .appName)
-if [ -n "$app_name" ] && [ "$app_name" != null ] && command -v aws >/dev/null && [ -n "${INSTANCE_ID:-}" ]; then
-  file=$(cat <<YAML
-# Written by infra/scripts/dokploy-setup.sh; user_data writes the dokploy part at first boot.
+if [ -z "$app_name" ] || [ "$app_name" = null ]; then
+  echo "application api has no appName; control-plane routers not written" >&2
+  exit 1
+fi
+file=$(cat <<YAML
+# Written by infra/scripts/dokploy-setup.sh once Dokploy has its owner; first boot writes none (ADR-048).
 http:
   routers:
     control-plane-dokploy:
       rule: Host(\`$dokploy_host\`)
       priority: 1000
-      service: dokploy-service-app
+      service: control-plane-dokploy
       entryPoints: [web]
       middlewares: [redirect-to-https]
     control-plane-dokploy-secure:
       rule: Host(\`$dokploy_host\`)
       priority: 1000
-      service: dokploy-service-app
+      service: control-plane-dokploy
       entryPoints: [websecure]
       tls:
         certResolver: letsencrypt
@@ -126,6 +140,11 @@ http:
       tls:
         certResolver: letsencrypt
   services:
+    control-plane-dokploy:
+      loadBalancer:
+        servers:
+          - url: http://dokploy:3000
+        passHostHeader: true
     control-plane-api:
       loadBalancer:
         servers:
@@ -133,16 +152,19 @@ http:
         passHostHeader: true
 YAML
 )
-  cmd=$(jq -cn --arg f "$file" '{commands: ["cat > /etc/dokploy/traefik/dynamic/00-control-plane.yml <<'"'"'EOF'"'"'", $f, "EOF", "echo written"]}')
-  cid=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment "control-plane routers (dokploy-setup.sh)" --parameters "$cmd" --query 'Command.CommandId' --output text)
-  for _ in $(seq 1 20); do
-    st=$(aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
-    case "$st" in Success|Failed|TimedOut|Cancelled) break ;; esac
-    sleep 3
-  done
-  echo "Traefik control-plane routers for $dokploy_host and $api_host -> $app_name: $st"
-else
-  echo "INSTANCE_ID not set or aws missing: control-plane routers not written (see infra/README.md Previews, Trust)" >&2
+# set -e: Run Command reports the last command's status, so a failed write
+# must stop before "echo written".
+cmd=$(jq -cn --arg f "$file" '{commands: ["set -e", "cat > /etc/dokploy/traefik/dynamic/00-control-plane.yml <<'"'"'EOF'"'"'", $f, "EOF", "echo written"]}')
+cid=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment "control-plane routers (dokploy-setup.sh)" --parameters "$cmd" --query 'Command.CommandId' --output text)
+for _ in $(seq 1 20); do
+  st=$(aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+  case "$st" in Success|Failed|TimedOut|Cancelled) break ;; esac
+  sleep 3
+done
+echo "Traefik control-plane routers for $dokploy_host and $api_host -> $app_name: $st"
+if [ "$st" != Success ]; then
+  echo "control-plane routers not written (see infra/README.md Previews, Trust); run again" >&2
+  exit 1
 fi
 
 # --- deploy ----------------------------------------------------------------
