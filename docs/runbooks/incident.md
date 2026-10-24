@@ -226,9 +226,9 @@ The chain of events, not a person.
 
 **What did not.** Nothing measured memory. The cleanup depended on a person.
 
-**Actions.** ADR-012, the same day: previews are removed unattended, by a sweep from `main` that every merge starts (#76). #77, still open: swap in the box's first-boot script, a memory limit on Dokploy, a memory alarm, and the `api-unreachable` row's memory commands.
+**Actions.** ADR-012, the same day: previews are removed unattended, by a sweep from `main` that every merge starts (#76). #77 (ADR-046): swap in the box's first-boot script, a memory limit on Dokploy, a memory alarm, and the `api-unreachable` row's memory commands.
 
-**It came back on 2026-10-08**, 17:39 to about 18:20 Helsinki time (#77). Two merges two minutes apart and a preview deploy hit the box at once; six API containers ran; a reboot alone brought the loop back. Fixed by hand through one SSM Run Command: `docker service scale api-pr-152-ccsysx=0` (a merged pull request's preview the sweep could not reach) and a 2 GB `/swapfile`. EC2's status check saw a healthy instance the whole time. The live box has its swap by hand; a rebuilt box will not have it until #77 lands, which part 2 of the drill below has to allow for.
+**It came back on 2026-10-08**, 17:39 to about 18:20 Helsinki time (#77). Two merges two minutes apart and a preview deploy hit the box at once; six API containers ran; a reboot alone brought the loop back. Fixed by hand through one SSM Run Command: `docker service scale api-pr-152-ccsysx=0` (a merged pull request's preview the sweep could not reach) and a 2 GB `/swapfile`. EC2's status check saw a healthy instance the whole time. The live box had its swap by hand from then; since #77 (ADR-046) a rebuilt box has it from first boot, and a running one from the headroom document.
 
 ## The restore drill
 
@@ -297,7 +297,7 @@ The four steps of `infra/README.md`, "Backups and rebuilding the box", on stagin
 
    Read the plan. It replaces the instance and changes what refers to it, and it destroys no `aws_sns_topic_subscription`. If it shows anything else, stop.
 3. In the same shell, run the four steps as written. Step 1 is a local `tofu apply -replace=module.compute.aws_instance.api`, while the README's Environments section otherwise keeps applies to CI, and the README's rebuild steps do not name the variable of step 2: write both down as gaps, and fix the README after the drill.
-4. The new box has no swap (#77, above). Until #77 lands, add it by hand as on 2026-10-08, or expect the out-of-memory loop as soon as previews deploy.
+4. The new box has its swap, Dokploy's memory limit and the free-memory metric from first boot (#77, ADR-046). Once `cloud-init status --wait` reports done, `free -m` shows 2 GB of swap, and `kuutti-staging-memory-low` returns to OK within minutes; until then it says ALARM, since no data counts as breaching.
 5. Check: `curl -sS https://api.staging.kuutti.app/health` answers `"status":"ok"`; Dokploy's UI signs in at `https://dokploy.staging.kuutti.app` with its two-factor login; re-run `main`'s latest `build.yml` run and see `deploy.yml` deploy; a pull request's preview deploys; `/etc/cron.d/dokploy-backup` exists and the next night's object appears; the probe and the status-check alarm return to OK. The alarm state says nothing about delivery, so also check both subscriptions, still in `infra/envs/staging`:
 
    ```sh

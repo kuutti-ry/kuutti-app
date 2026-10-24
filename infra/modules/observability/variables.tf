@@ -45,3 +45,9 @@ variable "budget_refusals_per_day" {
   type        = number
   default     = 100
 }
+
+variable "memory_available_mb" {
+  description = "Available memory on the API box, in MiB, under which for five minutes the memory-low alarm mails (#77, ADR-046)."
+  type        = number
+  default     = 200
+}

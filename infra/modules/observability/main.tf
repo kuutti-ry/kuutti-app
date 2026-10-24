@@ -8,9 +8,11 @@
 # confirmed by hand from the mailbox, like the billing one.
 #
 # Cost: standard alarms at 0.10 USD and custom metrics at 0.30 USD each (the
-# 5xx and Rekognition metrics, the exposure-budget one of #52 and the
-# nightly-failure one of #194), so about 2.00 USD a month per environment;
-# query definitions and the topic are free. The probe from outside the box,
+# 5xx and Rekognition metrics, the exposure-budget one of #52, the
+# nightly-failure one of #194 and the box's free memory of #77), plus the box's
+# PutMetricData once a minute, about 44,000 calls a month at 0.01 USD a
+# thousand: about 2.80 USD a month per environment at list price; query
+# definitions and the topic are free. The probe from outside the box,
 # which is what catches a stopped container, is probe.tf (#29): a Route 53
 # health check with its alarm and topic in us-east-1.
 # ---------------------------------------------------------------------------
@@ -94,6 +96,32 @@ resource "aws_cloudwatch_metric_alarm" "instance_credits" {
   evaluation_periods  = 2
   threshold           = 20
   comparison_operator = "LessThanThreshold"
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
+# The box's free memory (#77, ADR-046). Twice the box ran out of it with
+# nothing measuring it (2026-09-27, 2026-10-08) while EC2's status check saw a
+# healthy instance. The box pushes MemAvailable once a minute (modules/compute,
+# the headroom script) into a namespace of its own, which the box may write
+# and the log filters' metrics are not in. Missing data counts as breaching
+# once no real datapoint is left in the range CloudWatch evaluates: a box
+# that never ran the script (after the apply that brings this alarm, until
+# the headroom document has run; after a rebuild, until first boot has) is in
+# ALARM within a minute or two, one that stops pushing a few minutes after
+# its last good datapoint. A single missed push between good ones counts for
+# nothing.
+resource "aws_cloudwatch_metric_alarm" "memory_low" {
+  alarm_name          = "${local.name}-memory-low"
+  alarm_description   = "The API box has had under ${var.memory_available_mb} MB available for five minutes, or has stopped saying how much (#77). First steps: docs/runbooks/alerts.md."
+  namespace           = "${local.namespace}/box"
+  metric_name         = "MemAvailable"
+  statistic           = "Minimum"
+  period              = 60
+  evaluation_periods  = 5
+  threshold           = var.memory_available_mb
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
   alarm_actions       = [aws_sns_topic.alerts.arn]
   ok_actions          = [aws_sns_topic.alerts.arn]
 }

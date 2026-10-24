@@ -579,7 +579,7 @@ What stays possible, accepted: the trail names the role session, whose name is t
 
 ### Observability (#11)
 
-`infra/modules/observability`, composed by each environment: an SNS topic `kuutti-<env>-alerts` in eu-central-1, alarms for the instance status check, the instance and RDS CPU credit balances, RDS free storage, the API's 5xx rate (a metric filter on `/kuutti/<env>/api`) and a failed nightly job (#194), and three saved Logs Insights queries. The subscriber is the repository variable `ALERT_EMAIL` (`gh variable set ALERT_EMAIL --body <project alias>`), which CI hands to OpenTofu as `TF_VAR_alert_email`; confirm the subscription from that mailbox after the first apply (`aws sns list-subscriptions-by-topic --topic-arn <alerts_topic_arn>` shows `PendingConfirmation` until the link in AWS's mail is followed), then run the delivery test in `docs/runbooks/alerts.md`. Without the variable the topic exists with no subscriber. About 2 USD a month per environment (the module's header has the sum).
+`infra/modules/observability`, composed by each environment: an SNS topic `kuutti-<env>-alerts` in eu-central-1, alarms for the instance status check, the instance and RDS CPU credit balances, the box's free memory (#77, The box's headroom below), RDS free storage, the API's 5xx rate (a metric filter on `/kuutti/<env>/api`) and a failed nightly job (#194), and three saved Logs Insights queries. The subscriber is the repository variable `ALERT_EMAIL` (`gh variable set ALERT_EMAIL --body <project alias>`), which CI hands to OpenTofu as `TF_VAR_alert_email`; confirm the subscription from that mailbox after the first apply (`aws sns list-subscriptions-by-topic --topic-arn <alerts_topic_arn>` shows `PendingConfirmation` until the link in AWS's mail is followed), then run the delivery test in `docs/runbooks/alerts.md`. Without the variable the topic exists with no subscriber. About 3 USD a month per environment (the module's header has the sum).
 
 Logs reach that group through the Docker daemon's default driver, which user data sets to `awslogs` before Dokploy's installer starts a single container (`modules/compute/templates/user_data.sh.tpl`): every container on the box logs to `/kuutti/<env>/api`, one stream per container name, Dokploy's own included. Nothing to set per application. The instance role allows the stream calls; the group has 30-day retention.
 
@@ -696,6 +696,32 @@ Once, after staging is applied and its Dokploy is configured:
 
 Done when (the issue's list): a pull request that changes a screen gets its comment within 10 minutes and the page shows the version and commit of its own API; `/health` of the preview reports the pull request's commit; `psql -l` through the tunnel lists `kuutti_pr_<n>` while the pull request is open and not after it closes; a row written through one preview is absent from another; the fourth concurrent pull request gets the limit comment; the workflow's CORS step refuses the staging web origin and another pull request's; the preview reads only `/kuutti/staging/*`; `aws s3 ls s3://kuutti-admin-staging-<account>/pr-<n>/` lists the panel's preview while the pull request is open and nothing after the sweep, and `<ADMIN_URL>/pr-<n>/photos` answers that preview's `index.html`, whose scripts are under `/pr-<n>/assets/`.
 
+### The box's headroom (#77, ADR-046)
+
+Twice (2026-09-27, 2026-10-08) the box, 1.8 GB, ran out of memory with Dokploy, the API and previews on it, and the API went with it. One script, `modules/compute/templates/headroom.sh.tpl`, keeps that from happening again: a swap file with `vm.swappiness = 10` (`swap_mb`: 2 GB on staging, none in production until ADR-046's open point on rule 1 is answered); the box's `MemAvailable` pushed to CloudWatch (`Kuutti/<env>/box`) every minute by a cron line, which the alarm `kuutti-<env>-memory-low` reads (`docs/runbooks/alerts.md`); and a memory limit on Dokploy's own Swarm service (`dokploy_memory_mb`, 1024 MiB), so that a Dokploy that keeps growing is restarted alone instead of starving the API.
+
+A new box runs the script at first boot. A running box never sees an edit of user data, so it gets the same script from the Run Command document `kuutti-<env>-headroom`, which the maintainer sends once after the apply that creates it, and again after a change of `swap_mb` or `dokploy_memory_mb`. Until then the alarm says ALARM, since a box that has never pushed counts as breaching. A second run changes nothing; a swap file made by hand keeps its size, and its mode becomes 0600.
+
+Before sending it, see what Dokploy uses on the box (`aws ssm start-session --target <id>`, then `sudo docker stats --no-stream`): above about 700 MiB for the `dokploy` container, raise `dokploy_memory_mb` first, since Node inside it sizes its heap at half the limit. Then, from `infra/envs/<env>` with your own session (`pnpm aws:login`):
+
+```sh
+id="$(tofu output -raw instance_id)"
+cid="$(aws ssm send-command --instance-ids "$id" --document-name "$(tofu output -raw headroom_document)" --query Command.CommandId --output text)"
+aws ssm wait command-executed --command-id "$cid" --instance-id "$id"
+aws ssm get-command-invocation --command-id "$cid" --instance-id "$id" --query '[Status,StandardOutputContent,StandardErrorContent]' --output text
+```
+
+It prints the swap, where the metric goes and Dokploy's limit; a step that failed says so, and the other step is done all the same. Setting the limit restarts Dokploy's own task once, its UI away for a minute; the API and the previews keep running. For the ten minutes after, `sudo docker service ps dokploy` on the box shows one task running and none failed; a task that failed with exit code 134 or `OOMKilled` means the limit holds an idle Dokploy, so raise it and send the document again. Then #77's three checks, staging only:
+
+1. On the box: `free -m` shows 2 GB of swap, and `docker service inspect dokploy --format '{{.Spec.TaskTemplate.Resources.Limits.MemoryBytes}}'` shows `1073741824`.
+2. Dokploy held hard while the API keeps answering. On the box, `docker service update --limit-memory 200m dokploy`. Then for a minute `curl -sS https://api.staging.kuutti.app/health` from your machine answers `"status":"ok"`, while `docker service ps dokploy` on the box shows Dokploy's tasks failing and being started again: Node aborts on its heap (exit code 134, `docker service logs --tail 50 dokploy` says `heap out of memory`), or the kernel kills it (`dmesg -T | grep -i "killed process"`), and nothing else restarts. Send the document again to set the limit back.
+3. The alarm. From your machine, `aws cloudwatch describe-alarms --alarm-names kuutti-staging-memory-low --query 'MetricAlarms[0].StateValue'` says `OK` a few minutes after the document ran. To see it fire, hold the box's memory for seven minutes in a container of its own on the box, with no network, so the image never reaches the instance role. The mail says ALARM after about five minutes, and OK a few minutes after the container ends:
+
+   ```sh
+   mb=$(awk '/^MemAvailable:/ { printf "%d", $2 / 1024 - 100 }' /proc/meminfo)
+   docker run --rm --network none --name memory-alarm-test python:3.13-alpine python -c "import time; b = b'x' * ($mb * 1048576); time.sleep(420)"
+   ```
+
 ### Backups and rebuilding the box
 
 The box is stateless except for Dokploy's own configuration, the one manual island of ADR-001. A cron job at 02:17 UTC tars `/etc/dokploy` (Traefik configuration and certificates, application definitions) together with a dump of Dokploy's database and uploads it with SSE-KMS to `s3://kuutti-tfstate-<account>/dokploy-backup/<env>/`. The plan role can list the bucket but is denied `kms:Decrypt`, so it cannot read these objects.
@@ -706,7 +732,7 @@ aws s3 ls s3://kuutti-tfstate-438298963814/dokploy-backup/staging/
 
 Rebuild from scratch, tested once per the #7 checklist:
 
-1. `tofu apply -replace=module.compute.aws_instance.api` in the environment. The Elastic IP moves with it; wait for `cloud-init status --wait` on the new box to report done (Dokploy is installed fresh).
+1. `tofu apply -replace=module.compute.aws_instance.api` in the environment. The Elastic IP moves with it; wait for `cloud-init status --wait` on the new box to report done (Dokploy is installed fresh, with the swap, its memory limit and the free-memory metric of the headroom script, The box's headroom above).
 2. On the new box (`aws ssm start-session`, then `sudo -i`) fetch the latest backup; the instance role may read its own prefix: `aws s3 cp s3://kuutti-tfstate-<account>/dokploy-backup/<env>/dokploy-<stamp>.tgz /root/backup.tgz`.
 3. Still on the box: `docker service scale dokploy=0`, `tar -C / -xzf /root/backup.tgz etc/dokploy`, then the database into the fresh container (the dump holds only the `dokploy` database, so the container's generated password survives): `tar -C /root -xzf /root/backup.tgz dokploy-db.sql`, `c=$(docker ps -q --filter name=dokploy-postgres)`, `docker exec -i "$c" psql -U dokploy -d dokploy < /root/dokploy-db.sql`, finally `docker service scale dokploy=1`.
 4. Redeploy the application from Dokploy; certificates come back with `/etc/dokploy/traefik`.

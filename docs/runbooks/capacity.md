@@ -20,7 +20,7 @@ Stage 1 also pays for setting up the connections: the runner's TLS handshakes to
 
 ## Before a run
 
-1. **#77 is done.** The box pushes its free memory every minute, an alarm mails under 200 MB, and the alarm has its row in `alerts.md`. On 2026-09-27 the box ran out of memory with Dokploy, the API and three previews on it. A load run is how that would happen again, so nobody runs one without that alarm.
+1. **#77's alarm is in OK.** The box pushes its free memory every minute, and `kuutti-staging-memory-low` mails under 200 MB (ADR-046; its row in `alerts.md`). `aws cloudwatch describe-alarms --alarm-names kuutti-staging-memory-low --query 'MetricAlarms[0].StateValue'` says `OK`, which it does once the headroom document has run on the box (`infra/README.md`, The box's headroom). On 2026-09-27 the box ran out of memory with Dokploy, the API and three previews on it. A load run is how that would happen again, so nobody runs one without that alarm.
 2. **The release to measure is on staging.** `curl -sS https://api.staging.kuutti.app/health` shows its version and commit, and the script prints them too.
 3. **The box is quiet.** No preview is building or deploying: the previews share the box (ADR-012). The burst credits of the box and of the database are not low (the two `cpu-credits-low` rows of `alerts.md`). Staging runs `cpu_credits = standard`, so a box out of credits slows to its baseline, and the run would measure the baseline rather than the box.
 4. **The team knows.** On staging the API's address limit counts the CloudFront edge, which every phone near it shares (ADR-008 History). A run spends part of that window. Its last stage may also set off `kuutti-staging-api-5xx` (below), so the team expects that mail.

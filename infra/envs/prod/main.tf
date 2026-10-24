@@ -43,6 +43,10 @@ module "compute" {
   dokploy_version            = var.dokploy_version
   domain                     = var.domain
   manage_session_preferences = false
+
+  # No swap until the maintainer has answered ADR-046's open point on swap
+  # and rule 1, before the first release (#25).
+  swap_mb = 0
 }
 
 # Photos (#48, ADR-005): the media bucket and the CloudFront distribution that
