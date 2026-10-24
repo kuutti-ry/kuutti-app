@@ -2,18 +2,18 @@
 
 Error reporting only (TD-19, #11): unhandled errors from the API and the app, with readable stack traces. No tracing, no session replay, no user data: the code strips request bodies, headers and breadcrumb data before anything leaves (`apps/api/src/lib/sentry.ts`, `apps/mobile/src/lib/sentry.ts`, both asserted by tests). Without a DSN the SDK is off; staging has had one since 2026-09-20 (below), production gets its own with #25.
 
-The site is sentry.io. **The data region is chosen when the organisation is created and cannot be changed afterwards: choose the EU.** The organisation lives at `https://kuutti-fi.sentry.io` (slug `kuutti-fi`: `kuutti` was already taken on 2026-09-20; it is Sentry's own name and stayed when the GitHub organisation became `kuutti-ry`, #110) and its API at `https://de.sentry.io`. The `app.json` plugin block and the upload step in `deploy.yml` (`SENTRY_ORG`) both name it.
+The site is sentry.io. **The data region is chosen when the organisation is created and cannot be changed afterwards: choose the EU.** The organisation lives at `https://kuutti-ry.sentry.io` (slug `kuutti-ry`, the GitHub organisation's name since #110; it was `kuutti-fi` from its creation on 2026-09-20, when `kuutti` was already taken, until October 2026) and its API at `https://de.sentry.io`. The upload step in `deploy.yml` (`SENTRY_ORG`) names it; the `app.json` plugin block still names `kuutti-fi` until the next native change, since changing it moves the fingerprint, and a token's own slug wins over both (section 4).
 
 Done on 2026-09-20: every section. Both proofs of section 5 passed on staging (the API's self-test at boot; the app's test error from both phones with symbolicated frames), the test issues were deleted. What the events still carried afterwards, a per-install user id and a city, is #28: the app now strips the user before sending; the geo is an organisation-level scrubbing rule.
 
 ## 1. Account and organisation
 
 1. https://sentry.io/signup/ with the project mailbox (TD-4: accounts belong to the association), not a personal address. Turn on two-factor authentication in User settings, Security, before anything else, and add the entry to `docs/runbooks/custody.md`.
-2. Create the organisation: name `Kuutti`, slug **`kuutti-fi`**, **Data storage location: European Union (EU)**.
+2. Create the organisation: name `Kuutti`, slug **`kuutti-ry`**, **Data storage location: European Union (EU)**.
 3. Plan: the free Developer plan is enough for now (one user, a monthly error quota). Sentry also sponsors open-source projects; applying is worth the ten minutes once the repository has some history.
 4. Organisation settings, Security & Privacy: turn on **Require two-factor authentication** and **Enhanced privacy**; leave "Data scrubber" and "Use default scrubbers" on. Set **Prevent storing of IP addresses** on. _Requiring 2FA removes every member who has none, the owner mailbox included: enable 2FA on every account first. Still to do as of 2026-09-20._
 
-Settings and projects can also be done over the API without pasting a token anywhere visible: create a personal auth token (User settings, Auth Tokens; `org:write`, `project:admin`, `team:write` and the reads), store it with `pnpm exec sentry-cli login` (the default server; `--url https://de.sentry.io` fails, its token check lives on sentry.io only), let the calls read `~/.sentryclirc`, and revoke the token afterwards. Organisation data is served from `https://de.sentry.io/api/0/organizations/kuutti-fi/...`; account endpoints from `https://sentry.io`. The alert-rule endpoints are retired: alerts are checked in the UI.
+Settings and projects can also be done over the API without pasting a token anywhere visible: create a personal auth token (User settings, Auth Tokens; `org:write`, `project:admin`, `team:write` and the reads), store it with `pnpm exec sentry-cli login` (the default server; `--url https://de.sentry.io` fails, its token check lives on sentry.io only), let the calls read `~/.sentryclirc`, and revoke the token afterwards. Organisation data is served from `https://de.sentry.io/api/0/organizations/kuutti-ry/...`; account endpoints from `https://sentry.io`. The alert-rule endpoints are retired: alerts are checked in the UI.
 
 ## 2. Two projects
 
@@ -49,6 +49,8 @@ cd apps/mobile && pnpm exec eas env:create --environment preview --name SENTRY_A
 ```
 
 Add the token to the password manager entry. Production's copies are part of #25.
+
+**After a rename of the organisation, make the token again.** An organisation token carries the slug it was made under, and sentry-cli uses that slug rather than `SENTRY_ORG` or `app.json`'s, so the old token asks for an organisation that is no longer there: `error: organization not found`, which failed staging's deploys at this step from 2026-10-23, after the rename to `kuutti-ry`. Create the new token as above, put it in every place it lives (the `gh secret set` line again; on EAS `eas env:set` for the same name, never with the value as `--value` on the command line, which the shell's history keeps), and revoke the old one.
 
 **Then remove the stopgap:** delete the line `"env": { "SENTRY_DISABLE_AUTO_UPLOAD": "true" }` from the `preview` profile in `apps/mobile/eas.json`. It exists because a release-style build runs Sentry's upload step, and without a token that step fails the whole build (`Auth token is required`, seen on the first `preview` build, 2026-09-20). With the token in the EAS environment, `preview` builds upload their source maps like production ones will.
 
