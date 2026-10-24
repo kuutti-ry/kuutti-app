@@ -35,6 +35,17 @@ module.exports = {
       },
       // The minimum touch target (CLAUDE.md Accessibility): min-h-touch min-w-touch.
       spacing: { touch: "44px" },
+      // Saiga, Kuutti's typeface (ADR-052), through `font-sans` on the text
+      // primitives. A phone takes the first family only (NativeWind keeps one)
+      // and draws in the system font when its build has no Saiga; the web reads
+      // the whole stack, for a browser without Saiga and for a character it
+      // lacks (✓).
+      fontFamily: {
+        sans: ["Saiga", "system-ui", "-apple-system", "'Segoe UI'", "Roboto", "sans-serif"],
+      },
+      // Saiga has no 600. Bold, as the website draws its 650 (its decision 18),
+      // and the same face on every platform, where each would pick its own.
+      fontWeight: { semibold: "700" },
     },
   },
   plugins: [require("tailwindcss-animate")],

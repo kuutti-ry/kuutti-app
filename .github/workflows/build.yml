@@ -371,16 +371,18 @@ jobs:
       # assets never change under their names (ADR-025 §4); licenses.txt, the
       # bundled packages' licences the footer links (#416), keeps its name
       # from build to build, so it is revalidated too. pr-* holds the
-      # previews of open pull requests (§6): --delete must never reach it.
-      - name: Write the build to the bucket's root, never under pr-
+      # previews of open pull requests (§6), and fonts/ Saiga, which the
+      # maintainer puts there by hand and no workflow ever has (ADR-052):
+      # --delete must never reach either.
+      - name: Write the build to the bucket's root, never under pr- nor fonts/
         env:
           ADMIN_BUCKET: ${{ vars.ADMIN_BUCKET }}
         run: |
           immutable='public, max-age=31536000, immutable'
-          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude licenses.txt --exclude 'pr-*' --cache-control "$immutable"
+          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude licenses.txt --exclude 'pr-*' --exclude 'fonts/*' --cache-control "$immutable"
           aws s3 cp dist/licenses.txt "s3://$ADMIN_BUCKET/licenses.txt" --cache-control no-cache --content-type 'text/plain; charset=utf-8'
           aws s3 cp dist/index.html "s3://$ADMIN_BUCKET/index.html" --cache-control no-cache
-          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude licenses.txt --exclude 'pr-*' --cache-control "$immutable" --delete
+          aws s3 sync dist "s3://$ADMIN_BUCKET/" --exclude index.html --exclude licenses.txt --exclude 'pr-*' --exclude 'fonts/*' --cache-control "$immutable" --delete
 
       # /* is one path of the thousand free each month. Waited for, so the
       # checks below read this build and not an edge's copy of the last one.
@@ -404,7 +406,7 @@ jobs:
           ADMIN_URL: ${{ vars.ADMIN_URL }}
           API_URL: ${{ vars.API_URL }}
         run: |
-          csp="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' $API_URL; connect-src $API_URL; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+          csp="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' $API_URL; connect-src $API_URL; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
           for path in / /photos; do
             headers=$(curl -fsS -o /dev/null -D - "$ADMIN_URL$path" | tr -d '\r')
             while IFS='|' read -r name want; do

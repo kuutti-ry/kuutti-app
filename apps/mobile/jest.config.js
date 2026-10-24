@@ -7,6 +7,8 @@ module.exports = {
     "<rootDir>/src/**/*.test.(ts|tsx)",
     "<rootDir>/app/**/*.test.(ts|tsx)",
     "<rootDir>/scripts/**/*.test.(ts|tsx)",
+    // The config plugins: CommonJS, as Expo loads them (ADR-052).
+    "<rootDir>/plugins/**/*.test.js",
   ],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   // `pnpm test:coverage` counts every source file, the ones no test loads too.

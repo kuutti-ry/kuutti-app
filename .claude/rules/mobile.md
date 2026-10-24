@@ -34,6 +34,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 - Every candidate card shows its reason label: matches all filters, liked you, sent you a fish (#378), seen before, or included because you relaxed X.
 - Candidate lists are bounded to the round. No pagination, no "load more", no on-demand fetch of the next profile.
 - Glyph sets never imitate console vendors' trademarked shapes or names.
+- Text is Saiga (ADR-052) through `font-sans`, which `Text`, `Input`, `Label` and the dialog's title and description carry; a new text primitive carries it too. Saiga has no 600: `font-semibold` is Bold (`tailwind.config.js`), and no tabular figures. A build without Saiga, and every web preview, is in the system font: a screen never depends on Saiga's metrics.
 - The Android theme declares `android:forceDarkAllowed=false` (`plugins/withNoForceDark.js`, #27): the app follows the system scheme and ships its own dark and high-contrast sets, so a launcher's forced dark mode (MIUI) must not repaint them.
 
 ## Notifications

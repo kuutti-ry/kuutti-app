@@ -39,6 +39,7 @@ There is no rotation calendar. Rotate when a value may have been seen by someone
 | `EXPO_TOKEN` | GitHub environments `staging`, `prod`, `preview`, `preview-cleanup` | `deploy.yml`, `eas-build.yml`, `preview.yml`, `preview-cleanup.yml` | an Expo owner or Admin and a repository admin | 10 |
 | `SENTRY_AUTH_TOKEN`; the two DSNs | GitHub environments `staging`, `prod`; EAS environments `preview`, `production`; SSM `sentry-dsn` (String) | `deploy.yml`, EAS builds; the API and the app | the Sentry owner and a repository admin | 11 |
 | GitHub variables, AWS access from CI | repository and environment variables; OIDC roles | the workflows | an owner | 12 |
+| `FONTS_TOKEN`, read-only on `kuutti-ry/kuutti-app-fonts` alone | EAS environments `preview`, `production`, visibility secret. Never GitHub. The website's Amplify app holds a token of its own, rotated in `kuutti-app-site` (its decision 18) | EAS builds, `eas-build-pre-install` (`scripts/fonts.ts`, ADR-052) | the maintainer | 13 |
 
 ## 1. Database application password
 
@@ -270,12 +271,26 @@ Personal Sentry tokens made for settings work are revoked when the work is done 
 
 ## 12. GitHub: secrets, variables, AWS access
 
-- **Environment secrets** are the three above: `DOKPLOY_TOKEN`, `EXPO_TOKEN`, `SENTRY_AUTH_TOKEN`. The workflows read no other secret and none at repository or organisation level. Setting one needs admin rights on the repository (the organisation's owners).
+- **Environment secrets** are the three above: `DOKPLOY_TOKEN`, `EXPO_TOKEN`, `SENTRY_AUTH_TOKEN`. `FONTS_TOKEN` is EAS's alone (13). The workflows read no other secret and none at repository or organisation level. Setting one needs admin rights on the repository (the organisation's owners).
 - **Variables** are not secrets: role ARNs, the state bucket, URLs, ids and switches (`AWS_REGION`, `TF_STATE_BUCKET`, `AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN`, `AWS_PERMISSIONS_BOUNDARY_ARN`, `AWS_EXPORT_ROLE_ARN`, `ALERT_EMAIL`, `STAGING_ENABLED`, `PREVIEWS_ENABLED`, `EAS_ENABLED`, `EAS_PLATFORMS`, `EAS_BUILDS_ISSUE`, `DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `DOKPLOY_ENVIRONMENT_ID`, `API_URL`, `PREVIEW_API_DOMAIN`, `EAS_HOSTING_SUBDOMAIN`, `ADMIN_URL`, `ADMIN_BUCKET`, `ADMIN_DISTRIBUTION_ID`, `ADMIN_API_URL`). Nothing to rotate; a wrong one is set again with `gh variable set` from the commands in `infra/README.md`.
 - **AWS access from CI** is OIDC only: the roles trust this repository's numeric ids and an environment or branch, and no AWS key exists anywhere in GitHub (`infra/README.md`, After bootstrap). Nothing to rotate. `GITHUB_TOKEN` lives for one run.
 - **Owners' own tokens and second factors** follow `SECURITY.md`, Maintainer accounts.
 
-## 13. Nothing to rotate
+## 13. The fonts token
+
+`FONTS_TOKEN` lets a build read Saiga, Kuutti's typeface, from the association's private repository `kuutti-app-fonts` (ADR-052): a fine-grained token with Contents read on that repository alone, or a GitHub App's, the maintainer's choice. It lives in exactly these places, and in no GitHub secret, since no workflow ever has the typeface (`check-workflow-permissions.py` refuses one that names it):
+
+1. GitHub, Settings, Developer settings, fine-grained tokens: a new one, resource owner `kuutti-ry`, repository `kuutti-app-fonts` only, Contents read-only; the organisation approves it.
+2. The EAS environments `preview` and `production`, visibility secret: `eas env:create --name FONTS_TOKEN --environment preview --visibility secret` (and `production`), or `eas env:update` for a new value. A member's laptop needs none: `pnpm fonts` uses the member's own `gh` login.
+3. Revoke the old token on GitHub. The website's token is another one, in its Amplify app; this does not touch it.
+
+**Check.** The next EAS build's log shows `Saiga: …, verified` for each file in its install phase, and the build draws in Saiga.
+
+**What breaks meanwhile:** nothing fails. A build without the token, or with a dead one, says so in its log and is drawn in the system font (`scripts/fonts.ts --soft`). Do not let one reach the store that way.
+
+**If it leaked:** revoke it; the token reads the font files and nothing else. Whether Spoke is told is the maintainer's call (ADR-052).
+
+## 14. Nothing to rotate
 
 - **S3.** Deployed environments have no S3 keys: the API writes through its instance role. `S3_ACCESS_KEY` and `S3_SECRET_KEY` exist for the local stand-in only (`apps/api/src/lib/config.ts`).
 - **The instance role's credentials** are short-lived and issued by AWS to the box. A box that may be compromised is rebuilt and every secret under its prefix is rotated (`incident.md`).
@@ -290,6 +305,7 @@ Personal Sentry tokens made for settings work are revoked when the work is done 
 Write access is staging-level trust: a pull request's preview runs its code on the staging box with the staging instance role and the `preview` environment's tokens (`infra/README.md`, Previews, Trust; ADR-004 §3). When a person with write leaves the team, after their access is removed:
 
 - `EXPO_TOKEN` in all four environments (section 10);
+- `FONTS_TOKEN` in the EAS environments `preview` and `production` (section 13): anyone with write access could start a build that holds it;
 - the `ci-preview` Dokploy key (section 9);
 - on staging, what the role could read: `db-app-password` (1), `db-preview-password` (2), the Telia keys (4), the CloudFront key (7). The staging HMAC key is section 6's staging paragraph.
 

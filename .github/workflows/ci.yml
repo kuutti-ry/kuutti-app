@@ -50,6 +50,12 @@ jobs:
       # file, and write to a database of their own on this computer only (#106, ADR-051).
       - name: e2e:admin reads the host's headers and keeps to its own database
         run: node apps/admin/e2e/run.ts --self-test
+      # Saiga's fetch and the font guard, each against stand-ins: no runner
+      # ever has the typeface or its token (ADR-052).
+      - name: The font fetch verifies and the font guard refuses
+        run: |
+          node scripts/fonts.ts --self-test
+          node scripts/check-fonts.ts --self-test
       # Every PEM stays out of git; .gitignore un-ignores exactly one public
       # certificate bundle. TruffleHog filters unverifiable keys, so this is
       # the backstop.
