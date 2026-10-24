@@ -316,12 +316,14 @@ The instance role may call `rekognition:DetectModerationLabels`, `rekognition:De
 Staff are identities with a role (rules/admin.md): the person signs in once through the bank, on the panel (refused, since there is no role yet, but the login is recorded, #202) or in the app; a person the database has never seen signs in to the app once first, since the panel creates nothing (ADR-006 §5). The maintainer then grants the role to the identity at the top of `recent`, from a machine that reaches the database (the Session Manager tunnel of `db-app-role.sh`). The API never logs a `hetu_hmac`; `recent` lists the last five bank logins by it, the app's and the panel's, newest first, with the time of each: check that the top one's is that sign-in's before granting.
 
 ```sh
-export DATABASE_URL=postgres://kuutti_app:...@127.0.0.1:15432/kuutti
+export DATABASE_URL="postgres://kuutti_app:...@127.0.0.1:15432/kuutti?uselibpqcompat=true&sslmode=verify-ca&sslrootcert=$PWD/apps/api/certs/rds-eu-central-1-bundle.pem"
 pnpm --filter @kuutti/db moderator -- recent
 pnpm --filter @kuutti/db moderator -- grant <hetu_hmac> moderator --by "Nikolai"
 pnpm --filter @kuutti/db moderator -- list
 pnpm --filter @kuutti/db moderator -- revoke <hetu_hmac>
 ```
+
+The parameters are there because RDS refuses a connection without TLS (`rds.force_ssl`) and, through the tunnel, the host is `127.0.0.1`, a name the server's certificate does not carry. `verify-ca` checks the certificate against the RDS roots bundled with the API and leaves the name out; `uselibpqcompat=true` makes pg read the mode as libpq does, since pg alone treats `verify-ca` as `verify-full` and refuses the connection. `sslrootcert` is absolute because pnpm runs the command from `packages/db`: export the variable from the repository's root.
 
 Revoking ends the person's admin sessions at once. The panel signs in at `/admin/auth/start` and returns to `ADMIN_APP_URL`, which must also be on the CORS allowlist: both are parameters of the environment (`admin_app_url`, `cors_allowed_origins` in `envs/<env>/variables.tf` → `admin-app-url`, `cors-allowed-origins`). On staging the login returns to the hosted panel, `https://admin.staging.kuutti.app`, and the allowlist is that origin alone (Admin panel, below; ADR-025 §10); a developer's panel at `http://localhost:5173` talks to their own API (`pnpm env:up`), since the bank sends a staging login back to the hosted panel. Production defaults to `https://admin.kuutti.app`, which must exist before the first release (#25; the API refuses a non-https value there at boot).
 
