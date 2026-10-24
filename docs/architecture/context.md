@@ -16,7 +16,7 @@ packages/i18n/src/legal.ts
 infra/bootstrap/
 -->
 
-Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041 and ADR-043.
+Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043 and ADR-052.
 
 ## Part 1: the people and what their devices reach
 
@@ -127,7 +127,7 @@ flowchart TB
 15. RDS PostgreSQL: the API connects over TLS with full verification, as its own role `kuutti_app`. Only the box's security group reaches port 5432.
 16. S3, the private media bucket: the API writes each photo's variants under `media/` and removes them on erasure; versioning is off, so an erased photo is gone. The night's job writes one Parquet file a day under `research/`, once, never replaced or removed.
 17. CloudFront, the API's distribution: it reads `media/` through origin access control, and only for a URL whose signature checks out against the key group. The API signs each URL itself with the private key from SSM; it never calls CloudFront.
-18. S3, the panel's private bucket: `main`'s build at its root and each open pull request's under `pr-<n>/`, written by CI only ([Delivery](delivery.md)).
+18. S3, the panel's private bucket: `main`'s build at its root and each open pull request's under `pr-<n>/`, written by CI ([Delivery](delivery.md)); Saiga's faces under `fonts/`, which the maintainer uploads by hand (41).
 19. CloudFront, the panel's distribution: the only reader of the panel's bucket. It adds the panel's security headers to every answer and answers a page's path with `index.html`.
 20. Rekognition: three detect calls (moderation labels, faces, labels), on when the parameter `moderation` says `rekognition`, as it does on staging. The photo's bytes travel in the request and nothing is stored on Rekognition's side. Without the parameter every photo waits for a person in the moderation queue.
 21. SES: the code that confirms the optional e-mail address, from `noreply@kuutti.app`. The code is built (#385, ADR-043) and staging's parameter `mail` says `ses`, but the domain's identity lives in `infra/bootstrap`, which only the maintainer applies, and SES must then verify the domain; the repository does not record whether either has happened. Until both have, a send is answered 503 `mail_unavailable`. SES is also in its sandbox until the maintainer asks AWS for production access, and staging's role may mail only the testers of the repository variable `MAIL_TESTERS`, nobody while it is unset. Further mail is planned, #196.
@@ -143,7 +143,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Context, part 3: how code reaches the services
-  accDescr: A contributor pushes to the repository on GitHub, which starts GitHub Actions. The workflows push the API image to GHCR, deploy it through Dokploy on the staging box, which pulls it, and exchange their OIDC token for an AWS role to plan and apply the infrastructure. They start native builds on EAS Build, publish JavaScript to EAS Update, put a pull request's web export on EAS Hosting and upload source maps to Sentry. The website deploys from its own repository through Amplify.
+  accDescr: A contributor pushes to the repository on GitHub, which starts GitHub Actions. The workflows push the API image to GHCR, deploy it through Dokploy on the staging box, which pulls it, and exchange their OIDC token for an AWS role to plan and apply the infrastructure. They start native builds on EAS Build, publish JavaScript to EAS Update, put a pull request's web export on EAS Hosting and upload source maps to Sentry. EAS Build, and the website's Amplify, fetch the typeface from the association's private fonts repository with a token of their own, which no workflow holds; the maintainer uploads the panel's copy by hand. The website deploys from its own repository through Amplify.
   subgraph people3["The people"]
     n28["A contributor or the maintainer"]
   end
@@ -151,10 +151,12 @@ flowchart TB
     n29["The repository kuutti-ry/kuutti-app"]
     n30["GitHub Actions: the workflows"]
     n31["GHCR: the API image, a public package"]
+    n40["kuutti-ry/kuutti-app-fonts, private: Saiga"]
   end
   subgraph aws3["AWS"]
     n32["STS: kuutti-ci-plan and kuutti-ci-apply, by OIDC"]
     n33["The staging box: Dokploy (current; Kamal open)"]
+    n41["S3, the panel's bucket: fonts/"]
   end
   subgraph expo["Expo"]
     n34["EAS Build: the native apps"]
@@ -178,6 +180,9 @@ flowchart TB
   n30 -->|"uploads source maps, SENTRY_AUTH_TOKEN"| n37
   n38 -->|"a push to its main deploys"| n39
   n30 -->|"reads /legal/versions.json"| n39
+  n34 -->|"fetches Saiga before the install, FONTS_TOKEN, an EAS secret"| n40
+  n39 -->|"fetches Saiga at build, FONTS_TOKEN, the site's own"| n40
+  n28 -->|"the maintainer uploads Saiga by hand, pnpm fonts"| n41
 ```
 
 ### Steps
@@ -188,12 +193,14 @@ flowchart TB
 31. GHCR: `ghcr.io/kuutti-ry/kuutti-api`, one image per commit, built for arm64. The package is public, so the box pulls it without a credential.
 32. AWS STS: a job exchanges its GitHub OIDC token for `kuutti-ci-plan` (read-only, without data; trusts pull requests and `main`) or `kuutti-ci-apply` (trusts the GitHub environments `staging` and `prod` only). Both roles are made by `infra/bootstrap`, which only the maintainer applies.
 33. The staging box: Dokploy (current; Kamal open) deploys the image `deploy.yml` names and the previews `preview.yml` creates, through its API on `dokploy.staging.kuutti.app`.
-34. EAS Build: the native apps, built on Expo's servers when the app's fingerprint has changed on `main`, when a release is tagged, or by hand, while the repository variable `EAS_ENABLED` is on.
+34. EAS Build: the native apps, built on Expo's servers when the app's fingerprint has changed on `main`, when a release is tagged, or by hand, while the repository variable `EAS_ENABLED` is on. Before the install it fetches Saiga (40), which the build embeds; without it the app is in the system font.
 35. EAS Update: the JavaScript, published after each staging deploy to the `staging` channel and after a production deploy to `production`, while `EAS_ENABLED` is on; and, for a pull request whose native side, sign-in, notification or photo code changed, to the branch `pr-<n>`.
 36. EAS Hosting: a pull request's web export of the app at the alias `pr-<n>`, a developer's preview against that pull request's API only.
 37. Sentry: `deploy.yml` uploads the published update's source maps, so that Sentry can read the app's stack traces.
 38. `kuutti-ry/kuutti-app-site`: the website's own repository, with its build spec and its headers.
 39. Amplify Hosting: a push to the site's `main` deploys `kuutti.app`. CI here reads the deployed site's `/legal/versions.json` to hold the app's consent versions to the site's.
+40. `kuutti-ry/kuutti-app-fonts`: the association's private repository of Saiga, Kuutti's typeface, which Spoke Type licensed to Kuutti ry for Kuutti only and which is never public as a file (ADR-052). EAS Build and the website's Amplify read it at a pinned commit, each with a read-only token of its own, and hold every file to its SHA-256. No GitHub workflow reads it or holds a token for it, and a member's laptop reads it with the member's own login (`pnpm fonts`).
+41. The panel's bucket, `fonts/saiga-<version>/`: Saiga's faces, which the maintainer uploads from a laptop, since the panel is built on GitHub's runners, which never have them. The deploy leaves the folder alone, and the panel's CSP allows fonts from its own origin.
 
 ## Where it lives
 

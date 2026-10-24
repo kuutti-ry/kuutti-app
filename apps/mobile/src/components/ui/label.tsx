@@ -34,7 +34,7 @@ function Label({
       disabled={disabled}
     >
       <LabelPrimitive.Text
-        className={cn("shrink text-sm font-medium text-foreground", className)}
+        className={cn("shrink font-sans text-sm font-medium text-foreground", className)}
         maxFontSizeMultiplier={MAX_FONT_SCALE}
         {...props}
       />
