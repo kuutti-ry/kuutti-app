@@ -134,6 +134,14 @@ export function imgDirs(root: string): string[] {
 
 const RULE = "=".repeat(80);
 
+/**
+ * Kuutti's own copy of what could change or vanish of libvips' sources: every
+ * patch, and the release of each library under the LGPL its project could
+ * delete (#425, ADR-005). One release per sharp-libvips version, made by hand
+ * as notices/README.md says.
+ */
+const SOURCES = "https://github.com/kuutti-ry/kuutti-app/releases/tag/sources-sharp-libvips-";
+
 /** A library built into libvips' shared library or into sharp's addon, with the releases and patches its build is made from. */
 type Library = {
   name: string;
@@ -228,7 +236,11 @@ which fetches the release of each library named below with it and the
 patches named with it, and builds them for this platform; each Rust crate
 built into librsvg is the .crate file named with it. cairo is used under the
 Mozilla Public License 1.1, and the crates under the Mozilla Public License
-2.0 (text ${number(part.mpl2)}) under that licence; their source is at the same places.`;
+2.0 (text ${number(part.mpl2)}) under that licence; their source is at the same places.
+Every patch, and the release of each library under the Lesser General Public
+License that its project hosts on GitHub, is also copied to
+${SOURCES}${part.version},
+in case its own address moves or goes.`;
 }
 
 /**
