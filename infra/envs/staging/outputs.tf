@@ -3,7 +3,7 @@ output "instance_id" {
 }
 
 output "headroom_document" {
-  description = "Run Command document that gives the running box its swap, Dokploy's memory limit and the free-memory metric (#77, ADR-046); infra/README.md, The box's headroom."
+  description = "Run Command document that gives the running box its swap and the free-memory metric (#77, ADR-046); infra/README.md, The box's headroom."
   value       = module.compute.headroom_document
 }
 

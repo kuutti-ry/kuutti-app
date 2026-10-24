@@ -116,9 +116,8 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
 17 2 * * * root /usr/local/bin/dokploy-backup >> /var/log/dokploy-backup.log 2>&1
 CRON
 
-# Headroom (#77, ADR-046): swap, a memory limit on Dokploy's service, and the
-# free memory every minute for the memory-low alarm. Last, since the limit
-# needs Dokploy's service. A file of its own because the same text is the Run
+# Headroom (#77, ADR-046): swap, and the free memory every minute for the
+# memory-low alarm. A file of its own because the same text is the Run
 # Command document that brings a running box up to date (main.tf).
 echo "${headroom}" | base64 -d | gunzip > /root/headroom.sh
 sh /root/headroom.sh

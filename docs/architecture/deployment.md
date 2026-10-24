@@ -57,7 +57,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Deployment, part 2: staging, its network and its box
-  accDescr: api.staging.kuutti.app is CloudFront, which serves photos from the private media bucket and sends everything else over HTTPS to the box. Dokploy's control plane and the previews reach the box directly by its Elastic IP. On the box, in a public subnet, Traefik terminates TLS and routes by host to Dokploy, the API and the previews. RDS PostgreSQL sits in two private subnets with no NAT. Ingress from CloudFront alone and swap with a memory limit are planned.
+  accDescr: api.staging.kuutti.app is CloudFront, which serves photos from the private media bucket and sends everything else over HTTPS to the box. Dokploy's control plane and the previews reach the box directly by its Elastic IP. On the box, in a public subnet, Traefik terminates TLS and routes by host to Dokploy, the API and the previews. RDS PostgreSQL sits in two private subnets with no NAT. Ingress from CloudFront alone is planned. The box has 2 GB of swap and pushes its free memory to CloudWatch every minute.
   n11["Phones, browsers, the health probe and GitHub Actions"]
   subgraph dns["Route 53, zone kuutti.app"]
     n12["api.staging: alias of the API's distribution"]
@@ -84,7 +84,7 @@ flowchart TB
     end
   end
   n24["Ingress from CloudFront alone: planned, #198"]:::notbuilt
-  n25["Swap, a memory limit on Dokploy and a memory alarm: planned, #77"]:::notbuilt
+  n25["Swap, 2 GB, and the free memory to CloudWatch every minute, #77"]
   n12 -->|"names"| n14
   n13 -->|"names"| n18
   n11 -->|"api.staging, HTTPS"| n14
@@ -102,7 +102,7 @@ flowchart TB
   n21 -->|"5432, TLS, as kuutti_app"| n23
   n22 -->|"5432, TLS, as kuutti_preview"| n23
   n24 -.->|"planned, #198"| n17
-  n25 -.->|"planned, #77"| n20
+  n25 -->|"on"| n18
   classDef notbuilt stroke-dasharray: 5 5
 ```
 
@@ -122,7 +122,7 @@ flowchart TB
 22. The previews: at most three applications `api-pr-<n>` in the Dokploy project `previews`, each a pull request's image (part 4).
 23. RDS PostgreSQL 17 (the major pinned, minor versions applied automatically), single-AZ, `db.t4g.micro`: gp3 storage from 20 GB growing to 100, encrypted, 35 days of point-in-time recovery, TLS forced, Extended Support declined, not publicly reachable, no deletion protection on staging. Its subnet group spans the two private subnets in the region's first two zones, as RDS requires even for one instance. Its security group admits 5432 from the box's security group alone. The master password is held by AWS; the API connects as `kuutti_app`, a preview as `kuutti_preview`.
 24. Planned, #198: ingress from CloudFront alone. The switch `cloudfront_only_ingress` replaces the open 443 rule with CloudFront's origin-facing prefix list. It stays off until Dokploy's control plane and the previews are behind the distribution too (ADR-005 §7), and the rate limiter's `trusted-proxy` turns to `cloudfront` in the same apply, never before (ADR-008 §5); a precondition in the composition refuses the one without the other.
-25. Planned, #77: swap in the box's first-boot script, a memory limit on Dokploy, and a memory alarm. The code on `main` has none of the three.
+25. Swap and the free memory (#77, ADR-046): a 2 GB `/swapfile` with `vm.swappiness = 10`, and `MemAvailable` pushed every minute to `Kuutti/staging/box` by a cron line, which the alarm `kuutti-staging-memory-low` reads (part 3). First boot runs the script; the running box got it from the Run Command document `kuutti-staging-headroom` on 2026-10-24. Dokploy runs without a memory limit (ADR-046 §2).
 
 ## Part 3: staging, the services around the box
 
@@ -178,7 +178,7 @@ flowchart TB
 28. Session Manager: the way onto the box, as `ssm-user`, and the port forward to Dokploy's UI. Staging declares the account's session preferences: every session is streamed to the log group `/kuutti/ssm-sessions`, kept 90 days, so nothing secret is ever printed in one.
 29. SSM Parameter Store, `/kuutti/staging/`: the non-secret parameters `infra/envs/staging` writes (`app-env`, `log-level`, the database's `db-*`, `db-preview-user`, `moderation`, `mail`, `admin-app-url`, `cors-allowed-origins`, `trusted-proxy`, the media's three, and the bank's four: Telia's pre-production issuer, its client id, the callback and the level), and the secrets made by hand, never resources (the hetu HMAC key, the two Telia keys, the CloudFront signing key, the two database passwords), with Sentry's public DSN, also put by hand. The box's role reads this prefix only and is denied every other, `/kuutti/prod/` included.
 30. CloudWatch Logs: `/kuutti/staging/api`, one stream per container name, kept 30 days, with three saved Logs Insights queries (errors by route, latency by route, boot).
-31. The alarms: `kuutti-staging-instance-status-check-failed`, `-instance-cpu-credits-low`, `-db-cpu-credits-low`, `-db-free-storage-low`, `-api-5xx`, `-photo-budget-refusals` and `-nightly-job-failed`, the last three on metric filters over the API's log.
+31. The alarms: `kuutti-staging-instance-status-check-failed`, `-instance-cpu-credits-low`, `-db-cpu-credits-low`, `-db-free-storage-low`, `-api-5xx`, `-photo-budget-refusals`, `-nightly-job-failed` and `-memory-low`: three on metric filters over the API's log, the last on the box's own push to `Kuutti/staging/box`.
 32. The outside probe: a Route 53 health check of `https://api.staging.kuutti.app/health` every 30 seconds from eu-west-1, us-east-1 and ap-southeast-1, wanting `"status":"ok"` in the body; three failures in a row fire `kuutti-staging-api-unreachable`, whose metric and alarm live in us-east-1.
 33. SNS: `kuutti-staging-alerts` in eu-central-1 for the alarms, and a topic in us-east-1 for the probe's alarm, both mailing the repository variable `ALERT_EMAIL` once its subscription is confirmed by hand.
 34. The panel's distribution on `admin.staging.kuutti.app`: an ACM certificate from us-east-1, the managed `CachingOptimized` policy, the panel's response headers on every answer (a CSP whose only connection is the staging API, HSTS, `X-Frame-Options: DENY`, `X-Robots-Tag: noindex, nofollow` and the rest of ADR-025 §3), the function `kuutti-staging-admin-previews` on `pr-*` paths only, and 403 and 404 answered by `/index.html` so that a page's path loads the panel. It keeps no access log.
@@ -308,12 +308,11 @@ flowchart TB
 - Previews: [.github/workflows/preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [.github/scripts/dokploy-preview.sh](../../.github/scripts/dokploy-preview.sh), [apps/api/src/lib/preview-database.ts](../../apps/api/src/lib/preview-database.ts), [apps/api/src/lib/config.ts](../../apps/api/src/lib/config.ts) (what a preview drops)
 - The manual: [infra/README.md](../../infra/README.md) (Environments, Media, Mail, Admin panel, Research copy, Observability, Previews, Backups and rebuilding the box, Secrets, The website), [docs/runbooks/incident.md](../runbooks/incident.md)
 - ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (OpenTofu; Dokploy's configuration as the manual island), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (the distribution, §7 the ingress switch), [ADR-008](../adr/008-exposure-budget-and-client-address.md) §5 (the trusted proxy), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-014](../adr/014-demo-mode.md) (the mock bank; no real bank on a preview), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds no real person), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) (the flows on the local environment), [ADR-025](../adr/025-admin-host.md) (the panel's host and its previews), [ADR-029](../adr/029-the-research-copy.md) (the research copy), [ADR-043](../adr/043-email-confirmation.md) §5 and §6 (SES and staging's testers)
-- Issues: #198 (ingress from CloudFront alone), #77 (swap, a memory limit, a memory alarm; open pull request #430), #25 (production), #385 (SES)
+- Issues: #198 (ingress from CloudFront alone), #77 (swap and the memory alarm, ADR-046), #25 (production), #385 (SES)
 
 ## Open
 
 - Ingress from CloudFront alone (#198). Until it is on, staging's rate limiter keys on the CloudFront edge that forwarded a request, and people behind one edge share a bucket; the team accepts that on staging, and production keeps the order of ADR-008 §5 (`infra/README.md`, Media).
-- Swap (#77). The live staging box has a 2 GB swap file made by hand on 2026-10-08 (`docs/runbooks/incident.md`); a rebuilt box has none until #77 lands. That hand-made file is not in code, so it is not drawn.
 - Production (#25) is composed and not applied. Its `admin-app-url` already names `https://admin.kuutti.app`, a host production does not compose yet.
 - SES (#385): whether the maintainer has applied the bootstrap's identity, and SES verified the domain, is not recorded in the repository.
 - A preview runs a pull request's code on the staging box with the staging role, which can read every `/kuutti/staging/` parameter; the preview drops the secrets from its memory in code, and write access is that trust (ADR-004 §3; `infra/README.md`, Previews, Trust).
