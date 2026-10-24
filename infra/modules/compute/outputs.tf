@@ -27,6 +27,11 @@ output "backup_prefix" {
   value = "s3://${var.backup_bucket}/${local.backup_prefix}"
 }
 
+output "headroom_document" {
+  description = "Name of the Run Command document that gives a running box its swap, Dokploy's memory limit and the free-memory metric (#77, ADR-046); infra/README.md, The box's headroom."
+  value       = aws_ssm_document.headroom.name
+}
+
 output "preview_database_document" {
   description = "Name of the Run Command document preview-cleanup.yml sends to drop kuutti_pr_<n>; null where previews do not run."
   value       = var.preview_databases ? aws_ssm_document.preview_database[0].name : null
