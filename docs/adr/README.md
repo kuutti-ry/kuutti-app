@@ -9,6 +9,8 @@ Every record opens with the same list: `Status`, `Date` (when it was written), `
 - **amended** on a date or over a range of dates, **by ADR-NNN**, or **by §N** (a numbered amendment): points were changed or added later, in this record; the parenthesis names them, with their issue where there is one, and the History or the point itself says how.
 - **superseded by ADR-NNN**: replaced, and kept for its reasoning. No record is, so far.
 
+A record that changes what a view of `docs/architecture/` draws (a module, an environment, a flow across the system, a trust boundary) redraws that view in the same pull request (#397).
+
 The TD numbers are the technical decisions log, TD-1 to TD-19, which lives in the maintainers' private planning documents (CLAUDE.md); where a record and the log disagree, the log wins. The repository cannot show the log, so this page maps each TD number to the public records that cite it, in their `Follows` line or their text: a reader of "TD-6" in CLAUDE.md finds here what to read. A TD that no record cites says "no ADR", with where the repository names it.
 
 `pnpm check:adr-index` (`scripts/check-adr-index.ts`, in CI) fails when a record is missing from the first table, when two records share a number, when a row names a file that does not exist, or when a row's status is not its record's Status line word for word: a new record or a changed status changes this page in the same pull request. The TD columns are not checked.

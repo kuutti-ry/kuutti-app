@@ -17,7 +17,7 @@ Before touching matching, rounds, likes, notifications, rewards, profile present
 | `@kuutti-ry/tunnistus-oidc` (npm) | Telia Tunnistus relying-party kit: the OIDC client in Telia's dialect, discovery, key helpers, the hetu format, the broker's test double; its own repository, kuutti-ry/tunnistus-oidc, MIT, ADR-017 §6 | `docs/vendors/telia.md` |
 | `packages/notices` | the third-party packages a bundle ships, from its source maps or esbuild's metafile, with their copyright lines, licence texts and NOTICE files: the app's licences screen and the API image's `THIRD_PARTY_NOTICES` (#416) | `packages/notices/README.md` |
 | `services/mock-idp` | navikt/mock-oauth2-server with FTN-shaped claims for local dev; its login page names the twenty-four demo personas (ADR-014) | `.claude/rules/infra.md` |
-| `docs/` | security checklist, accessibility checklist, `adr/` | |
+| `docs/` | security checklist, accessibility checklist, `architecture/` (how Kuutti is built and where it runs: six views as Mermaid, #397), `adr/` | `docs/architecture/README.md` |
 | `features/` | Gherkin specs for the rules layer, one directory per slice | `.claude/rules/layout.md` |
 
 Inside each app, code is organised by vertical slice (identity, profile, media, pond, matching, chat, safety, research, rewards, notifications), never by layer; see `.claude/rules/layout.md`. Rules in `.claude/rules/` load automatically when you work on matching paths.

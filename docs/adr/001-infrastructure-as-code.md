@@ -29,7 +29,7 @@ infra/
     data/           RDS instance, parameter group, backups
     compute/        EC2, EBS, Elastic IP, instance profile and role, user_data
     media/          S3 buckets, CloudFront, OAC, cache and origin request policies, ACM
-    email/          SES identity, DKIM, configuration set, SNS topic
+    email/          not built: the SES identity is the domain's, bootstrap/mail.tf (ADR-043 §5)
     observability/  log groups, alarms
   envs/
     staging/ prod/
@@ -88,3 +88,7 @@ Added 2026-10-03. The organisation was renamed from `kuutti-fi` to `kuutti-ry` o
 **CloudFormation directly.** Its historical advantages (day-one support for new services, StackSets, Service Catalog) do not apply to a single-account stack of long-established services. Its changesets are also a weaker review artefact than a plan.
 
 **No IaC, console plus a runbook.** Cheapest today and the usual choice at this size. Rejected for the four reasons in the context section, of which transfer to the association and reviewability of security-relevant resources are the ones that do not go away.
+
+## History
+
+- 2026-10-24 (#397): the layout's `email/` module was never built. Mail's SES identity belongs to the domain, so it went to `bootstrap/mail.tf` with #385 (ADR-043 §5). The modules that came later, `admin` (ADR-025) and `research` (ADR-029), and the deployment they make are in `infra/README.md`'s layout and in `docs/architecture/`.
