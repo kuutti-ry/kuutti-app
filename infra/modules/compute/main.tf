@@ -2,7 +2,8 @@
 # 24.04 arm64, an Elastic IP, and an instance role that reaches exactly its own
 # SSM prefix, its own log group and its backup prefix (TD-19, TD-4 access rule).
 # The bucket (modules/media, #48) and Rekognition (#49) arrived with M3, SES
-# sending with #385 (ADR-043 §5).
+# sending with #385 (ADR-043 §5), the box's swap, Dokploy's memory limit and
+# its free-memory metric with #77 (ADR-046).
 
 data "aws_caller_identity" "current" {}
 data "aws_region" "current" {}
@@ -26,6 +27,19 @@ locals {
   # The API's MAIL_FROM default (apps/api/src/lib/config.ts) without its
   # display name, which ses:FromAddress does not include.
   mail_from = "noreply@${var.domain}"
+  # Where the box's free memory goes, which modules/observability's
+  # memory-low alarm reads (#77). A namespace of its own, not Kuutti/<env>:
+  # the box may write here and nowhere else, so nothing on it (the API, a
+  # preview) can push into the log filters' metrics and quiet their alarms.
+  metric_namespace = "Kuutti/${var.environment}/box"
+  # One text for first boot (user_data) and for a running box (the Run
+  # Command document below), #77, ADR-046.
+  headroom = templatefile("${path.module}/templates/headroom.sh.tpl", {
+    region            = local.region
+    namespace         = local.metric_namespace
+    swap_mb           = var.swap_mb
+    dokploy_memory_mb = var.dokploy_memory_mb
+  })
 }
 
 # ---------------------------------------------------------------------------
@@ -168,6 +182,22 @@ data "aws_iam_policy_document" "api" {
       "${aws_cloudwatch_log_group.api.arn}:*",
       "arn:aws:logs:${local.region}:${local.account_id}:log-group:${local.session_log_group}:*",
     ]
+  }
+
+  # The box's free memory, once a minute (#77, ADR-046), into this
+  # environment's namespace alone. PutMetricData takes no resource; the
+  # namespace is its one condition key.
+  statement {
+    sid       = "OwnMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = [local.metric_namespace]
+    }
   }
 
   # The agent checks the session log group exists before it streams to it.
@@ -333,6 +363,44 @@ resource "aws_ssm_document" "preview_database" {
 }
 
 # ---------------------------------------------------------------------------
+# Headroom on a running box (#77, ADR-046). user_data gives a new box its
+# swap, Dokploy's memory limit and the free-memory metric at first boot, and
+# ignore_changes keeps a running box from ever seeing an edit of it. So the
+# maintainer sends this document, the same text, to a box that predates the
+# change, and again after a change of swap_mb or dokploy_memory_mb
+# (infra/README.md, The box's headroom). A second run changes nothing.
+# Nothing in CI sends it.
+# ---------------------------------------------------------------------------
+
+resource "aws_ssm_document" "headroom" {
+  name            = "${local.name}-headroom"
+  document_type   = "Command"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "2.2"
+    description   = "Swap, a memory limit on Dokploy's service and the free-memory metric on ${local.name} (#77). Sent by the maintainer; a second run changes nothing."
+    mainSteps = [{
+      action = "aws:runShellScript"
+      name   = "headroom"
+      inputs = {
+        timeoutSeconds = "600"
+        runCommand     = split("\n", local.headroom)
+      }
+    }]
+  })
+
+  lifecycle {
+    # Run Command reads {{ name }} in a document as its parameter; this one
+    # has none, so a brace pair in the script would break the document.
+    precondition {
+      condition     = !strcontains(local.headroom, "{{")
+      error_message = "templates/headroom.sh.tpl holds a double brace, which a Run Command document reads as a parameter."
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
 # The box.
 # ---------------------------------------------------------------------------
 
@@ -381,6 +449,7 @@ resource "aws_instance" "api" {
     # The same RDS bundle the API image carries (apps/api/certs); the box's own
     # psql (preview cleanup) verifies the database with it.
     rds_ca_sha256 = filesha256("${path.module}/../../../apps/api/certs/rds-eu-central-1-bundle.pem")
+    headroom      = base64gzip(local.headroom)
   })
 
   # A newer AMI or an edited first-boot script must not replace the running

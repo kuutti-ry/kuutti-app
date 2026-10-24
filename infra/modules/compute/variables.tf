@@ -43,6 +43,27 @@ variable "dokploy_version" {
   type        = string
 }
 
+variable "swap_mb" {
+  description = "Size of the box's /swapfile in MiB, 0 for none (#77, ADR-046). Set by each environment: swap may page the API's memory, a hetu in flight during a callback included, to the root volume, which ADR-046 leaves to the maintainer for production (rule 1)."
+  type        = number
+
+  validation {
+    condition     = var.swap_mb >= 0 && floor(var.swap_mb) == var.swap_mb
+    error_message = "swap_mb is a whole number of MiB, 0 for no swap file."
+  }
+}
+
+variable "dokploy_memory_mb" {
+  description = "Memory limit of Dokploy's own Swarm service (the dokploy service alone, not its Postgres or Traefik), in MiB (#77, ADR-046). Dokploy idles at about 0.8 GB, and Node.js inside it sizes its heap at half the limit. A new box gets it at first boot; a running box when the headroom document is sent again."
+  type        = number
+  default     = 1024
+
+  validation {
+    condition     = var.dokploy_memory_mb >= 1024 && floor(var.dokploy_memory_mb) == var.dokploy_memory_mb
+    error_message = "dokploy_memory_mb is a whole number of MiB, at least 1024: below it an idle Dokploy (about 0.8 GB, its heap at half the limit) would restart in a loop."
+  }
+}
+
 variable "root_volume_gb" {
   type    = number
   default = 30

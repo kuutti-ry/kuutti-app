@@ -46,6 +46,10 @@ module "compute" {
   cpu_credits                = "standard" # a pegged staging box slows down instead of costing extra
   manage_session_preferences = true
   preview_databases          = true # pull-request previews run here (#9)
+
+  # Swap (#77, ADR-046): the size the box has had by hand since 2026-10-08.
+  # Its people are Telia's test persons (ADR-018), so no real hetu can be paged.
+  swap_mb = 2048
 }
 
 # Photos (#48, ADR-005): the media bucket and the CloudFront distribution that

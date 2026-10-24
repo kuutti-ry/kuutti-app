@@ -7,6 +7,7 @@ output "alarm_names" {
   value = [
     aws_cloudwatch_metric_alarm.instance_status.alarm_name,
     aws_cloudwatch_metric_alarm.instance_credits.alarm_name,
+    aws_cloudwatch_metric_alarm.memory_low.alarm_name,
     aws_cloudwatch_metric_alarm.db_storage.alarm_name,
     aws_cloudwatch_metric_alarm.db_credits.alarm_name,
     aws_cloudwatch_metric_alarm.five_xx.alarm_name,
