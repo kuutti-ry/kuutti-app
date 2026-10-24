@@ -1,6 +1,6 @@
 # ADR-048: Nothing public reaches Dokploy before it has its owner
 
-- Status: proposed (#437, built as written here; a change to user data reaches only a box built after it, so production's first boot, #25, is the first to run it, and the two checks of `infra/README.md`, After the first apply, step 2, are the maintainer's then)
+- Status: proposed (#437, built as written here and verified at production's first boot on 2026-10-24, #25: the two checks of `infra/README.md`, After the first apply, step 2, answered 404; accepting it is the maintainer's)
 - Date: 2026-10-24
 - Follows: ADR-001 (`user_data` installs Dokploy, whose configuration is the one manual island, and a change to user data never reaches a running box), ADR-005 §7 (the box admits 80 and 443 from anywhere until the ingress switch), TD-19 (one staging box with the previews on it); the control-plane pin of #9 (`infra/README.md`, Previews, Trust); issues #437, #25
 

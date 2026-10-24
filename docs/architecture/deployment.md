@@ -14,7 +14,7 @@ infra/scripts/db-app-role.sh
 apps/api/src/lib/preview-database.ts
 -->
 
-Where each part of Kuutti runs, environment by environment: a developer's machine, staging and the services around its box, a pull request's previews, production as the code composes it, and the website. It is for a contributor who wants to know what a change will land on, and for a reviewer of `infra/`. Everything here is read from `infra/`, the workflows and the compose file on `main`; what is planned is dashed and names its issue. The deploy tool is drawn as it runs today, Dokploy, while Dokploy versus Kamal stays open. The view draws ADR-001, ADR-005, ADR-008, ADR-012, ADR-014, ADR-018, ADR-025, ADR-029 and ADR-043.
+Where each part of Kuutti runs, environment by environment: a developer's machine, staging and the services around its box, a pull request's previews, production as applied on 2026-10-24 (ADR-049), and the website. It is for a contributor who wants to know what a change will land on, and for a reviewer of `infra/`. Everything here is read from `infra/`, the workflows and the compose file on `main`; what is planned is dashed and names its issue. The deploy tool is drawn as it runs today, Dokploy, while Dokploy versus Kamal stays open. The view draws ADR-001, ADR-005, ADR-008, ADR-012, ADR-014, ADR-018, ADR-025, ADR-029, ADR-043, ADR-046, ADR-048 and ADR-049.
 
 ## Part 1: a developer's machine
 
@@ -254,28 +254,28 @@ flowchart TB
 50. The Run Command document `kuutti-staging-preview-database`: the plan role may send exactly this document to exactly the staging box. It reads the preview role's password from SSM on the box and runs `DROP DATABASE IF EXISTS kuutti_pr_<n> WITH (FORCE)` as `kuutti_preview`.
 51. Update signing: not built yet. Expo signs updates only on its paid plans, so whatever holds `EXPO_TOKEN` can publish to any branch, `staging` and `production` included. ADR-004 §4 reopens this before a production build reaches anyone outside the team.
 
-## Part 5: production, composed and not applied
+## Part 5: production
 
 ```mermaid
 flowchart TB
-  accTitle: Deployment, part 5: production, composed and not applied
-  accDescr: infra/envs/prod composes the same network, box, database, alarms and parameters as staging, with a larger database class and deletion protection, and declares the media module switched off. It leaves out the admin panel's host and the research copy. None of it is applied yet.
-  subgraph prodenv["infra/envs/prod: planned, #25"]
-    n52["Route 53: api.kuutti.app and dokploy.kuutti.app to the Elastic IP: planned, #25"]:::notbuilt
-    n53["VPC: one public subnet, two private, no NAT: planned, #25"]:::notbuilt
-    n54["EC2 t4g.small, arm64, unlimited CPU credits, Dokploy (current; Kamal open): planned, #25"]:::notbuilt
-    n55["RDS PostgreSQL 17, single-AZ, db.t4g.small, deletion protection: planned, #25"]:::notbuilt
-    n56["Parameters under /kuutti/prod/: planned, #25"]:::notbuilt
-    n57["Alarms, topic and probe on api.kuutti.app: planned, #25"]:::notbuilt
+  accTitle: Deployment, part 5: production
+  accDescr: infra/envs/prod, applied on 2026-10-24 before the first release, composes the same network, box, database, alarms and parameters as staging, with a larger database class and deletion protection. Dokploy on the box runs one application, the API, pinned to a commit and with bank identification off. The media module is declared switched off; the admin panel's host and the research copy are not built.
+  subgraph prodenv["infra/envs/prod: applied 2026-10-24, ADR-049"]
+    n52["Route 53: api.kuutti.app and dokploy.kuutti.app to the Elastic IP"]
+    n53["VPC: one public subnet, two private, no NAT"]
+    n54["EC2 t4g.small, arm64, unlimited CPU credits, no swap; Dokploy (current; Kamal open) running the API"]
+    n55["RDS PostgreSQL 17, single-AZ, db.t4g.small, deletion protection"]
+    n56["Parameters under /kuutti/prod/: no bank, HMAC or CloudFront key"]
+    n57["Alarms, topic and probe on api.kuutti.app"]
     n58["Media and the API's distribution, declared with media_enabled off: not built yet, #25"]:::notbuilt
   end
   n59["The admin panel on admin.kuutti.app: not built yet, #25"]:::notbuilt
   n60["The research copy: not built yet, ADR-029's open points"]:::notbuilt
-  n52 -.->|"names"| n54
-  n53 -.->|"holds"| n54
-  n54 -.->|"5432, TLS"| n55
-  n54 -.->|"reads at boot"| n56
-  n57 -.->|"watches"| n54
+  n52 -->|"names"| n54
+  n53 -->|"holds"| n54
+  n54 -->|"5432, TLS"| n55
+  n54 -->|"reads at boot"| n56
+  n57 -->|"watches"| n54
   n58 -.->|"would front"| n54
   n59 -.->|"would call the API"| n54
   n60 -.->|"would live in the media bucket"| n58
@@ -286,15 +286,15 @@ flowchart TB
 
 52. Route 53: `api.kuutti.app` and `dokploy.kuutti.app` as A records to production's Elastic IP; `origin.api` takes `api`'s place once media is on. No preview records: production has no previews.
 53. The same network module as staging, with its own /16: one public subnet, two private, no NAT, 443 open to the world while `cloudfront_only_ingress` is off.
-54. The same compute module: `t4g.small`, arm64, with unlimited CPU credits (the module's default, where staging asks for standard). No preview databases and no Session Manager preferences, which staging owns for the account. Its role `kuutti-api-prod` reads `/kuutti/prod/` alone and may mail any address. Dokploy (current; Kamal open) as on staging.
+54. The same compute module: `t4g.small`, arm64, with unlimited CPU credits (the module's default, where staging asks for standard). No preview databases and no Session Manager preferences, which staging owns for the account. Its role `kuutti-api-prod` reads `/kuutti/prod/` alone and may mail any address; a policy simulation on 2026-10-24 denied it `/kuutti/staging/`. No swap until ADR-046's open point is answered: with the API running, the box had about 270 MiB available on 2026-10-24, against the memory alarm's 200. Dokploy (current; Kamal open) as on staging, its owner made through the port forward while nothing public reached it (ADR-048, checked from outside at the first boot). Its one application, `api`, runs the API pinned to a commit whose image's attestation was verified, deployed by hand (ADR-049 §2).
 55. RDS PostgreSQL 17, single-AZ, `db.t4g.small`, with deletion protection and a final snapshot.
-56. The parameters: `app-env` `production`, `moderation` `rekognition`, `mail` `ses`, `admin-app-url` and `cors-allowed-origins` `https://admin.kuutti.app`, `trusted-proxy` `traefik`. The bank's production issuer and its level are written only together with Telia's production client id, which is null today.
+56. The parameters: `app-env` `production`, `moderation` `rekognition`, `mail` `ses`, `admin-app-url` and `cors-allowed-origins` `https://admin.kuutti.app`, `trusted-proxy` `traefik`. The bank's production issuer and its level are written only together with Telia's production client id, which is null today, so the API boots with bank identification off. `db-app-password` is the one secret, made by `db-app-role.sh`; no HMAC, Telia or CloudFront key exists for production yet (ADR-049 §1).
 57. The same observability module: the alarms, the topic and the outside probe, on `api.kuutti.app`.
 58. The media module is declared, but `media_enabled` is off: no bucket, no distribution, until production's own cutover.
 59. Production composes no host for the panel; it comes with #25, at `admin.kuutti.app`, the address production's parameters already name.
 60. The research copy: production composes neither the module nor the copy until the maintainer has answered ADR-029's ninety days and its other open points.
 
-Production is applied by `infra-prod.yml` on a release tag, behind the `prod` environment's reviewer ([Delivery](delivery.md), part 3). Staging was applied first. Production is applied before the first release, as a rehearsal of #25 without bank identification, from a tag `v<version>-rehearsal.<n>`, and this part is redrawn as built in the change after that apply (ADR-049; `infra/README.md`, Cost).
+Production is applied by `infra-prod.yml` on a `v*` tag, behind the `prod` environment's reviewer ([Delivery](delivery.md), part 3). Staging was applied first. Production was applied on 2026-10-24 from the tag `v0.64.8-rehearsal.1`, before the first release and without bank identification, and stays up (ADR-049). Between tags it lags `main`: a pull request plans it, and only the next tag and its approval apply it (ADR-049 §5).
 
 ## Part 6: the website
 
@@ -321,14 +321,14 @@ flowchart TB
 - Staging and production: [infra/envs/staging](../../infra/envs/staging) and [infra/envs/prod](../../infra/envs/prod) (`main.tf`, `dns.tf`, `variables.tf`); the modules [network](../../infra/modules/network), [compute](../../infra/modules/compute) (with its first-boot script and the vendored Dokploy installer), [data](../../infra/modules/data), [media](../../infra/modules/media), [admin](../../infra/modules/admin), [research](../../infra/modules/research), [observability](../../infra/modules/observability); [infra/bootstrap](../../infra/bootstrap) (the state bucket, the zone, the SES identity, the CI roles); [infra/scripts/dokploy-setup.sh](../../infra/scripts/dokploy-setup.sh), [db-app-role.sh](../../infra/scripts/db-app-role.sh)
 - Previews: [.github/workflows/preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [.github/scripts/dokploy-preview.sh](../../.github/scripts/dokploy-preview.sh), [apps/api/src/lib/preview-database.ts](../../apps/api/src/lib/preview-database.ts), [apps/api/src/lib/config.ts](../../apps/api/src/lib/config.ts) (what a preview drops)
 - The manual: [infra/README.md](../../infra/README.md) (Environments, Media, Mail, Admin panel, Research copy, Observability, Previews, Backups and rebuilding the box, Secrets, The website), [docs/runbooks/incident.md](../runbooks/incident.md)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (OpenTofu; Dokploy's configuration as the manual island), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (the distribution, §7 the ingress switch), [ADR-008](../adr/008-exposure-budget-and-client-address.md) §5 (the trusted proxy), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-014](../adr/014-demo-mode.md) (the mock bank; no real bank on a preview), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds no real person), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) (the flows on the local environment), [ADR-025](../adr/025-admin-host.md) (the panel's host and its previews), [ADR-029](../adr/029-the-research-copy.md) (the research copy), [ADR-043](../adr/043-email-confirmation.md) §5 and §6 (SES and staging's testers)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (OpenTofu; Dokploy's configuration as the manual island), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (the distribution, §7 the ingress switch), [ADR-008](../adr/008-exposure-budget-and-client-address.md) §5 (the trusted proxy), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-014](../adr/014-demo-mode.md) (the mock bank; no real bank on a preview), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds no real person), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) (the flows on the local environment), [ADR-025](../adr/025-admin-host.md) (the panel's host and its previews), [ADR-029](../adr/029-the-research-copy.md) (the research copy), [ADR-043](../adr/043-email-confirmation.md) §5 and §6 (SES and staging's testers), [ADR-046](../adr/046-box-headroom.md) (swap and the memory alarm), [ADR-048](../adr/048-dokploy-owner-first.md) (nothing public before Dokploy's owner), [ADR-049](../adr/049-production-before-the-first-release.md) (production before the first release)
 - Issues: #198 (ingress from CloudFront alone), #77 (swap and the memory alarm, ADR-046), #25 (production), #385 (SES)
 
 ## Open
 
 - Ingress from CloudFront alone (#198). Until it is on, staging's rate limiter keys on the CloudFront edge that forwarded a request, and people behind one edge share a bucket; the team accepts that on staging, and production keeps the order of ADR-008 §5 (`infra/README.md`, Media).
-- Production (#25) is composed and not applied. Its `admin-app-url` already names `https://admin.kuutti.app`, a host production does not compose yet.
-- SES (#385): whether the maintainer has applied the bootstrap's identity, and SES verified the domain, is not recorded in the repository.
+- Production (#25) runs without bank identification (ADR-049) and without swap (ADR-046's open point). Its `admin-app-url` already names `https://admin.kuutti.app`, a host production does not compose yet.
+- SES (#385): on 2026-10-24 the bootstrap's identity was not applied, and the account was in SES's sandbox (ADR-049), so neither environment sends mail yet.
 - A preview runs a pull request's code on the staging box with the staging role, which can read every `/kuutti/staging/` parameter; the preview drops the secrets from its memory in code, and write access is that trust (ADR-004 §3; `infra/README.md`, Previews, Trust).
 - `infra/modules/network/variables.tf` says the VPC's "four subnets are carved from it"; the module makes three, as `infra/README.md` says. The view draws the module's three.
 - `infra/README.md` (Previews) still calls the native lane "dormant until `expo-updates` is configured"; `apps/mobile/app.json` has configured it, and `preview.yml` publishes when the lane's check passes.
