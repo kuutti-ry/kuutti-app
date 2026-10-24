@@ -1,6 +1,6 @@
 # ADR-049: Production stands up before the first release
 
-- Status: proposed (#25, on the maintainer's answers of 2026-10-24: the tag applies production and the release gate holds, production stays up afterwards, the budget is 110 USD; nothing applied yet)
+- Status: proposed (#25, on the maintainer's answers of 2026-10-24: the tag applies production and the release gate holds, production stays up afterwards, the budget is 110 USD; applied on 2026-10-24 from `v0.64.8-rehearsal.1`, the API deployed by hand, #25; accepting it, swap in production and bank identification are the maintainer's)
 - Date: 2026-10-24
 - Follows: TD-4 (one vendor, AWS; the budget of 50 EUR a month), TD-19 (RDS, the parameter store and the instance role), ADR-001 (production applied by CI behind the `prod` environment's approval on a `v*` tag), ADR-028 (the counted version and its tags), ADR-046 (swap in production, open), ADR-048 (nothing public reaches Dokploy before it has its owner, #437), rules/i18n.md (the release gate), CLAUDE.md rules 1 and 2; issue #25 and the maintainer's comment on it of 2026-10-24 (bank identification in production on hold)
 

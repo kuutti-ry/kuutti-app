@@ -146,7 +146,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Delivery, part 3: a release tag
-  accDescr: A v tag runs the release checks, retags the image main built for that commit and attests it, then deploys it to production through deploy.yml and drafts the release. Beside it infra-prod.yml applies production and eas-build.yml makes the production builds. Every job in the prod environment waits for the maintainer's approval. Production's first apply has not happened.
+  accDescr: A v tag runs the release checks, retags the image main built for that commit and attests it, then deploys it to production through deploy.yml and drafts the release. Beside it infra-prod.yml applies production and eas-build.yml makes the production builds. Every job in the prod environment waits for the maintainer's approval. Production's first apply ran on 2026-10-24 from a rehearsal tag, on which the release gate stopped the image, the deploy and the builds.
   n29["The maintainer pushes a tag vX.Y.Z"]
   subgraph buildtag["build.yml on the tag"]
     n30["image: no machine Finnish, then main's image for this commit retagged vX.Y.Z"]
@@ -156,14 +156,13 @@ flowchart TB
   end
   n34["infra-prod.yml: applies prod as kuutti-ci-apply, environment prod, after the reviewer"]
   n35["eas-build.yml: the production builds, environment prod, after the reviewer"]
-  n36["Production's first apply and deploy: planned, #25"]:::notbuilt
+  n36["A full release tag through CI, deploy prod included: planned, #25"]:::notbuilt
   n29 -->|"the tag"| n30
   n30 -->|"the digest"| n31
   n30 -->|"the image vX.Y.Z"| n32
   n30 -->|"the image by digest"| n33
   n29 -->|"the tag"| n34
   n29 -->|"the tag, with EAS_ENABLED"| n35
-  n36 -.->|"planned, #25"| n34
   n36 -.->|"planned, #25"| n32
   classDef notbuilt stroke-dasharray: 5 5
 ```
@@ -173,11 +172,11 @@ flowchart TB
 29. The maintainer pushes a tag `vX.Y.Z`. The tag ruleset in `infra/README.md` lets only repository admins create, move or delete a `v*` tag, since a tag deploys production. Before it, the version was bumped in the pull request that carried the change (ADR-028).
 30. `build.yml`, job `image`: first `pnpm i18n:check --release`, so that no image is tagged while a Finnish text is still machine-translated. Then, if `main` already built this commit, its image is retagged `vX.Y.Z` and not rebuilt, so production runs the bytes staging ran; a tag off `main`, such as a hotfix, is built and pushed as on `main`.
 31. Job `attest`: the attestation again, under the tag's ref, so that a recovery can verify the release's image by its tag.
-32. Job `deploy prod`: `deploy.yml` in the environment `prod`, which waits for the maintainer's approval, then Dokploy, `/health`, and the EAS Update to the channel `production` with production's EAS environment, and its source maps, with the `prod` environment's own `DOKPLOY_TOKEN`, `EXPO_TOKEN` and `SENTRY_AUTH_TOKEN`. Until production's Dokploy is set up and its variables exist, the job stops green.
+32. Job `deploy prod`: `deploy.yml` in the environment `prod`, which waits for the maintainer's approval, then Dokploy, `/health`, and the EAS Update to the channel `production` with production's EAS environment, and its source maps, with the `prod` environment's own `DOKPLOY_TOKEN`, `EXPO_TOKEN` and `SENTRY_AUTH_TOKEN`. Production's Dokploy and its four values (`DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `API_URL`, `DOKPLOY_TOKEN`) exist since 2026-10-24 (ADR-049). `prod` holds no `SENTRY_AUTH_TOKEN` yet (#201), so production's source maps are not uploaded until it does.
 33. Job `release`: `release.yml`, with `contents: write`, drafts a GitHub release with notes generated from the commits since the last tag and the image's digest. The maintainer reads the draft and publishes it.
 34. `infra-prod.yml`: plan and apply of `envs/prod` as `kuutti-ci-apply` in the environment `prod`, after the reviewer. It has its own concurrency group and shares no cache with pull-request runs.
 35. `eas-build.yml` on the tag: its release check of the Finnish texts first, in a job without an environment, so that it answers before the reviewer is asked; then the `production` profile for both platforms in the environment `prod`, with `prod`'s `EXPO_TOKEN`.
-36. Planned, #25: production is applied before the first release by a rehearsal tag `v<version>-rehearsal.<n>` (ADR-049), whose run of `infra-prod.yml` is the first. On that tag the release gate stops `build.yml` and `eas-build.yml` while Finnish texts wait for review, so steps 29 to 35 run in full only at the first release proper. The budget is raised with it (`infra/README.md`, Cost).
+36. Production was first applied on 2026-10-24 by the rehearsal tag `v0.64.8-rehearsal.1` (ADR-049): step 34 ran, while the release gate stopped steps 30 to 33 and 35, as it stops any tag while Finnish texts wait for review. The API was then deployed to production by hand, pinned to a verified commit. Planned, #25: steps 29 to 35 in full, CI's deploy of production among them, at the first release.
 
 ## What each job may touch
 
@@ -218,7 +217,7 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 - Scripts: [.github/scripts](../../.github/scripts) (`aws-oidc.sh`, the OIDC exchange with no third-party action; `dokploy-deploy.sh`; `dokploy-preview.sh`; `wait-healthy.sh`; `check-workflow-permissions.py`)
 - The roles and their trust: [infra/bootstrap/main.tf](../../infra/bootstrap/main.tf); the environments, the rulesets and the variables: [infra/README.md](../../infra/README.md) (After bootstrap: GitHub; Environments, CI; Previews; Admin panel)
 - The app's channels and profiles: [apps/mobile/eas.json](../../apps/mobile/eas.json), [apps/mobile/app.json](../../apps/mobile/app.json)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (plans on pull requests, applies behind environments), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed; who can publish), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) §6 and §7 (the flows in CI), [ADR-025](../adr/025-admin-host.md) §5 to §8 (the panel's deploy and previews), [ADR-028](../adr/028-versioning-and-the-bump.md) (the version)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (plans on pull requests, applies behind environments), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed; who can publish), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) §6 and §7 (the flows in CI), [ADR-025](../adr/025-admin-host.md) §5 to §8 (the panel's deploy and previews), [ADR-028](../adr/028-versioning-and-the-bump.md) (the version), [ADR-049](../adr/049-production-before-the-first-release.md) (production's first apply from a rehearsal tag)
 - Not drawn, since they deliver nothing: `audit.yml`, `dead-code.yml`, `dependency-review.yml`, `scorecard.yml`, and `export.yml`, the weekly copy of what exists only on GitHub, under its own role `kuutti-ci-export`.
 - Issues: #25 (production), #77 (the box's memory, which a deploy and three previews at once have exhausted before)
 
@@ -226,7 +225,7 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 
 - Which profiles a push to `main` builds. `infra/README.md` (CI) and the header of `eas-build.yml` say `development` and `preview`; the job's code builds `development` alone on a push and leaves `preview` to a start by hand. The view says "a native build" and names neither.
 - The switches `STAGING_ENABLED`, `EAS_ENABLED`, `PREVIEWS_ENABLED`, `EAS_PLATFORMS` and the environments' variables are set on GitHub, not in the repository; the view draws what runs when they are on.
-- Production (#25): it waits for the first release, so `infra-prod.yml` has not applied `envs/prod`. Production's Dokploy is set up only after that first apply (`infra/README.md`, After the first apply), so the first tag's `deploy prod` would stop green, deploying nothing, until its variables exist.
+- Production (#25): applied on 2026-10-24 by a rehearsal tag and set up by hand (ADR-049). The first tag that passes the release gate is the first whose `deploy prod` deploys it.
 - Update signing (ADR-004 §4) is not built: an `EXPO_TOKEN` from any of four environments can publish to the `production` channel, and the `preview` environment has no reviewer, so write access to the repository is the trust of the update path.
 - A pull request's `image` job holds `packages: write` and could push any tag of the API image; a later release would retag only a commit `main` built, and the attestation's source ref tells a pull request's image apart (`infra/README.md`, Build provenance and Previews).
 - `auto-approve.yml` needs the repository's setting that lets Actions approve pull requests; whether it is on is not in the repository.

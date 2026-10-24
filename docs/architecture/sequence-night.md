@@ -12,7 +12,7 @@ In these diagrams every arrow is built. Mermaid's sequence diagrams take a messa
 
 ## The jobs, in order
 
-"Everywhere" is every process the API runs in: staging, a developer's machine, and each pull request's preview against its own database. Production would run the same list but the two jobs it holds back; it is not applied yet.
+"Everywhere" is every process the API runs in: staging, a developer's machine, and each pull request's preview against its own database. Production runs the same list but the two jobs it holds back.
 
 | # | Job, as the log names it | Where the work lives | Reads | Writes | Runs |
 |---|---|---|---|---|---|
@@ -184,7 +184,7 @@ sequenceDiagram
 
 ## Open
 
-- **Two jobs held back in production, the maintainer's to lift.** `round-builder` waits for how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1), and `research-export` for ADR-029's ninety days. Both are `shortcut:` lines in `boot.ts`. Production itself is not applied yet.
+- **Two jobs held back in production, the maintainer's to lift.** `round-builder` waits for how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1), and `research-export` for ADR-029's ninety days. Both are `shortcut:` lines in `boot.ts`.
 - **"As cron".** `.claude/rules/api.md` says the nightly jobs run "as cron inside the same container". There is no cron: one timer in the API's process (`jobs/nightly.ts`). Drawn as the code.
 - **What `jobs/` holds.** `.claude/rules/layout.md` says `jobs/` holds the nightly runner and its jobs, "the slices' sweeps" among them. The sweeps live in their slices, `jobs/` also holds the round builder and the invitation count, and the order is `boot.ts`'s list. Drawn as `boot.ts`.
 - **"Every 24 hours".** The comment at the top of `jobs/nightly.ts` says one timer to the next 04:00, then every 24 hours. The code arms the timer again for the next 04:00 after each run, so on the nights summer time begins or ends the wait is 23 or 25 hours. Drawn as the code: 04:00 in Helsinki, every night.
