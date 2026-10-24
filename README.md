@@ -38,7 +38,7 @@ AGPL-3.0 with App Store exception.
 
 The code is licensed under the GNU Affero General Public License, version 3, see [LICENSE](LICENSE), with an additional permission under section 7 that allows distribution through app stores whose terms conflict with the AGPL, see [LICENSE-EXCEPTION](LICENSE-EXCEPTION).
 
-The licence covers the code, not the name or the look: a fork needs its own name and emblem, see [TRADEMARKS.md](TRADEMARKS.md). Whoever runs the code as a service offers its source to the users of that service (AGPL section 13): the API names it in `GET /health` (`source`, with the running `commit`), and the app and the moderation panel show both. A modified deployment sets `SOURCE_URL` to its own repository.
+The licence covers the code, not the name or the look: a fork needs its own name and emblem, see [TRADEMARKS.md](TRADEMARKS.md). Saiga, the typeface the app and the panel are set in, is Spoke Type's, licensed to Kuutti ry for Kuutti alone; it is not in this repository and not under its licence, and a build without it, a fork's, is in the system font (ADR-052). Whoever runs the code as a service offers its source to the users of that service (AGPL section 13): the API names it in `GET /health` (`source`, with the running `commit`), and the app and the moderation panel show both. A modified deployment sets `SOURCE_URL` to its own repository.
 
 The Telia Tunnistus relying-party kit is a repository of its own, [kuutti-ry/tunnistus-oidc](https://github.com/kuutti-ry/tunnistus-oidc), MIT, published as `@kuutti-ry/tunnistus-oidc` (ADR-017 §6), so that any Finnish relying party can take it; this repository takes it from npm.
 

@@ -7,23 +7,27 @@ import { MAX_FONT_SCALE } from "@/theme/a11y";
 
 // From React Native Reusables (#12, TD-9), adapted: text follows the OS font
 // size up to MAX_FONT_SCALE, and no variant shrinks at a web breakpoint.
-const textVariants = cva(cn("text-base text-foreground", Platform.select({ web: "select-text" })), {
-  variants: {
-    variant: {
-      default: "",
-      h1: "text-4xl font-extrabold tracking-tight",
-      h2: "text-3xl font-semibold tracking-tight",
-      h3: "text-2xl font-semibold tracking-tight",
-      h4: "text-xl font-semibold tracking-tight",
-      lead: "text-xl text-muted-foreground",
-      large: "text-lg font-semibold",
-      small: "text-sm font-medium",
-      muted: "text-sm text-muted-foreground",
-      code: "rounded bg-muted px-1 py-0.5 font-mono text-sm",
+// font-sans is Saiga (ADR-052).
+const textVariants = cva(
+  cn("font-sans text-base text-foreground", Platform.select({ web: "select-text" })),
+  {
+    variants: {
+      variant: {
+        default: "",
+        h1: "text-4xl font-extrabold tracking-tight",
+        h2: "text-3xl font-semibold tracking-tight",
+        h3: "text-2xl font-semibold tracking-tight",
+        h4: "text-xl font-semibold tracking-tight",
+        lead: "text-xl text-muted-foreground",
+        large: "text-lg font-semibold",
+        small: "text-sm font-medium",
+        muted: "text-sm text-muted-foreground",
+        code: "rounded bg-muted px-1 py-0.5 font-mono text-sm",
+      },
     },
+    defaultVariants: { variant: "default" },
   },
-  defaultVariants: { variant: "default" },
-});
+);
 
 type TextVariantProps = VariantProps<typeof textVariants>;
 type TextVariant = NonNullable<TextVariantProps["variant"]>;

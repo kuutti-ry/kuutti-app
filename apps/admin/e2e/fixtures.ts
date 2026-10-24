@@ -5,6 +5,12 @@ import { test as base, expect, type Page } from "@playwright/test";
 // The guard listens on the panel's origin only: the mock bank's page is not the panel's to answer
 // for.
 
+// Saiga's faces are on no runner and in no build (ADR-052): where they are missing, the host
+// answers their path with index.html, the browser says it could not read a font, and the panel
+// draws in the system's. Those two warnings, and nothing else, are expected.
+const SAIGA_ABSENT =
+  /^(?:Failed to decode downloaded font: \S*\/fonts\/saiga-|OTS parsing error: invalid sfntVersion)/;
+
 export const test = base.extend<{ problems: string[] }>({
   problems: [
     async ({ page, baseURL }, use) => {
@@ -13,7 +19,11 @@ export const test = base.extend<{ problems: string[] }>({
       const onPanel = () => URL.canParse(page.url()) && new URL(page.url()).origin === panel;
       const problems: string[] = [];
       page.on("console", (message) => {
-        if (["error", "warning"].includes(message.type()) && onPanel()) {
+        if (
+          ["error", "warning"].includes(message.type()) &&
+          onPanel() &&
+          !SAIGA_ABSENT.test(message.text())
+        ) {
           problems.push(`console ${message.type()}: ${message.text()}`);
         }
       });

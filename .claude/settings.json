@@ -1,6 +1,16 @@
 {
   "permissions": {
-    "deny": ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)"]
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Read(~/.cache/kuutti-fonts/**)",
+      "Read(**/*.ttf)",
+      "Read(**/*.otf)",
+      "Read(**/*.woff)",
+      "Read(**/*.woff2)"
+    ]
   },
   "enabledPlugins": {
     "expo@claude-plugins-official": true

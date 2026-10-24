@@ -1,5 +1,48 @@
 @import "./src/theme/tokens.css";
 
+/*
+ * Saiga for the web target (ADR-052). Native ignores these rules: a phone has
+ * Saiga embedded by its build (plugins/withSaiga.js). The dev server answers
+ * the files from ~/.cache/kuutti-fonts, to this computer alone
+ * (metro.config.js); an export has none, so a pull request's web preview is in
+ * the system font, as the stack of tailwind.config.js has it.
+ */
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Saiga;
+  src: url("/fonts/saiga-1.002/Saiga-Extrabold.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
