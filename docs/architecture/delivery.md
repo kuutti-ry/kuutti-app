@@ -14,13 +14,14 @@
 .github/workflows/dco.yml
 .github/workflows/secret-scan.yml
 .github/workflows/e2e.yml
+.github/workflows/e2e-admin.yml
 .github/workflows/auto-approve.yml
 .github/scripts/
 apps/mobile/eas.json
 infra/bootstrap/main.tf
 -->
 
-How a change travels from a pull request to the staging box, the phones and, at a release, production: which workflow does what, in which order, and what each step may touch, by its GitHub environment, its AWS role and its secrets, named and never shown. It is for a contributor who wants to know what their pull request sets off, and for a reviewer of `.github/workflows`. The checks of `ci.yml` and `e2e.yml` appear only as far as they gate delivery. The view draws ADR-001, ADR-004, ADR-012, ADR-020, ADR-025 and ADR-028.
+How a change travels from a pull request to the staging box, the phones and, at a release, production: which workflow does what, in which order, and what each step may touch, by its GitHub environment, its AWS role and its secrets, named and never shown. It is for a contributor who wants to know what their pull request sets off, and for a reviewer of `.github/workflows`. The checks of `ci.yml`, `e2e.yml` and `e2e-admin.yml` appear only as far as they gate delivery. The view draws ADR-001, ADR-004, ADR-012, ADR-020, ADR-025, ADR-028 and ADR-051.
 
 Three roles reach AWS, all made by `infra/bootstrap` and assumed by a job's GitHub OIDC token (the third, `kuutti-ci-export`, is the weekly export's, delivers nothing and is not drawn); no AWS credential exists in any secret. `kuutti-ci-plan` is AWS's read-only access less every data read and decryption, and trusts any pull request of this repository and `main`. `kuutti-ci-apply` is power-user access with scoped IAM, and trusts only a job in the GitHub environment `staging` or `prod`. The four GitHub environments: `staging` takes deployments from `main` alone, with no reviewer; `prod` takes `v*` tags alone, behind the maintainer as reviewer; `preview` takes any branch of this repository, with no reviewer since 2026-10-08 (ADR-004 §3); `preview-cleanup` takes `main` alone, with no reviewer (ADR-012 §9).
 
@@ -29,7 +30,7 @@ Three roles reach AWS, all made by `infra/bootstrap` and assumed by a job's GitH
 ```mermaid
 flowchart TB
   accTitle: Delivery, part 1: a pull request
-  accDescr: Every push to a pull request runs the fourteen required checks, builds and smoke-tests the API image and pushes it under the pull request's tags. A change under infra is planned for staging and production by the read-only role. The previews deploy the image as a Dokploy application, the web export to EAS Hosting, the admin panel to its prefix and, when native code changed, an EAS Update. Merging needs the checks green and one approving review, and is a squash. The Maestro flows run only with the label e2e and do not gate the merge.
+  accDescr: Every push to a pull request runs the fourteen required checks, builds and smoke-tests the API image and pushes it under the pull request's tags. A change under infra is planned for staging and production by the read-only role. The previews deploy the image as a Dokploy application, the web export to EAS Hosting, the admin panel to its prefix and, when native code changed, an EAS Update. Merging needs the checks green and one approving review, and is a squash. The Maestro flows run only with the label e2e, the panel's flows when what they exercise changed; neither gates the merge.
   n1["A branch of this repository, with a pull request"]
   subgraph gates["What a merge waits for"]
     n2["ci.yml: twelve required checks, no environment, no secret"]
@@ -41,7 +42,7 @@ flowchart TB
     n6["build.yml image: built and smoke-tested on arm64, pushed to GHCR as pr-N"]
     n7["infra.yml: fmt, and beside it plans staging and prod as kuutti-ci-plan"]
     n8["infra-oidc.yml: kuutti-ci-plan still cannot decrypt"]
-    n9["e2e.yml: the Maestro flows, with the label e2e only, not required"]
+    n9["e2e.yml and e2e-admin.yml: the Maestro flows with the label e2e, the panel's flows when it changed; not required"]
   end
   subgraph prev["preview.yml, environment preview"]
     n10["api lane: Dokploy application api-pr-N, DOKPLOY_TOKEN"]
@@ -54,7 +55,7 @@ flowchart TB
   n1 -->|"every push"| n6
   n1 -->|"when infra/ changed"| n7
   n1 -->|"when infra/ changed"| n8
-  n1 -->|"with the label e2e"| n9
+  n1 -->|"with the label e2e; the panel's paths"| n9
   n2 -->|"green"| n5
   n3 -->|"green"| n5
   n4 -->|"approved"| n5
@@ -74,7 +75,7 @@ flowchart TB
 6. `build.yml`, job `image`: the API's image, built natively on an arm64 runner, never under emulation, then started against a Postgres 17 service until `/health` says the database is reachable and the migrations current, and checked for its licence and third-party notices. For a pull request from this repository it is pushed to GHCR as `kuutti-api:pr-<n>-<sha7>` and `:pr-<n>`, with the job's `GITHUB_TOKEN` and `packages: write`, without provenance: nothing ships from it.
 7. `infra.yml`, when `infra/`, the workflow or `.github/scripts` changed: `tofu fmt` for everything, with no credential, and in parallel `init`, `validate` and `plan` for `envs/staging` and `envs/prod` as `kuutti-ci-plan`, each plan a sticky comment on the pull request. The bootstrap is never planned or applied by CI.
 8. `infra-oidc.yml`, when `infra/` or its own workflow changed, or by hand: proves that `kuutti-ci-plan` can still be assumed from a pull request and still cannot decrypt a SecureString parameter.
-9. `e2e.yml`: the Maestro flows on Android emulators against a local stack on the runner (ADR-020 §6 and §7), on a pull request only with the label `e2e`, and on every push to `main`. No environment, no secret, not a required check: it gates no deploy.
+9. `e2e.yml`: the Maestro flows on Android emulators against a local stack on the runner (ADR-020 §6 and §7), on a pull request only with the label `e2e`, and on every push to `main`. `e2e-admin.yml`: the moderation panel's flows in Chromium against the same stack and the panel's production build under its host's headers (ADR-051), on a pull request that changes what they exercise (the panel, the API, the packages, the mock bank, the panel's host module, or the stack's and the workspace's files: `docker-compose.yml`, `env.example`, the manifests, the lockfile, `tsconfig.base.json` and the pnpm action), and on every push to `main`. Neither has an environment or a secret, and neither is a required check: they gate no deploy.
 10. `preview.yml`, lane `api`, while `PREVIEWS_ENABLED` is on: it waits for the image of step 6, then creates or updates the Dokploy application `api-pr-<n>` with `DOKPLOY_TOKEN`, a member's token that reaches the `previews` project only. It waits until the preview's `/health` reports the commit and checks that the preview answers its own web origin and refuses every other. At most three pull requests hold previews ([Deployment](deployment.md), part 4).
 11. Lane `web`: `expo export --platform web` against the preview's API, then `eas deploy --alias pr-<n>` with `EXPO_TOKEN`, and a check that the page's bundle names that API.
 12. The panel's lanes: one job in the environment `preview`, for its variables only, builds the panel under `/pr-<n>/` against the staging API, holding no credential, since the pull request's own install and Vite configuration run there. A second job, with no environment and no install, writes the build to `pr-<n>/` of the panel's bucket as `kuutti-ci-plan`, whose only write there is `pr-*` (ADR-025 §6 and §7).
@@ -85,7 +86,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Delivery, part 2: a merge to main
-  accDescr: A merge pushes the API image for the commit with provenance and an attestation, deploys it to staging's Dokploy, waits for /health and publishes the EAS Update to the staging channel, then builds and uploads the admin panel. Beside it, infra.yml applies staging, eas-build.yml starts a native build when the fingerprint changed, the sweep removes old previews and the Maestro flows run. Update signing is not built.
+  accDescr: A merge pushes the API image for the commit with provenance and an attestation, deploys it to staging's Dokploy, waits for /health and publishes the EAS Update to the staging channel, then builds and uploads the admin panel. Beside it, infra.yml applies staging, eas-build.yml starts a native build when the fingerprint changed, the sweep removes old previews and the end-to-end flows run. Update signing is not built.
   n14["The squash commit lands on main"]
   subgraph buildyml["build.yml"]
     n15["image: kuutti-api:SHA and :main, with provenance and an SBOM"]
@@ -103,7 +104,7 @@ flowchart TB
   n24["eas-build.yml: a native build on EAS when the fingerprint changed, environment staging, EXPO_TOKEN"]
   n25["preview-cleanup.yml: the sweep, environment preview-cleanup and kuutti-ci-plan"]
   n26["preview.yml: the fingerprint of main, kept for the native lane"]
-  n27["e2e.yml: the Maestro flows, after the merge"]
+  n27["e2e.yml and e2e-admin.yml: the end-to-end flows, after the merge"]
   n28["Update signing: not built yet, ADR-004 §4"]:::notbuilt
   n14 -->|"every push to main"| n15
   n15 -->|"the digest"| n16
@@ -137,7 +138,7 @@ flowchart TB
 24. `eas-build.yml`, while `EAS_ENABLED` is `true`, in the environment `staging` with `EXPO_TOKEN`: for each platform of `EAS_PLATFORMS` (Android unless set), it compares the project's fingerprint with the newest development build's, and starts a build on EAS only when they differ, cancelling older builds of the same profile still queued. A job that reads nothing secret first checks, on a production build only, that no Finnish text is still machine-translated. Build links go to the issue named by `EAS_BUILDS_ISSUE`, when set, with `issues: write`.
 25. `preview-cleanup.yml`, the sweep, on every push to `main` and on a schedule: it selects closed, merged and week-old previews with `DOKPLOY_TOKEN` in the environment `preview-cleanup`, drops their databases as `kuutti-ci-plan` through the one Run Command document it may send, removes the EAS alias and branch with `EXPO_TOKEN`, then the Dokploy application, and removes the panel's `pr-<n>/` as `kuutti-ci-plan`. A job of its own, holding the only `actions: write` in the repository and no secret, cancels preview runs still waiting for a pull request that is not open (ADR-012).
 26. `preview.yml`, job `fingerprint of main`: it computes the app's fingerprint and caches it under the commit, for the native lane of later pull requests. No environment, no secret.
-27. `e2e.yml`: every push to `main` runs the Maestro flows in four parallel jobs. A failure here says something is broken on `main`; it does not hold the deploy, which has already run.
+27. `e2e.yml` and `e2e-admin.yml`: every push to `main` runs the Maestro flows in four parallel jobs and the panel's flows in one. A failure here says something is broken on `main`; it does not hold the deploy, which has already run.
 28. Update signing: not built yet. Expo signs updates only on its paid plans, so whatever holds `EXPO_TOKEN`, in any of the four environments that have it, can publish to any branch, the ones behind `staging` and `production` included. ADR-004 §4 reopens this before a production build reaches anyone outside the team.
 
 ## Part 3: a release tag
@@ -206,13 +207,14 @@ flowchart TB
 | `eas-build.yml`, `i18n release gate` | `main`, `v*` tags, by hand | none | none | none | none |
 | `eas-build.yml`, `eas build` | the same | `staging`, or `prod` for a production build | none | `EXPO_TOKEN`; `GITHUB_TOKEN`, `issues: write` | `EAS_ENABLED`, `EAS_PLATFORMS`, `EAS_BUILDS_ISSUE` |
 | `e2e.yml` | `main`; a pull request with the label `e2e` | none | none | none | none |
+| `e2e-admin.yml` | `main`; a pull request that changes what the panel's flows exercise | none | none | none | none |
 | `auto-approve.yml` | every five minutes, from `main` | none | none | `GITHUB_TOKEN`, `pull-requests: write` | none |
 
 The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `staging`, `prod`, `preview` and `preview-cleanup` alone, never at repository level; the `DOKPLOY_TOKEN` of `preview` and `preview-cleanup` is a member's token for the `previews` project only. `SENTRY_AUTH_TOKEN` is read from `staging` and `prod` only. The role ARNs, the region and the switches are repository variables, not secrets.
 
 ## Where it lives
 
-- Workflows: [build.yml](../../.github/workflows/build.yml), [deploy.yml](../../.github/workflows/deploy.yml), [release.yml](../../.github/workflows/release.yml), [preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [infra.yml](../../.github/workflows/infra.yml), [infra-prod.yml](../../.github/workflows/infra-prod.yml), [infra-oidc.yml](../../.github/workflows/infra-oidc.yml), [eas-build.yml](../../.github/workflows/eas-build.yml), [ci.yml](../../.github/workflows/ci.yml), [dco.yml](../../.github/workflows/dco.yml), [secret-scan.yml](../../.github/workflows/secret-scan.yml), [e2e.yml](../../.github/workflows/e2e.yml), [auto-approve.yml](../../.github/workflows/auto-approve.yml)
+- Workflows: [build.yml](../../.github/workflows/build.yml), [deploy.yml](../../.github/workflows/deploy.yml), [release.yml](../../.github/workflows/release.yml), [preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [infra.yml](../../.github/workflows/infra.yml), [infra-prod.yml](../../.github/workflows/infra-prod.yml), [infra-oidc.yml](../../.github/workflows/infra-oidc.yml), [eas-build.yml](../../.github/workflows/eas-build.yml), [ci.yml](../../.github/workflows/ci.yml), [dco.yml](../../.github/workflows/dco.yml), [secret-scan.yml](../../.github/workflows/secret-scan.yml), [e2e.yml](../../.github/workflows/e2e.yml), [e2e-admin.yml](../../.github/workflows/e2e-admin.yml), [auto-approve.yml](../../.github/workflows/auto-approve.yml)
 - Scripts: [.github/scripts](../../.github/scripts) (`aws-oidc.sh`, the OIDC exchange with no third-party action; `dokploy-deploy.sh`; `dokploy-preview.sh`; `wait-healthy.sh`; `check-workflow-permissions.py`)
 - The roles and their trust: [infra/bootstrap/main.tf](../../infra/bootstrap/main.tf); the environments, the rulesets and the variables: [infra/README.md](../../infra/README.md) (After bootstrap: GitHub; Environments, CI; Previews; Admin panel)
 - The app's channels and profiles: [apps/mobile/eas.json](../../apps/mobile/eas.json), [apps/mobile/app.json](../../apps/mobile/app.json)

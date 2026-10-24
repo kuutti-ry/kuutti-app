@@ -78,3 +78,5 @@ apps/mobile/keys/
 
 # --- End-to-end flows: the copy of the cached pictures scripts/e2e.ts makes ---
 apps/mobile/e2e/media
+# The panel's flows: their build, the stack's logs and Playwright's results (apps/admin/e2e/run.ts)
+apps/admin/e2e/.out
