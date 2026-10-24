@@ -227,6 +227,9 @@ describe("the notices file", () => {
     expect(intro).toContain("is text 6. The shared library can be\nreplaced");
     expect(intro).toContain("https://github.com/lovell/sharp-libvips/tree/v1.3.4,\n");
     expect(intro).toContain("2.0 (text 7) under that licence");
+    expect(intro).toContain(
+      "is also copied to\nhttps://github.com/kuutti-ry/kuutti-app/releases/tag/sources-sharp-libvips-1.3.4,\nin case",
+    );
     expect(
       file.slice(file.indexOf(`${rule}\nlibvips 8.18.7`), file.indexOf(`${rule}\nText 1\n`)),
     ).toBe(
