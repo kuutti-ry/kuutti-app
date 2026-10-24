@@ -115,8 +115,8 @@ jobs:
       # the GitHub organisation's name (#110), since October 2026. An
       # organisation token carries the slug it was made under and sentry-cli
       # prefers it to SENTRY_ORG, so a rename also means a new token
-      # (docs/runbooks/sentry-setup.md, section 4).
-      # app.json follows with the next native change (a fingerprint change).
+      # (docs/runbooks/sentry-setup.md, section 4). app.json's plugin block
+      # names kuutti-ry since the seal-head icons' native change (#409).
       - name: Upload the update's source maps to Sentry
         if: steps.ready.outputs.ready == 'true' && vars.EAS_ENABLED == 'true'
         working-directory: apps/mobile

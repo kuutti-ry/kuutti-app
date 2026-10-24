@@ -208,6 +208,6 @@ flowchart TB
 ## Open
 
 - SES: the identity is in `infra/bootstrap`, which CI never applies. On 2026-10-24 the identity did not exist and the bootstrap's plan still held it (ADR-049); until it is applied and SES has verified the domain, staging answers a code request 503. SES's production access and the list `MAIL_TESTERS` are his as well (ADR-043, Open 5 and 7).
-- Sentry: whether `/kuutti/staging/sentry-dsn` and `EXPO_PUBLIC_SENTRY_DSN` are set is not in the repository. The Sentry organisation's slug is `kuutti-ry` (`kuutti-fi` until October 2026), which `deploy.yml` names; `apps/mobile/app.json` keeps the old one until the next native change; this view names neither.
+- Sentry: whether `/kuutti/staging/sentry-dsn` and `EXPO_PUBLIC_SENTRY_DSN` are set is not in the repository. The Sentry organisation's slug is `kuutti-ry` (`kuutti-fi` until October 2026), which `deploy.yml` and the plugin block of `apps/mobile/app.json` name; this view names neither.
 - The two anti-scraping items of #86 that remain, app attestation and iOS screenshot detection, are the maintainer's to decide (CLAUDE.md, Decisions); app attestation waits for #184's native batch (ADR-041, Open 1).
 - Dokploy versus Kamal is open (CLAUDE.md, Decisions); the box is drawn with the tool it runs today.

@@ -70,7 +70,11 @@ describe("a preview's build", () => {
       (element) => element.getAttribute("src") ?? element.getAttribute("href") ?? "",
     );
     expect(references).toEqual(
-      expect.arrayContaining([expect.stringMatching(/\.js$/), expect.stringMatching(/\.css$/)]),
+      expect.arrayContaining([
+        expect.stringMatching(/\.js$/),
+        expect.stringMatching(/\.css$/),
+        expect.stringMatching(/\/favicon-[\w-]+\.png$/),
+      ]),
     );
     for (const url of references) {
       expect(url).toMatch(/^\/pr-7\/assets\/[^/]+$/);
