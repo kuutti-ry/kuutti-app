@@ -29,7 +29,7 @@ Production, unless the row says otherwise.
 | SSM `/kuutti/prod/*`; the offline medium; the sealed envelope | keys and passwords (`rotation.md`, The list) | no, but the HMAC key unlocks `hetu_hmac` | until deleted | 4.1, 4.6 |
 | Log group `/kuutti/prod/api` | request lines with `account_id` and request id, never hetu, message text, e-mail or `seeks` | pseudonymous | 30 days | 4.7 |
 | Log group `/kuutti/ssm-sessions` | what was typed and shown in Session Manager | possibly | 90 days | 4.7 |
-| Sentry `kuutti-fi`, projects `api` and `mobile` | errors; request data, user and IP stripped (`sentry-setup.md`) | not by design | Sentry's own retention (not in the repository) | 4.7 |
+| Sentry `kuutti-ry`, projects `api` and `mobile` | errors; request data, user and IP stripped (`sentry-setup.md`) | not by design | Sentry's own retention (not in the repository) | 4.7 |
 | Research copies outside the database | the Parquet export (#194, not built today) and what the research partner holds | pseudonymous or anonymous (ADR-011 §9) | the research agreement's (not in the repository) | 4.3 |
 | S3 `kuutti-admin-<env>-<account>` | the moderation panel's files | no | until deleted | 4.8 |
 | State bucket `kuutti-tfstate-<account>` | OpenTofu state, `dokploy-backup/` (90 days), `github-export/` (365 days) | no | as shown | 4.12 |
@@ -140,7 +140,7 @@ Destroy the private halves on the offline medium and on the laptop (`custody.md`
 
 ### 4.7 Logs and error reports
 
-`/kuutti/prod/api` keeps 30 days and `/kuutti/ssm-sessions` 90 days; let them run out, or delete the groups with the teardown. In Sentry, delete the projects `api` and `mobile`, then the organisation `kuutti-fi` (its owner, the project mailbox's account).
+`/kuutti/prod/api` keeps 30 days and `/kuutti/ssm-sessions` 90 days; let them run out, or delete the groups with the teardown. In Sentry, delete the projects `api` and `mobile`, then the organisation `kuutti-ry` (its owner, the project mailbox's account).
 
 ### 4.8 The infrastructure
 

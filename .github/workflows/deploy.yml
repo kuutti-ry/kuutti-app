@@ -110,17 +110,19 @@ jobs:
       # published (#11). dist is eas update's export directory. Skipped, not
       # failed, while the environment has no token: the update is already out.
       # The organisation is named here because the uploader reads these
-      # variables before the app.json plugin block, and the slug `kuutti` was
-      # taken when the organisation was created (2026-09-20): it is kuutti-fi.
-      # That is Sentry's organisation, which kept its slug when the GitHub
-      # organisation became kuutti-ry (#110).
+      # variables before the app.json plugin block. Sentry's slug was kuutti-fi
+      # from its creation (2026-09-20, `kuutti` was taken) and is kuutti-ry,
+      # the GitHub organisation's name (#110), since October 2026. An
+      # organisation token carries the slug it was made under and sentry-cli
+      # prefers it to SENTRY_ORG, so a rename also means a new token
+      # (docs/runbooks/sentry-setup.md, section 4).
       # app.json follows with the next native change (a fingerprint change).
       - name: Upload the update's source maps to Sentry
         if: steps.ready.outputs.ready == 'true' && vars.EAS_ENABLED == 'true'
         working-directory: apps/mobile
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: kuutti-fi
+          SENTRY_ORG: kuutti-ry
           SENTRY_PROJECT: mobile
           SENTRY_URL: https://de.sentry.io/
         run: |
