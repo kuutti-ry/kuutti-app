@@ -1,8 +1,13 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { type FeedbackItem, type FeedbackKind, FeedbackList as FeedbackPage } from "@kuutti/schema";
+import { Check, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { Alert } from "../../components/ui/alert.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Card, CardContent, CardTitle } from "../../components/ui/card.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
@@ -10,7 +15,7 @@ import { useList } from "../../lib/use-list.ts";
 // Feedback from inside the app (#171, ADR-023, rules/admin.md): what people
 // sent, a bug first and praise last, each with the build the app read and the
 // sender's account id; a moderator marks a row handled, which is an
-// audit_log row. Plain HTML, keyboard first; English only (TD-17).
+// audit_log row. Keyboard first; English only (TD-17).
 
 const KIND_LABEL: Record<FeedbackKind, PlainMessageKey> = {
   bug: "admin.feedback.kind.bug",
@@ -30,19 +35,22 @@ export function FeedbackList() {
   // A handled row stays where it was, saying so, until the next refresh; the
   // count of what still waits goes down.
   return (
-    <section aria-labelledby="feedback-title">
-      <div className="row">
+    <section aria-labelledby="feedback-title" className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="feedback-title">{t("admin.feedback.title")}</ScreenTitle>
-        <button type="button" onClick={() => void reload()}>
+        <Button variant="outline" onClick={() => void reload()}>
+          <RefreshCw aria-hidden="true" />
           {t("admin.feedback.refresh")}
-        </button>
+        </Button>
       </div>
-      {state.kind === "loading" && <p aria-busy="true">{t("admin.feedback.loading")}</p>}
-      {state.kind === "error" && <p role="alert">{t("admin.feedback.error")}</p>}
+      {state.kind === "loading" && <Loading>{t("admin.feedback.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.feedback.error")}</Alert>}
       {state.kind === "ready" && (
         <>
-          <p aria-live="polite">{t("admin.feedback.total", { total: state.total })}</p>
-          <ul className="queue">
+          <p aria-live="polite" className="text-muted-foreground">
+            {t("admin.feedback.total", { total: state.total })}
+          </p>
+          <ul className="grid gap-4">
             {state.items.map((item) => (
               <FeedbackRow key={item.id} item={item} onHandled={settle} />
             ))}
@@ -77,31 +85,41 @@ function FeedbackRow({ item, onHandled }: { item: FeedbackItem; onHandled: () =>
 
   if (state === "handled") {
     return (
-      <li className="item" aria-live="polite">
-        {t("admin.feedback.handled")}
+      <li aria-live="polite">
+        <Card className="bg-muted">
+          <CardContent className="flex-row items-center gap-2 font-medium">
+            <Check aria-hidden="true" className="size-4" />
+            {t("admin.feedback.handled")}
+          </CardContent>
+        </Card>
       </li>
     );
   }
   return (
-    <li className="item">
-      <h3>{t(KIND_LABEL[item.kind])}</h3>
-      <p>{item.text}</p>
-      <p>
-        {t("admin.feedback.meta", {
-          version: item.appVersion,
-          platform: item.platform,
-          locale: item.locale,
-          time: formatDateTime(locale, new Date(item.createdAt)),
-          account: item.accountId.slice(0, 8),
-        })}{" "}
-        · <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
-      </p>
-      <div className="actions">
-        {state === "failed" && <p role="alert">{t("admin.feedback.handleFailed")}</p>}
-        <button type="button" disabled={state === "saving"} onClick={() => void mark()}>
-          {t("admin.feedback.handle")}
-        </button>
-      </div>
+    <li>
+      <Card>
+        <CardContent>
+          <CardTitle>{t(KIND_LABEL[item.kind])}</CardTitle>
+          <p className="whitespace-pre-wrap wrap-anywhere">{item.text}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("admin.feedback.meta", {
+              version: item.appVersion,
+              platform: item.platform,
+              locale: item.locale,
+              time: formatDateTime(locale, new Date(item.createdAt)),
+              account: item.accountId.slice(0, 8),
+            })}{" "}
+            · <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
+          </p>
+          <div className="flex flex-wrap items-center gap-3 border-t pt-3">
+            {state === "failed" && <Alert>{t("admin.feedback.handleFailed")}</Alert>}
+            <Button variant="outline" disabled={state === "saving"} onClick={() => void mark()}>
+              <Check aria-hidden="true" />
+              {t("admin.feedback.handle")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </li>
   );
 }

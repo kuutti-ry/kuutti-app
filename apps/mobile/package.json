@@ -1,6 +1,6 @@
 {
   "name": "@kuutti/mobile",
-  "version": "0.64.8",
+  "version": "0.65.0",
   "private": true,
   "main": "expo-router/entry",
   "description": "Expo app. Routes under app/ stay thin; features live under src/features/<slice>/.",

@@ -56,6 +56,14 @@
   },
   "overrides": [
     {
+      "includes": ["apps/admin/src/styles.css"],
+      "css": {
+        "parser": {
+          "tailwindDirectives": true
+        }
+      }
+    },
+    {
       "includes": ["apps/mobile/global.css"],
       "linter": {
         "rules": {

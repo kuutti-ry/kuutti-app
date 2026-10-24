@@ -7,7 +7,8 @@ import { createPortal } from "react-dom";
 // stays inside (Tab and Shift+Tab wrap around; a press on the backdrop keeps
 // it; focus moved out any other way comes back), Escape closes it wherever
 // the focus is, and on closing the focus goes back to what had it before.
-// Plain HTML, no library (rules/admin.md).
+// Drawn as shadcn/ui's Dialog (ADR-047), but kept our own: Radix's dialog
+// writes a <style> element the CSP refuses, and this one needs no library.
 
 const FOCUSABLE =
   'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
@@ -88,20 +89,24 @@ export function Dialog({
     // biome-ignore lint/a11y/noStaticElementInteractions: the backdrop only keeps a pointer press from moving the focus; the keyboard is handled at the document.
     <div
       ref={layer}
-      className="backdrop"
+      data-slot="dialog-overlay"
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/50 p-4"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) event.preventDefault();
       }}
     >
       <div
         ref={box}
-        className="dialog"
+        data-slot="dialog-content"
+        className="grid w-full max-w-lg gap-4 rounded-xl bg-popover p-5 text-sm text-popover-foreground shadow-lg ring-1 ring-foreground/10 sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
         tabIndex={-1}
       >
-        <h3 id={id}>{title}</h3>
+        <h3 id={id} className="text-lg leading-snug font-semibold">
+          {title}
+        </h3>
         {children}
       </div>
     </div>,

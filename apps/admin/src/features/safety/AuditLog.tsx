@@ -1,8 +1,24 @@
 import { formatDateTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { AuditPage, type AuditQuery } from "@kuutti/schema";
+import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
+import { Alert } from "../../components/ui/alert.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Card, CardContent } from "../../components/ui/card.tsx";
+import { Input } from "../../components/ui/input.tsx";
+import { Label } from "../../components/ui/label.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { AuditDetail } from "./audit-detail.tsx";
@@ -114,107 +130,126 @@ export function AuditLog() {
     setCursors(next);
   };
   const field = (key: keyof Filters, label: string, type = "text") => (
-    <label>
+    <Label className="grid gap-2">
       {label}
-      <input
+      <Input
         type={type}
         value={draft[key]}
         autoComplete="off"
         spellCheck={false}
         onChange={(event) => setDraft({ ...draft, [key]: event.target.value })}
       />
-    </label>
+    </Label>
   );
 
   return (
-    <section aria-labelledby="audit-title" className="audit">
+    <section aria-labelledby="audit-title" className="space-y-6">
       <ScreenTitle id="audit-title">{t("admin.audit.title")}</ScreenTitle>
-      <form className="actions" onSubmit={apply} aria-label={t("admin.audit.filters")}>
-        {field("actor", t("admin.audit.actor"))}
-        {field("action", t("admin.audit.action"))}
-        {field("subjectType", t("admin.audit.subjectType"))}
-        {field("subjectId", t("admin.audit.subjectId"))}
-        {field("from", t("admin.audit.from"), "date")}
-        {field("to", t("admin.audit.to"), "date")}
-        <button type="submit">{t("admin.audit.apply")}</button>
-      </form>
-      {state.kind === "loading" && <p aria-busy="true">{t("admin.audit.loading")}</p>}
+      <Card>
+        <CardContent>
+          <form
+            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+            onSubmit={apply}
+            aria-label={t("admin.audit.filters")}
+          >
+            {field("actor", t("admin.audit.actor"))}
+            {field("action", t("admin.audit.action"))}
+            {field("subjectType", t("admin.audit.subjectType"))}
+            {field("subjectId", t("admin.audit.subjectId"))}
+            {field("from", t("admin.audit.from"), "date")}
+            {field("to", t("admin.audit.to"), "date")}
+            <div className="sm:col-span-2 lg:col-span-3">
+              <Button type="submit">
+                <Filter aria-hidden="true" />
+                {t("admin.audit.apply")}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+      {state.kind === "loading" && <Loading>{t("admin.audit.loading")}</Loading>}
       {state.kind === "error" && (
-        <p role="alert">{t(state.invalid ? "admin.audit.invalid" : "admin.audit.error")}</p>
+        <Alert>{t(state.invalid ? "admin.audit.invalid" : "admin.audit.error")}</Alert>
       )}
       {state.kind === "ready" && (
         <>
-          <div ref={shownPage} tabIndex={-1} className="page">
-            {state.page.items.length === 0 ? (
-              <p>{t("admin.audit.none")}</p>
-            ) : (
-              <table>
-                <caption>{t("admin.audit.caption")}</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">{t("admin.account.col.when")}</th>
-                    <th scope="col">{t("admin.account.col.who")}</th>
-                    <th scope="col">{t("admin.audit.role")}</th>
-                    <th scope="col">{t("admin.account.col.what")}</th>
-                    <th scope="col">{t("admin.audit.subject")}</th>
-                    <th scope="col">{t("admin.account.col.detail")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {state.page.items.map((row, index) => (
-                    // Two rows can match in every field (one transaction's now()): the place breaks the tie.
-                    <tr key={`${index}-${row.at}-${row.action}-${row.subjectId}`}>
-                      <td>{formatDateTime(locale, new Date(row.at))}</td>
-                      <td>
-                        {/* No person: a shadow ban an automatic rule applied (#105). */}
-                        {row.actorIdentityId === null ? (
-                          t("admin.audit.actorAutomatic")
-                        ) : (
-                          <code>{row.actorIdentityId}</code>
-                        )}
-                      </td>
-                      {/* The automatic rules hold no role, and never held one. */}
-                      <td>
-                        {row.actorIdentityId === null
-                          ? t("admin.audit.roleAutomatic")
-                          : (row.actorRole ?? t("admin.audit.noRole"))}
-                      </td>
-                      <td>{row.action}</td>
-                      <td>
-                        {row.accountId ? (
-                          <Link className="target" to={`/accounts/${row.accountId}`}>
-                            {row.subjectType} <code>{row.subjectId.slice(0, 8)}</code>
-                          </Link>
-                        ) : (
-                          <>
-                            {row.subjectType} <code>{row.subjectId.slice(0, 8)}</code>
-                          </>
-                        )}
-                      </td>
-                      <td>
-                        <AuditDetail detail={row.detail} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-          <div className="actions">
-            <button
-              type="button"
+          <Card>
+            <CardContent>
+              <div ref={shownPage} tabIndex={-1}>
+                {state.page.items.length === 0 ? (
+                  <p className="text-muted-foreground">{t("admin.audit.none")}</p>
+                ) : (
+                  <Table className="[&_td]:align-top">
+                    <TableCaption>{t("admin.audit.caption")}</TableCaption>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead scope="col">{t("admin.account.col.when")}</TableHead>
+                        <TableHead scope="col">{t("admin.account.col.who")}</TableHead>
+                        <TableHead scope="col">{t("admin.audit.role")}</TableHead>
+                        <TableHead scope="col">{t("admin.account.col.what")}</TableHead>
+                        <TableHead scope="col">{t("admin.audit.subject")}</TableHead>
+                        <TableHead scope="col">{t("admin.account.col.detail")}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {state.page.items.map((row, index) => (
+                        // Two rows can match in every field (one transaction's now()): the place breaks the tie.
+                        <TableRow key={`${index}-${row.at}-${row.action}-${row.subjectId}`}>
+                          <TableCell>{formatDateTime(locale, new Date(row.at))}</TableCell>
+                          <TableCell className="min-w-28 whitespace-normal">
+                            {/* No person: a shadow ban an automatic rule applied (#105). */}
+                            {row.actorIdentityId === null ? (
+                              t("admin.audit.actorAutomatic")
+                            ) : (
+                              <code className="break-all">{row.actorIdentityId}</code>
+                            )}
+                          </TableCell>
+                          {/* The automatic rules hold no role, and never held one. */}
+                          <TableCell>
+                            {row.actorIdentityId === null
+                              ? t("admin.audit.roleAutomatic")
+                              : (row.actorRole ?? t("admin.audit.noRole"))}
+                          </TableCell>
+                          <TableCell>{row.action}</TableCell>
+                          <TableCell className="whitespace-normal [&_code]:wrap-normal">
+                            {row.accountId ? (
+                              <Link className="target" to={`/accounts/${row.accountId}`}>
+                                {row.subjectType} <code>{row.subjectId.slice(0, 8)}</code>
+                              </Link>
+                            ) : (
+                              <>
+                                {row.subjectType} <code>{row.subjectId.slice(0, 8)}</code>
+                              </>
+                            )}
+                          </TableCell>
+                          <TableCell className="min-w-36 whitespace-normal">
+                            <AuditDetail detail={row.detail} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          <div className="flex flex-wrap justify-between gap-3">
+            <Button
+              variant="outline"
               disabled={cursors.length === 1}
               onClick={() => page(cursors.slice(0, -1))}
             >
+              <ChevronLeft aria-hidden="true" />
               {t("admin.audit.newer")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
               disabled={state.page.next === null}
               onClick={() => page([...cursors, state.page.next])}
             >
               {t("admin.audit.older")}
-            </button>
+              <ChevronRight aria-hidden="true" />
+            </Button>
           </div>
         </>
       )}

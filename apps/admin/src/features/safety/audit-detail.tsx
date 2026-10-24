@@ -5,7 +5,7 @@ export function AuditDetail({ detail }: { detail: AdminAuditRow["detail"] }) {
   const entries = Object.entries(detail ?? {});
   if (entries.length === 0) return null;
   return (
-    <dl className="detail">
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-2 [&_dd]:wrap-anywhere [&_dt]:text-muted-foreground [&>div]:contents">
       {entries.map(([key, value]) => (
         <div key={key}>
           <dt>

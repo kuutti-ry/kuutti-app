@@ -25,7 +25,7 @@ flowchart TB
   subgraph apps["The apps, apps/"]
     c1["The phone app: Expo, iOS and Android, a dev client"]
     c2["The phone app's web target: pull-request previews and local runs only"]
-    c3["The admin panel: Vite and React, a static build"]
+    c3["The admin panel: Vite, React and shadcn/ui, a static build"]
     c4["The API: Hono on Node, one process"]
     c5["The OpenAPI document, written from the API's route contracts"]
   end
@@ -62,7 +62,7 @@ flowchart TB
 
 1. **The phone app** (`apps/mobile`): Expo with a dev client, for iOS and Android. It calls the API over HTTPS through `openapi-fetch`, typed by the generated paths (6), and holds one WebSocket to `GET /ws` while it is signed in and in front (see Chat). It imports the contracts (6) and the texts (7). Its build script for the licences screen uses the notices package (9). It is exported for the web as its web target (2).
 2. **The web target** is the same code, exported with `expo export --platform web`. It exists for pull-request previews (EAS Hosting, alias `pr-<n>`) and for local runs, never as a product web surface (rule 8). It talks to the API as the phone app does; it cannot set a header on a WebSocket, which is why the socket takes its token in the first frame.
-3. **The admin panel** (`apps/admin`): Vite and React, built to static files. It calls the API's `/admin` routes over HTTPS through `openapi-fetch`, typed by the same generated paths, and imports the contracts (6) and the texts (7).
+3. **The admin panel** (`apps/admin`): Vite and React, with shadcn/ui's components on Tailwind compiled into one stylesheet (ADR-050), built to static files. It calls the API's `/admin` routes over HTTPS through `openapi-fetch`, typed by the same generated paths, and imports the contracts (6) and the texts (7).
 4. **The API** (`apps/api`): Hono on Node in one process, which serves HTTP, the chat's WebSocket and the nightly jobs (part 2). It imports the contracts (6), the texts (7), the database package (8) and the Telia kit (10), and keeps its data in PostgreSQL (12) through a pool. Its route contracts are written out as the OpenAPI document (5). Its build script for the image's third-party notices uses the notices package (9).
 5. **The OpenAPI document** (`apps/api/openapi.json`) is written by `pnpm openapi` from the routes the API declares with `createRoute`, and the same command turns it into the generated paths in the contracts package with `openapi-typescript` (ADR-003). CI runs the command and fails on a difference. The running API serves the document at `/openapi.json` everywhere except production.
 6. **Contracts** (`packages/schema`, `@kuutti/schema`): the zod schemas that validate every request at the API's boundary and type its answers, the socket's frames both ways, the research event registry, and the generated paths both clients are typed by. It is the only place a feature's code is shared between the apps (layout rules).
@@ -144,7 +144,7 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | rewards | yes | yes | no directory | no | light, light, none |
 | notifications | yes | yes | no directory | no | light, light, none |
 
-Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jobs that read across slices: the waitlist count, the pond gate, the invitation count, the round builder), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/`.
+Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jobs that read across slices: the waitlist count, the pond gate, the invitation count, the round builder), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
 
 1. **identity**: the bank login, accounts, sessions, re-registration, taking a break, staff sessions. In all three apps; specs in `features/identity`.
 2. **profile**: onboarding, profile fields and prompts, completeness. API and phone app.

@@ -6,16 +6,24 @@ import {
   PhotoReviewQueue,
   PhotoUrlResponse,
 } from "@kuutti/schema";
+import { Check, EyeOff, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { Alert } from "../../components/ui/alert.tsx";
+import { Badge } from "../../components/ui/badge.tsx";
+import { Button } from "../../components/ui/button.tsx";
+import { Card, CardContent } from "../../components/ui/card.tsx";
+import { Label } from "../../components/ui/label.tsx";
+import { NativeSelect } from "../../components/ui/native-select.tsx";
+import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
-// the photos the automatic check would not approve. Plain HTML, keyboard
-// first: every control is a button or a labelled select, the image has its
-// alt text, and a decided item announces itself. English only (TD-17).
+// the photos the automatic check would not approve. Keyboard first: every
+// control is a button or a labelled select, the image has its alt text, and
+// a decided item announces itself. English only (TD-17).
 
 const REASONS: ReadonlyArray<{ value: ModeratorRejectionReason; label: PlainMessageKey }> = [
   { value: "nudity", label: "admin.queue.reason.nudity" },
@@ -39,19 +47,22 @@ export function PhotoQueue() {
   // next refresh: the moderator sees the result of the click, and the count
   // of what is still waiting goes down.
   return (
-    <section aria-labelledby="queue-title">
-      <header className="row">
+    <section aria-labelledby="queue-title" className="space-y-6">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <ScreenTitle id="queue-title">{t("admin.queue.title")}</ScreenTitle>
-        <button type="button" onClick={() => void reload()}>
+        <Button variant="outline" onClick={() => void reload()}>
+          <RefreshCw aria-hidden="true" />
           {t("admin.queue.refresh")}
-        </button>
+        </Button>
       </header>
-      {state.kind === "loading" && <p aria-busy="true">{t("admin.queue.loading")}</p>}
-      {state.kind === "error" && <p role="alert">{t("admin.queue.error")}</p>}
+      {state.kind === "loading" && <Loading>{t("admin.queue.loading")}</Loading>}
+      {state.kind === "error" && <Alert>{t("admin.queue.error")}</Alert>}
       {state.kind === "ready" && (
         <>
-          <p aria-live="polite">{t("admin.queue.total", { total: state.total })}</p>
-          <ul className="queue">
+          <p aria-live="polite" className="text-muted-foreground">
+            {t("admin.queue.total", { total: state.total })}
+          </p>
+          <ul className="grid gap-4">
             {state.items.map((item) => (
               <QueueItem key={item.photoId} item={item} onDecided={settle} />
             ))}
@@ -123,115 +134,142 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
 
   if (state.kind === "decided") {
     return (
-      <li className="item" aria-live="polite">
-        {t("admin.queue.decided", { decision: state.decision })}
+      <li aria-live="polite">
+        <Card className="bg-muted">
+          <CardContent className="flex-row items-center gap-2 font-medium">
+            {state.decision === "approved" ? (
+              <Check aria-hidden="true" className="size-4" />
+            ) : (
+              <X aria-hidden="true" className="size-4" />
+            )}
+            {t("admin.queue.decided", { decision: state.decision })}
+          </CardContent>
+        </Card>
       </li>
     );
   }
 
   return (
-    <li className="item">
-      <figure>
-        {!shown ? (
-          <div className="hidden-picture">
-            <p>{t("admin.queue.sensitive")}</p>
-            <button type="button" onClick={() => setShown(true)}>
-              {t("admin.queue.show")}
-            </button>
-          </div>
-        ) : url ? (
-          <img src={url} alt={t("admin.queue.image")} width={400} height={533} />
-        ) : (
-          <p aria-busy="true">{t("admin.queue.imageLoading")}</p>
-        )}
-        <figcaption>
-          {t("admin.queue.uploaded", { time: uploaded })} ·{" "}
-          {t("admin.queue.account", { account: item.accountId.slice(0, 8) })} ·{" "}
-          <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
-        </figcaption>
-      </figure>
-      <div className="check">
-        {item.appealed && <p className="appealed">{t("admin.queue.appealed")}</p>}
-        <h3>{t("admin.queue.labels")}</h3>
-        {notChecked ? (
-          <p>{t("admin.queue.notChecked")}</p>
-        ) : (
-          <>
-            <p>{t("admin.queue.faces", { faces: item.faces })}</p>
-            {item.labels.length === 0 ? (
-              <p>{t("admin.queue.noLabels")}</p>
+    <li>
+      <Card>
+        {/* The decision beside the photo on a wide screen, so neither scrolls away from the other. */}
+        <CardContent className="grid gap-4 sm:grid-cols-[minmax(10rem,16rem)_1fr]">
+          <figure className="space-y-2">
+            {!shown ? (
+              <div className="flex aspect-3/4 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-muted p-4 text-center">
+                <EyeOff aria-hidden="true" className="size-6 text-muted-foreground" />
+                <p>{t("admin.queue.sensitive")}</p>
+                <Button variant="outline" onClick={() => setShown(true)}>
+                  {t("admin.queue.show")}
+                </Button>
+              </div>
+            ) : url ? (
+              <img
+                src={url}
+                alt={t("admin.queue.image")}
+                width={400}
+                height={533}
+                className="block h-auto w-full rounded-md"
+              />
             ) : (
-              <ul>
-                {item.labels.map((label) => (
-                  <li key={`${label.parentName}/${label.name}`}>
-                    {t("admin.queue.label", {
-                      name: label.name,
-                      confidence: Math.round(label.confidence),
-                    })}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex aspect-3/4 items-center justify-center rounded-md bg-muted">
+                <Loading>{t("admin.queue.imageLoading")}</Loading>
+              </div>
             )}
-          </>
-        )}
-      </div>
-      <div className="actions">
-        {state.kind === "failed" && <p role="alert">{t("admin.queue.decisionFailed")}</p>}
-        {state.kind === "rejecting" ? (
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (state.reason) void decide({ decision: "reject", reason: state.reason });
-            }}
-          >
-            <label>
-              {t("admin.queue.reason.label")}
-              <select
-                required
-                value={state.reason ?? ""}
-                onChange={(event) =>
-                  setState({
-                    kind: "rejecting",
-                    reason: event.target.value as ModeratorRejectionReason,
-                  })
-                }
-              >
-                <option value="" disabled>
-                  {t("admin.queue.reason.choose")}
-                </option>
-                {REASONS.map((reason) => (
-                  <option key={reason.value} value={reason.value}>
-                    {t(reason.label)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="submit" disabled={!state.reason}>
-              {t("admin.queue.confirmReject")}
-            </button>
-            <button type="button" onClick={() => setState({ kind: "idle" })}>
-              {t("admin.queue.cancel")}
-            </button>
-          </form>
-        ) : (
-          <>
-            <button
-              type="button"
-              disabled={state.kind === "saving"}
-              onClick={() => void decide({ decision: "approve" })}
-            >
-              {t("admin.queue.approve")}
-            </button>
-            <button
-              type="button"
-              disabled={state.kind === "saving"}
-              onClick={() => setState({ kind: "rejecting", reason: null })}
-            >
-              {t("admin.queue.reject")}
-            </button>
-          </>
-        )}
-      </div>
+            <figcaption className="text-xs text-muted-foreground">
+              {t("admin.queue.uploaded", { time: uploaded })} ·{" "}
+              {t("admin.queue.account", { account: item.accountId.slice(0, 8) })} ·{" "}
+              <Link to={`/accounts/${item.accountId}`}>{t("admin.account.pageLink")}</Link>
+            </figcaption>
+          </figure>
+          <div className="flex flex-col gap-4">
+            <div className="space-y-2">
+              {item.appealed && <Badge variant="secondary">{t("admin.queue.appealed")}</Badge>}
+              <h3 className="font-semibold">{t("admin.queue.labels")}</h3>
+              {notChecked ? (
+                <p className="text-muted-foreground">{t("admin.queue.notChecked")}</p>
+              ) : (
+                <>
+                  <p>{t("admin.queue.faces", { faces: item.faces })}</p>
+                  {item.labels.length === 0 ? (
+                    <p className="text-muted-foreground">{t("admin.queue.noLabels")}</p>
+                  ) : (
+                    <ul className="list-disc space-y-0.5 ps-5">
+                      {item.labels.map((label) => (
+                        <li key={`${label.parentName}/${label.name}`}>
+                          {t("admin.queue.label", {
+                            name: label.name,
+                            confidence: Math.round(label.confidence),
+                          })}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex flex-wrap items-end gap-3 border-t pt-4">
+              {state.kind === "failed" && <Alert>{t("admin.queue.decisionFailed")}</Alert>}
+              {state.kind === "rejecting" ? (
+                <form
+                  className="flex w-full flex-wrap items-end gap-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (state.reason) void decide({ decision: "reject", reason: state.reason });
+                  }}
+                >
+                  <Label className="grid w-full gap-2 sm:w-auto">
+                    {t("admin.queue.reason.label")}
+                    <NativeSelect
+                      required
+                      value={state.reason ?? ""}
+                      onChange={(event) =>
+                        setState({
+                          kind: "rejecting",
+                          reason: event.target.value as ModeratorRejectionReason,
+                        })
+                      }
+                    >
+                      <option value="" disabled>
+                        {t("admin.queue.reason.choose")}
+                      </option>
+                      {REASONS.map((reason) => (
+                        <option key={reason.value} value={reason.value}>
+                          {t(reason.label)}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </Label>
+                  <Button type="submit" variant="destructive" disabled={!state.reason}>
+                    {t("admin.queue.confirmReject")}
+                  </Button>
+                  <Button variant="outline" onClick={() => setState({ kind: "idle" })}>
+                    {t("admin.queue.cancel")}
+                  </Button>
+                </form>
+              ) : (
+                <>
+                  <Button
+                    disabled={state.kind === "saving"}
+                    onClick={() => void decide({ decision: "approve" })}
+                  >
+                    <Check aria-hidden="true" />
+                    {t("admin.queue.approve")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={state.kind === "saving"}
+                    onClick={() => setState({ kind: "rejecting", reason: null })}
+                  >
+                    <X aria-hidden="true" />
+                    {t("admin.queue.reject")}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </li>
   );
 }

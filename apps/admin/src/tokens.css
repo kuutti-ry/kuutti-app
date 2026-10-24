@@ -1,0 +1,106 @@
+/*
+ * The panel's design tokens (ADR-047): shadcn/ui's semantic names, the app's
+ * palette (apps/mobile/src/theme/tokens.css), with the page and the card
+ * swapped so the panel's cards stand on a tinted page. Components never name
+ * a colour; they use the Tailwind names styles.css maps to these variables.
+ *
+ * Four sets, chosen by the system's own settings and nothing in the panel:
+ * light, dark, and the high-contrast pair, a second token set rather than a
+ * separate mode (CLAUDE.md Accessibility). Each later block redefines every
+ * name, so the last one that applies wins whole. tokens.test.ts holds every
+ * text pair to WCAG AA (4.5:1; 7:1 in the high-contrast sets) and the
+ * outlines of controls and the focus to 3:1; --border is decorative.
+ */
+:root {
+  --background: hsl(210 40% 98%);
+  --foreground: hsl(222 47% 11%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 47% 11%);
+  --primary: hsl(224 76% 48%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(214 32% 91%);
+  --secondary-foreground: hsl(222 47% 11%);
+  --muted: hsl(210 40% 96%);
+  --muted-foreground: hsl(215 19% 35%);
+  --accent: hsl(214 32% 91%);
+  --accent-foreground: hsl(222 47% 11%);
+  --destructive: hsl(0 74% 42%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(214 32% 85%);
+  --input: hsl(215 16% 47%);
+  --ring: hsl(224 76% 48%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: hsl(220 49% 8%);
+    --foreground: hsl(220 14% 96%);
+    --card: hsl(221 39% 12%);
+    --card-foreground: hsl(220 14% 96%);
+    --popover: hsl(221 39% 12%);
+    --popover-foreground: hsl(220 14% 96%);
+    --primary: hsl(212 96% 78%);
+    --primary-foreground: hsl(222 47% 11%);
+    --secondary: hsl(217 33% 20%);
+    --secondary-foreground: hsl(220 14% 96%);
+    --muted: hsl(217 33% 17%);
+    --muted-foreground: hsl(218 11% 70%);
+    --accent: hsl(217 33% 20%);
+    --accent-foreground: hsl(220 14% 96%);
+    --destructive: hsl(0 94% 82%);
+    --destructive-foreground: hsl(0 63% 15%);
+    --border: hsl(217 33% 24%);
+    --input: hsl(215 16% 60%);
+    --ring: hsl(212 96% 78%);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 0%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(0 0% 0%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(0 0% 0%);
+    --primary: hsl(224 90% 25%);
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(0 0% 100%);
+    --secondary-foreground: hsl(0 0% 0%);
+    --muted: hsl(0 0% 100%);
+    --muted-foreground: hsl(0 0% 15%);
+    --accent: hsl(0 0% 100%);
+    --accent-foreground: hsl(0 0% 0%);
+    --destructive: hsl(0 100% 25%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(0 0% 0%);
+    --input: hsl(0 0% 0%);
+    --ring: hsl(224 90% 25%);
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root {
+    --background: hsl(0 0% 0%);
+    --foreground: hsl(0 0% 100%);
+    --card: hsl(0 0% 0%);
+    --card-foreground: hsl(0 0% 100%);
+    --popover: hsl(0 0% 0%);
+    --popover-foreground: hsl(0 0% 100%);
+    --primary: hsl(212 100% 85%);
+    --primary-foreground: hsl(0 0% 0%);
+    --secondary: hsl(0 0% 0%);
+    --secondary-foreground: hsl(0 0% 100%);
+    --muted: hsl(0 0% 0%);
+    --muted-foreground: hsl(0 0% 88%);
+    --accent: hsl(0 0% 0%);
+    --accent-foreground: hsl(0 0% 100%);
+    --destructive: hsl(0 100% 86%);
+    --destructive-foreground: hsl(0 0% 0%);
+    --border: hsl(0 0% 100%);
+    --input: hsl(0 0% 100%);
+    --ring: hsl(212 100% 85%);
+  }
+}
