@@ -59,6 +59,16 @@ overrides:
   # gate since 2026-10-07. Both are patched within their major.
   "shell-quote@1": ">=1.11.0 <2"
   "source-map-js@1": ">=1.2.2 <2"
+  # undici under @sentry/cli (Sentry's upload tool, run at build time) and
+  # under jsdom (the tests' DOM): GHSA-xjj6-f33q-929c, failing the audit gate
+  # since 2026-10-24. Both majors are patched within themselves.
+  "undici@6": ">=6.29.1 <7"
+  "undici@8": ">=8.12.2 <9"
+  # zod 4 under the Telia kit (which runs in the API), knip and eas-cli's
+  # packages, whose ranges already take 4.6.7: no copy of zod 4 stays below
+  # GHSA-mrhx-c7xc-m3w5's fix (our own ask for ^4.6.7). zod 3 has no fixed
+  # release; auditConfig below says why its one copy stays.
+  "zod@4": ">=4.6.7 <5"
   # Not installed at all. @sentry/node 11 lists its bundler plugins as a
   # dependency for the entry points ./vite, ./rollup, ./webpack and ./esbuild,
   # which the API does not import, and they bring Sentry's command-line tool
@@ -69,10 +79,11 @@ overrides:
   # Remove this when the plugins are an optional peer.
   "@sentry/node>@sentry/bundler-plugins": "-"
 
-# pnpm audit: two advisories set aside, each with its reason. Neither has a
-# patched version, and neither package is in the API's image or the app's
-# bundle. Remove an entry when a patched version exists or the package is gone
-# from the tree. Every other advisory still fails the job.
+# pnpm audit: three advisories set aside, each with its reason. None has a
+# patched version for the copy that is left, and none of those copies is in
+# the API's image or the app's bundle. Remove an entry when a patched version
+# exists or the package is gone from the tree. Every other advisory still
+# fails the job.
 #
 # GHSA-86w9-cpqp-85rv (node-forge <= 1.4.0): a forged RSA PKCS#1 v1.5 signature
 # is accepted for keys with a low exponent. node-forge is asked for by
@@ -85,10 +96,19 @@ overrides:
 # exhausts the stack. braces is asked for by micromatch only, under fast-glob,
 # jest, Metro's file map and tailwindcss: build and test tools that expand the
 # patterns of our own configuration, never a pattern somebody sends us.
+#
+# GHSA-mrhx-c7xc-m3w5 (zod < 4.6.6): validating an oversized array, set or
+# record against a size limit can exhaust memory. Our own zod is 4.6.7, past
+# the fix (the API, the panel, packages/schema and packages/i18n). What is left
+# is zod 3.25.76 under @expo/cli, the dev server and `expo export` on a
+# developer's machine and in CI, which validates its own configuration and
+# manifests; zod 3 has no patched release. Remove this when @expo/cli moves to
+# zod 4.6.6 or later.
 auditConfig:
   ignoreGhsas:
     - GHSA-86w9-cpqp-85rv
     - GHSA-vfj7-8cjw-p6xm
+    - GHSA-mrhx-c7xc-m3w5
 
 # Fixes taken from a newer release onto the version Expo's SDK pins, each with
 # its reason. Remove an entry once the pinned version carries the fix (pnpm
