@@ -6,6 +6,7 @@ import { tFor } from "../lib/i18n.ts";
 import type { Logger } from "../lib/logger.ts";
 import { asHour, matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
 import {
+  EXPO_PROJECT,
   MIXED_PROJECTS,
   PUSHES_PER_REQUEST,
   type Pusher,
@@ -68,6 +69,8 @@ export type PushDeps = {
   schedule?: Schedule;
   /** Waits between two requests of one delivery; tests hand in one that does not. */
   pause?: (ms: number) => Promise<void>;
+  /** The Expo project this app's tokens are of; EXPO_PROJECT unless a test says otherwise. */
+  project?: string;
 };
 
 type Token = { id: string; accountId: string; token: string; locale: string };
@@ -88,6 +91,7 @@ export function inQuietHours(hour: number, from: number, to: number): boolean {
 export function createPush(deps: PushDeps) {
   const schedule = deps.schedule ?? realSchedule;
   const pause = deps.pause ?? realPause;
+  const project = deps.project ?? EXPO_PROJECT;
   // shortcut: the interval lives in this process's memory, so a restart forgets
   // it and the first message after one may push again early (ADR-055 §4); a
   // column on push_token for the last push of each conversation would lift it.
@@ -188,9 +192,10 @@ export function createPush(deps: PushDeps) {
   /**
    * One request's pushes, and what Expo said of each. A request refused for
    * tokens of more than one Expo project (a build of another project, or a
-   * token typed in by hand) keeps the project most of them are of, forgets
-   * the others' tokens, and is sent once more without them, so one stray
-   * token cannot cost the rest of its request every day.
+   * token typed in by hand) forgets the tokens Expo names under another
+   * project than this app's, and is sent once more without them, so one stray
+   * token cannot cost the rest of its request every day. Without this app's
+   * project among those named, nothing is forgotten on a guess.
    */
   async function sendPart(
     pusher: Pusher,
@@ -206,10 +211,11 @@ export function createPush(deps: PushDeps) {
     } catch (error) {
       const groups = error instanceof PushFailed ? error.byProject : undefined;
       if (!(error instanceof PushFailed) || error.reason !== MIXED_PROJECTS || !groups) throw error;
-      // A stray is a token Expo named in a project other than the largest; a
-      // token it named nowhere is kept, never forgotten on a guess.
-      const [, ...others] = [...groups].sort((a, b) => b.length - a.length);
-      const foreign = new Set(others.flat());
+      if (!Object.hasOwn(groups, project)) throw error;
+      // A stray is a token Expo named under another project; one it named nowhere is kept.
+      const foreign = new Set(
+        Object.entries(groups).flatMap(([name, tokens]) => (name === project ? [] : tokens)),
+      );
       const strays = part.filter(({ token }) => foreign.has(token.token));
       // No stray among this request's tokens: the refusal is the request's, as any other.
       if (strays.length === 0) throw error;
@@ -219,7 +225,9 @@ export function createPush(deps: PushDeps) {
         "push tokens of another project gone",
       );
       const kept = part.filter(({ token }) => !foreign.has(token.token));
-      return kept.length === 0 ? [] : sendPart(pusher, kept, kind);
+      if (kept.length === 0) return [];
+      await pause(REQUEST_SPACING_MS);
+      return sendPart(pusher, kept, kind);
     }
   }
 
@@ -272,8 +280,18 @@ export function createPush(deps: PushDeps) {
         continue;
       }
       for (const { token, ticket } of answered) {
-        if (ticket.status === "ok") taken.push({ id: ticket.id, token });
-        else await refused(token, ticket.error, kind);
+        if (ticket.status === "ok") {
+          taken.push({ id: ticket.id, token });
+          continue;
+        }
+        // The push is gone either way; a refusal that cannot be acted on (the
+        // database away) is logged and the rest go on, so nothing is retried
+        // that was sent (a round run tried again would push everybody twice).
+        try {
+          await refused(token, ticket.error, kind);
+        } catch (error) {
+          deps.logger.error({ ...failure(error, kind), err: error }, "push refusal not handled");
+        }
       }
     }
     readReceiptsLater(pusher, taken, kind);
@@ -341,9 +359,16 @@ export function createPush(deps: PushDeps) {
       });
     },
 
-    /** The day's round (ADR-055 §6), to those the job chose; the job waits for it and logs its failure. */
+    /** The day's round (ADR-055 §6), to those the job chose; the job waits for it and logs its failure, and `settled` waits for it too. */
     round(accountIds: readonly string[]): Promise<number> {
-      return deliver([...accountIds], { kind: "round" }, "normal");
+      const run = deliver([...accountIds], { kind: "round" }, "normal");
+      const watched = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      inFlight.add(watched);
+      void watched.finally(() => inFlight.delete(watched));
+      return run;
     },
 
     /** Resolves once every push started in the background has settled: the tests, and a shutdown. */

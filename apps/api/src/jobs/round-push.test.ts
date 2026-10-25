@@ -515,6 +515,50 @@ describe("the round's push on its timer (ADR-055 §6)", () => {
     }
   });
 
+  test("a retry that would run past midnight is given up, and the next day is told at its hour", async ({
+    ctx,
+  }) => {
+    // The hour at 23 (an hour asHour takes): 22:59 in Helsinki, summer time.
+    await withMatchingConfig(ctx.client, { [ROUND_PUSH_HOUR_KEY]: 23 });
+    vi.useFakeTimers({ now: new Date("2026-07-01T19:59:00.000Z"), toFake: [...FAKE.toFake] });
+    const log = await watchedLogger();
+    // The scheduler's clock: the fake one, until the day's run hangs for 58 minutes.
+    let late = 0;
+    const now = () => new Date(Date.now() + late);
+    const runs: string[] = [];
+    const push: Push = {
+      message: () => {},
+      match: () => {},
+      settled: async () => {},
+      round: async () => {
+        runs.push(now().toISOString());
+        if (runs.length === 1) {
+          late = 58 * MINUTE;
+          throw new Error("the database hung, then broke");
+        }
+        return 0;
+      },
+    };
+    const stop = scheduleRoundPush({ db: ctx.client, logger: log.logger, now, push });
+    try {
+      await log.until("round push armed", 1);
+      await vi.advanceTimersByTimeAsync(MINUTE);
+      await log.until("round push failed", 1);
+      // Its retry comes at 00:03 of the next day: given up, never run for the day before.
+      await vi.advanceTimersByTimeAsync(RUN_RETRY_MS);
+      await log.until("round push given up: the day ended", 1);
+      expect(runs).toHaveLength(1);
+      // Armed for the new day's 23:00, 22 h 57 min on, which is told.
+      await log.until("round push armed", 2);
+      expect(log.armed().at(-1)).toBe(DAY - 63 * MINUTE);
+      await vi.advanceTimersByTimeAsync(DAY - 63 * MINUTE);
+      await log.until("round push done", 1);
+      expect(runs).toEqual(["2026-07-01T20:00:00.000Z", "2026-07-02T20:00:00.000Z"]);
+    } finally {
+      stop();
+    }
+  });
+
   test("a retry that succeeds tells the day once, and the next run is the next day's", async ({
     ctx,
   }) => {

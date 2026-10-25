@@ -18,6 +18,8 @@ The API sends each push to `https://exp.host/--/api/v2/push/send` (`apps/api/src
 | `channelId` `default`, a priority, `sound: "default"` | how the phone shows it |
 | When, and the API's address on the network | as for any request |
 
+And from the phone: at each start of the app while it may notify, and on a return to the front when a registration is owed, the app asks Expo for its push token (`getExpoPushTokenAsync`), which shows Expo the phone's address and the app's installation. A return with nothing owed asks nothing.
+
 Never a message's text, a name, an account's id or anything of a profile; `apps/api/src/notifications/push.test.ts` fails on a payload that carries one. Apple and Google receive the same through Expo.
 
 ### What Expo keeps

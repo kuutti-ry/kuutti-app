@@ -114,6 +114,8 @@ let registering: Promise<void> = Promise.resolve();
  * only once the API has taken it, so a refused one is sent again next time.
  */
 let sent: { sessionId: string; token: string; locale: string } | null = null;
+/** Whether the last registration that reached for a token failed: what a return to the front owes. */
+let failed = false;
 
 /**
  * Hands this phone's Expo push token to the API for the signed-in session
@@ -144,12 +146,33 @@ async function register({ locale, channel, device }: Registration): Promise<void
       devicePushToken: device,
     });
     if (currentSession()?.sessionId !== sessionId) return;
+    failed = false;
     if (sent?.sessionId === sessionId && sent.token === token && sent.locale === locale) return;
     await savePushToken({ token, platform }, locale);
     sent = { sessionId, token, locale };
   } catch (error) {
+    failed = true;
     Sentry.captureException(error);
   }
+}
+
+/**
+ * A registration on the app's return to the front (#102, ADR-055 §9), only
+ * when one is owed: nothing registered yet for this session (the phone may
+ * have just been allowed in its own settings), another language, or a last
+ * try that failed (a start with no network). Otherwise nothing at all, since
+ * fetching the token tells Expo of every return to the app.
+ */
+export function registerOnReturn(registration: Registration): Promise<void> {
+  registering = registering.then(() => {
+    const owed =
+      failed ||
+      sent === null ||
+      sent.sessionId !== currentSession()?.sessionId ||
+      sent.locale !== registration.locale;
+    return owed ? register(registration) : undefined;
+  });
+  return registering;
 }
 
 /**

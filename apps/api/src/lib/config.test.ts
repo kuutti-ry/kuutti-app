@@ -318,9 +318,28 @@ describe("parseConfig for push (#102, ADR-055 §8)", () => {
   );
 
   it.each(each)("takes expo and off as set in %s, and the log where it is allowed", (name, raw) => {
-    expect(parseConfig({ ...raw, PUSH: "expo" }).PUSH).toBe("expo");
+    // Production sends only with Expo's access token (the test below).
+    const token = name === "production" ? { EXPO_ACCESS_TOKEN: "robot-token" } : {};
+    expect(parseConfig({ ...raw, ...token, PUSH: "expo" }).PUSH).toBe("expo");
     expect(parseConfig({ ...raw, PUSH: "off" }).PUSH).toBe("off");
     if (local.has(name)) expect(parseConfig({ ...raw, PUSH: "log" }).PUSH).toBe("log");
+  });
+
+  it("refuses expo in production without Expo's access token, and names it; takes it with one", () => {
+    try {
+      parseConfig({ ...environments.production, PUSH: "expo" });
+      throw new Error("expected ConfigError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigError);
+      expect((error as ConfigError).missing).toEqual(["EXPO_ACCESS_TOKEN"]);
+    }
+    expect(
+      parseConfig({ ...environments.production, PUSH: "expo", EXPO_ACCESS_TOKEN: "robot-token" })
+        .PUSH,
+    ).toBe("expo");
+    // Off, or unset, needs none; staging and the previews may send without one.
+    expect(parseConfig({ ...environments.production, PUSH: "off" }).PUSH).toBe("off");
+    expect(parseConfig({ ...environments.staging, PUSH: "expo" }).PUSH).toBe("expo");
   });
 
   it.each(["fcm", "EXPO", "", "expo "])("refuses %j and names PUSH", (value) => {

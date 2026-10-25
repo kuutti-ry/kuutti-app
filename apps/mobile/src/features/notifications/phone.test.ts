@@ -5,7 +5,14 @@ import { createElement } from "react";
 import { Platform } from "react-native";
 import { SessionProvider, useSession } from "@/features/identity";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
-import { askPermission, permissionOf, readPermission, registerPush, unregisterPush } from "./phone";
+import {
+  askPermission,
+  permissionOf,
+  readPermission,
+  registerOnReturn,
+  registerPush,
+  unregisterPush,
+} from "./phone";
 
 // The phone's side of the push (#102, ADR-055 §2, §9): the permission in the
 // app's words on each platform, on the web and when the phone cannot be read;
@@ -415,5 +422,58 @@ describe("the device token dropped (#102)", () => {
     expect(currentSession()).toBeNull();
     await waitFor(() => expect(Sentry.captureException).toHaveBeenCalledWith(error));
     expect(notifications.unregisterForNotificationsAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a registration on the return to the front (ADR-055 §9)", () => {
+  const fetches = () => notifications.getExpoPushTokenAsync.mock.calls.length;
+
+  it("asks Expo nothing while this session's registration stands in its language", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    await registerPush({ locale: "en", channel: "Notifications" });
+    const before = fetches();
+    await registerOnReturn({ locale: "en", channel: "Notifications" });
+    await registerOnReturn({ locale: "en", channel: "Notifications" });
+    expect(fetches()).toBe(before);
+    expect(seen).toHaveLength(1);
+  });
+
+  it("registers when this session has none yet, and when the language is another", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    // The phone was allowed meanwhile in its own settings: nothing registered for this session yet.
+    await registerOnReturn({ locale: "en", channel: "Notifications" });
+    await registerOnReturn({ locale: "fi", channel: "Ilmoitukset" });
+    expect(seen.map(({ language }) => language)).toEqual(["en", "fi"]);
+    // A new sign-in on the phone owes its own.
+    await signIn();
+    await registerOnReturn({ locale: "fi", channel: "Ilmoitukset" });
+    expect(seen).toHaveLength(3);
+  });
+
+  it("registers after a try that failed, and asks nothing once one has gone", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    // Registered for this session, then a try in the same language that failed for want of network.
+    await registerPush({ locale: "en", channel: "Notifications" });
+    notifications.getExpoPushTokenAsync.mockRejectedValueOnce(new Error("offline"));
+    await registerPush({ locale: "en", channel: "Notifications" });
+    const before = fetches();
+    // Only the failure is owed: the return tries again, finds the same token, and sends nothing new.
+    await registerOnReturn({ locale: "en", channel: "Notifications" });
+    expect(fetches()).toBe(before + 1);
+    expect(seen).toHaveLength(1);
+    // Gone through now: the next return asks nothing.
+    await registerOnReturn({ locale: "en", channel: "Notifications" });
+    expect(fetches()).toBe(before + 1);
+  });
+
+  it("reads the phone, and asks Expo nothing, while the phone does not allow it", async () => {
+    const seen = api();
+    notifications.getPermissionsAsync.mockResolvedValue(ios(1));
+    await registerOnReturn({ locale: "en", channel: "Notifications" });
+    expect(fetches()).toBe(0);
+    expect(seen).toEqual([]);
   });
 });

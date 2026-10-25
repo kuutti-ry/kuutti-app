@@ -200,13 +200,17 @@ function landingBefore(
   when: (text: string, values?: unknown[]) => boolean,
   land: () => Promise<unknown>,
 ): Queryable & { landed: () => boolean } {
+  let started = false;
+  // Landed means `land` finished: an expectation that failed inside it, in
+  // the push's own background, would otherwise be only a logged failure.
   let landed = false;
   return {
     landed: () => landed,
     async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
-      if (!landed && when(text, values)) {
-        landed = true;
+      if (!started && when(text, values)) {
+        started = true;
         await land();
+        landed = true;
       }
       return db.query<R>(text, values);
     },

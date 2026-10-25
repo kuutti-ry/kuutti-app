@@ -43,12 +43,12 @@ export type Pusher = {
  */
 export class PushFailed extends Error {
   /** Not enumerable, so neither JSON nor the logger's error serializer prints a token. */
-  declare readonly byProject?: readonly (readonly string[])[];
+  declare readonly byProject?: Readonly<Record<string, readonly string[]>>;
 
   constructor(
     readonly reason: string,
     readonly status: number | undefined,
-    byProject?: readonly (readonly string[])[],
+    byProject?: Readonly<Record<string, readonly string[]>>,
   ) {
     super(`push not sent: ${reason}`);
     this.name = "PushFailed";
@@ -56,6 +56,12 @@ export class PushFailed extends Error {
       Object.defineProperty(this, "byProject", { value: byProject, enumerable: false });
   }
 }
+
+/**
+ * The project Expo names Kuutti's tokens by, `@<owner>/<slug>` of
+ * apps/mobile/app.json, as a mixed-projects refusal keys them.
+ */
+export const EXPO_PROJECT = "@kuutti/kuutti";
 
 /** The code with which Expo refuses a request whose tokens are of more than one project. */
 export const MIXED_PROJECTS = "PUSH_TOO_MANY_EXPERIENCE_IDS";
@@ -136,7 +142,7 @@ export function expoPusher(
       throw new PushFailed(
         first?.code ?? "refused",
         response.status,
-        groups?.success ? Object.values(groups.data) : undefined,
+        groups?.success ? groups.data : undefined,
       );
     }
     return answer;

@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 import { useLock, useSession } from "@/features/identity";
 import { useT } from "@/lib/locale";
-import { registerPush } from "./phone";
+import { registerOnReturn, registerPush } from "./phone";
 
 /** A push that arrives while the app is in front: seen, never heard, never counted (ADR-055 §9). */
 const IN_FRONT: Notifications.NotificationBehavior = {
@@ -70,7 +70,7 @@ function OnThePhone() {
         void registerPush({ locale, channel, device });
       }),
       AppState.addEventListener("change", (next) => {
-        if (next === "active") void registerPush({ locale, channel });
+        if (next === "active") void registerOnReturn({ locale, channel });
       }),
     ];
     return () => {

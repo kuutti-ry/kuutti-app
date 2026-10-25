@@ -220,15 +220,18 @@ describe("PushNotifications", () => {
     });
   });
 
-  it("sends nothing again as the app comes back to the front with nothing changed", async () => {
+  it("sends nothing again as the app comes back to the front with nothing changed, and asks Expo nothing", async () => {
     const seen = api();
     await signIn();
     await renderWithTheme(<PushNotifications />);
     await waitFor(() => expect(seen).toHaveLength(1));
+    const fetched = notifications.getExpoPushTokenAsync.mock.calls.length;
     await toApp("background");
     await toApp("active");
     await settle();
     expect(seen).toHaveLength(1);
+    // A fetch would tell Expo of every return to the app.
+    expect(notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(fetched);
   });
 
   it("retries a start whose token Expo would not give, as the app comes back to the front", async () => {

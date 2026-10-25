@@ -62,9 +62,12 @@ export function scheduleRoundPush(deps: RoundPushDeps): () => void {
     timer = setTimeout(() => void task(), ms);
     timer.unref();
   };
-  const run = async () => {
+  // A retry carries the day it is for, and is dropped once that day has ended.
+  const run = async (retryOf?: string) => {
     const day = finnishDay(deps.now());
-    if (toldDay !== day) {
+    if (retryOf !== undefined && retryOf !== day) {
+      deps.logger.warn({ job: "round-push", day: retryOf }, "round push given up: the day ended");
+    } else if (toldDay !== day) {
       try {
         const result = await runRoundPush(deps);
         toldDay = day;
@@ -74,7 +77,7 @@ export function scheduleRoundPush(deps: RoundPushDeps): () => void {
         const again = failed.runs <= RUN_RETRIES;
         deps.logger.error({ job: "round-push", err, again }, "round push failed");
         if (again) {
-          after(RUN_RETRY_MS, run);
+          after(RUN_RETRY_MS, () => run(day));
           return;
         }
       }

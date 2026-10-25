@@ -286,8 +286,11 @@ describe("Expo's push service (ADR-055 §8)", () => {
     const failure = await failureOf(expoPusher(fetchImpl).send(sent));
     expect([failure.reason, failure.status]).toEqual([MIXED_PROJECTS, 400]);
     expect(MIXED_PROJECTS).toBe("PUSH_TOO_MANY_EXPERIENCE_IDS");
-    // In Expo's order of the projects, for the sender to keep its own.
-    expect(failure.byProject).toEqual([[first, third], [second]]);
+    // By Expo's names of the projects, for the sender to keep its own.
+    expect(failure.byProject).toEqual({
+      "@kuutti-ry/kuutti": [first, third],
+      "@someone/else": [second],
+    });
     const printed = [failure.message, String(failure), failure.stack ?? "", failure.reason].join(
       "\n",
     );

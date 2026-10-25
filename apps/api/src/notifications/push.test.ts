@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PushData } from "@kuutti/schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { messageReaders } from "../chat/index.ts";
-import { MIXED_PROJECTS, PushFailed, type PushMessage } from "../lib/push.ts";
+import { EXPO_PROJECT, MIXED_PROJECTS, PushFailed, type PushMessage } from "../lib/push.ts";
 import { withMatchingConfig } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
 import { captureLogger, type LogLine, type TestContext, test } from "../test/harness.ts";
@@ -268,6 +268,27 @@ describe("a message's push (ADR-055 §4)", () => {
     // The receipts are read once, fifteen minutes later.
     expect(s.schedule.tasks.map((task) => task.ms)).toEqual([RECEIPT_DELAY_MS]);
     expect(RECEIPT_DELAY_MS).toBe(15 * MINUTE);
+  });
+
+  test("settled waits for a round's delivery too, as a shutdown must", async ({ ctx }) => {
+    const s = await scene(ctx);
+    await s.device(s.b);
+    const expo = gate();
+    const reached = gate();
+    s.pusher.gate = expo.promise;
+    s.pusher.reached = reached.open;
+    const delivery = s.push.round([s.b]);
+    await reached.promise;
+    let settled = false;
+    const waiting = s.push.settled().then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    expo.open();
+    expect(await delivery).toBe(1);
+    await waiting;
+    expect(settled).toBe(true);
   });
 
   test("returns at once and runs after its caller, and settled waits for it and for a push started while it waits", async ({
@@ -1047,7 +1068,7 @@ describe("the round's push (ADR-055 §6)", () => {
 });
 
 describe("a request refused for tokens of more than one Expo project (ADR-055 §8)", () => {
-  test("keeps the project most tokens are of, forgets the others' tokens, and sends the rest once more", async ({
+  test("keeps this app's project, forgets the others' tokens, and sends the rest once more, spaced", async ({
     ctx,
   }) => {
     const s = await scene(ctx);
@@ -1055,9 +1076,13 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     for (let i = 0; i < 6; i += 1) devices.push(await s.device(s.b, "en", i));
     const [t1, t2, t3, t4, t5, t6] = devices.map((device) => device.token);
     if (!t1 || !t2 || !t3 || !t4 || !t5 || !t6) throw new Error("no devices");
-    // Three projects: ours has three of the tokens, the other two the rest.
+    // Three projects: this app's has three of the tokens, the other two the rest.
     const strays = [t2, t4, t6];
-    const mixed = new PushFailed(MIXED_PROJECTS, 400, [[t2], [t1, t3, t5], [t4, t6]]);
+    const mixed = new PushFailed(MIXED_PROJECTS, 400, {
+      "@someone/else": [t2],
+      [EXPO_PROJECT]: [t1, t3, t5],
+      "@another/app": [t4, t6],
+    });
     s.pusher.reached = () => {
       const batch = s.pusher.batches.at(-1) ?? [];
       s.pusher.failure = batch.some((m) => strays.includes(m.to)) ? mixed : undefined;
@@ -1078,6 +1103,8 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     ]);
     expect(lineOf(lines, "push not sent")).toEqual([]);
     expectNoToken(lines, [t1, t2, t3, t4, t5, t6]);
+    // The resend is a request like any other: spaced to Expo's rate.
+    expect(s.pauses).toEqual([{ ms: REQUEST_SPACING_MS, after: 1 }]);
     // The next push goes in one request.
     s.clock.at = new Date(T.getTime() + MINUTE);
     await s.send("a", "Taas");
@@ -1090,7 +1117,9 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     const s = await scene(ctx);
     const first = await s.device(s.b, "en", 1);
     const second = await s.device(s.b, "en", 2);
-    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, [[first.token, second.token]]);
+    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, {
+      [EXPO_PROJECT]: [first.token, second.token],
+    });
     expect(await s.push.round([s.b])).toBe(0);
     expect(s.pusher.batches).toHaveLength(1);
     expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
@@ -1115,10 +1144,10 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     const stray = await s.device(s.b, "en", 2);
     const unnamed = await s.device(s.b, "en", 3);
     // Expo names two projects, and not the third token at all.
-    const mixed = new PushFailed(MIXED_PROJECTS, 400, [
-      [ours.token, "ExponentPushToken[elsewhere]"],
-      [stray.token],
-    ]);
+    const mixed = new PushFailed(MIXED_PROJECTS, 400, {
+      [EXPO_PROJECT]: [ours.token, "ExponentPushToken[elsewhere]"],
+      "@someone/else": [stray.token],
+    });
     s.pusher.reached = () => {
       const batch = s.pusher.batches.at(-1) ?? [];
       s.pusher.failure = batch.some((m) => m.to === stray.token) ? mixed : undefined;
@@ -1144,16 +1173,87 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     const s = await scene(ctx);
     const first = await s.device(s.b, "en", 1);
     const second = await s.device(s.b, "en", 2);
-    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, [
-      ["ExponentPushToken[one]"],
-      ["ExponentPushToken[two]"],
-    ]);
+    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, {
+      [EXPO_PROJECT]: ["ExponentPushToken[one]"],
+      "@someone/else": ["ExponentPushToken[two]"],
+    });
     expect(await s.push.round([s.b])).toBe(0);
     expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
     expect(lineOf(s.logs(), "push not sent")).toEqual([
       expect.objectContaining({ reason: MIXED_PROJECTS, pushes: 2 }),
     ]);
     expect(lineOf(s.logs(), "push tokens of another project gone")).toEqual([]);
+  });
+
+  test("a token of this app's is kept when another project has as many: the project decides, never the count", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const ours = await s.device(s.b, "en", 1);
+    const theirs = await s.device(s.b, "en", 2);
+    s.pusher.reached = () => {
+      s.pusher.failure =
+        s.pusher.batches.length === 1
+          ? new PushFailed(MIXED_PROJECTS, 400, {
+              "@someone/else": [theirs.token],
+              [EXPO_PROJECT]: [ours.token],
+            })
+          : undefined;
+    };
+    s.push.match({ accountId: s.b });
+    await s.push.settled();
+    expect(s.pusher.batches.map((batch) => batch.map((m) => m.to))).toEqual([
+      [ours.token, theirs.token],
+      [ours.token],
+    ]);
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([ours.token]);
+  });
+
+  test("a refusal that does not name this app's project forgets nothing, however many projects it names", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const first = await s.device(s.b, "en", 1);
+    const second = await s.device(s.b, "en", 2);
+    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, {
+      "@someone/else": [first.token],
+      "@another/app": [second.token],
+    });
+    expect(await s.push.round([s.b])).toBe(0);
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
+    expect(lineOf(s.logs(), "push not sent")).toEqual([
+      expect.objectContaining({ reason: MIXED_PROJECTS, pushes: 2 }),
+    ]);
+    expect(lineOf(s.logs(), "push tokens of another project gone")).toEqual([]);
+  });
+
+  test("a refusal that cannot be acted on is logged, and the rest of the delivery goes on", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const gone = await s.device(s.b, "en", 1);
+    const kept = await s.device(s.b, "en", 2);
+    s.pusher.ticket = (message) =>
+      message.to === gone.token
+        ? { status: "error", error: "DeviceNotRegistered" }
+        : { status: "ok", id: `ticket-${message.to}` };
+    // The token's delete fails: a database gone for a moment.
+    await ctx.client.query(
+      `CREATE FUNCTION pg_temp.refuse_delete() RETURNS trigger LANGUAGE plpgsql AS
+       $$ BEGIN RAISE EXCEPTION 'refused for the test'; END $$`,
+    );
+    await ctx.client.query(
+      "CREATE TRIGGER refuse_delete BEFORE DELETE ON push_token FOR EACH ROW EXECUTE FUNCTION pg_temp.refuse_delete()",
+    );
+    await ctx.client.query("SAVEPOINT before_delete");
+    expect(await s.push.round([s.b])).toBe(1);
+    await ctx.client.query("ROLLBACK TO SAVEPOINT before_delete");
+    expect(lineOf(s.logs(), "push refusal not handled")).toEqual([
+      expect.objectContaining({ push: "round", level: 50 }),
+    ]);
+    // What Expo took still waits for its receipt.
+    expect(s.schedule.tasks).toHaveLength(1);
+    expectNoToken(s.logs(), [gone.token, kept.token]);
   });
 
   test("a resend that is refused too loses its own pushes, and the others' tokens stay forgotten", async ({
@@ -1166,7 +1266,10 @@ describe("a request refused for tokens of more than one Expo project (ADR-055 §
     s.pusher.reached = () => {
       s.pusher.failure =
         s.pusher.batches.length === 1
-          ? new PushFailed(MIXED_PROJECTS, 400, [[ours.token, alsoOurs.token], [theirs.token]])
+          ? new PushFailed(MIXED_PROJECTS, 400, {
+              [EXPO_PROJECT]: [ours.token, alsoOurs.token],
+              "@someone/else": [theirs.token],
+            })
           : new PushFailed("TOO_MANY_REQUESTS", 429);
     };
     s.push.match({ accountId: s.b });

@@ -316,6 +316,14 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   if (env.PUSH === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
     throw new ConfigError(["PUSH"], [`PUSH: log is for development and test, not ${env.APP_ENV}`]);
   }
+  // Production sends only with Expo's access token, so that nobody holding a
+  // stored token can send to its people's phones (ADR-055 §8).
+  if (env.PUSH === "expo" && env.APP_ENV === "production" && !env.EXPO_ACCESS_TOKEN) {
+    throw new ConfigError(
+      ["EXPO_ACCESS_TOKEN"],
+      ["EXPO_ACCESS_TOKEN: production sends pushes only with Expo's access token"],
+    );
+  }
   const push =
     env.PUSH ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
   const trustedProxy: TrustedProxy =
