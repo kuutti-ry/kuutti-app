@@ -349,7 +349,7 @@ Staging and production are one account in one region, so they share the identity
 
 In this order, maintainer only:
 
-1. **The bootstrap.** CI never applies it, since it owns the CI roles. The plan adds the identity, its MAIL FROM, the suppression attributes and five records, and leaves the Workspace's records as they are (#450). Read it whole first: it may also hold other changes merged since the last apply.
+1. **The bootstrap.** CI never applies it, since it owns the CI roles. The plan adds the identity, its MAIL FROM, the suppression attributes and five records. After #450 it also moves the root's MX and TXT to `root_mx` and `root_txt`, imports Google's DKIM key (`google_dkim`) and adds the CAA's `iodef`, all without changing a mail record. Read it whole first: it may also hold other changes merged since the last apply.
 
    ```sh
    cd infra/bootstrap

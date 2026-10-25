@@ -41,7 +41,9 @@ resource "aws_route53_zone" "main" {
 # Google's envelope also aligns under aspf=s, while SES's, checked for
 # mail.kuutti.app, does not and need not. Mail that neither signed fails
 # DMARC, and receivers that honour it reject it, which is what stops the
-# domain being spoofed. The SPF ends in ~all, Google's advice, rather than
+# domain being spoofed. The one exception is mail that leaves Google's servers
+# with a kuutti.app envelope: it passes on SPF alone, so that part rests on
+# Google refusing such an envelope to its other customers. The SPF ends in ~all, Google's advice, rather than
 # -all: DMARC does the rejecting, and a receiver that refuses a hard SPF fail
 # outright never sees that a forwarded message's DKIM still passes.
 #
