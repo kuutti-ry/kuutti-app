@@ -1,20 +1,22 @@
 import * as Sentry from "@sentry/react-native";
-import { act, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform, View } from "react-native";
+import { useLock } from "@/features/identity";
 import { type LocalePreference, useLocaleSettings } from "@/lib/locale";
 import { clearSession, saveSession } from "@/lib/session";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { PushNotifications } from "./PushNotifications";
 
 // The push on this phone (#102, ADR-055 §2, §9): the foreground handler; the
-// token registered at the start while signed in, on a new token and on a
-// change of the app's language, once when iOS hands the same token over
-// again, and never while signed out; the phone's list cleared on a sign-out;
-// a tap opening its conversation or today's round once, and nothing for a
-// tap the app cannot read, an action that is not the tap, or a tap while
-// signed out; and none of it on the web target.
+// token registered at the start while signed in, on a new token, on a
+// change of the app's language and as the app comes back to the front, once
+// when nothing changed, and never while signed out; the phone's list cleared
+// on a sign-out; a tap opening the conversations or today's round once,
+// waiting under the lock, and nothing for a tap the app cannot read, an
+// action that is not the tap, a tap while signed out or one whose lock was
+// left through the bank; and none of it on the web target.
 
 const notifications = jest.mocked(Notifications);
 const phone = jest.requireMock("expo-notifications") as {
@@ -27,6 +29,9 @@ const { __router: router } = jest.requireMock("expo-router") as {
 const secureStore = jest.requireMock("expo-secure-store") as { __store: Map<string, string> };
 
 const CONVERSATION = "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e6f";
+const CODE = "246810";
+const PASSCODE = "Your Kuutti passcode";
+const BANK = "Sign in with the bank instead";
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 /** Expo's token for a device token the phone hands over. */
 const expoToken = (seed: string) => `ExponentPushToken[${(seed + "a".repeat(22)).slice(0, 22)}]`;
@@ -50,7 +55,32 @@ const allowed = {
   expires: "never",
   ios: { status: 2 },
 };
+const denied = { ...allowed, status: "denied", granted: false, ios: { status: 1 } };
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+
+// The app's comings and goings, to the push's listener and the lock's alike.
+let appState: Array<(state: string) => void>;
+const toApp = (state: string) =>
+  act(async () => {
+    for (const listener of [...appState]) listener(state);
+  });
+
+let lock: ReturnType<typeof useLock>;
+/** The push with the lock's own settings at hand, as Settings › Lock has them. */
+function WithLock() {
+  lock = useLock();
+  return <PushNotifications />;
+}
+/** The lock turned on with a passcode, to lock at the first time away. */
+async function turnLockOn() {
+  // One at a time, as Settings does: each change builds on the lock as it now is.
+  await act(() => lock.setPasscode(CODE));
+  await act(() => lock.setGrace(0));
+}
+async function unlock() {
+  await fireEvent.changeText(screen.getByLabelText(PASSCODE), CODE);
+  await settle();
+}
 
 /** What reached the API: each registration's body and its language. */
 function api(): Array<{ body: unknown; language: string | null }> {
@@ -90,10 +120,19 @@ function InLanguage({ language }: { language: LocalePreference }) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  // The phone's language, whatever a test before chose in the app.
-  secureStore.__store.delete("kuutti.preference.locale");
+  // The phone's language and the lock, whatever a test before chose in the app.
+  secureStore.__store.clear();
   phone.__respond(null);
   notifications.getPermissionsAsync.mockResolvedValue(allowed as never);
+  appState = [];
+  jest.spyOn(AppState, "addEventListener").mockImplementation((event, listener) => {
+    const heard = listener as (state: string) => void;
+    if (event === "change") appState.push(heard);
+    const remove = () => {
+      appState = appState.filter((other) => other !== heard);
+    };
+    return { remove } as never;
+  });
   await clearSession();
 });
 afterEach(() => jest.restoreAllMocks());
@@ -160,6 +199,51 @@ describe("PushNotifications", () => {
     expect(seen).toHaveLength(1);
   });
 
+  it("registers as the app comes back to the front once the phone's settings allowed it meanwhile", async () => {
+    const seen = api();
+    notifications.getPermissionsAsync.mockResolvedValue(denied as never);
+    await signIn();
+    await renderWithTheme(<PushNotifications />);
+    await settle();
+    expect(seen).toEqual([]);
+
+    // Away in the phone's settings: nothing is sent until the app is in front again.
+    notifications.getPermissionsAsync.mockResolvedValue(allowed as never);
+    await toApp("background");
+    await settle();
+    expect(seen).toEqual([]);
+    await toApp("active");
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(seen[0]).toEqual({
+      body: { token: "ExponentPushToken[aaaaaaaaaaaaaaaaaaaaaa]", platform: "ios" },
+      language: "en",
+    });
+  });
+
+  it("sends nothing again as the app comes back to the front with nothing changed", async () => {
+    const seen = api();
+    await signIn();
+    await renderWithTheme(<PushNotifications />);
+    await waitFor(() => expect(seen).toHaveLength(1));
+    await toApp("background");
+    await toApp("active");
+    await settle();
+    expect(seen).toHaveLength(1);
+  });
+
+  it("retries a start whose token Expo would not give, as the app comes back to the front", async () => {
+    const seen = api();
+    const error = new Error("offline");
+    notifications.getExpoPushTokenAsync.mockRejectedValueOnce(error);
+    await signIn();
+    await renderWithTheme(<PushNotifications />);
+    await settle();
+    expect(seen).toEqual([]);
+    expect(Sentry.captureException).toHaveBeenCalledWith(error);
+    await toApp("active");
+    await waitFor(() => expect(seen).toHaveLength(1));
+  });
+
   it("clears the phone's list of pushes on a sign-out, and not at the start or on a sign-in", async () => {
     api();
     await signIn();
@@ -200,6 +284,7 @@ describe("PushNotifications", () => {
   it("registers nothing and listens for no token while signed out, and stops on a sign-out", async () => {
     const seen = api();
     await renderWithTheme(<PushNotifications />);
+    await toApp("active");
     await settle();
     expect(seen).toEqual([]);
     expect(notifications.addPushTokenListener).not.toHaveBeenCalled();
@@ -208,12 +293,16 @@ describe("PushNotifications", () => {
       await signIn();
     });
     await waitFor(() => expect(seen).toHaveLength(1));
+    const reads = notifications.getPermissionsAsync.mock.calls.length;
     await act(async () => {
       await clearSession();
     });
     await act(async () => phone.__newToken({ type: "ios", data: "after-sign-out" }));
+    await toApp("active");
     await settle();
     expect(seen).toHaveLength(1);
+    // Not even begun: the listeners went with the session.
+    expect(notifications.getPermissionsAsync).toHaveBeenCalledTimes(reads);
   });
 });
 
@@ -224,8 +313,8 @@ describe("a tap on a push", () => {
   });
 
   it.each([
-    ["a message", { kind: "message", conversationId: CONVERSATION }, `/chats/${CONVERSATION}`],
-    ["a match", { kind: "match", conversationId: CONVERSATION }, `/chats/${CONVERSATION}`],
+    ["a message", { kind: "message" }, "/chats"],
+    ["a match", { kind: "match" }, "/chats"],
     ["the round", { kind: "round" }, "/round"],
   ])("on %s opens what it is about, once", async (_, data, path) => {
     await renderWithTheme(<PushNotifications />);
@@ -244,18 +333,18 @@ describe("a tap on a push", () => {
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
-  it("at a cold start waits for the session, then opens the conversation", async () => {
-    phone.__respond(tap({ kind: "message", conversationId: CONVERSATION }));
+  it("at a cold start waits for the session, then opens the conversations", async () => {
+    phone.__respond(tap({ kind: "message" }));
     await renderWithTheme(<PushNotifications />);
-    await waitFor(() => expect(router.push).toHaveBeenCalledWith(`/chats/${CONVERSATION}`));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/chats"));
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
   it.each([
-    ["no kind", { conversationId: CONVERSATION }],
+    ["no kind", {}],
     ["a kind the app does not know", { kind: "promotion" }],
-    ["a message without its conversation", { kind: "message" }],
-    ["a conversation that is no id", { kind: "match", conversationId: "../settings" }],
+    // No push names its conversation any more (the maintainer's of 25/10/2026).
+    ["a conversation", { kind: "message", conversationId: CONVERSATION }],
     ["a word too many", { kind: "round", name: "Henna" }],
     ["no data at all", undefined],
   ])("opens nothing for a push with %s, and lets it go", async (_, data) => {
@@ -278,7 +367,7 @@ describe("a tap on a push", () => {
 
   it("opens nothing for a tap while signed out, not even after a sign-in", async () => {
     await clearSession();
-    phone.__respond(tap({ kind: "message", conversationId: CONVERSATION }));
+    phone.__respond(tap({ kind: "message" }));
     await renderWithTheme(<PushNotifications />);
     await settle();
     expect(notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
@@ -287,6 +376,79 @@ describe("a tap on a push", () => {
     });
     await settle();
     expect(router.push).not.toHaveBeenCalled();
+  });
+});
+
+describe("a tap on a push under the lock", () => {
+  beforeEach(async () => {
+    api();
+    await signIn();
+  });
+
+  it("waits while the lock is shown, and opens once it is unlocked", async () => {
+    await renderWithTheme(<WithLock />);
+    await turnLockOn();
+    // Tapped while away: the cover holds it, and the return locks.
+    await toApp("background");
+    await act(async () => phone.__respond(tap({ kind: "message" })));
+    await toApp("active");
+    await settle();
+    expect(screen.getByLabelText(PASSCODE)).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
+    expect(notifications.clearLastNotificationResponse).not.toHaveBeenCalled();
+
+    await unlock();
+    expect(router.push).toHaveBeenCalledWith("/chats");
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
+    // Locked and unlocked again, nothing opens a second time.
+    await toApp("background");
+    await toApp("active");
+    await unlock();
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("at a cold start waits for the lock, read and shown, and opens once it is unlocked", async () => {
+    const view = await renderWithTheme(<WithLock />);
+    await turnLockOn();
+    // The app gone; the push tapped starts it again.
+    await view.rerender(<View />);
+    phone.__respond(tap({ kind: "round" }));
+    await view.rerender(underProviders(<PushNotifications />));
+    await settle();
+    expect(screen.getByLabelText(PASSCODE)).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
+
+    await unlock();
+    expect(router.push).toHaveBeenCalledWith("/round");
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens nothing when the lock is left through the bank, not even after a sign-in", async () => {
+    await renderWithTheme(<WithLock />);
+    await turnLockOn();
+    await toApp("background");
+    await toApp("active");
+    await act(async () => phone.__respond(tap({ kind: "match" })));
+    await settle();
+    expect(router.push).not.toHaveBeenCalled();
+
+    await fireEvent.press(screen.getByRole("button", { name: BANK }));
+    await settle();
+    expect(screen.queryByLabelText(PASSCODE)).toBeNull();
+    expect(notifications.clearLastNotificationResponse).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await signIn();
+    });
+    await settle();
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("opens at once while the lock is on and open", async () => {
+    await renderWithTheme(<WithLock />);
+    await turnLockOn();
+    await act(async () => phone.__respond(tap({ kind: "round" })));
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/round"));
   });
 });
 
@@ -302,6 +464,7 @@ describe("the web target", () => {
     expect(screen.toJSON()).toBeNull();
     expect(notifications.setNotificationHandler).not.toHaveBeenCalled();
     expect(notifications.addPushTokenListener).not.toHaveBeenCalled();
+    expect(AppState.addEventListener).not.toHaveBeenCalled();
     expect(notifications.clearLastNotificationResponse).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
     expect(seen).toEqual([]);

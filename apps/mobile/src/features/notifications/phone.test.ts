@@ -1,8 +1,11 @@
 import * as Sentry from "@sentry/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import { createElement } from "react";
 import { Platform } from "react-native";
-import { clearSession, saveSession } from "@/lib/session";
-import { askPermission, permissionOf, readPermission, registerPush } from "./phone";
+import { SessionProvider, useSession } from "@/features/identity";
+import { clearSession, currentSession, saveSession } from "@/lib/session";
+import { askPermission, permissionOf, readPermission, registerPush, unregisterPush } from "./phone";
 
 // The phone's side of the push (#102, ADR-055 §2, §9): the permission in the
 // app's words on each platform, on the web and when the phone cannot be read;
@@ -10,7 +13,8 @@ import { askPermission, permissionOf, readPermission, registerPush } from "./pho
 // badge; and the registration, which sends the token and the platform and
 // nothing else, only while allowed, in the app's language, one at a time,
 // once for the same session, token and language, never after a sign-out, a
-// failure reported and never thrown.
+// failure reported and never thrown; and the device token dropped after a
+// logout the API never heard, in turn with the registrations.
 
 // app.json's EAS project, which Expo's token is made for.
 const PROJECT = "aaea145c-d019-4411-988a-52772edf1fa8";
@@ -349,5 +353,67 @@ describe("the registration", () => {
     expect(notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1);
     expect(seen).toHaveLength(0);
     expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+});
+
+describe("the device token dropped (#102)", () => {
+  it("has the phone drop its device token", async () => {
+    await expect(unregisterPush()).resolves.toBeUndefined();
+    expect(notifications.unregisterForNotificationsAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops nothing on the web target", async () => {
+    jest.replaceProperty(Platform, "OS", "web");
+    await unregisterPush();
+    expect(notifications.unregisterForNotificationsAsync).not.toHaveBeenCalled();
+  });
+
+  it("reports a phone that would not drop it, the error alone, and throws nothing", async () => {
+    const error = new Error("no Play services");
+    notifications.unregisterForNotificationsAsync.mockRejectedValueOnce(error);
+    await expect(unregisterPush()).resolves.toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalledWith(error);
+  });
+
+  it("waits for a registration on its way, which cannot register the device again after it", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    let release: () => void = () => undefined;
+    notifications.getExpoPushTokenAsync.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ type: "expo", data: TOKEN });
+        }),
+    );
+    const registration = registerPush({ locale: "en", channel: "Notifications" });
+    await flush();
+    await clearSession();
+    const dropped = unregisterPush();
+    await flush();
+    // Expo is still making the token, and with it registering the device.
+    expect(notifications.unregisterForNotificationsAsync).not.toHaveBeenCalled();
+    release();
+    await Promise.all([registration, dropped]);
+    expect(notifications.unregisterForNotificationsAsync).toHaveBeenCalledTimes(1);
+    expect(seen).toEqual([]);
+  });
+
+  it("is what a logout the API never heard calls, and the sign-out completes when the phone would not drop it", async () => {
+    globalThis.fetch = jest.fn(async () => {
+      throw new TypeError("Network request failed");
+    }) as unknown as typeof fetch;
+    const error = new Error("no Play services");
+    notifications.unregisterForNotificationsAsync.mockRejectedValueOnce(error);
+    // As the root layout gives it.
+    const { result } = await renderHook(() => useSession(), {
+      wrapper: ({ children }) =>
+        createElement(SessionProvider, { onLogoutUnheard: unregisterPush, children }),
+    });
+    await waitFor(() => expect(result.current.status).toBe("signed-in"));
+    await act(async () => result.current.signOut());
+    expect(result.current.status).toBe("signed-out");
+    expect(currentSession()).toBeNull();
+    await waitFor(() => expect(Sentry.captureException).toHaveBeenCalledWith(error));
+    expect(notifications.unregisterForNotificationsAsync).toHaveBeenCalledTimes(1);
   });
 });

@@ -25,10 +25,17 @@ import {
   writeTries,
 } from "./store";
 
-/** What Settings and the offer read and change. */
+/** What Settings and the offer read and change, and what the push waits for. */
 export type LockApi = {
   /** The lock as stored; null while it is off. */
   settings: LockSettings | null;
+  /**
+   * Whether the lock holds the screens: shown, still deciding at a cold
+   * start, or covering them while the app is away, whence it may come back
+   * locked. A tap on a push waits while it holds (#102), since a screen
+   * opened under the lock would run before anybody unlocked it.
+   */
+  holding: boolean;
   /** What this phone can open it with; null when nothing is enrolled, undefined while asked. */
   biometrics: Biometrics | null | undefined;
   /** Asks the phone again what it has, as Settings opens. */
@@ -270,23 +277,6 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
     [settings],
   );
 
-  const api = React.useMemo<LockApi>(
-    () => ({
-      settings: settings ?? null,
-      biometrics,
-      recheck,
-      setBiometrics: async (wanted) => {
-        if (wanted && (await ask()) !== "ok") return "failed";
-        await change((current) => ({ ...current, biometrics: wanted }));
-        return "ok";
-      },
-      setPasscode: (code) => change((current) => ({ ...current, passcode: hashPasscode(code) })),
-      removePasscode: () => change((current) => ({ ...current, passcode: null })),
-      setGrace: (minutes) => change((current) => ({ ...current, graceMinutes: minutes })),
-    }),
-    [settings, biometrics, recheck, change, ask],
-  );
-
   const signedIn = status === "signed-in";
   // Signed in at a cold start: locked while the stored lock is on, and
   // covered while it is not read yet, or while the phone is still asked
@@ -299,6 +289,26 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
   const cover =
     signedIn &&
     ((covered && on) || (deciding && settings === undefined) || (wantsLock && kindPending));
+  // The cover counts while away: the return that locks lifts it in the same render.
+  const holding = signedIn && (phase === "locked" || deciding || (covered && on));
+
+  const api = React.useMemo<LockApi>(
+    () => ({
+      settings: settings ?? null,
+      holding,
+      biometrics,
+      recheck,
+      setBiometrics: async (wanted) => {
+        if (wanted && (await ask()) !== "ok") return "failed";
+        await change((current) => ({ ...current, biometrics: wanted }));
+        return "ok";
+      },
+      setPasscode: (code) => change((current) => ({ ...current, passcode: hashPasscode(code) })),
+      removePasscode: () => change((current) => ({ ...current, passcode: null })),
+      setGrace: (minutes) => change((current) => ({ ...current, graceMinutes: minutes })),
+    }),
+    [settings, holding, biometrics, recheck, change, ask],
+  );
 
   // A lock that shows with its tries spent goes to the bank at once.
   React.useEffect(() => {

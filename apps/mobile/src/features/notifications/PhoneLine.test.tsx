@@ -12,8 +12,8 @@ import { PhoneLine } from "./PhoneLine";
 // under a refusal, the phone's own question for a phone never asked, asked
 // once however often the button is pressed, read again as the app comes back
 // to the front, a change said (VoiceOver told, TalkBack's region), the token
-// registered whenever the permission becomes allowed here, nothing done
-// after the screen has gone, and on the web the line alone.
+// registered on a yes to the phone's question, nothing done after the screen
+// has gone, and on the web the line alone.
 
 // NativeWind's colour-scheme setter needs its compiled stylesheet, which the
 // test runner has none of: the web preview's theme effect calls it, seen, not applied.
@@ -165,7 +165,7 @@ describe("PhoneLine", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("reads the phone again back in front, and registers once it allows them", async () => {
+  it("reads the phone again back in front, and leaves the registration to the push", async () => {
     const seen = api();
     phoneSays(DENIED);
     await renderWithTheme(<PhoneLine />);
@@ -178,12 +178,9 @@ describe("PhoneLine", () => {
     expect(screen.getByText(LINES.denied)).toBeTruthy();
     await toApp("active");
     expect(await screen.findByText(LINES.allowed)).toBeTruthy();
-    await waitFor(() => expect(seen).toHaveLength(1));
-
-    // Allowed still: nothing registered twice.
-    await toApp("active");
+    // The push registers as the app comes back, on every screen (PushNotifications.test).
     await settle();
-    expect(seen).toHaveLength(1);
+    expect(seen).toEqual([]);
   });
 
   it("does nothing with an answer that comes after the screen has gone", async () => {
@@ -200,21 +197,6 @@ describe("PhoneLine", () => {
     await act(async () => answer(ALLOWED));
     await settle();
     expect(screen.queryByText(LINES.allowed)).toBeNull();
-    expect(seen).toEqual([]);
-  });
-
-  it("registers nothing for a read back in front that answers after the screen has gone", async () => {
-    const seen = api();
-    phoneSays(DENIED);
-    const view = await renderWithTheme(<PhoneLine />);
-    expect(await screen.findByText(LINES.denied)).toBeTruthy();
-    const read = held();
-    notifications.getPermissionsAsync.mockImplementation(() => read.answer);
-    await toApp("active");
-    await view.rerender(underProviders(<View />));
-    // Allowed in the phone's settings meanwhile: a registration, were the screen still there.
-    await act(async () => read.give(ALLOWED));
-    await settle();
     expect(seen).toEqual([]);
   });
 

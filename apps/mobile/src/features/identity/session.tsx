@@ -67,7 +67,20 @@ const SessionContext = React.createContext<SessionApi | null>(null);
 const fromStored = (session: StoredSession | null): SessionState =>
   session ? { status: "signed-in", sessionId: session.sessionId } : { status: "signed-out" };
 
-export function SessionProvider({ children }: { children: React.ReactNode }) {
+export function SessionProvider({
+  children,
+  onLogoutUnheard,
+}: {
+  children: React.ReactNode;
+  /**
+   * Called after a sign-out whose logout the API did not answer with a 2xx:
+   * the server's session lives on until it expires, and with it this phone's
+   * push token (#102). The notifications slice's, handed over by the root
+   * layout, so this slice never imports it. Reports its own failure and
+   * never rejects.
+   */
+  onLogoutUnheard?: () => Promise<void>;
+}) {
   const [state, setState] = React.useState<SessionState>({ status: "loading" });
 
   React.useEffect(() => {
@@ -100,19 +113,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   // Ending the session locally waits for the API a few seconds at most: a
   // phone without network still signs out, and the row expires or is swept
-  // later. The lock's way out counts on it ending (ADR-045 §3, §6).
-  const signOut = React.useCallback(async (notice?: "lock") => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      api.POST("/auth/logout").catch(() => undefined),
-      new Promise<void>((done) => {
-        timer = setTimeout(done, LOGOUT_WAIT_MS);
-      }),
-    ]);
-    clearTimeout(timer);
-    await clearSession();
-    if (notice) setState({ status: "signed-out", notice });
-  }, []);
+  // later. The lock's way out counts on it ending (ADR-045 §3, §6). A logout
+  // the API did not take leaves the session's push token live, so the phone
+  // is then told to drop its device token (`onLogoutUnheard`), not waited
+  // for: the sign-out is done once the device's session is gone.
+  const signOut = React.useCallback(
+    async (notice?: "lock") => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const heard = await Promise.race([
+        api.POST("/auth/logout").then(
+          ({ response }) => response.ok,
+          () => false,
+        ),
+        new Promise<boolean>((done) => {
+          timer = setTimeout(() => done(false), LOGOUT_WAIT_MS);
+        }),
+      ]);
+      clearTimeout(timer);
+      await clearSession();
+      if (notice) setState({ status: "signed-out", notice });
+      if (!heard) void onLogoutUnheard?.();
+    },
+    [onLogoutUnheard],
+  );
 
   const signOutEverywhere = React.useCallback(async () => {
     const { response } = await api.POST("/auth/logout-all");

@@ -151,3 +151,28 @@ async function register({ locale, channel, device }: Registration): Promise<void
     Sentry.captureException(error);
   }
 }
+
+/**
+ * Has Apple or Google drop this phone's device token (#102), after a
+ * sign-out whose logout the API never took: the server's session lives on
+ * until it expires, and with it the token, which would bring the previous
+ * person's pushes here. Expo's next ticket or receipt for it then says
+ * DeviceNotRegistered and the API deletes the row (ADR-055 §8); the next
+ * sign-in fetches a token again. In turn with the registrations, so that
+ * one on its way registers nothing after it and the next sign-in's comes
+ * after it. Nothing on the web target; a failure is reported, the error
+ * alone, and never thrown.
+ */
+export function unregisterPush(): Promise<void> {
+  registering = registering.then(unregister);
+  return registering;
+}
+
+async function unregister(): Promise<void> {
+  if (!onPhone()) return;
+  try {
+    await Notifications.unregisterForNotificationsAsync();
+  } catch (error) {
+    Sentry.captureException(error);
+  }
+}
