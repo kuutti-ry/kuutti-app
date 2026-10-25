@@ -53,10 +53,12 @@ deploy() {
       '{name: $name, appName: $name, description: "Pull-request preview, managed by preview.yml (#9)", environmentId: $env, sourceType: "docker"}')" \
       | jq -r .applicationId)
     [ -n "$id" ] && [ "$id" != null ] || { echo "::error::Dokploy did not return an application id" >&2; exit 1; }
-    # HTTPS through Traefik with a Let's Encrypt certificate per preview host;
-    # the wildcard DNS record for $PREVIEW_API_DOMAIN points at the box.
+    # HTTPS through Traefik under the previews' one wildcard, which covers the
+    # host, so Traefik orders nothing; the DNS resolver could not order one for
+    # it either (ADR-053). The wildcard DNS record for $PREVIEW_API_DOMAIN points
+    # at the box.
     post domain.create "$(jq -cn --arg id "$id" --arg host "$host" \
-      '{applicationId: $id, host: $host, path: "/", port: 3000, https: true, certificateType: "letsencrypt", domainType: "application"}')" >/dev/null
+      '{applicationId: $id, host: $host, path: "/", port: 3000, https: true, certificateType: "custom", customCertResolver: "letsencrypt-dns", domainType: "application"}')" >/dev/null
     echo "created $name ($id) at https://$host"
   else
     echo "updating $name ($id) at https://$host"
@@ -64,7 +66,7 @@ deploy() {
     # application without a domain that later pushes would never fix.
     if ! api "$DOKPLOY_URL/api/domain.byApplicationId?applicationId=$id" | jq -e --arg h "$host" '.[] | select(.host == $h)' >/dev/null; then
       post domain.create "$(jq -cn --arg id "$id" --arg host "$host" \
-        '{applicationId: $id, host: $host, path: "/", port: 3000, https: true, certificateType: "letsencrypt", domainType: "application"}')" >/dev/null
+        '{applicationId: $id, host: $host, path: "/", port: 3000, https: true, certificateType: "custom", customCertResolver: "letsencrypt-dns", domainType: "application"}')" >/dev/null
       echo "added the missing domain https://$host"
     fi
   fi
