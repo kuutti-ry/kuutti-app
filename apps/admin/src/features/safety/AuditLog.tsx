@@ -2,7 +2,7 @@ import { formatDateTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import { AuditPage, type AuditQuery } from "@kuutti/schema";
 import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -113,7 +113,10 @@ export function AuditLog() {
     void load();
   }, [load]);
 
-  useEffect(() => {
+  // In the commit that shows the page, not in an effect a task later: a press
+  // of Older or Newer landing before that task would spend `paged` on the page
+  // being left, whose container then goes with the load.
+  useLayoutEffect(() => {
     if (state.kind !== "ready" || !paged.current) return;
     paged.current = false;
     shownPage.current?.focus();
