@@ -2660,13 +2660,13 @@ legal.privacy.title:
   en: "Privacy"
   description: "Heading of the privacy consent (#46). Binding legal text."
   fi: "Tietosuoja"
-  consent_version: "2026-09-draft-1"
+  consent_version: "2026-10-draft-2"
 
 legal.privacy.summary:
   en: "DRAFT: Kuutti stores your year and month of birth, a keyed hash of your personal identity code, your self-declared gender, whom you seek, your age window, your area, your profile and photos, and a log of the photos you fetch. It never stores your personal identity code, your legal sex, your name from the bank or your date of birth. You can download everything and delete your account at any time; deletion removes your profile, photos and preferences and keeps only what the law requires."
   description: "The privacy summary the person accepts by version (#46). DRAFT wording; the full policy is a page of #53."
   fi: "LUONNOS: Kuutti tallentaa syntymävuotesi ja -kuukautesi, henkilötunnuksesi avaimellisen tiivisteen, itse ilmoittamasi sukupuolen, kenen seuraa etsit, ikähaarukkasi, alueesi, profiilisi ja kuvasi sekä lokin hakemistasi kuvista. Se ei koskaan tallenna henkilötunnustasi, juridista sukupuoltasi, pankin ilmoittamaa nimeäsi tai syntymäaikaasi. Voit ladata kaikki tietosi ja poistaa tilisi milloin tahansa; poisto hävittää profiilin, kuvat ja asetukset ja säilyttää vain sen, mitä laki vaatii."
-  consent_version: "2026-09-draft-1"
+  consent_version: "2026-10-draft-2"
 
 legal.research.title:
   en: "Research"
