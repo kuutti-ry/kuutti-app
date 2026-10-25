@@ -249,11 +249,7 @@ describe("the photo rule", () => {
         kind.variant,
         kind.purpose,
       );
-      // Under the day's budget of the size, so the last fetch is issued and checked.
-      await withMatchingConfig(ctx.client, {
-        photo_fetches_per_day: { thumb: 600, card: 300, full: 300 },
-      });
-      await fetched(app, a, photo, "full");
+      await fetched(app, a, photo, "card");
       expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([]);
     }
   });
@@ -284,14 +280,6 @@ describe("the photo rule", () => {
     expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 121)]);
   });
 
-  test("a full-size fetch is checked like a card", async ({ ctx, app }) => {
-    const a = await signedInAccount(ctx.client);
-    const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, spread(119));
-    expect((await fetched(app, a, photo, "full")).variant).toBe("full");
-    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 120)]);
-  });
-
   test("an erased or unknown account is never checked", async ({ ctx }) => {
     const { logger, lines } = await captureLogger();
     const a = await signedInAccount(ctx.client);
@@ -310,7 +298,8 @@ describe("the photo rule", () => {
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
     await handed(ctx.client, a.accountId, photo, spread(120));
-    // A photo never shown, and the day's card budget spent: neither is issued, neither is checked.
+    // A photo never shown, a shown one in the full size (ADR-056 §3), and the
+    // day's card budget spent: none is issued, none is checked.
     const stranger = await signedInAccount(ctx.client);
     const unseen = await cardShown(
       ctx.client,
@@ -318,6 +307,7 @@ describe("the photo rule", () => {
       (await signedInAccount(ctx.client)).accountId,
     );
     expect((await fetchPhoto(app, a, unseen, "card")).status).toBe(404);
+    expect((await fetchPhoto(app, a, photo, "full")).status).toBe(404);
     await withMatchingConfig(ctx.client, {
       photo_fetches_per_day: { thumb: 600, card: 0, full: 60 },
     });

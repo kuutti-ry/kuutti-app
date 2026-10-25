@@ -154,23 +154,27 @@ export async function isAccountLive(db: Queryable, accountId: string): Promise<b
  * shadow-banned, suspended, banned or paused owner's photos stop for everyone
  * at once and come back with a lift (ADR-024 §6, the card's rule of ADR-009
  * §6). A block between the two, set by either, stops them for good (#84,
- * ADR-030 §2): `blocked_between` of migration 0051. Both branches carry the
- * caller's account id (rule 6); there is no third.
+ * ADR-030 §2): `blocked_between` of migration 0051. Another account's photo
+ * never in the full size (ADR-056 §3): the app asks for it only of one's own,
+ * so it is what a script would take that the app does not. Both branches
+ * carry the caller's account id (rule 6); there is no third.
  */
 export async function findVisiblePhoto(
   db: Queryable,
   accountId: string,
   photoId: string,
+  variant: PhotoVariant,
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `SELECT ${COLUMNS} FROM photo
      WHERE id = $2 AND purpose = 'profile'
        AND (account_id = $1
-         OR (state = 'approved'
+         OR ($3::photo_variant <> 'full'
+           AND state = 'approved'
            AND EXISTS (SELECT 1 FROM card_shown WHERE account_id = $1 AND photo_id = photo.id)
            AND EXISTS (SELECT 1 FROM account owner WHERE owner.id = photo.account_id AND owner.state = 'active')
            AND NOT blocked_between($1, photo.account_id)))`,
-    [accountId, photoId],
+    [accountId, photoId, variant],
   );
   return rows[0] ? photoFrom(rows[0]) : null;
 }
@@ -438,7 +442,9 @@ export async function insertPhotoAccess(
  * `since`, and the earliest. A thumb never counts (the chat list asks one
  * per conversation on every read), nor the person's own photos, nor a
  * conversation's (purpose message); a photo deleted since drops out with
- * its owner unknown. Scoped by the account (rule 6).
+ * its owner unknown. Another's full size is refused since ADR-056 §3, so a
+ * full-size row of someone else's photo is one issued before it. Scoped by
+ * the account (rule 6).
  */
 export async function othersPhotoFetchesSince(
   db: Queryable,
