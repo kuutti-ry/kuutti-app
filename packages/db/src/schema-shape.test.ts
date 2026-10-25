@@ -12,6 +12,7 @@ import {
   PhotoPurpose,
   PhotoRejectionReason,
   PhotoState,
+  PushPlatform,
   RelaxationKind,
   ReportMessageSide,
   ReportOutcome,
@@ -77,6 +78,8 @@ describe("the tables", () => {
       "ponds",
       "preferences",
       "profile",
+      // A signed-in device's push token (#102, ADR-055).
+      "push_token",
       "report",
       "report_message",
       "research_subject",
@@ -139,7 +142,7 @@ describe("the foreign keys", () => {
     }),
   );
 
-  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction or an invitation to its notice, and from an invitation to what it earned; identity and account rows are never deleted from under anything (TD-7)", () => {
+  it("cascade only from a photo to what describes it, from a conversation to its people and messages, from a report to its copy, from a sanction or an invitation to its notice, from an invitation to what it earned, and from a session to its push token; identity and account rows are never deleted from under anything (TD-7)", () => {
     expect(references.filter((reference) => reference.endsWith(" cascade")).sort()).toEqual([
       "card_shown.photo_id -> photo.id cascade",
       // A conversation goes only once nobody is left to keep it for (#348, ADR-031 §5),
@@ -152,6 +155,8 @@ describe("the foreign keys", () => {
       // A warning's notice goes with its warning (#176).
       "notice.sanction_id -> sanction.id cascade",
       "photo_review.photo_id -> photo.id cascade",
+      // A device's push token goes with its session, whatever deletes it (#102, ADR-055 §3).
+      "push_token.session_id -> session.id cascade",
       // A report's frozen copy goes with the report, twelve months from filing (#351).
       "report_message.report_id -> report.id cascade",
       // The units an invitation earned go with it (#107, ADR-044).
@@ -192,6 +197,8 @@ describe("the foreign keys", () => {
       "photo_check_note",
       "preferences",
       "profile",
+      // A device's push token (#102), deleted at erasure before its session.
+      "push_token",
       "report",
       "report",
       "research_subject",
@@ -346,6 +353,8 @@ describe("the indexes", () => {
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
     ["notice", "notice_account_created_idx", ["account_id", "created_at"]],
+    // The push's read of an account's devices (#102).
+    ["push_token", "push_token_account_idx", ["account_id"]],
     ["invitation", "invitation_inviter_created_idx", ["inviter_account_id", "created_at"]],
     ["reward", "reward_account_kind_idx", ["account_id", "kind"]],
     ["reward", "reward_invitation_idx", ["invitation_id"]],
@@ -494,6 +503,8 @@ describe("the enums", () => {
     // What a person may be notified of, and what a notice is about (#176).
     expect(enums.notification_kind).toEqual(NotificationKind.options);
     expect(enums.notice_kind).toEqual(NoticeKind.options);
+    // The platforms a push reaches (#102).
+    expect(enums.push_platform).toEqual(PushPlatform.options);
     // What one unit of the reward ledger is (#107).
     expect(enums.reward_kind).toEqual(RewardKind.options);
     expect(enums.conversation_close).toEqual(ConversationCloseKind.options);
@@ -512,5 +523,17 @@ describe("the enums", () => {
       ),
     );
     expect([...used].sort()).toEqual(Object.keys(enums).sort());
+  });
+});
+
+describe("a device's push token (#102, ADR-055 §2)", () => {
+  it("is one per session, and a token is in one session", () => {
+    const columns = byName.get("push_token")?.columns ?? [];
+    expect(
+      columns
+        .filter((column) => column.isUnique)
+        .map((column) => column.name)
+        .sort(),
+    ).toEqual(["session_id", "token"]);
   });
 });
