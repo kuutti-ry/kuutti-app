@@ -84,6 +84,24 @@ describe("msUntilFinnishHour", () => {
     expect(msUntilFinnishHour(new Date(at), hour)).toBe(wait);
   });
 
+  it.each([
+    // Summer time ends on 25 October 2026 at 04:00 EEST (01:00 UTC): the night
+    // is 04:00 EET, 02:00 UTC, and the round's push 09:00 EET, 07:00 UTC.
+    [4, "2026-10-24T22:00:00Z", 4 * 60 * 60 * SECOND],
+    [9, "2026-10-24T06:00:00Z", DAY + 60 * 60 * SECOND],
+    // Summer time begins on 29 March 2026 at 03:00 EET (01:00 UTC): the night
+    // is 04:00 EEST, 01:00 UTC, and the round's push 09:00 EEST, 06:00 UTC.
+    [4, "2026-03-28T23:00:00Z", 2 * 60 * 60 * SECOND],
+    [9, "2026-03-28T07:00:00Z", DAY - 60 * 60 * SECOND],
+    // 03:00 does not happen that night: the count stands, and lands at 04:00.
+    [3, "2026-03-28T23:00:00Z", 2 * 60 * 60 * SECOND],
+  ])(
+    "for %i o'clock from %s across a change of clocks waits %i ms, landing on the hour",
+    (hour, at, wait) => {
+      expect(msUntilFinnishHour(new Date(at), hour)).toBe(wait);
+    },
+  );
+
   it("leaves out a fraction of a second, so a timer is late by it and never early", () => {
     // 08:59:59.500 in Helsinki: the second's half is not counted, the timer fires at 09:00:00.500.
     expect(msUntilFinnishHour(new Date("2026-07-02T05:59:59.500Z"), 9)).toBe(SECOND);

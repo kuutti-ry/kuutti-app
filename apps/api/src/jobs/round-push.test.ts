@@ -327,7 +327,9 @@ describe("the round's push on its timer (ADR-055 §6)", () => {
     }
   });
 
-  test("tells each Finnish day once across the change from summer time", async ({ ctx }) => {
+  test("tells each Finnish day once, at the hour, across the change from summer time", async ({
+    ctx,
+  }) => {
     // 08:00 in Helsinki on the Saturday before summer time ends.
     vi.useFakeTimers({ now: new Date("2026-10-24T05:00:00.000Z"), toFake: [...FAKE.toFake] });
     const log = await watchedLogger();
@@ -345,8 +347,20 @@ describe("the round's push on its timer (ADR-055 §6)", () => {
         await vi.advanceTimersByTimeAsync(Number(wait));
         await log.until("round push armed", armings);
       }
-      // Saturday, Sunday and Monday, each once, however the timer fell around the hour.
-      expect(calls.map((call) => call.day)).toEqual(["2026-10-24", "2026-10-25", "2026-10-26"]);
+      // Each day once, at 09:00 in Helsinki on either side of the change:
+      // 06:00 UTC in summer time, 07:00 UTC after it.
+      expect(calls.map((call) => call.day)).toEqual([
+        "2026-10-24",
+        "2026-10-25",
+        "2026-10-26",
+        "2026-10-27",
+      ]);
+      expect(calls.map((call) => call.at)).toEqual([
+        "2026-10-24T06:00:00.000Z",
+        "2026-10-25T07:00:00.000Z",
+        "2026-10-26T07:00:00.000Z",
+        "2026-10-27T07:00:00.000Z",
+      ]);
     } finally {
       stop();
     }

@@ -803,6 +803,45 @@ describe("the round's push (ADR-055 §6)", () => {
     expect(s.pusher.batches).toHaveLength(1);
   });
 
+  test("a hundred pushes go in a request, and one refused loses only its own: the tickets before it are read", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    for (let i = 0; i < 150; i += 1) await s.device(s.b, "en", i % 60);
+    // The first request's last push is refused as a device gone; Expo refuses the second request whole.
+    let ticketed = 0;
+    s.pusher.ticket = (message) => {
+      ticketed += 1;
+      return ticketed === 100
+        ? { status: "error", error: "DeviceNotRegistered" }
+        : { status: "ok", id: `ticket-${message.to}` };
+    };
+    s.pusher.reached = () => {
+      s.pusher.failure =
+        s.pusher.batches.length === 2 ? new PushFailed("TOO_MANY_REQUESTS", 429) : undefined;
+    };
+    expect(await s.push.round([s.b], 60)).toBe(99);
+    expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 50]);
+    expect(lineOf(s.logs(), "push not sent")).toEqual([
+      expect.objectContaining({
+        push: "round",
+        reason: "TOO_MANY_REQUESTS",
+        status: 429,
+        pushes: 50,
+      }),
+    ]);
+    // The refused device of the first request went, the second's fifty are kept.
+    const { rows } = await ctx.client.query<{ n: number }>(
+      "SELECT count(*)::int AS n FROM push_token WHERE account_id = $1",
+      [s.b],
+    );
+    expect(rows[0]?.n).toBe(149);
+    // Only what Expo took waits for its receipt.
+    expect(s.schedule.tasks).toHaveLength(1);
+    await s.schedule.runAll();
+    expect(s.pusher.asked.flat()).toHaveLength(99);
+  });
+
   test("a round's failure is its job's to log: a missing parameter rejects, a refused send answers none", async ({
     ctx,
   }) => {

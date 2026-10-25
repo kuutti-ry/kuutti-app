@@ -5,7 +5,13 @@ import { finnishHour } from "../lib/finnish-day.ts";
 import { tFor } from "../lib/i18n.ts";
 import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
-import { type Pusher, PushFailed, type PushMessage, type PushTicket } from "../lib/push.ts";
+import {
+  PUSHES_PER_REQUEST,
+  type Pusher,
+  PushFailed,
+  type PushMessage,
+  type PushTicket,
+} from "../lib/push.ts";
 
 // The push (#102, ADR-055): that there is something, never what or from
 // whom. Each sender reads, fresh: the person's switch for its kind (ADR-032),
@@ -173,19 +179,25 @@ export function createPush(deps: PushDeps) {
       sound: "default",
       ...(options.ttl !== undefined ? { ttl: options.ttl } : {}),
     }));
-    let tickets: PushTicket[];
-    try {
-      tickets = await pusher.send(messages);
-    } catch (error) {
-      deps.logger.warn(failure(error, kind), "push not sent");
-      return 0;
-    }
+    // A request at a time, as many pushes as Expo takes in one, so a request
+    // refused loses only its own pushes, and the tickets of those sent before
+    // it are still read (the round's push can be thousands).
     const taken: Array<{ id: string; token: Token }> = [];
-    for (const [i, ticket] of tickets.entries()) {
-      const token = tokens[i];
-      if (!token) continue;
-      if (ticket.status === "ok") taken.push({ id: ticket.id, token });
-      else await refused(token, ticket.error, kind);
+    for (let from = 0; from < messages.length; from += PUSHES_PER_REQUEST) {
+      const part = tokens.slice(from, from + PUSHES_PER_REQUEST);
+      let tickets: PushTicket[];
+      try {
+        tickets = await pusher.send(messages.slice(from, from + PUSHES_PER_REQUEST));
+      } catch (error) {
+        deps.logger.warn({ ...failure(error, kind), pushes: part.length }, "push not sent");
+        continue;
+      }
+      for (const [i, ticket] of tickets.entries()) {
+        const token = part[i];
+        if (!token) continue;
+        if (ticket.status === "ok") taken.push({ id: ticket.id, token });
+        else await refused(token, ticket.error, kind);
+      }
     }
     readReceiptsLater(pusher, taken, kind);
     return taken.length;
