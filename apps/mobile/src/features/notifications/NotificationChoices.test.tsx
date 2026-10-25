@@ -6,9 +6,10 @@ import { renderWithTheme } from "@/test/render";
 import { NotificationChoices } from "./NotificationChoices";
 
 // What a person may be notified of (#176, ADR-032): the four switches in the
-// API's order with their lines, a press saved at once and the switch waiting
-// meanwhile, a failure said in words with the switch as it was, a load that
-// failed with Try again, and every switch labelled.
+// API's order with their lines, the phone's own permission above them (#102),
+// a press saved at once and the switch waiting meanwhile, a failure said in
+// words with the switch as it was, a load that failed with Try again, and
+// every switch labelled.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
@@ -61,6 +62,10 @@ describe("NotificationChoices", () => {
     );
     await renderWithTheme(<NotificationChoices />);
     expect(await screen.findByRole("switch", { name: "Messages" })).toBeTruthy();
+    // Above the switches, what the phone itself lets Kuutti do (#102; PhoneLine.test.tsx).
+    expect(
+      await screen.findByText("This phone has not been asked yet whether Kuutti may notify it."),
+    ).toBeTruthy();
     for (const name of ["A new round", "Messages", "Moderators' decisions"]) {
       expect(checked(name)).toBe(true);
     }

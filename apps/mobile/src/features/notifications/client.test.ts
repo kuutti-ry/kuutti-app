@@ -1,8 +1,9 @@
 import { saveSession } from "@/lib/session";
-import { fetchChoices, fetchNotices, markNoticeRead, saveChoice } from "./client";
+import { fetchChoices, fetchNotices, markNoticeRead, saveChoice, savePushToken } from "./client";
 
-// The notifications routes as the app calls them (#176): methods, paths, the
-// body, the answers parsed, and a refusal as an ApiError with its code.
+// The notifications routes as the app calls them (#176, #102): methods, paths,
+// the body, the language a push token is registered in, the answers parsed,
+// and a refusal as an ApiError with its code.
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 const json = (body: unknown, status = 200) =>
@@ -85,5 +86,24 @@ describe("the notifications client", () => {
     });
     await expect(fetchNotices()).rejects.toMatchObject({ status: 502, code: undefined });
     await expect(fetchChoices()).rejects.toMatchObject({ status: 502 });
+  });
+
+  it("registers the push token in the language named, and fails a refusal with its code", async () => {
+    const languages: Array<string | null> = [];
+    const seen = answering(new Response(null, { status: 204 }), refusal("validation_failed", 400));
+    const fetch = globalThis.fetch as jest.Mock;
+    const answer = fetch.getMockImplementation() as (input: Request) => Promise<Response>;
+    fetch.mockImplementation((input: Request) => {
+      languages.push(input.headers.get("accept-language"));
+      return answer(input);
+    });
+    const body = { token: "ExponentPushToken[abc]", platform: "android" } as const;
+    await expect(savePushToken(body, "sv")).resolves.toBeUndefined();
+    expect(seen).toEqual([{ method: "PUT", path: "/push-token", body }]);
+    await expect(savePushToken(body, "fi")).rejects.toMatchObject({
+      status: 400,
+      code: "validation_failed",
+    });
+    expect(languages).toEqual(["sv", "fi"]);
   });
 });

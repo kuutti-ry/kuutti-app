@@ -1,6 +1,6 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import type { GateResponse, PondSummary, WaitlistResponse } from "@kuutti/schema";
-import { fireEvent, screen, userEvent } from "@testing-library/react-native";
+import { fireEvent, screen, userEvent, within } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import * as React from "react";
 import { useSession } from "@/features/identity";
@@ -133,6 +133,30 @@ describe("HomeScreen", () => {
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
     );
+  });
+
+  it("offers notifications in the gate card once matching is open, never before (#102)", async () => {
+    // A phone never asked, an offer never answered: the jest.setup.js defaults.
+    const heading = "Shall Kuutti tell you?";
+    await renderWithTheme(<HomeScreen />);
+    expect(
+      await screen.findByText("About 20 more people are needed before matching opens for you."),
+    ).toBeTruthy();
+    expect(screen.queryByText(heading)).toBeNull();
+
+    (globalThis.fetch as jest.Mock).mockImplementation(async (input: Request | string) => {
+      const url = new URL(input instanceof Request ? input.url : input);
+      if (url.pathname === "/waitlist") return json(waitlist);
+      if (url.pathname === "/gate")
+        return json({ state: "open", within: null, needed: null, step: 10 });
+      return json({ error: { code: "not_found" } }, 404);
+    });
+    await renderWithTheme(<HomeScreen />);
+    expect(await screen.findByText(heading)).toBeTruthy();
+    const card = screen.getByLabelText("When matching opens for you");
+    expect(within(card).getByRole("button", { name: "Today's round" })).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "Allow notifications" })).toBeTruthy();
+    expect(within(card).getByRole("button", { name: "No thanks" })).toBeTruthy();
   });
 
   it("says that it is checking while the status is in flight", async () => {

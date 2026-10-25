@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import * as Updates from "expo-updates";
 import { ChatLiveProvider } from "@/features/chat";
 import { LockProvider, SessionProvider, SignedOutToStart } from "@/features/identity";
+import { PushNotifications } from "@/features/notifications";
 import { ScreenReaderHint } from "@/features/settings";
 import { DecisionButtonsProvider } from "@/lib/decision-buttons";
 import { LocaleProvider } from "@/lib/locale";
@@ -36,6 +37,8 @@ function RootLayout() {
                   />
                   <StatusBar style="auto" />
                   <SignedOutToStart />
+                  {/* The push: the token while signed in, a tap opening what it is about (#102). */}
+                  <PushNotifications />
                   {/* The one-time hint for a screen-reader user (#296); stays on the device. */}
                   <ScreenReaderHint />
                 </ChatLiveProvider>
