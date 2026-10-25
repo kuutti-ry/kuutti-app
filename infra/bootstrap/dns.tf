@@ -37,8 +37,11 @@ resource "aws_route53_zone" "main" {
 # that honour it reject it, which is what stops the domain being spoofed. CAA
 # limits who may issue certificates for the domain to the two issuers in use:
 # ACM (Amplify Hosting, later CloudFront) and Let's Encrypt (Traefik on the
-# boxes). No issuewild: wildcards are not used. When the project has a
-# mailbox, add an iodef record and replace the SPF and the null MX.
+# boxes). No issuewild, so issue governs wildcards too (RFC 8659): the one
+# wildcard is the previews', *.preview.api.staging, whose own CAA in
+# envs/staging/dns.tf admits Let's Encrypt by DNS-01 alone (ADR-053). When the
+# project has a mailbox, add an iodef record and replace the SPF and the null
+# MX.
 # ---------------------------------------------------------------------------
 
 resource "aws_route53_record" "caa" {

@@ -1,0 +1,58 @@
+# ADR-053: The previews share one certificate, obtained by DNS-01
+
+- Status: proposed (#448, built as written here at the maintainer's word of 2026-10-24, option 1 of the four weighed; the staging apply on merge and one run of `dokploy-setup.sh staging` switch it on; accepting it is the maintainer's)
+- Date: 2026-10-24
+- Follows: TD-2 (three previews), TD-19 (one staging box with the previews on it), ADR-001 (Dokploy's configuration is the one manual island; each environment declares its own records in `envs/<env>/dns.tf`), ADR-004 §3 (write access to the repository is a preview's trust, and staging-level trust), ADR-048 (`dokploy-setup.sh` writes what Traefik routes once Dokploy has its owner), ADR-049 (production runs under the same registered domain since 2026-10-24); issues #448, #9, #25
+
+## Context
+
+Every pull request's preview API is its own host, `pr-<n>.preview.api.staging.kuutti.app`, and Traefik on the staging box obtained a Let's Encrypt certificate for each one by HTTP-01. Let's Encrypt issues at most 50 new certificates per registered domain in 7 days, counted across every account. An order for exactly the names of an earlier certificate counts as a renewal and is exempt from that limit, so only new names count. In the 7 days to 2026-10-24, 81 pull requests were opened and 80 branches ran `preview.yml`. On 2026-10-24 Traefik was refused for `pr-445` and `pr-446` (`429 rateLimited: too many certificates (50) already issued for "kuutti.app" in the last 168h`), and both previews came up with Traefik's self-signed default. Production's `api.kuutti.app` and `dokploy.kuutti.app` had received theirs at 14:54 UTC the same day, about 80 minutes before the limit was reached. Any new production name during such a week would be refused: a rebuilt box's first issuance, or the media cutover's `origin.api.kuutti.app`.
+
+Write access already lets a pull request do the same on purpose. The `preview` environment's Dokploy member token can attach any host under the preview wildcard (the script's check is the pull request's own copy), and every attached host made Traefik order a certificate. Fifty hosts would use up `kuutti.app`'s week, production included.
+
+Traefik decides whether to order by looking in its store first. Before it orders, it matches a router's names against every certificate already held there, wildcards included, whichever resolver or file the certificate came from (Traefik 3.6, `pkg/provider/acme/provider.go`, `getUncheckedDomains`). A wildcard in the store therefore means no order for any name it covers.
+
+## Decision
+
+1. **One certificate for every preview.** It is `*.preview.api.staging.kuutti.app`, from Let's Encrypt by DNS-01, obtained and renewed by Traefik on the staging box through a second resolver, `letsencrypt-dns`, with lego's `route53` provider. A file router, `01-preview-certificate.yml`, asks for it. That router's rule names `preview.api.staging.kuutti.app`, which has no record, so it never serves a request.
+2. **A preview never takes a certificate of its own.** A preview's domain names `letsencrypt-dns` as its resolver (Dokploy's certificate type `custom`, `dokploy-preview.sh`), and Traefik orders nothing for it, because the wildcard covers the name. If the wildcard were missing, the resolver would try DNS-01 at `_acme-challenge.pr-<n>.preview.api.staging.kuutti.app`, which the role is refused. The preview would then fail at `wait-healthy.sh`, and no certificate would be issued.
+3. **One TXT name in DNS, on staging's instance role alone** (`envs/staging/dns.tf`, `PreviewCertificateChallenge`):
+   - `route53:ChangeResourceRecordSets` on the zone, when every change in the request is an `UPSERT` or a `DELETE` of a `TXT` record named exactly `_acme-challenge.preview.api.staging.kuutti.app`;
+   - `route53:ListResourceRecordSets` on the zone, since lego reads the name's values before it writes;
+   - `route53:GetChange`, since lego waits for the change to be in sync.
+
+   Nothing else in DNS, and production's role gets nothing. The bootstrap's permissions boundary already admits Route 53, so the bootstrap does not change.
+4. **Traefik's side is written by `dokploy-setup.sh staging`** through Dokploy's admin API, like the rest of the island:
+   - The resolver goes into `traefik.yml`. It is stored in the same `acme.json` as the HTTP-01 resolver, so the nightly backup of `/etc/dokploy` carries the wildcard.
+   - Traefik's environment gets `AWS_REGION` and `AWS_HOSTED_ZONE_ID`. The AWS SDK refuses to work without a region, and the zone's id spares lego a zone lookup and the right it would need. The credentials are the instance role's, through IMDSv2, which containers reach (hop limit 2).
+   - The router file is written by the same Run Command that writes `00-control-plane.yml`.
+
+   Writing the environment makes Dokploy recreate Traefik, so the box serves nothing for some seconds. The script then waits for Dokploy to answer again and for the wildcard to be served, and fails if it is not. A second run changes nothing.
+5. **Under the preview name, Let's Encrypt issues by DNS-01 alone.** A CAA record at `preview.api.staging.kuutti.app`, `0 issue "letsencrypt.org;validationmethods=dns-01"` (RFC 8657, which Let's Encrypt honours), in `envs/staging/dns.tf`. The DNS wildcard answers at any depth, `h1.pr-1.preview…` included, but the certificate covers one label, so without the record a member token could still attach deeper hosts with Dokploy's HTTP-01 type and make Traefik order each one. The DNS wildcard holds no CAA, so every name below climbs to this record. The role cannot write a CAA record, and the wildcard's own order passes: with no `issuewild`, `issue` governs wildcards too (RFC 8659). The domain's CAA in `bootstrap/dns.tf` is unchanged; only its comment, which said wildcards are not used, changes.
+
+## What a pull request may do now, and what it no longer can
+
+- **Gained.** Preview code holds the instance role, so a pull request may write that one TXT record. With it, it can obtain a certificate for `*.preview.api.staging.kuutti.app` under a key of its own. It can also read Traefik's own key for it from the box's nightly backup, which the instance role reads, as it can every certificate key on the box (`infra/README.md`, Backups). Only preview code answers at those names already. It can also break the wildcard's renewal by changing or removing the record during a challenge, which takes the previews down; preview code can already take the box down. It cannot write another name or another record type: AWS enforces the conditions.
+- **Lost.** A member token can no longer make Traefik order a certificate by attaching preview hosts. A name one label under the preview domain is covered by the wildcard, so nothing is ordered. Deeper names are refused HTTP-01 by the CAA record of §5. The other names that lead to the box hold their certificates already. The TXT right reaches only the wildcard's own sets of names. Repeating one is a renewal, exempt from the 50 and limited to 5 in 7 days per set.
+
+## Consequences
+
+- Previews keep their addresses. The quota sees one new certificate when the wildcard is first issued, and renewals after that.
+- Production's names no longer compete with the previews for the domain's week.
+- Rollout order: merging applies the role's statement to staging, and then the maintainer runs `dokploy-setup.sh staging` once. Until that run, a new preview's domain names a resolver Traefik does not have, and the preview serves Traefik's default certificate, as previews do today while the quota is spent. This pull request's own preview is one of them.
+- Dokploy recreates Traefik from the version it pins: `traefik:v3.6.25` in Dokploy v0.30.6, while first boot's installer starts `v3.6.7`. So the run may move staging's Traefik within 3.6, as any Traefik setting changed in Dokploy's UI would.
+- A rebuilt box gets `traefik.yml` and the certificates back from the backup, but not the container's environment. A box rebuilt from the user data has the environment of the installer's `docker run`, which carries none. So the rebuild ends with `dokploy-setup.sh staging` (`infra/README.md`, Backups and rebuilding the box). Without it the wildcard is not renewed, and it expires within 90 days.
+- The certificates of earlier previews stay in `acme.json`. Traefik tries to renew every certificate it holds, but the CAA record of §5 refuses their HTTP-01 renewals. So from about 25 November, as each comes within 30 days of expiry, Traefik logs a refusal a day for it until it expires. Their previews retired long before, and no router names them.
+
+## Not done, and what would make it needed
+
+- **Pruning the earlier previews' certificates from `acme.json`.** It means stopping Traefik and editing the file. Worth it if the refusals in Traefik's log from late November get in the way of reading it.
+- **A registered domain of its own for the previews.** It would move unreviewed code off `kuutti.app`'s site, so a preview could not set a cookie on `.kuutti.app` or be same-site with the panel. Neither the API nor the panel sets a cookie today; worth it the day a production surface relies on one.
+- **A test of the setup script.** There is no harness for it, as for the rest of the island (ADR-048). The IAM statement is checked by policy simulation (`aws iam simulate-custom-policy`) before the merge, for the challenge name, other names, other record types and actions, a request mixing names, and one that names none; the pull request carries the results. The checks of #448 are the test on the box.
+
+## Alternatives considered
+
+- **Three fixed preview hosts, one per place on the box** (`PREVIEW_LIMIT` is three): three certificates once, then renewals, and no new right. But a member token could still attach `pr-<anything>` hosts and use up the week. A preview's API address would no longer be a function of its number. And two pull requests deploying in the same seconds could take the same place.
+- **A registered domain of its own for the previews:** production is insulated, but the previews still take one certificate each from the new domain's 50, which this week's 80 would exceed. It also needs a purchase and a zone (about 10 to 20 USD a year, plus 0.50 USD a month). Kept under Not done for its other merit.
+- **The wildcard obtained by a job from `main`, under a CI role that pull-request code never reaches, then delivered to the box:** previews would hold no DNS right. But the key would reach the box through something the instance role can read, and previews hold that role, so they could read the key. That ends up about where this decision is, with a renewal job, a delivery path and a key on a runner to keep.
+- **One host with a path per pull request; another CA for the previews; certificates of 100 names each; asking Let's Encrypt for an override:** respectively, a base path in the API and the clients and one shared browser origin; a new vendor and an EAB secret in Traefik's static configuration; someone writing the next block before the numbers reach it; an exception meant for hosting providers, which takes weeks.

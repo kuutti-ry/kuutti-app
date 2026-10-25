@@ -29,7 +29,7 @@ One AWS account, everything in eu-central-1. Vendor list: AWS, Expo/EAS, GitHub,
 
 ## AWS
 
-- The API authenticates with an EC2 instance role scoped to its bucket, Rekognition detect calls, SES send, and its own SSM parameters. No IAM user, no static keys, ever.
+- The API authenticates with an EC2 instance role scoped to its bucket, Rekognition detect calls, SES send, and its own SSM parameters; on staging also the TXT record `_acme-challenge.preview.api.staging`, by which Traefik obtains the previews' one wildcard certificate (ADR-053). No IAM user, no static keys, ever.
 - Secrets live in SSM Parameter Store as SecureString and are fetched at boot. The hetu HMAC key and the Telia signing key never enter the Dokploy control plane, the repo, or CI logs.
 - RDS sits in the API's VPC; the security group admits only the API instance. Extended Support declined at creation. 35-day PITR. Manual snapshot before a release-tag migration.
 - DNS: the project domain (`kuutti.app`, variable `domain`) is registered through Route 53 in this account; the bootstrap adopts the zone the registration created and declares the domain-wide records (CAA, SPF, DMARC, null MX; `bootstrap/dns.tf`) and the SES sending identity with its DKIM and MAIL FROM records (`bootstrap/mail.tf`, ADR-043 §5), and each environment declares its own records in `envs/<env>/dns.tf`. No records in the console (the records Amplify Hosting writes for the website, served from `kuutti-ry/kuutti-app-site`, are the documented exception, ADR-001).
