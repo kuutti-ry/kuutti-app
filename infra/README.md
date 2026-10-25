@@ -339,9 +339,9 @@ A later migration that touches `audit_log` would fail as `kuutti_app`, and with 
 
 ### Mail (#385, ADR-043)
 
-Kuutti sends one kind of message, the code that confirms the optional e-mail address, from `noreply@kuutti.app` through SES, and receives no mail (ADR-043 §1, §5). Three pieces, each in code:
+Kuutti sends one kind of message, the code that confirms the optional e-mail address, from `noreply@kuutti.app` through SES, and receives none (ADR-043 §1, §5). The domain's one mailbox, `admin@kuutti.app`, which the alarms mail, is the association's at Google Workspace (`bootstrap/dns.tf`, #450). Three pieces, each in code:
 
-- **The identity**, `bootstrap/mail.tf`, since it belongs to the domain and to no environment: `kuutti.app` as an SES identity in eu-central-1, the region the API's SES client uses (`S3_REGION`); Easy DKIM with 2048-bit keys that SES holds, signing every message as `d=kuutti.app`, through three CNAMEs `<token>._domainkey`; the custom MAIL FROM `mail.kuutti.app`, an MX to `feedback-smtp.eu-central-1.amazonses.com` and the SPF `v=spf1 include:amazonses.com -all`, where SES refuses to send while it cannot see that MX rather than fall back to `amazonses.com`; and the account's suppression list for bounces and complaints. The root keeps its `-all` SPF, its null MX and its reject DMARC (`bootstrap/dns.tf`): DKIM aligns under `adkim=s`, and that carries DMARC.
+- **The identity**, `bootstrap/mail.tf`, since it belongs to the domain and to no environment: `kuutti.app` as an SES identity in eu-central-1, the region the API's SES client uses (`S3_REGION`); Easy DKIM with 2048-bit keys that SES holds, signing every message as `d=kuutti.app`, through three CNAMEs `<token>._domainkey`; the custom MAIL FROM `mail.kuutti.app`, an MX to `feedback-smtp.eu-central-1.amazonses.com` and the SPF `v=spf1 include:amazonses.com -all`, where SES refuses to send while it cannot see that MX rather than fall back to `amazonses.com`; and the account's suppression list for bounces and complaints. The root's MX and SPF are the Workspace's, which SES does not need: its envelope is `mail.kuutti.app`. The reject DMARC holds for both senders (`bootstrap/dns.tf`), since each signs as `d=kuutti.app`, which aligns under `adkim=s`.
 - **The permission**, `modules/compute`, statement `SesSendAsNoreply`: `ses:SendEmail` on that identity alone, with `ses:FromAddress` equal to `noreply@kuutti.app`; on staging, also every recipient within its testers (`ses:Recipients`, Staging's testers, below).
 - **The switch**, the parameter `mail=ses` under `/kuutti/<env>/`, which the API reads as `MAIL` (ADR-043 §4). Without it a deployed API sends nothing and the code route answers 503 `mail_unavailable`. A pull request's preview reads staging's parameters under staging's role, so it sends through the same identity (write access is that trust, ADR-004 §3).
 
@@ -349,7 +349,7 @@ Staging and production are one account in one region, so they share the identity
 
 In this order, maintainer only:
 
-1. **The bootstrap.** CI never applies it, since it owns the CI roles. The plan adds the identity, its MAIL FROM, the suppression attributes and five records, and changes nothing else:
+1. **The bootstrap.** CI never applies it, since it owns the CI roles. The plan adds the identity, its MAIL FROM, the suppression attributes and five records, and leaves the Workspace's records as they are (#450). Read it whole first: it may also hold other changes merged since the last apply.
 
    ```sh
    cd infra/bootstrap
