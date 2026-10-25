@@ -706,7 +706,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "notifications.kind.match.label": "［Máátçhééš］",
   "notifications.kind.message.hint": "［Tháát thééréé ííš áá ñééw mééššáágéé, ñéévéér wháát íít šááýýš óór whóó šééñt íít.］",
   "notifications.kind.message.label": "［Mééššáágééš］",
-  "notifications.kind.moderation.hint": "［ÁÁbóóúút ýýóóúúr phóótóóš ááñd théé réépóórtš ýýóóúú máádéé. ÁÁ wáárñííñg tóó ýýóóúú ííš šhóówñ ííñ théé áápp wháátéévéér ýýóóúú çhóóóóšéé hééréé.］",
+  "notifications.kind.moderation.hint": "［ÁÁbóóúút ýýóóúúr phóótóóš ááñd théé réépóórtš ýýóóúú máádéé. Ñóóthííñg ííš šééñt tóó ýýóóúúr phóóñééš fóór thééšéé ýýéét. ÁÁ wáárñííñg tóó ýýóóúú ííš šhóówñ ííñ théé áápp wháátéévéér ýýóóúú çhóóóóšéé hééréé.］",
   "notifications.kind.moderation.label": "［Móódééráátóórš' dééçííšííóóñš］",
   "notifications.kind.round.hint": "［Whééñ théé dááýý'š pééóópléé ááréé rééáádýý fóór ýýóóúú.］",
   "notifications.kind.round.label": "［ÁÁ ñééw róóúúñd］",

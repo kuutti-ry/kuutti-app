@@ -105,10 +105,9 @@ resource "aws_ssm_parameter" "config" {
     # Mail through SES (#385, ADR-043 §4): the instance role sends as noreply@
     # through the domain's identity in infra/bootstrap.
     "mail" = "ses"
-    # Push through Expo (#102, ADR-055 §8): the API sends to Expo's push
-    # service over HTTPS; its access token, once EAS's enhanced push security
-    # is on, is the SecureString expo-access-token, never a resource (ADR-001).
-    "push" = "expo"
+    # No "push" here yet (#102, ADR-055 §8): production sends once its
+    # SecureString expo-access-token exists and EAS's enhanced push security is
+    # on, so nobody holding a stored token can send to its people's phones.
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.
     "admin-app-url"        = var.admin_app_url

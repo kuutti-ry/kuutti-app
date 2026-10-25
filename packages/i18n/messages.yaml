@@ -9017,7 +9017,7 @@ notifications.kind.message.hint:
 
 notifications.kind.match.label:
   en: "Matches"
-  description: "The Notifications screen (#176), the switch of a new match (M5 sends it)."
+  description: "The Notifications screen (#176), the switch of a new match, which #102's push sends to the person whose earlier like it met."
   fi: "Mätsit"
   sv: "Matchningar"
   machine: { fi: true, sv: true }
@@ -9037,10 +9037,10 @@ notifications.kind.moderation.label:
   machine: { fi: true, sv: true }
 
 notifications.kind.moderation.hint:
-  en: "About your photos and the reports you made. A warning to you is shown in the app whatever you choose here."
-  description: "The Notifications screen (#176), the line under Moderators' decisions: the switch governs a push only; a warning always appears among the notices on the home screen (ADR-024 §7)."
-  fi: "Kuvistasi ja tekemistäsi ilmoituksista. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa."
-  sv: "Om dina foton och de anmälningar du gjort. En varning till dig visas i appen vad du än väljer här."
+  en: "About your photos and the reports you made. Nothing is sent to your phones for these yet. A warning to you is shown in the app whatever you choose here."
+  description: "The Notifications screen (#176), the line under Moderators' decisions: the switch will govern a push only, and none is sent yet (#312's, ADR-055 Not done); a warning always appears among the notices on the home screen (ADR-024 §7)."
+  fi: "Kuvistasi ja tekemistäsi ilmoituksista. Näistä ei vielä lähetetä puhelimillesi mitään. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa."
+  sv: "Om dina foton och de anmälningar du gjort. Inget skickas till dina telefoner om detta än. En varning till dig visas i appen vad du än väljer här."
   machine: { fi: true, sv: true }
 
 notices.title:

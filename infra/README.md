@@ -418,8 +418,8 @@ Staging's personas have no address and stay unconfirmed (ADR-043 §6): one-time 
 
 The API sends the app's pushes to Expo's push service over HTTPS (`apps/api/src/lib/push.ts`), which hands them to Apple and Google; nothing of AWS is added, and the box already reaches the internet as it does for Telia and Sentry. Two pieces here:
 
-- **The switch**, the parameter `push=expo` under `/kuutti/<env>/`, which the API reads as `PUSH` (ADR-055 §8). Without it a deployed API sends nothing. A preview reads staging's, so it sends to the dev clients registered against it.
-- **The access token**, once the maintainer switches EAS's enhanced push security on (`docs/vendors/expo.md`, steps 3 and 4): an Expo robot's token as a secret, below, read as `EXPO_ACCESS_TOKEN`. Put it in both environments and restart their APIs before the switch, or every push is refused `UNAUTHORIZED`:
+- **The switch**, the parameter `push=expo` under `/kuutti/<env>/`, which the API reads as `PUSH` (ADR-055 §8). Without it a deployed API sends nothing. Staging has it, and a preview reads staging's, so it sends to the dev clients registered against it and holds the access token as staging does. Production gets it together with its access token.
+- **The access token**, once the maintainer switches EAS's enhanced push security on (`docs/vendors/expo.md`, steps 3 and 4): the token of an Expo robot made for this alone, never CI's, as a secret, below, read as `EXPO_ACCESS_TOKEN`. Put it in both environments and restart their APIs before the switch, or every push is refused `UNAUTHORIZED`:
 
 ```sh
 aws ssm put-parameter --name /kuutti/<env>/expo-access-token --type SecureString \

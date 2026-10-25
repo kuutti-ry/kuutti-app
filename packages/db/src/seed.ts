@@ -121,6 +121,8 @@ export const MATCHING_CONFIG_V1 = {
   push_quiet_from_hour: 22,
   push_quiet_to_hour: 8,
   round_push_hour: 9,
+  // #102 (migration 0083): no round push after seven days without an opened round.
+  round_push_idle_days: 7,
   moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
   // #84 (ADR-030 §4, migration 0052): reports a person may file per Finnish
   // day, counted from report in the statement that writes the row; the sixth

@@ -1,6 +1,6 @@
 # ADR-038: The match
 
-- Status: accepted 2026-10-20 (#100, built as written here on the maintainer's decisions of that day, #100's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§1: what a shadow-banned person's round holds, ADR-037 §7; see History)
+- Status: accepted 2026-10-20 (#100, built as written here on the maintainer's decisions of that day, #100's comment of 20/10/2026; the points under "Open, the maintainer's" are his to confirm or change), amended 2026-10-21 (§1: what a shadow-banned person's round holds, ADR-037 §7) and 2026-10-25 (Open 1: the push half answered, #102, ADR-055 §5; see History)
 - Date: 2026-10-20
 - Follows: TD-5 (the research event `match`), TD-7 (erasure), TD-11 (a like is scarce), TD-13 (the archive of a silent match), ADR-024 §6 (a shadow ban withholds), ADR-030 §2 (a block), ADR-031 (the conversation as the match's record, §8 the archive), ADR-034 §5 (a decision changes until the day ends), ADR-036 (the day's likes), ADR-037 (liked-you), CLAUDE.md rule 7 and Product constraints; issues #100, #96, #97, #98, #101, #379
 

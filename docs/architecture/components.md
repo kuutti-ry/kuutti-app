@@ -3,6 +3,7 @@
 <!-- draws
 apps/api/src/index.ts
 apps/api/src/jobs/nightly.ts
+apps/api/src/jobs/round-push.ts
 apps/api/src/chat/ws.ts
 apps/api/src/chat/listen.ts
 apps/api/scripts/openapi.ts
@@ -89,7 +90,7 @@ flowchart TB
     c19["The live hub: open sockets and presence in memory, the frames each person may see"]
     c20["The chat listener: LISTEN on kuutti_chat over one pooled connection"]
     c21["The two timers: the next 04:00 in Helsinki, and the next round_push_hour"]
-    c22["The nightly jobs, one after another: see The night's jobs; the round's push"]
+    c22["What the timers run: the nightly jobs one after another (see The night's jobs), and the round's push"]
     c23["lib/: configuration, logger, Sentry, S3, SSM, mail, push, limits, errors, the session check"]
     c24["The pool of database connections"]
   end
@@ -122,7 +123,7 @@ flowchart TB
 19. **The live hub** (`chat/live.ts`, `chat/presence.ts`): which accounts have a socket open, in the process's memory and never in a table, and the frames each person may see, read through that person's own participant row. It reads PostgreSQL through the pool (24).
 20. **The chat listener** (`chat/listen.ts`) holds one connection of the pool for `LISTEN kuutti_chat`. The triggers of migrations 0055, 0059 and 0063 notify on that channel when a transaction commits, with ids and numbers only (25). The listener hands each notification to the hub, one at a time, in the order Postgres delivers them (19).
 21. **The two timers.** The night's (`jobs/nightly.ts`): one timer to the next 04:00 in Helsinki, armed again after each run, which runs the jobs (22). The round's push (`jobs/round-push.ts`, #102, ADR-055 §6): one timer to the next `round_push_hour` in Helsinki, the hour read from `matching_config` at each arming and an hour later again if it cannot be read, which tells the day once.
-22. **The nightly jobs**, listed in `boot.ts` and run one after another; a failure is logged and the next job runs. They reach PostgreSQL through the pool (24). The Night's jobs view has the order and the steps. The round's push reads today's rounds not yet opened and hands them to the notifications slice, which sends through Expo; its failure is logged, never thrown.
+22. **What the timers run.** The nightly jobs, listed in `boot.ts` and run one after another; a failure is logged and the next job runs. They reach PostgreSQL through the pool (24). The Night's jobs view has the order and the steps. The round's push reads today's rounds not yet opened and hands them to the notifications slice, which sends through Expo; its failure is logged, never thrown.
 23. **`lib/`**: horizontal code every slice uses and none owns. The configuration is validated with zod at start; on AWS its values come from SSM through the instance role. Also the logger, Sentry, the S3 client, mail, push out to Expo (`lib/push.ts`), the rate limits, the error envelope and the session check the guard and the socket share.
 24. **The pool**: `DB_POOL_MAX` connections, one of them held by the chat listener (20).
 25. **PostgreSQL**: the tables, and the chat's triggers, which send a notification when their transaction commits and none when it rolls back. Its notifications go to the listener (20).

@@ -12,9 +12,10 @@ The API sends each push to `https://exp.host/--/api/v2/push/send` (`apps/api/src
 |---|---|
 | The Expo push token of one installation of the app | where the push goes; the token names an installation to Expo, Apple and Google, nothing about the person to them |
 | One line of the app's own words, in the device's language: "You have a new message", "You have a new match" or "Today's round is ready" | what the phone shows |
-| `data`: the kind, and for a message or a match the conversation's id (a random UUID) | what the app opens on a tap |
-| `collapseId` and `tag`: the conversation's id, or `round` | so a later push replaces an earlier one of the same thing |
-| `channelId` `default`, a priority, `sound: "default"`, for the round a time to live | how the phone shows it |
+| `data`: the kind alone (`message`, `match` or `round`), never the conversation, whose one id on both people's phones would pair them | where the app goes on a tap |
+| `collapseId` and `tag`: the kind | so a later push replaces an earlier one of its kind |
+| `ttl`: seconds until the quiet hours begin or the Finnish day ends, whichever is sooner | so a phone that was off is not told in the night or days later |
+| `channelId` `default`, a priority, `sound: "default"` | how the phone shows it |
 | When, and the API's address on the network | as for any request |
 
 Never a message's text, a name, an account's id or anything of a profile; `apps/api/src/notifications/push.test.ts` fails on a payload that carries one. Apple and Google receive the same through Expo.
@@ -31,15 +32,16 @@ Never a message's text, a name, an account's id or anything of a profile; `apps/
 1. **Apple**: an APNs key (`.p8`) of the Apple Developer account, uploaded to EAS with `eas credentials` for `fi.kuutti.app`. Without it no push reaches an iPhone.
 2. **Google**: a Firebase project with the Android app `fi.kuutti.app`, its FCM V1 service account key uploaded to EAS (`eas credentials`, Android, "Google Service Account Key For FCM V1"), and the project's `google-services.json` in the native build (`android.googleServicesFile` in `app.json`). Without the file an Android phone gets no Expo push token at all (the app logs the failure and tries again at its next start); the file names the Firebase project and is public by design, but adding it moves the fingerprint, so it belongs in the same native change as `expo-notifications` or costs one more build. Without the key no push reaches an Android phone; `MismatchSenderId` in a receipt means the key and the file are of different projects.
 3. **Enhanced push security** in EAS (project settings), after step 4: Expo then refuses a push without the project's access token, so a token that leaked cannot be sent to by anybody but the API.
-4. **The access token**, an Expo robot's, as the SecureString `/kuutti/<env>/expo-access-token` in each environment, made with the CLI and never a resource (ADR-001, `infra/README.md`); the API reads it as `EXPO_ACCESS_TOKEN` at boot and logs only whether it has one. Rotated by putting a new value and restarting the API.
+4. **The access token**, of an Expo robot made for this alone, never CI's (`EXPO_TOKEN`, which can publish updates), with the least role Expo lets send under push security, as the SecureString `/kuutti/<env>/expo-access-token` in each environment, made with the CLI and never a resource (ADR-001, `infra/README.md`); the API reads it as `EXPO_ACCESS_TOKEN` at boot and logs only whether it has one. Rotated by putting a new value and restarting the API.
 
-`push` is `expo` in both environments' configuration (`infra/envs/*/main.tf`), so staging, its previews and production send; a development machine logs instead (`PUSH=log`), and `PUSH=expo` there sends for real to a dev client's token.
+`push` is `expo` in staging's configuration (`infra/envs/staging/main.tf`), so staging and its previews send. Production has no `push` yet and sends nothing: it gets `expo` in the same change as its access token, with enhanced push security on, so that nobody holding a stored token can send to its people's phones. A development machine logs instead (`PUSH=log`), and `PUSH=expo` there sends for real to a dev client's token.
 
 ### When something goes wrong
 
 - A ticket or receipt with `DeviceNotRegistered` deletes the token: the app was removed, or the phone no longer lets Kuutti notify. The app registers again at its next start if it may.
 - `InvalidCredentials` (a receipt): the APNs key or the FCM key in EAS is wrong or gone; step 1 or 2 again.
-- `MessageRateExceeded`, a 429 or a 5xx: nothing is retried (ADR-055 Open 4); the push is lost and the app shows everything when it opens. The API logs the code alone, never a token.
+- `MessageRateExceeded`, a 429 or a 5xx: nothing is retried (ADR-055 Open 4); the push is lost and the app shows everything when it opens. The API logs the code alone, never a token, and spaces its requests 200 ms apart, under Expo's 600 a second.
+- `PUSH_TOO_MANY_EXPERIENCE_IDS`: a token of another Expo project was in the request (a build of another project, or one registered by hand). The API deletes the tokens of the smaller projects and sends the rest again.
 - `UNAUTHORIZED` for every push: enhanced push security is on and the environment has no access token, or a wrong one.
 
 ## EAS Build and EAS Update

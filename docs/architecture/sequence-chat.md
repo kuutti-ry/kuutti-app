@@ -6,6 +6,7 @@ apps/api/src/chat/live.ts
 apps/api/src/chat/presence.ts
 apps/api/src/chat/listen.ts
 apps/api/src/chat/messages.ts
+apps/api/src/notifications/push.ts
 apps/api/src/lib/auth-middleware.ts
 packages/schema/src/chat-frames.ts
 apps/mobile/src/features/chat/socket.ts
@@ -109,8 +110,8 @@ sequenceDiagram
   par the answer to the sender
     api->>db: The research event message_sent, in bands, where the sender takes part in research
     api->>api: After a conversation's first message, the safety slice's automatic rules
-    api->>push: To whom the chat lets read it and has no live socket, You have a new message and the conversation's id, never the text
     api->>phone: 201 with the message and its sequence
+    api-)push: After the answer, to whom the chat lets read it and has no live socket, You have a new message, never the text or the conversation
   and the delivery, on commit
     db->>api: A notification on kuutti_chat, the conversation and the sequence, never the text
     api->>db: Who is in the conversation, and the message as each of them may read it
@@ -131,8 +132,8 @@ sequenceDiagram
 27. The message is inserted with the conversation's next sequence, in the statement that moves the conversation on: the next sequence, the last message's time, and out of the archive. Two sends at once take consecutive sequences with no gap. The transaction commits.
 28. After the commit, the research event `message_sent` with the kind, the length's band and the waits' bands, never the text (rule 5). It is written only for a person whose research consent stands, keyed by `research_id` (ADR-011).
 29. After a conversation's first message, the safety slice's automatic rules check the sender (ADR-033). The chat hands over counts and times only, and the check changes no answer.
-30. The push (#102, ADR-055 §4), after the commit: the route hands the conversation and the sequence to the notifications slice, which asks the chat whom it lets read the message (`messageReaders`: the other participant, through their own participant row, in a conversation still open for them, so nothing crosses a block or a close and a shadow-banned sender's withheld message tells nobody). It leaves out whoever has a live socket (the hub's `online`), whose message switch is off (ADR-032), or who was pushed of this conversation within `matching_config message_push_min_interval_minutes`, and sends nothing in the quiet hours (`push_quiet_from_hour` to `push_quiet_to_hour`, Helsinki). Each live device of whoever is left gets one push through Expo: "You have a new message" in the device's language and the conversation's id, never the text or a name; Apple or Google wakes the phone with it. The answer waits for this at most five seconds, and a failure is logged and changes no answer. A photo's send does the same.
-31. The sender's phone gets 201 with the stored message and its sequence.
+30. The sender's phone gets 201 with the stored message and its sequence.
+31. The push (#102, ADR-055 §4), after the answer: the route hands the conversation and the sequence to the notifications slice, which asks the chat whom it lets read the message (`messageReaders`: the other participant, through their own participant row, in a conversation still open for them, so nothing crosses a block or a close and a shadow-banned sender's withheld message tells nobody). It leaves out whoever has a live socket (the hub's `online`), whose message switch is off (ADR-032), or who was pushed of this conversation within `matching_config message_push_min_interval_minutes`, and sends nothing in the quiet hours (`push_quiet_from_hour` to `push_quiet_to_hour`, Helsinki). Each live device of whoever is left gets one push through Expo: "You have a new message" in the device's language and the kind, never the text, a name or the conversation, and it lives no longer than the quiet hours' start or the day's end; Apple or Google wakes the phone with it. The push runs after the answer, which never waits for it, so the answer's time says nothing of whether anybody was pushed; a failure is logged. A photo's send does the same.
 32. Meanwhile Postgres delivers the message trigger's notification to the chat listener on `kuutti_chat` when the transaction commits, and drops it if the transaction rolls back. It carries the conversation and the sequence, never the text.
 33. The hub takes one notification at a time, in commit order. It reads who is in the conversation, then the message through each person's own participant row, with every rule of the reads: nothing crosses a block, and a shadow-banned sender's message reaches only the sender while the ban stays open.
 34. Each live socket of the other person gets a `message` frame. A photo's frame carries no URL; the phone reads that one message again over HTTP for its signed URLs (ADR-031 §10).

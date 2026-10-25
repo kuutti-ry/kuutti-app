@@ -31,7 +31,7 @@ async function main(): Promise<void> {
 
   // Everything from the configuration to the app, the pool and the jobs is
   // boot.ts, where the tests run it; this file is the process around it.
-  const { app, pool, jobs, live, roundPush } = await boot({ config, logger });
+  const { app, pool, jobs, live, push, roundPush } = await boot({ config, logger });
   scheduleNightly(jobs, logger);
   // The day's round, told at round_push_hour to those who have not opened it (#102, ADR-055 §6).
   scheduleRoundPush(roundPush);
@@ -88,8 +88,10 @@ async function main(): Promise<void> {
       for (const client of wss.clients) client.terminate();
     }, 1_000).unref();
     server.close(() => {
-      listener
-        .stop()
+      // The pushes the last requests started (#102), at most five seconds of Expo's each, before the pool goes.
+      push
+        .settled()
+        .then(() => listener.stop())
         .then(() => pool.end())
         .finally(() => process.exit(0));
     });

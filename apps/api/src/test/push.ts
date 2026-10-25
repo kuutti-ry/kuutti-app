@@ -145,11 +145,16 @@ export async function tokensLeft(db: Queryable, accountIds: string[]): Promise<s
   return rows.map((row) => row.token);
 }
 
-/** What a push must never carry (ADR-055 §1): the people's words, names, accounts and sessions. */
+/**
+ * What a push must never carry (ADR-055 §1): the people's words, names,
+ * accounts and sessions, and the conversation, whose id both people's
+ * phones would share.
+ */
 export type Withheld = {
   texts?: readonly string[];
   names?: readonly string[];
   ids?: readonly string[];
+  conversations?: readonly string[];
 };
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
@@ -158,8 +163,9 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
  * The payload rule (ADR-055 §1): what a push carries past its address says
  * that there is something, never what or from whom. Its every field but `to`
  * is read as Expo, Apple and Google receive it: no message text, no name, no
- * account's or session's id, in any case; no uuid but the one its data names
- * for the app to open. The reasons it fails, empty when it passes.
+ * account's, session's or conversation's id, in any case; no uuid at all,
+ * since its data names its kind alone. The reasons it fails, empty when it
+ * passes.
  */
 export function payloadBreaches(message: PushMessage, withheld: Withheld): string[] {
   const { to: _address, ...payload } = message;
@@ -170,16 +176,14 @@ export function payloadBreaches(message: PushMessage, withheld: Withheld): strin
     ["text", withheld.texts ?? []],
     ["name", withheld.names ?? []],
     ["id", withheld.ids ?? []],
+    ["conversation", withheld.conversations ?? []],
   ] as const) {
     for (const value of values) {
       if (value.length > 0 && lower.includes(value.toLowerCase()))
         breaches.push(`${what}: ${value}`);
     }
   }
-  const opened = "conversationId" in message.data ? message.data.conversationId : null;
-  for (const uuid of carried.match(UUID) ?? []) {
-    if (uuid !== opened) breaches.push(`uuid: ${uuid}`);
-  }
+  for (const uuid of carried.match(UUID) ?? []) breaches.push(`uuid: ${uuid}`);
   return breaches;
 }
 

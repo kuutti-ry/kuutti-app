@@ -1,7 +1,9 @@
 import type { Queryable } from "@kuutti/db";
+import { it } from "vitest";
 import { describe, expect, test } from "../test/harness.ts";
 import { AppError } from "./errors.ts";
 import {
+  asHour,
   matchingConfigNumber,
   matchingConfigNumbers,
   readMatchingConfig,
@@ -96,4 +98,31 @@ describe("matchingConfigNumbers", () => {
     const nulled = await refusal(matchingConfigNumbers(ctx.client, ["lib_test.b"]));
     expect(nulled.message).toBe("matching_config lib_test.b is not a number");
   });
+});
+
+// The push's quiet hours and the round's hour (#102, ADR-055 §6, §7): the
+// panel keeps a number whole and from 0, with no ceiling.
+describe("asHour", () => {
+  it.each([0, 1, 9, 22, 23])("takes %i as an hour of the day", (hour) => {
+    expect(asHour("lib_test.hour", hour)).toBe(hour);
+  });
+
+  it.each([-1, 24, 2.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "refuses %d as no hour, naming the key, as a missing row is refused",
+    (value) => {
+      let error: unknown;
+      try {
+        asHour("lib_test.hour", value);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(AppError);
+      expect(error).toMatchObject({
+        status: 500,
+        code: "internal_error",
+        message: "matching_config lib_test.hour is not an hour",
+        detail: { key: "lib_test.hour" },
+      });
+    },
+  );
 });

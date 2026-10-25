@@ -36,23 +36,35 @@ export type Pusher = {
 
 /**
  * A request Expo did not take, by its error code or HTTP status alone: never
- * the tokens it was for, since this error reaches a log line.
+ * the tokens it was for, since this error reaches a log line. A request whose
+ * tokens span Expo projects (`PUSH_TOO_MANY_EXPERIENCE_IDS`) also carries the
+ * tokens by project, for the sender to keep its own; they are a property, in
+ * neither the message nor a log line.
  */
 export class PushFailed extends Error {
+  /** Not enumerable, so neither JSON nor the logger's error serializer prints a token. */
+  declare readonly byProject?: readonly (readonly string[])[];
+
   constructor(
     readonly reason: string,
     readonly status: number | undefined,
+    byProject?: readonly (readonly string[])[],
   ) {
     super(`push not sent: ${reason}`);
     this.name = "PushFailed";
+    if (byProject)
+      Object.defineProperty(this, "byProject", { value: byProject, enumerable: false });
   }
 }
+
+/** The code with which Expo refuses a request whose tokens are of more than one project. */
+export const MIXED_PROJECTS = "PUSH_TOO_MANY_EXPERIENCE_IDS";
 
 const EXPO_PUSH = "https://exp.host/--/api/v2/push";
 /** Expo's ceilings per request: a hundred pushes, a thousand receipts. */
 export const PUSHES_PER_REQUEST = 100;
 const RECEIPTS_PER_REQUEST = 1000;
-/** A send waits for Expo at most this long (ADR-055 §4): a message's answer waits on it. */
+/** A request waits for Expo at most this long (ADR-055 §8). */
 const EXPO_TIMEOUT_MS = 5_000;
 
 const Refusal = z.object({ details: z.object({ error: z.string().max(100) }).partial() }).partial();
@@ -73,10 +85,15 @@ const ReceiptAnswer = z.object({
     ]),
   ),
 });
-/** A whole request refused (`errors`): its first code, which names no token. */
+/**
+ * A whole request refused (`errors`): its first code, which names no token,
+ * and for mixed projects the tokens of each project in `details`.
+ */
 const RequestRefusal = z.object({
-  errors: z.array(z.object({ code: z.string().max(100) })).min(1),
+  errors: z.array(z.object({ code: z.string().max(100), details: z.unknown().optional() })).min(1),
 });
+/** The tokens of each project, in a mixed-projects refusal's details; any other shape is none. */
+const ByProject = z.record(z.string().max(200), z.array(z.string().max(200)));
 
 const chunks = <T>(items: readonly T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) =>
@@ -113,9 +130,13 @@ export function expoPusher(
     const answer: unknown = await response.json().catch(() => null);
     const refused = RequestRefusal.safeParse(answer);
     if (!response.ok || refused.success) {
+      const first = refused.success ? refused.data.errors[0] : undefined;
+      const groups =
+        first?.code === MIXED_PROJECTS ? ByProject.safeParse(first.details) : undefined;
       throw new PushFailed(
-        refused.success ? (refused.data.errors[0]?.code ?? "refused") : "refused",
+        first?.code ?? "refused",
         response.status,
+        groups?.success ? Object.values(groups.data) : undefined,
       );
     }
     return answer;

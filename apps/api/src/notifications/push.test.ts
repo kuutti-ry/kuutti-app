@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { PushData } from "@kuutti/schema";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { messageReaders } from "../chat/index.ts";
-import { PushFailed, type PushMessage } from "../lib/push.ts";
+import { MIXED_PROJECTS, PushFailed, type PushMessage } from "../lib/push.ts";
 import { withMatchingConfig } from "../test/account.ts";
 import { conversationBetween } from "../test/chat.ts";
 import { captureLogger, type LogLine, type TestContext, test } from "../test/harness.ts";
@@ -27,14 +27,17 @@ import {
   QUIET_FROM_KEY,
   QUIET_TO_KEY,
   RECEIPT_DELAY_MS,
+  REQUEST_SPACING_MS,
 } from "./push.ts";
 
 // The push's decisions (#102, ADR-055 §1, §4-§8): whom a message, a match
-// and the day's round tell, in which words, when not, and what a ticket or a
-// receipt does to a token. On the real database in the harness's rolled-back
-// transaction, a memory pusher for Expo, a held schedule for the receipts'
-// timer, and a clock the test moves. Every push a scene records is held to
-// the payload rule (§1) after its test.
+// and the day's round tell, in which words, when not, how long a push may
+// wait for its phone, and what a ticket or a receipt does to a token. On the
+// real database in the harness's rolled-back transaction, a memory pusher
+// for Expo, a held schedule for the receipts' timer, a recorded pause between
+// requests, and a clock the test moves. A message's and a match's push run
+// after their caller, so a scene waits for them with `settled`. Every push a
+// scene records is held to the payload rule (§1) after its test.
 
 /** 12:00 in Helsinki, a Friday in summer time (UTC+3). */
 const T = new Date("2026-10-16T09:00:00.000Z");
@@ -43,6 +46,8 @@ const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 /** Helsinki's wall clock on T's day, summer time: `hh:mm:ss` there. */
 const helsinki = (time: string) => new Date(`2026-10-16T${time}+03:00`);
+/** At T a push may wait ten hours for its phone: the quiet hours begin at 22:00. */
+const TTL_AT_T = 10 * 60 * 60;
 
 const LINES = {
   message: {
@@ -69,8 +74,10 @@ afterEach(() => {
 
 /**
  * Two people with names of their own in a conversation, a pusher, a held
- * schedule, a clock and who is online; `send` writes a message as the chat
- * does and hands it to the push with the chat's own readers.
+ * schedule, a recorded pause, a clock and who is online; `send` writes a
+ * message as the chat does, hands it to the push with the chat's own readers
+ * and waits for the push to settle. `control` lets a test see who is asked
+ * whether they are online and hold a pause.
  */
 async function scene(ctx: TestContext, options: { pusher?: false } = {}) {
   const [first, second] = await people(ctx.client, null, 2, { complete: true });
@@ -92,15 +99,26 @@ async function scene(ctx: TestContext, options: { pusher?: false } = {}) {
   const online = new Set<string>();
   const texts: string[] = [];
   const ids = [a, b];
+  const conversations = [conversationId];
+  /** Each pause asked for, and how many requests had gone when it was. */
+  const pauses: Array<{ ms: number; after: number }> = [];
+  const control: { asked?: (accountId: string) => void; pause?: () => Promise<void> } = {};
   const push: Push = createPush({
     db: ctx.client,
     logger,
     now: () => clock.at,
     ...(options.pusher === false ? {} : { pusher }),
-    online: (accountId) => online.has(accountId),
+    online: (accountId) => {
+      control.asked?.(accountId);
+      return online.has(accountId);
+    },
     schedule: schedule.schedule,
+    pause: async (ms) => {
+      pauses.push({ ms, after: pusher.batches.length });
+      await control.pause?.();
+    },
   });
-  const withheld = (): Withheld => ({ texts, names, ids });
+  const withheld = (): Withheld => ({ texts, names, ids, conversations });
   recorded.push({ pusher, withheld });
 
   /** A message written as the chat writes it, then handed to the push. */
@@ -118,11 +136,12 @@ async function scene(ctx: TestContext, options: { pusher?: false } = {}) {
     const seq = sent.rows[0]?.seq;
     if (seq === undefined) throw new Error("message not written");
     const senderAccountId = from === "a" ? a : b;
-    await push.message({
+    push.message({
       conversationId: conversation,
       readers: () =>
         messageReaders(ctx.client, { conversationId: conversation, seq, senderAccountId }),
     });
+    await push.settled();
   }
 
   /** A device of `accountId`, registered at `minute` minutes before T, its session among what a push must not name. */
@@ -150,6 +169,9 @@ async function scene(ctx: TestContext, options: { pusher?: false } = {}) {
     send,
     device,
     ids,
+    conversations,
+    pauses,
+    control,
   };
 }
 
@@ -173,15 +195,17 @@ function expectNoToken(lines: LogLine[], tokens: string[]) {
   }
 }
 
-const messagePush = (to: string, body: string, conversationId: string): PushMessage => ({
+/** A message's push as it goes: its kind alone, a later one replacing it, waiting `ttl` seconds at most. */
+const messagePush = (to: string, body: string, ttl = TTL_AT_T): PushMessage => ({
   to,
   body,
-  data: { kind: "message", conversationId },
-  collapseId: conversationId,
-  tag: conversationId,
+  data: { kind: "message" },
+  collapseId: "message",
+  tag: "message",
   channelId: "default",
   priority: "high",
   sound: "default",
+  ttl,
 });
 
 describe("the quiet hours (ADR-055 §7)", () => {
@@ -231,17 +255,59 @@ describe("a message's push (ADR-055 §4)", () => {
 
     expect(s.pusher.batches).toHaveLength(1);
     expect(s.pusher.sent()).toStrictEqual([
-      messagePush(fi.token, LINES.message.fi, s.conversationId),
-      messagePush(sv.token, LINES.message.sv, s.conversationId),
-      messagePush(en.token, LINES.message.en, s.conversationId),
+      messagePush(fi.token, LINES.message.fi),
+      messagePush(sv.token, LINES.message.sv),
+      messagePush(en.token, LINES.message.en),
     ]);
     for (const message of s.pusher.sent()) {
-      for (const absent of ["title", "badge", "ttl", "subtitle"])
+      for (const absent of ["title", "badge", "subtitle"])
         expect(message).not.toHaveProperty(absent);
+      // Its kind alone: never the conversation, whose id both phones would share.
+      expect(message.data).toStrictEqual({ kind: "message" });
     }
     // The receipts are read once, fifteen minutes later.
     expect(s.schedule.tasks.map((task) => task.ms)).toEqual([RECEIPT_DELAY_MS]);
     expect(RECEIPT_DELAY_MS).toBe(15 * MINUTE);
+  });
+
+  test("returns at once and runs after its caller, and settled waits for it and for a push started while it waits", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const device = await s.device(s.b);
+    // Nothing in flight: settled resolves at once.
+    await s.push.settled();
+    const expo = gate();
+    const reached = gate();
+    s.pusher.gate = expo.promise;
+    s.pusher.reached = reached.open;
+    let read = false;
+    const returned = s.push.message({
+      conversationId: s.conversationId,
+      readers: async () => {
+        read = true;
+        return [s.b];
+      },
+    });
+    // It returned before anything was read or sent.
+    expect(returned).toBeUndefined();
+    expect(read).toBe(false);
+    expect(s.pusher.batches).toEqual([]);
+    // It goes on by itself, as far as Expo, which has not answered.
+    await reached.promise;
+    expect(read).toBe(true);
+    expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
+    const waiting = s.push.settled();
+    // A match started while settled waits, its reads still ahead of it: waited for too.
+    s.push.match({ accountId: s.b });
+    expo.open();
+    await waiting;
+    expect(s.pusher.batches.map((batch) => batch.map((m) => m.data.kind))).toEqual([
+      ["message"],
+      ["match"],
+    ]);
+    // Both were taken, and wait for their receipts.
+    expect(s.schedule.tasks).toHaveLength(2);
   });
 
   test("sends nothing to a reader with a live socket, and pushes once they have none", async ({
@@ -313,13 +379,17 @@ describe("a message's push (ADR-055 §4)", () => {
     // The other reader's interval is theirs: B's reply pushes A.
     await s.send("b", "Kuusi");
     expect(s.pusher.sent().map((m) => m.to)).toEqual([toB.token, toB.token, toA.token]);
-    // Another conversation of B's is its own.
+    // Another conversation of B's is its own: it pushes within the first's interval.
     const [c] = await people(ctx.client, null, 1, { complete: true });
     if (!c) throw new Error("no person");
     s.ids.push(c);
     const other = await conversationBetween(ctx.client, c, s.b, { openedAt: T });
+    s.conversations.push(other);
     await s.send("a", "Seitsemän", other);
-    expect(s.pusher.sent().at(-1)).toStrictEqual(messagePush(toB.token, LINES.message.en, other));
+    expect(s.pusher.sent()).toHaveLength(4);
+    expect(s.pusher.sent().at(-1)).toStrictEqual(
+      messagePush(toB.token, LINES.message.en, TTL_AT_T - 15 * 60),
+    );
   });
 
   test("reads the interval from matching_config", async ({ ctx }) => {
@@ -348,27 +418,28 @@ describe("a message's push (ADR-055 §4)", () => {
       await opened.promise;
       return [s.b];
     };
-    const first = s.push.message({ conversationId: s.conversationId, readers });
-    const second = s.push.message({ conversationId: s.conversationId, readers });
+    s.push.message({ conversationId: s.conversationId, readers });
+    s.push.message({ conversationId: s.conversationId, readers });
     opened.open();
-    await Promise.all([first, second]);
+    await s.push.settled();
     expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
 
-    // The first still waiting on Expo when the second is decided.
+    // The first still waiting on Expo when the second is decided: a reader is
+    // decided on the moment they are asked whether they are online.
     s.clock.at = new Date(T.getTime() + 10 * MINUTE);
     const expo = gate();
     const reached = gate();
     s.pusher.gate = expo.promise;
     s.pusher.reached = reached.open;
-    const waiting = s.push.message({
-      conversationId: s.conversationId,
-      readers: async () => [s.b],
-    });
+    s.push.message({ conversationId: s.conversationId, readers: async () => [s.b] });
     await reached.promise;
     expect(s.pusher.batches).toHaveLength(2);
-    await s.push.message({ conversationId: s.conversationId, readers: async () => [s.b] });
+    const decided = gate();
+    s.control.asked = decided.open;
+    s.push.message({ conversationId: s.conversationId, readers: async () => [s.b] });
+    await decided.promise;
     expo.open();
-    await waiting;
+    await s.push.settled();
     expect(s.pusher.batches).toHaveLength(2);
   });
 
@@ -531,7 +602,8 @@ describe("a message's push (ADR-055 §4)", () => {
         pusher: s.pusher,
         online: () => false,
       });
-      await push.message({ conversationId: s.conversationId, readers: async () => [s.b] });
+      push.message({ conversationId: s.conversationId, readers: async () => [s.b] });
+      await push.settled();
       expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
       await vi.advanceTimersByTimeAsync(RECEIPT_DELAY_MS - 1);
       expect(s.pusher.asked).toEqual([]);
@@ -649,6 +721,40 @@ describe("a message's push (ADR-055 §4)", () => {
     expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
   });
 
+  test("a quiet hour that is no hour of the day is a failure, logged by its key, and sends nothing", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const device = await s.device(s.b);
+    const cases: Array<[string, number]> = [
+      [QUIET_FROM_KEY, 24],
+      [QUIET_TO_KEY, -1],
+      [QUIET_FROM_KEY, 2.5],
+    ];
+    for (const [i, [key, value]] of cases.entries()) {
+      await withMatchingConfig(ctx.client, {
+        [QUIET_FROM_KEY]: 22,
+        [QUIET_TO_KEY]: 8,
+        [key]: value,
+      });
+      s.clock.at = new Date(T.getTime() + i * MINUTE);
+      await s.send("a", `Viesti ${i}`);
+    }
+    expect(s.pusher.sent()).toEqual([]);
+    const failed = lineOf(s.logs(), "push failed");
+    expect(failed.map((line) => [line.push, line.reason, line.level])).toEqual(
+      cases.map(() => ["message", "AppError", 50]),
+    );
+    expect(failed.map((line) => (line.err as { detail?: unknown }).detail)).toEqual(
+      cases.map(([key]) => ({ key })),
+    );
+    // Hours again: the interval was given back each time, so the next message pushes.
+    await withMatchingConfig(ctx.client, { [QUIET_FROM_KEY]: 22, [QUIET_TO_KEY]: 8 });
+    s.clock.at = new Date(T.getTime() + cases.length * MINUTE);
+    await s.send("a", "Nyt");
+    expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
+  });
+
   test("where nothing is sent, nothing is read: not the readers, not a parameter, not a token", async ({
     ctx,
   }) => {
@@ -656,15 +762,16 @@ describe("a message's push (ADR-055 §4)", () => {
     const { db, statements } = recorder(ctx.client);
     const push = createPush({ db, logger, now: () => T, online: () => false });
     let read = false;
-    await push.message({
+    push.message({
       conversationId: randomUUID(),
       readers: async () => {
         read = true;
         return [randomUUID()];
       },
     });
-    await push.match({ accountId: randomUUID(), conversationId: randomUUID() });
-    expect(await push.round([randomUUID()], 3600)).toBe(0);
+    push.match({ accountId: randomUUID() });
+    await push.settled();
+    expect(await push.round([randomUUID()])).toBe(0);
     expect(read).toBe(false);
     expect(statements).toEqual([]);
   });
@@ -680,7 +787,8 @@ describe("a message's push (ADR-055 §4)", () => {
       pusher: s.pusher,
       online: () => false,
     });
-    await push.message({ conversationId: s.conversationId, readers: async () => [] });
+    push.message({ conversationId: s.conversationId, readers: async () => [] });
+    await push.settled();
     expect(s.pusher.sent()).toEqual([]);
     // The interval's row alone: no quiet hours, switch or token for nobody.
     expect(statements).toHaveLength(1);
@@ -698,8 +806,9 @@ describe("a match's push (ADR-055 §5)", () => {
     await s.device(s.a, "en", 3);
     s.online.add(s.a);
     s.online.add(s.b);
-    await s.push.match({ accountId: s.b, conversationId: s.conversationId });
-    const data: PushData = { kind: "match", conversationId: s.conversationId };
+    expect(s.push.match({ accountId: s.b })).toBeUndefined();
+    await s.push.settled();
+    const data: PushData = { kind: "match" };
     expect(s.pusher.sent()).toStrictEqual(
       [
         [fi.token, LINES.match.fi],
@@ -708,11 +817,12 @@ describe("a match's push (ADR-055 §5)", () => {
         to,
         body,
         data,
-        collapseId: s.conversationId,
-        tag: s.conversationId,
+        collapseId: "match",
+        tag: "match",
         channelId: "default",
         priority: "high",
         sound: "default",
+        ttl: TTL_AT_T,
       })),
     );
     expect(s.schedule.tasks).toHaveLength(1);
@@ -723,30 +833,38 @@ describe("a match's push (ADR-055 §5)", () => {
   }) => {
     const s = await scene(ctx);
     const device = await s.device(s.b);
+    const match = async () => {
+      s.push.match({ accountId: s.b });
+      await s.push.settled();
+    };
     await switchOff(ctx, s.b, "match");
-    await s.push.match({ accountId: s.b, conversationId: s.conversationId });
+    await match();
     await switchOff(ctx, s.b, "match", true);
     s.clock.at = helsinki("22:00:00");
-    await s.push.match({ accountId: s.b, conversationId: s.conversationId });
+    await match();
     expect(s.pusher.sent()).toEqual([]);
     // The message's switch is not the match's.
     s.clock.at = T;
     await switchOff(ctx, s.b, "message");
-    await s.push.match({ accountId: s.b, conversationId: s.conversationId });
+    await match();
     expect(s.pusher.sent().map((m) => m.to)).toEqual([device.token]);
-    // A missing parameter is logged, never thrown.
+    // A missing parameter, or a quiet hour that is no hour, is logged, never thrown.
+    await withMatchingConfig(ctx.client, { [QUIET_FROM_KEY]: 24 });
+    expect(() => s.push.match({ accountId: s.b })).not.toThrow();
+    await s.push.settled();
     await ctx.client.query("DELETE FROM matching_config WHERE key = $1", [QUIET_TO_KEY]);
-    await expect(
-      s.push.match({ accountId: s.b, conversationId: s.conversationId }),
-    ).resolves.toBeUndefined();
+    expect(() => s.push.match({ accountId: s.b })).not.toThrow();
+    await s.push.settled();
     expect(lineOf(s.logs(), "push failed")).toEqual([
       expect.objectContaining({ push: "match", reason: "AppError" }),
+      expect.objectContaining({ push: "match", reason: "AppError" }),
     ]);
+    expect(s.pusher.sent()).toHaveLength(1);
   });
 });
 
 describe("the round's push (ADR-055 §6)", () => {
-  test("goes to each account named, worded in each device's language, until the time it is given", async ({
+  test("goes to each account named, worded in each device's language, until the quiet hours begin", async ({
     ctx,
   }) => {
     const s = await scene(ctx);
@@ -755,7 +873,7 @@ describe("the round's push (ADR-055 §6)", () => {
     const en = await s.device(s.b, "en", 3);
     // The round reads no socket: whom its job names is told.
     s.online.add(s.a);
-    expect(await s.push.round([s.a, s.b], 3600)).toBe(3);
+    expect(await s.push.round([s.a, s.b])).toBe(3);
     const sent = s.pusher.sent();
     // By account, then by when each device registered; the accounts' order is their ids'.
     expect(new Set(sent.map((m) => `${m.to} ${m.body}`))).toEqual(
@@ -776,7 +894,7 @@ describe("the round's push (ADR-055 §6)", () => {
         channelId: "default",
         priority: "normal",
         sound: "default",
-        ttl: 3600,
+        ttl: TTL_AT_T,
       });
     }
   });
@@ -793,13 +911,13 @@ describe("the round's push (ADR-055 §6)", () => {
       message.to === gone.token
         ? { status: "error", error: "DeviceNotRegistered" }
         : { status: "ok", id: "ticket-round" };
-    expect(await s.push.round([s.a, s.b], 60)).toBe(1);
+    expect(await s.push.round([s.a, s.b])).toBe(1);
     expect(s.pusher.sent().map((m) => m.to)).toEqual([gone.token, kept.token]);
     expect(await tokensLeft(ctx.client, [s.a, s.b])).toEqual([a.token, kept.token]);
     // Nobody, or the quiet hours: nothing is sent.
-    expect(await s.push.round([], 60)).toBe(0);
+    expect(await s.push.round([])).toBe(0);
     s.clock.at = helsinki("23:00:00");
-    expect(await s.push.round([s.b], 60)).toBe(0);
+    expect(await s.push.round([s.b])).toBe(0);
     expect(s.pusher.batches).toHaveLength(1);
   });
 
@@ -820,8 +938,10 @@ describe("the round's push (ADR-055 §6)", () => {
       s.pusher.failure =
         s.pusher.batches.length === 2 ? new PushFailed("TOO_MANY_REQUESTS", 429) : undefined;
     };
-    expect(await s.push.round([s.b], 60)).toBe(99);
+    expect(await s.push.round([s.b])).toBe(99);
     expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 50]);
+    // Spaced to Expo's rate: one pause, between the two requests.
+    expect(s.pauses).toEqual([{ ms: REQUEST_SPACING_MS, after: 1 }]);
     expect(lineOf(s.logs(), "push not sent")).toEqual([
       expect.objectContaining({
         push: "round",
@@ -848,12 +968,216 @@ describe("the round's push (ADR-055 §6)", () => {
     const s = await scene(ctx);
     await s.device(s.b);
     s.pusher.failure = new PushFailed("TOO_MANY_REQUESTS", 429);
-    expect(await s.push.round([s.b], 60)).toBe(0);
+    expect(await s.push.round([s.b])).toBe(0);
     expect(lineOf(s.logs(), "push not sent")).toEqual([
       expect.objectContaining({ push: "round", reason: "TOO_MANY_REQUESTS", status: 429 }),
     ]);
+    // A quiet hour that is no hour of the day, then none at all: the run fails, naming it.
+    await withMatchingConfig(ctx.client, { [QUIET_TO_KEY]: 24 });
+    await expect(s.push.round([s.b])).rejects.toThrow(
+      "matching_config push_quiet_to_hour is not an hour",
+    );
     await ctx.client.query("DELETE FROM matching_config WHERE key = $1", [QUIET_FROM_KEY]);
-    await expect(s.push.round([s.b], 60)).rejects.toThrow(/push_quiet_from_hour/);
+    await expect(s.push.round([s.b])).rejects.toThrow(/push_quiet_from_hour/);
+    expect(s.pusher.batches).toHaveLength(1);
+    expect(lineOf(s.logs(), "push failed")).toEqual([]);
+  });
+
+  test("spaces its requests to Expo's rate: a pause between two requests, never before the first", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    // A hundred devices are one request, with no pause.
+    for (let i = 0; i < 100; i += 1) await s.device(s.a, "en", i % 60);
+    expect(await s.push.round([s.a])).toBe(100);
+    expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100]);
+    expect(s.pauses).toEqual([]);
+    // Two hundred and one are three, with a pause before each after the first,
+    // and a request waits for its pause.
+    for (let i = 0; i < 201; i += 1) await s.device(s.b, "en", i % 60);
+    const holding = gate();
+    const reached = gate();
+    s.control.pause = async () => {
+      s.control.pause = undefined;
+      reached.open();
+      await holding.promise;
+    };
+    const round = s.push.round([s.b]);
+    await reached.promise;
+    expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 100]);
+    holding.open();
+    expect(await round).toBe(201);
+    expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 100, 100, 1]);
+    expect(s.pauses).toEqual([
+      { ms: REQUEST_SPACING_MS, after: 2 },
+      { ms: REQUEST_SPACING_MS, after: 3 },
+    ]);
+    expect(REQUEST_SPACING_MS).toBe(200);
+  });
+
+  test("without a pause handed in, waits on the process's own timer between requests", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    for (let i = 0; i < 101; i += 1) await s.device(s.b, "en", i % 60);
+    const { logger } = await captureLogger();
+    const first = gate();
+    s.pusher.reached = first.open;
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const push = createPush({
+        db: ctx.client,
+        logger,
+        now: () => T,
+        pusher: s.pusher,
+        online: () => false,
+        schedule: s.schedule.schedule,
+      });
+      const round = push.round([s.b]);
+      await first.promise;
+      await vi.advanceTimersByTimeAsync(REQUEST_SPACING_MS - 1);
+      expect(s.pusher.batches).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await round).toBe(101);
+      expect(s.pusher.batches.map((batch) => batch.length)).toEqual([100, 1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("a request refused for tokens of more than one Expo project (ADR-055 §8)", () => {
+  test("keeps the project most tokens are of, forgets the others' tokens, and sends the rest once more", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const devices: Array<{ token: string }> = [];
+    for (let i = 0; i < 6; i += 1) devices.push(await s.device(s.b, "en", i));
+    const [t1, t2, t3, t4, t5, t6] = devices.map((device) => device.token);
+    if (!t1 || !t2 || !t3 || !t4 || !t5 || !t6) throw new Error("no devices");
+    // Three projects: ours has three of the tokens, the other two the rest.
+    const strays = [t2, t4, t6];
+    const mixed = new PushFailed(MIXED_PROJECTS, 400, [[t2], [t1, t3, t5], [t4, t6]]);
+    s.pusher.reached = () => {
+      const batch = s.pusher.batches.at(-1) ?? [];
+      s.pusher.failure = batch.some((m) => strays.includes(m.to)) ? mixed : undefined;
+    };
+    expect(await s.push.round([s.b])).toBe(3);
+    expect(s.pusher.batches.map((batch) => batch.map((m) => m.to))).toEqual([
+      [t1, t2, t3, t4, t5, t6],
+      [t1, t3, t5],
+    ]);
+    // The others' tokens are gone; ours are kept, and wait for their receipts.
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([t1, t3, t5]);
+    expect(s.schedule.tasks).toHaveLength(1);
+    await s.schedule.runAll();
+    expect(s.pusher.asked.flat()).toHaveLength(3);
+    const lines = s.logs();
+    expect(lineOf(lines, "push tokens of another project gone")).toEqual([
+      expect.objectContaining({ push: "round", strays: 3, level: 40 }),
+    ]);
+    expect(lineOf(lines, "push not sent")).toEqual([]);
+    expectNoToken(lines, [t1, t2, t3, t4, t5, t6]);
+    // The next push goes in one request.
+    s.clock.at = new Date(T.getTime() + MINUTE);
+    await s.send("a", "Taas");
+    expect(s.pusher.batches.at(-1)?.map((m) => m.to)).toEqual([t1, t3, t5]);
+  });
+
+  test("one where every token is of one project after all is the request's refusal: logged as not sent, nothing forgotten", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const first = await s.device(s.b, "en", 1);
+    const second = await s.device(s.b, "en", 2);
+    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, [[first.token, second.token]]);
+    expect(await s.push.round([s.b])).toBe(0);
+    expect(s.pusher.batches).toHaveLength(1);
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
+    const lines = s.logs();
+    expect(lineOf(lines, "push not sent")).toEqual([
+      expect.objectContaining({ push: "round", reason: MIXED_PROJECTS, status: 400, pushes: 2 }),
+    ]);
+    expect(lineOf(lines, "push tokens of another project gone")).toEqual([]);
+    // Without the projects it names, the refusal is any other: nothing forgotten either.
+    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400);
+    expect(await s.push.round([s.b])).toBe(0);
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
+    expect(lineOf(s.logs(), "push not sent")).toHaveLength(2);
+    expectNoToken(s.logs(), [first.token, second.token]);
+  });
+
+  test("forgets only the tokens Expo named in another project: one it named nowhere is kept and sent again", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const ours = await s.device(s.b, "en", 1);
+    const stray = await s.device(s.b, "en", 2);
+    const unnamed = await s.device(s.b, "en", 3);
+    // Expo names two projects, and not the third token at all.
+    const mixed = new PushFailed(MIXED_PROJECTS, 400, [
+      [ours.token, "ExponentPushToken[elsewhere]"],
+      [stray.token],
+    ]);
+    s.pusher.reached = () => {
+      const batch = s.pusher.batches.at(-1) ?? [];
+      s.pusher.failure = batch.some((m) => m.to === stray.token) ? mixed : undefined;
+    };
+    expect(await s.push.round([s.b])).toBe(2);
+    expect(
+      s.pusher.batches
+        .at(-1)
+        ?.map((m) => m.to)
+        .sort(),
+    ).toEqual([ours.token, unnamed.token].sort());
+    expect((await tokensLeft(ctx.client, [s.b])).sort()).toEqual(
+      [ours.token, unnamed.token].sort(),
+    );
+    expect(lineOf(s.logs(), "push tokens of another project gone")).toEqual([
+      expect.objectContaining({ strays: 1 }),
+    ]);
+  });
+
+  test("groups that name none of the request's tokens forget nothing: the refusal is logged as not sent", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const first = await s.device(s.b, "en", 1);
+    const second = await s.device(s.b, "en", 2);
+    s.pusher.failure = new PushFailed(MIXED_PROJECTS, 400, [
+      ["ExponentPushToken[one]"],
+      ["ExponentPushToken[two]"],
+    ]);
+    expect(await s.push.round([s.b])).toBe(0);
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([first.token, second.token]);
+    expect(lineOf(s.logs(), "push not sent")).toEqual([
+      expect.objectContaining({ reason: MIXED_PROJECTS, pushes: 2 }),
+    ]);
+    expect(lineOf(s.logs(), "push tokens of another project gone")).toEqual([]);
+  });
+
+  test("a resend that is refused too loses its own pushes, and the others' tokens stay forgotten", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    const ours = await s.device(s.b, "en", 1);
+    const theirs = await s.device(s.b, "en", 2);
+    const alsoOurs = await s.device(s.b, "en", 3);
+    s.pusher.reached = () => {
+      s.pusher.failure =
+        s.pusher.batches.length === 1
+          ? new PushFailed(MIXED_PROJECTS, 400, [[ours.token, alsoOurs.token], [theirs.token]])
+          : new PushFailed("TOO_MANY_REQUESTS", 429);
+    };
+    s.push.match({ accountId: s.b });
+    await s.push.settled();
+    expect(s.pusher.batches).toHaveLength(2);
+    expect(await tokensLeft(ctx.client, [s.b])).toEqual([ours.token, alsoOurs.token]);
+    expect(lineOf(s.logs(), "push not sent")).toEqual([
+      expect.objectContaining({ push: "match", reason: "TOO_MANY_REQUESTS", status: 429 }),
+    ]);
+    expect(lineOf(s.logs(), "push failed")).toEqual([]);
+    expect(s.schedule.tasks).toEqual([]);
   });
 });
 
@@ -863,8 +1187,9 @@ describe("the quiet hours and the switches, for every kind", () => {
     const device = await s.device(s.b);
     const everyKind = async () => {
       await s.send("a", `Viesti ${s.clock.at.toISOString()}`);
-      await s.push.match({ accountId: s.b, conversationId: s.conversationId });
-      await s.push.round([s.b], 60);
+      s.push.match({ accountId: s.b });
+      await s.push.settled();
+      await s.push.round([s.b]);
     };
     // 22:00, 03:00 and 07:59:59 in Helsinki, each after the interval had passed.
     for (const at of [helsinki("22:00:00"), helsinki("03:00:00"), helsinki("07:59:59")]) {
@@ -896,8 +1221,9 @@ describe("the quiet hours and the switches, for every kind", () => {
     const everyKind = async (minute: number) => {
       s.clock.at = new Date(T.getTime() + minute * 10 * MINUTE);
       await s.send("a", `Viesti ${minute}`);
-      await s.push.match({ accountId: s.b, conversationId: s.conversationId });
-      await s.push.round([s.b], 60);
+      s.push.match({ accountId: s.b });
+      await s.push.settled();
+      await s.push.round([s.b]);
     };
     const kinds: Array<PushData["kind"]> = ["message", "match", "round"];
     for (const [i, off] of kinds.entries()) {
@@ -918,15 +1244,69 @@ describe("the quiet hours and the switches, for every kind", () => {
   });
 });
 
+describe("how long a push waits for its phone (ADR-055 §7)", () => {
+  test("until the quiet hours begin or the Finnish day ends, whichever is sooner, for every kind, across a change of clocks", async ({
+    ctx,
+  }) => {
+    const s = await scene(ctx);
+    await s.device(s.b);
+    // Every message pushes, so the times can follow each other closely.
+    await withMatchingConfig(ctx.client, { [MESSAGE_PUSH_INTERVAL_KEY]: 0 });
+    const cases: Array<[string, [number, number], number]> = [
+      // 12:00 in summer time, quiet from 22: ten hours, though midnight is twelve away.
+      ["2026-10-16T09:00:00.000Z", [22, 8], 10 * 3600],
+      // 21:59:59: a second.
+      ["2026-10-16T18:59:59.000Z", [22, 8], 1],
+      // 23:00, quiet from 01:00: midnight comes first, an hour away.
+      ["2026-10-16T20:00:00.000Z", [1, 5], 3600],
+      // 00:30, quiet from 01:00: half an hour, though the day has 23 and a half left.
+      ["2026-10-16T21:30:00.000Z", [1, 5], 1800],
+      // Equal hours are no quiet hours: midnight alone, twelve hours from noon.
+      ["2026-10-17T09:00:00.000Z", [7, 7], 12 * 3600],
+      // 00:30 on 25 October, the day summer time ends: its 25 hours, less the half hour gone.
+      ["2026-10-24T21:30:00.000Z", [7, 7], 24 * 3600 + 1800],
+      // 02:00 that day, quiet from 05:00: four hours, the clocks going back between.
+      ["2026-10-24T23:00:00.000Z", [5, 6], 4 * 3600],
+      // 12:00 in winter time.
+      ["2026-12-01T10:00:00.000Z", [22, 8], 10 * 3600],
+      // 00:30 on 28 March 2027, the day summer time begins: its 23 hours, less the half hour.
+      ["2027-03-27T22:30:00.000Z", [7, 7], 22 * 3600 + 1800],
+      // 01:00 that day, quiet from 22: twenty hours, the clocks going forward between.
+      ["2027-03-27T23:00:00.000Z", [22, 0], 20 * 3600],
+    ];
+    for (const [at, [from, to], ttl] of cases) {
+      await withMatchingConfig(ctx.client, { [QUIET_FROM_KEY]: from, [QUIET_TO_KEY]: to });
+      s.clock.at = new Date(at);
+      const before = s.pusher.sent().length;
+      await s.send("a", `Viesti ${at}`);
+      s.push.match({ accountId: s.b });
+      await s.push.settled();
+      await s.push.round([s.b]);
+      expect(
+        s.pusher
+          .sent()
+          .slice(before)
+          .map((m) => [m.data.kind, m.ttl]),
+        at,
+      ).toEqual([
+        ["message", ttl],
+        ["match", ttl],
+        ["round", ttl],
+      ]);
+    }
+  });
+});
+
 describe("the payload rule (ADR-055 §1)", () => {
   const conversationId = "0b8f6a52-2c4d-4e1f-9a3b-7c5d6e8f9a0b";
   const accountId = "5d2e8c1a-7b3f-4a6e-9d0c-1e2f3a4b5c6d";
   const sessionId = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
-  const clean = messagePush("ExponentPushToken[payload-rule]", LINES.message.fi, conversationId);
+  const clean = messagePush("ExponentPushToken[payload-rule]", LINES.message.fi);
   const withheld: Withheld = {
     texts: ["Moi, nähdäänkö huomenna?"],
     names: ["Ilmatar"],
     ids: [accountId, sessionId],
+    conversations: [conversationId],
   };
 
   it("passes a push that says only that there is something", () => {
@@ -936,14 +1316,10 @@ describe("the payload rule (ADR-055 §1)", () => {
         expect(payloadBreaches({ ...clean, body }, withheld)).toEqual([]);
       }
     }
-    const round: PushMessage = {
-      ...clean,
-      data: { kind: "round" },
-      collapseId: "round",
-      tag: "round",
-      ttl: 60,
-    };
-    expect(payloadBreaches(round, withheld)).toEqual([]);
+    for (const kind of ["match", "round"] as const) {
+      const other: PushMessage = { ...clean, data: { kind }, collapseId: kind, tag: kind, ttl: 60 };
+      expect(payloadBreaches(other, withheld)).toEqual([]);
+    }
   });
 
   it.each<[string, PushMessage, string]>([
@@ -964,9 +1340,19 @@ describe("the payload rule (ADR-055 §1)", () => {
       "id",
     ],
     [
-      "an account's id where the conversation should be",
-      { ...clean, data: { kind: "match", conversationId: accountId } },
+      "an account's id where a conversation was once named",
+      { ...clean, data: { kind: "match", conversationId: accountId } as unknown as PushData },
       "id",
+    ],
+    [
+      "the conversation's id in the data",
+      { ...clean, data: { kind: "message", conversationId } as unknown as PushData },
+      "conversation",
+    ],
+    [
+      "the conversation's id as the collapse id and Android's tag",
+      { ...clean, collapseId: conversationId, tag: conversationId.toUpperCase() },
+      "conversation",
     ],
     ["a session's id as the collapse id", { ...clean, collapseId: sessionId }, "id"],
     ["a session's id as Android's tag", { ...clean, tag: sessionId.toUpperCase() }, "id"],

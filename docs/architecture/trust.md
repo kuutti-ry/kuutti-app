@@ -7,6 +7,8 @@ apps/api/src/identity/oidc-broker.ts
 apps/api/src/identity/sessions.ts
 apps/api/src/lib/auth-middleware.ts
 apps/api/src/lib/push.ts
+apps/api/src/notifications/push.ts
+apps/api/src/notifications/tokens.ts
 apps/api/src/lib/ssm.ts
 apps/api/src/lib/cors.ts
 apps/api/src/lib/sentry.ts
@@ -121,7 +123,7 @@ flowchart TB
     b26["The admin panel at its own origin: the one browser origin CORS answers on staging"]
     b27["The researcher: a read-only role on research/, every read in a CloudTrail trail"]
     b28["Sentry: unhandled errors, with request data and variables stripped"]
-    b29["Expo's push service, then Apple's APNs or Google's FCM: a device's token, one line of the app's words, a kind and a conversation's id"]
+    b29["Expo's push service, then Apple's APNs or Google's FCM: a device's token, one line of the app's words and its kind"]
   end
   b15 -->|"requests, uploads and signed photo URLs, over TLS"| b16
   b16 -->|"HTTPS to the box, viewer headers forwarded"| b17
@@ -161,7 +163,7 @@ flowchart TB
 26. **The admin panel** runs in a browser at its own origin, the only origin staging's CORS allowlist names (rule 8, ADR-025 §10). It calls the API with an eight-hour staff token, and every view of a photo and every decision writes an audit row first (ADR-006 §6). A pull request's preview API answers its own web origin as well, and no other.
 27. **The researcher** reaches `research/` through a role that may list and read there and nothing else, assumed through the Identity Center permission set `KuuttiResearchStaging` (the trust's wildcard suffix would also admit a set named `KuuttiResearchStaging_<anything>`, and only the maintainer creates sets); a CloudTrail trail logs every object call under `research/` into a bucket neither role can read (ADR-029 §10, §11).
 28. **Sentry** receives unhandled errors only, with the request's body, headers, cookies and query, local variables and extra data stripped before sending, and no tracing.
-29. **Expo's push service** (#102, ADR-055) receives, per push, the device's Expo token, one line of the app's own words in the device's language and what it is about (its kind and, for a message or a match, the conversation's id), never a message's text, a name, an account or a profile's field, and hands it to Apple's APNs or Google's FCM, which wake the phone. The tokens are `push_token` rows, one per session, deleted the moment the session is revoked or deleted and at erasure; the export names which sessions have one, never the token. The API sends where the parameter `push` says `expo`; once EAS's enhanced push security is on, only with the access token from SSM. What Expo receives and keeps: `docs/vendors/expo.md`.
+29. **Expo's push service** (#102, ADR-055) receives, per push, the device's Expo token, one line of the app's own words in the device's language and its kind, never a message's text, a name, an account, a profile's field or the conversation, whose id both phones would share, and hands it to Apple's APNs or Google's FCM, which wake the phone. The tokens are `push_token` rows, one per session, deleted the moment the session is revoked or deleted and at erasure; the export names which sessions have one, never the token. The API sends where the parameter `push` says `expo`; once EAS's enhanced push security is on, only with the access token from SSM. What Expo receives and keeps: `docs/vendors/expo.md`.
 
 ## Where it lives
 

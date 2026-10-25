@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { captureLogger } from "../test/harness.ts";
+import { serializeError } from "./logger.ts";
 import {
   expoPusher,
   logPusher,
+  MIXED_PROJECTS,
   PUSHES_PER_REQUEST,
   PushFailed,
   type PushMessage,
@@ -15,19 +17,19 @@ import {
 
 const SEND = "https://exp.host/--/api/v2/push/send";
 const RECEIPTS = "https://exp.host/--/api/v2/push/getReceipts";
-const CONVERSATION = "6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b";
 
-/** The nth device's push, as notifications/push.ts words a message's. */
+/** The nth device's push, as notifications/push.ts words a message's: its kind alone. */
 function pushTo(n: number): PushMessage {
   return {
     to: `ExponentPushToken[lib-push-device-${n}]`,
     body: "You have a new message",
-    data: { kind: "message", conversationId: CONVERSATION },
-    collapseId: CONVERSATION,
-    tag: CONVERSATION,
+    data: { kind: "message" },
+    collapseId: "message",
+    tag: "message",
     channelId: "default",
     priority: "high",
     sound: "default",
+    ttl: 3600,
   };
 }
 const pushes = (count: number) => Array.from({ length: count }, (_, i) => pushTo(i + 1));
@@ -215,14 +217,20 @@ describe("Expo's push service (ADR-055 §8)", () => {
         json(200, {
           errors: [
             {
-              code: "PUSH_TOO_MANY_EXPERIENCE_IDS",
-              message: `Tokens of several projects: ${(call.body as PushMessage[])[0]?.to}`,
-              details: { "@kuutti/other": [(call.body as PushMessage[])[0]?.to] },
+              code: "PUSH_TOO_MANY_NOTIFICATIONS",
+              message: `Too many for ${(call.body as PushMessage[])[0]?.to}`,
+              details: { "@kuutti/other": [(call.body as PushMessage[])[0]?.to ?? ""] },
             },
           ],
         }),
-      "PUSH_TOO_MANY_EXPERIENCE_IDS",
+      "PUSH_TOO_MANY_NOTIFICATIONS",
       200,
+    ],
+    [
+      "tokens of several projects, with no details to say which",
+      () => json(400, { errors: [{ code: MIXED_PROJECTS, message: "Separate them by project." }] }),
+      MIXED_PROJECTS,
+      400,
     ],
     [
       "a fetch that throws",
@@ -251,12 +259,77 @@ describe("Expo's push service (ADR-055 §8)", () => {
       expect(failure.status).toBe(status);
       expect(failure.message).toBe(`push not sent: ${reason}`);
       expect(failure.cause).toBeUndefined();
+      // Only a refusal for several projects that names them carries tokens.
+      expect(failure.byProject).toBeUndefined();
       expectNoToken(
         failure,
         sent.map((message) => message.to),
       );
     },
   );
+
+  it("a request refused for tokens of several projects carries each project's tokens as a property, and nothing it prints names one", async () => {
+    const sent = pushes(3);
+    const [first, second, third] = sent.map((message) => message.to);
+    const { fetchImpl } = fakeFetch(() =>
+      json(400, {
+        errors: [
+          {
+            code: MIXED_PROJECTS,
+            message: `All push notification messages in the same request must be for the same project: ${second}`,
+            details: { "@kuutti-ry/kuutti": [first, third], "@someone/else": [second] },
+            isTransient: false,
+          },
+        ],
+      }),
+    );
+    const failure = await failureOf(expoPusher(fetchImpl).send(sent));
+    expect([failure.reason, failure.status]).toEqual([MIXED_PROJECTS, 400]);
+    expect(MIXED_PROJECTS).toBe("PUSH_TOO_MANY_EXPERIENCE_IDS");
+    // In Expo's order of the projects, for the sender to keep its own.
+    expect(failure.byProject).toEqual([[first, third], [second]]);
+    const printed = [failure.message, String(failure), failure.stack ?? "", failure.reason].join(
+      "\n",
+    );
+    expect(printed).not.toMatch(/Expo(nent)?PushToken|lib-push-device/);
+    // The tokens are no field JSON or the logger's error serializer would write.
+    expect(Object.keys(failure)).not.toContain("byProject");
+    expect(JSON.stringify(failure)).not.toMatch(/lib-push-device/);
+    expect(JSON.stringify(serializeError(failure))).not.toMatch(/lib-push-device/);
+  });
+
+  it("a mixed-projects refusal whose details are of another shape keeps its code and names no tokens", async () => {
+    const sent = pushes(2);
+    for (const details of [["a list"], { "@someone/else": "not a list" }, "words", null]) {
+      const { fetchImpl } = fakeFetch(() =>
+        json(400, { errors: [{ code: MIXED_PROJECTS, message: "mixed", details }] }),
+      );
+      const failure = await failureOf(expoPusher(fetchImpl).send(sent));
+      expect([failure.reason, failure.status, failure.byProject], JSON.stringify(details)).toEqual([
+        MIXED_PROJECTS,
+        400,
+        undefined,
+      ]);
+    }
+  });
+
+  it("a refusal of another code keeps no tokens, whatever its details", async () => {
+    const sent = pushes(1);
+    const { fetchImpl } = fakeFetch(() =>
+      json(400, {
+        errors: [
+          {
+            code: "PUSH_TOO_MANY_NOTIFICATIONS",
+            details: { "@kuutti-ry/kuutti": [sent[0]?.to ?? ""] },
+          },
+        ],
+      }),
+    );
+    const failure = await failureOf(expoPusher(fetchImpl).send(sent));
+    expect(failure.reason).toBe("PUSH_TOO_MANY_NOTIFICATIONS");
+    expect(failure.byProject).toBeUndefined();
+    expectNoToken(failure, [sent[0]?.to ?? ""]);
+  });
 
   it("cuts a request Expo does not answer within its time, as a timeout", async () => {
     // A fetch that answers only when its signal says the time is up.
@@ -347,7 +420,9 @@ describe("the development log of pushes (ADR-055 §8)", () => {
       {
         ...pushTo(2),
         body: "Sinulle on uusi mätsi",
-        data: { kind: "match", conversationId: CONVERSATION },
+        data: { kind: "match" },
+        collapseId: "match",
+        tag: "match",
       },
       {
         ...pushTo(3),
@@ -355,7 +430,7 @@ describe("the development log of pushes (ADR-055 §8)", () => {
         data: { kind: "round" },
         collapseId: "round",
         tag: "round",
-        ttl: 60,
+        priority: "normal",
       },
     ];
     const tickets = await logPusher(logger).send(sent);
@@ -371,7 +446,6 @@ describe("the development log of pushes (ADR-055 §8)", () => {
       expect(raw).not.toContain(message.to);
       expect(raw).not.toContain(message.body);
     }
-    expect(raw).not.toContain(CONVERSATION);
     expect((await logPusher(logger).receipts(["log-0", "log-1"])).size).toBe(0);
   });
 });

@@ -1,11 +1,12 @@
 import type { Queryable } from "@kuutti/db";
 import type { PlainMessageKey } from "@kuutti/i18n";
 import type { NotificationKind, PushData } from "@kuutti/schema";
-import { finnishHour } from "../lib/finnish-day.ts";
+import { finnishHour, msUntilFinnishHour } from "../lib/finnish-day.ts";
 import { tFor } from "../lib/i18n.ts";
 import type { Logger } from "../lib/logger.ts";
-import { matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
+import { asHour, matchingConfigNumber, matchingConfigNumbers } from "../lib/matching-config.ts";
 import {
+  MIXED_PROJECTS,
   PUSHES_PER_REQUEST,
   type Pusher,
   PushFailed,
@@ -17,8 +18,9 @@ import {
 // whom. Each sender reads, fresh: the person's switch for its kind (ADR-032),
 // the quiet hours, and the tokens of the person's live sessions. A push's one
 // line is the app's own words in the device's language; its data names the
-// kind and, for a message or a match, the conversation. Nothing here reaches
-// a log line but kinds, counts, error codes and the account a line is about.
+// kind alone, never the conversation, whose id both people's phones would
+// share. Nothing here reaches a log line but kinds, counts, error codes and
+// the account a line is about.
 
 export const MESSAGE_PUSH_INTERVAL_KEY = "message_push_min_interval_minutes";
 export const QUIET_FROM_KEY = "push_quiet_from_hour";
@@ -26,6 +28,12 @@ export const QUIET_TO_KEY = "push_quiet_to_hour";
 
 /** The receipts are read once, this long after the send (Expo's advice; ADR-055 §8). */
 export const RECEIPT_DELAY_MS = 15 * 60 * 1000;
+
+/**
+ * The least time between two requests of one delivery: Expo takes at most
+ * 600 pushes a second for a project, and a request is a hundred (ADR-055 §8).
+ */
+export const REQUEST_SPACING_MS = 200;
 
 /** What a push of each kind says, in the app's words. */
 const LINES: Record<PushData["kind"], PlainMessageKey> = {
@@ -44,6 +52,11 @@ const realSchedule: Schedule = (ms, task) => {
   setTimeout(() => void task(), ms).unref();
 };
 
+const realPause = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms).unref();
+  });
+
 export type PushDeps = {
   db: Queryable;
   logger: Logger;
@@ -53,6 +66,8 @@ export type PushDeps = {
   /** Whether the account has a live socket now (#349): the chat's registry. */
   online: (accountId: string) => boolean;
   schedule?: Schedule;
+  /** Waits between two requests of one delivery; tests hand in one that does not. */
+  pause?: (ms: number) => Promise<void>;
 };
 
 type Token = { id: string; accountId: string; token: string; locale: string };
@@ -64,18 +79,36 @@ export function inQuietHours(hour: number, from: number, to: number): boolean {
 }
 
 /**
- * The pushes of one process: the message's interval kept in its memory
- * (`shortcut:` a restart forgets it, ADR-055 §4) and the receipts it waits
- * for on its timers. One per app, as the chat's live registry is.
+ * The pushes of one process, one per app as the chat's live registry is.
+ * A message's and a match's push run after the answer that caused them, so
+ * how long an answer takes says nothing about whether anybody was pushed: a
+ * shadow ban, a switch or a phone (ADR-055 §4, §5). `settled` waits for what
+ * is in flight.
  */
 export function createPush(deps: PushDeps) {
   const schedule = deps.schedule ?? realSchedule;
-  /** When a conversation last pushed to its recipient, by `account:conversation`, in ms. */
+  const pause = deps.pause ?? realPause;
+  // shortcut: the interval lives in this process's memory, so a restart forgets
+  // it and the first message after one may push again early (ADR-055 §4); a
+  // column on push_token for the last push of each conversation would lift it.
   const lastPushed = new Map<string, number>();
+  const inFlight = new Set<Promise<void>>();
 
-  async function quietNow(at: Date): Promise<boolean> {
+  /**
+   * Whether now is in the quiet hours, and how long a push sent now may wait
+   * for its phone: until the quiet hours begin, and at most to the end of the
+   * Finnish day, so a phone that comes back later is not told late (§7).
+   */
+  async function timing(at: Date): Promise<{ quiet: boolean; ttl: number }> {
     const hours = await matchingConfigNumbers(deps.db, [QUIET_FROM_KEY, QUIET_TO_KEY]);
-    return inQuietHours(finnishHour(at), hours[QUIET_FROM_KEY], hours[QUIET_TO_KEY]);
+    const from = asHour(QUIET_FROM_KEY, hours[QUIET_FROM_KEY]);
+    const to = asHour(QUIET_TO_KEY, hours[QUIET_TO_KEY]);
+    const untilMidnight = msUntilFinnishHour(at, 0);
+    const untilQuiet = from === to ? untilMidnight : msUntilFinnishHour(at, from);
+    return {
+      quiet: inQuietHours(finnishHour(at), from, to),
+      ttl: Math.max(1, Math.floor(Math.min(untilMidnight, untilQuiet) / 1000)),
+    };
   }
 
   /** The accounts among `accountIds` whose switch for `kind` is on: no row means on (ADR-032 §1). */
@@ -136,6 +169,9 @@ export function createPush(deps: PushDeps) {
     kind: PushData["kind"],
   ) {
     if (taken.length === 0) return;
+    // shortcut: the receipts wait on a timer in this process's memory, so a
+    // restart within the fifteen minutes never reads them and a dead token
+    // stays until its next refusal; a table of tickets would lift it.
     schedule(RECEIPT_DELAY_MS, async () => {
       try {
         const receipts = await pusher.receipts(taken.map(({ id }) => id));
@@ -150,51 +186,92 @@ export function createPush(deps: PushDeps) {
   }
 
   /**
+   * One request's pushes, and what Expo said of each. A request refused for
+   * tokens of more than one Expo project (a build of another project, or a
+   * token typed in by hand) keeps the project most of them are of, forgets
+   * the others' tokens, and is sent once more without them, so one stray
+   * token cannot cost the rest of its request every day.
+   */
+  async function sendPart(
+    pusher: Pusher,
+    part: Array<{ token: Token; message: PushMessage }>,
+    kind: PushData["kind"],
+  ): Promise<Array<{ token: Token; ticket: PushTicket }>> {
+    try {
+      const tickets = await pusher.send(part.map(({ message }) => message));
+      return part.map(({ token }, i) => ({
+        token,
+        ticket: tickets[i] ?? { status: "error", error: null },
+      }));
+    } catch (error) {
+      const groups = error instanceof PushFailed ? error.byProject : undefined;
+      if (!(error instanceof PushFailed) || error.reason !== MIXED_PROJECTS || !groups) throw error;
+      // A stray is a token Expo named in a project other than the largest; a
+      // token it named nowhere is kept, never forgotten on a guess.
+      const [, ...others] = [...groups].sort((a, b) => b.length - a.length);
+      const foreign = new Set(others.flat());
+      const strays = part.filter(({ token }) => foreign.has(token.token));
+      // No stray among this request's tokens: the refusal is the request's, as any other.
+      if (strays.length === 0) throw error;
+      for (const { token } of strays) await forget(token);
+      deps.logger.warn(
+        { push: kind, strays: strays.length },
+        "push tokens of another project gone",
+      );
+      const kept = part.filter(({ token }) => !foreign.has(token.token));
+      return kept.length === 0 ? [] : sendPart(pusher, kept, kind);
+    }
+  }
+
+  /**
    * One push of `data` to every live device of `accountIds`, worded in each
    * device's language. The number of pushes Expo took; none in the quiet
-   * hours, where nothing is kept for later (Open 1). A refused request is
-   * logged and answers nought: the push is lost, and the app shows everything
-   * when it opens (Open 4).
+   * hours, where nothing is kept for later (Open 1), and none of them waits
+   * for its phone into them. A request at a time, a hundred pushes each and
+   * spaced to Expo's rate, so a request refused loses only its own pushes and
+   * the tickets of those before it are read; a refusal is logged and nothing
+   * is retried (Open 4).
    */
   async function deliver(
     accountIds: string[],
     data: PushData,
-    options: { collapse: string; priority: PushMessage["priority"]; ttl?: number },
+    priority: PushMessage["priority"],
   ): Promise<number> {
     const { pusher } = deps;
     if (!pusher || accountIds.length === 0) return 0;
     const at = deps.now();
-    if (await quietNow(at)) return 0;
+    const { quiet, ttl } = await timing(at);
+    if (quiet) return 0;
     const kind = data.kind;
     const tokens = await tokensOf(await switchedOn(kind, accountIds), at);
     if (tokens.length === 0) return 0;
-    const messages: PushMessage[] = tokens.map((token) => ({
-      to: token.token,
-      body: tFor(token.locale)(LINES[kind]),
-      data,
-      collapseId: options.collapse,
-      tag: options.collapse,
-      channelId: "default",
-      priority: options.priority,
-      sound: "default",
-      ...(options.ttl !== undefined ? { ttl: options.ttl } : {}),
+    const all = tokens.map((token) => ({
+      token,
+      message: {
+        to: token.token,
+        body: tFor(token.locale)(LINES[kind]),
+        data,
+        // A later push of the same kind replaces the earlier one on the phone.
+        collapseId: kind,
+        tag: kind,
+        channelId: "default",
+        priority,
+        sound: "default",
+        ttl,
+      } satisfies PushMessage,
     }));
-    // A request at a time, as many pushes as Expo takes in one, so a request
-    // refused loses only its own pushes, and the tickets of those sent before
-    // it are still read (the round's push can be thousands).
     const taken: Array<{ id: string; token: Token }> = [];
-    for (let from = 0; from < messages.length; from += PUSHES_PER_REQUEST) {
-      const part = tokens.slice(from, from + PUSHES_PER_REQUEST);
-      let tickets: PushTicket[];
+    for (let from = 0; from < all.length; from += PUSHES_PER_REQUEST) {
+      if (from > 0) await pause(REQUEST_SPACING_MS);
+      const part = all.slice(from, from + PUSHES_PER_REQUEST);
+      let answered: Array<{ token: Token; ticket: PushTicket }>;
       try {
-        tickets = await pusher.send(messages.slice(from, from + PUSHES_PER_REQUEST));
+        answered = await sendPart(pusher, part, kind);
       } catch (error) {
         deps.logger.warn({ ...failure(error, kind), pushes: part.length }, "push not sent");
         continue;
       }
-      for (const [i, ticket] of tickets.entries()) {
-        const token = part[i];
-        if (!token) continue;
+      for (const { token, ticket } of answered) {
         if (ticket.status === "ok") taken.push({ id: ticket.id, token });
         else await refused(token, ticket.error, kind);
       }
@@ -203,13 +280,17 @@ export function createPush(deps: PushDeps) {
     return taken.length;
   }
 
-  /** A sender's failure (a config row missing, the database gone) is logged and changes nothing for its caller. */
-  async function guarded(kind: PushData["kind"], task: () => Promise<void>): Promise<void> {
-    try {
-      await task();
-    } catch (error) {
+  /**
+   * A sender started after its caller's answer: its failure (a config row
+   * missing, the database gone) is logged, and nothing waits for it but
+   * `settled`.
+   */
+  function inTheBackground(kind: PushData["kind"], task: () => Promise<void>): void {
+    const running = task().catch((error: unknown) => {
       deps.logger.error({ ...failure(error, kind), err: error }, "push failed");
-    }
+    });
+    inFlight.add(running);
+    void running.finally(() => inFlight.delete(running));
   }
 
   return {
@@ -218,11 +299,11 @@ export function createPush(deps: PushDeps) {
      * participants other than its sender who may read it by the socket's own
      * rule (read only when something may be sent), who has no live socket
      * and was not pushed of this conversation within the interval. The
-     * interval counts from the push that went.
+     * interval counts from the push that went. Returns at once.
      */
-    message: (input: { conversationId: string; readers: () => Promise<readonly string[]> }) =>
-      guarded("message", async () => {
-        if (!deps.pusher) return;
+    message(input: { conversationId: string; readers: () => Promise<readonly string[]> }): void {
+      if (!deps.pusher) return;
+      inTheBackground("message", async () => {
         const nowMs = deps.now().getTime();
         const intervalMs =
           (await matchingConfigNumber(deps.db, MESSAGE_PUSH_INTERVAL_KEY)) * 60 * 1000;
@@ -236,46 +317,38 @@ export function createPush(deps: PushDeps) {
         for (const accountId of due) {
           // Taken before the send, so two messages at once push once; given
           // back when nothing went (the quiet hours, no device, a refusal, a
-          // failure on the way, which `guarded` logs).
+          // failure on the way, which the background logs).
           const key = `${accountId}:${input.conversationId}`;
           lastPushed.set(key, nowMs);
           let sent = 0;
           try {
-            sent = await deliver(
-              [accountId],
-              { kind: "message", conversationId: input.conversationId },
-              { collapse: input.conversationId, priority: "high" },
-            );
+            sent = await deliver([accountId], { kind: "message" }, "high");
           } finally {
             if (sent === 0) lastPushed.delete(key);
           }
         }
-      }),
+      });
+    },
 
     /**
      * A match committed (ADR-055 §5): to the person whose earlier like it met,
-     * in the app or not, since no frame tells of a new match.
+     * in the app or not, since no frame tells of a new match. Returns at once.
      */
-    match: (input: { accountId: string; conversationId: string }) =>
-      guarded("match", async () => {
-        await deliver(
-          [input.accountId],
-          { kind: "match", conversationId: input.conversationId },
-          { collapse: input.conversationId, priority: "high" },
-        );
-      }),
+    match(input: { accountId: string }): void {
+      if (!deps.pusher) return;
+      inTheBackground("match", async () => {
+        await deliver([input.accountId], { kind: "match" }, "high");
+      });
+    },
 
-    /** The day's round (ADR-055 §6), to those the job chose; it lives until the day ends. */
-    async round(accountIds: readonly string[], ttlSeconds: number): Promise<number> {
-      return deliver(
-        [...accountIds],
-        { kind: "round" },
-        {
-          collapse: "round",
-          priority: "normal",
-          ttl: ttlSeconds,
-        },
-      );
+    /** The day's round (ADR-055 §6), to those the job chose; the job waits for it and logs its failure. */
+    round(accountIds: readonly string[]): Promise<number> {
+      return deliver([...accountIds], { kind: "round" }, "normal");
+    },
+
+    /** Resolves once every push started in the background has settled: the tests, and a shutdown. */
+    async settled(): Promise<void> {
+      while (inFlight.size > 0) await Promise.all([...inFlight]);
     },
   };
 }

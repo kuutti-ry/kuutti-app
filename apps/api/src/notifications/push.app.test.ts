@@ -24,29 +24,40 @@ import { fixtureJpeg, testMediaDeps } from "../test/media.ts";
 import { people } from "../test/people.ts";
 import {
   expectNamesNothing,
+  gate,
+  heldSchedule,
   type MemoryPusher,
   memoryPusher,
   type Withheld,
 } from "../test/push.ts";
+import { createPush } from "./push.ts";
 
 // The push through the routes (#102, ADR-055 §4, §5,
 // features/notifications/push.feature): a message sent over HTTP tells its
 // reader who has no socket, by the chat's own rule of who may read it, read
-// after the send has committed; a like that makes a match tells the earlier
-// liker. The app is the real one, with a memory pusher, a live registry the
-// test puts sockets in, and a clock the test moves.
+// after the send has answered; a like that makes a match tells the earlier
+// liker. The app is the real one, handed a push over a memory pusher, a live
+// registry the test puts sockets in, a held schedule for the receipts and a
+// clock the test moves; a test waits for the push with `settled`.
 
 /** 12:00 in Helsinki, a Friday in summer time (UTC+3). */
 const T = new Date("2026-10-16T09:00:00.000Z");
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
+/** At T a push may wait ten hours for its phone: the quiet hours begin at 22:00. */
+const TTL_AT_T = 10 * 60 * 60;
 
 type Person = { accountId: string; name: string; headers: { authorization: string } };
 
 /** Every push a test's app recorded, held to the payload rule once the test is done (ADR-055 §1). */
-const recorded: Array<{ pusher: MemoryPusher; withheld: () => Promise<Withheld> }> = [];
+const recorded: Array<{
+  pusher: MemoryPusher;
+  settled: () => Promise<void>;
+  withheld: () => Promise<Withheld>;
+}> = [];
 afterEach(async () => {
-  for (const { pusher, withheld } of recorded.splice(0)) {
+  for (const { pusher, settled, withheld } of recorded.splice(0)) {
+    await settled();
     expectNamesNothing(pusher.sent(), await withheld());
   }
 });
@@ -54,34 +65,55 @@ afterEach(async () => {
 let tokens = 0;
 
 /**
- * The app with a memory pusher, a live registry, a clock and the photo
- * pipeline; the people its pushes must not name, their words and every
- * account and session id of the test.
+ * The app with a push of its own over a memory pusher, a live registry, a
+ * held schedule, a clock and the photo pipeline; the people its pushes must
+ * not name, their words, every account and session id of the test, and
+ * every conversation.
  */
 async function appWith(ctx: TestContext, options: { db?: Queryable } = {}) {
   const { logger, lines } = await captureLogger();
   const pusher = memoryPusher();
   const live: Live = createLive({ db: ctx.client, logger, socketsPerAccount: 3 });
   const clock = { at: T };
+  const schedule = heldSchedule();
+  const db = options.db ?? ctx.client;
   await withMatchingConfig(ctx.client, { message_photos_per_day: 3 });
+  // The push app.ts would make, handed in as boot hands in its own, so the test can wait for it.
+  const push = createPush({
+    db,
+    logger,
+    now: () => clock.at,
+    pusher,
+    online: (accountId) => live.online(accountId),
+    schedule: schedule.schedule,
+  });
   const app = createApp({
     config: testConfig(),
     logger,
-    db: options.db ?? ctx.client,
+    db,
     now: () => clock.at,
     pusher,
+    push,
     live,
     media: testMediaDeps().deps,
   });
   const names: string[] = [];
   const texts: string[] = [];
+  const settled = () => push.settled();
   recorded.push({
     pusher,
+    settled,
     withheld: async () => {
       const { rows } = await ctx.client.query<{ id: string }>(
         "SELECT id FROM account UNION ALL SELECT id FROM session",
       );
-      return { names, texts, ids: rows.map((row) => row.id) };
+      const conversations = await ctx.client.query<{ id: string }>("SELECT id FROM conversation");
+      return {
+        names,
+        texts,
+        ids: rows.map((row) => row.id),
+        conversations: conversations.rows.map((row) => row.id),
+      };
     },
   });
 
@@ -115,13 +147,21 @@ async function appWith(ctx: TestContext, options: { db?: Queryable } = {}) {
     return token;
   }
 
-  const send = (who: Person, id: string, body: string, clientId: string = randomUUID()) => {
+  /** A message sent through the route, answered; the push it starts may still be running. */
+  const post = (who: Person, id: string, body: string, clientId: string = randomUUID()) => {
     texts.push(body);
     return app.request(`/conversations/${id}/messages`, {
       method: "POST",
       headers: { ...who.headers, "content-type": "application/json" },
       body: JSON.stringify({ clientId, body }),
     });
+  };
+
+  /** A message sent, and the push it started settled. */
+  const send = async (who: Person, id: string, body: string, clientId: string = randomUUID()) => {
+    const answer = await post(who, id, body, clientId);
+    await settled();
+    return answer;
   };
 
   /** A phone of `who` with the app in front: a live socket in the registry. */
@@ -137,7 +177,21 @@ async function appWith(ctx: TestContext, options: { db?: Queryable } = {}) {
     return () => live.presence.remove(socket);
   }
 
-  return { app, pusher, live, clock, logs: lines, person, register, send, inTheApp, texts };
+  return {
+    app,
+    pusher,
+    live,
+    clock,
+    schedule,
+    settled,
+    logs: lines,
+    person,
+    register,
+    post,
+    send,
+    inTheApp,
+    texts,
+  };
 }
 
 /** A database that does `land` once, just before the first statement `when` picks: a request that commits there. */
@@ -203,12 +257,13 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
       {
         to: token,
         body: "Sinulle on uusi viesti",
-        data: { kind: "message", conversationId: id },
-        collapseId: id,
-        tag: id,
+        data: { kind: "message" },
+        collapseId: "message",
+        tag: "message",
         channelId: "default",
         priority: "high",
         sound: "default",
+        ttl: TTL_AT_T,
       },
     ]);
     s.clock.at = new Date(T.getTime() + 10 * MINUTE);
@@ -255,8 +310,9 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
     });
     expect(answer.status).toBe(201);
     expect(ChatMessage.parse(await answer.json()).kind).toBe("photo");
+    await s.settled();
     expect(s.pusher.sent().map((m) => [m.to, m.body, m.data])).toEqual([
-      [token, "Du har ett nytt meddelande", { kind: "message", conversationId: id }],
+      [token, "Du har ett nytt meddelande", { kind: "message" }],
     ]);
   });
 
@@ -276,23 +332,18 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
       "SELECT id FROM session WHERE account_id = ANY($1::uuid[])",
       [[a.accountId, b.accountId]],
     );
-    // What Expo, Apple and Google get past the address: the app's words and the conversation.
+    // What Expo, Apple and Google get past the address: the app's words and the kind alone.
     expect(
       expectNamesNothing(sent, {
         texts: [text, "Kauppatori"],
         names: [a.name, b.name],
         ids: [a.accountId, b.accountId, ...rows.map((row) => row.id)],
+        conversations: [id],
       }),
     ).toBe(2);
     expect(sent.map(({ to: _, ...payload }) => payload)).toEqual([
-      expect.objectContaining({
-        body: "Sinulle on uusi viesti",
-        data: { kind: "message", conversationId: id },
-      }),
-      expect.objectContaining({
-        body: "You have a new message",
-        data: { kind: "message", conversationId: id },
-      }),
+      expect.objectContaining({ body: "Sinulle on uusi viesti", data: { kind: "message" } }),
+      expect.objectContaining({ body: "You have a new message", data: { kind: "message" } }),
     ]);
     // Nor does any log line carry the text or a token.
     const raw = JSON.stringify(s.logs());
@@ -432,6 +483,9 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
     await withMatchingConfig(ctx.client, { push_quiet_from_hour: 5, push_quiet_to_hour: 5 });
     const { logger } = await captureLogger();
     const pusher = memoryPusher();
+    const reached = gate();
+    pusher.reached = reached.open;
+    // No push handed in either: the app makes its own over the pusher.
     const app = createApp({ config: testConfig(), logger, db: ctx.client, pusher });
     const answer = await app.request(`/conversations/${id}/messages`, {
       method: "POST",
@@ -439,6 +493,8 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
       body: JSON.stringify({ clientId: randomUUID(), body: "Kello on mitä on." }),
     });
     expect(answer.status).toBe(201);
+    // The app's own push cannot be waited for: its send to Expo is what is seen.
+    await reached.promise;
     expect(pusher.sent().map((m) => m.to)).toEqual([token]);
   });
 
@@ -467,6 +523,32 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
     expect(lineOf(s.logs(), "push not sent")).toHaveLength(2);
     expect(lineOf(s.logs(), "push failed")).toHaveLength(1);
   });
+
+  test("the send answers before Expo does, and the push goes once Expo answers", async ({
+    ctx,
+  }) => {
+    const s = await appWith(ctx);
+    const a = await s.person("Ilmatar");
+    const b = await s.person("Väinämöinen");
+    const token = await s.register(b);
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    const expo = gate();
+    const reached = gate();
+    s.pusher.gate = expo.promise;
+    s.pusher.reached = reached.open;
+    // Expo holds the push: the answer comes back all the same, with the message.
+    const answer = await s.post(a, id, "Ehditkö jo?");
+    expect(answer.status).toBe(201);
+    expect(ChatMessage.parse(await answer.json())).toMatchObject({ seq: 1, side: "mine" });
+    await reached.promise;
+    expect(s.pusher.sent().map((m) => m.to)).toEqual([token]);
+    // Not taken yet: nothing waits for a receipt.
+    expect(s.schedule.tasks).toEqual([]);
+    expo.open();
+    await s.settled();
+    expect(s.schedule.tasks).toHaveLength(1);
+    expect(s.pusher.batches).toHaveLength(1);
+  });
 });
 
 describe("a match's push through the routes (ADR-055 §5)", () => {
@@ -487,12 +569,23 @@ describe("a match's push through the routes (ADR-055 §5)", () => {
     return built.roundId;
   }
 
+  /** A decision through the route, answered; the push it starts may still be running. */
   const decideBy = (app: App, who: Person, position: number, decision: string) =>
     app.request(`/rounds/${TODAY}/entries/${position}/decision`, {
       method: "PUT",
       headers: { ...who.headers, "content-type": "application/json" },
       body: JSON.stringify({ decision }),
     });
+
+  /** B liked A yesterday, and today A's round shows B. */
+  async function likedYesterday(ctx: TestContext, a: Person, b: Person) {
+    const yesterday = await roundOf(ctx, b, [a], 1);
+    await ctx.client.query(
+      "UPDATE round_entries SET decision = 'like', decided_at = $2 WHERE round_id = $1",
+      [yesterday, new Date(T.getTime() - DAY)],
+    );
+    await roundOf(ctx, a, [b]);
+  }
 
   test("A match tells the one who liked first, in the app or not", async ({ ctx }) => {
     const s = await appWith(ctx);
@@ -501,33 +594,33 @@ describe("a match's push through the routes (ADR-055 §5)", () => {
     const toA = await s.register(a);
     const toB = await s.register(b, "fi");
     // B liked A yesterday; today A's round shows B, and A likes back.
-    const yesterday = await roundOf(ctx, b, [a], 1);
-    await ctx.client.query(
-      "UPDATE round_entries SET decision = 'like', decided_at = $2 WHERE round_id = $1",
-      [yesterday, new Date(T.getTime() - DAY)],
-    );
-    await roundOf(ctx, a, [b]);
+    await likedYesterday(ctx, a, b);
     // B is in the app: no frame tells of a match, so the push goes all the same.
     s.inTheApp(b);
     const answer = await decideBy(s.app, a, 1, "like");
     expect(answer.status).toBe(200);
     const match = RoundDecisionAnswer.parse(await answer.json()).match;
     if (!match) throw new Error("no match");
+    await s.settled();
+    // That there is a match, and nothing of which or whose.
     expect(s.pusher.sent()).toStrictEqual([
       {
         to: toB,
         body: "Sinulle on uusi mätsi",
-        data: { kind: "match", conversationId: match.conversationId },
-        collapseId: match.conversationId,
-        tag: match.conversationId,
+        data: { kind: "match" },
+        collapseId: "match",
+        tag: "match",
         channelId: "default",
         priority: "high",
         sound: "default",
+        ttl: TTL_AT_T,
       },
     ]);
+    expect(JSON.stringify(s.pusher.sent())).not.toContain(match.conversationId);
     expect(s.pusher.sent().map((m) => m.to)).not.toContain(toA);
     // The same like again makes nothing new, and tells nobody again.
     expect((await decideBy(s.app, a, 1, "like")).status).toBe(200);
+    await s.settled();
     expect(s.pusher.sent()).toHaveLength(1);
   });
 
@@ -546,6 +639,32 @@ describe("a match's push through the routes (ADR-055 §5)", () => {
     await roundOf(ctx, a, [b, c]);
     expect((await decideBy(s.app, a, 1, "like")).status).toBe(200);
     expect((await decideBy(s.app, a, 2, "pass")).status).toBe(200);
+    await s.settled();
     expect(s.pusher.sent()).toEqual([]);
+  });
+
+  test("the like that makes a match answers before Expo does, and the push goes once Expo answers", async ({
+    ctx,
+  }) => {
+    const s = await appWith(ctx);
+    const a = await s.person("Ilmatar");
+    const b = await s.person("Väinämöinen");
+    const toB = await s.register(b);
+    await likedYesterday(ctx, a, b);
+    const expo = gate();
+    const reached = gate();
+    s.pusher.gate = expo.promise;
+    s.pusher.reached = reached.open;
+    // Expo holds the push: the answer comes back all the same, with the match.
+    const answer = await decideBy(s.app, a, 1, "like");
+    expect(answer.status).toBe(200);
+    expect(RoundDecisionAnswer.parse(await answer.json()).match).not.toBeNull();
+    await reached.promise;
+    expect(s.pusher.sent().map((m) => m.to)).toEqual([toB]);
+    expect(s.schedule.tasks).toEqual([]);
+    expo.open();
+    await s.settled();
+    expect(s.schedule.tasks).toHaveLength(1);
+    expect(s.pusher.batches).toHaveLength(1);
   });
 });

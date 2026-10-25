@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { msUntilFinnishHour } from "../lib/finnish-day.ts";
 import { captureLogger } from "../test/harness.ts";
-import { msUntilFinnishHour, msUntilNightly, runNightly, scheduleNightly } from "./nightly.ts";
+import { msUntilNightly, runNightly, scheduleNightly } from "./nightly.ts";
 
 describe("nightly jobs", () => {
   it("waits until the next 04:00 in Helsinki", () => {

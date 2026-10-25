@@ -98,6 +98,7 @@ describe("seed", () => {
           push_quiet_from_hour: 22,
           push_quiet_to_hour: 8,
           round_push_hour: 9,
+          round_push_idle_days: 7,
           moderation_response_hours: 24,
           reports_per_day: 5,
           report_after_close_days: 30,

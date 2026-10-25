@@ -356,7 +356,7 @@ export const fi: Readonly<Record<string, string>> = {
   "notifications.kind.match.label": "Mätsit",
   "notifications.kind.message.hint": "Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti.",
   "notifications.kind.message.label": "Viestit",
-  "notifications.kind.moderation.hint": "Kuvistasi ja tekemistäsi ilmoituksista. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa.",
+  "notifications.kind.moderation.hint": "Kuvistasi ja tekemistäsi ilmoituksista. Näistä ei vielä lähetetä puhelimillesi mitään. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa.",
   "notifications.kind.moderation.label": "Moderaattorien päätökset",
   "notifications.kind.round.hint": "Kun päivän ihmiset ovat valmiina sinulle.",
   "notifications.kind.round.label": "Uusi kierros",

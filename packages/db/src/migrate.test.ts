@@ -482,7 +482,7 @@ describe("migrate", () => {
             )
           ).rows;
           // Versions 1 and 2 of the migrations before it, every one of them;
-          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082, #102) are not there yet.
+          // the keys a later migration adds (0072, #378; 0048, #303; 0052, #84; 0054, #348; 0057, #350; 0061, #351; 0065, #105; 0068, #376; 0075, #86; 0078, #385; 0080, #107; 0082 and 0083, #102) are not there yet.
           const later = new Set([
             "moderation_response_hours",
             "reports_per_day",
@@ -517,6 +517,7 @@ describe("migrate", () => {
             "push_quiet_from_hour",
             "push_quiet_to_hour",
             "round_push_hour",
+            "round_push_idle_days",
           ]);
           // A key's second version a later migration writes (0069, #95; 0070, #98) is not there yet either.
           const laterVersions = new Set(["round_size", "like_budget_balanced"]);

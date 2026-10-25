@@ -25,7 +25,7 @@ import { pusherFor } from "./lib/push.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
 import { createMediaDeps, rejectUnreviewedPhotos, sweepPendingPhotos } from "./media/index.ts";
-import { createPush } from "./notifications/index.ts";
+import { createPush, type Push } from "./notifications/index.ts";
 import {
   copiedBeforeDrop,
   ensureEventPartitions,
@@ -55,6 +55,8 @@ export type Booted = {
   pool: Pool;
   jobs: NightlyJob[];
   live: Live;
+  /** The pushes in flight, which index.ts's shutdown waits for (#102). */
+  push: Push;
   /** The round's push on its own timer, which index.ts arms (#102, ADR-055 §6). */
   roundPush: RoundPushDeps;
 };
@@ -221,8 +223,18 @@ export async function boot({
   // Push (#102, ADR-055 §8): Expo, the log locally, none where PUSH is off.
   const pusher = pusherFor(config, logger);
   logger.info({ push: config.PUSH, authenticated: Boolean(config.EXPO_ACCESS_TOKEN) }, "push");
+  // The process's one push (#102, ADR-055): the app's message and match
+  // pushes and the round's, asking the same live registry who is in the app.
+  const push = createPush({
+    db: pool,
+    logger,
+    now: () => new Date(),
+    ...(pusher ? { pusher } : {}),
+    online: (accountId) => live.online(accountId),
+  });
   const app = createApp({
     live,
+    push,
     config,
     logger,
     db: pool,
@@ -309,18 +321,6 @@ export async function boot({
     logger.error({ job: "waitlist-snapshot", err }, "first waitlist snapshot failed"),
   );
 
-  // The round's push reads no socket: everybody it tells is out of today's round.
-  const roundPush: RoundPushDeps = {
-    db: pool,
-    logger,
-    now,
-    push: createPush({
-      db: pool,
-      logger,
-      now,
-      ...(pusher ? { pusher } : {}),
-      online: () => false,
-    }),
-  };
-  return { app, pool, jobs, live, roundPush };
+  const roundPush: RoundPushDeps = { db: pool, logger, now, push };
+  return { app, pool, jobs, live, push, roundPush };
 }

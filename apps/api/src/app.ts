@@ -49,7 +49,7 @@ import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
-import { createPush, notificationRoutes } from "./notifications/index.ts";
+import { createPush, notificationRoutes, type Push } from "./notifications/index.ts";
 import { pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
 import { invitationRoutes } from "./rewards/index.ts";
@@ -90,6 +90,8 @@ export type Deps = {
   mailer?: Mailer;
   /** Push out (#102, ADR-055): Expo or the development log; absent where PUSH is off, and nothing is sent. */
   pusher?: Pusher;
+  /** The pushes (#102): boot hands in the process's one, which its shutdown waits for; absent, the app makes its own over `pusher`. */
+  push?: Push;
 };
 
 const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
@@ -254,13 +256,15 @@ export function createApp(deps: Deps) {
     });
   // The pushes (#102, ADR-055): the notifications slice decides whom to tell,
   // the chat and the round's routes only say when.
-  const push = createPush({
-    db: deps.db,
-    logger: deps.logger,
-    now: deps.now ?? (() => new Date()),
-    ...(deps.pusher ? { pusher: deps.pusher } : {}),
-    online: (accountId) => live.online(accountId),
-  });
+  const push =
+    deps.push ??
+    createPush({
+      db: deps.db,
+      logger: deps.logger,
+      now: deps.now ?? (() => new Date()),
+      ...(deps.pusher ? { pusher: deps.pusher } : {}),
+      online: (accountId) => live.online(accountId),
+    });
   // The conversations a match opens and their text messages (#348, ADR-031).
   // A conversation's first message is checked by the automatic rules (#105,
   // ADR-033): the safety slice decides, the chat only measures. Every new

@@ -348,7 +348,7 @@ export const sv: Readonly<Record<string, string>> = {
   "notifications.kind.match.label": "Matchningar",
   "notifications.kind.message.hint": "Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det.",
   "notifications.kind.message.label": "Meddelanden",
-  "notifications.kind.moderation.hint": "Om dina foton och de anmälningar du gjort. En varning till dig visas i appen vad du än väljer här.",
+  "notifications.kind.moderation.hint": "Om dina foton och de anmälningar du gjort. Inget skickas till dina telefoner om detta än. En varning till dig visas i appen vad du än väljer här.",
   "notifications.kind.moderation.label": "Moderatorernas beslut",
   "notifications.kind.round.hint": "När dagens personer är redo för dig.",
   "notifications.kind.round.label": "En ny omgång",

@@ -3034,7 +3034,7 @@ export interface paths {
         };
         /**
          * What the caller may be notified of
-         * @description Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The senders read it when they exist (#102 the message).
+         * @description Every kind (a new round, a message, a match, a moderator's decision), in that order, each on unless the person switched it off. The push reads it for the round, a message and a match; nothing is sent for a moderator's decision yet.
          */
         get: {
             parameters: {

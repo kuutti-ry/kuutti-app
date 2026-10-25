@@ -61,9 +61,9 @@ export type Matches = {
   /**
    * After a match committed: the push to the person whose earlier like it met
    * (#102, ADR-055 §5), the notifications slice's, handed in by app.ts. It
-   * changes no answer.
+   * runs after the answer and changes nothing in it, its timing included.
    */
-  made?: (input: { accountId: string; conversationId: string }) => Promise<void>;
+  made?: (input: { accountId: string }) => void;
 };
 
 /**
@@ -538,9 +538,7 @@ export async function decide(
       await track({ ...deps, now }, input.accountId, "match", { completed: true });
       await track({ ...deps, now }, decided.candidateId, "match", { completed: false });
       // The one who just liked sees the match in the answer; the other is told (ADR-055 §5).
-      if (written.match) {
-        await matches.made?.({ accountId: decided.candidateId, conversationId: written.match });
-      }
+      matches.made?.({ accountId: decided.candidateId });
     }
   }
   return { match: written.match };
@@ -549,20 +547,32 @@ export async function decide(
 /**
  * The people whose round for `day` was built and not yet opened, with a card
  * that can still be shown: whom the round's push tells (#102, ADR-055 §6).
- * An empty round has no card; one opened was read already. The owners are
- * those the builder builds for: a shadow-banned person's round is told as
- * anybody's, since a shadow ban shows its owner nothing (ADR-024 §7). Read
- * across accounts by the push's job, as the builder writes across them.
+ * An empty round has no card; one opened was read already. Nobody who opened
+ * no round in the last `idleDays` days: the push is for those who use the
+ * app, and somebody who never opened one counts from their first (the
+ * maintainer's of 25/10/2026). A shadow-banned owner's round is told as
+ * anybody's: the builder builds it, and a ban tells nobody anything (ADR-024
+ * §7). Read across accounts by the push's job, as the builder writes across
+ * them.
  */
-export async function unopenedRoundsOf(db: Queryable, day: string): Promise<string[]> {
+export async function unopenedRoundsOf(
+  db: Queryable,
+  day: string,
+  idleDays: number,
+): Promise<string[]> {
   const { rows } = await db.query<{ account_id: string }>(
     `SELECT r.account_id FROM rounds r
       WHERE r.day = $1 AND r.opened_at IS NULL
-        AND EXISTS (SELECT 1 FROM account o
-                     WHERE o.id = r.account_id AND o.state IN ('active', 'shadow_banned'))
+        AND EXISTS (SELECT 1 FROM account o WHERE o.id = r.account_id
+                      AND o.state IN ('active', 'shadow_banned'))
         AND EXISTS (SELECT 1 FROM round_entries e WHERE e.round_id = r.id AND ${SERVABLE})
+        AND COALESCE(
+              (SELECT max(p.day) FROM rounds p
+                WHERE p.account_id = r.account_id AND p.opened_at IS NOT NULL),
+              (SELECT min(p.day) FROM rounds p WHERE p.account_id = r.account_id)
+            ) >= $1::date - $2::int
       ORDER BY r.account_id`,
-    [day],
+    [day, idleDays],
   );
   return rows.map((row) => row.account_id);
 }

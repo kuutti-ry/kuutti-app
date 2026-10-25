@@ -204,7 +204,7 @@ describe("boot", () => {
     expect(await health.json()).toMatchObject({ db: "ok", migrations: "current" });
   });
 
-  it("pushes as PUSH says, saying whether with an access token and never the token, and gives the round's push its own sender (#102)", async () => {
+  it("pushes as PUSH says, saying whether with an access token and never the token, and gives the round's push the process's one sender (#102)", async () => {
     for (const [overrides, said] of [
       [{}, { push: "log", authenticated: false }],
       [{ PUSH: "off" }, { push: "off", authenticated: false }],
@@ -213,16 +213,21 @@ describe("boot", () => {
         { push: "expo", authenticated: true },
       ],
     ] as const) {
-      const { lines, roundPush } = await booted(overrides);
+      const { lines, push, roundPush } = await booted(overrides);
       expect(line(lines, "push")).toMatchObject(said);
       expect(JSON.stringify(lines())).not.toContain("boot-test-expo-access");
+      // One push for the app and the round, which index.ts's shutdown waits for.
+      expect(roundPush.push).toBe(push);
       // Nobody has a round in a fresh database: the run tells nobody and sends nothing.
       expect(await runRoundPush(roundPush)).toEqual({ rounds: 0, pushed: 0 });
-      // The round's sender reads no socket: whoever it would tell counts as away.
-      await roundPush.push.message({
-        conversationId: "00000000-0000-4000-8000-000000000000",
-        readers: async () => ["00000000-0000-4000-8000-000000000001"],
-      });
+      // A message's push returns at once; settled waits for it. Nobody has a device here.
+      expect(
+        push.message({
+          conversationId: "00000000-0000-4000-8000-000000000000",
+          readers: async () => ["00000000-0000-4000-8000-000000000001"],
+        }),
+      ).toBeUndefined();
+      await push.settled();
       expect(lines().filter((l) => /^push (failed|not sent)/.test(l.msg ?? ""))).toEqual([]);
     }
   });

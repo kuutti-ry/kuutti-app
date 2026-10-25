@@ -18,9 +18,9 @@ import { session } from "./sessions.ts";
 /**
  * What a person may be notified of (#176, ADR-032): a new round, a message,
  * a match, a moderator's decision. Each kind can be switched off; a kind the
- * person never touched is on, so no row means on. Whoever sends later reads
- * the switch (#102 the message, #95 the round, #100 the match, #312 the
- * decision). Erased with the account; in the export.
+ * person never touched is on, so no row means on. The push reads the switch
+ * (#102: the round, the message, the match; #312 will read the decision's).
+ * Erased with the account; in the export.
  */
 export const notificationKind = pgEnum("notification_kind", [
   "round",

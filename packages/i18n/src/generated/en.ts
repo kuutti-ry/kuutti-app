@@ -706,7 +706,7 @@ export const en: Readonly<Record<string, string>> = {
   "notifications.kind.match.label": "Matches",
   "notifications.kind.message.hint": "That there is a new message, never what it says or who sent it.",
   "notifications.kind.message.label": "Messages",
-  "notifications.kind.moderation.hint": "About your photos and the reports you made. A warning to you is shown in the app whatever you choose here.",
+  "notifications.kind.moderation.hint": "About your photos and the reports you made. Nothing is sent to your phones for these yet. A warning to you is shown in the app whatever you choose here.",
   "notifications.kind.moderation.label": "Moderators' decisions",
   "notifications.kind.round.hint": "When the day's people are ready for you.",
   "notifications.kind.round.label": "A new round",
