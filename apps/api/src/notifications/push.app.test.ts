@@ -326,7 +326,12 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
     const s = await appWith(ctx);
     const a = await s.person("Ilmatar");
     const b = await s.person("Väinämöinen");
-    const tokensOfB = [await s.register(b, "fi"), await s.register(b, "en", "another")];
+    const first = await s.register(b, "fi");
+    // The second device a minute later: the push goes to a person's devices in
+    // the order they registered (`tokensOf`), and two registrations at the
+    // clock's one instant tie, which Postgres may return either way.
+    s.clock.at = new Date(T.getTime() + MINUTE);
+    const tokensOfB = [first, await s.register(b, "en", "another")];
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
     const text = "Ilmatar täällä, tavataanko Kauppatorilla kello viisi?";
     expect((await s.send(a, id, text)).status).toBe(201);
