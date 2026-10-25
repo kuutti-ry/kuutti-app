@@ -33,7 +33,7 @@ Two likes make a match, and a match is what a like can turn into (#100). ADR-031
 
 ## Open, the maintainer's
 
-1. A notice in the app for the person who did not make the match (ADR-032's `match` kind) and the push (#102): the conversation appears in their list, and nothing more is said yet.
+1. A notice in the app for the person who did not make the match (ADR-032's `match` kind): the conversation appears in their list. The push half is answered (2026-10-25, the maintainer, ADR-055 §5): they are pushed that they have a new match, never by whom.
 2. A block that commits while a match is being opened can leave the new conversation open beside the block, since each statement asks the block for itself (ADR-034 §4's residual, the same for every write of the round); the send refuses to write in it (`blocked_between`, ADR-031 §3).
 
 ## History
@@ -41,3 +41,4 @@ Two likes make a match, and a match is what a like can turn into (#100). ADR-031
 - 2026-10-20: written with #100's build, on the maintainer's decisions of that day.
 - 2026-10-20, after the audit of the first cut: §1 says the opening sends no notification (none ever did); §2's accounts are taken first, shared and in id order, since a match opening took them after the round's rows and could deadlock with an erasure and miss a sanction (tested by deterministic interleaving in `matches.test.ts`).
 - 2026-10-21 (ADR-037 §7): a shadow-banned person's round holds no liked-you or fish places, so a like back that makes no match cannot tell them of the ban; the residual, two likes on one day, is ADR-037 §7's.
+- 2026-10-25 (#102, ADR-055 §5): a match made pushes the person whose earlier like it met, through `Matches.made` after the commit; Open 1 keeps the notice in the app.

@@ -146,6 +146,11 @@ resource "aws_ssm_parameter" "config" {
     # through the domain's identity in infra/bootstrap; the previews read this
     # too. In SES's sandbox until production access, one for both environments.
     "mail" = "ses"
+    # Push through Expo (#102, ADR-055 §8): the API sends to Expo's push
+    # service over HTTPS; its access token, once EAS's enhanced push security
+    # is on, is the SecureString expo-access-token, never a resource (ADR-001);
+    # the previews read this too.
+    "push" = "expo"
     # The staff login's return and the panel's origin (#49): without them a
     # deployed box sends the one-time code to localhost and refuses the panel's preflight.
     # Both name module admin's host (#313, ADR-025 §10).

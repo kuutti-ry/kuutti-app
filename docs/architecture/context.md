@@ -4,6 +4,7 @@
 apps/api/src/lib/ssm.ts
 apps/api/src/lib/s3.ts
 apps/api/src/lib/mail.ts
+apps/api/src/lib/push.ts
 apps/api/src/lib/sentry.ts
 apps/api/src/identity/oidc-broker.ts
 apps/api/src/media/wiring.ts
@@ -16,14 +17,14 @@ packages/i18n/src/legal.ts
 infra/bootstrap/
 -->
 
-Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043 and ADR-052.
+Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052 and ADR-055.
 
 ## Part 1: the people and what their devices reach
 
 ```mermaid
 flowchart TB
   accTitle: Context, part 1: the people and what their devices reach
-  accDescr: A person uses the phone app and a moderator uses the admin panel in a browser. Both reach the API through CloudFront, and both log in at their bank through Telia Tunnistus, which sends the browser back to the API. The app takes its JavaScript from Expo's EAS Update, reports errors to Sentry and links to the legal texts on the website. Push through Expo is not built, and app attestation is undecided.
+  accDescr: A person uses the phone app and a moderator uses the admin panel in a browser. Both reach the API through CloudFront, and both log in at their bank through Telia Tunnistus, which sends the browser back to the API. The app takes its JavaScript from Expo's EAS Update, reports errors to Sentry and links to the legal texts on the website. The API sends its pushes to Expo's push service, which delivers them to the app through Apple's or Google's push service. App attestation is undecided.
   subgraph people["The people"]
     n1["A person, with the phone app"]
     n2["A moderator, with the admin panel in a browser"]
@@ -39,7 +40,7 @@ flowchart TB
     n8["Expo EAS Update: the app's JavaScript"]
     n9["Sentry, EU region: error reports"]
     n10["The website kuutti.app on Amplify Hosting, its own repository"]
-    n11["Expo push: not built yet, #102"]:::notbuilt
+    n11["Expo push, then Apple's APNs or Google's FCM: the pushes"]
     n12["App attestation by Apple and Google: undecided, #86"]:::notbuilt
   end
   n1 -->|"uses"| n3
@@ -55,8 +56,8 @@ flowchart TB
   n3 -->|"errors, when a DSN is set"| n9
   n5 -->|"errors, when a DSN is set"| n9
   n3 -->|"opens the legal texts"| n10
-  n5 -.->|"not built yet, #102"| n11
-  n11 -.->|"not built yet, #102"| n3
+  n5 -->|"a push: one line of the app's words and what it is about, never a text or a name"| n11
+  n11 -->|"wakes the phone with it"| n3
   n3 -.->|"undecided, #86"| n12
   classDef notbuilt stroke-dasharray: 5 5
 ```
@@ -73,7 +74,7 @@ flowchart TB
 8. Expo EAS Update: the app's JavaScript bundle. The app checks for an update at each start, on the channel its build names: `staging` for the development and preview builds, `production` for the store build. Updates are not code-signed (ADR-004).
 9. Sentry, in its EU data region: error reports from the API and the app, with every category of data the SDK would collect by itself switched off in the API. Each is on only where a DSN is set: the parameter `sentry-dsn` for the API, `EXPO_PUBLIC_SENTRY_DSN` for the app.
 10. The website `kuutti.app`, on AWS Amplify Hosting, built from its own repository `kuutti-ry/kuutti-app-site`. The app opens the full legal texts there. No arrow joins the website and the API: the API's browser allowlist on staging names the panel's origin alone.
-11. Push through Expo: not built yet, #102. The API would send a push with no text, and the app has no notification library yet; the switches in Settings are stored and nothing is sent (ADR-032).
+11. Push through Expo (#102, ADR-055): the API sends each push to Expo's push service over HTTPS, at most a hundred a request, and Expo hands it to Apple's APNs or Google's FCM, which wake the phone. A push carries the device's token, one line of the app's own words in the device's language (a new message, a new match, today's round) and what it is about (its kind and, for a message or a match, the conversation's id), never a message's text, a name or an account. The app registers its token with the API (`PUT /push-token`) once the phone lets Kuutti notify; the API sends where the parameter `push` says `expo`, as on staging, and reads receipts back once, fifteen minutes later, to forget tokens Apple or Google no longer know. What Expo receives and keeps: `docs/vendors/expo.md`.
 12. App attestation by Apple and Google: undecided, one of #86's anti-scraping items the maintainer has not settled. iOS screenshot detection is the other.
 
 ## Part 2: the API and the AWS services it calls
@@ -123,7 +124,7 @@ flowchart TB
 ### Steps
 
 13. The API, in a container on the staging box, an EC2 instance. Its credentials are the instance role's, through the instance metadata; no static AWS key exists anywhere.
-14. SSM Parameter Store: at boot the API reads every parameter under `/kuutti/staging/`, decrypted, and turns each into an environment variable. The non-secret ones (the database's address, `moderation`, `mail`, the bank's issuer and client) are written by `infra/envs/staging`; the secrets (the hetu HMAC key, the two Telia keys, the CloudFront signing key, the database passwords) are made by hand and never appear in code or state. The instance role reaches its own prefix and is explicitly denied every other. A pull request's preview reads the same prefix under the same role; the API's own code drops the secrets a preview must not use, which is no boundary ([Trust](trust.md), step 8).
+14. SSM Parameter Store: at boot the API reads every parameter under `/kuutti/staging/`, decrypted, and turns each into an environment variable. The non-secret ones (the database's address, `moderation`, `mail`, `push`, the bank's issuer and client) are written by `infra/envs/staging`; the secrets (the hetu HMAC key, the two Telia keys, the CloudFront signing key, the database passwords, and Expo's access token once EAS's enhanced push security is on) are made by hand and never appear in code or state. The instance role reaches its own prefix and is explicitly denied every other. A pull request's preview reads the same prefix under the same role; the API's own code drops the secrets a preview must not use, which is no boundary ([Trust](trust.md), step 8).
 15. RDS PostgreSQL: the API connects over TLS with full verification, as its own role `kuutti_app`. Only the box's security group reaches port 5432.
 16. S3, the private media bucket: the API writes each photo's variants under `media/` and removes them on erasure; versioning is off, so an erased photo is gone. The night's job writes one Parquet file a day under `research/`, once, never replaced or removed.
 17. CloudFront, the API's distribution: it reads `media/` through origin access control, and only for a URL whose signature checks out against the key group. The API signs each URL itself with the private key from SSM; it never calls CloudFront.

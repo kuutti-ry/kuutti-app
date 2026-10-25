@@ -12,7 +12,7 @@ Rounds, filters, likes, budgets, recycling. TD-11, TD-12, TD-14.
 
 #97 (ADR-037): `likedYouPlaces` is the round's first places, the people whose like waits on the person in the order the builder reads them (the oldest like first), up to `liked_you_cap`, each one somebody the person may meet. The builder reads the waiting likes from the round record itself (`waitingOn` in `jobs/round-builder.ts`): likes of ended days within `like_expiry_days`, not answered. A shadow-banned person's round holds none of these places (ADR-037 §7).
 
-#100 (ADR-038): `decide` makes a match of a like meeting a standing like, under a lock on the pair, opening the conversation through the chat slice's `openConversation` (handed in by `app.ts` as `Matches`), and answers with it; a like that is part of a match is final (409 `match_made`).
+#100 (ADR-038): `decide` makes a match of a like meeting a standing like, under a lock on the pair, opening the conversation through the chat slice's `openConversation` (handed in by `app.ts` as `Matches`), and answers with it; a like that is part of a match is final (409 `match_made`). After the commit, `Matches.made` hands the match to the push, which tells the person whose earlier like it met (#102, ADR-055 §5). `unopenedRoundsOf` answers whom the round's push tells: today's rounds built and not opened, with a card that can still be shown (ADR-055 §6, `jobs/round-push.ts`).
 
 #378 (ADR-039): a fish is a like with a mark (`round_entries.fish`), chosen as `fish` on a card and read back so; `decide` counts the person's fish of the last `fish_window_days` under the round's lock (429 `fish_budget_exceeded`), and on a `liked_you` or `fish` card it is a like. The builder puts the waiting fish ahead of the waiting likes, labelled `fish`.
 
