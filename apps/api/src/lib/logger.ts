@@ -61,7 +61,9 @@ export type LoggerOptions = {
  */
 export function serializeError(error: unknown): ReturnType<typeof pino.stdSerializers.err> {
   const serialized = pino.stdSerializers.err(error as Error);
-  if (typeof serialized.stack === "string") {
+  // A value that is no error comes back as it was, null too (#102: a push
+  // refused with no code logs `error: null`), and has no stack to redact.
+  if (typeof serialized?.stack === "string") {
     serialized.stack = serialized.stack.replace(
       /^[^\n]*/,
       `${serialized.type ?? "Error"}: [redacted]`,

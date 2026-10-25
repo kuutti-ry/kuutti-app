@@ -12,7 +12,7 @@ import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
 import { RoundButton } from "@/features/matching";
-import { Notices } from "@/features/notifications";
+import { Notices, PushOffer } from "@/features/notifications";
 import { GateCard, WaitlistCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
@@ -103,9 +103,19 @@ export function HomeScreen() {
             {/* What must reach the person even without a push, unread, first (#176). */}
             <Notices />
             {/* How the person's own pond is filling up (#54), and where they stand themselves (#94);
-                once matching is open, the way to today's round (#379). */}
+                once matching is open, the way to today's round (#379) and the one offer of
+                notifications, since now there is something to tell (#102, ADR-055 §9). */}
             {gate.pond && <WaitlistCard pond={gate.pond} />}
-            {gate.pond && <GateCard whenOpen={<RoundButton />} />}
+            {gate.pond && (
+              <GateCard
+                whenOpen={
+                  <>
+                    <RoundButton />
+                    <PushOffer />
+                  </>
+                }
+              />
+            )}
             <Button
               variant="outline"
               accessibilityLabel={t("profile.home.open")}

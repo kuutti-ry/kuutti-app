@@ -114,6 +114,15 @@ export const MATCHING_CONFIG_V1 = {
   invitation_reward: { fish: 1, likes: 0 },
   invitations_open: 5,
   invitation_tries_per_day: 5,
+  // #102 (ADR-055 §10, migration 0082): at most one push of a conversation to
+  // its recipient in ten minutes; none from 22 to 8 in Helsinki (equal hours
+  // mean no quiet hours); the round's push at 9 in Helsinki.
+  message_push_min_interval_minutes: 10,
+  push_quiet_from_hour: 22,
+  push_quiet_to_hour: 8,
+  round_push_hour: 9,
+  // #102 (migration 0083): no round push after seven days without an opened round.
+  round_push_idle_days: 7,
   moderation_response_hours: 24, // #303, #299: the hours the association promises to answer within
   // #84 (ADR-030 §4, migration 0052): reports a person may file per Finnish
   // day, counted from report in the statement that writes the row; the sixth

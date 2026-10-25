@@ -15,14 +15,17 @@ import { invitationCountJob } from "./jobs/invitation-count.ts";
 import type { NightlyJob } from "./jobs/nightly.ts";
 import { gateJob } from "./jobs/pond-gate.ts";
 import { roundsJob } from "./jobs/round-builder.ts";
+import type { RoundPushDeps } from "./jobs/round-push.ts";
 import { ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
 import { ensurePreviewDatabase } from "./lib/preview-database.ts";
+import { pusherFor } from "./lib/push.ts";
 import { createS3Client } from "./lib/s3.ts";
 import { initSentry, sentryReporter } from "./lib/sentry.ts";
 import { createMediaDeps, rejectUnreviewedPhotos, sweepPendingPhotos } from "./media/index.ts";
+import { createPush, type Push } from "./notifications/index.ts";
 import {
   copiedBeforeDrop,
   ensureEventPartitions,
@@ -47,7 +50,16 @@ export type BootOptions = {
   createBroker?: (options: Parameters<typeof OidcBroker.create>[0]) => Promise<IdentityBroker>;
 };
 
-export type Booted = { app: App; pool: Pool; jobs: NightlyJob[]; live: Live };
+export type Booted = {
+  app: App;
+  pool: Pool;
+  jobs: NightlyJob[];
+  live: Live;
+  /** The pushes in flight, which index.ts's shutdown waits for (#102). */
+  push: Push;
+  /** The round's push on its own timer, which index.ts arms (#102, ADR-055 §6). */
+  roundPush: RoundPushDeps;
+};
 
 /**
  * Everything between a validated configuration and a server that may listen:
@@ -208,8 +220,21 @@ export async function boot({
   // Mail (#385, ADR-043): SES on AWS, the log locally, none where MAIL is off.
   const mailer = mailerFor(config, logger);
   logger.info({ mail: config.MAIL }, "mail");
+  // Push (#102, ADR-055 §8): Expo, the log locally, none where PUSH is off.
+  const pusher = pusherFor(config, logger);
+  logger.info({ push: config.PUSH, authenticated: Boolean(config.EXPO_ACCESS_TOKEN) }, "push");
+  // The process's one push (#102, ADR-055): the app's message and match
+  // pushes and the round's, asking the same live registry who is in the app.
+  const push = createPush({
+    db: pool,
+    logger,
+    now: () => new Date(),
+    ...(pusher ? { pusher } : {}),
+    online: (accountId) => live.online(accountId),
+  });
   const app = createApp({
     live,
+    push,
     config,
     logger,
     db: pool,
@@ -217,6 +242,7 @@ export async function boot({
     ...(broker ? { broker } : {}),
     ...(media.deps ? { media: media.deps } : {}),
     ...(mailer ? { mailer } : {}),
+    ...(pusher ? { pusher } : {}),
   });
   // Nightly housekeeping inside the process (rules/api.md): ended sessions and
   // stale login attempts (#35).
@@ -295,5 +321,6 @@ export async function boot({
     logger.error({ job: "waitlist-snapshot", err }, "first waitlist snapshot failed"),
   );
 
-  return { app, pool, jobs, live };
+  const roundPush: RoundPushDeps = { db: pool, logger, now, push };
+  return { app, pool, jobs, live, push, roundPush };
 }

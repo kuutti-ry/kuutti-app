@@ -41,8 +41,13 @@ function serve(routes: Record<string, () => Response>) {
   return seen;
 }
 
-async function session() {
-  const view = await renderHook(() => useSession(), { wrapper: SessionProvider });
+/** The provider as the root layout gives it, with what a logout the API did not take calls. */
+async function session(onLogoutUnheard?: () => Promise<void>) {
+  const view = await renderHook(() => useSession(), {
+    wrapper: ({ children }) => (
+      <SessionProvider onLogoutUnheard={onLogoutUnheard}>{children}</SessionProvider>
+    ),
+  });
   await waitFor(() => expect(view.result.current.status).not.toBe("loading"));
   return view;
 }
@@ -210,6 +215,61 @@ describe("SessionProvider: signing out", () => {
       expect(done).toBe(true);
       expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
       expect(currentSession()).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("leaves the phone's push alone after a logout the API took", async () => {
+    await saveSession(tokens());
+    serve({ "POST /auth/logout": () => new Response(null, { status: 204 }) });
+    const unheard = jest.fn(async () => undefined);
+    const { result } = await session(unheard);
+    await act(async () => result.current.signOut());
+    expect(result.current.status).toBe("signed-out");
+    expect(unheard).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["could not reach the API", {}],
+    ["was refused", { "POST /auth/logout": () => refusal("internal_error", 500) }],
+  ])(
+    "has the phone drop its push once signed out, when the logout %s (#102)",
+    async (_, routes) => {
+      await saveSession(tokens());
+      serve(routes);
+      // Whether the device's session was gone by the time it was called.
+      const signedIn: boolean[] = [];
+      const unheard = jest.fn(async () => {
+        signedIn.push(currentSession() !== null);
+      });
+      const { result } = await session(unheard);
+      await act(async () => result.current.signOut("lock"));
+      expect(result.current).toMatchObject({ status: "signed-out", notice: "lock" });
+      expect(unheard).toHaveBeenCalledTimes(1);
+      expect(signedIn).toEqual([false]);
+    },
+  );
+
+  it("has the phone drop its push when the API never answers the logout (#102)", async () => {
+    await saveSession(tokens());
+    const unheard = jest.fn(async () => undefined);
+    const { result } = await session(unheard);
+    jest.useFakeTimers();
+    try {
+      globalThis.fetch = jest.fn(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+      await act(async () => {
+        void result.current.signOut();
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(4_999);
+      });
+      expect(unheard).not.toHaveBeenCalled();
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+      expect(result.current.status).toBe("signed-out");
+      expect(unheard).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();
     }

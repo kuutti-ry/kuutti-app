@@ -53,6 +53,14 @@
       "./plugins/withSaiga.js",
       "expo-local-authentication",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#1D4ED8",
+          "defaultChannel": "default"
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Kuutti shows the photo you pick here on your profile. Nothing else in your library is read.",

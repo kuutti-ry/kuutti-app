@@ -452,15 +452,19 @@ describe("the e-mail and the account screens", () => {
     noProblems();
   });
 
-  it("hold the notification choices for a person (#176)", async () => {
+  it("hold the notification choices and the phone's own permission for a person (#176, #102)", async () => {
     await saveSession(tokens);
     await renderWithTheme(<NotificationsSettingsScreen />);
     expectPinnedHeader("Notifications", "Back");
     expect(
       screen.getByText(
-        "Nothing is sent to this phone yet. What you choose here is kept, and decides what is sent once it is. Each kind is on until you switch it off.",
+        "What you choose here decides what Kuutti tells your phones. A notification says only that there is something, never what or from whom. Each kind is on until you switch it off.",
       ),
     ).toBeTruthy();
+    expect(
+      await screen.findByText("This phone has not been asked yet whether Kuutti may notify it."),
+    ).toBeTruthy();
+    noProblems();
   });
 
   it("say there is no session on the notifications screen of a signed-out device (#176)", async () => {

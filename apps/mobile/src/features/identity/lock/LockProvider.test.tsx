@@ -18,7 +18,8 @@ import type { LockSettings } from "./store";
 
 // The app's lock (#418, ADR-045): over the screens at a cold start and after
 // the chosen time away, a cover over the app switcher's snapshot, the
-// passcode's five tries, the bank as the way out, and gone with the session.
+// passcode's five tries, the bank as the way out, gone with the session, and
+// whether it holds the screens, which a push's tap waits for (#102).
 
 const store = jest.requireMock("expo-secure-store").__store as Map<string, string>;
 const secureStore = jest.requireMock("expo-secure-store") as {
@@ -341,6 +342,37 @@ describe("the lock's provider", () => {
     await act(async () => read.resolve(JSON.stringify(withPasscode())));
     expect(cover()).toBeNull();
     expect(screen.getByText(LOCKED)).toBeTruthy();
+  });
+
+  it("says it holds the screens while it is read at a cold start, while it shows and under the cover, not once open (#102)", async () => {
+    const read = deferred<string | null>();
+    secureStore.getItemAsync.mockImplementation((key: string) =>
+      key === "kuutti.lock" ? read.promise : reading?.(key),
+    );
+    await start();
+    expect(lock.holding).toBe(true);
+    await act(async () => read.resolve(JSON.stringify(withPasscode({ graceMinutes: 5 }))));
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(lock.holding).toBe(true);
+    await typeCode(CODE);
+    expect(lock.holding).toBe(false);
+    // Away, covered: the return may lock.
+    await toApp("background");
+    expect(lock.holding).toBe(true);
+    await toApp("active");
+    expect(lock.holding).toBe(false);
+  });
+
+  it("says it holds nothing while it is off, away or not", async () => {
+    await start();
+    expect(lock.holding).toBe(false);
+    await toApp("background");
+    expect(lock.holding).toBe(false);
+  });
+
+  it("says it holds nothing with no session, whatever lock is stored", async () => {
+    await start({ lock: withPasscode(), signedIn: false });
+    expect(lock.holding).toBe(false);
   });
 
   it("The app switcher shows a cover while the lock is on", async () => {

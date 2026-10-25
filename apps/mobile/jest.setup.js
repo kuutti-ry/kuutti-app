@@ -29,6 +29,80 @@ jest.mock("expo-local-authentication", () => ({
   authenticateAsync: jest.fn(async () => ({ success: false, error: "not_available" })),
 }));
 
+// The phone's notifications (#102) are native: a phone that has not been
+// asked yet and says no when it is, with a token Expo hands out, unless a
+// test says otherwise through these mocks. The enums carry the module's own
+// values. `__respond(response)` is a tap on a push, which the hook returns
+// until the last response is cleared, as the module's own hook does;
+// `__newToken(token)` is the phone giving a new device token. The phone's
+// list of pushes is cleared, and its device token dropped, without fail
+// unless a test says otherwise.
+jest.mock("expo-notifications", () => {
+  const { useEffect, useState } = require("react");
+  let lastResponse = null;
+  const responseListeners = new Set();
+  const tokenListeners = new Set();
+  const announce = () => {
+    for (const listener of responseListeners) listener(lastResponse);
+  };
+  return {
+    IosAuthorizationStatus: {
+      NOT_DETERMINED: 0,
+      DENIED: 1,
+      AUTHORIZED: 2,
+      PROVISIONAL: 3,
+      EPHEMERAL: 4,
+    },
+    AndroidImportance: { DEFAULT: 5 },
+    DEFAULT_ACTION_IDENTIFIER: "expo.modules.notifications.actions.DEFAULT",
+    getPermissionsAsync: jest.fn(async () => ({
+      status: "undetermined",
+      granted: false,
+      canAskAgain: true,
+      expires: "never",
+      ios: { status: 0 },
+    })),
+    requestPermissionsAsync: jest.fn(async () => ({
+      status: "denied",
+      granted: false,
+      canAskAgain: false,
+      expires: "never",
+      ios: { status: 1 },
+    })),
+    setNotificationChannelAsync: jest.fn(async () => null),
+    getExpoPushTokenAsync: jest.fn(async () => ({
+      type: "expo",
+      data: "ExponentPushToken[aaaaaaaaaaaaaaaaaaaaaa]",
+    })),
+    addPushTokenListener: jest.fn((listener) => {
+      tokenListeners.add(listener);
+      return { remove: () => tokenListeners.delete(listener) };
+    }),
+    setNotificationHandler: jest.fn(),
+    dismissAllNotificationsAsync: jest.fn(async () => undefined),
+    unregisterForNotificationsAsync: jest.fn(async () => undefined),
+    useLastNotificationResponse: () => {
+      const [response, setResponse] = useState(lastResponse);
+      useEffect(() => {
+        responseListeners.add(setResponse);
+        return () => responseListeners.delete(setResponse);
+      }, []);
+      return response;
+    },
+    clearLastNotificationResponse: jest.fn(() => {
+      lastResponse = null;
+      announce();
+    }),
+    __respond: (response) => {
+      lastResponse = response;
+      announce();
+    },
+    __newToken: (token) => {
+      for (const listener of tokenListeners) listener(token);
+    },
+  };
+});
+
 // The Sentry SDK is native and ships ESM; tests get a stand-in and can assert
 // on what was reported (never the stored value, only the error).
 jest.mock("@sentry/react-native", () => ({

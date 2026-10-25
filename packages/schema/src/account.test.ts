@@ -195,6 +195,7 @@ function anExport(): Record<string, unknown> {
         createdAt: at,
         lastUsedAt: at,
         expiresAt: at,
+        push: null,
       },
     ],
     profile: null,
@@ -451,6 +452,39 @@ describe("the account export", () => {
     const negative = anExport();
     negative.identity = { ...(negative.identity as object), refusedAttempts: -1 };
     expect(codes(AccountExport, negative)).toEqual(["too_small"]);
+  });
+
+  it("says whether a device gets pushes, its platform, language and since when, and never its token (#102)", () => {
+    const pushed = anExport();
+    const push = {
+      platform: "android",
+      locale: "fi",
+      registeredAt: at,
+      token: "ExponentPushToken[abc]",
+    };
+    pushed.sessions = [{ ...(pushed.sessions as object[])[0], push }];
+    const [session] = AccountExport.parse(pushed).sessions;
+    expect(session?.push).toEqual({ platform: "android", locale: "fi", registeredAt: at });
+    expect(JSON.stringify(AccountExport.parse(pushed))).not.toContain("ExponentPushToken");
+    const missing = anExport();
+    const { push: _, ...withoutPush } =
+      (missing.sessions as Array<Record<string, unknown>>)[0] ?? {};
+    missing.sessions = [withoutPush];
+    expect(codes(AccountExport, missing)).toEqual(["invalid_type"]);
+    for (const [field, value, code] of [
+      ["platform", "web", "invalid_value"],
+      ["locale", "de", "invalid_value"],
+      ["registeredAt", "25.10.2026", "invalid_format"],
+    ] as const) {
+      const wrong = anExport();
+      wrong.sessions = [
+        {
+          ...(wrong.sessions as object[])[0],
+          push: { platform: "ios", locale: "en", registeredAt: at, [field]: value },
+        },
+      ];
+      expect(codes(AccountExport, wrong), field).toEqual([code]);
+    }
   });
 
   it("refuses an unknown session platform and a timestamp that is not ISO 8601", () => {

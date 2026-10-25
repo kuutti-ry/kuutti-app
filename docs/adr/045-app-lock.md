@@ -62,7 +62,7 @@ Nothing locked the app. Whoever holds an unlocked phone opens Kuutti signed in: 
 - On Android, the recents thumbnail taken before the cover is drawn (§4).
 - A dialog or, on iOS, a picker or share sheet left open: above the cover in the snapshot (§4).
 - A wall clock set back while the phone sleeps, to a time after it went away (§4).
-- A push notice shows on the phone's own lock screen whatever its text says, when #102's push comes (Open 1).
+- A push notice shows on the phone's own lock screen whatever its text says; since #102 (ADR-055) its words name nobody and nothing (Open 1).
 - Screenshots are not blocked (#296).
 
 ## Alternatives considered
@@ -80,7 +80,7 @@ Nothing locked the app. Whoever holds an unlocked phone opens Kuutti signed in: 
 
 ## Open, the maintainer's
 
-1. What a push notice says while the lock is on (#418's proposal 6, left out): whether it says less, when #102's push comes.
+1. What a push notice says while the lock is on (#418's proposal 6, left out): #102 shows the same words with the lock on or off, since they name nobody and nothing and the lock never reaches the API (ADR-055 Open 3); whether it should say less is still the maintainer's.
 2. Whether changing or removing the lock, or turning the face or finger off, asks for the passcode or the face first.
 3. The Android recents ceiling (§4): a small native module with `setRecentsScreenshotEnabled(false)` for Android 13 and later, in a native batch, or accepted as it is.
 4. The face and the finger checked by hand on devices (Face ID, Touch ID, Android's face and fingerprint), `docs/runbooks/devices.md`: nobody has run the checks yet; they wait for the native build.
@@ -92,3 +92,4 @@ Nothing locked the app. Whoever holds an unlocked phone opens Kuutti signed in: 
 
 - 2026-10-22: written with #418's lock half, on the maintainer's answers of that day.
 - 2026-10-22: the build's review found that on iOS the lock, then a modal, was refused while a photo picker or share sheet was presented and stayed away until a cold start; it is now a view of the window's own (§1, §4). The same review found that a fifth try whose sign-out never finished let a restart buy more tries (spent tries are now never checked, and the sign-out waits five seconds at most, §3, §6), that a trip away during the phone's prompt was dropped (§4), that a face or finger removed from the phone left a switch that could not be turned off (§7), and that a lock written by deleting first failed open (§2).
+- 2026-10-25 (#102, ADR-055): the push exists; with the lock on it says what it says without it (Open 1, ADR-055 Open 3).

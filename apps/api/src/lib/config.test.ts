@@ -274,6 +274,112 @@ describe("parseConfig for mail (#385, ADR-043 §4)", () => {
   });
 });
 
+describe("parseConfig for push (#102, ADR-055 §8)", () => {
+  // As mail's: a Record over AppEnv, so a new environment is listed here too.
+  const environments: Record<AppEnv, Record<string, string>> = {
+    development: { DATABASE_URL: "postgres://x", APP_ENV: "development" },
+    test: { DATABASE_URL: "postgres://x", APP_ENV: "test" },
+    preview: { DATABASE_URL: "postgres://x", APP_ENV: "preview", PR_NUMBER: "1" },
+    staging: { DATABASE_URL: "postgres://x", APP_ENV: "staging" },
+    production: {
+      DATABASE_URL: "postgres://x",
+      APP_ENV: "production",
+      ADMIN_APP_URL: "https://admin.kuutti.app",
+    },
+  };
+  const each = Object.entries(environments) as Array<[AppEnv, Record<string, string>]>;
+  const local = new Set<AppEnv>(["development", "test"]);
+
+  it.each(each)(
+    "unset in %s, writes the kinds to the log on a developer's machine only",
+    (name, raw) => {
+      expect(parseConfig(raw).PUSH).toBe(local.has(name) ? "log" : "off");
+    },
+  );
+
+  it("unset with APP_ENV unset too, is the development log", () => {
+    expect(parseConfig({ DATABASE_URL: "postgres://x" }).PUSH).toBe("log");
+  });
+
+  it.each(each.filter(([name]) => !local.has(name)))(
+    "refuses the log in %s, where nothing would be sent, and names PUSH",
+    (name, raw) => {
+      try {
+        parseConfig({ ...raw, PUSH: "log" });
+        throw new Error("expected ConfigError");
+      } catch (error) {
+        expect(error).toBeInstanceOf(ConfigError);
+        expect((error as ConfigError).missing).toEqual(["PUSH"]);
+        expect((error as ConfigError).issues).toEqual([
+          `PUSH: log is for development and test, not ${name}`,
+        ]);
+      }
+    },
+  );
+
+  it.each(each)("takes expo and off as set in %s, and the log where it is allowed", (name, raw) => {
+    // Production sends only with Expo's access token (the test below).
+    const token = name === "production" ? { EXPO_ACCESS_TOKEN: "robot-token" } : {};
+    expect(parseConfig({ ...raw, ...token, PUSH: "expo" }).PUSH).toBe("expo");
+    expect(parseConfig({ ...raw, PUSH: "off" }).PUSH).toBe("off");
+    if (local.has(name)) expect(parseConfig({ ...raw, PUSH: "log" }).PUSH).toBe("log");
+  });
+
+  it("refuses expo in production without Expo's access token, and names it; takes it with one", () => {
+    try {
+      parseConfig({ ...environments.production, PUSH: "expo" });
+      throw new Error("expected ConfigError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigError);
+      expect((error as ConfigError).missing).toEqual(["EXPO_ACCESS_TOKEN"]);
+    }
+    expect(
+      parseConfig({ ...environments.production, PUSH: "expo", EXPO_ACCESS_TOKEN: "robot-token" })
+        .PUSH,
+    ).toBe("expo");
+    // Off, or unset, needs none; staging and the previews may send without one.
+    expect(parseConfig({ ...environments.production, PUSH: "off" }).PUSH).toBe("off");
+    expect(parseConfig({ ...environments.staging, PUSH: "expo" }).PUSH).toBe("expo");
+  });
+
+  it.each(["fcm", "EXPO", "", "expo "])("refuses %j and names PUSH", (value) => {
+    try {
+      parseConfig({ ...environments.staging, PUSH: value });
+      throw new Error("expected ConfigError");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConfigError);
+      expect((error as ConfigError).issues.join("\n")).toMatch(/^PUSH: /);
+    }
+  });
+
+  it("has no access token unless one is set, trims one, and refuses a blank one", () => {
+    expect(parseConfig(environments.production).EXPO_ACCESS_TOKEN).toBeUndefined();
+    expect(
+      parseConfig({
+        ...environments.staging,
+        PUSH: "expo",
+        EXPO_ACCESS_TOKEN: "  expo-access-test\n",
+      }).EXPO_ACCESS_TOKEN,
+    ).toBe("expo-access-test");
+    for (const blank of ["", "   ", "\n"]) {
+      try {
+        parseConfig({ ...environments.staging, EXPO_ACCESS_TOKEN: blank });
+        throw new Error("expected ConfigError");
+      } catch (error) {
+        expect(error, JSON.stringify(blank)).toBeInstanceOf(ConfigError);
+        expect((error as ConfigError).issues.join("\n")).toMatch(/^EXPO_ACCESS_TOKEN: /);
+      }
+    }
+  });
+
+  it("is read from the parameters push and expo-access-token", () => {
+    expect(parameterNameToEnvKey("/kuutti/prod/push", ssmPrefix("production"))).toBe("PUSH");
+    expect(parameterNameToEnvKey("/kuutti/staging/expo-access-token", ssmPrefix("preview"))).toBe(
+      "EXPO_ACCESS_TOKEN",
+    );
+  });
+});
+
 describe("parseConfig for a pull-request preview", () => {
   const staging = {
     APP_ENV: "preview",

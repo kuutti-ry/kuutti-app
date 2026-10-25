@@ -414,6 +414,20 @@ What AWS asks, and what is true here (ADR-043 Open 5): what is sent (one plain-t
 
 Staging's personas have no address and stay unconfirmed (ADR-043 §6): one-time addresses under `kuutti.app` would need SES receiving, an MX and a receipt rule, to read their codes, for one card on the demo.
 
+### Push (#102, ADR-055)
+
+The API sends the app's pushes to Expo's push service over HTTPS (`apps/api/src/lib/push.ts`), which hands them to Apple and Google; nothing of AWS is added, and the box already reaches the internet as it does for Telia and Sentry. Two pieces here:
+
+- **The switch**, the parameter `push=expo` under `/kuutti/<env>/`, which the API reads as `PUSH` (ADR-055 §8). Without it a deployed API sends nothing. Staging has it, and a preview reads staging's, so it sends to the dev clients registered against it and holds the access token as staging does. Production gets it together with its access token.
+- **The access token**, once the maintainer switches EAS's enhanced push security on (`docs/vendors/expo.md`, steps 3 and 4): the token of an Expo robot made for this alone, never CI's, as a secret, below, read as `EXPO_ACCESS_TOKEN`. Put it in both environments and restart their APIs before the switch, or every push is refused `UNAUTHORIZED`:
+
+```sh
+aws ssm put-parameter --name /kuutti/<env>/expo-access-token --type SecureString \
+  --value file:///Volumes/<offline-medium>/kuutti-expo-access-token.txt
+```
+
+Apple's APNs key and Google's FCM key live in EAS, not here (`eas credentials`).
+
 ### Admin panel (#313, ADR-025)
 
 `infra/modules/admin`, composed by staging (production with #25, on `admin.kuutti.app`): the moderators' panel as static files at `https://admin.staging.kuutti.app`. The module creates a private bucket `kuutti-admin-<env>-<account>` (public access blocked, bucket owner enforced, SSE-S3, no versioning since every object is the build of a commit; incomplete uploads go after a day and `pr-` objects after 14 days) that only the distribution reads, through origin access control; the distribution with its ACM certificate in us-east-1 and the A and AAAA alias records; the managed `CachingOptimized` policy; and a response-headers policy on every behaviour: a CSP of `default-src 'none'` whose `connect-src` is the API's origin alone, `img-src` `'self'` and the API's origin (the signed photo URLs, ADR-005), `script-src`, `style-src` and `font-src` `'self'` (Saiga's faces under `fonts/`, which the maintainer uploads by hand and the deploy's sync leaves alone, ADR-052), and `worker-src`, `base-uri`, `form-action` and `frame-ancestors` `'none'`, with HSTS, `nosniff`, `no-referrer`, `X-Frame-Options: DENY`, `Permissions-Policy`, COOP and CORP, and `X-Robots-Tag: noindex, nofollow` (the whole list is ADR-025 §3). The bucket answers 403 for a key it does not have, because CloudFront may not list it, and the distribution turns 403 and 404 into `/index.html` with 200, so `/accounts/<id>` loads the panel and its router finds the page (#302). A pull request's preview is `pr-<n>/` of the same bucket (Previews, below): the viewer-request CloudFront Function `kuutti-staging-admin-previews` (`modules/admin/previews.js`), on the `pr-*` behaviour alone, answers a path inside a preview whose last segment has no dot with that preview's `index.html`. There is no access log: the API's log has every staff request with the account and the request id, and a log of the host would add staff members' IP addresses and nothing a moderator does (ADR-025 §9). Staging's `admin-app-url` is that address and its `cors-allowed-origins` that origin alone (ADR-025 §10).
@@ -777,6 +791,7 @@ Secret parameters are not resources in this code: the AWS provider would store t
 | `/kuutti/<env>/telia-encryption-key` | API; decrypts the ID token Telia encrypts to us | #32 |
 | `/kuutti/<env>/cloudfront-signing-key` | API; signs photo URLs (ADR-005); the public half is `envs/<env>/cloudfront-signing-key.pub.pem` in the repository | #48, at the media cutover |
 | `/kuutti/<env>/db-app-password` | API; its own database role | #7 |
+| `/kuutti/<env>/expo-access-token` | API at boot; authenticates its pushes to Expo once EAS's enhanced push security is on (`docs/vendors/expo.md`) | #102, before the switch |
 | `/kuutti/staging/db-preview-password` | a preview API as `kuutti_preview` (creates, owns and serves `kuutti_pr_<n>`); the `preview-database` Run Command document that drops it | #9 |
 | `/kuutti/ci-check/secret` | nothing; proves the plan role cannot decrypt | #6 |
 

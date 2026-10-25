@@ -52,3 +52,16 @@ export async function matchingConfigNumbers<K extends string>(
   }
   return out;
 }
+
+/**
+ * An hour of the day, 0 to 23, read as matchingConfigNumber reads a number:
+ * the push's quiet hours and the round's hour (#102, ADR-055 §6, §7). The
+ * panel keeps a number whole and from 0 but has no ceiling, and a 24 would
+ * arm a timer for no hour there is, so anything else fails as a missing row.
+ */
+export function asHour(key: string, value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > 23) {
+    throw new AppError(500, "internal_error", `matching_config ${key} is not an hour`, { key });
+  }
+  return value;
+}

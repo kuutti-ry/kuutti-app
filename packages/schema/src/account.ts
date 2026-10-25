@@ -15,7 +15,7 @@ import {
   PhotoCheckKind,
   PhotoVariant,
 } from "./media.ts";
-import { ExportedNotifications } from "./notifications.ts";
+import { ExportedNotifications, ExportedPush } from "./notifications.ts";
 import { ConsentRecord, Gender, PondSummary, PreferencesResponse } from "./onboarding.ts";
 import { ProfileDocument } from "./profile.ts";
 import { ExportedBlocks, ExportedReports } from "./report.ts";
@@ -190,6 +190,8 @@ export const AccountExport = z
         createdAt: z.iso.datetime(),
         lastUsedAt: z.iso.datetime(),
         expiresAt: z.iso.datetime(),
+        /** Whether the device gets pushes, and in which language (#102); never its token. Null when it has none. */
+        push: ExportedPush.nullable(),
       }),
     ),
     /** The profile as written (#47); null when never saved. */

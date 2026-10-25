@@ -9,6 +9,7 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchChoices, saveChoice } from "./client";
+import { PhoneLine } from "./PhoneLine";
 
 const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint: PlainMessageKey }> = {
   round: { label: "notifications.kind.round.label", hint: "notifications.kind.round.hint" },
@@ -30,9 +31,8 @@ type ChoicesView =
  * the API's order, each with its line, each on until switched off, stored on
  * the server so every phone of the person's and every later sender reads the
  * same. A press saves at once; while it is on its way the switch waits, and a
- * failure is said in words with the switch as it was. Nothing is sent to the
- * phone yet (#102), and the opening line says so. Whether the phone itself
- * lets Kuutti notify comes with #102's native update.
+ * failure is said in words with the switch as it was. Above the switches,
+ * whether this phone lets Kuutti notify it at all (#102, ADR-055 §9).
  */
 export function NotificationChoices() {
   const { t } = useT();
@@ -74,6 +74,7 @@ export function NotificationChoices() {
   return (
     <>
       <Text>{t("notifications.intro")}</Text>
+      <PhoneLine />
       {view.status === "loading" && (
         <Text accessibilityLiveRegion="polite">{t("notifications.loading")}</Text>
       )}

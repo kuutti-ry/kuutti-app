@@ -88,6 +88,14 @@ jest.mock("@/features/chat", () => {
     ConversationsScreen: probe("ConversationsScreen"),
   };
 });
+jest.mock("@/features/notifications", () => {
+  const { createElement } = require("react") as typeof import("react");
+  const { Text } = require("react-native") as typeof import("react-native");
+  return {
+    PushNotifications: (props: object) =>
+      createElement(Text, { testID: "PushNotifications" }, JSON.stringify(props)),
+  };
+});
 jest.mock("@/features/home", () => {
   const { createElement } = require("react") as typeof import("react");
   const { Text } = require("react-native") as typeof import("react-native");
@@ -473,12 +481,13 @@ describe("the root layout", () => {
     );
   });
 
-  it("puts the stack without headers under the providers, with the signed-out watcher and the screen-reader hint beside it", async () => {
+  it("puts the stack without headers under the providers, with the signed-out watcher, the push and the screen-reader hint beside it", async () => {
     await render(<RootLayout />);
     expect(propsOf("Stack")).toEqual({
       screenOptions: { headerShown: false, contentStyle: { backgroundColor: "transparent" } },
     });
     expect(screen.getByTestId("SignedOutToStart")).toBeTruthy();
+    expect(screen.getByTestId("PushNotifications")).toBeTruthy();
     expect(screen.getByTestId("ScreenReaderHint")).toBeTruthy();
   });
 
@@ -494,7 +503,8 @@ describe("the root layout", () => {
       return names;
     };
     const around = ["ChatLiveProvider", "LockProvider", "SessionProvider"];
-    for (const inside of ["Stack", "SignedOutToStart", "ScreenReaderHint"]) {
+    // The push under the lock too: a tapped push opens its screen beneath it (#102).
+    for (const inside of ["Stack", "SignedOutToStart", "PushNotifications", "ScreenReaderHint"]) {
       expect([inside, providersAround(inside)]).toEqual([inside, around]);
     }
   });

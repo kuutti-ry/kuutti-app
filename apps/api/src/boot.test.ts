@@ -18,6 +18,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { type BootOptions, boot } from "./boot.ts";
 import { type IdentityBroker, OidcBroker } from "./identity/index.ts";
 import { runNightly } from "./jobs/nightly.ts";
+import { runRoundPush } from "./jobs/round-push.ts";
 import { CHALLENGE } from "./test/attempt.ts";
 import { captureLogger, type LogLine, TEST_DATABASE_URL, testConfig } from "./test/harness.ts";
 import { testSigningKeys } from "./test/media.ts";
@@ -201,6 +202,34 @@ describe("boot", () => {
     const health = await app.request("/health");
     expect(health.status).toBe(200);
     expect(await health.json()).toMatchObject({ db: "ok", migrations: "current" });
+  });
+
+  it("pushes as PUSH says, saying whether with an access token and never the token, and gives the round's push the process's one sender (#102)", async () => {
+    for (const [overrides, said] of [
+      [{}, { push: "log", authenticated: false }],
+      [{ PUSH: "off" }, { push: "off", authenticated: false }],
+      [
+        { PUSH: "expo", EXPO_ACCESS_TOKEN: "boot-test-expo-access" },
+        { push: "expo", authenticated: true },
+      ],
+    ] as const) {
+      const { lines, push, roundPush } = await booted(overrides);
+      expect(line(lines, "push")).toMatchObject(said);
+      expect(JSON.stringify(lines())).not.toContain("boot-test-expo-access");
+      // One push for the app and the round, which index.ts's shutdown waits for.
+      expect(roundPush.push).toBe(push);
+      // Nobody has a round in a fresh database: the run tells nobody and sends nothing.
+      expect(await runRoundPush(roundPush)).toEqual({ rounds: 0, pushed: 0 });
+      // A message's push returns at once; settled waits for it. Nobody has a device here.
+      expect(
+        push.message({
+          conversationId: "00000000-0000-4000-8000-000000000000",
+          readers: async () => ["00000000-0000-4000-8000-000000000001"],
+        }),
+      ).toBeUndefined();
+      await push.settled();
+      expect(lines().filter((l) => /^push (failed|not sent)/.test(l.msg ?? ""))).toEqual([]);
+    }
   });
 
   // Without an object store there is no research copy either (#194).

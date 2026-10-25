@@ -6,15 +6,16 @@ apps/api/src/chat/live.ts
 apps/api/src/chat/presence.ts
 apps/api/src/chat/listen.ts
 apps/api/src/chat/messages.ts
+apps/api/src/notifications/push.ts
 apps/api/src/lib/auth-middleware.ts
 packages/schema/src/chat-frames.ts
 apps/mobile/src/features/chat/socket.ts
 apps/mobile/src/features/chat/store.tsx
 -->
 
-How a message gets from one phone to the other, from the system's side: the phone opening its socket and catching up, a message sent over HTTP and stored under the conversation's lock, its delivery through Postgres's `LISTEN/NOTIFY` on the channel `kuutti_chat` to the other person's live sockets, read marks, presence, ends, and a lost connection. It is written for a contributor or a reviewer who works on the chat, the socket or anything that writes to a conversation. A match opens the conversation (ADR-038); this view starts after that. It draws ADR-031 §3, §8 and §9, ADR-030 §6 and §12, and ADR-026.
+How a message gets from one phone to the other, from the system's side: the phone opening its socket and catching up, a message sent over HTTP and stored under the conversation's lock, its delivery through Postgres's `LISTEN/NOTIFY` on the channel `kuutti_chat` to the other person's live sockets, read marks, presence, ends, and a lost connection. It is written for a contributor or a reviewer who works on the chat, the socket or anything that writes to a conversation. A match opens the conversation (ADR-038); this view starts after that. It draws ADR-031 §3, §8 and §9, ADR-030 §6 and §12, ADR-026 and ADR-055 §4.
 
-In these diagrams a solid arrow is built. The one dotted arrow is not built yet, and its label says so with its issue. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and an issue's `#` is written `#35;` there, which draws as `#`, since a bare `#` ends a label (`README.md`, How a view is drawn).
+In these diagrams every arrow is built. Mermaid's sequence diagrams take a message's words as they are, so the labels are not in quotes, and an issue's `#` is written `#35;` there, which draws as `#`, since a bare `#` ends a label (`README.md`, How a view is drawn).
 
 ## Part 1: opening the socket and catching up
 
@@ -84,13 +85,13 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: Chat, part 2: sending a message
-  accDescr: The phone sends a message over HTTP, not over the socket. In one transaction the API holds the sender's account, locks the conversation's row, reads it afresh and refuses a conversation that is not the sender's, a resend, a closed or blocked conversation, a text too long or one with contact details. Otherwise it stores the message with the next sequence and commits. The sender gets the stored message back. On commit a trigger notifies kuutti_chat with ids only, and the hub reads the message as each person may see it and sends it to their live sockets. A push for a person with no live socket is not built yet, issue 102.
+  accDescr: The phone sends a message over HTTP, not over the socket. In one transaction the API holds the sender's account, locks the conversation's row, reads it afresh and refuses a conversation that is not the sender's, a resend, a closed or blocked conversation, a text too long or one with contact details. Otherwise it stores the message with the next sequence and commits. After the commit the API pushes the other person through Expo when they have no live socket: one line, never the text or a name. The sender gets the stored message back. On commit a trigger notifies kuutti_chat with ids only, and the hub reads the message as each person may see it and sends it to their live sockets.
   autonumber 20
   participant phone as The sender's phone
   participant api as The API
   participant db as PostgreSQL
   participant other as The other person's phone
-  participant push as A push, not built yet, #35;102
+  participant push as Expo's push service, to the other person's phone
   phone->>api: POST /conversations/{id}/messages, the phone's own id for the message and the text
   alt no live session, or the minute's messages spent
     api->>phone: 401, or 429 message_budget_exceeded with Retry-After
@@ -110,14 +111,12 @@ sequenceDiagram
     api->>db: The research event message_sent, in bands, where the sender takes part in research
     api->>api: After a conversation's first message, the safety slice's automatic rules
     api->>phone: 201 with the message and its sequence
+    api-)push: After the answer, to whom the chat lets read it and has no live socket, You have a new message, never the text or the conversation
   and the delivery, on commit
     db->>api: A notification on kuutti_chat, the conversation and the sequence, never the text
     api->>db: Who is in the conversation, and the message as each of them may read it
     api->>other: A message frame, to each of the other person's live sockets
     api->>phone: The same frame, to the sender's own live sockets
-    opt the other person has no live socket
-      api-->>push: A push with no text, not built yet, #35;102
-    end
   end
 ```
 
@@ -134,11 +133,11 @@ sequenceDiagram
 28. After the commit, the research event `message_sent` with the kind, the length's band and the waits' bands, never the text (rule 5). It is written only for a person whose research consent stands, keyed by `research_id` (ADR-011).
 29. After a conversation's first message, the safety slice's automatic rules check the sender (ADR-033). The chat hands over counts and times only, and the check changes no answer.
 30. The sender's phone gets 201 with the stored message and its sequence.
-31. Meanwhile Postgres delivers the message trigger's notification to the chat listener on `kuutti_chat` when the transaction commits, and drops it if the transaction rolls back. It carries the conversation and the sequence, never the text.
-32. The hub takes one notification at a time, in commit order. It reads who is in the conversation, then the message through each person's own participant row, with every rule of the reads: nothing crosses a block, and a shadow-banned sender's message reaches only the sender while the ban stays open.
-33. Each live socket of the other person gets a `message` frame. A photo's frame carries no URL; the phone reads that one message again over HTTP for its signed URLs (ADR-031 §10).
-34. The sender's own live sockets get the same frame, so the sender's other phones show it too.
-35. Not built yet (#102): when the other person has no live socket, a push with no text. The hub already answers whether an account has a live socket (`online`), and the notification choices are stored (ADR-032), but nothing is sent.
+31. The push (#102, ADR-055 §4), after the answer: the route hands the conversation and the sequence to the notifications slice, which asks the chat whom it lets read the message (`messageReaders`: the other participant, through their own participant row, in a conversation still open for them, so nothing crosses a block or a close and a shadow-banned sender's withheld message tells nobody). It leaves out whoever has a live socket (the hub's `online`), whose message switch is off (ADR-032), or who was pushed of this conversation within `matching_config message_push_min_interval_minutes`, and sends nothing in the quiet hours (`push_quiet_from_hour` to `push_quiet_to_hour`, Helsinki). Each live device of whoever is left gets one push through Expo: "You have a new message" in the device's language and the kind, never the text, a name or the conversation, and it lives no longer than the quiet hours' start or the day's end; Apple or Google wakes the phone with it. The push runs after the answer, which never waits for it, so the answer's time says nothing of whether anybody was pushed; a failure is logged. A photo's send does the same.
+32. Meanwhile Postgres delivers the message trigger's notification to the chat listener on `kuutti_chat` when the transaction commits, and drops it if the transaction rolls back. It carries the conversation and the sequence, never the text.
+33. The hub takes one notification at a time, in commit order. It reads who is in the conversation, then the message through each person's own participant row, with every rule of the reads: nothing crosses a block, and a shadow-banned sender's message reaches only the sender while the ban stays open.
+34. Each live socket of the other person gets a `message` frame. A photo's frame carries no URL; the phone reads that one message again over HTTP for its signed URLs (ADR-031 §10).
+35. The sender's own live sockets get the same frame, so the sender's other phones show it too.
 
 ## Part 3: read marks, ends, and a lost connection
 
@@ -192,17 +191,16 @@ sequenceDiagram
 
 ## Where it lives
 
-- API: `apps/api/src/chat/ws.ts` (the socket), `live.ts` (the hub and the resume), `presence.ts` (the registry), `listen.ts` (the listener), `routes.ts` (the HTTP routes and the send's limiter), `messages.ts` (the send), `repo.ts` (`lockConversation`, `readSendState`, `insertMessage`, `markRead`, `participantsOf`, `messageFor`, `blockerSidesBetween`); `apps/api/src/lib/auth-middleware.ts` (`authenticate`); `apps/api/src/index.ts` (the server and the shutdown); `apps/api/src/app.ts` (`GET /ws` among the public routes, the first message's check handed to the chat); `apps/api/src/lib/config.ts` (`WS_SOCKETS_PER_ACCOUNT`, `WS_AUTH_TIMEOUT_MS`, `WS_PING_INTERVAL_MS`, `WS_PONG_TIMEOUT_MS`)
+- API: `apps/api/src/chat/ws.ts` (the socket), `live.ts` (the hub and the resume), `presence.ts` (the registry), `listen.ts` (the listener), `routes.ts` (the HTTP routes and the send's limiter), `messages.ts` (the send, and `messageReaders` for the push), `repo.ts` (`lockConversation`, `readSendState`, `insertMessage`, `markRead`, `participantsOf`, `messageFor`, `blockerSidesBetween`); `apps/api/src/lib/auth-middleware.ts` (`authenticate`); `apps/api/src/index.ts` (the server and the shutdown); `apps/api/src/app.ts` (`GET /ws` among the public routes, the first message's check and the push handed to the chat); `apps/api/src/notifications/push.ts` (whom a message's push tells); `apps/api/src/lib/config.ts` (`WS_SOCKETS_PER_ACCOUNT`, `WS_AUTH_TIMEOUT_MS`, `WS_PING_INTERVAL_MS`, `WS_PONG_TIMEOUT_MS`)
 - Contracts: `packages/schema/src/chat-frames.ts` (every frame both ways, `FRAME_BYTES_MAX`), `packages/schema/src/chat.ts`
 - Database: `packages/db/drizzle/0053_chat.sql` (the tables), `0055_chat_notify.sql` (the triggers on `kuutti_chat`), `0059_contact_share_notify.sql` (shared contacts), `0063_conversation_notify_close_only.sql` (the conversation's trigger narrowed)
 - Phone app: `apps/mobile/src/features/chat/socket.ts` (connect, auth, resume, ping, backoff, refresh ahead), `store.tsx` (the socket while signed in and in front), `client.ts` (the HTTP routes), `ConversationScreen.tsx` (the rest over `?after=`, a photo's message read again)
 - Specs: `features/chat/live.feature`, `features/chat/conversations.feature`, `features/chat/closing.feature`
-- ADRs: [ADR-031](../adr/031-chat.md) §3 (the send), §4 (what each side reads), §8 (the archive), §9 (the socket, delivery on commit, presence and resume), §10 (a photo); [ADR-030](../adr/030-reports-and-blocks.md) §6 and §12 (no frame tells a block from an end); [ADR-024](../adr/024-sanctions.md) §6 (a shadow ban is never online); [ADR-026](../adr/026-limits-per-person-and-sign-in-doors.md) (the limiters); [ADR-027](../adr/027-sign-in-code-bound-to-the-device.md) (the one refresh); [ADR-033](../adr/033-automatic-shadow-bans.md) (the first message's check); [ADR-011](../adr/011-research-events.md) (the event); [ADR-032](../adr/032-notification-choices-and-notices.md) (the choices the push will read); [ADR-038](../adr/038-the-match.md) (the match opens the conversation)
-- Issues: #348 (conversations and messages), #349 (the socket), #350 (photos), #351 (ends), #103 (contacts shared), #105 (the automatic rules), #102 (the push, not built)
+- ADRs: [ADR-031](../adr/031-chat.md) §3 (the send), §4 (what each side reads), §8 (the archive), §9 (the socket, delivery on commit, presence and resume), §10 (a photo); [ADR-030](../adr/030-reports-and-blocks.md) §6 and §12 (no frame tells a block from an end); [ADR-024](../adr/024-sanctions.md) §6 (a shadow ban is never online); [ADR-026](../adr/026-limits-per-person-and-sign-in-doors.md) (the limiters); [ADR-027](../adr/027-sign-in-code-bound-to-the-device.md) (the one refresh); [ADR-033](../adr/033-automatic-shadow-bans.md) (the first message's check); [ADR-011](../adr/011-research-events.md) (the event); [ADR-032](../adr/032-notification-choices-and-notices.md) (the choices the push reads); [ADR-055](../adr/055-push.md) §4 (the message's push); [ADR-038](../adr/038-the-match.md) (the match opens the conversation)
+- Issues: #348 (conversations and messages), #349 (the socket), #350 (photos), #351 (ends), #103 (contacts shared), #105 (the automatic rules), #102 (the push)
 
 ## Open
 
-- **The push is not built** (#102). Step 35 is drawn dotted. Nothing is sent from the notifications slice yet; the hub's `online` is there for it.
 - **The socket's numbers and the refresh ahead are the maintainer's to confirm** (ADR-031, Open 11 and 12): the sockets per account, the first frame's time, the ping and the pong, and that a socket lives while its session's access token does. The view names them by their configuration keys.
 - **Which section of ADR-031 is the socket.** The code and the spec cite ADR-031 §5 for the socket (`chat/ws.ts`, `chat/live.ts`, `chat/listen.ts`, `chat/presence.ts`, `app.ts`, migration 0055's header, `features/chat/live.feature`, the phone's `socket.ts`); in the ADR the socket is §9, and §5 is the retention of messages. This view cites §9.
 - **The resume in ADR-031 §3.** §3 says the socket reuses `?after=` at every connect. The code, and §9, answer a `resume` frame with at most one page per conversation, and the phone reads the rest over `?after=` when it opens the conversation. Drawn as the code and §9.

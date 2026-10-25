@@ -1,4 +1,4 @@
-import { transaction } from "@kuutti/db";
+import { type Queryable, transaction } from "@kuutti/db";
 import {
   type ChatMessage,
   elapsedBand,
@@ -12,7 +12,12 @@ import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { issueMessagePhotoUrls } from "../media/index.ts";
 import { contactDetailsIn } from "../profile/index.ts";
 import { track } from "../research/index.ts";
-import { type ChatDeps, MESSAGE_MAX_LENGTH_KEY, requireConversation } from "./conversations.ts";
+import {
+  type ChatDeps,
+  MESSAGE_MAX_LENGTH_KEY,
+  requireConversation,
+  stateOf,
+} from "./conversations.ts";
 import * as repo from "./repo.ts";
 
 // Text messages (#348, ADR-031 §3): the send with every refusal, the pages of
@@ -215,4 +220,38 @@ export async function markRead(
   if (!(await repo.markRead(deps.db, { accountId, conversationId, upTo }))) {
     throw new AppError(404, "not_found", "No such conversation");
   }
+}
+
+/**
+ * Who besides its sender may read message `seq` now, through their own
+ * participant row by the socket's rule (#349), in a conversation still open
+ * for them: whom a push of it may tell (#102, ADR-055 §4). Nobody across a
+ * block or a close, nobody for a shadow-banned sender's withheld message,
+ * nobody erased.
+ */
+export async function messageReaders(
+  db: Queryable,
+  input: { conversationId: string; seq: number; senderAccountId: string },
+): Promise<string[]> {
+  const readers: string[] = [];
+  for (const { accountId } of await repo.participantsOf(db, input.conversationId)) {
+    if (accountId === input.senderAccountId) continue;
+    const row = await repo.findConversation(db, accountId, input.conversationId);
+    if (!row) continue;
+    const open =
+      stateOf({
+        archivedAt: row.archivedAt,
+        closedAt: row.closedAt,
+        closedHow: row.closedHow,
+        counterpartLinked: row.counterpartId !== null,
+        blocked: row.blocked,
+      }).state !== "closed";
+    const message = await repo.messageFor(db, {
+      accountId,
+      conversationId: input.conversationId,
+      seq: input.seq,
+    });
+    if (open && message) readers.push(accountId);
+  }
+  return readers;
 }

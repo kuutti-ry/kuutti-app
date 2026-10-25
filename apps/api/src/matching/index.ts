@@ -39,5 +39,7 @@ export {
   relaxationsOf,
   type ShortPool,
   saveRound,
+  // Whom the round's push tells (#102, ADR-055 §6).
+  unopenedRoundsOf,
 } from "./rounds.ts";
 export { preferencesRoutes } from "./routes.ts";

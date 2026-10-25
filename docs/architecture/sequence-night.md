@@ -3,6 +3,7 @@
 <!-- draws
 apps/api/src/jobs/nightly.ts
 apps/api/src/boot.ts
+apps/api/src/jobs/round-push.ts
 infra/modules/observability/
 -->
 
@@ -131,7 +132,7 @@ sequenceDiagram
 20. `waitlist-snapshot` (`jobs/`, #54, ADR-013): under its own advisory lock, counts the waitlist of each pond: live, bank-verified accounts with a pond. A pond's figures move only when at least k people have come or gone since they were taken. The public waitlist route serves them all day. A database with no figures gets its first ones at boot.
 21. `pond-gate` (`jobs/`, #94, ADR-015): under its own advisory lock, with every account it may write for held first, counts each pond's gate: who of a pond is let in, how large everybody's pool is and their place in the line, and for whom matching opens. The exact figures exist in memory only while it runs; what is written, said and logged is in steps (ADR-015 §6). It reads across slices, so it lives with the jobs.
 22. `invitation-count` (rewards, #107, ADR-044 §7): in one transaction, each invitation whose redeemer now has a gate row, and was not counted yet, is counted once; its inviter gets the units `matching_config invitation_reward` says tonight, and one notice in the app (ADR-032). Its line says how many and of what, never who.
-23. `round-builder` (`jobs/`, #95, ADR-035), after the gate: in each pond with an open gate, each person whose matching is open gets a round for the Finnish day, written through the matching slice's one writer. The people whose like waits on the person come first (ADR-037, ADR-039). Somebody the night did not build for gets theirs at the day's first read. Not in production, by night or by read, until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1): a `shortcut:` in `boot.ts` and `app.ts`.
+23. `round-builder` (`jobs/`, #95, ADR-035), after the gate: in each pond with an open gate, each person whose matching is open gets a round for the Finnish day, written through the matching slice's one writer. The people whose like waits on the person come first (ADR-037, ADR-039). Somebody the night did not build for gets theirs at the day's first read. Not in production, by night or by read, until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1): a `shortcut:` in `boot.ts` and `app.ts`. The day's round is told later, at `matching_config round_push_hour` (9 in Helsinki), by a timer of its own in the same process and not by a nightly job: one push to each person whose round was built and who has not opened it, and who opened a round within `matching_config round_push_idle_days` (7), through Expo; a failed run is tried again three times five minutes apart, the same day (#102, ADR-055 §6; [Components](components.md), step 21).
 
 ## Part 4: photos, reports and silent conversations
 
@@ -175,7 +176,7 @@ sequenceDiagram
 
 ## Where it lives
 
-- The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly`, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the two held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
+- The timer and the list: `apps/api/src/jobs/nightly.ts` (`msUntilNightly` over `msUntilFinnishHour`, which the round's push uses too, `runNightly`, `scheduleNightly`), `apps/api/src/boot.ts` (the jobs, in order, and the two held back in production), `apps/api/src/index.ts` (`scheduleNightly` at start)
 - The jobs: `apps/api/src/identity/sessions.ts` and `admin-session.ts`; `apps/api/src/research/copy.ts`, `copy-store.ts`, `partitions.ts`, `anonymity.ts`; `apps/api/src/safety/sanctions.ts` (`endSuspensions`), `photo-check.ts`, `reports.ts` (`pruneReports`); `apps/api/src/jobs/waitlist-snapshot.ts`, `pond-gate.ts`, `invitation-count.ts` with `apps/api/src/rewards/invitations.ts`, `round-builder.ts` with `apps/api/src/matching/rounds.ts` (`saveRound`); `apps/api/src/media/moderation.ts` (`rejectUnreviewedPhotos`, `sweepPendingPhotos`); `apps/api/src/chat/archive.ts`
 - The alarm: `infra/modules/observability/main.tf` (the topic, the e-mail subscription, the metric filter `nightly-failures`, the alarm `nightly-job-failed`), `infra/modules/compute/main.tf` and `templates/user_data.sh.tpl` (the log group and the `awslogs` driver), `infra/envs/staging/main.tf` and `infra/envs/prod/main.tf` (each composes it), `docs/runbooks/alerts.md`
 - Specs: `features/safety/sanctions.feature` (the night lifts a suspension), `features/pond/gate.feature`, `features/pond/waitlist.feature`, `features/matching/rounds.feature`, `features/media/moderation.feature`, `features/chat/conversations.feature`

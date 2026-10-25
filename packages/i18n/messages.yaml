@@ -8869,10 +8869,101 @@ settings.notifications.label:
   machine: { fi: true, sv: true }
 
 notifications.intro:
-  en: "Nothing is sent to this phone yet. What you choose here is kept, and decides what is sent once it is. Each kind is on until you switch it off."
-  description: "The Notifications screen (#176, ADR-032), its opening line: no push exists yet (#102 comes with a native update), the choices are stored and honoured by whatever sends later; a kind never touched is on. Plain and true; no promise of a date."
-  fi: "Tähän puhelimeen ei vielä lähetetä mitään. Valintasi tallennetaan, ja ne ratkaisevat, mitä lähetetään, kun lähettäminen alkaa. Jokainen laji on päällä, kunnes kytket sen pois."
-  sv: "Inget skickas till den här telefonen än. Det du väljer här sparas och avgör vad som skickas när det börjar. Varje slag är på tills du stänger av det."
+  en: "What you choose here decides what Kuutti tells your phones. A notification says only that there is something, never what or from whom. Each kind is on until you switch it off."
+  description: "The Notifications screen (#176, ADR-032; #102, ADR-055), its opening line: the choices are stored on the server and every phone of the person's follows them; a push carries no text and no name; a kind never touched is on. Plain and true."
+  fi: "Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi. Ilmoitus kertoo vain, että jotain on, ei koskaan mitä tai keneltä. Jokainen laji on päällä, kunnes kytket sen pois."
+  sv: "Det du väljer här avgör vad Kuutti berättar för dina telefoner. En avisering säger bara att det finns något, aldrig vad eller från vem. Varje slag är på tills du stänger av det."
+  machine: { fi: true, sv: true }
+
+notifications.phone.allowed:
+  en: "This phone shows Kuutti's notifications."
+  description: "The Notifications screen (#102, ADR-055 §9), above the switches: the phone's own setting lets Kuutti notify. A plain statement of the state."
+  fi: "Tämä puhelin näyttää Kuutin ilmoitukset."
+  sv: "Den här telefonen visar Kuuttis aviseringar."
+  machine: { fi: true, sv: true }
+
+notifications.phone.denied:
+  en: "This phone does not show Kuutti's notifications. You can allow them in the phone's settings."
+  description: "The Notifications screen (#102, ADR-055 §9): the phone's own setting refuses Kuutti's notifications; a button to the phone's settings follows. The app never asks again by itself."
+  fi: "Tämä puhelin ei näytä Kuutin ilmoituksia. Voit sallia ne puhelimen asetuksista."
+  sv: "Den här telefonen visar inte Kuuttis aviseringar. Du kan tillåta dem i telefonens inställningar."
+  machine: { fi: true, sv: true }
+
+notifications.phone.undetermined:
+  en: "This phone has not been asked yet whether Kuutti may notify it."
+  description: "The Notifications screen (#102, ADR-055 §9): the phone has never shown its question; a button that shows it follows. On iOS the phone's settings have no Notifications row for the app until it has."
+  fi: "Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia."
+  sv: "Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den."
+  machine: { fi: true, sv: true }
+
+notifications.phone.unavailable:
+  en: "This device cannot show Kuutti's notifications."
+  description: "The Notifications screen (#102, ADR-055 §9) where no push can reach: the web preview, or a phone that could not be read. The switches still hold for the person's other phones."
+  fi: "Tämä laite ei voi näyttää Kuutin ilmoituksia."
+  sv: "Den här enheten kan inte visa Kuuttis aviseringar."
+  machine: { fi: true, sv: true }
+
+notifications.phone.openSettings:
+  en: "Open the phone's settings"
+  description: "The Notifications screen (#102, ADR-055 §9), the button under a refusal: opens Kuutti's page in the phone's own settings, on iOS and Android. A button label."
+  fi: "Avaa puhelimen asetukset"
+  sv: "Öppna telefonens inställningar"
+  machine: { fi: true, sv: true }
+
+notifications.allow:
+  en: "Allow notifications"
+  description: "A button that shows the phone's own question whether Kuutti may notify it (#102, ADR-055 §9): on the home screen's offer and on the Notifications screen while the phone was never asked. A button label."
+  fi: "Salli ilmoitukset"
+  sv: "Tillåt aviseringar"
+  machine: { fi: true, sv: true }
+
+notifications.ask.heading:
+  en: "Shall Kuutti tell you?"
+  description: "The home screen's one offer of notifications (#102, ADR-055 §9), shown once matching is open and never again after an answer. Its heading; a short question, no pressure."
+  fi: "Kerrotaanko sinulle?"
+  sv: "Ska Kuutti berätta för dig?"
+  machine: { fi: true, sv: true }
+
+notifications.ask.body:
+  en: "Kuutti can tell this phone when today's round is ready, when someone likes you back and when a message arrives. A notification says only that there is something, never what or from whom. You choose which kinds in Settings."
+  description: "The home screen's offer of notifications (#102, ADR-055 §9), the reason in words, under its heading: the three pushes, what a push never carries, and where the kinds are chosen. Calm; no promise of more."
+  fi: "Kuutti voi kertoa tälle puhelimelle, kun päivän kierros on valmis, kun joku tykkää sinusta takaisin ja kun saat viestin. Ilmoitus kertoo vain, että jotain on, ei koskaan mitä tai keneltä. Lajit valitset asetuksista."
+  sv: "Kuutti kan berätta för den här telefonen när dagens omgång är klar, när någon gillar dig tillbaka och när ett meddelande kommer. En avisering säger bara att det finns något, aldrig vad eller från vem. Du väljer slagen i inställningarna."
+  machine: { fi: true, sv: true }
+
+notifications.ask.decline:
+  en: "No thanks"
+  description: "The home screen's offer of notifications (#102, ADR-055 §9), the button beside Allow notifications: the offer goes and is never shown again on this phone; the Notifications screen can still allow them. A button label, as plain as the other."
+  fi: "Ei kiitos"
+  sv: "Nej tack"
+  machine: { fi: true, sv: true }
+
+push.message:
+  en: "You have a new message"
+  description: "A push (#102, ADR-055 §1), its one line: a message arrived while the person was not in the app. Never the text, never who sent it; the phone shows it on the lock screen. Short, no full stop."
+  fi: "Sinulle on uusi viesti"
+  sv: "Du har ett nytt meddelande"
+  machine: { fi: true, sv: true }
+
+push.match:
+  en: "You have a new match"
+  description: "A push (#102, ADR-055 §5), its one line: somebody the person liked liked them back and a conversation opened. Never who; the phone shows it on the lock screen. Short, no full stop."
+  fi: "Sinulle on uusi mätsi"
+  sv: "Du har en ny matchning"
+  machine: { fi: true, sv: true }
+
+push.round:
+  en: "Today's round is ready"
+  description: "A push (#102, ADR-055 §6), its one line, once a day at the round's hour: the day's round waits for the person. Calm, finite; no urgency. Short, no full stop."
+  fi: "Päivän kierros on valmis"
+  sv: "Dagens omgång är klar"
+  machine: { fi: true, sv: true }
+
+push.channel:
+  en: "Notifications"
+  description: "The name of Kuutti's one notification channel in Android's own settings for the app (#102, ADR-055 §9). Short."
+  fi: "Ilmoitukset"
+  sv: "Aviseringar"
   machine: { fi: true, sv: true }
 
 notifications.loading:
@@ -8926,7 +9017,7 @@ notifications.kind.message.hint:
 
 notifications.kind.match.label:
   en: "Matches"
-  description: "The Notifications screen (#176), the switch of a new match (M5 sends it)."
+  description: "The Notifications screen (#176), the switch of a new match, which #102's push sends to the person whose earlier like it met."
   fi: "Mätsit"
   sv: "Matchningar"
   machine: { fi: true, sv: true }
@@ -8946,10 +9037,10 @@ notifications.kind.moderation.label:
   machine: { fi: true, sv: true }
 
 notifications.kind.moderation.hint:
-  en: "About your photos and the reports you made. A warning to you is shown in the app whatever you choose here."
-  description: "The Notifications screen (#176), the line under Moderators' decisions: the switch governs a push only; a warning always appears among the notices on the home screen (ADR-024 §7)."
-  fi: "Kuvistasi ja tekemistäsi ilmoituksista. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa."
-  sv: "Om dina foton och de anmälningar du gjort. En varning till dig visas i appen vad du än väljer här."
+  en: "About your photos and the reports you made. Nothing is sent to your phones for these yet. A warning to you is shown in the app whatever you choose here."
+  description: "The Notifications screen (#176), the line under Moderators' decisions: the switch will govern a push only, and none is sent yet (#312's, ADR-055 Not done); a warning always appears among the notices on the home screen (ADR-024 §7)."
+  fi: "Kuvistasi ja tekemistäsi ilmoituksista. Näistä ei vielä lähetetä puhelimillesi mitään. Sinulle annettu varoitus näytetään sovelluksessa, valitsitpa tässä mitä tahansa."
+  sv: "Om dina foton och de anmälningar du gjort. Inget skickas till dina telefoner om detta än. En varning till dig visas i appen vad du än väljer här."
   machine: { fi: true, sv: true }
 
 notices.title:

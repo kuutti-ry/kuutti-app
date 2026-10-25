@@ -3,6 +3,7 @@
 <!-- draws
 apps/api/src/index.ts
 apps/api/src/jobs/nightly.ts
+apps/api/src/jobs/round-push.ts
 apps/api/src/chat/ws.ts
 apps/api/src/chat/listen.ts
 apps/api/scripts/openapi.ts
@@ -78,19 +79,19 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Components, part 2: inside the API's one process
-  accDescr: One Node process serves HTTP and the chat's WebSocket on the same server and runs the nightly jobs on a timer. Requests pass the app-wide middleware, then a guard, then a slice's route. The socket's upgrade passes the same middleware, then authenticates by its first frame and registers with the live hub. The slices, the hub and the jobs reach PostgreSQL through one pool. The chat's triggers notify on commit, and one pooled connection listens and hands each notification to the hub.
+  accDescr: One Node process serves HTTP and the chat's WebSocket on the same server, runs the nightly jobs on a timer and the round's push on a second. Requests pass the app-wide middleware, then a guard, then a slice's route. The socket's upgrade passes the same middleware, then authenticates by its first frame and registers with the live hub. The slices, the hub and the jobs reach PostgreSQL through one pool. The chat's triggers notify on commit, and one pooled connection listens and hands each notification to the hub.
   subgraph process["The API's one process"]
     c13["The server: serve() from @hono/node-server on PORT"]
-    c14["Boot: error reporting, the bank's discovery, the pool, migrations, media, mail, the app and the jobs"]
+    c14["Boot: error reporting, the bank's discovery, the pool, migrations, media, mail, push, the app and the jobs"]
     c15["App-wide middleware: request id, language, request log, secure headers, noindex, CORS allowlist, body cap, the address's limiter"]
     c16["The guards: the session guard and three staff guards, each with the person's limiter"]
     c17["The routes of the ten slices, and the health probe"]
     c18["The chat's socket, GET /ws: the Origin check, the upgrade over ws, the token in the first frame"]
     c19["The live hub: open sockets and presence in memory, the frames each person may see"]
     c20["The chat listener: LISTEN on kuutti_chat over one pooled connection"]
-    c21["The nightly timer: the next 04:00 in Helsinki"]
-    c22["The nightly jobs, one after another: see The night's jobs"]
-    c23["lib/: configuration, logger, Sentry, S3, SSM, mail, limits, errors, the session check"]
+    c21["The two timers: the next 04:00 in Helsinki, and the next round_push_hour"]
+    c22["What the timers run: the nightly jobs one after another (see The night's jobs), and the round's push"]
+    c23["lib/: configuration, logger, Sentry, S3, SSM, mail, push, limits, errors, the session check"]
     c24["The pool of database connections"]
   end
   c25[("PostgreSQL: the tables, and the chat's triggers that notify on commit")]
@@ -113,17 +114,17 @@ flowchart TB
 
 ### Steps
 
-13. **The server.** `index.ts` loads the configuration through `lib/` (23), boots (14), arms the nightly timer (21), and serves the app on `PORT` with `serve()` from `@hono/node-server`, whose own WebSocket upgrade runs over `ws` on the same server (ADR-031 §9). Every request goes to the app-wide middleware (15). On SIGTERM it tells every socket `restarting`, drains the requests in flight within ten seconds, then stops the listener and the pool.
-14. **Boot** (`boot.ts`) turns error reporting on where a DSN is configured, reads the bank's discovery document through the kit, creates a preview's own database on its first boot, opens the pool, runs the migrations under their advisory lock, makes the research events' partitions, builds media (S3 and the photo check), makes the live hub, builds mail, builds the app, and lists the nightly jobs. A deployed box with half a bank configuration fails here rather than serving a login that answers 503.
+13. **The server.** `index.ts` loads the configuration through `lib/` (23), boots (14), arms the two timers (21), and serves the app on `PORT` with `serve()` from `@hono/node-server`, whose own WebSocket upgrade runs over `ws` on the same server (ADR-031 §9). Every request goes to the app-wide middleware (15). On SIGTERM it tells every socket `restarting`, drains the requests in flight within ten seconds, then stops the listener and the pool.
+14. **Boot** (`boot.ts`) turns error reporting on where a DSN is configured, reads the bank's discovery document through the kit, creates a preview's own database on its first boot, opens the pool, runs the migrations under their advisory lock, makes the research events' partitions, builds media (S3 and the photo check), makes the live hub, builds mail and push, builds the app, and lists the nightly jobs and the round's push. A deployed box with half a bank configuration fails here rather than serving a login that answers 503.
 15. **The app-wide middleware**, in order: the request id, the request's language, the request log, secure headers, `X-Robots-Tag: noindex`, the CORS allowlist, the body cap (the two photo uploads have their own 10 MB cap on their routes), and the limiter keyed by the client address (ADR-026). A request goes on to a guard (16), or straight to its route when the route answers without a session (the health probe, the sign-in's own routes, the public waitlist); the socket's upgrade goes to the socket (18).
 16. **The guards.** One session guard for every route that reads a person's data (rule 6), and three staff guards: any member of staff (moderator, admin or researcher), moderators and admins, and admins alone. Each hands the request it admits to one limiter keyed by the person, and the address gets its count back. The routes that answer without a session are listed in `PUBLIC_ROUTES`; a test checks that no other route lacks a guard.
-17. **The routes** of the ten slices (part 3) and the health probe. They reach PostgreSQL through the pool (24), and the outside services (S3, Rekognition, SES, Telia) through what boot handed them. Where two slices must not import each other, `app.ts` hands one slice's function to the other as a callback (part 4).
+17. **The routes** of the ten slices (part 3) and the health probe. They reach PostgreSQL through the pool (24), and the outside services (S3, Rekognition, SES, Telia, Expo's push) through what boot handed them. Where two slices must not import each other, `app.ts` hands one slice's function to the other as a callback (part 4).
 18. **The chat's socket**, `GET /ws`. The upgrade passes the app-wide middleware (15), so the address's limiter counts it, but no guard: the token comes in the first frame and is checked by the session guard's own code. A browser's Origin must be the API's own host or on the allowlist. A frame is at most 256 KiB, bounded before it is read. The socket only tells; writing stays on the HTTP routes. The socket registers with the hub (19). The Chat view has the steps.
 19. **The live hub** (`chat/live.ts`, `chat/presence.ts`): which accounts have a socket open, in the process's memory and never in a table, and the frames each person may see, read through that person's own participant row. It reads PostgreSQL through the pool (24).
 20. **The chat listener** (`chat/listen.ts`) holds one connection of the pool for `LISTEN kuutti_chat`. The triggers of migrations 0055, 0059 and 0063 notify on that channel when a transaction commits, with ids and numbers only (25). The listener hands each notification to the hub, one at a time, in the order Postgres delivers them (19).
-21. **The nightly timer** (`jobs/nightly.ts`): one timer to the next 04:00 in Helsinki, armed again after each run. It runs the jobs (22).
-22. **The nightly jobs**, listed in `boot.ts` and run one after another; a failure is logged and the next job runs. They reach PostgreSQL through the pool (24). The Night's jobs view has the order and the steps.
-23. **`lib/`**: horizontal code every slice uses and none owns. The configuration is validated with zod at start; on AWS its values come from SSM through the instance role. Also the logger, Sentry, the S3 client, mail, the rate limits, the error envelope and the session check the guard and the socket share.
+21. **The two timers.** The night's (`jobs/nightly.ts`): one timer to the next 04:00 in Helsinki, armed again after each run, which runs the jobs (22). The round's push (`jobs/round-push.ts`, #102, ADR-055 §6): one timer to the next `round_push_hour` in Helsinki, the hour read from `matching_config` at each arming and an hour later again if it cannot be read, which tells the day once.
+22. **What the timers run.** The nightly jobs, listed in `boot.ts` and run one after another; a failure is logged and the next job runs. They reach PostgreSQL through the pool (24). The Night's jobs view has the order and the steps. The round's push reads today's rounds not yet opened and hands them to the notifications slice, which sends through Expo; its failure is logged, never thrown.
+23. **`lib/`**: horizontal code every slice uses and none owns. The configuration is validated with zod at start; on AWS its values come from SSM through the instance role. Also the logger, Sentry, the S3 client, mail, push out to Expo (`lib/push.ts`), the rate limits, the error envelope and the session check the guard and the socket share.
 24. **The pool**: `DB_POOL_MAX` connections, one of them held by the chat listener (20).
 25. **PostgreSQL**: the tables, and the chat's triggers, which send a notification when their transaction commits and none when it rolls back. Its notifications go to the listener (20).
 
@@ -144,7 +145,7 @@ Code inside each app is organised by slice, never by layer (`.claude/rules/layou
 | rewards | yes | yes | no directory | no | light, light, none |
 | notifications | yes | yes | no directory | no | light, light, none |
 
-Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jobs that read across slices: the waitlist count, the pond gate, the invitation count, the round builder), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
+Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jobs that read across slices: the waitlist count, the pond gate, the invitation count, the round builder, and the round's push on its own timer), `lib/` and `test/`; the phone app has `home/` and `settings/` among its features, and `src/lib/`; the admin panel has `src/lib/` and `src/components/ui/` (shadcn/ui's components, ADR-050).
 
 1. **identity**: the bank login, accounts, sessions, re-registration, taking a break, staff sessions. In all three apps; specs in `features/identity`.
 2. **profile**: onboarding, profile fields and prompts, completeness. API and phone app.
@@ -155,7 +156,7 @@ Besides the slices, the API has `health/`, `jobs/` (the nightly timer and the jo
 7. **safety**: reports, blocks, sanctions, the audit log, the automatic shadow bans, velocity. In all three apps; the admin panel's screens are all in this slice. Specs in `features/safety`.
 8. **research**: the event registry's one door (`track`), the `research_id` mapping, the partitions and the research copy. The API alone has code; the phone app's directory holds a README only.
 9. **rewards**: invitations and the reward ledger. API and phone app.
-10. **notifications**: the notification choices and the notices in the app. API and phone app; no push is sent yet (#102).
+10. **notifications**: the notification choices, the notices in the app and the push (#102, ADR-055): whom to tell of a message, a match or the day's round, and the devices' tokens. API and phone app.
 
 ## Part 4: the import boundary
 
@@ -192,7 +193,7 @@ flowchart LR
 31. **The packages** `@kuutti/schema` and `@kuutti/db`: allowed.
 32. **The demo tools**, `@kuutti/db/demo`: refused in the apps' code, so the API's image and the clients' bundles carry nothing of the personas or the synthetic population (ADR-014). Command lines under `scripts/` and tests may import them.
 33. **The check**: Biome's `noRestrictedImports`, in the overrides of `biome.json`, for `apps/api/src`, `apps/mobile/src`, `apps/mobile/app` and `apps/admin/src`, and again for `apps/api/scripts` without the demo rule. It is part of `pnpm lint`, which CI runs on every pull request (#2).
-34. **The callbacks in `app.ts`.** Two slices that would import each other in a cycle meet in `app.ts` instead: the safety slice's check of a conversation's first message is handed to the chat's routes, so the chat never imports safety; the chat's opening of a conversation is handed to the round's routes, since the chat imports the profile, which imports matching.
+34. **The callbacks in `app.ts`.** Two slices that would import each other in a cycle meet in `app.ts` instead: the safety slice's check of a conversation's first message is handed to the chat's routes, so the chat never imports safety; the chat's opening of a conversation is handed to the round's routes, since the chat imports the profile, which imports matching. The push (#102, ADR-055) is made once, in `boot.ts`, over the live hub whose presence it asks, and `app.ts` hands it to both: the chat's routes say when a message is new and the round's when a match is made, and the notifications slice decides whom to tell, so neither imports it.
 
 ## Where it lives
 

@@ -84,6 +84,26 @@ describe("error serialization", () => {
     const error = new TypeError("cannot read email a@b.fi");
     expect(serializeError(error).stack).toMatch(/^TypeError: \[redacted\]\n\s+at /);
   });
+
+  it("writes an err or error field that holds no error as it is, null included, and never throws (#102)", async () => {
+    // A push refused with no code logs `error: null` (notifications/push.ts).
+    const lines: string[] = [];
+    const logger = await createLogger({
+      level: "info",
+      pretty: false,
+      destination: { write: (line) => lines.push(line) },
+    });
+    for (const value of [null, "DeviceNotRegistered", 429, undefined]) {
+      expect(() => logger.warn({ error: value, err: value }, "push refused")).not.toThrow();
+    }
+    expect(lines.map((line) => JSON.parse(line).error)).toEqual([
+      null,
+      "DeviceNotRegistered",
+      429,
+      undefined,
+    ]);
+    expect(serializeError(null)).toBeNull();
+  });
 });
 
 describe("request log line", () => {
