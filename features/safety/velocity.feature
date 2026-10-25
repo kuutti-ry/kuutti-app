@@ -26,7 +26,7 @@ Feature: Velocity rules
   Scenario: Thumbs, the person's own photos and a conversation's photos do not count
     Given auto_shadow_ban_photo_fetches is 120
     And "A" was handed 119 URLs in the last hour of other people's thumbs, of their own photos and of photos sent in conversations
-    When "A" fetches another person's photo in the full size
+    When "A" fetches another person's photo in the card size
     Then "A" is not sanctioned
 
   Scenario: A fetch as old as the window does not count

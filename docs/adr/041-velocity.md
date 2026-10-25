@@ -54,11 +54,12 @@ The maintainer set the parameters on 21/10/2026: three signals (other people's p
 
 ## Open, the maintainer's
 
-1. App attestation (#86) waits for #184's native batch; with it, a request not from the app could be refused instead of counted.
-2. Whether iOS notices a screenshot (#86's comment).
+1. App attestation (#86): settled by ADR-056 on 2026-10-25. Not now; it comes back when update signing returns, Kuutti is on Google Play or a route serves cards outside the round, in ADR-056 §2's shape, refusing only on iOS in production and marking a session for these rules everywhere else.
+2. Whether iOS notices a screenshot: settled by ADR-056 on 2026-10-25. Never, on either platform (§4 there).
 3. `cards_served`'s first value, on the day a route serves cards outside the round: above two rounds' places while `round_size` and `liked_you_cap` stay at 10.
 4. Whether `scraping` becomes the reason of ADR-033's message rules too (its Open 1).
 
 ## History
 
 - 2026-10-21: written with #86's velocity half, on the maintainer's parameters of that day. Before the pull request, its review moved the person's standing into the measure without the lock (a hidden person had paid for the lock on every request after the ban), put the round's reads on a timer sweep with at most the threshold's worth per account, and corrected what the app fetches in full and what a shadow ban does to later rounds.
+- 2026-10-25 (#86, ADR-056): Open 1 and 2 settled. Another account's photo is no longer served in the full size (ADR-056 §3, amending ADR-008 §3), so `photo_fetches` meets new card URLs only; a full-size row of someone else's photo inside the window is one issued before. The rule, its count and its panel text are unchanged.

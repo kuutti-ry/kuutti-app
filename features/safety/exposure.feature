@@ -4,7 +4,8 @@ Feature: Exposure is budgeted and counted
   of a profile photo is a fetch-log row; the day's fetches of a variant are
   counted against matching_config.photo_fetches_per_day in the statement that
   writes the row, and another account's photo is served only from a card the
-  account was shown. A photo sent in a conversation is logged with the
+  account was shown, and never in the full size, which the app asks for only
+  of one's own (ADR-056). A photo sent in a conversation is logged with the
   purpose message and never counted (ADR-031 §10, ADR-008). A refusal is said
   in plain words and counted; nobody is limited in silence. The day is the
   calendar day in Finland (#52, ADR-008).
@@ -42,8 +43,13 @@ Feature: Exposure is budgeted and counted
 
   Scenario: A photo on a card the account was shown is served
     Given an approved photo of another account on a card this account was shown
-    When this account fetches its card and full variants
+    When this account fetches its card and thumb variants
     Then both are issued and written to the fetch log under this account
+
+  Scenario: Another account's photo is never served in the full size, from a shown card too
+    Given an approved photo of another account on a card this account was shown
+    When this account fetches its full variant
+    Then the answer is 404 as for a photo never shown, nothing is written to the fetch log, and the owner is still served it in the full size
 
   Scenario: A photo shown twice is one shown record
     Given a photo of another account on a card this account was shown

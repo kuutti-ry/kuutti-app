@@ -196,9 +196,35 @@ describe("exposure", () => {
     await approve(ctx, theirs.id);
     await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
     expect((await fetchUrl(app, a.headers, theirs.id, "card")).status).toBe(200);
-    expect((await fetchUrl(app, a.headers, theirs.id, "full")).status).toBe(200);
+    expect((await fetchUrl(app, a.headers, theirs.id, "thumb")).status).toBe(200);
     expect(await accessRows(ctx, a.accountId)).toBe(2);
     expect(await accessRows(ctx, b.accountId)).toBe(0);
+  });
+
+  test("Another account's photo is never served in the full size, from a shown card too", async ({
+    ctx,
+  }) => {
+    // ADR-056 §3: the app asks for the full size only of one's own photos, so
+    // another's is what a script would take that the app does not. The same
+    // 404 and line as a photo never shown, and no budget spent.
+    const { app, logs } = await appWith(ctx);
+    const a = await signedInAccount(ctx.client);
+    const b = await signedInAccount(ctx.client);
+    const theirs = await upload(app, b.headers, await fixturePng(64, 64));
+    await approve(ctx, theirs.id);
+    await showCard(ctx, a.accountId, b.accountId, [theirs.id]);
+    const refused = await fetchUrl(app, a.headers, theirs.id, "full");
+    expect(refused.status).toBe(404);
+    expect(await errorCode(refused)).toBe("not_found");
+    expect(await accessRows(ctx, a.accountId)).toBe(0);
+    expect(logs().find((l) => l.msg === "photo refused")).toMatchObject({
+      accountId: a.accountId,
+      photoId: theirs.id,
+      variant: "full",
+      reason: "not_visible",
+    });
+    // The owner still has their own in the full size, for the zoom.
+    expect((await fetchUrl(app, b.headers, theirs.id, "full")).status).toBe(200);
   });
 
   test("A photo not yet approved is not served from a shown card", async ({ ctx }) => {
@@ -265,7 +291,7 @@ describe("A photo of an owner who is not active is not served from a shown card"
       photoId: theirs.id,
       reason: "not_visible",
     });
-    expect(await findVisiblePhoto(ctx.client, owner.accountId, theirs.id)).toMatchObject({
+    expect(await findVisiblePhoto(ctx.client, owner.accountId, theirs.id, "full")).toMatchObject({
       id: theirs.id,
     });
     if (ownerPassesGuard) {

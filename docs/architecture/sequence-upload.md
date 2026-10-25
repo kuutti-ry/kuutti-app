@@ -16,7 +16,7 @@ apps/mobile/src/features/media/client.ts
 infra/modules/media/
 -->
 
-How a profile photo gets from the phone to the media bucket and back to the people who may see it: the app's preparation, the API's pipeline, the automatic check by Rekognition, and the signed CloudFront URL a photo is fetched by. It is written for a contributor or a reviewer who is about to touch the media slice, the photo screens or the media infrastructure. The person's side of the same flow, with the queue and the moderators, is drawn in #395 (`docs/flows/photos.md` once it lands). It draws rule 4, TD-2, TD-6 and TD-8, ADR-005 (the pipeline and delivery), ADR-006 (the check and the queue), ADR-008 (the exposure budget and the shown record) and ADR-041 (velocity). What is drawn is staging's: production has run since 2026-10-24 with photos off until its media cutover (ADR-049).
+How a profile photo gets from the phone to the media bucket and back to the people who may see it: the app's preparation, the API's pipeline, the automatic check by Rekognition, and the signed CloudFront URL a photo is fetched by. It is written for a contributor or a reviewer who is about to touch the media slice, the photo screens or the media infrastructure. The person's side of the same flow, with the queue and the moderators, is drawn in #395 (`docs/flows/photos.md` once it lands). It draws rule 4, TD-2, TD-6 and TD-8, ADR-005 (the pipeline and delivery), ADR-006 (the check and the queue), ADR-008 (the exposure budget and the shown record), ADR-041 (velocity) and ADR-056 (no full size of others). What is drawn is staging's: production has run since 2026-10-24 with photos off until its media cutover (ADR-049).
 
 In the sequences a solid arrow is a request or an action and a dotted arrow is an answer. The numbers on the arrows are the steps under each part, and they run on from one part to the next.
 
@@ -105,7 +105,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: The photo upload, part 3: fetching a photo
-  accDescr: The app asks the API for a URL for one variant of one photo. The API serves only a photo in the caller's scope, signs a CloudFront URL for fifteen minutes, counts the day's fetches against the budget and writes the fetch log in one statement, and runs the velocity check for the larger sizes. The app fetches the URL from CloudFront, which checks the signature and reads the private bucket.
+  accDescr: The app asks the API for a URL for one variant of one photo. The API serves only a photo in the caller's scope, another account's never in the full size, signs a CloudFront URL for fifteen minutes, counts the day's fetches against the budget and writes the fetch log in one statement, and runs the velocity check for the larger sizes. The app fetches the URL from CloudFront, which checks the signature and reads the private bucket.
   autonumber 21
   participant app as The app
   participant api as The API
@@ -113,7 +113,7 @@ sequenceDiagram
   participant cf as CloudFront
   participant s3 as The media bucket
   app->>api: GET /photos/{id}/{variant}
-  api->>db: Finds the photo in the caller's scope: their own, or one on a card they were shown
+  api->>db: Finds the photo in the caller's scope: their own, or one on a card they were shown, never in the full size
   api->>api: Signs a CloudFront URL for media/{key}/{variant}.webp, valid fifteen minutes
   api->>db: Counts the day's fetches against photo_fetches_per_day and writes the photo_access row
   api->>db: For card and full, the velocity check reads the fetch log
@@ -126,11 +126,11 @@ sequenceDiagram
 
 ### Steps
 
-21. The app asks `GET /photos/{id}/{variant}` for the variant it shows: `thumb` in lists, `card` when a profile opens, `full` only from the zoom screen. It caches by photo id and variant, never by the URL.
-22. The API finds the photo in the caller's scope, in the query itself (rule 6): the caller's own photo in any state, or another account's approved profile photo on a card the caller was shown, whose owner is active, with no block between the two. Anything else, a guessed id included, is 404 and a warn line, the same for every miss (ADR-008 §3).
+21. The app asks `GET /photos/{id}/{variant}` for the variant it shows: `thumb` in lists, `card` when a profile opens, `full` only from the zoom screen of one's own photos. It caches by photo id and variant, never by the URL.
+22. The API finds the photo in the caller's scope, in the query itself (rule 6): the caller's own photo in any state, or another account's approved profile photo on a card the caller was shown, whose owner is active, with no block between the two, in the thumb and card sizes. Another account's full size, which the app never asks for, is refused like any miss (ADR-056 §3). Anything else, a guessed id included, is 404 and a warn line, the same for every miss (ADR-008 §3).
 23. It signs a CloudFront canned-policy URL for `media/{key}/{variant}.webp` on the API's own name, valid fifteen minutes, with the private key read from SSM at boot (ADR-005 §3). Signing comes first because it has no side effect: a failure there spends nothing.
 24. Under an advisory lock per account and variant, one statement counts the caller's fetches of this variant since midnight in Finland against `photo_fetches_per_day` and writes the `photo_access` row, the fetch log (ADR-008 §1). Over the budget there is no row and no URL. A block that landed meanwhile is the same 404 as step 22.
-25. For a `card` or a `full`, the safety slice's velocity check reads the fetch log after the row has committed and before the answer (ADR-041); a `thumb` never counts.
+25. For a `card` or a `full`, the safety slice's velocity check reads the fetch log after the row has committed and before the answer (ADR-041); a `thumb` never counts. Since step 22 refuses another's full size, a `full` that reaches here is the caller's own, which the rule never counts.
 26. The app gets 200 with the URL, the variant and when it stops working; or 429 `photo_budget_exceeded` with `Retry-After` until the day rolls, which the app says in words; or 404.
 27. The app fetches the URL from CloudFront.
 28. CloudFront serves `/media/*` only with a signature from a key in the key group the behaviour trusts, before its expiry.
@@ -145,7 +145,7 @@ sequenceDiagram
 - Infrastructure: [infra/modules/media](../../infra/modules/media/main.tf) (the bucket, the distribution, `/media/*`, the key group, origin access control), the `RekognitionDetect` statement in [infra/modules/compute](../../infra/modules/compute/main.tf), `moderation = "rekognition"` in [infra/envs/staging/main.tf](../../infra/envs/staging/main.tf); the signing key in SSM ([infra/README.md](../../infra/README.md), Secrets, Media)
 - Locally: the compose S3 stand-in (versitygw) presigns its own GETs, refused outside development and test
 - Specs: [moderation.feature](../../features/media/moderation.feature)
-- ADRs: [ADR-005](../adr/005-media-pipeline-and-delivery.md), [ADR-006](../adr/006-photo-moderation.md), [ADR-008](../adr/008-exposure-budget-and-client-address.md), [ADR-030](../adr/030-reports-and-blocks.md) §2, [ADR-041](../adr/041-velocity.md)
+- ADRs: [ADR-005](../adr/005-media-pipeline-and-delivery.md), [ADR-006](../adr/006-photo-moderation.md), [ADR-008](../adr/008-exposure-budget-and-client-address.md), [ADR-030](../adr/030-reports-and-blocks.md) §2, [ADR-041](../adr/041-velocity.md), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md) §3
 - Issues: #48 (the pipeline), #49 (the check), #52 (the budget), #56 (tips), #253 (the check's own rejections), #296 (the description), #376 (the queue's limit), #184 (the phone's check)
 
 ## Open

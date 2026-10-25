@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.69.0",
+    "version": "0.69.1",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -8025,7 +8025,7 @@
     "/photos/{id}/{variant}": {
       "get": {
         "summary": "A signed URL for one variant",
-        "description": "Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen. Another account's photo is served only from a card the caller was shown.",
+        "description": "Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen of one's own photos. Another account's photo is served only from a card the caller was shown, and never in the full size (ADR-056).",
         "security": [
           {
             "session": []
@@ -8082,7 +8082,7 @@
             }
           },
           "404": {
-            "description": "Not a photo this account may see: not its own, and not on a card it was shown.",
+            "description": "Not a photo this account may see: not its own, and not on a card it was shown, or another account's in the full size.",
             "content": {
               "application/json": {
                 "schema": {

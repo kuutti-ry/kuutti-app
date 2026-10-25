@@ -1712,7 +1712,7 @@ export interface paths {
         };
         /**
          * A signed URL for one variant
-         * @description Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen. Another account's photo is served only from a card the caller was shown.
+         * @description Valid for fifteen minutes. Every issuance is logged against the caller and counted against the day's budget for the variant (matching_config.photo_fetches_per_day; the day rolls at midnight in Finland). The app caches by photo id and variant, never by this URL, and asks for full only from the zoom screen of one's own photos. Another account's photo is served only from a card the caller was shown, and never in the full size (ADR-056).
          */
         get: {
             parameters: {
@@ -1754,7 +1754,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description Not a photo this account may see: not its own, and not on a card it was shown. */
+                /** @description Not a photo this account may see: not its own, and not on a card it was shown, or another account's in the full size. */
                 404: {
                     headers: {
                         [name: string]: unknown;

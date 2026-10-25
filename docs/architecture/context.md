@@ -17,14 +17,14 @@ packages/i18n/src/legal.ts
 infra/bootstrap/
 -->
 
-Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052 and ADR-055.
+Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052, ADR-055 and ADR-056.
 
 ## Part 1: the people and what their devices reach
 
 ```mermaid
 flowchart TB
   accTitle: Context, part 1: the people and what their devices reach
-  accDescr: A person uses the phone app and a moderator uses the admin panel in a browser. Both reach the API through CloudFront, and both log in at their bank through Telia Tunnistus, which sends the browser back to the API. The app takes its JavaScript from Expo's EAS Update, reports errors to Sentry and links to the legal texts on the website. The API sends its pushes to Expo's push service, which delivers them to the app through Apple's or Google's push service. App attestation is undecided.
+  accDescr: A person uses the phone app and a moderator uses the admin panel in a browser. Both reach the API through CloudFront, and both log in at their bank through Telia Tunnistus, which sends the browser back to the API. The app takes its JavaScript from Expo's EAS Update, reports errors to Sentry and links to the legal texts on the website. The API sends its pushes to Expo's push service, which delivers them to the app through Apple's or Google's push service. App attestation is planned for later.
   subgraph people["The people"]
     n1["A person, with the phone app"]
     n2["A moderator, with the admin panel in a browser"]
@@ -41,7 +41,7 @@ flowchart TB
     n9["Sentry, EU region: error reports"]
     n10["The website kuutti.app on Amplify Hosting, its own repository"]
     n11["Expo push, then Apple's APNs or Google's FCM: the pushes"]
-    n12["App attestation by Apple and Google: undecided, #86"]:::notbuilt
+    n12["App attestation by Apple and Google: planned for later, ADR-056"]:::notbuilt
   end
   n1 -->|"uses"| n3
   n2 -->|"uses"| n4
@@ -58,7 +58,7 @@ flowchart TB
   n3 -->|"opens the legal texts"| n10
   n5 -->|"a push: one line of the app's words and what it is about, never a text or a name"| n11
   n11 -->|"wakes the phone with it"| n3
-  n3 -.->|"undecided, #86"| n12
+  n3 -.->|"planned for later, ADR-056"| n12
   classDef notbuilt stroke-dasharray: 5 5
 ```
 
@@ -75,7 +75,7 @@ flowchart TB
 9. Sentry, in its EU data region: error reports from the API and the app, with every category of data the SDK would collect by itself switched off in the API. Each is on only where a DSN is set: the parameter `sentry-dsn` for the API, `EXPO_PUBLIC_SENTRY_DSN` for the app.
 10. The website `kuutti.app`, on AWS Amplify Hosting, built from its own repository `kuutti-ry/kuutti-app-site`. The app opens the full legal texts there. No arrow joins the website and the API: the API's browser allowlist on staging names the panel's origin alone.
 11. Push through Expo (#102, ADR-055): the API sends each push to Expo's push service over HTTPS, at most a hundred a request, and Expo hands it to Apple's APNs or Google's FCM, which wake the phone. A push carries the device's token, one line of the app's own words in the device's language (a new message, a new match, today's round) and its kind, never a message's text, a name, an account or the conversation, whose id would pair the two phones for the vendors. The app registers its token with the API (`PUT /push-token`) once the phone lets Kuutti notify; the API sends where the parameter `push` says `expo`, as on staging, and reads receipts back once, fifteen minutes later, to forget tokens Apple or Google no longer know. What Expo receives and keeps: `docs/vendors/expo.md`.
-12. App attestation by Apple and Google: undecided, one of #86's anti-scraping items the maintainer has not settled. iOS screenshot detection is the other.
+12. App attestation by Apple and Google: planned for later, not built. It may come back when one of ADR-056 §1's triggers holds, the maintainer's call. Screenshots are never noticed, so no service stands for them (ADR-056 §4).
 
 ## Part 2: the API and the AWS services it calls
 
@@ -210,12 +210,12 @@ flowchart TB
 - AWS: [infra/modules](../../infra/modules) (`compute`, `media`, `admin`, `research`, `observability`), [infra/envs/staging](../../infra/envs/staging), [infra/bootstrap](../../infra/bootstrap) (OIDC roles, the zone, the SES identity, billing); [infra/README.md](../../infra/README.md), Media, Mail, Admin panel, Research copy, Observability, The website
 - Vendors: [docs/vendors/telia.md](../vendors/telia.md)
 - Workflows: [.github/workflows](../../.github/workflows), drawn in [Delivery](delivery.md)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (one AWS account, OpenTofu), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (photos through CloudFront), [ADR-006](../adr/006-photo-moderation.md) (Rekognition), [ADR-014](../adr/014-demo-mode.md) §1 (no real bank on a preview), [ADR-016](../adr/016-fresh-bank-login.md) and [ADR-017](../adr/017-tunnistus-oidc-package.md) (the bank login and the Telia kit), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds test persons only), [ADR-025](../adr/025-admin-host.md) (the panel's host), [ADR-029](../adr/029-the-research-copy.md) (the research copy and the researcher's role), [ADR-031](../adr/031-chat.md) and [ADR-032](../adr/032-notification-choices-and-notices.md) (no push yet), [ADR-041](../adr/041-velocity.md) (#86's open items), [ADR-043](../adr/043-email-confirmation.md) (SES)
-- Issues: #102 (push), #86 (app attestation, iOS screenshot detection), #385 and #196 (mail), #25 (production)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (one AWS account, OpenTofu), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (photos through CloudFront), [ADR-006](../adr/006-photo-moderation.md) (Rekognition), [ADR-014](../adr/014-demo-mode.md) §1 (no real bank on a preview), [ADR-016](../adr/016-fresh-bank-login.md) and [ADR-017](../adr/017-tunnistus-oidc-package.md) (the bank login and the Telia kit), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds test persons only), [ADR-025](../adr/025-admin-host.md) (the panel's host), [ADR-029](../adr/029-the-research-copy.md) (the research copy and the researcher's role), [ADR-031](../adr/031-chat.md) and [ADR-032](../adr/032-notification-choices-and-notices.md) (no push yet), [ADR-041](../adr/041-velocity.md) (velocity), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md) (attestation later), [ADR-043](../adr/043-email-confirmation.md) (SES)
+- Issues: #102 (push), #86 (anti-scraping: attestation later), #385 and #196 (mail), #25 (production)
 
 ## Open
 
 - SES: in its sandbox until the maintainer asks AWS for production access (ADR-043 Open 5, followed in #196); until then it delivers only to verified identities. The identity is in `infra/bootstrap`, which CI never applies; the maintainer applied it on 2026-10-25.
 - Sentry: whether `/kuutti/staging/sentry-dsn` and `EXPO_PUBLIC_SENTRY_DSN` are set is not in the repository. The Sentry organisation's slug is `kuutti-ry` (`kuutti-fi` until October 2026), which `deploy.yml` and the plugin block of `apps/mobile/app.json` name; this view names neither.
-- The two anti-scraping items of #86 that remain, app attestation and iOS screenshot detection, are the maintainer's to decide (CLAUDE.md, Decisions); app attestation waits for #184's native batch (ADR-041, Open 1).
+- App attestation waits for one of ADR-056 §1's three triggers; nothing in the repository watches for them.
 - Dokploy versus Kamal is open (CLAUDE.md, Decisions); the box is drawn with the tool it runs today.
