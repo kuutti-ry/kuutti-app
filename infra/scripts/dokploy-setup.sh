@@ -159,8 +159,15 @@ YAML
 )
 writes=$(jq -cn --arg f "$file" '["cat > /etc/dokploy/traefik/dynamic/00-control-plane.yml <<'"'"'EOF'"'"'", $f, "EOF"]')
 # On staging the same command writes the router that asks the DNS resolver for
-# the previews' one certificate (ADR-053). Nothing resolves to its host, so it
-# serves no request; a preview's own router finds the wildcard in the store.
+# the previews' one certificate (ADR-053), naming the preview name itself as
+# well, so no host a member token attaches is left for Traefik to order. No
+# address record names that host, so it serves no request; a preview's own
+# router finds the wildcard in the store. It also pulls the Traefik image that
+# Dokploy recreates Traefik from below: Dokploy removes the running Traefik
+# without waiting for its pull, so a missing image would leave the box without
+# one. The tag is TRAEFIK_VERSION of the Dokploy that dokploy_version pins
+# (packages/server/src/setup/traefik-setup.ts at v0.30.6).
+traefik_image=traefik:v3.6.25
 if [ -n "$preview_domain" ]; then
   preview_file=$(cat <<YAML
 # Written by infra/scripts/dokploy-setup.sh on staging: the previews' one certificate (ADR-053).
@@ -174,15 +181,16 @@ http:
         certResolver: letsencrypt-dns
         domains:
           - main: "*.$preview_domain"
+            sans: ["$preview_domain"]
 YAML
 )
-  writes=$(jq -c --arg p "$preview_file" '. + ["cat > /etc/dokploy/traefik/dynamic/01-preview-certificate.yml <<'"'"'EOF'"'"'", $p, "EOF"]' <<< "$writes")
+  writes=$(jq -c --arg p "$preview_file" --arg i "$traefik_image" '. + ["cat > /etc/dokploy/traefik/dynamic/01-preview-certificate.yml <<'"'"'EOF'"'"'", $p, "EOF", "docker pull -q \($i)"]' <<< "$writes")
 fi
 # set -e: Run Command reports the last command's status, so a failed write
 # must stop before "echo written".
 cmd=$(jq -cn --argjson w "$writes" '{commands: (["set -e"] + $w + ["echo written"])}')
 cid=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript --comment "Traefik routers (dokploy-setup.sh)" --parameters "$cmd" --query 'Command.CommandId' --output text)
-for _ in $(seq 1 20); do
+for _ in $(seq 1 60); do
   st=$(aws ssm get-command-invocation --command-id "$cid" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
   case "$st" in Success|Failed|TimedOut|Cancelled) break ;; esac
   sleep 3
@@ -246,7 +254,10 @@ if [ -n "$preview_domain" ]; then
     for i in $(seq 1 36); do
       now=$(get settings.readTraefikEnv 2>/dev/null | jq -r '. // ""' 2>/dev/null || true)
       grep -qx "AWS_HOSTED_ZONE_ID=$zone_id" <<< "$now" && break
-      [ "$i" -lt 36 ] || { echo "Traefik was not back with its environment within 3 minutes; see Settings, Web Server, Traefik" >&2; exit 1; }
+      [ "$i" -lt 36 ] || {
+        echo "Traefik was not back with its environment within 3 minutes. If the box has no container dokploy-traefik, Dokploy cannot recreate it: start it through Run Command with the installer's docker run (infra/modules/compute/installer/dokploy-install.sh) on $traefik_image, adding -e AWS_REGION=eu-central-1 -e AWS_HOSTED_ZONE_ID=$zone_id (ADR-053)" >&2
+        exit 1
+      }
       sleep 5
     done
     echo "Traefik is back"
