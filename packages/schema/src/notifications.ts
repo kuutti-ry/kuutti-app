@@ -90,3 +90,46 @@ export const ExportedNotifications = z
   })
   .meta({ id: "ExportedNotifications" });
 export type ExportedNotifications = z.infer<typeof ExportedNotifications>;
+
+// The push (#102, ADR-055): a device's token, and what a push carries for the
+// app. A push says that there is something, never what or from whom: its one
+// line is the app's own words, and its data names the kind and, for a message
+// or a match, the conversation. Never a message's text, a name or an account.
+
+/** The phone platforms a push reaches. Mirrors the database's enum. */
+export const PushPlatform = z.enum(["ios", "android"]).meta({ id: "PushPlatform" });
+export type PushPlatform = z.infer<typeof PushPlatform>;
+
+/** An Expo push token as `getExpoPushTokenAsync` gives it, either of Expo's two spellings. */
+export const ExpoPushToken = z
+  .string()
+  .max(200)
+  .regex(/^Expo(nent)?PushToken\[[A-Za-z0-9_-]{1,160}\]$/);
+
+/** The caller's session's token; the language its pushes are worded in is the request's. */
+export const PushTokenRequest = z
+  .object({ token: ExpoPushToken, platform: PushPlatform })
+  .strict()
+  .meta({ id: "PushTokenRequest" });
+export type PushTokenRequest = z.infer<typeof PushTokenRequest>;
+
+/** What a push's `data` carries, all the app needs to open what it is about on a tap. */
+export const PushData = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("message"), conversationId: z.uuid() }).strict(),
+    z.object({ kind: z.literal("match"), conversationId: z.uuid() }).strict(),
+    z.object({ kind: z.literal("round") }).strict(),
+  ])
+  .meta({ id: "PushData" });
+export type PushData = z.infer<typeof PushData>;
+
+/** A session's push in the export (ADR-055 §11): whether it gets them, never the token. */
+export const ExportedPush = z
+  .object({
+    platform: PushPlatform,
+    /** The language its pushes are worded in. */
+    locale: z.enum(["en", "fi", "sv"]),
+    registeredAt: z.iso.datetime(),
+  })
+  .meta({ id: "ExportedPush" });
+export type ExportedPush = z.infer<typeof ExportedPush>;

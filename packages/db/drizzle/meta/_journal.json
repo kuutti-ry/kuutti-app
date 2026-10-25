@@ -568,6 +568,20 @@
       "when": 1792654755279,
       "tag": "0080_invitations_config",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1792933259557,
+      "tag": "0081_push_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1792933263907,
+      "tag": "0082_push_token_trigger_and_config",
+      "breakpoints": true
     }
   ]
 }

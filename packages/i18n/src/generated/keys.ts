@@ -697,6 +697,10 @@ export type MessageParams = {
   "notices.title": Record<never, never>;
   "notices.warning.body": { "reason": string };
   "notices.warning.title": Record<never, never>;
+  "notifications.allow": Record<never, never>;
+  "notifications.ask.body": Record<never, never>;
+  "notifications.ask.decline": Record<never, never>;
+  "notifications.ask.heading": Record<never, never>;
   "notifications.failed": Record<never, never>;
   "notifications.intro": Record<never, never>;
   "notifications.kind.match.hint": Record<never, never>;
@@ -708,6 +712,11 @@ export type MessageParams = {
   "notifications.kind.round.hint": Record<never, never>;
   "notifications.kind.round.label": Record<never, never>;
   "notifications.loading": Record<never, never>;
+  "notifications.phone.allowed": Record<never, never>;
+  "notifications.phone.denied": Record<never, never>;
+  "notifications.phone.openSettings": Record<never, never>;
+  "notifications.phone.unavailable": Record<never, never>;
+  "notifications.phone.undetermined": Record<never, never>;
   "notifications.saveFailed": Record<never, never>;
   "onboarding.age.explain": { "min": number; "max": number };
   "onboarding.age.oldest": Record<never, never>;
@@ -1313,6 +1322,10 @@ export type MessageParams = {
   "profile.tip.tight_crop": Record<never, never>;
   "profile.tip.title": Record<never, never>;
   "profile.title": Record<never, never>;
+  "push.channel": Record<never, never>;
+  "push.match": Record<never, never>;
+  "push.message": Record<never, never>;
+  "push.round": Record<never, never>;
   "round.back": Record<never, never>;
   "round.decision.failed": Record<never, never>;
   "round.done": Record<never, never>;

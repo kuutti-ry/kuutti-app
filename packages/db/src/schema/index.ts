@@ -57,6 +57,8 @@ export {
   noticeKind,
   notificationKind,
   notificationPreference,
+  pushPlatform,
+  pushToken,
 } from "./notifications.ts";
 export { ponds } from "./ponds.ts";
 export {

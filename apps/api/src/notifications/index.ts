@@ -10,3 +10,5 @@ export {
   recordWarningNotice,
 } from "./notifications.ts";
 export { notificationRoutes } from "./routes.ts";
+// The device's push token (#102, ADR-055): erasure's and the export's halves.
+export { erasePushTokensOf, exportPushTokens } from "./tokens.ts";

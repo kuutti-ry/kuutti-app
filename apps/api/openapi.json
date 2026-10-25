@@ -201,6 +201,9 @@
                 "expiresAt": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "push": {
+                  "$ref": "#/components/schemas/ExportedPush"
                 }
               },
               "required": [
@@ -209,7 +212,8 @@
                 "userAgent",
                 "createdAt",
                 "lastUsedAt",
-                "expiresAt"
+                "expiresAt",
+                "push"
               ]
             }
           },
@@ -549,6 +553,39 @@
         ]
       },
       "AuthPlatform": {
+        "type": "string",
+        "enum": [
+          "ios",
+          "android"
+        ]
+      },
+      "ExportedPush": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "platform": {
+            "$ref": "#/components/schemas/PushPlatform"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en",
+              "fi",
+              "sv"
+            ]
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "platform",
+          "locale",
+          "registeredAt"
+        ]
+      },
+      "PushPlatform": {
         "type": "string",
         "enum": [
           "ios",
@@ -3999,6 +4036,24 @@
           "fish",
           "likes"
         ]
+      },
+      "PushTokenRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 200,
+            "pattern": "^Expo(nent)?PushToken\\[[A-Za-z0-9_-]{1,160}\\]$"
+          },
+          "platform": {
+            "$ref": "#/components/schemas/PushPlatform"
+          }
+        },
+        "required": [
+          "token",
+          "platform"
+        ],
+        "additionalProperties": false
       },
       "Invitations": {
         "type": "object",
@@ -9368,6 +9423,52 @@
           },
           "404": {
             "description": "not_found: no such notice of the caller's.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/push-token": {
+      "put": {
+        "summary": "Register this device's push token",
+        "description": "The caller's session's Expo push token, which its pushes go to (ADR-055): one per session, replacing the session's earlier one, and taken from any other session it was registered to. The pushes are worded in the request's language. It goes when the session ends. A session revoked meanwhile writes nothing.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushTokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Registered, or nothing to register for a session that ended."
+          },
+          "400": {
+            "description": "validation_failed: not an Expo push token, an unknown platform, an unknown key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
             "content": {
               "application/json": {
                 "schema": {

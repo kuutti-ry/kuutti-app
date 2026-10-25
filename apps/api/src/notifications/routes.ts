@@ -1,10 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { DEFAULT_LOCALE } from "@kuutti/i18n";
 import {
   ErrorResponse,
   NoticeParams,
   Notices,
   NotificationChoices,
   NotificationKindParams,
+  PushTokenRequest,
   PutNotificationChoice,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
@@ -12,10 +14,12 @@ import type { Deps } from "../app.ts";
 import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { choicesOf, noticesOf, readNotice, setChoice } from "./notifications.ts";
+import { registerPushToken } from "./tokens.ts";
 
-// The notification choices and the notices in the app (#176, ADR-032),
-// behind the session guard, each statement naming the caller's account
-// (rule 6). Nothing here sends anything.
+// The notification choices and the notices in the app (#176, ADR-032), and
+// the device's push token (#102, ADR-055 §2), behind the session guard, each
+// statement naming the caller's account (rule 6) but the token's one move,
+// which says why in tokens.ts. Nothing here sends anything.
 
 const errorContent = (description: string) => ({
   description,
@@ -82,11 +86,34 @@ const readNoticeRoute = createRoute({
   },
 });
 
+const pushTokenRoute = createRoute({
+  method: "put",
+  path: "/push-token",
+  summary: "Register this device's push token",
+  description:
+    "The caller's session's Expo push token, which its pushes go to (ADR-055): one per session, replacing the session's earlier one, and taken from any other session it was registered to. The pushes are worded in the request's language. It goes when the session ends. A session revoked meanwhile writes nothing.",
+  ...bearer,
+  request: { body: { required: true, ...json(PushTokenRequest) } },
+  responses: {
+    204: { description: "Registered, or nothing to register for a session that ended." },
+    400: errorContent(
+      "validation_failed: not an Expo push token, an unknown platform, an unknown key.",
+    ),
+    401: unauthenticated,
+  },
+});
+
 export function notificationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>) {
   const app = new OpenAPIHono<AppEnv>();
   const now = deps.now ?? (() => new Date());
   // On the routing paths themselves, which app.test.ts holds every guarded route to.
-  for (const route of [choicesRoute, setChoiceRoute, noticesRoute, readNoticeRoute]) {
+  for (const route of [
+    choicesRoute,
+    setChoiceRoute,
+    noticesRoute,
+    readNoticeRoute,
+    pushTokenRoute,
+  ]) {
     app.use(route.getRoutingPath(), guard);
   }
 
@@ -114,6 +141,21 @@ export function notificationRoutes(deps: Deps, guard: MiddlewareHandler<AppEnv>)
     const { accountId } = callerOf(c);
     const { id } = c.req.valid("param");
     await readNotice({ db: deps.db, now }, { accountId, noticeId: id });
+    return c.body(null, 204);
+  });
+
+  app.openapi(pushTokenRoute, async (c) => {
+    const { accountId, sessionId } = callerOf(c);
+    const { token, platform } = c.req.valid("json");
+    await registerPushToken(deps.db, {
+      accountId,
+      sessionId,
+      token,
+      platform,
+      // The language the request was answered in, one this environment serves (#55).
+      locale: c.get("locale") ?? DEFAULT_LOCALE,
+      at: now(),
+    });
     return c.body(null, 204);
   });
 

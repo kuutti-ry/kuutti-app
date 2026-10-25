@@ -19,7 +19,12 @@ import {
   type MediaDeps,
   type PhotoErasure,
 } from "../media/index.ts";
-import { eraseNotificationsOf, exportNotifications } from "../notifications/index.ts";
+import {
+  eraseNotificationsOf,
+  erasePushTokensOf,
+  exportNotifications,
+  exportPushTokens,
+} from "../notifications/index.ts";
 import { deleteGateOfAccount, exportGate, findPondOfAccount } from "../pond/index.ts";
 import { eraseProfileOfAccount, exportProfile } from "../profile/index.ts";
 import { exportResearch, removeResearchSubject } from "../research/index.ts";
@@ -96,6 +101,8 @@ export type ExportDeps = ErasureDeps & { version: string };
 
 export type ErasureSummary = {
   sessions: number;
+  /** The devices' push tokens (#102, ADR-055 §3), counted before the sessions take them. */
+  pushTokens: number;
   authRequests: number;
   /** 0 or 1: the profile row (#47). */
   profileRows: number;
@@ -161,6 +168,8 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     }
     const identity = await repo.findIdentitySummaryForAccount(tx, accountId);
     if (!identity) throw new Error("account without identity");
+    // Before the sessions, whose cascade would take them uncounted (ADR-055 §3).
+    const pushTokens = await erasePushTokensOf(tx, accountId);
     const sessions = await repo.deleteAccountSessions(tx, accountId);
     const authRequests = await repo.deleteAuthRequestsOfAccount(tx, accountId);
     // A photo a report's frozen copy holds stays its twelve months (#351, ADR-030 §12).
@@ -206,6 +215,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     await repo.recordIdentityDeletion(tx, identity.identityId, deletion);
     return {
       sessions,
+      pushTokens,
       authRequests,
       photos,
       profileRows,
@@ -232,6 +242,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     : 0;
   const summary: ErasureSummary = {
     sessions: result.sessions,
+    pushTokens: result.pushTokens,
     authRequests: result.authRequests,
     profileRows: result.profileRows,
     preferences: result.preferences,
@@ -305,6 +316,7 @@ export async function exportAccount(
   const identity = await repo.findIdentitySummaryForAccount(deps.db, accountId);
   if (!account || !identity) throw new AppError(404, "not_found", "No such account");
   const sessions = await repo.listSessionsForAccount(deps.db, accountId);
+  const pushes = await exportPushTokens(deps.db, accountId);
   const media = deps.media
     ? { ...deps.media, db: deps.db, logger: deps.logger, now: deps.now }
     : { db: deps.db, logger: deps.logger, now: deps.now };
@@ -398,6 +410,7 @@ export async function exportAccount(
       createdAt: s.createdAt.toISOString(),
       lastUsedAt: s.lastUsedAt.toISOString(),
       expiresAt: s.expiresAt.toISOString(),
+      push: pushes.get(s.id) ?? null,
     })),
     profile,
     // The check's description in words too (#296): what the person's photo is

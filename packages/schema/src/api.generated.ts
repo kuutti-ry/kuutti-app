@@ -3253,6 +3253,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/push-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Register this device's push token
+         * @description The caller's session's Expo push token, which its pushes go to (ADR-055): one per session, replacing the session's earlier one, and taken from any other session it was registered to. The pushes are worded in the request's language. It goes when the session ends. A session revoked meanwhile writes nothing.
+         */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["PushTokenRequest"];
+                };
+            };
+            responses: {
+                /** @description Registered, or nothing to register for a session that ended. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description validation_failed: not an Expo push token, an unknown platform, an unknown key. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/invitations": {
         parameters: {
             query?: never;
@@ -6785,6 +6844,7 @@ export interface components {
                 lastUsedAt: string;
                 /** Format: date-time */
                 expiresAt: string;
+                push: components["schemas"]["ExportedPush"];
             }[];
             profile: components["schemas"]["ProfileDocument"];
             photos: components["schemas"]["ExportedPhoto"][];
@@ -6861,6 +6921,15 @@ export interface components {
         IdentityStanding: "ok" | "suspended" | "banned";
         /** @enum {string} */
         AuthPlatform: "ios" | "android";
+        ExportedPush: {
+            platform: components["schemas"]["PushPlatform"];
+            /** @enum {string} */
+            locale: "en" | "fi" | "sv";
+            /** Format: date-time */
+            registeredAt: string;
+        } | null;
+        /** @enum {string} */
+        PushPlatform: "ios" | "android";
         ProfileDocument: {
             displayName: string;
             bio: string | null;
@@ -7728,6 +7797,10 @@ export interface components {
         RewardUnits: {
             fish: number;
             likes: number;
+        };
+        PushTokenRequest: {
+            token: string;
+            platform: components["schemas"]["PushPlatform"];
         };
         Invitations: {
             /** @description True once the person's profile has passed the pond gate's test. */
