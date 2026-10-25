@@ -124,6 +124,10 @@ export function AuditLog() {
 
   const apply = (event: FormEvent) => {
     event.preventDefault();
+    // A search is no paging: a page Older or Newer asked for that failed, or is
+    // still loading, leaves `paged` set, and the page Show asks for must not
+    // spend it (#458).
+    paged.current = false;
     setFilters(draft);
     setCursors([null]);
     setAsked((n) => n + 1);

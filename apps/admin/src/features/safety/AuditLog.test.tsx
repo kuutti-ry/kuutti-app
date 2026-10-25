@@ -482,6 +482,44 @@ describe("the audit log", () => {
     expect(second.closest('[tabindex="-1"]')).toHaveFocus();
   });
 
+  it("leaves the focus on Show after an Older whose page failed: a search is no paging (#458)", async () => {
+    fetchMock([
+      answer(({ before }) => (before ? failure("internal_error", 500) : json(numbered(1, "c1")))),
+    ]);
+    show();
+    await screen.findByText("page 1");
+    fireEvent.click(older());
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The audit log could not be loaded.",
+    );
+    // fireEvent.click does not move the focus as a person's click does.
+    const apply = filters().getByRole("button", { name: "Show" });
+    apply.focus();
+    fireEvent.click(apply);
+    const first = await screen.findByText("page 1");
+    expect(apply).toHaveFocus();
+    expect(first.closest('[tabindex="-1"]')).not.toHaveFocus();
+  });
+
+  it("leaves the focus on Show when it is pressed while Older's page loads (#458)", async () => {
+    const second = deferred<Response>();
+    fetchMock([answer(({ before }) => (before ? second.promise : json(numbered(1, "c1"))))]);
+    show();
+    await screen.findByText("page 1");
+    fireEvent.click(older());
+    expect(await screen.findByText("Loading the audit log…")).toBeInTheDocument();
+    const apply = filters().getByRole("button", { name: "Show" });
+    apply.focus();
+    fireEvent.click(apply);
+    const first = await screen.findByText("page 1");
+    expect(apply).toHaveFocus();
+    expect(first.closest('[tabindex="-1"]')).not.toHaveFocus();
+    // Older's answer, arriving last, is superseded and moves nothing.
+    await act(async () => second.resolve(json(numbered(2, null))));
+    expect(screen.queryByText("page 2")).toBeNull();
+    expect(apply).toHaveFocus();
+  });
+
   it("leaves a superseded request's failure unsaid: the rows of the filters applied stay", async () => {
     const first = deferred<Response>();
     const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
