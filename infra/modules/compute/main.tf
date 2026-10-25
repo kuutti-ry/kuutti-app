@@ -207,10 +207,13 @@ data "aws_iam_policy_document" "api" {
     resources = ["*"]
   }
 
-  # Nightly Dokploy backup. SSE-KMS is required so the objects stay unreadable
-  # to the plan role, which may read the state bucket but is explicitly denied
-  # kms:Decrypt (bootstrap). The box may read its own backups back for a
-  # rebuild (README); it can never delete them or touch state.
+  # Nightly Dokploy backup, write only. SSE-KMS is required so the objects stay
+  # unreadable to the plan role, which may read the state bucket but is
+  # explicitly denied kms:Decrypt (bootstrap). The box never reads them back:
+  # on staging a preview holds this role, and a backup carries every
+  # certificate key on the box, so a rebuild fetches it through a link the
+  # maintainer presigns (README, ADR-054). It can never delete them or touch
+  # state.
   statement {
     sid       = "DokployBackupWrite"
     effect    = "Allow"
@@ -221,26 +224,6 @@ data "aws_iam_policy_document" "api" {
       test     = "StringEquals"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
-    }
-  }
-
-  statement {
-    sid       = "DokployBackupRead"
-    effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = ["arn:aws:s3:::${var.backup_bucket}/${local.backup_prefix}*"]
-  }
-
-  statement {
-    sid       = "DokployBackupList"
-    effect    = "Allow"
-    actions   = ["s3:ListBucket"]
-    resources = ["arn:aws:s3:::${var.backup_bucket}"]
-
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values   = ["${local.backup_prefix}*"]
     }
   }
 }

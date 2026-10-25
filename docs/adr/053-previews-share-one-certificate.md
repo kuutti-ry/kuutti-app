@@ -1,6 +1,6 @@
 # ADR-053: The previews share one certificate, obtained by DNS-01
 
-- Status: proposed (#448, built as written here at the maintainer's word of 2026-10-24, option 1 of the four weighed; the staging apply on merge and one run of `dokploy-setup.sh staging` switch it on; accepting it is the maintainer's)
+- Status: proposed (#448, built as written here at the maintainer's word of 2026-10-24, option 1 of the four weighed; the staging apply on merge and one run of `dokploy-setup.sh staging` switch it on; accepting it is the maintainer's), amended by ADR-054 on 2026-10-25 (What a pull request may do now: no certificate key from the backup)
 - Date: 2026-10-24
 - Follows: TD-2 (three previews), TD-19 (one staging box with the previews on it), ADR-001 (Dokploy's configuration is the one manual island; each environment declares its own records in `envs/<env>/dns.tf`), ADR-004 §3 (write access to the repository is a preview's trust, and staging-level trust), ADR-048 (`dokploy-setup.sh` writes what Traefik routes once Dokploy has its owner), ADR-049 (production runs under the same registered domain since 2026-10-24); issues #448, #9, #25
 
@@ -32,7 +32,7 @@ Traefik decides whether to order by looking in its store first. Before it orders
 
 ## What a pull request may do now, and what it no longer can
 
-- **Gained.** Preview code holds the instance role, so a pull request may write that one TXT record. With it, it can obtain a certificate for `*.preview.api.staging.kuutti.app` under a key of its own. It can also read Traefik's own key for it from the box's nightly backup, which the instance role reads, as it can every certificate key on the box (`infra/README.md`, Backups). Only preview code answers at those names already. It can also break the wildcard's renewal by changing or removing the record during a challenge, which takes the previews down; preview code can already take the box down. It cannot write another name or another record type: AWS enforces the conditions.
+- **Gained.** Preview code holds the instance role, so a pull request may write that one TXT record. With it, it can obtain a certificate for `*.preview.api.staging.kuutti.app` under a key of its own. It could also read Traefik's own key for it, as every certificate key on the box, from the box's nightly backup, until ADR-054 took that read off the role. Only preview code answers at those names already. It can also break the wildcard's renewal by changing or removing the record during a challenge, which takes the previews down; preview code can already take the box down. It cannot write another name or another record type: AWS enforces the conditions.
 - **Lost.** A member token can no longer make Traefik order a certificate by attaching preview hosts. The preview name itself and every name one label under it are covered by the certificate, so nothing is ordered. Deeper names are refused HTTP-01 by the CAA record of §5. The other names that lead to the box hold their certificates already. The TXT right reaches only the wildcard's own sets of names. Repeating one is a renewal, exempt from the 50 and limited to 5 in 7 days per set.
 
 ## Consequences
