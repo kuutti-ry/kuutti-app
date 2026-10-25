@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react-native";
 import { act, render, screen, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
@@ -9,10 +10,11 @@ import { PushNotifications } from "./PushNotifications";
 
 // The push on this phone (#102, ADR-055 §2, §9): the foreground handler; the
 // token registered at the start while signed in, on a new token and on a
-// change of the app's language, and never while signed out; a tap opening
-// its conversation or today's round once, and nothing for a tap the app
-// cannot read, an action that is not the tap, or a tap while signed out;
-// and none of it on the web target.
+// change of the app's language, once when iOS hands the same token over
+// again, and never while signed out; the phone's list cleared on a sign-out;
+// a tap opening its conversation or today's round once, and nothing for a
+// tap the app cannot read, an action that is not the tap, or a tap while
+// signed out; and none of it on the web target.
 
 const notifications = jest.mocked(Notifications);
 const phone = jest.requireMock("expo-notifications") as {
@@ -22,17 +24,25 @@ const phone = jest.requireMock("expo-notifications") as {
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock };
 };
+const secureStore = jest.requireMock("expo-secure-store") as { __store: Map<string, string> };
 
 const CONVERSATION = "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e6f";
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
-const signIn = () =>
-  saveSession({
-    sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+/** Expo's token for a device token the phone hands over. */
+const expoToken = (seed: string) => `ExponentPushToken[${(seed + "a".repeat(22)).slice(0, 22)}]`;
+// Each sign-in a session of its own, as the API gives: the app sends a
+// registration once per session, token and language.
+let sessions = 0;
+const signIn = () => {
+  sessions += 1;
+  return saveSession({
+    sessionId: `6f1c1c4e-9a8e-4a0b-9c3a-${String(sessions).padStart(12, "0")}`,
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
     refreshToken: token("refresh"),
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
+};
 const allowed = {
   status: "granted",
   granted: true,
@@ -80,6 +90,8 @@ function InLanguage({ language }: { language: LocalePreference }) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  // The phone's language, whatever a test before chose in the app.
+  secureStore.__store.delete("kuutti.preference.locale");
   phone.__respond(null);
   notifications.getPermissionsAsync.mockResolvedValue(allowed as never);
   await clearSession();
@@ -110,19 +122,79 @@ describe("PushNotifications", () => {
     });
 
     const device = { type: "ios", data: "a-new-device-token" } as const;
+    notifications.getExpoPushTokenAsync.mockResolvedValueOnce({
+      type: "expo",
+      data: expoToken("new"),
+    });
     await act(async () => phone.__newToken(device));
     await waitFor(() => expect(seen).toHaveLength(2));
     expect(notifications.getExpoPushTokenAsync).toHaveBeenLastCalledWith(
       expect.objectContaining({ devicePushToken: device }),
     );
+    expect(seen[1]).toEqual({ body: { token: expoToken("new"), platform: "ios" }, language: "en" });
 
     await view.rerender(underProviders(<InLanguage language="fi" />));
     await waitFor(() => expect(seen).toHaveLength(3));
     expect(seen[2]?.language).toBe("fi");
     // The token listener follows the language too.
+    notifications.getExpoPushTokenAsync.mockResolvedValueOnce({
+      type: "expo",
+      data: expoToken("newer"),
+    });
     await act(async () => phone.__newToken(device));
     await waitFor(() => expect(seen).toHaveLength(4));
-    expect(seen[3]?.language).toBe("fi");
+    expect(seen[3]).toEqual({
+      body: { token: expoToken("newer"), platform: "ios" },
+      language: "fi",
+    });
+  });
+
+  it("sends the token once when iOS hands it over again after the fetch", async () => {
+    const seen = api();
+    await signIn();
+    await renderWithTheme(<PushNotifications />);
+    await waitFor(() => expect(seen).toHaveLength(1));
+    await act(async () => phone.__newToken({ type: "ios", data: "the-same-device-token" }));
+    await settle();
+    expect(notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(2);
+    expect(seen).toHaveLength(1);
+  });
+
+  it("clears the phone's list of pushes on a sign-out, and not at the start or on a sign-in", async () => {
+    api();
+    await signIn();
+    await renderWithTheme(<PushNotifications />);
+    await settle();
+    expect(notifications.dismissAllNotificationsAsync).not.toHaveBeenCalled();
+    await act(async () => {
+      await clearSession();
+    });
+    expect(notifications.dismissAllNotificationsAsync).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await signIn();
+    });
+    await settle();
+    expect(notifications.dismissAllNotificationsAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears nothing at a start signed out", async () => {
+    await renderWithTheme(<PushNotifications />);
+    await settle();
+    expect(notifications.dismissAllNotificationsAsync).not.toHaveBeenCalled();
+  });
+
+  it("reports a list that would not clear on a sign-out, and throws nothing", async () => {
+    api();
+    await signIn();
+    const error = new Error("no list");
+    notifications.dismissAllNotificationsAsync.mockRejectedValueOnce(error);
+    await renderWithTheme(<PushNotifications />);
+    await settle();
+    await act(async () => {
+      await clearSession();
+    });
+    await settle();
+    expect(Sentry.captureException).toHaveBeenCalledWith(error);
   });
 
   it("registers nothing and listens for no token while signed out, and stops on a sign-out", async () => {
@@ -233,5 +305,7 @@ describe("the web target", () => {
     expect(notifications.clearLastNotificationResponse).not.toHaveBeenCalled();
     expect(router.push).not.toHaveBeenCalled();
     expect(seen).toEqual([]);
+    await clearSession();
+    expect(notifications.dismissAllNotificationsAsync).not.toHaveBeenCalled();
   });
 });

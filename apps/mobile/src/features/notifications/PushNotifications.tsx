@@ -1,7 +1,8 @@
 import { PushData } from "@kuutti/schema";
+import * as Sentry from "@sentry/react-native";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { useSession } from "@/features/identity";
 import { useT } from "@/lib/locale";
@@ -30,7 +31,7 @@ export function PushNotifications() {
  * the API words the pushes in it. A tap on a push opens what it is about:
  * its conversation, or today's round, under the lock if the lock is on; a tap
  * that came while signed out is let go. Either way it is cleared, so it opens
- * nothing twice.
+ * nothing twice. A sign-out clears the phone's list of Kuutti's pushes.
  */
 function OnThePhone() {
   const { t, locale } = useT();
@@ -42,6 +43,18 @@ function OnThePhone() {
   useEffect(() => {
     Notifications.setNotificationHandler({ handleNotification: async () => IN_FRONT });
   }, []);
+
+  const signedIn = useRef<string | null>(null);
+  useEffect(() => {
+    const before = signedIn.current;
+    signedIn.current = sessionId;
+    if (before === null || sessionId !== null) return;
+    // A sign-out clears the pushes still in the phone's list, so that the next
+    // person to sign in cannot tap the previous one's. Reported, the error alone.
+    Notifications.dismissAllNotificationsAsync().catch((error: unknown) =>
+      Sentry.captureException(error),
+    );
+  }, [sessionId]);
 
   useEffect(() => {
     if (sessionId === null) return;

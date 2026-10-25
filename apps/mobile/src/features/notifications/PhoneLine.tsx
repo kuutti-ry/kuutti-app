@@ -1,6 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import * as Sentry from "@sentry/react-native";
-import { Linking, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { AccessibilityInfo, Linking, Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
@@ -20,17 +21,29 @@ const WORDS: Record<PhonePermission, PlainMessageKey> = {
  * Settings › Notifications above the switches, read again as the app comes
  * back from the phone's settings. A refusal has the way to the phone's
  * settings, on both platforms; a phone never asked has the button that shows
- * the phone's own question, which on iOS is the only way its settings ever
- * get a Notifications row for Kuutti. No dialog of ours asks.
+ * the phone's own question, which waits while the question is open and on
+ * iOS is the only way its settings ever get a Notifications row for Kuutti.
+ * No dialog of ours asks. A change after the first read is said: iOS has no
+ * live regions, so VoiceOver is told; TalkBack reads the region itself.
  */
 export function PhoneLine() {
   const { t } = useT();
   const tap = useHapticTap();
-  const { permission, ask } = usePhonePermission();
-  if (permission === null) return null;
+  const { permission, asking, ask } = usePhonePermission();
+  const line = permission === null ? null : t(WORDS[permission]);
+  const shown = useRef<PhonePermission | null>(null);
+  useEffect(() => {
+    if (line === null) return;
+    const before = shown.current;
+    shown.current = permission;
+    if (before !== null && before !== permission && Platform.OS === "ios") {
+      AccessibilityInfo.announceForAccessibility(line);
+    }
+  }, [permission, line]);
+  if (line === null) return null;
   return (
     <View className="gap-2">
-      <Text accessibilityLiveRegion="polite">{t(WORDS[permission])}</Text>
+      <Text accessibilityLiveRegion="polite">{line}</Text>
       {permission === "denied" && (
         <Button
           variant="outline"
@@ -46,6 +59,7 @@ export function PhoneLine() {
       {permission === "undetermined" && (
         <Button
           variant="outline"
+          disabled={asking}
           onPress={() => {
             tap();
             void ask();

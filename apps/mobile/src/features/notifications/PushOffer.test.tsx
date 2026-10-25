@@ -1,20 +1,25 @@
 import { act, screen, userEvent, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
+import { View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { PushOffer } from "./PushOffer";
 
 // The home screen's one offer of notifications (#102, ADR-055 §9): shown
 // only while the phone has not been asked and this phone has not answered
 // the offer; Allow shows the phone's question and registers on a yes; No
-// thanks asks nothing; either answer is kept and the offer never comes back.
+// thanks asks nothing; both wait while the question is open, so it is asked
+// once; either answer is kept and the offer never comes back; nothing
+// offered for a read that answers after the home screen has gone.
 // Where it shows, only once matching is open, is HomeScreen.test.tsx's.
 
 const notifications = jest.mocked(Notifications);
-const { __store: store } = jest.requireMock("expo-secure-store") as {
+const secure = jest.requireMock("expo-secure-store") as {
   __store: Map<string, string>;
+  getItemAsync: (key: string) => Promise<string | null>;
 };
+const store = secure.__store;
 const ASKED = "kuutti.preference.pushAsked";
 const status = (ios: number, root: string) => ({
   status: root,
@@ -47,19 +52,25 @@ function api(): unknown[] {
   return seen;
 }
 
+// A session of its own for each test: the app sends a registration once per
+// session, token and language.
+let sessions = 0;
+
 beforeEach(async () => {
   jest.clearAllMocks();
   store.delete(ASKED);
   notifications.getPermissionsAsync.mockResolvedValue(NOT_ASKED as never);
   await clearSession();
+  sessions += 1;
   await saveSession({
-    sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+    sessionId: `6f1c1c4e-9a8e-4a0b-9c3a-${String(sessions).padStart(12, "0")}`,
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
     refreshToken: token("refresh"),
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
 });
+afterEach(() => jest.restoreAllMocks());
 
 describe("PushOffer", () => {
   it("offers once, with the reason in words and two answers of equal weight", async () => {
@@ -143,5 +154,54 @@ describe("PushOffer", () => {
     await renderWithTheme(<PushOffer />);
     await settle();
     expect(screen.queryByText(HEADING)).toBeNull();
+  });
+
+  it("waits, both answers dimmed, while the phone's question is open, and asks it once", async () => {
+    const seen = api();
+    let answer: () => void = () => undefined;
+    notifications.requestPermissionsAsync.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answer = () => {
+            notifications.getPermissionsAsync.mockResolvedValue(ALLOWED as never);
+            resolve(ALLOWED as never);
+          };
+        }),
+    );
+    await renderWithTheme(<PushOffer />);
+    const user = userEvent.setup();
+    await user.press(await screen.findByRole("button", { name: "Allow notifications" }));
+    await waitFor(() => expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1));
+    const allow = screen.getByRole("button", { name: "Allow notifications" });
+    const decline = screen.getByRole("button", { name: "No thanks" });
+    expect(allow.props.accessibilityState?.disabled).toBe(true);
+    expect(decline.props.accessibilityState?.disabled).toBe(true);
+    await user.press(allow);
+    await user.press(decline);
+    await settle();
+    // Still waiting for the phone: asked once, the offer still there.
+    expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(HEADING)).toBeTruthy();
+    await act(async () => answer());
+    await waitFor(() => expect(seen).toHaveLength(1));
+    expect(screen.queryByText(HEADING)).toBeNull();
+  });
+
+  it("offers nothing for a read that answers after the home screen has gone", async () => {
+    let read: (stored: string | null) => void = () => undefined;
+    const real = secure.getItemAsync;
+    jest
+      .spyOn(secure, "getItemAsync")
+      .mockImplementation((key) =>
+        key === ASKED ? new Promise((resolve) => (read = resolve)) : real(key),
+      );
+    const view = await renderWithTheme(<PushOffer />);
+    expect(secure.getItemAsync).toHaveBeenCalledWith(ASKED);
+    await view.rerender(underProviders(<View />));
+    // Never answered: the offer, were the screen still there.
+    await act(async () => read(null));
+    await settle();
+    expect(screen.queryByText(HEADING)).toBeNull();
+    expect(notifications.getPermissionsAsync).not.toHaveBeenCalled();
   });
 });

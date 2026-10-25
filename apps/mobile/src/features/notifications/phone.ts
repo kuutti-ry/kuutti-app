@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import { currentSession } from "@/lib/session";
 import { savePushToken } from "./client";
 
 /**
@@ -14,7 +15,8 @@ export type PhonePermission = "allowed" | "denied" | "undetermined" | "unavailab
 /** Android's one channel, the one app.json's `defaultChannel` names. */
 const CHANNEL = "default";
 
-const onPhone = () => Platform.OS === "ios" || Platform.OS === "android";
+/** Whether push can reach this device at all: never on the web target. */
+export const onPhone = () => Platform.OS === "ios" || Platform.OS === "android";
 
 /**
  * The phone's answer in the app's words. iOS says it in its own status, where
@@ -105,10 +107,20 @@ type Registration = {
 let registering: Promise<void> = Promise.resolve();
 
 /**
+ * The last registration the API took. On iOS a token fetched hands the token
+ * to the token listener again, which would register it a second time; one
+ * identical to this is not sent. Kept per session, since a new sign-in on the
+ * same phone registers the same token and language for its own session, and
+ * only once the API has taken it, so a refused one is sent again next time.
+ */
+let sent: { sessionId: string; token: string; locale: string } | null = null;
+
+/**
  * Hands this phone's Expo push token to the API for the signed-in session
  * (ADR-055 §2), only while the phone allows notifications, and nothing but
  * the token and the platform. One at a time, in the order asked, so that the
- * language of the last one is the language the API keeps. A failure is not
+ * language of the last one is the language the API keeps, and never after a
+ * sign-out, however long it waited its turn. A failure is not
  * the person's to see, since the next start registers again; it is reported,
  * the error alone.
  */
@@ -123,11 +135,18 @@ async function register({ locale, channel, device }: Registration): Promise<void
   if ((await readPermission()) !== "allowed") return;
   try {
     await makeChannel(channel);
+    // Asked while signed in: a sign-out while it waited its turn fetches no
+    // token, and one while Expo made it sends nothing.
+    const sessionId = currentSession()?.sessionId;
+    if (sessionId === undefined) return;
     const { data: token } = await Notifications.getExpoPushTokenAsync({
       projectId: Constants.expoConfig?.extra?.eas?.projectId,
       devicePushToken: device,
     });
+    if (currentSession()?.sessionId !== sessionId) return;
+    if (sent?.sessionId === sessionId && sent.token === token && sent.locale === locale) return;
     await savePushToken({ token, platform }, locale);
+    sent = { sessionId, token, locale };
   } catch (error) {
     Sentry.captureException(error);
   }

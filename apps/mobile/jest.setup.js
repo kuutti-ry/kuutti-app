@@ -34,7 +34,8 @@ jest.mock("expo-local-authentication", () => ({
 // test says otherwise through these mocks. The enums carry the module's own
 // values. `__respond(response)` is a tap on a push, which the hook returns
 // until the last response is cleared, as the module's own hook does;
-// `__newToken(token)` is the phone giving a new device token.
+// `__newToken(token)` is the phone giving a new device token. The phone's
+// list of pushes is cleared without fail unless a test says otherwise.
 jest.mock("expo-notifications", () => {
   const { useEffect, useState } = require("react");
   let lastResponse = null;
@@ -77,6 +78,7 @@ jest.mock("expo-notifications", () => {
       return { remove: () => tokenListeners.delete(listener) };
     }),
     setNotificationHandler: jest.fn(),
+    dismissAllNotificationsAsync: jest.fn(async () => undefined),
     useLastNotificationResponse: () => {
       const [response, setResponse] = useState(lastResponse);
       useEffect(() => {

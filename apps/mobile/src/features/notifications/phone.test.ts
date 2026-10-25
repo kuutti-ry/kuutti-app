@@ -1,14 +1,15 @@
 import * as Sentry from "@sentry/react-native";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { saveSession } from "@/lib/session";
+import { clearSession, saveSession } from "@/lib/session";
 import { askPermission, permissionOf, readPermission, registerPush } from "./phone";
 
 // The phone's side of the push (#102, ADR-055 §2, §9): the permission in the
 // app's words on each platform, on the web and when the phone cannot be read;
 // the question, which makes Android's channel first and never asks for a
 // badge; and the registration, which sends the token and the platform and
-// nothing else, only while allowed, in the app's language, one at a time, a
+// nothing else, only while allowed, in the app's language, one at a time,
+// once for the same session, token and language, never after a sign-out, a
 // failure reported and never thrown.
 
 // app.json's EAS project, which Expo's token is made for.
@@ -60,17 +61,31 @@ function api(status = 204): Sent[] {
   return seen;
 }
 
-beforeEach(async () => {
-  jest.clearAllMocks();
-  jest.replaceProperty(Platform, "OS", "ios");
-  notifications.getPermissionsAsync.mockResolvedValue(ios(0));
-  await saveSession({
-    sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+/**
+ * A sign-in of its own, with a session id of its own: the app remembers the
+ * last registration it sent per session, so each test starts from one it has
+ * sent nothing for.
+ */
+let sessions = 0;
+const signIn = () => {
+  sessions += 1;
+  return saveSession({
+    sessionId: `6f1c1c4e-9a8e-4a0b-9c3a-${String(sessions).padStart(12, "0")}`,
     accessToken: token("access"),
     accessExpiresAt: "2030-01-01T00:15:00.000Z",
     refreshToken: token("refresh"),
     refreshExpiresAt: "2030-04-01T00:00:00.000Z",
   });
+};
+
+/** Every promise already on its way runs to where it waits on something the test holds. */
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+beforeEach(async () => {
+  jest.clearAllMocks();
+  jest.replaceProperty(Platform, "OS", "ios");
+  notifications.getPermissionsAsync.mockResolvedValue(ios(0));
+  await signIn();
 });
 afterEach(() => jest.restoreAllMocks());
 
@@ -255,12 +270,84 @@ describe("the registration", () => {
     );
     const first = registerPush({ locale: "en", channel: "Notifications" });
     const second = registerPush({ locale: "fi", channel: "Ilmoitukset" });
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flush();
     // The second waits for the first, which waits for Expo.
     expect(seen).toEqual([]);
     expect(notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1);
     release();
     await Promise.all([first, second]);
     expect(seen.map(({ language }) => language)).toEqual(["en", "fi"]);
+  });
+
+  it("sends a registration identical to the last one once, as iOS hands the token over again after it is fetched", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    await registerPush({ locale: "en", channel: "Notifications" });
+    // The token listener, called with the device token the fetch handed over.
+    await registerPush({
+      locale: "en",
+      channel: "Notifications",
+      device: { type: "ios", data: "a" },
+    });
+    expect(seen).toHaveLength(1);
+    expect(notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it("still sends a changed language, a new token and a new sign-in's same token", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    const NEW = "ExponentPushToken[bbbbbbbbbbbbbbbbbbbbbb]";
+    await registerPush({ locale: "en", channel: "Notifications" });
+    await registerPush({ locale: "fi", channel: "Ilmoitukset" });
+    notifications.getExpoPushTokenAsync.mockResolvedValueOnce({ type: "expo", data: NEW });
+    await registerPush({ locale: "fi", channel: "Ilmoitukset" });
+    // Back to the first token, in the same language: changed again since the last one sent.
+    await registerPush({ locale: "fi", channel: "Ilmoitukset" });
+    await signIn();
+    await registerPush({ locale: "fi", channel: "Ilmoitukset" });
+    expect(seen.map(({ body, language }) => [(body as { token: string }).token, language])).toEqual(
+      [
+        [TOKEN, "en"],
+        [TOKEN, "fi"],
+        [NEW, "fi"],
+        [TOKEN, "fi"],
+        [TOKEN, "fi"],
+      ],
+    );
+  });
+
+  it("sends again a registration the API refused, since it took nothing", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    api(500);
+    await registerPush({ locale: "en", channel: "Notifications" });
+    const seen = api();
+    await registerPush({ locale: "en", channel: "Notifications" });
+    expect(seen).toHaveLength(1);
+  });
+
+  it("sends nothing after a sign-out, and the registration whose turn comes after it fetches no token", async () => {
+    notifications.getPermissionsAsync.mockResolvedValue(ios(2));
+    const seen = api();
+    let release: () => void = () => undefined;
+    notifications.getExpoPushTokenAsync.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ type: "expo", data: TOKEN });
+        }),
+    );
+    const first = registerPush({ locale: "en", channel: "Notifications" });
+    const queued = registerPush({
+      locale: "en",
+      channel: "Notifications",
+      device: { type: "ios", data: "a" },
+    });
+    await flush();
+    await clearSession();
+    release();
+    await Promise.all([first, queued]);
+    // Expo was making the first one's token at the sign-out; the queued one never asked it.
+    expect(notifications.getExpoPushTokenAsync).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveLength(0);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });

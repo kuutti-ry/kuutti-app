@@ -1,6 +1,9 @@
-# Notification choices (#176, ADR-032): a row under Account in Settings whose
-# screen says that nothing is sent to the phone yet and holds a switch per
-# kind, each on until switched off and kept on the server. Sanna switches
+# Notification choices (#176, ADR-032; #102, ADR-055 §9): a row under Account
+# in Settings whose screen says that the choices decide what Kuutti tells the
+# phones, then whether this phone lets Kuutti notify it, which on the emulator
+# and the simulator is never asked (no flow answers the phone's question), and
+# holds a switch per kind, each on until switched off and kept on the server.
+# Asking, allowing and refusing are the jest tests' (PhoneLine). Sanna switches
 # Messages off, leaves, finds it kept when she comes back by way of home,
 # and switches it on again, so the flow leaves her as it found her. The
 # other kinds work alike (the jest tests and the API's).
@@ -20,7 +23,11 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
     timeout: 60000
 - tapOn: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
 - extendedWaitUntil:
-    visible: "Nothing is sent to this phone yet\\..*|Tähän puhelimeen ei vielä lähetetä mitään\\..*|Inget skickas till den här telefonen än\\..*"
+    visible: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
+    timeout: 15000
+# The phone's line comes once the phone has been read.
+- extendedWaitUntil:
+    visible: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
     timeout: 15000
 # A switch's text, to Maestro, is its value ("0" off, "1" on) on iOS, and its
 # words with its state on Android. Every switch sits at the right edge, so the

@@ -1,23 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { useT } from "@/lib/locale";
-import { askPermission, type PhonePermission, readPermission, registerPush } from "./phone";
+import {
+  askPermission,
+  onPhone,
+  type PhonePermission,
+  readPermission,
+  registerPush,
+} from "./phone";
 
 /**
  * The phone's permission for a screen (ADR-055 §9): read as it opens and
  * again whenever the app comes back to the front, since the person may have
- * changed it in the phone's settings meanwhile; null until read. `ask` shows
- * the phone's own question. Whenever the permission becomes allowed here, by
- * the question or in the phone's settings, the token is registered at once
- * rather than at the next start.
+ * changed it in the phone's settings meanwhile; null until read. On the web
+ * target it is unavailable from the start, and nothing is read, listened for
+ * or asked. `ask` shows the phone's own question, and `asking` holds while it
+ * is open, so that a second tap does not ask again. Whenever the permission
+ * becomes allowed here, by the question or in the phone's settings, the token
+ * is registered at once rather than at the next start.
  */
 export function usePhonePermission(): {
   permission: PhonePermission | null;
+  asking: boolean;
   ask: () => Promise<void>;
 } {
   const { t, locale } = useT();
   const channel = t("push.channel");
-  const [permission, setPermission] = useState<PhonePermission | null>(null);
+  const [permission, setPermission] = useState<PhonePermission | null>(() =>
+    onPhone() ? null : "unavailable",
+  );
+  const [asking, setAsking] = useState(false);
   const known = useRef<PhonePermission | null>(null);
   const live = useRef(true);
 
@@ -35,6 +47,7 @@ export function usePhonePermission(): {
   );
 
   useEffect(() => {
+    if (!onPhone()) return;
     live.current = true;
     const read = () => void readPermission().then(settle);
     read();
@@ -48,8 +61,11 @@ export function usePhonePermission(): {
   }, [settle]);
 
   const ask = useCallback(async () => {
+    setAsking(true);
+    // askPermission reports its own failure and never throws.
     settle(await askPermission(channel));
+    if (live.current) setAsking(false);
   }, [channel, settle]);
 
-  return { permission, ask };
+  return { permission, asking, ask };
 }
