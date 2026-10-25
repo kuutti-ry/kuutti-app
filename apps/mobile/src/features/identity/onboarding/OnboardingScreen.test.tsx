@@ -35,10 +35,15 @@ const json = (body: unknown, status = 200) =>
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 // The versions this build carries, each kind its own since the privacy
 // summary moved on alone (#102): what the welcome step shows and records.
-const TERMS = CONSENT_VERSIONS.terms;
-const PRIVACY = CONSENT_VERSIONS.privacy;
-const RESEARCH = CONSENT_VERSIONS.research;
-const SPECIAL = CONSENT_VERSIONS.special_category;
+const versionOf = (kind: string): string => {
+  const version = CONSENT_VERSIONS[kind];
+  if (!version) throw new Error(`this build carries no version of ${kind}`);
+  return version;
+};
+const TERMS = versionOf("terms");
+const PRIVACY = versionOf("privacy");
+const RESEARCH = versionOf("research");
+const SPECIAL = versionOf("special_category");
 const POND = {
   id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
   slug: "suomi",
