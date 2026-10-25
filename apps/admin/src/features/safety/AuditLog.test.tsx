@@ -458,12 +458,28 @@ describe("the audit log", () => {
     show();
     await screen.findByText("page 1");
     expect(document.body).toHaveFocus();
+    // The focus moves in the commit that shows the rows: nothing to wait for once they are there.
     fireEvent.click(older());
     const second = await screen.findByText("page 2");
-    await waitFor(() => expect(second.closest('[tabindex="-1"]')).toHaveFocus());
+    expect(second.closest('[tabindex="-1"]')).toHaveFocus();
     fireEvent.click(newer());
     const first = await screen.findByText("page 1");
-    await waitFor(() => expect(first.closest('[tabindex="-1"]')).toHaveFocus());
+    expect(first.closest('[tabindex="-1"]')).toHaveFocus();
+  });
+
+  it("gives the focus to the page Older reached when it is pressed the moment the first page shows", async () => {
+    fetchMock([pages({ "": numbered(1, "c1"), c1: numbered(2, null) })]);
+    // Older is pressed in the microtasks right after the commit that shows the
+    // first page, before React runs that commit's effects in a task of their own.
+    const watch = new MutationObserver(() => {
+      if (!screen.queryByText("page 1")) return;
+      watch.disconnect();
+      fireEvent.click(older());
+    });
+    watch.observe(document.body, { childList: true, subtree: true });
+    show();
+    const second = await screen.findByText("page 2");
+    expect(second.closest('[tabindex="-1"]')).toHaveFocus();
   });
 
   it("leaves a superseded request's failure unsaid: the rows of the filters applied stay", async () => {
