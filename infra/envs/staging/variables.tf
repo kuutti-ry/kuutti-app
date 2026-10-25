@@ -43,7 +43,7 @@ variable "alert_email" {
 }
 
 variable "mail_recipients" {
-  description = "Whom staging may mail (#385, ADR-043 §6): its testers alone, since every staging account is one of Telia's test persons, whose credentials are published. CI passes the repository variable MAIL_TESTERS, a JSON list of addresses (patterns such as *@example.fi allowed), as TF_VAR_mail_recipients. The default is Kuutti's own sender, which receives nothing: until the maintainer lists the testers, staging mails nobody."
+  description = "Whom staging may mail (#385, ADR-043 §6): its testers alone, since every staging account is one of Telia's test persons, whose credentials are published. CI passes the repository variable MAIL_TESTERS, a JSON list of addresses (patterns such as *@example.fi allowed), as TF_VAR_mail_recipients. The default is Kuutti's own sender, an alias at the association's Google Workspace: until the maintainer lists the testers, staging mails that address alone."
   type        = list(string)
   default     = ["noreply@kuutti.app"]
 }

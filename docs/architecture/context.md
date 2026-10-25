@@ -81,7 +81,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Context, part 2: the API and the AWS services it calls
-  accDescr: The API reads its configuration and secrets from SSM Parameter Store, keeps its data in RDS PostgreSQL, writes photos and the night's research copy to the media bucket, and asks Rekognition to check photos. CloudFront reads the media bucket and the panel's bucket. Every container's logs go to CloudWatch, whose alarms mail through SNS, and Route 53 probes the API from outside. SES sends the e-mail code once the bootstrap is applied. A researcher signs in through IAM Identity Center to a read-only role on the research copy, and CloudTrail logs every read.
+  accDescr: The API reads its configuration and secrets from SSM Parameter Store, keeps its data in RDS PostgreSQL, writes photos and the night's research copy to the media bucket, and asks Rekognition to check photos. CloudFront reads the media bucket and the panel's bucket. Every container's logs go to CloudWatch, whose alarms mail through SNS, and Route 53 probes the API from outside. SES sends the e-mail code. A researcher signs in through IAM Identity Center to a read-only role on the research copy, and CloudTrail logs every read.
   subgraph kuutti2["Kuutti"]
     n13["The API, in a container on the EC2 box"]
   end
@@ -93,7 +93,7 @@ flowchart TB
     n18["S3, the panel's bucket"]
     n19["CloudFront, the panel's distribution"]
     n20["Rekognition: the photo check"]
-    n21["SES: the e-mail code. Sends once the bootstrap is applied, #385. More mail planned, #196"]:::notbuilt
+    n21["SES: the e-mail code, in the sandbox. More mail planned, #196"]
     n22["CloudWatch: logs, metrics and alarms"]
     n23["SNS: alert mail"]
     n24["Route 53: DNS and the outside health probe"]
@@ -109,7 +109,7 @@ flowchart TB
   n17 -->|"reads media/ for a validly signed URL"| n16
   n19 -->|"reads the panel's files"| n18
   n13 -->|"a photo's bytes, for labels and faces"| n20
-  n13 -.->|"the code from noreply@kuutti.app"| n21
+  n13 -->|"the code from noreply@kuutti.app"| n21
   n13 -->|"every container's log lines"| n22
   n22 -->|"an alarm"| n23
   n24 -->|"asks /health every 30 seconds"| n13
@@ -130,7 +130,7 @@ flowchart TB
 18. S3, the panel's private bucket: `main`'s build at its root and each open pull request's under `pr-<n>/`, written by CI ([Delivery](delivery.md)); Saiga's faces under `fonts/`, which the maintainer uploads by hand (41).
 19. CloudFront, the panel's distribution: the only reader of the panel's bucket. It adds the panel's security headers to every answer and answers a page's path with `index.html`.
 20. Rekognition: three detect calls (moderation labels, faces, labels), on when the parameter `moderation` says `rekognition`, as it does on staging. The photo's bytes travel in the request and nothing is stored on Rekognition's side. Without the parameter every photo waits for a person in the moderation queue.
-21. SES: the code that confirms the optional e-mail address, from `noreply@kuutti.app`. The code is built (#385, ADR-043) and staging's parameter `mail` says `ses`, but the domain's identity lives in `infra/bootstrap`, which only the maintainer applies, and SES must then verify the domain; the repository does not record whether either has happened. Until both have, a send is answered 503 `mail_unavailable`. SES is also in its sandbox until the maintainer asks AWS for production access, and staging's role may mail only the testers of the repository variable `MAIL_TESTERS`, nobody while it is unset. Further mail is planned, #196.
+21. SES: the code that confirms the optional e-mail address, from `noreply@kuutti.app`, an alias at the association's Google Workspace (#385, ADR-043). The domain's identity lives in `infra/bootstrap`, which only the maintainer applies; he applied it on 2026-10-25, SES verified the domain, its DKIM and the MAIL FROM `mail.kuutti.app`, and staging's parameter `mail` says `ses`. SES is in its sandbox until the maintainer asks AWS for production access, so it delivers only to verified identities, the addresses of `kuutti.app` among them, and staging's role may mail only what the repository variable `MAIL_TESTERS` matches, `*@kuutti.app` since 2026-10-25. Further mail is planned, #196.
 22. CloudWatch: Docker on the box sends every container's log lines to `/kuutti/staging/api`, Dokploy's own included. Metric filters count the API's 5xx answers, photo refusals, Rekognition calls and failed nightly jobs. Alarms watch each of those counts but the Rekognition one, the instance's status check, the instance's and the database's CPU credits, the database's free storage, and the box's free memory, which the box itself pushes every minute (#77).
 23. SNS: the topic `kuutti-staging-alerts` mails the address of the repository variable `ALERT_EMAIL`. The probe's alarm has a topic of its own in us-east-1 with the same address, and the bootstrap's billing alarm and budget a third.
 24. Route 53: the zone `kuutti.app`, adopted from the domain's registration, holds every record. Its health check asks `https://api.staging.kuutti.app/health` every 30 seconds from three regions and wants the body to say the API is up; it is the one alarm that sees a stopped container.
@@ -214,7 +214,7 @@ flowchart TB
 
 ## Open
 
-- SES: the identity is in `infra/bootstrap`, which CI never applies. On 2026-10-24 the identity did not exist and the bootstrap's plan still held it (ADR-049); until it is applied and SES has verified the domain, staging answers a code request 503. SES's production access and the list `MAIL_TESTERS` are his as well (ADR-043, Open 5 and 7).
+- SES: in its sandbox until the maintainer asks AWS for production access (ADR-043 Open 5, followed in #196); until then it delivers only to verified identities. The identity is in `infra/bootstrap`, which CI never applies; the maintainer applied it on 2026-10-25.
 - Sentry: whether `/kuutti/staging/sentry-dsn` and `EXPO_PUBLIC_SENTRY_DSN` are set is not in the repository. The Sentry organisation's slug is `kuutti-ry` (`kuutti-fi` until October 2026), which `deploy.yml` and the plugin block of `apps/mobile/app.json` name; this view names neither.
 - The two anti-scraping items of #86 that remain, app attestation and iOS screenshot detection, are the maintainer's to decide (CLAUDE.md, Decisions); app attestation waits for #184's native batch (ADR-041, Open 1).
 - Dokploy versus Kamal is open (CLAUDE.md, Decisions); the box is drawn with the tool it runs today.
