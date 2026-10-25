@@ -33,8 +33,17 @@ const type = (element: ReturnType<typeof screen.getByLabelText>, text: string) =
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
-const VERSION = "2026-09-draft-1";
-const SPECIAL = "2026-10-draft-2";
+// The versions this build carries, each kind its own since the privacy
+// summary moved on alone (#102): what the welcome step shows and records.
+const versionOf = (kind: string): string => {
+  const version = CONSENT_VERSIONS[kind];
+  if (!version) throw new Error(`this build carries no version of ${kind}`);
+  return version;
+};
+const TERMS = versionOf("terms");
+const PRIVACY = versionOf("privacy");
+const RESEARCH = versionOf("research");
+const SPECIAL = versionOf("special_category");
 const POND = {
   id: "5f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a00",
   slug: "suomi",
@@ -68,7 +77,8 @@ type Profile = {
 function fakeApi(
   options: { version?: string; age?: number; redeemable?: boolean; redeem?: () => Response } = {},
 ) {
-  const current = options.version ?? VERSION;
+  // A version the API holds as current that this build does not carry, for every kind but the sensitive answers'.
+  const current = (version: string) => options.version ?? version;
   const server: {
     gender: string | null;
     seeks: string[] | null;
@@ -98,8 +108,8 @@ function fakeApi(
     const bio = server.profile?.bio ?? "";
     const prompts = server.profile?.prompts.filter((p) => p.answer.length > 0).length ?? 0;
     const missing = [
-      ...(has("terms", VERSION) ? [] : ["terms"]),
-      ...(has("privacy", VERSION) ? [] : ["privacy"]),
+      ...(has("terms", TERMS) ? [] : ["terms"]),
+      ...(has("privacy", PRIVACY) ? [] : ["privacy"]),
       ...(server.profile?.displayName ? [] : ["name"]),
       ...(server.gender ? [] : ["gender"]),
       ...(server.seeks && has("special_category", SPECIAL) ? [] : ["seeks"]),
@@ -118,15 +128,15 @@ function fakeApi(
       pond: server.pond,
       preferences: { seeks: server.seeks, ageWindow: server.ageWindow },
       consents: {
-        terms: has("terms", VERSION) ? VERSION : null,
-        privacy: has("privacy", VERSION) ? VERSION : null,
+        terms: has("terms", TERMS) ? TERMS : null,
+        privacy: has("privacy", PRIVACY) ? PRIVACY : null,
         specialCategory: has("special_category", SPECIAL) ? SPECIAL : null,
-        research: research ? { version: VERSION, givenAt: "2026-09-26T10:00:00.000Z" } : null,
+        research: research ? { version: RESEARCH, givenAt: "2026-09-26T10:00:00.000Z" } : null,
       },
       currentVersions: {
-        terms: current,
-        privacy: current,
-        research: current,
+        terms: current(TERMS),
+        privacy: current(PRIVACY),
+        research: current(RESEARCH),
         special_category: SPECIAL,
       },
       nextChange: { gender: server.genderFrom, seeks: null },
@@ -217,7 +227,9 @@ const checkA11y = () => {
 };
 const consented = (kind: string) => ({
   kind,
-  version: kind === "special_category" ? SPECIAL : VERSION,
+  version: { terms: TERMS, privacy: PRIVACY, research: RESEARCH, special_category: SPECIAL }[
+    kind as "terms" | "privacy" | "research" | "special_category"
+  ],
   locale: "en",
 });
 
@@ -626,11 +638,13 @@ describe("OnboardingScreen", () => {
     // English is a translation: the Finnish text is the binding one.
     expect(screen.getByText(/The Finnish text is the one that counts/)).toBeTruthy();
     // Each summary's version links to the full text on the website (#208).
-    expect(
-      screen.getAllByRole("link", {
-        name: `Read the full text on kuutti.app (version ${VERSION})`,
-      }),
-    ).toHaveLength(2);
+    for (const version of new Set([TERMS, PRIVACY])) {
+      expect(
+        screen.getAllByRole("link", {
+          name: `Read the full text on kuutti.app (version ${version})`,
+        }),
+      ).toHaveLength([TERMS, PRIVACY].filter((v) => v === version).length);
+    }
     // A step outside the count: nothing personal is numbered before the name.
     expect(screen.queryByText(/^Step \d+ of \d+$/)).toBeNull();
     expect(screen.queryByText("Help us learn how matching works")).toBeNull();
@@ -640,8 +654,8 @@ describe("OnboardingScreen", () => {
     await waitFor(() => expect(screen.getByText("What should we call you?")).toBeTruthy());
     expect(screen.getByText("Step 1 of 8")).toBeTruthy();
     expect(server.consents.map((c) => [c.kind, c.version, c.locale])).toEqual([
-      ["terms", VERSION, "en"],
-      ["privacy", VERSION, "en"],
+      ["terms", TERMS, "en"],
+      ["privacy", PRIVACY, "en"],
     ]);
     expect(calls.filter((c) => c.method !== "GET").map((c) => c.path)).toEqual([
       "/consents",
