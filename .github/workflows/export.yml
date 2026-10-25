@@ -1,8 +1,8 @@
 name: Export
 
-# What exists only on GitHub, copied out weekly (#16 D.2): issues with their
-# comments, milestones, labels, rulesets, environment protection rules, and
-# the repository itself as a git bundle. On 2026-09-17 a machine was wiped and
+# What exists only on GitHub, copied out weekly (#16 D.2): issues and pull
+# requests with their comments and reviews, milestones, labels, rulesets,
+# environment protection rules, and the repository itself as a git bundle. On 2026-09-17 a machine was wiped and
 # what lived in one place was lost; this is the same lesson for the repository.
 # Written to s3://<state bucket>/github-export/<date>/ through a role of its
 # own that trusts the main branch only and may put objects under that prefix
@@ -30,9 +30,13 @@ jobs:
     # repository variable (infra/README.md): no red run every Sunday before that.
     if: github.ref == 'refs/heads/main' && vars.AWS_EXPORT_ROLE_ARN != ''
     runs-on: ubuntu-latest
+    # pull-requests: read as well as issues: read: with issues alone, the first
+    # run (2026-10-25, #16) got the issues list without a single pull request,
+    # and the restore needs them there to keep the numbering.
     permissions:
       contents: read
       issues: read
+      pull-requests: read
       id-token: write
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
@@ -47,11 +51,23 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Issues, milestones, labels, rulesets, environments
+      - name: Issues, pull requests, milestones, labels, rulesets, environments
         run: |
           out="$RUNNER_TEMP/export"; mkdir -p "$out"
           gh api --paginate "repos/$REPO/issues?state=all&per_page=100" | jq -s 'add' > "$out/issues.json"
           gh api --paginate "repos/$REPO/issues/comments?per_page=100" | jq -s 'add' > "$out/issue-comments.json"
+          # A pull request's branches and merge commit are not in the issues list;
+          # the comments on its diff and each review's verdict and text are in
+          # neither comment list.
+          gh api --paginate "repos/$REPO/pulls?state=all&per_page=100" | jq -s 'add' > "$out/pulls.json"
+          gh api --paginate "repos/$REPO/pulls/comments?per_page=100" | jq -s 'add // []' > "$out/pull-comments.json"
+          # shortcut: one call per pull request, against the repository's 1,000
+          # GITHUB_TOKEN requests an hour, which every workflow's runs share; some
+          # way short of 900 pull requests it runs out and the run fails before it
+          # uploads. GraphQL's reviews per page of pull requests would lift it.
+          jq -r '.[].number' "$out/pulls.json" | while read -r n; do
+            gh api --paginate "repos/$REPO/pulls/$n/reviews?per_page=100"
+          done | jq -s 'add // []' > "$out/pull-reviews.json"
           gh api --paginate "repos/$REPO/milestones?state=all&per_page=100" | jq -s 'add' > "$out/milestones.json"
           gh api --paginate "repos/$REPO/labels?per_page=100" | jq -s 'add' > "$out/labels.json"
           # The list has no rules in it: fetch each ruleset for its full definition.
@@ -68,6 +84,10 @@ jobs:
           for f in "$out"/*.json; do echo "$(basename "$f"): $(jq 'if type == "array" then length else 1 end' "$f")"; done
           # An export with no issues in it is a broken export, not an empty repository.
           [ "$(jq length "$out/issues.json")" -gt 0 ]
+          # Nor is one without pull requests, in either list: the first run had
+          # the issues alone, and a restore from it would have numbered them wrong.
+          [ "$(jq length "$out/pulls.json")" -gt 0 ]
+          [ "$(jq 'map(select(.pull_request)) | length' "$out/issues.json")" -gt 0 ]
 
       - name: The repository as a bundle
         run: |
