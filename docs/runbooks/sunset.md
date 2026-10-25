@@ -165,7 +165,7 @@ Archive it on GitHub. The source stays public under the AGPL and holds no member
 
 ### 4.11 The website and the domain
 
-The site keeps a closing page for as long as the association wants to be reachable there. Keep `kuutti.app` registered for a while after T2: as long as the association holds it, nobody else can put up a service under the name on that domain (`TRADEMARKS.md`), and the domain-wide records that stop it being used for spoofed mail (SPF, DMARC, null MX, `infra/bootstrap/dns.tf`) stay in place. How long is the association's call; the domain renews on 2027-09-17 (`custody.md`). When it goes: retire the Amplify app (`delete-app`, then the records it left, `infra/README.md`, The website), turn auto-renew off, and delete the hosted zone last.
+The site keeps a closing page for as long as the association wants to be reachable there. Keep `kuutti.app` registered for a while after T2: as long as the association holds it, nobody else can put up a service under the name on that domain (`TRADEMARKS.md`), and the domain-wide records that stop it being used for spoofed mail (`infra/bootstrap/dns.tf`) stay in place. Once the association's Google Workspace closes, put the root back to what it had before the Workspace (#450): the null MX `0 .` and the SPF `v=spf1 -all`, without Google's key at `google._domainkey`. Otherwise the root's SPF still admits Google's servers for a domain that no longer sends from them. DMARC stays `p=reject`. How long is the association's call; the domain renews on 2027-09-17 (`custody.md`). When it goes: retire the Amplify app (`delete-app`, then the records it left, `infra/README.md`, The website), turn auto-renew off, and delete the hosted zone last.
 
 ### 4.12 The AWS account
 
