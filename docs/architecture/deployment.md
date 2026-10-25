@@ -144,7 +144,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Deployment, part 3: staging, the services around the box
-  accDescr: The API reads the parameter store at boot, logs through Docker to CloudWatch, calls Rekognition, and writes one research file a night to the media bucket. CloudWatch's alarms and the Route 53 health probe mail through SNS. The box backs Dokploy up to the state bucket every night, and Session Manager is the way in. The admin panel has its own bucket and distribution. A researcher's role reads the research copy, and CloudTrail logs every read. SES sends once the bootstrap is applied.
+  accDescr: The API reads the parameter store at boot, logs through Docker to CloudWatch, calls Rekognition, and writes one research file a night to the media bucket. CloudWatch's alarms and the Route 53 health probe mail through SNS. The box backs Dokploy up to the state bucket every night, and Session Manager is the way in. The admin panel has its own bucket and distribution. A researcher's role reads the research copy, and CloudTrail logs every read. SES sends the e-mail code.
   subgraph boxside["On the staging box"]
     n26["The API and every container on the box"]
     n27["The nightly Dokploy backup, 02:17 UTC"]
@@ -168,7 +168,7 @@ flowchart TB
   end
   n39["S3 kuutti-tfstate: state, and dokploy-backup/staging/"]
   n40["Rekognition: three detect calls"]
-  n41["SES: built, sends once the maintainer applies the bootstrap's identity, #385"]:::notbuilt
+  n41["SES: the e-mail code, in the sandbox, #196"]
   n26 -->|"reads at boot"| n29
   n26 -->|"logs, Docker's awslogs driver"| n30
   n30 -->|"metric filters"| n31
@@ -178,7 +178,7 @@ flowchart TB
   n27 -->|"one SSE-KMS object a night"| n39
   n28 -->|"a shell or a port forward"| n26
   n26 -->|"a photo's bytes"| n40
-  n26 -.->|"waits on the bootstrap's apply, #385"| n41
+  n26 -->|"the e-mail code, as noreply@kuutti.app"| n41
   n26 -->|"one file a night, written once"| n36
   n37 -->|"lists and reads research/ only"| n36
   n36 -->|"each object call"| n38
@@ -203,7 +203,7 @@ flowchart TB
 38. The trail `kuutti-staging-research-access`: S3 data events for objects under `research/` alone, no management events, one region, with log-file validation, into the private, versioned bucket `kuutti-research-access-staging-<account>`, whose files are kept five years (the maintainer's to confirm, ADR-029).
 39. The state bucket `kuutti-tfstate-<account>`, made by the bootstrap: OpenTofu's state for the bootstrap, staging and production, the Dokploy backups and the weekly GitHub export. Versioned, encrypted, public access blocked.
 40. Rekognition: `DetectModerationLabels`, `DetectFaces` and `DetectLabels`, on because staging's `moderation` parameter says `rekognition`.
-41. SES: the role may send as `noreply@kuutti.app` through the domain's identity, on staging only to the addresses of `MAIL_TESTERS` (nobody while it is unset), and the parameter `mail` is `ses`. The identity is in `infra/bootstrap`, which only the maintainer applies; until he has and SES has verified the domain, a code request is answered 503 (#385, ADR-043). SES is in its sandbox until production access is requested.
+41. SES: the role may send as `noreply@kuutti.app` through the domain's identity, on staging only to what `MAIL_TESTERS` matches (`*@kuutti.app` since 2026-10-25; `noreply@kuutti.app` alone while it is unset), and the parameter `mail` is `ses`. The identity is in `infra/bootstrap`, which only the maintainer applies; he applied it on 2026-10-25, and SES verified the domain, its DKIM and the MAIL FROM `mail.kuutti.app` (#385, ADR-043). SES is in its sandbox, which delivers only to verified identities, until production access is requested (#196).
 
 ## Part 4: a pull request's previews
 
@@ -323,13 +323,13 @@ flowchart TB
 - Previews: [.github/workflows/preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [.github/scripts/dokploy-preview.sh](../../.github/scripts/dokploy-preview.sh), [apps/api/src/lib/preview-database.ts](../../apps/api/src/lib/preview-database.ts), [apps/api/src/lib/config.ts](../../apps/api/src/lib/config.ts) (what a preview drops)
 - The manual: [infra/README.md](../../infra/README.md) (Environments, Media, Mail, Admin panel, Research copy, Observability, Previews, Backups and rebuilding the box, Secrets, The website), [docs/runbooks/incident.md](../runbooks/incident.md)
 - ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (OpenTofu; Dokploy's configuration as the manual island), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (the distribution, §7 the ingress switch), [ADR-008](../adr/008-exposure-budget-and-client-address.md) §5 (the trusted proxy), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-014](../adr/014-demo-mode.md) (the mock bank; no real bank on a preview), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds no real person), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) (the flows on the local environment), [ADR-025](../adr/025-admin-host.md) (the panel's host and its previews), [ADR-029](../adr/029-the-research-copy.md) (the research copy), [ADR-043](../adr/043-email-confirmation.md) §5 and §6 (SES and staging's testers), [ADR-046](../adr/046-box-headroom.md) (swap and the memory alarm), [ADR-048](../adr/048-dokploy-owner-first.md) (nothing public before Dokploy's owner), [ADR-049](../adr/049-production-before-the-first-release.md) (production before the first release), [ADR-054](../adr/054-backup-write-only.md) (the box writes its backup and never reads it)
-- Issues: #198 (ingress from CloudFront alone), #77 (swap and the memory alarm, ADR-046), #25 (production), #385 (SES)
+- Issues: #198 (ingress from CloudFront alone), #77 (swap and the memory alarm, ADR-046), #25 (production), #385 and #196 (SES)
 
 ## Open
 
 - Ingress from CloudFront alone (#198). Until it is on, staging's rate limiter keys on the CloudFront edge that forwarded a request, and people behind one edge share a bucket; the team accepts that on staging, and production keeps the order of ADR-008 §5 (`infra/README.md`, Media).
 - Production (#25) runs without bank identification (ADR-049) and without swap (ADR-046's open point). Its `admin-app-url` already names `https://admin.kuutti.app`, a host production does not compose yet.
-- SES (#385): on 2026-10-24 the bootstrap's identity was not applied, and the account was in SES's sandbox (ADR-049), so neither environment sends mail yet.
+- SES (#196): the account is in SES's sandbox until the maintainer asks AWS for production access, so production as well delivers only to verified identities, the addresses of `kuutti.app` among them.
 - A preview runs a pull request's code on the staging box with the staging role, which can read every `/kuutti/staging/` parameter; the preview drops the secrets from its memory in code, and write access is that trust (ADR-004 §3; `infra/README.md`, Previews, Trust).
 - `infra/modules/network/variables.tf` says the VPC's "four subnets are carved from it"; the module makes three, as `infra/README.md` says. The view draws the module's three.
 - `infra/README.md` (Previews) still calls the native lane "dormant until `expo-updates` is configured"; `apps/mobile/app.json` has configured it, and `preview.yml` publishes when the lane's check passes.

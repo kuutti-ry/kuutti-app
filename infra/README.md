@@ -339,7 +339,7 @@ A later migration that touches `audit_log` would fail as `kuutti_app`, and with 
 
 ### Mail (#385, ADR-043)
 
-Kuutti sends one kind of message, the code that confirms the optional e-mail address, from `noreply@kuutti.app` through SES, and receives none (ADR-043 §1, §5). The domain's one mailbox, `admin@kuutti.app`, which the alarms mail, is the association's at Google Workspace (`bootstrap/dns.tf`, #450). Three pieces, each in code:
+Kuutti sends one kind of message, the code that confirms the optional e-mail address, from `noreply@kuutti.app` through SES (ADR-043 §1, §5). That address is an alias at the association's Google Workspace, so a reply reaches a person; the alarms mail `admin@kuutti.app`, a Workspace mailbox as well (`bootstrap/dns.tf`, #450). Three pieces, each in code:
 
 - **The identity**, `bootstrap/mail.tf`, since it belongs to the domain and to no environment: `kuutti.app` as an SES identity in eu-central-1, the region the API's SES client uses (`S3_REGION`); Easy DKIM with 2048-bit keys that SES holds, signing every message as `d=kuutti.app`, through three CNAMEs `<token>._domainkey`; the custom MAIL FROM `mail.kuutti.app`, an MX to `feedback-smtp.eu-central-1.amazonses.com` and the SPF `v=spf1 include:amazonses.com -all`, where SES refuses to send while it cannot see that MX rather than fall back to `amazonses.com`; and the account's suppression list for bounces and complaints. The root's MX and SPF are the Workspace's, which SES does not need: its envelope is `mail.kuutti.app`. The reject DMARC holds for both senders (`bootstrap/dns.tf`), since each signs as `d=kuutti.app`, which aligns under `adkim=s`.
 - **The permission**, `modules/compute`, statement `SesSendAsNoreply`: `ses:SendEmail` on that identity alone, with `ses:FromAddress` equal to `noreply@kuutti.app`; on staging, also every recipient within its testers (`ses:Recipients`, Staging's testers, below).
@@ -380,7 +380,14 @@ aws sesv2 send-email --from-email-address noreply@kuutti.app --destination ToAdd
   --content 'Simple={Subject={Data=kuutti-mail-check},Body={Text={Data=delivery-check}}}'
 ```
 
-**Staging's testers.** Every account on staging is one of Telia's test persons, whose credentials are published (`docs/vendors/telia.md`), so anybody could have staging send codes to addresses of their choosing, and their complaints would count against the reputation and the suppression list production shares. Staging's role therefore mails only the addresses of its variable `mail_recipients` (ADR-043 §6), which CI fills from the repository variable `MAIL_TESTERS`, a JSON list; a pattern such as `*@example.fi` takes a whole domain. Unset, the list is `noreply@kuutti.app`, which receives nothing: staging mails nobody, and a code asked for there is answered 503 `mail_unavailable` (the log line says `AccessDeniedException`). To let testers in, set the list, then apply staging by re-running `main`'s latest infra run (GitHub re-runs a run for 30 days; past that, the next merge under `infra/` applies it):
+**The suppression list** keeps every address that bounced or complained, for staging and production alike, Kuutti's own included: SES then accepts each message to it and drops it, while the API logs `email code sent` and nothing arrives. A code sent to an alias before the alias exists does that (2026-10-25). Once the address receives again, take it off:
+
+```sh
+aws sesv2 list-suppressed-destinations
+aws sesv2 delete-suppressed-destination --email-address <address>
+```
+
+**Staging's testers.** Every account on staging is one of Telia's test persons, whose credentials are published (`docs/vendors/telia.md`), so anybody could have staging send codes to addresses of their choosing, and their complaints would count against the reputation and the suppression list production shares. Staging's role therefore mails only the addresses of its variable `mail_recipients` (ADR-043 §6), which CI fills from the repository variable `MAIL_TESTERS`, a JSON list; a pattern such as `*@example.fi` takes a whole domain. Unset, the list is `noreply@kuutti.app` alone, the Workspace alias: staging mails that address only, and a code asked for any other is answered 503 `mail_unavailable` (the log line says `AccessDeniedException`). Since 2026-10-25 the list is `["*@kuutti.app"]` (ADR-043 Open 7), which shows no tester's address; its ceiling is that anybody on staging can ask for codes to made-up addresses of the domain, whose bounces count against the reputation and the suppression list production shares (#196). To let testers in, set the list, then apply staging by re-running `main`'s latest infra run (GitHub re-runs a run for 30 days; past that, the next merge under `infra/` applies it):
 
 ```sh
 gh variable set MAIL_TESTERS --body '["you@example.fi", "*@example.fi"]'
