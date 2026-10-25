@@ -54,6 +54,16 @@ export function requestLocale(offered: readonly Locale[] = LOCALES): MiddlewareH
   };
 }
 
+/**
+ * A t() fixed to a stored language, for what is worded outside a request: a
+ * push, in the language its device registered in (ADR-055 §1). A value that is
+ * not one of ours is English.
+ */
+export function tFor(locale: string): TFunction {
+  const parsed = RequestLocale.safeParse(locale);
+  return parsed.success ? typedT(i18n, parsed.data) : fallbackT;
+}
+
 /** The request's t(), or English where the locale middleware has not run (a bare test app). */
 export function tOf<E extends Env>(c: Context<E, string>): TFunction {
   const t: unknown = c.get("t" as never);

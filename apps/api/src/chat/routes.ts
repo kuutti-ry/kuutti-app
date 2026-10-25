@@ -328,12 +328,15 @@ const stopShareRoute = createRoute({
 /**
  * `opened` is the safety slice's check after a conversation's first message
  * (#105, ADR-033), handed in by app.ts so the chat never imports safety;
- * awaited after the send has committed, it changes no answer.
+ * `pushed` is the notifications slice's push after every new message (#102,
+ * ADR-055 §4), handed in the same way. Each is awaited after the send has
+ * committed and changes no answer.
  */
 export function chatRoutes(
   deps: Deps,
   guard: MiddlewareHandler<AppEnv>,
   opened?: (accountId: string, conversationId: string) => Promise<void>,
+  pushed?: (accountId: string, conversationId: string, seq: number) => Promise<void>,
 ) {
   const app = new OpenAPIHono<AppEnv>();
   const chat = (): ChatDeps => ({
@@ -446,6 +449,7 @@ export function chatRoutes(
       body: body.body,
     });
     if (sent.created && sent.message.seq === 1) await opened?.(accountId, id);
+    if (sent.created) await pushed?.(accountId, id, sent.message.seq);
     return sent.created ? c.json(sent.message, 201) : c.json(sent.message, 200);
   });
 
@@ -463,6 +467,7 @@ export function chatRoutes(
         bytes: new Uint8Array(await form.photo.arrayBuffer()),
       });
       if (sent.created && sent.message.seq === 1) await opened?.(accountId, id);
+      if (sent.created) await pushed?.(accountId, id, sent.message.seq);
       return sent.created ? c.json(sent.message, 201) : c.json(sent.message, 200);
     } catch (error) {
       // The wait goes in the header, as a limiter's refusal says it.

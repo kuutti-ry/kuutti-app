@@ -9,6 +9,7 @@ import {
   conversationBetween,
   createLive,
   type Live,
+  messageReaders,
   openConversation,
   PHOTO_MESSAGE_PATH,
 } from "./chat/index.ts";
@@ -43,11 +44,12 @@ import { requestLocale, servedLocales } from "./lib/i18n.ts";
 import { type Logger, requestLogger } from "./lib/logger.ts";
 import type { Mailer } from "./lib/mail.ts";
 import { servedDocument } from "./lib/openapi.ts";
+import type { Pusher } from "./lib/push.ts";
 import { addressOf, limited, personOf, rateLimit } from "./lib/rate-limit.ts";
 import { serverRequestId } from "./lib/request-id.ts";
 import { preferencesRoutes, readPreferences, roundRoutes } from "./matching/index.ts";
 import { type MediaDeps, photoAdminRoutes, photoRoutes, UPLOAD_ROUTE } from "./media/index.ts";
-import { notificationRoutes } from "./notifications/index.ts";
+import { createPush, notificationRoutes } from "./notifications/index.ts";
 import { pondRoutes } from "./pond/index.ts";
 import { buildCard, exportProfile, profileRoutes } from "./profile/index.ts";
 import { invitationRoutes } from "./rewards/index.ts";
@@ -86,6 +88,8 @@ export type Deps = {
   live?: Live;
   /** Mail out (#385, ADR-043): SES or the development log; absent where MAIL is off, and a code answers 503. */
   mailer?: Mailer;
+  /** Push out (#102, ADR-055): Expo or the development log; absent where PUSH is off, and nothing is sent. */
+  pusher?: Pusher;
 };
 
 const UNLIMITED_PATHS = new Set(["/health", "/openapi.json"]);
@@ -240,13 +244,39 @@ export function createApp(deps: Deps) {
   app.route("/", notificationRoutes(deps, guard));
   // Invitations and the reward they earn (#107, ADR-044).
   app.route("/", invitationRoutes(deps, guard));
+  // The chat's live sockets (#349): who is in the app now, which the push asks too.
+  const live =
+    deps.live ??
+    createLive({
+      db: deps.db,
+      logger: deps.logger,
+      socketsPerAccount: deps.config.WS_SOCKETS_PER_ACCOUNT,
+    });
+  // The pushes (#102, ADR-055): the notifications slice decides whom to tell,
+  // the chat and the round's routes only say when.
+  const push = createPush({
+    db: deps.db,
+    logger: deps.logger,
+    now: deps.now ?? (() => new Date()),
+    ...(deps.pusher ? { pusher: deps.pusher } : {}),
+    online: (accountId) => live.online(accountId),
+  });
   // The conversations a match opens and their text messages (#348, ADR-031).
   // A conversation's first message is checked by the automatic rules (#105,
-  // ADR-033): the safety slice decides, the chat only measures.
+  // ADR-033): the safety slice decides, the chat only measures. Every new
+  // message is handed to the push with whom the chat lets read it.
   app.route(
     "/",
-    chatRoutes(deps, guard, (accountId, conversationId) =>
-      checkFirstMessage(ruleDeps, { accountId, conversationId }),
+    chatRoutes(
+      deps,
+      guard,
+      (accountId, conversationId) => checkFirstMessage(ruleDeps, { accountId, conversationId }),
+      (accountId, conversationId, seq) =>
+        push.message({
+          conversationId,
+          readers: () =>
+            messageReaders(deps.db, { conversationId, seq, senderAccountId: accountId }),
+        }),
     ),
   );
   // ...and what changes in them, live over one socket (#349, ADR-031 §5).
@@ -256,13 +286,7 @@ export function createApp(deps: Deps) {
       db: deps.db,
       logger: deps.logger,
       store: sessionStore,
-      live:
-        deps.live ??
-        createLive({
-          db: deps.db,
-          logger: deps.logger,
-          socketsPerAccount: deps.config.WS_SOCKETS_PER_ACCOUNT,
-        }),
+      live,
       now: deps.now ?? (() => new Date()),
       allowedOrigins: deps.config.corsAllowedOrigins,
       timing: {
@@ -329,7 +353,7 @@ export function createApp(deps: Deps) {
         : (accountId) => buildRoundOf(builderDeps(), accountId),
       // A match is a conversation (#100, ADR-031): the chat slice's, handed in
       // here since the chat imports the profile, which imports matching.
-      { between: conversationBetween, open: openConversation },
+      { between: conversationBetween, open: openConversation, made: push.match },
       roundRead,
       // A short round's relaxations (#99, ADR-042) read the pond as the builder does.
       {

@@ -13,3 +13,14 @@ export function finnishDay(at: Date): string {
     day: "2-digit",
   }).format(at);
 }
+
+/** The hour of an instant in Finland, 0 to 23: the quiet hours and the round's push (ADR-055 §6, §7). */
+export function finnishHour(at: Date): number {
+  const hour = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Helsinki",
+    hour: "numeric",
+    hour12: false,
+  }).format(at);
+  // en-GB writes midnight as 00; % 24 keeps a 24 from any engine at 0.
+  return Number(hour) % 24;
+}

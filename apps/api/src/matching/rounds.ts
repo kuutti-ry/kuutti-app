@@ -58,6 +58,12 @@ export type BuildToday = (accountId: string) => Promise<boolean>;
 export type Matches = {
   between: (db: Queryable, accountId: string, otherAccountId: string) => Promise<string | null>;
   open: (tx: Queryable, input: { first: string; second: string; at: Date }) => Promise<string>;
+  /**
+   * After a match committed: the push to the person whose earlier like it met
+   * (#102, ADR-055 §5), the notifications slice's, handed in by app.ts. It
+   * changes no answer.
+   */
+  made?: (input: { accountId: string; conversationId: string }) => Promise<void>;
 };
 
 /**
@@ -531,9 +537,31 @@ export async function decide(
     if (decided.opened) {
       await track({ ...deps, now }, input.accountId, "match", { completed: true });
       await track({ ...deps, now }, decided.candidateId, "match", { completed: false });
+      // The one who just liked sees the match in the answer; the other is told (ADR-055 §5).
+      if (written.match) {
+        await matches.made?.({ accountId: decided.candidateId, conversationId: written.match });
+      }
     }
   }
   return { match: written.match };
+}
+
+/**
+ * The people whose round for `day` was built and not yet opened, with a card
+ * that can still be shown: whom the round's push tells (#102, ADR-055 §6).
+ * An empty round has no card; one opened was read already. Read across
+ * accounts by the push's job, as the builder writes across them.
+ */
+export async function unopenedRoundsOf(db: Queryable, day: string): Promise<string[]> {
+  const { rows } = await db.query<{ account_id: string }>(
+    `SELECT r.account_id FROM rounds r
+      WHERE r.day = $1 AND r.opened_at IS NULL
+        AND EXISTS (SELECT 1 FROM account o WHERE o.id = r.account_id AND o.state = 'active')
+        AND EXISTS (SELECT 1 FROM round_entries e WHERE e.round_id = r.id AND ${SERVABLE})
+      ORDER BY r.account_id`,
+    [day],
+  );
+  return rows.map((row) => row.account_id);
 }
 
 /**

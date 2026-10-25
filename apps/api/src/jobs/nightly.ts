@@ -14,6 +14,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Milliseconds from `now` to the next 04:00 Europe/Helsinki. */
 export function msUntilNightly(now: Date): number {
+  return msUntilFinnishHour(now, NIGHTLY_HOUR);
+}
+
+/** Milliseconds from `now` to the next `hour`:00 Europe/Helsinki: the night's jobs, the round's push (#102). */
+export function msUntilFinnishHour(now: Date, hour: number): number {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Helsinki",
     hour: "numeric",
@@ -23,7 +28,7 @@ export function msUntilNightly(now: Date): number {
   }).formatToParts(now);
   const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? "0");
   const sinceMidnight = ((get("hour") % 24) * 3600 + get("minute") * 60 + get("second")) * 1000;
-  const target = NIGHTLY_HOUR * 3600 * 1000;
+  const target = hour * 3600 * 1000;
   const wait = target - sinceMidnight;
   return wait > 0 ? wait : wait + DAY_MS;
 }

@@ -78,6 +78,14 @@ const Env = z.object({
   MAIL: z.enum(["ses", "log", "off"]).optional(),
   // The sender of every message: the SES identity kuutti.app (infra/bootstrap/mail.tf).
   MAIL_FROM: z.string().min(1).default("Kuutti <noreply@kuutti.app>"),
+  // Push (#102, ADR-055 §8): expo through Expo's push service (the SSM
+  // parameter `push`); log on a developer's machine and in tests, which writes
+  // the kind of each push to the log and sends nothing; off sends nothing.
+  // Unset, it is log in development and test and off everywhere else.
+  PUSH: z.enum(["expo", "log", "off"]).optional(),
+  // Expo's enhanced push security (EAS), once the maintainer switches it on:
+  // the SecureString /kuutti/<env>/expo-access-token, never a resource (ADR-001).
+  EXPO_ACCESS_TOKEN: z.string().trim().min(1).optional(),
   // Where a staff bank login returns to (#49): the moderation panel's origin,
   // which is also on the CORS allowlist. Vite's dev server by default.
   ADMIN_APP_URL: z.url().default("http://localhost:5173"),
@@ -195,12 +203,13 @@ export type PreviewConfig = {
 
 export type Config = Omit<
   z.infer<typeof Env>,
-  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY" | "MAIL"
+  "RATE_LIMIT_PER_MINUTE" | "SIGN_IN_RATE_LIMIT_PER_MINUTE" | "TRUSTED_PROXY" | "MAIL" | "PUSH"
 > & {
   RATE_LIMIT_PER_MINUTE: number;
   SIGN_IN_RATE_LIMIT_PER_MINUTE: number;
   TRUSTED_PROXY: TrustedProxy;
   MAIL: "ses" | "log" | "off";
+  PUSH: "expo" | "log" | "off";
   databaseUrl: string;
   corsAllowedOrigins: ReadonlySet<string>;
   preview?: PreviewConfig;
@@ -303,6 +312,12 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
   }
   const mail =
     env.MAIL ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
+  // As mail's: a deployed environment sends through Expo or not at all (ADR-055 §8).
+  if (env.PUSH === "log" && env.APP_ENV !== "development" && env.APP_ENV !== "test") {
+    throw new ConfigError(["PUSH"], [`PUSH: log is for development and test, not ${env.APP_ENV}`]);
+  }
+  const push =
+    env.PUSH ?? (env.APP_ENV === "development" || env.APP_ENV === "test" ? "log" : "off");
   const trustedProxy: TrustedProxy =
     env.TRUSTED_PROXY ??
     (env.APP_ENV === "development" || env.APP_ENV === "test" ? "none" : "traefik");
@@ -312,6 +327,7 @@ export function parseConfig(raw: Record<string, string | undefined>): Config {
     SIGN_IN_RATE_LIMIT_PER_MINUTE: signInRateLimit,
     TRUSTED_PROXY: trustedProxy,
     MAIL: mail,
+    PUSH: push,
     databaseUrl: preview ? withDatabase(baseUrl, preview.database) : baseUrl,
     corsAllowedOrigins: allowedOrigins(env),
     ...(preview
