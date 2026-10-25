@@ -202,7 +202,7 @@ gh attestation verify oci://ghcr.io/kuutti-ry/kuutti-api:<sha> --repo kuutti-fi/
 
 ### Restoring from an export
 
-`export.yml` writes `s3://<state bucket>/github-export/<date>/` every Sunday: `issues.json`, `issue-comments.json`, `milestones.json`, `labels.json`, `rulesets.json`, `environments.json`, `environment-branch-policies.json`, `manifest.json` and `repository.bundle`. Its role (`kuutti-ci-export`) trusts the `main` branch only, can add objects under that prefix and nothing else, and cannot delete; the bucket is versioned and replaced versions are kept a year. After applying the bootstrap, once: `gh variable set AWS_EXPORT_ROLE_ARN --body "$(cd infra/bootstrap && tofu output -raw ci_export_role_arn)"`; the workflow stays dormant until then. To restore into a new or scratch repository (`NEW=owner/name`, signed in with `pnpm aws:login`):
+`export.yml` writes `s3://<state bucket>/github-export/<date>/` every Sunday: `issues.json`, `issue-comments.json`, `pulls.json`, `pull-comments.json`, `pull-reviews.json`, `milestones.json`, `labels.json`, `rulesets.json`, `environments.json`, `environment-branch-policies.json`, `manifest.json` and `repository.bundle`. Its role (`kuutti-ci-export`) trusts the `main` branch only, can add objects under that prefix and nothing else, and cannot delete; the bucket is versioned and replaced versions are kept a year. After applying the bootstrap, once: `gh variable set AWS_EXPORT_ROLE_ARN --body "$(cd infra/bootstrap && tofu output -raw ci_export_role_arn)"`; the workflow stays dormant until then. To restore into a new or scratch repository (`NEW=owner/name`, signed in with `pnpm aws:login`):
 
 ```sh
 B=$(cd infra/bootstrap && tofu output -raw state_bucket)
@@ -212,14 +212,18 @@ aws s3 cp "s3://$B/github-export/<date>/" export/ --recursive
 git clone export/repository.bundle restored && git -C restored remote set-url origin "https://github.com/$NEW.git" && git -C restored push --all origin && git -C restored push --tags origin
 jq -c '.[] | {name, color, description}' export/labels.json | while read -r l; do gh api -X POST "repos/$NEW/labels" --input - <<< "$l" || true; done
 jq -c '.[] | {title, state, description, due_on}' export/milestones.json | while read -r m; do gh api -X POST "repos/$NEW/milestones" --input - <<< "$m"; done
-# Issues in number order, so that #n stays #n while nothing else has been created. Pull requests are in
-# the list too (they have a pull_request key): create a placeholder issue for each to keep the numbering.
-jq -c 'sort_by(.number) | .[] | {title, body: ((.body // "") + "\n\n_Restored from the export; originally #\(.number) by @\(.user.login), \(.created_at)._"), labels: [.labels[].name]}' export/issues.json \
+# Every number from 1 to the highest, so that #n stays #n while nothing else has been created. Pull requests
+# are in the list too (they have a pull_request key) and come back as placeholder issues; a number GitHub no
+# longer has (deleted, such as #158 and #230) gets a placeholder of its own. A number the list holds twice
+# (a page shifted during the export) comes back once.
+jq -c 'INDEX(.number) as $by | range(1; (map(.number) | max) + 1) as $n | $by["\($n)"] as $i
+  | if $i then {title: $i.title, body: (($i.body // "") + "\n\n_Restored from the export; originally #\($n) by @\($i.user.login), \($i.created_at)._"), labels: [$i.labels[].name]}
+    else {title: "#\($n): not in the export", body: "Deleted on GitHub before the export; kept so that the numbers after it stay theirs.", labels: []} end' export/issues.json \
   | while read -r i; do gh api -X POST "repos/$NEW/issues" --input - <<< "$i" --jq .number; sleep 1; done
 jq -c '.[] | del(.id, .source, .source_type, .node_id, ._links, .created_at, .updated_at, .current_user_can_bypass)' export/rulesets.json | while read -r r; do gh api -X POST "repos/$NEW/rulesets" --input - <<< "$r"; done
 ```
 
-Comments (`issue-comments.json`, each with its `issue_url`) are posted the same way through `repos/$NEW/issues/<n>/comments`; closed issues are closed afterwards with `gh issue close`. Environment protection rules are re-created with the `PUT .../environments/<name>` commands of this file; `environments.json` is the record of what they were. Secrets are not in the export and never can be: they are re-entered from the password manager (`docs/runbooks/custody.md`).
+Comments (`issue-comments.json`, each with its `issue_url`) are posted the same way through `repos/$NEW/issues/<n>/comments`; closed issues and the placeholders of missing numbers are closed afterwards with `gh issue close`. A pull request cannot come back as one under its number (an open one can be opened again from its branch, under a new number): its placeholder issue keeps the number and the body, and `pulls.json` is the record of the rest. There `state` is open or closed, and a pull request was merged when `merged_at` is set; only then is `merge_commit_sha` the commit that landed on `main`, while for a closed, unmerged one it is a test merge that is not in the bundle. Of its branches the names and head SHAs are kept; a merged branch's own commits are not in the bundle, since the branch is deleted on merge. The comments on its diff (`pull-comments.json`, with `path`, `line` and `diff_hunk`, a reply naming its parent in `in_reply_to_id`) carry a `pull_request_url` and are posted on the placeholder like the issue comments, with the path and the line written into the text. So are its reviews (`pull-reviews.json`), with the verdict (`state`), the reviewer and `submitted_at` in front of the text; a `COMMENTED` review with an empty body is only the envelope of its diff comments and is skipped, since GitHub refuses an empty comment. An export whose `issues.json` holds no pull request cannot keep the numbering; the workflow fails such a run (#16; the first export, of 2026-10-25, was one). Environment protection rules are re-created with the `PUT .../environments/<name>` commands of this file; `environments.json` is the record of what they were. Secrets are not in the export and never can be: they are re-entered from the password manager (`docs/runbooks/custody.md`).
 
 ## Verify
 
