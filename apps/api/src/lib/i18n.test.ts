@@ -5,7 +5,7 @@ import { createApp } from "../app.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { AppEnv } from "./env.ts";
 import { AppError } from "./errors.ts";
-import { isLocalisedErrorCode, requestLocale, servedLocales, tOf } from "./i18n.ts";
+import { isLocalisedErrorCode, requestLocale, servedLocales, tFor, tOf } from "./i18n.ts";
 
 describe("localised responses", () => {
   test("an API error response for a request with Accept-Language: fi carries the Finnish message", async ({
@@ -140,4 +140,23 @@ describe("the request's language where the middleware has or has not run", () =>
       expect(isLocalisedErrorCode(code), code).toBe(false);
     }
   });
+});
+
+// A push is worded in the language its device registered in (#102, ADR-055 §1).
+describe("a stored language's t()", () => {
+  test.each([
+    ["en", "You have a new message", "You have a new match", "Today's round is ready"],
+    ["fi", "Sinulle on uusi viesti", "Sinulle on uusi mätsi", "Päivän kierros on valmis"],
+    ["sv", "Du har ett nytt meddelande", "Du har en ny matchning", "Dagens omgång är klar"],
+  ])("tFor(%j) words the pushes in it", (locale, message, match, round) => {
+    const t = tFor(locale);
+    expect([t("push.message"), t("push.match"), t("push.round")]).toEqual([message, match, round]);
+  });
+
+  test.each(["de", "", "FI", "fi-FI", "en-XA", "toString", "__proto__"])(
+    "a value that is not one of ours, %j, is English",
+    (locale) => {
+      expect(tFor(locale)("push.message")).toBe("You have a new message");
+    },
+  );
 });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { captureLogger } from "../test/harness.ts";
-import { msUntilNightly, runNightly, scheduleNightly } from "./nightly.ts";
+import { msUntilFinnishHour, msUntilNightly, runNightly, scheduleNightly } from "./nightly.ts";
 
 describe("nightly jobs", () => {
   it("waits until the next 04:00 in Helsinki", () => {
@@ -10,6 +10,19 @@ describe("nightly jobs", () => {
     expect(msUntilNightly(new Date("2026-07-01T01:00:01Z"))).toBe(24 * 60 * 60 * 1000 - 1000);
     // Winter time: 04:00 Helsinki is 02:00 UTC.
     expect(msUntilNightly(new Date("2026-12-01T00:30:00Z"))).toBe(90 * 60 * 1000);
+  });
+
+  it("waits until 04:00 as it did before the hour was a parameter (#102)", () => {
+    for (const at of [
+      "2026-07-01T00:00:00Z",
+      "2026-07-01T01:00:00Z",
+      "2026-07-01T01:00:01Z",
+      "2026-12-01T00:30:00Z",
+      "2026-12-01T23:59:59Z",
+    ]) {
+      expect(msUntilNightly(new Date(at)), at).toBe(msUntilFinnishHour(new Date(at), 4));
+    }
+    expect(msUntilNightly(new Date("2026-12-01T01:59:59Z"))).toBe(1000);
   });
 
   it("runs every job and logs a failure without stopping the rest", async () => {
@@ -41,6 +54,41 @@ describe("nightly jobs", () => {
       "broken:nightly job failed",
       "last:nightly job done",
     ]);
+  });
+});
+
+// The wait the round's push is armed with (#102, ADR-055 §6), and the night's.
+describe("msUntilFinnishHour", () => {
+  const SECOND = 1000;
+  const DAY = 24 * 60 * 60 * SECOND;
+  it.each([
+    // Summer time, UTC+3: 00:00 Helsinki is 21:00 UTC the day before.
+    [0, "2026-07-01T20:59:59Z", SECOND],
+    [0, "2026-07-01T21:00:00Z", DAY],
+    [0, "2026-07-01T21:00:01Z", DAY - SECOND],
+    // 09:00 Helsinki is 06:00 UTC.
+    [9, "2026-07-02T05:59:59Z", SECOND],
+    [9, "2026-07-02T06:00:00Z", DAY],
+    [9, "2026-07-02T06:00:01Z", DAY - SECOND],
+    // 23:00 Helsinki is 20:00 UTC.
+    [23, "2026-07-02T19:59:59Z", SECOND],
+    [23, "2026-07-02T20:00:00Z", DAY],
+    [23, "2026-07-02T20:00:01Z", DAY - SECOND],
+    // Winter time, UTC+2: 09:00 Helsinki is 07:00 UTC.
+    [9, "2026-12-02T06:59:59Z", SECOND],
+    [9, "2026-12-02T07:00:00Z", DAY],
+    [9, "2026-12-02T07:00:01Z", DAY - SECOND],
+    // From the far side of the day: 09:00 the next morning.
+    [9, "2026-12-02T21:00:00Z", 10 * 60 * 60 * SECOND],
+  ])("for %i o'clock from %s waits %i ms", (hour, at, wait) => {
+    expect(msUntilFinnishHour(new Date(at), hour)).toBe(wait);
+  });
+
+  it("leaves out a fraction of a second, so a timer is late by it and never early", () => {
+    // 08:59:59.500 in Helsinki: the second's half is not counted, the timer fires at 09:00:00.500.
+    expect(msUntilFinnishHour(new Date("2026-07-02T05:59:59.500Z"), 9)).toBe(SECOND);
+    // At 09:00:00.500 the hour has come: the next is a day away.
+    expect(msUntilFinnishHour(new Date("2026-07-02T06:00:00.500Z"), 9)).toBe(DAY);
   });
 });
 

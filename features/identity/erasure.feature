@@ -171,6 +171,12 @@ Feature: Account deletion per the erasure table
     Then the export carries every kind with its state and the notice with when it was read
     And the erasure takes the choices and the notices
 
+  Scenario: The devices' push tokens go with the account, and the export names the devices that had one, never a token
+    Given "A" is signed in on three devices, two of which registered a push token, and "B" on one that did
+    When "A" exports the account, and then deletes it
+    Then the export says of each device whether it is pushed, with its platform, language and since when, and carries no token
+    And the erasure counts and takes A's two tokens and leaves B's
+
   Scenario: An erased inviter's open invitations go, their units and notices with the account, and the redeemed ones stay for their redeemers
     Given "A" made an open invitation, one that "B" used and that has counted, earning "A" a fish and a notice, and one that "C" used and has not finished
     When "A" deletes the account

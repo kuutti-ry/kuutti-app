@@ -28,13 +28,14 @@ const LINES: Record<PushData["kind"], PlainMessageKey> = {
   round: "push.round",
 };
 
-/** Runs a task after `ms`; the returned function cancels it. Tests hand in their own. */
-export type Schedule = (ms: number, task: () => void) => () => void;
+/**
+ * Runs a task after `ms`, on a timer that keeps no process alive. The task
+ * never rejects: it logs its own failure. Tests hand in their own, and await it.
+ */
+export type Schedule = (ms: number, task: () => Promise<void>) => void;
 
 const realSchedule: Schedule = (ms, task) => {
-  const timer = setTimeout(task, ms);
-  timer.unref();
-  return () => clearTimeout(timer);
+  setTimeout(() => void task(), ms).unref();
 };
 
 export type PushDeps = {
@@ -129,18 +130,16 @@ export function createPush(deps: PushDeps) {
     kind: PushData["kind"],
   ) {
     if (taken.length === 0) return;
-    schedule(RECEIPT_DELAY_MS, () => {
-      void (async () => {
-        try {
-          const receipts = await pusher.receipts(taken.map(({ id }) => id));
-          for (const { id, token } of taken) {
-            const receipt = receipts.get(id);
-            if (receipt?.status === "error") await refused(token, receipt.error, kind);
-          }
-        } catch (error) {
-          deps.logger.warn(failure(error, kind), "push receipts not read");
+    schedule(RECEIPT_DELAY_MS, async () => {
+      try {
+        const receipts = await pusher.receipts(taken.map(({ id }) => id));
+        for (const { id, token } of taken) {
+          const receipt = receipts.get(id);
+          if (receipt?.status === "error") await refused(token, receipt.error, kind);
         }
-      })();
+      } catch (error) {
+        deps.logger.warn(failure(error, kind), "push receipts not read");
+      }
     });
   }
 
@@ -224,15 +223,20 @@ export function createPush(deps: PushDeps) {
         );
         for (const accountId of due) {
           // Taken before the send, so two messages at once push once; given
-          // back when nothing went (the quiet hours, no device, a refusal).
+          // back when nothing went (the quiet hours, no device, a refusal, a
+          // failure on the way, which `guarded` logs).
           const key = `${accountId}:${input.conversationId}`;
           lastPushed.set(key, nowMs);
-          const sent = await deliver(
-            [accountId],
-            { kind: "message", conversationId: input.conversationId },
-            { collapse: input.conversationId, priority: "high" },
-          );
-          if (sent === 0) lastPushed.delete(key);
+          let sent = 0;
+          try {
+            sent = await deliver(
+              [accountId],
+              { kind: "message", conversationId: input.conversationId },
+              { collapse: input.conversationId, priority: "high" },
+            );
+          } finally {
+            if (sent === 0) lastPushed.delete(key);
+          }
         }
       }),
 
