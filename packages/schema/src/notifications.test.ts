@@ -8,6 +8,9 @@ import {
   NotificationChoices,
   NotificationKind,
   NotificationKindParams,
+  PushData,
+  PushPlatform,
+  PushTokenRequest,
   PutNotificationChoice,
 } from "./notifications.ts";
 
@@ -91,5 +94,63 @@ describe("the notices", () => {
       { kind: "warning", at, readAt: at },
       { kind: "invitation_counted", at, readAt: null },
     ]);
+  });
+});
+
+// The push (#102, ADR-055): a device's token, and what a push's data carries.
+describe("a device's push token", () => {
+  const token = "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]";
+
+  it("is either of Expo's two spellings, with a platform of the phone app's", () => {
+    expect(PushPlatform.options).toEqual(["ios", "android"]);
+    expect(PushTokenRequest.parse({ token, platform: "ios" })).toEqual({ token, platform: "ios" });
+    expect(
+      PushTokenRequest.parse({ token: "ExpoPushToken[a-b_C9]", platform: "android" }).token,
+    ).toBe("ExpoPushToken[a-b_C9]");
+  });
+
+  it.each([
+    ["no brackets", "ExponentPushToken"],
+    ["empty brackets", "ExponentPushToken[]"],
+    ["another prefix", "FcmToken[abc]"],
+    ["a space inside", "ExponentPushToken[abc def]"],
+    ["text after the bracket", "ExponentPushToken[abc]x"],
+    ["a device token alone", "f0e1d2c3b4a5"],
+    ["over 160 inside", `ExponentPushToken[${"a".repeat(161)}]`],
+  ])("refuses %s", (_, value) => {
+    expect(PushTokenRequest.safeParse({ token: value, platform: "ios" }).success).toBe(false);
+  });
+
+  it("refuses a web platform, a missing field and an unknown key", () => {
+    expect(codes(PushTokenRequest, { token, platform: "web" })).toEqual(["invalid_value"]);
+    expect(codes(PushTokenRequest, { token })).toEqual(["invalid_value"]);
+    expect(codes(PushTokenRequest, { platform: "ios" })).toEqual(["invalid_type"]);
+    expect(codes(PushTokenRequest, { token, platform: "ios", locale: "fi" })).toEqual([
+      "unrecognized_keys",
+    ]);
+  });
+});
+
+describe("a push's data", () => {
+  const conversationId = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+
+  it("names a message's or a match's conversation, and nothing for the round", () => {
+    expect(PushData.parse({ kind: "message", conversationId })).toEqual({
+      kind: "message",
+      conversationId,
+    });
+    expect(PushData.parse({ kind: "match", conversationId }).kind).toBe("match");
+    expect(PushData.parse({ kind: "round" })).toEqual({ kind: "round" });
+  });
+
+  it("refuses an unknown kind, a conversation that is not a uuid, and anything more", () => {
+    expect(PushData.safeParse({ kind: "moderation" }).success).toBe(false);
+    expect(PushData.safeParse({ kind: "message" }).success).toBe(false);
+    expect(PushData.safeParse({ kind: "message", conversationId: "42" }).success).toBe(false);
+    // Nothing besides what the app opens: never a text, a name or an account.
+    expect(
+      PushData.safeParse({ kind: "message", conversationId, body: "Moi", from: "Ilmatar" }).success,
+    ).toBe(false);
+    expect(PushData.safeParse({ kind: "round", conversationId }).success).toBe(false);
   });
 });
