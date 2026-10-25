@@ -326,12 +326,27 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
     const s = await appWith(ctx);
     const a = await s.person("Ilmatar");
     const b = await s.person("Väinämöinen");
-    const tokensOfB = [await s.register(b, "fi"), await s.register(b, "en", "another")];
+    const fi = await s.register(b, "fi");
+    const en = await s.register(b, "en", "another");
     const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
     const text = "Ilmatar täällä, tavataanko Kauppatorilla kello viisi?";
     expect((await s.send(a, id, text)).status).toBe(201);
     const sent = s.pusher.sent();
-    expect(sent.map((m) => m.to)).toEqual(tokensOfB);
+    // Both of B's devices are told, each in its own language. They register at
+    // the app's one moment, so which is told first is the database's to choose;
+    // the order by registration is push.test.ts's to hold.
+    expect(new Map(sent.map(({ to, ...payload }) => [to, payload]))).toEqual(
+      new Map([
+        [
+          fi,
+          expect.objectContaining({ body: "Sinulle on uusi viesti", data: { kind: "message" } }),
+        ],
+        [
+          en,
+          expect.objectContaining({ body: "You have a new message", data: { kind: "message" } }),
+        ],
+      ]),
+    );
     const { rows } = await ctx.client.query<{ id: string }>(
       "SELECT id FROM session WHERE account_id = ANY($1::uuid[])",
       [[a.accountId, b.accountId]],
@@ -345,13 +360,9 @@ describe("a message's push through the routes (ADR-055 §4)", () => {
         conversations: [id],
       }),
     ).toBe(2);
-    expect(sent.map(({ to: _, ...payload }) => payload)).toEqual([
-      expect.objectContaining({ body: "Sinulle on uusi viesti", data: { kind: "message" } }),
-      expect.objectContaining({ body: "You have a new message", data: { kind: "message" } }),
-    ]);
     // Nor does any log line carry the text or a token.
     const raw = JSON.stringify(s.logs());
-    for (const secret of [text, ...tokensOfB]) expect(raw).not.toContain(secret);
+    for (const secret of [text, fi, en]) expect(raw).not.toContain(secret);
   });
 
   test("Nothing is pushed across a block or a close", async ({ ctx }) => {
