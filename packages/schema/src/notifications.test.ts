@@ -132,25 +132,21 @@ describe("a device's push token", () => {
 });
 
 describe("a push's data", () => {
-  const conversationId = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
-
-  it("names a message's or a match's conversation, and nothing for the round", () => {
-    expect(PushData.parse({ kind: "message", conversationId })).toEqual({
-      kind: "message",
-      conversationId,
-    });
-    expect(PushData.parse({ kind: "match", conversationId }).kind).toBe("match");
-    expect(PushData.parse({ kind: "round" })).toEqual({ kind: "round" });
+  it("names its kind and nothing else", () => {
+    for (const kind of ["message", "match", "round"] as const) {
+      expect(PushData.parse({ kind })).toEqual({ kind });
+    }
   });
 
-  it("refuses an unknown kind, a conversation that is not a uuid, and anything more", () => {
-    expect(PushData.safeParse({ kind: "moderation" }).success).toBe(false);
-    expect(PushData.safeParse({ kind: "message" }).success).toBe(false);
-    expect(PushData.safeParse({ kind: "message", conversationId: "42" }).success).toBe(false);
-    // Nothing besides what the app opens: never a text, a name or an account.
+  it("refuses an unknown kind and anything besides the kind: a conversation, a text, a name", () => {
+    expect(codes(PushData, { kind: "moderation" })).toEqual(["invalid_value"]);
+    expect(codes(PushData, {})).toEqual(["invalid_value"]);
+    // Both people's phones would carry the same conversation id (the maintainer's of 25/10/2026).
     expect(
-      PushData.safeParse({ kind: "message", conversationId, body: "Moi", from: "Ilmatar" }).success,
-    ).toBe(false);
-    expect(PushData.safeParse({ kind: "round", conversationId }).success).toBe(false);
+      codes(PushData, { kind: "message", conversationId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b" }),
+    ).toEqual(["unrecognized_keys"]);
+    expect(codes(PushData, { kind: "message", body: "Moi", from: "Ilmatar" })).toEqual([
+      "unrecognized_keys",
+    ]);
   });
 });

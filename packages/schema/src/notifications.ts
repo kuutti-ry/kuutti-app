@@ -93,8 +93,10 @@ export type ExportedNotifications = z.infer<typeof ExportedNotifications>;
 
 // The push (#102, ADR-055): a device's token, and what a push carries for the
 // app. A push says that there is something, never what or from whom: its one
-// line is the app's own words, and its data names the kind and, for a message
-// or a match, the conversation. Never a message's text, a name or an account.
+// line is the app's own words, and its data names the kind alone. Never a
+// message's text, a name, an account, or the conversation, whose id both
+// people's phones would share and so tie the two together for Expo, Apple and
+// Google (the maintainer's of 25/10/2026).
 
 /** The phone platforms a push reaches. Mirrors the database's enum. */
 export const PushPlatform = z.enum(["ios", "android"]).meta({ id: "PushPlatform" });
@@ -113,13 +115,10 @@ export const PushTokenRequest = z
   .meta({ id: "PushTokenRequest" });
 export type PushTokenRequest = z.infer<typeof PushTokenRequest>;
 
-/** What a push's `data` carries, all the app needs to open what it is about on a tap. */
+/** What a push's `data` carries: its kind, which tells the app where a tap goes (the conversations or today's round). */
 export const PushData = z
-  .discriminatedUnion("kind", [
-    z.object({ kind: z.literal("message"), conversationId: z.uuid() }).strict(),
-    z.object({ kind: z.literal("match"), conversationId: z.uuid() }).strict(),
-    z.object({ kind: z.literal("round") }).strict(),
-  ])
+  .object({ kind: z.enum(["message", "match", "round"]) })
+  .strict()
   .meta({ id: "PushData" });
 export type PushData = z.infer<typeof PushData>;
 
