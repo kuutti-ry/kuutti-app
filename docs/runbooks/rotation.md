@@ -40,6 +40,7 @@ There is no rotation calendar. Rotate when a value may have been seen by someone
 | `SENTRY_AUTH_TOKEN`; the two DSNs | GitHub environments `staging`, `prod`; EAS environments `preview`, `production`; SSM `sentry-dsn` (String) | `deploy.yml`, EAS builds; the API and the app | the Sentry owner and a repository admin | 11 |
 | GitHub variables, AWS access from CI | repository and environment variables; OIDC roles | the workflows | an owner | 12 |
 | `FONTS_TOKEN`, read-only on `kuutti-ry/kuutti-app-fonts` alone | EAS environments `preview`, `production`, visibility secret. Never GitHub. The website's Amplify app holds a token of its own, rotated in `kuutti-app-site` (its decision 18) | EAS builds, `eas-build-pre-install` (`scripts/fonts.ts`, ADR-052) | the maintainer | 13 |
+| the Google Play service account's JSON key; Play's upload key, EAS's keystore of `fi.kuutti.app` | EAS's credentials of `fi.kuutti.app`, no other copy. Never GitHub | EAS Submit and EAS builds, for any holder of `EXPO_TOKEN`; the `staging` profile's `--auto-submit` (ADR-057) | the maintainer (Google Cloud, expo.dev, Play Console) | 14 |
 
 ## 1. Database application password
 
@@ -250,7 +251,7 @@ Then revoke the old token on expo.dev.
 
 **What breaks meanwhile:** the EAS steps of `deploy.yml` (after the API is already deployed), `eas-build.yml`, the preview lanes and the sweep's EAS removals fail until the new token is set. The sweep retries.
 
-**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's.
+**If it leaked:** revoke first, before setting the new one. Then look at what was published to the `staging` and `production` channels since the leak (the project's updates on expo.dev). Roll a bad one back as ADR-004 says: republish the previous commit, or `eas update:republish`. Channel edits stay the maintainer's. The token also reached Google Play through EAS, which uses the Play key for any holder and hands the upload key to every cloud build (ADR-057 §3): in Play Console, read each testing track's history; halt on a closed or open track what nobody started, and replace an internal release, which cannot be halted, with a staging build from a known-good `main`. Then replace the Play key and reset the upload key (section 14).
 
 ## 11. Sentry DSNs and the source-map token
 
@@ -290,13 +291,29 @@ Personal Sentry tokens made for settings work are revoked when the work is done 
 
 **If it leaked:** revoke it; the token reads the font files and nothing else. Whether Spoke is told is the maintainer's call (ADR-052).
 
-## 14. Nothing to rotate
+## 14. Google Play: the service account key and the upload key
+
+**The service account key** lets EAS upload a bundle to Google Play and release it on the app's testing tracks, never to production (ADR-057 §3). It lives in one place, EAS's credentials of `fi.kuutti.app` (Service credentials, the Google service account key for EAS Submit), and no copy is kept, on a laptop or in GitHub.
+
+1. Lift the organisation's ban on keys for the project as in `docs/vendors/google-play.md`, step 4 (`gcloud org-policies set-policy`, both constraints), and make a new key outside the checkout: `gcloud iam service-accounts keys create ~/eas-submit.json --iam-account=eas-submit@<project>.iam.gserviceaccount.com`.
+2. On expo.dev, the project's Credentials, Android, `fi.kuutti.app`: upload the new key in place of the old, or with `eas credentials -p android`, Google Service Account. Then `rm ~/eas-submit.json`.
+3. Delete the old key (`gcloud iam service-accounts keys list --iam-account=…` gives its id, then `gcloud iam service-accounts keys delete <id> --iam-account=…`) and put the policy back (`gcloud org-policies delete <constraint> --project=<project>`, both).
+
+**Check.** The next `staging` build's submission ends finished on expo.dev, and its release is on the internal testing track.
+
+**What breaks meanwhile:** a submission between the old key's deletion and the new one's upload fails, and its bundle reaches nobody until `eas submit --platform android --profile staging --id <build id>`. Upload first, delete last.
+
+**If it leaked:** delete the key in Google Cloud first. On a track it releases only bundles with the upload key's signature, but it can release those on any testing track and halt them on a closed or open one, and it can upload a bundle signed with any key to internal app sharing, which reaches the e-mail list of `docs/vendors/google-play.md`, step 3, and shows in no track's history. Read the tracks' release history in Play Console, and treat what internal app sharing handed out since the leak as unknown.
+
+**The upload key** is EAS's keystore of `fi.kuutti.app`, which also signs the development and preview APKs; EAS holds it and nobody rotates it on a schedule. When it is lost or out: make a new keystore for the app on EAS (`eas credentials -p android`), and in Play Console, Manage Play app signing, request an upload key reset with the new key's certificate as a PEM file (`keytool -export -rfc` on the keystore, which `eas credentials` can download), then delete the downloaded keystore and its passwords from the disk. No bundle can be uploaded until Google has made the change. Then register the new key under Android developer verification (`docs/vendors/google-play.md`, step 7) and put its fingerprint in place of the old one in `/kuutti/<env>/android-cert-fingerprints` (`devices.md`, Verified links). A phone with an expo.dev APK signed with the old key cannot update to one signed with the new: it uninstalls first.
+
+## 15. Nothing to rotate
 
 - **S3.** Deployed environments have no S3 keys: the API writes through its instance role. `S3_ACCESS_KEY` and `S3_SECRET_KEY` exist for the local stand-in only (`apps/api/src/lib/config.ts`).
 - **The instance role's credentials** are short-lived and issued by AWS to the box. A box that may be compromised is rebuilt and every secret under its prefix is rotated (`incident.md`).
 - **Encryption keys of SSM, S3 and RDS** are AWS-managed (`aws/ssm`, SSE-S3, RDS storage encryption). Their rotation is AWS's.
 - **TLS certificates** renew themselves: ACM for CloudFront, Let's Encrypt through Traefik on the box.
-- **Store signing credentials** (the Android keystore, the iOS distribution certificate and profiles) are held by EAS (`apps/mobile/README.md`, Setting up EAS). This page does not rotate them. A new Android keystore would change the fingerprint in `/kuutti/<env>/android-cert-fingerprints` (`devices.md`, Verified links).
+- **Store signing credentials** (the Android keystore, the iOS distribution certificate and profiles) are held by EAS (`apps/mobile/README.md`, Setting up EAS). This page does not rotate them on a schedule; a lost or leaked Android keystore is section 14's upload key. Play's own signing keys are Google's (`docs/vendors/google-play.md`).
 - **Developer keys** for maintainer tools are not service secrets: the Claude API key of `pnpm i18n:translate` (`packages/i18n/README.md`) and the image-model key of the demo pictures (`docs/demo/photo-prompts.md`) live in the developer's own environment and are revoked at their provider.
 - **Human logins** (the mailbox, AWS root and Identity Center, GitHub, Expo, Dokploy, Sentry) are `custody.md`'s; a lost device is `SECURITY.md`'s.
 
