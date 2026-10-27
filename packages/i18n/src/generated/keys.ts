@@ -339,6 +339,9 @@ export type MessageParams = {
   "admin.report.personPage": Record<never, never>;
   "admin.report.photoFailed": Record<never, never>;
   "admin.report.photoRemoved": Record<never, never>;
+  "admin.report.pointedImage": { "state": string };
+  "admin.report.pointedLine": Record<never, never>;
+  "admin.report.pointedTitle": Record<never, never>;
   "admin.report.reason": Record<never, never>;
   "admin.report.reportedFor": { "reason": string };
   "admin.report.showPhoto": Record<never, never>;

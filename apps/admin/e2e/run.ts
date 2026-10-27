@@ -21,8 +21,9 @@
  *      its log in e2e/.out/api.log.
  *   3. The cast's stories through the API's own routes (`demo:reset`: Noa's photos wait in review
  *      among them), then what the flows act on: Mikael signs in once as anybody does and is made a
- *      moderator with the maintainer's own command line (ADR-006 §5), Laura reports her conversation
- *      with Emmi, and Iida's round names the person whose page the sanction flow opens.
+ *      moderator with the maintainer's own command line (ADR-006 §5), Emmi sends Laura a photo and
+ *      Laura reports their conversation pointing at it (#476), and Iida's round names the person
+ *      whose page the sanction flow opens.
  *   4. The panel's production build against that API, served with the headers of
  *      infra/modules/admin/main.tf, read from the file: its CSP, with the S3 stand-in added to
  *      img-src alone, for the photo URLs the API presigns on it locally (deployed, a photo comes
@@ -59,7 +60,7 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { ConversationList, RoundResponse } from "@kuutti/schema";
+import { ChatMessage, ConversationList, RoundResponse } from "@kuutti/schema";
 import { createPool } from "../../../packages/db/src/pool.ts";
 import { DEMO_PERSONAS } from "../../../packages/db/src/seed/personas.ts";
 import { demoAssetsDir } from "../../../packages/db/src/seed/photos.ts";
@@ -352,9 +353,25 @@ class Stack {
     );
     if (!withEmmi)
       throw new Error("Laura has no open conversation with Emmi: did the stories run?");
+    // Emmi sends Laura a photo through the chat's own route, and Laura's report
+    // points at it (#476). Here only: this stack's database and bucket go with
+    // the run, so no copy holds the photo past it.
+    const emmi = await session("emmi");
+    const form = new FormData();
+    const picture = readFileSync(join(demoAssetsDir(), "negatives/beer.jpg"));
+    form.append("photo", new Blob([new Uint8Array(picture)], { type: "image/jpeg" }), "photo.jpg");
+    form.append("clientId", "4b8f0c1e-6d2a-4e7b-9f3c-1a2b3c4d5e6f");
+    const sent = await fetch(new URL(`/conversations/${withEmmi.id}/photos`, api), {
+      method: "POST",
+      headers: { authorization: `Bearer ${emmi}` },
+      body: form,
+    });
+    if (!sent.ok) throw new Error(`Emmi's photo to Laura was refused: ${sent.status}`);
+    const { seq } = ChatMessage.parse(await sent.json());
     await call(context, laura, "POST", `/conversations/${withEmmi.id}/report`, {
       reason: "harassment",
       note: "She called me names when I said no.",
+      seq,
     });
 
     const iida = await session("iida");
