@@ -5,7 +5,9 @@ Feature: Photo moderation before anyone else sees a photo
   what it is sure of and tells the owner why; what it is unsure of is a
   person's to decide (ADR-006 §2, #206, #253), and one nobody decided within
   matching_config photo_queue_reject_days the night rejects as not reviewed
-  (#376); nothing is ever deleted by a machine. Each hard group of labels has two lines, 60 to ask a person and 90
+  (#376); nothing is ever deleted by a machine. A person may also take down
+  a profile photo that was approved, with a reason the owner is told (#477).
+  Each hard group of labels has two lines, 60 to ask a person and 90
   to decide, as migration 0030 sets them. A photo sent in a conversation is
   held to the same lines without the face rules, and only what the check is
   sure of is refused: there `queued` is the stored state of a photo
@@ -139,6 +141,22 @@ Feature: Photo moderation before anyone else sees a photo
   Scenario: A rejection needs a reason from the list
     When a moderator rejects without a reason, or with a reason outside the list
     Then the request is refused as invalid and nothing changes
+
+  Scenario: A moderator takes down an approved photo with a reason, and the owner is told
+    Given an approved profile photo, and another, that a viewer was shown
+    When a moderator rejects the first with a reason
+    Then the viewer is served only the second, the owner's list shows the reason with no appeal, the review names the moderator, and an audit row records it
+    And no sanction, no check note and no deletion follow
+
+  Scenario: An approved photo takes a rejection only, and one taken down stays down
+    Given an approved photo, and one a moderator took down
+    When a moderator approves the first, or decides the second again
+    Then each is refused as not queued and nothing is written
+
+  Scenario: A photo sent in a conversation is never taken down
+    Given a photo the check let through in a conversation
+    When a moderator rejects it
+    Then the answer is the 404 of no photo and nothing changes
 
   Scenario: The queue shows queued photos oldest first with what the check saw
     Given three photos, two of them queued

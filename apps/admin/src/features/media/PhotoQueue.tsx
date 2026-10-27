@@ -1,4 +1,4 @@
-import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
+import { formatDateTime } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import {
   type ModeratorRejectionReason,
@@ -19,21 +19,12 @@ import { Loading } from "../../components/ui/spinner.tsx";
 import { api } from "../../lib/api.ts";
 import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { useList } from "../../lib/use-list.ts";
+import { REJECTION_REASONS } from "./reasons.ts";
 
 // The photo review queue (#49, rules/admin.md): what a person decides about
 // the photos the automatic check would not approve. Keyboard first: every
 // control is a button or a labelled select, the image has its alt text, and
 // a decided item announces itself. English only (TD-17).
-
-const REASONS: ReadonlyArray<{ value: ModeratorRejectionReason; label: PlainMessageKey }> = [
-  { value: "nudity", label: "admin.queue.reason.nudity" },
-  { value: "no_person", label: "admin.queue.reason.no_person" },
-  { value: "several_people", label: "admin.queue.reason.several_people" },
-  { value: "minor", label: "admin.queue.reason.minor" },
-  { value: "violence", label: "admin.queue.reason.violence" },
-  { value: "contact_details", label: "admin.queue.reason.contact_details" },
-  { value: "other", label: "admin.queue.reason.other" },
-];
 
 export function PhotoQueue() {
   const { t } = useT();
@@ -233,7 +224,7 @@ function QueueItem({ item, onDecided }: { item: PhotoReviewItem; onDecided: () =
                       <option value="" disabled>
                         {t("admin.queue.reason.choose")}
                       </option>
-                      {REASONS.map((reason) => (
+                      {REJECTION_REASONS.map((reason) => (
                         <option key={reason.value} value={reason.value}>
                           {t(reason.label)}
                         </option>

@@ -74,9 +74,9 @@ const cardRoute = createRoute({
 const decisionRoute = createRoute({
   method: "post",
   path: "/admin/photos/{id}/decision",
-  summary: "Approve or reject a photo",
+  summary: "Approve or reject a photo, or take an approved one down",
   description:
-    "approve makes the photo visible to others; reject hides it and tells the owner the reason in words. Only a queued photo takes a decision, once. Only a person rejects. Written to audit_log.",
+    "approve makes a queued photo visible to others; reject hides a queued photo, or takes down an approved one (#477), and tells the owner the reason in words, with no appeal. A queued photo takes either decision and an approved one a rejection, once. Nothing is deleted. Written to audit_log.",
   ...bearer,
   request: { params: PhotoParams, body: { required: true, ...json(PhotoDecisionRequest) } },
   responses: {
@@ -85,7 +85,7 @@ const decisionRoute = createRoute({
     ...staffErrors,
     404: errorContent("No such photo."),
     409: errorContent(
-      "photo_not_queued: the photo is not waiting for a decision (already decided, or still being checked).",
+      "photo_not_queued: the photo does not take this decision (still being checked, rejected already, or approved already and asked to be approved).",
     ),
   },
 });
@@ -160,12 +160,23 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
     const before = await repo.findPhotoForStaff(deps.db, id);
     if (!before) throw new AppError(404, "not_found", "No such photo");
     const notQueued = () =>
-      new AppError(409, "photo_not_queued", "Only a queued photo takes a decision");
-    if (before.state !== "queued") throw notQueued();
+      new AppError(
+        409,
+        "photo_not_queued",
+        "Only a queued photo takes a decision, and an approved one a rejection",
+      );
+    // A queued photo takes either decision. An approved one takes a person's
+    // rejection, which takes it down (#477, ADR-006 §2): not a sanction, and
+    // nothing of it is deleted.
+    const from =
+      before.state === "queued" || (before.state === "approved" && body.decision === "reject")
+        ? before.state
+        : null;
+    if (!from) throw notQueued();
     const decision = body.decision === "approve" ? "approved" : "rejected";
     const reason = body.decision === "reject" ? body.reason : null;
     // The audit row and the decision are one unit: neither exists without the
-    // other. The update is keyed on the queued state, so of two moderators
+    // other. The update is keyed on the state read here, so of two moderators
     // deciding at once exactly one writes, and the other's audit row is
     // rolled back with the refusal.
     const row = await transaction(deps.db, async (tx) => {
@@ -178,6 +189,7 @@ export function photoAdminRoutes(deps: Deps, requireModerator: MiddlewareHandler
       });
       const updated = await repo.decidePhoto(tx, {
         photoId: id,
+        from,
         decision,
         reason,
         decidedBy: staff.identityId,

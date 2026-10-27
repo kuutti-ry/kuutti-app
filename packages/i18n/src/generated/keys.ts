@@ -457,6 +457,14 @@ export type MessageParams = {
   "admin.staff.never": Record<never, never>;
   "admin.staff.refresh": Record<never, never>;
   "admin.staff.title": Record<never, never>;
+  "admin.takeDown.action": Record<never, never>;
+  "admin.takeDown.confirm": Record<never, never>;
+  "admin.takeDown.done": Record<never, never>;
+  "admin.takeDown.effect": Record<never, never>;
+  "admin.takeDown.error.failed": Record<never, never>;
+  "admin.takeDown.error.not_found": Record<never, never>;
+  "admin.takeDown.error.photo_not_queued": Record<never, never>;
+  "admin.takeDown.title": Record<never, never>;
   "admin.title": Record<never, never>;
   "chat.actions.open": Record<never, never>;
   "chat.actions.title": Record<never, never>;

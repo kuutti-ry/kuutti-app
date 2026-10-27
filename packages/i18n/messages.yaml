@@ -6306,6 +6306,38 @@ admin.account.photoFailed:
   en: "The photo could not be shown."
   description: "Admin panel, a person's page, a photo's signed URL was refused or failed (#306)."
 
+admin.takeDown.action:
+  en: "Take down…"
+  description: "Admin panel, a person's page, the button beside an approved photo that opens the take-down's confirm step (#477)."
+
+admin.takeDown.title:
+  en: "Take down this photo"
+  description: "Admin panel, the title of the take-down's confirm step (#477)."
+
+admin.takeDown.effect:
+  en: "Nobody else is shown this photo from now on; the card shows the rest. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction: their standing stays as it is."
+  description: "Admin panel, the take-down's confirm step (#477, ADR-006 §2): what taking down an approved photo does, in words."
+
+admin.takeDown.confirm:
+  en: "Take down"
+  description: "Admin panel, the confirming button of the take-down's step (#477)."
+
+admin.takeDown.done:
+  en: "Taken down. Nobody else is shown the photo now."
+  description: "Admin panel, a person's page, the status after a photo was taken down (#477)."
+
+admin.takeDown.error.photo_not_queued:
+  en: "The photo is no longer approved: someone took it down meanwhile. Nothing more was changed."
+  description: "Admin panel, the take-down's step (#477): refused, the photo was not approved any more when the request came."
+
+admin.takeDown.error.not_found:
+  en: "The photo is gone: its owner removed it meanwhile."
+  description: "Admin panel, the take-down's step (#477): refused, the photo no longer exists."
+
+admin.takeDown.error.failed:
+  en: "The photo was not taken down. Try again."
+  description: "Admin panel, the take-down's step (#477): the request failed for any other reason."
+
 admin.account.sanctionsTitle:
   en: "Sanctions"
   description: "Admin panel, a person's page, the heading of the sanctions (#306, #307)."

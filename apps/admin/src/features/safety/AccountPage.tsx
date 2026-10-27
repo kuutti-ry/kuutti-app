@@ -7,7 +7,7 @@ import {
   SanctionList,
 } from "@kuutti/schema";
 import { Image, Search } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { Alert } from "../../components/ui/alert.tsx";
 import { Button } from "../../components/ui/button.tsx";
@@ -30,15 +30,17 @@ import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { AuditDetail } from "./audit-detail.tsx";
 import { usePhotoOnRequest } from "./photo-on-request.ts";
 import { Sanctions } from "./Sanctions.tsx";
+import { TakeDown } from "./TakeDown.tsx";
 
 // A person's page in the panel (#306): one account by its id, never a
 // search. Every open is an audit row on the API's side (account.view), so
 // the page asks once per id, StrictMode's second effect run included; a
 // photo is fetched only when the moderator asks to see it (#253), one
-// photo.view row per look. An erased account shows its deletion date and
-// nothing else. The sanctions and their actions are #308's (Sanctions.tsx);
-// after one, the page is read again in place, which is another look and
-// another account.view row. English only (TD-17); keyboard first.
+// photo.view row per look, and an approved one can be taken down (#477,
+// TakeDown.tsx). An erased account shows its deletion date and nothing
+// else. The sanctions and their actions are #308's (Sanctions.tsx); after
+// one, or a take-down, the page is read again in place, which is another
+// look and another account.view row. English only (TD-17); keyboard first.
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -150,6 +152,18 @@ export function AccountPage() {
     void load();
   }, [id, load]);
 
+  // A take-down (#477) is said in the photos' status line, and the focus goes
+  // there: the button that opened the step goes with the change.
+  const [photoDone, setPhotoDone] = useState("");
+  const photoStatus = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (photoDone) photoStatus.current?.focus();
+  }, [photoDone]);
+  const takenDown = useCallback(async () => {
+    setPhotoDone(t("admin.takeDown.done"));
+    await refresh();
+  }, [refresh, t]);
+
   const title = t("admin.account.title", { account: id.slice(0, 8) });
   if (state.kind !== "ready") {
     return (
@@ -259,12 +273,20 @@ export function AccountPage() {
       <Card>
         <CardContent>
           <CardTitle>{t("admin.account.photosTitle")}</CardTitle>
+          <p ref={photoStatus} role="status" tabIndex={-1} className="font-medium empty:sr-only">
+            {photoDone}
+          </p>
           {page.photos.length === 0 ? (
             <p className="text-muted-foreground">{t("admin.account.none")}</p>
           ) : (
             <ul className="grid gap-4 items-start sm:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))]">
               {page.photos.map((photo) => (
-                <PersonPhoto key={photo.id} photo={photo} />
+                <PersonPhoto
+                  key={photo.id}
+                  photo={photo}
+                  onTakeDownOpen={() => setPhotoDone("")}
+                  onTakenDown={takenDown}
+                />
               ))}
             </ul>
           )}
@@ -339,16 +361,28 @@ export function AccountPage() {
   );
 }
 
-/** One photo, hidden until asked (photo-on-request.ts): its card variant, as others see it. */
-function PersonPhoto({ photo }: { photo: AdminAccountPhoto }) {
+/**
+ * One photo, hidden until asked (photo-on-request.ts): its card variant, as
+ * others see it; an approved one with its take-down (#477).
+ */
+function PersonPhoto({
+  photo,
+  onTakeDownOpen,
+  onTakenDown,
+}: {
+  photo: AdminAccountPhoto;
+  onTakeDownOpen: () => void;
+  onTakenDown: () => Promise<void>;
+}) {
   const { t, locale } = useT();
+  const line = useId();
   const { url, failed, pending, show, picture } = usePhotoOnRequest(() =>
     api.GET("/admin/photos/{id}/card", { params: { path: { id: photo.id } } }),
   );
   const uploaded = formatDateTime(locale, new Date(photo.uploadedAt));
   return (
     <li className="flex flex-col gap-3 rounded-lg border p-3">
-      <p className="text-muted-foreground">
+      <p id={line} className="text-muted-foreground">
         {photo.state}
         {photo.rejectionReason && ` · ${photo.rejectionReason}`} · {uploaded}
       </p>
@@ -375,6 +409,14 @@ function PersonPhoto({ photo }: { photo: AdminAccountPhoto }) {
             {t("admin.account.showPhoto")}
           </Button>
         </>
+      )}
+      {photo.state === "approved" && (
+        <TakeDown
+          photoId={photo.id}
+          describedBy={line}
+          onOpen={onTakeDownOpen}
+          onDone={onTakenDown}
+        />
       )}
     </li>
   );

@@ -781,15 +781,17 @@ export async function findPhotoForStaff(
 
 /**
  * A person's decision: the photo's state and reason, and the review row with
- * who decided and when. Only a queued photo takes one (null otherwise, and
- * nothing is written), so an earlier decision is never overwritten. A queued
- * photo is rejected only here and by the night's limit below (#376); nothing
- * is ever deleted by a machine (rules/api.md).
+ * who decided and when. Keyed on the state the caller read, `from`: a queued
+ * photo, or an approved one a person takes down (#477); null when the photo
+ * is no longer in it, and nothing is written, so a decision made meanwhile is
+ * never overwritten. A queued photo is rejected only here and by the night's
+ * limit below (#376); nothing is ever deleted by a machine (rules/api.md).
  */
 export async function decidePhoto(
   db: Queryable,
   input: {
     photoId: string;
+    from: "queued" | "approved";
     decision: "approved" | "rejected";
     reason: PhotoRejectionReason | null;
     decidedBy: string;
@@ -798,8 +800,8 @@ export async function decidePhoto(
 ): Promise<PhotoRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE photo SET state = $2, rejection_reason = $3
-     WHERE id = $1 AND purpose = 'profile' AND state = 'queued' RETURNING ${COLUMNS}`,
-    [input.photoId, input.decision, input.reason],
+     WHERE id = $1 AND purpose = 'profile' AND state = $4 RETURNING ${COLUMNS}`,
+    [input.photoId, input.decision, input.reason, input.from],
   );
   const row = rows[0];
   if (!row) return null;
@@ -819,8 +821,8 @@ export async function decidePhoto(
  * photo waiting since before `waitingSince`, from its upload or its owner's
  * appeal as the queue counts it (`listQueue`), is rejected as not_reviewed
  * with no appeal, and its review row says so with nobody named. Keyed on the
- * queued state like `decidePhoto`, so of a moderator and the night deciding
- * at once exactly one writes. The ids it moved.
+ * queued state, as `decidePhoto` is on a queued photo, so of a moderator and
+ * the night deciding at once exactly one writes. The ids it moved.
  */
 export async function rejectQueuedSince(
   db: Queryable,

@@ -37,8 +37,13 @@ async function photoIn(
   if (options.labels) {
     await ctx.client.query(
       `INSERT INTO photo_review (photo_id, labels, faces, flagged, checked_at, decision)
-       VALUES ($1, $2::jsonb, 1, $3, now(), 'queued')`,
-      [id, JSON.stringify(options.labels), options.flagged ?? []],
+       VALUES ($1, $2::jsonb, 1, $3, now(), $4)`,
+      [
+        id,
+        JSON.stringify(options.labels),
+        options.flagged ?? [],
+        state === "approved" ? "approved" : "queued",
+      ],
     );
   }
   return id;
@@ -254,7 +259,7 @@ describe("photo review queue", () => {
     // No label name in any log line was ever a risk here; the reason is a code, and the owner sees a text.
   });
 
-  test("A decision is taken once, on a queued photo only, and a refused one leaves no audit row", async ({
+  test("An approval is taken once, on a queued photo only, and a refused one leaves no audit row", async ({
     ctx,
   }) => {
     const { app } = await appWith(ctx);
@@ -312,10 +317,13 @@ describe("photo review queue", () => {
     const researcher = await staffSession(ctx.client, "researcher");
     const owner = await signedInAccount(ctx.client);
     const id = await photoIn(ctx, owner.accountId, "queued");
+    const approved = await photoIn(ctx, owner.accountId, "approved");
     for (const res of [
       await app.request("/admin/photos/queue", { headers: researcher.headers }),
       await app.request(`/admin/photos/${id}/card`, { headers: researcher.headers }),
       await decide(app, researcher.headers, id, { decision: "approve" }),
+      // Nor take an approved photo down (#477).
+      await decide(app, researcher.headers, approved, { decision: "reject", reason: "other" }),
     ]) {
       expect(res.status).toBe(403);
       expect(await errorCode(res)).toBe("admin_forbidden");
@@ -323,9 +331,14 @@ describe("photo review queue", () => {
     expect(Number((await ctx.client.query("SELECT count(*) AS n FROM audit_log")).rows[0]?.n)).toBe(
       0,
     );
-    expect(
-      (await ctx.client.query("SELECT state FROM photo WHERE id = $1", [id])).rows[0]?.state,
-    ).toBe("queued");
+    const states = await ctx.client.query<{ id: string; state: string }>(
+      "SELECT id, state FROM photo WHERE id = ANY($1::uuid[])",
+      [[id, approved]],
+    );
+    expect(Object.fromEntries(states.rows.map((r) => [r.id, r.state]))).toEqual({
+      [id]: "queued",
+      [approved]: "approved",
+    });
     // whoami answers every role.
     const me = await app.request("/admin/whoami", { headers: researcher.headers });
     expect(me.status).toBe(200);
@@ -525,6 +538,207 @@ describe("photo review queue, the remaining branches", () => {
       expect(res.status, limit).toBe(400);
       expect(await errorCode(res), limit).toBe("validation_failed");
     }
+  });
+});
+
+// Taking an approved photo down (#477, ADR-006 §2, features/media/moderation.feature):
+// the same decision route, a rejection keyed on the approved state; not a
+// sanction, and nothing of the photo deleted.
+describe("taking an approved photo down", () => {
+  /** The viewer was shown these photos on a card, as a served card leaves it (#84). */
+  const shownTo = (ctx: TestContext, viewerAccountId: string, photoIds: string[]) =>
+    ctx.client.query(
+      "INSERT INTO card_shown (account_id, photo_id, at) SELECT $1, unnest($2::uuid[]), now()",
+      [viewerAccountId, photoIds],
+    );
+  const standingOf = async (ctx: TestContext, accountId: string) =>
+    (
+      await ctx.client.query(
+        `SELECT a.state, i.standing, i.standing_changed_at FROM account a
+         JOIN identity i ON i.id = a.identity_id WHERE a.id = $1`,
+        [accountId],
+      )
+    ).rows[0];
+  const count = async (ctx: TestContext, text: string, values: unknown[]) =>
+    Number((await ctx.client.query<{ n: string }>(text, values)).rows[0]?.n);
+
+  test("A moderator takes down an approved photo with a reason, and the owner is told", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx);
+    await withMatchingConfig(ctx.client, {
+      photo_fetches_per_day: { thumb: 20, card: 20, full: 20 },
+    });
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const viewer = await signedInAccount(ctx.client);
+    const labels = [{ name: "Smoking", parentName: "Drugs & Tobacco", confidence: 99 }];
+    const taken = await photoIn(ctx, owner.accountId, "approved", { labels, key: "k-taken" });
+    const kept = await photoIn(ctx, owner.accountId, "approved");
+    await shownTo(ctx, viewer.accountId, [taken, kept]);
+    const card = (id: string, headers: Record<string, string>) =>
+      app.request(`/photos/${id}/card`, { headers });
+    expect((await card(taken, viewer.headers)).status).toBe(200);
+    const standing = await standingOf(ctx, owner.accountId);
+
+    const res = await decide(app, staff.headers, taken, { decision: "reject", reason: "other" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      photoId: taken,
+      state: "rejected",
+      rejectionReason: "other",
+    });
+
+    // Nobody else is served it; the rest of the card still is, and the owner still has their own.
+    const refused = await card(taken, viewer.headers);
+    expect(refused.status).toBe(404);
+    expect(await errorCode(refused)).toBe("not_found");
+    expect((await card(kept, viewer.headers)).status).toBe(200);
+    expect((await card(taken, owner.headers)).status).toBe(200);
+    // The owner's list says why, as after a person's rejection in the queue, with no appeal.
+    const list = PhotoList.parse(
+      await (await app.request("/photos", { headers: owner.headers })).json(),
+    );
+    expect(list.photos.map((p) => [p.id, p.state, p.rejectionReason, p.appealable])).toEqual([
+      [taken, "rejected", "other", false],
+      [kept, "approved", null, false],
+    ]);
+    const appeal = await app.request(`/photos/${taken}/appeal`, {
+      method: "POST",
+      headers: owner.headers,
+    });
+    expect(appeal.status).toBe(409);
+    // The review names the moderator and keeps what the check saw; the audit row says from what.
+    const review = await ctx.client.query(
+      "SELECT decision, decided_by, reason, labels FROM photo_review WHERE photo_id = $1",
+      [taken],
+    );
+    expect(review.rows).toEqual([
+      { decision: "rejected", decided_by: staff.identityId, reason: "other", labels },
+    ]);
+    const audit = await ctx.client.query(
+      "SELECT actor_identity_id, action, subject_type, subject_id, detail FROM audit_log",
+    );
+    expect(audit.rows).toEqual([
+      {
+        actor_identity_id: staff.identityId,
+        action: "photo.reject",
+        subject_type: "photo",
+        subject_id: taken,
+        detail: { from: "approved", to: "rejected", reason: "other" },
+      },
+    ]);
+    expect(logs().find((l) => l.msg === "photo decided")).toMatchObject({
+      photoId: taken,
+      from: "approved",
+      to: "rejected",
+      reason: "other",
+    });
+    // Not a sanction: no sanction row and the standing as it was; no check note; nothing deleted.
+    expect(
+      await count(ctx, "SELECT count(*) AS n FROM sanction WHERE account_id = $1", [
+        owner.accountId,
+      ]),
+    ).toBe(0);
+    expect(await standingOf(ctx, owner.accountId)).toEqual(standing);
+    expect(
+      await count(ctx, "SELECT count(*) AS n FROM photo_check_note WHERE account_id = $1", [
+        owner.accountId,
+      ]),
+    ).toBe(0);
+    expect((await ctx.client.query("SELECT key FROM photo WHERE id = $1", [taken])).rows).toEqual([
+      { key: "k-taken" },
+    ]);
+  });
+
+  test("An approved photo takes a rejection only, and one taken down stays down", async ({
+    ctx,
+  }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const approved = await photoIn(ctx, owner.accountId, "approved");
+    const down = await photoIn(ctx, owner.accountId, "approved");
+    expect(
+      (await decide(app, staff.headers, down, { decision: "reject", reason: "minor" })).status,
+    ).toBe(200);
+    for (const [id, body] of [
+      [approved, { decision: "approve" }],
+      [down, { decision: "reject", reason: "nudity" }],
+      [down, { decision: "approve" }],
+    ] as const) {
+      const res = await decide(app, staff.headers, id, body);
+      expect(res.status).toBe(409);
+      expect(await errorCode(res)).toBe("photo_not_queued");
+    }
+    const states = await ctx.client.query<{ id: string; state: string; reason: string | null }>(
+      "SELECT id, state, rejection_reason AS reason FROM photo WHERE id = ANY($1::uuid[])",
+      [[approved, down]],
+    );
+    expect(Object.fromEntries(states.rows.map((r) => [r.id, [r.state, r.reason]]))).toEqual({
+      [approved]: ["approved", null],
+      [down]: ["rejected", "minor"],
+    });
+    const audit = await ctx.client.query("SELECT action, subject_id FROM audit_log");
+    expect(audit.rows).toEqual([{ action: "photo.reject", subject_id: down }]);
+  });
+
+  test("A photo sent in a conversation is never taken down", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, purpose, position)
+       VALUES ($1, 'k-sent', 'LEHV6nWB2yk8pyo0adR*.7kCMdnj', 800, 1067, 'approved', 'message', NULL)
+       RETURNING id`,
+      [owner.accountId],
+    );
+    const sent = rows[0]?.id ?? "";
+    const res = await decide(app, staff.headers, sent, { decision: "reject", reason: "nudity" });
+    expect(res.status).toBe(404);
+    expect(await errorCode(res)).toBe("not_found");
+    const after = await ctx.client.query(
+      "SELECT state, rejection_reason FROM photo WHERE id = $1",
+      [sent],
+    );
+    expect(after.rows).toEqual([{ state: "approved", rejection_reason: null }]);
+    expect(await auditRows(ctx)).toBe(0);
+  });
+
+  test("Of two moderators taking one photo down at once, the second is refused and its audit row goes with it", async ({
+    ctx,
+  }) => {
+    // The other moderator's take-down lands between this one's read and its
+    // update: the update is keyed on the approved state and finds nothing.
+    const owner = await signedInAccount(ctx.client);
+    const id = await photoIn(ctx, owner.accountId, "approved");
+    let landed = false;
+    const db = {
+      async query(text: string, values?: unknown[]) {
+        const result = await ctx.client.query(text, values);
+        if (!landed && text.includes(", account_id FROM photo WHERE id = $1")) {
+          landed = true;
+          await ctx.client.query(
+            "UPDATE photo SET state = 'rejected', rejection_reason = 'other' WHERE id = $1",
+            [id],
+          );
+        }
+        return result;
+      },
+    } as Queryable;
+    await withMatchingConfig(ctx.client, { max_photos: 6 });
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db, media: testMediaDeps().deps });
+    const staff = await staffSession(ctx.client);
+    const res = await decide(app, staff.headers, id, { decision: "reject", reason: "nudity" });
+    expect(res.status).toBe(409);
+    expect(await errorCode(res)).toBe("photo_not_queued");
+    expect(await auditRows(ctx)).toBe(0);
+    const after = await ctx.client.query(
+      "SELECT p.state, p.rejection_reason, (SELECT count(*) FROM photo_review r WHERE r.photo_id = p.id) AS reviews FROM photo p WHERE p.id = $1",
+      [id],
+    );
+    expect(after.rows[0]).toEqual({ state: "rejected", rejection_reason: "other", reviews: "0" });
   });
 });
 
