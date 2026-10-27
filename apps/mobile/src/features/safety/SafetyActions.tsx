@@ -290,7 +290,8 @@ export function ConversationPhotoReport({
   const { t } = useT();
   const tap = useHapticTap();
   const [open, setOpen] = useState(false);
-  if (!reportable && !open) return null;
+  // The dialog stays mounted when the button goes, closed or not: a report
+  // sent before it went still says its failure, by opening the dialog again.
   return (
     <>
       {reportable && (

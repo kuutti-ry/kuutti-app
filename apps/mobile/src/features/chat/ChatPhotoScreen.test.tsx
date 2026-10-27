@@ -5,8 +5,10 @@ import { AccessibilityInfo } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
+import { FakeWebSocket } from "@/test/websocket";
 import { ChatPhotoScreen } from "./ChatPhotoScreen";
 import { takeNotice } from "./notice";
+import { ChatLiveProvider } from "./store";
 
 // A conversation's photo full size (#350): read again by its place, the full
 // size contained with its label, the description under it when the setting
@@ -341,6 +343,31 @@ describe("Report this photo (#476)", () => {
   it("says in an ended conversation that the report blocks, and not that it ends", async () => {
     routes([() => json({ messages: [photoMessage()] })]);
     await renderWithTheme(<ChatPhotoScreen {...props} report="ended" />);
+    await reportThis();
+    expect(reportLines()).toEqual([POINTS, COPY, BLOCKS]);
+  });
+
+  it("says the report blocks once the socket tells that the conversation ended while the photo was open", async () => {
+    FakeWebSocket.install();
+    routes([() => json({ messages: [photoMessage()] })]);
+    await renderWithTheme(
+      <ChatLiveProvider>
+        <ChatPhotoScreen {...props} report="open" />
+      </ChatLiveProvider>,
+    );
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
+    await act(async () => {
+      FakeWebSocket.latest().open();
+      FakeWebSocket.latest().receive({ type: "ready" });
+    });
+    await act(async () =>
+      FakeWebSocket.latest().receive({
+        type: "conversation",
+        conversationId: CONVERSATION,
+        state: "closed",
+        closedHow: "unmatch",
+      }),
+    );
     await reportThis();
     expect(reportLines()).toEqual([POINTS, COPY, BLOCKS]);
   });

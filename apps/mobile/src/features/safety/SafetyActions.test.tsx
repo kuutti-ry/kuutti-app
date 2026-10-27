@@ -1149,6 +1149,31 @@ describe("ConversationPhotoReport", () => {
     expect(pressables(screen.toJSON() as HostNode)).toEqual([]);
   });
 
+  it("says a failed report in the dialog, opened again, when the button went and the dialog was closed while it was sending", async () => {
+    let release: (response: Response) => void = () => undefined;
+    conversationApi(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const ui = (reportable: boolean) => <PhotoHost reportable={reportable} onDone={jest.fn()} />;
+    await renderWithTheme(ui(true));
+    await press("Report this photo");
+    await press("Something else", "radio");
+    await press("Send report");
+    // The screen's read again fails meanwhile, so the button goes; the person closes the dialog.
+    await screen.rerender(underProviders(ui(false)));
+    await pressScrim();
+    expect(screen.queryByText("Report and block")).toBeNull();
+    await act(async () => {
+      release(refusal("internal_error", 500));
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    });
+    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
+  });
+
   it("hands a conversation gone meanwhile on as gone", async () => {
     conversationApi(() => refusal("not_found", 404));
     const onDone = jest.fn();

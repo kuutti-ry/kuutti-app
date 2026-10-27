@@ -601,10 +601,23 @@ describe("GET /admin/reports/{id}/copy/{seq}/photo", () => {
 });
 
 /** A's report of B from B's card, pointing at the photo of it A was shown (#476), filed through the route. */
-async function pointedCardReport(ctx: TestContext) {
+async function pointedCardReport(ctx: TestContext, { second = false } = {}) {
   const [a, b] = await signedInPeople(ctx.client, 2);
   if (!a || !b) throw new Error("people not written");
-  const shown = await cardShown(ctx.client, a.accountId, b.accountId);
+  let shown = await cardShown(ctx.client, a.accountId, b.accountId);
+  if (second) {
+    // The card had a second photo, shown too: the report points at that one.
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       VALUES ($1, 'k-second-shown', 'LKO2?U%2Tw=w', 800, 1067, 'approved', 1) RETURNING id`,
+      [b.accountId],
+    );
+    shown = rows[0]?.id ?? "";
+    await ctx.client.query(
+      "INSERT INTO card_shown (account_id, photo_id, at) VALUES ($1, $2, now())",
+      [a.accountId, shown],
+    );
+  }
   const answer = await ctx.app.request("/reports", {
     method: "POST",
     headers: { ...a.headers, "content-type": "application/json" },
@@ -627,15 +640,16 @@ describe("GET /admin/reports/{id}/photo", () => {
     app,
   }) => {
     const moderator = await staffSession(ctx.client);
-    const { id, photoId, key } = await pointedCardReport(ctx);
+    const { id, photoId, key } = await pointedCardReport(ctx, { second: true });
+    expect(key).toBe("k-second-shown");
     const response = await open(app, moderator.headers, id);
     const text = await response.text();
-    // The id and the state for a take-down beside it (#477), never the stored key.
+    // The second photo, with its state for a take-down beside it (#477), never the stored key.
     expect(ReportDetail.parse(JSON.parse(text))).toMatchObject({
       source: "card",
       copy: null,
       lineSeq: null,
-      pointedPhoto: { removed: false, id: photoId, state: "approved", approvedPhotos: 1 },
+      pointedPhoto: { removed: false, id: photoId, state: "approved", approvedPhotos: 2 },
     });
     expect(text).not.toContain(key);
     expect(await auditOf(ctx.client, "photo.view")).toEqual([]);

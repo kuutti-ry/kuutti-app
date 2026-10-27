@@ -16,6 +16,7 @@ import { DECORATIVE } from "@/theme/a11y";
 import { useMotionDuration } from "@/theme/useReducedMotion";
 import { fetchMessages } from "./client";
 import { useHandToList } from "./notice";
+import { useChatLive } from "./store";
 
 /** What the photo bubble passes in the link: the message, its conversation, its place there, its placeholder. */
 export type ChatPhotoParams = {
@@ -72,6 +73,9 @@ export function ChatPhotoScreen({
   const { t } = useT();
   const router = useRouter();
   const handToList = useHandToList();
+  // The conversation as the socket has told it since the link was made: an
+  // end meanwhile changes what the report says, with no read (ADR-008).
+  const endedLive = useChatLive().conversations[conversation]?.state?.state === "closed";
   const described = usePhotoDescriptionText();
   const transition = useMotionDuration(200);
   const [view, setView] = useState<PhotoView>({ status: "loading" });
@@ -200,7 +204,7 @@ export function ChatPhotoScreen({
           <ConversationPhotoReport
             conversationId={conversation}
             seq={door}
-            ended={report === "ended"}
+            ended={report === "ended" || endedLive}
             reportable={ready !== null && !late}
             onDone={(outcome) => handToList(outcome, focused.current)}
             onStale={() => setLate(true)}
