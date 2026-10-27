@@ -99,12 +99,13 @@ const STAFF_ROLES: { what: string; roles: string[]; keys: string[] }[] = [
     ],
   },
   {
-    what: "the report queue, a report opened, its copy's photos and its decision to moderators and admins (#311, #312)",
+    what: "the report queue, a report opened, its copy's photos, the photo a card's report points at and its decision to moderators and admins (#311, #312, #476)",
     roles: MODERATORS,
     keys: [
       "GET /admin/reports",
       "GET /admin/reports/:id",
       "GET /admin/reports/:id/copy/:seq/photo",
+      "GET /admin/reports/:id/photo",
       "POST /admin/reports/:id/decision",
     ],
   },

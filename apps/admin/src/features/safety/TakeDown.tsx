@@ -18,7 +18,9 @@ import { type Refusals, useSend } from "./use-send.ts";
 // a photo others already see, the decision route's take_down. It is not a
 // sanction, and nothing is deleted. Its confirm step says the effect in words
 // and asks for a reason chosen on purpose, nothing preset (#250): the one the
-// owner is told. English only (TD-17); keyboard first.
+// owner is told. Beside each approved photo on a person's page, and beside the
+// photo a card's report points at (#476), where the page updates from the
+// answer. English only (TD-17); keyboard first.
 
 const REFUSALS: Refusals = {
   codes: {
@@ -43,7 +45,8 @@ export function TakeDown({
   leavesTooFew: boolean;
   /** The step opens: the line that said the last change is cleared, so the next one is heard. */
   onOpen: () => void;
-  onDone: () => Promise<void>;
+  /** Taken down: the photo as the take-down left it. */
+  onDone: (answer: PhotoDecisionResponse) => Promise<void>;
 }) {
   const { t } = useT();
   const [open, setOpen] = useState(false);
@@ -65,9 +68,9 @@ export function TakeDown({
           photoId={photoId}
           leavesTooFew={leavesTooFew}
           onCancel={() => setOpen(false)}
-          onDone={async () => {
+          onDone={async (answer) => {
             setOpen(false);
-            await onDone();
+            await onDone(answer);
           }}
         />
       )}
@@ -84,7 +87,7 @@ function TakeDownStep({
   photoId: string;
   leavesTooFew: boolean;
   onCancel: () => void;
-  onDone: () => Promise<void>;
+  onDone: (answer: PhotoDecisionResponse) => Promise<void>;
 }) {
   const { t } = useT();
   const ids = useId();

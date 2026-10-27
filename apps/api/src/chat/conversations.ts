@@ -354,6 +354,21 @@ export async function lockReportedConversation(
 }
 
 /**
+ * Whether a line of the conversation is a photo the other person sent that
+ * the caller may read (#476, ADR-030 §13): the one a report may point at.
+ * Through the caller's own participant row and every rule of the reads, so a
+ * line a shadow ban withholds from the caller, the caller's own, a text and a
+ * photo gone are all no, and the answer never tells which.
+ */
+export async function counterpartPhotoAt(
+  db: Queryable,
+  input: { accountId: string; conversationId: string; seq: number },
+): Promise<boolean> {
+  const found = await repo.messageFor(db, input);
+  return found !== null && found.row.side !== found.side && found.row.photo !== null;
+}
+
+/**
  * A report's frozen copy of a conversation the caller locked (#351, ADR-030
  * §12): every message of both people, into the report the caller just wrote,
  * inside its transaction; the words never pass through the process. The

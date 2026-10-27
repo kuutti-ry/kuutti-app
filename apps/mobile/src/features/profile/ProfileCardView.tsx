@@ -33,7 +33,8 @@ const SAFETY_ACTION = "blockOrReport";
  * Someone else's card carries "Block or report" (#84, ADR-030 §11): an icon
  * button beside the name, and the same as an accessibility action on the
  * name. Only a screen that passes `onGone` shows it, so the owner's preview
- * never does.
+ * never does. Its report may name one of the card's photos (#476), each
+ * named as the card names it.
  */
 export function ProfileCardView({
   card,
@@ -52,19 +53,19 @@ export function ProfileCardView({
   const [main, ...rest] = card.photos;
   const [firstPrompt, ...morePrompts] = card.prompts;
   const total = card.photos.length;
+  /** A photo's place on the card and the owner's line, as the report step shows it (#476). */
+  const photoText = (photo: ProfileCard["photos"][number], position: number) =>
+    photo.caption
+      ? t("profile.card.photoLabelCaption", {
+          position,
+          total,
+          caption: t(captionKey(photo.caption)),
+        })
+      : t("profile.card.photoLabel", { position, total });
   // A photo's label says its caption too (#296), so a screen reader hears the
   // owner's line with the picture, and then what the check saw in it.
   const photoLabel = (photo: ProfileCard["photos"][number], position: number) =>
-    described.label(
-      photo.caption
-        ? t("profile.card.photoLabelCaption", {
-            position,
-            total,
-            caption: t(captionKey(photo.caption)),
-          })
-        : t("profile.card.photoLabel", { position, total }),
-      photo.description,
-    );
+    described.label(photoText(photo, position), photo.description);
   /** The description under a photo for the eye, where the setting asks for it. */
   const wordsUnder = (photo: ProfileCard["photos"][number]) =>
     described.shown ? described.describe(photo.description) : null;
@@ -130,6 +131,15 @@ export function ProfileCardView({
           {onGone && (
             <SafetyActions
               accountId={card.accountId}
+              // The report may name one of these (#476): named as here, in the variant
+              // painted here, so the phone's cache has each and nothing is signed again.
+              photos={card.photos.map((photo, index) => ({
+                id: photo.id,
+                variant: index === 0 ? "card" : "thumb",
+                blurhash: photo.blurhash,
+                label: photoLabel(photo, index + 1),
+                text: photoText(photo, index + 1),
+              }))}
               open={safetyOpen}
               onOpenChange={setSafetyOpen}
               onGone={onGone}

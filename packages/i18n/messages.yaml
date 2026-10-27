@@ -6072,19 +6072,31 @@ admin.report.side.reported:
 
 admin.report.showPhoto:
   en: "Show photo"
-  description: "Admin panel, one report's page (#312), the frozen copy: the button that fetches a photo a line held; the fetch is an audit row."
+  description: "Admin panel, one report's page (#312): the button that fetches a photo a line of the frozen copy held, or the photo a card's report points at (#476); the fetch is an audit row."
 
 admin.report.photoRemoved:
   en: "Photo removed"
-  description: "Admin panel, one report's page (#312), the frozen copy: the line held a photo removed before the report."
+  description: "Admin panel, one report's page (#312): the line of the frozen copy held a photo removed before the report, or the photo a card's report points at was deleted since (#476)."
 
 admin.report.photoFailed:
   en: "The photo could not be shown."
-  description: "Admin panel, one report's page (#312), the frozen copy: a photo's signed URL was refused or failed."
+  description: "Admin panel, one report's page (#312): a photo's signed URL was refused or failed, of the frozen copy or of the photo a card's report points at (#476)."
 
 admin.report.image:
   en: "Photo sent by {side, select, reporter {the reporter} other {the reported person}}. Sent: {time}"
   description: "Admin panel, one report's page (#312), the frozen copy: the alt text of a photo a moderator asked to see, who sent it and when."
+
+admin.report.pointedLine:
+  en: "The reporter pointed at this photo"
+  description: "Admin panel, one report's page, the frozen copy: the mark on the line of the photo the reporter pointed at (#476), listed first under the copy's heading and again in its place; said in words, never by colour alone."
+
+admin.report.pointedTitle:
+  en: "The photo the reporter pointed at"
+  description: "Admin panel, one report's page: the heading of the card that holds the photo a card's report points at (#476)."
+
+admin.report.pointedImage:
+  en: "The photo the reporter pointed at: {state}"
+  description: "Admin panel, one report's page: the alt text of the photo a card's report points at (#476), once a moderator asked to see it. {state} is the photo's state as the panel shows it: approved, rejected and so on."
 
 admin.report.decisionTitle:
   en: "Decision"
@@ -6308,7 +6320,7 @@ admin.account.photoFailed:
 
 admin.takeDown.action:
   en: "Take down…"
-  description: "Admin panel, a person's page, the button beside an approved photo that opens the take-down's confirm step (#477)."
+  description: "Admin panel, the button beside an approved photo that opens the take-down's confirm step (#477): on a person's page, and beside the photo a card's report points at (#476)."
 
 admin.takeDown.title:
   en: "Take down this photo"
@@ -6328,7 +6340,7 @@ admin.takeDown.confirm:
 
 admin.takeDown.done:
   en: "Taken down. Nobody else is given the photo from now on."
-  description: "Admin panel, a person's page, the status after a photo was taken down (#477)."
+  description: "Admin panel, the status after a photo was taken down (#477), on a person's page or beside the photo a card's report points at (#476)."
 
 admin.takeDown.error.photo_not_approved:
   en: "The photo is no longer approved: it was taken down meanwhile. Reload the page to see it as it is."
@@ -8182,6 +8194,13 @@ chat.report.limited:
   sv: "Det räcker med anmälningar för i dag. Du kan skicka fler efter midnatt."
   machine: { fi: true, sv: true }
 
+chat.report.photo:
+  en: "The report points the moderators to this photo."
+  description: "The report step opened from Report this photo (chat.photo.report) on a conversation's photo full size (#476, ADR-030 §13), first under its title, before chat.report.copy: the report names this photo, whose line the moderators' copy marks in words and lists first. Says only that; the copy and the block follow in their own lines. Plain, calm."
+  fi: "Ilmoitus ohjaa moderaattorit tähän kuvaan."
+  sv: "Anmälan pekar ut det här fotot för moderatorerna."
+  machine: { fi: true, sv: true }
+
 chat.notice.gone:
   en: "That conversation is no longer available."
   description: "Said on the list of conversations when an action from a conversation found it gone meanwhile (#351): nothing was reported, blocked or ended."
@@ -8425,6 +8444,13 @@ chat.photo.fullCaption:
   description: "Screen-reader label of a conversation's photo shown full size, with its caption (#350); {caption} is what the sender wrote, in nominative."
   fi: "Kuva, täysikokoinen. {caption}"
   sv: "Foto, full storlek. {caption}"
+  machine: { fi: true, sv: true }
+
+chat.photo.report:
+  en: "Report this photo"
+  description: "A conversation's photo full size (#476, ADR-030 §13): the button under a photo the other person sent, offered while the conversation can be reported. It opens the report step with this photo pointed at, which also blocks, as the step says. A verb phrase, a button."
+  fi: "Ilmoita tästä kuvasta"
+  sv: "Anmäl det här fotot"
   machine: { fi: true, sv: true }
 
 chat.row.photo:
@@ -9759,6 +9785,20 @@ safety.report.reason.other:
   description: "The report step (#84, #106's list), the last of six reasons, a radio button: anything the other five do not cover; the note can say what. Also the reason of a filed report in the person's data download (ADR-030 §8)."
   fi: "Jokin muu"
   sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+safety.report.photo.question:
+  en: "Is it about one photo?"
+  description: "The report step of somebody else's card (#476, ADR-030 §13), after the reasons: the heading over an optional choice of the card's own photos, each named as the card names it, and the radio group's heard name. Nothing has to be chosen: safety.report.photo.none is chosen first. A short question about the report."
+  fi: "Koskeeko ilmoitus tiettyä kuvaa?"
+  sv: "Gäller anmälan ett visst foto?"
+  machine: { fi: true, sv: true }
+
+safety.report.photo.none:
+  en: "Not one photo"
+  description: "The report step of somebody else's card (#476), the first option under safety.report.photo.question and the one chosen until the person picks one of the card's photos: the report is about the person, not about one photo. A radio button, short."
+  fi: "Ei tiettyä kuvaa"
+  sv: "Inget visst foto"
   machine: { fi: true, sv: true }
 
 safety.report.noteLabel:

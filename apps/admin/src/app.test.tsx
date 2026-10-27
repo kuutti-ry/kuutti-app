@@ -98,6 +98,8 @@ const reportAnswers = {
       decidedBy: null,
       sanctionId: null,
       copy: null,
+      lineSeq: null,
+      pointedPhoto: null,
       actable: [],
     }),
 };

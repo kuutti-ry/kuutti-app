@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import ContactRound from "lucide-react-native/icons/contact-round";
 import ImagePlus from "lucide-react-native/icons/image-plus";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
+import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -38,7 +38,7 @@ import {
   sendPhoto,
   unmatchConversation,
 } from "./client";
-import { leaveNotice, NOTICES } from "./notice";
+import { useHandToList } from "./notice";
 import { PhotoBubble, SendingPhotoBubble } from "./PhotoBubble";
 import { SharedContacts } from "./SharedContacts";
 import { type ConversationLive, merged, useChatLive } from "./store";
@@ -161,6 +161,7 @@ export function ConversationScreen({ id }: { id: string }) {
   const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
+  const handToList = useHandToList();
   const [view, setView] = useState<ScreenView>({ status: "loading" });
   const [text, setText] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
@@ -486,21 +487,8 @@ export function ConversationScreen({ id }: { id: string }) {
     if (closedLive && !closedHeld) void load();
   }, [closedLive, closedHeld, load]);
 
-  /**
-   * A report, a block or an end went through, or the conversation was gone:
-   * back to the list, which says so. One that lands after the person left the
-   * screen moves nobody (a dismissTo from elsewhere would replace the screen
-   * they are on) and is announced instead, on both platforms, since nothing
-   * on their screen says it.
-   */
-  const done = (outcome: SafetyOutcome) => {
-    if (!focused.current) {
-      AccessibilityInfo.announceForAccessibility(t(NOTICES[outcome]));
-      return;
-    }
-    leaveNotice(outcome);
-    router.dismissTo("/chats");
-  };
+  /** A report, a block or an end went through, or the conversation was gone: back to the list, while the screen is in front. */
+  const done = (outcome: SafetyOutcome) => handToList(outcome, focused.current);
 
   // The one who blocked sees it gone at once (ADR-031 §4).
   const shown: ScreenView = here?.state?.state === "gone" ? { status: "gone" } : view;
@@ -673,6 +661,9 @@ function Conversation({
     .filter((m) => m.side === "mine" && m.seq <= detail.counterpartReadUpTo)
     .reduce((top, m) => Math.max(top, m.seq), 0);
   const first = messages[0];
+  // Whether the conversation takes a report, for the other person's photos full
+  // size (#476): their screen reads no detail, which would sign a thumb.
+  const report = detail.reportable ? (detail.state === "closed" ? "ended" : "open") : null;
   return (
     <ScrollView
       ref={scroll}
@@ -701,6 +692,7 @@ function Conversation({
               conversationId={detail.id}
               who={message.side === "mine" ? t("chat.message.you") : them}
               note={message.seq === readSeq ? t("chat.message.read") : null}
+              report={report}
               onExpired={onExpired}
             />
           ) : (

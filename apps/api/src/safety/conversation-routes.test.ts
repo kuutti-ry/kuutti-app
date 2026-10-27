@@ -1,12 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { createPool, migrate, type Pool, type Queryable, withTemporaryDatabase } from "@kuutti/db";
-import { ConversationDetail, ConversationList, ErrorResponse, MessagePage } from "@kuutti/schema";
+import {
+  ConversationDetail,
+  ConversationList,
+  ErrorResponse,
+  MessagePage,
+  ReportDetail,
+} from "@kuutti/schema";
 import { describe, expect, it } from "vitest";
 import { createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { objectKey } from "../media/index.ts";
-import { signInAs, withMatchingConfig } from "../test/account.ts";
+import { signInAs, staffSession, withMatchingConfig } from "../test/account.ts";
 import { cardShown } from "../test/cards.ts";
 import {
   conversationBetween,
@@ -543,6 +549,189 @@ describe("a report from a conversation", () => {
   });
 });
 
+// The pointer at one photo (#476, ADR-030 §13): a line the reporter could
+// read of a photo the other person sent is kept; any other pointer, from a
+// conversation or a card, is left out and the answer is the one without it.
+describe("a report that points at one photo", () => {
+  const pointers = (ctx: TestContext) =>
+    ctx.client
+      .query<{ line_seq: number | null; photo_id: string | null; photo_pointed: boolean }>(
+        "SELECT line_seq, photo_id, photo_pointed FROM report ORDER BY created_at, id",
+      )
+      .then((result) => result.rows);
+
+  test("A report from a conversation can point at one photo the other person sent", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
+      messages: [{ from: "b", body: "Moi Aino" }],
+    });
+    const fromB = await photoMessage(ctx.client, {
+      conversationId: id,
+      accountId: b.accountId,
+      side: "b",
+      caption: null,
+    });
+    await photoMessage(ctx.client, {
+      conversationId: id,
+      accountId: a.accountId,
+      side: "a",
+      caption: null,
+    });
+    const answer = await report(ctx.app, a, id, { reason: "misrepresentation", seq: fromB.seq });
+    expect(answer.status).toBe(204);
+    expect(await pointers(ctx)).toEqual([
+      { line_seq: fromB.seq, photo_id: null, photo_pointed: false },
+    ]);
+    // The copy holds every line, both people's, the pointer adding and taking none.
+    expect(await written(ctx)).toEqual({ reports: 1, copies: 3, blocks: 1, closed: 1 });
+    // The moderator reads the line pointed at; a conversation's report points at no card photo.
+    const moderator = await staffSession(ctx.client);
+    const filed = await ctx.client.query<{ id: string }>("SELECT id FROM report");
+    const opened = await ctx.app.request(`/admin/reports/${filed.rows[0]?.id}`, {
+      headers: moderator.headers,
+    });
+    expect(opened.status).toBe(200);
+    const detail = ReportDetail.parse(await opened.json());
+    expect(detail).toMatchObject({ lineSeq: fromB.seq, pointedPhoto: null });
+    expect(detail.copy?.find((line) => line.seq === fromB.seq)).toMatchObject({
+      side: "reported",
+      kind: "photo",
+      photo: true,
+    });
+  });
+
+  test("A pointer that names no photo of the other person's is left out, and the answer is the same", async ({
+    ctx,
+  }) => {
+    // From a conversation, each pointer in a pair of its own (one open report per pair).
+    const conversationOf = async (label: string) => {
+      const a = await person(ctx, `A${label}`);
+      const b = await person(ctx, `B${label}`);
+      const id = await conversationBetween(ctx.client, a.accountId, b.accountId, {
+        messages: [{ from: "b", body: "Moi" }],
+      });
+      return { a, b, id };
+    };
+    const own = await conversationOf("own");
+    const ownPhoto = await photoMessage(ctx.client, {
+      conversationId: own.id,
+      accountId: own.a.accountId,
+      side: "a",
+    });
+    const text = await conversationOf("text");
+    const withheld = await conversationOf("withheld");
+    // A photo sent under the sender's open shadow ban never reached the reporter.
+    await applySanction(ctx.client, {
+      accountId: withheld.b.accountId,
+      kind: "shadow_ban",
+      reason: "harassment",
+      note: "Hidden from others.",
+      actor: null,
+      at: new Date(Date.now() - 60_000),
+    });
+    const hidden = await photoMessage(ctx.client, {
+      conversationId: withheld.id,
+      accountId: withheld.b.accountId,
+      side: "b",
+    });
+    const past = await conversationOf("past");
+    for (const [from, seq] of [
+      [own, ownPhoto.seq],
+      [text, 1],
+      [withheld, hidden.seq],
+      [past, 99],
+    ] as const) {
+      const answer = await report(ctx.app, from.a, from.id, { reason: "other", seq });
+      expect(answer.status).toBe(204);
+    }
+
+    // From a card: a photo never shown, another person's, the reporter's own, nobody's.
+    const viewer = await person(ctx, "Viewer");
+    const cardOf = async (label: string) => {
+      const subject = await person(ctx, label);
+      await cardShown(ctx.client, viewer.accountId, subject.accountId);
+      return subject;
+    };
+    const fromCard = (accountId: string, photoId: string) =>
+      ctx.app.request("/reports", {
+        method: "POST",
+        headers: jsonHeaders(viewer.headers),
+        body: JSON.stringify({ accountId, reason: "other", photoId }),
+      });
+    const photoOf = async (accountId: string) => {
+      const { rows } = await ctx.client.query<{ id: string }>(
+        `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+         VALUES ($1, $2, 'LKO2?U%2Tw=w', 800, 1067, 'approved',
+                 (SELECT coalesce(max(position) + 1, 0) FROM photo
+                  WHERE account_id = $1 AND purpose = 'profile'))
+         RETURNING id`,
+        [accountId, randomUUID()],
+      );
+      return rows[0]?.id ?? "";
+    };
+    const unshown = await cardOf("Unshown");
+    const other = await cardOf("Other");
+    const otherShown = await cardShown(ctx.client, viewer.accountId, other.accountId);
+    const notTheirs = await cardOf("NotTheirs");
+    const mine = await cardOf("Mine");
+    const nobody = await cardOf("Nobody");
+    const cases: Array<[string, string]> = [
+      [unshown.accountId, await photoOf(unshown.accountId)],
+      [notTheirs.accountId, otherShown],
+      [mine.accountId, await photoOf(viewer.accountId)],
+      [nobody.accountId, randomUUID()],
+    ];
+    for (const [accountId, photoId] of cases) {
+      expect((await fromCard(accountId, photoId)).status).toBe(204);
+    }
+
+    // Every report and its block is written, and no pointer is kept.
+    expect(await pointers(ctx)).toEqual(
+      Array.from({ length: 8 }, () => ({ line_seq: null, photo_id: null, photo_pointed: false })),
+    );
+    expect(await count(ctx, "SELECT count(*) AS n FROM block")).toBe(8);
+  });
+
+  test("a second report while one is open, and one over the day's cap, keep no pointer either", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    const first = await photoMessage(ctx.client, {
+      conversationId: id,
+      accountId: b.accountId,
+      side: "b",
+    });
+    const second = await photoMessage(ctx.client, {
+      conversationId: id,
+      accountId: b.accountId,
+      side: "b",
+    });
+    expect((await report(ctx.app, a, id, { reason: "other", seq: first.seq })).status).toBe(204);
+    // Still open: the repeat answers 204 and writes nothing, its pointer included.
+    expect((await report(ctx.app, a, id, { reason: "other", seq: second.seq })).status).toBe(204);
+    expect(await pointers(ctx)).toEqual([
+      { line_seq: first.seq, photo_id: null, photo_pointed: false },
+    ]);
+    // Over the cap: refused before the pointer is asked, nothing written.
+    await withMatchingConfig(ctx.client, { reports_per_day: 1 });
+    const c = await person(ctx, "Cilla");
+    const other = await conversationBetween(ctx.client, a.accountId, c.accountId);
+    const fromC = await photoMessage(ctx.client, {
+      conversationId: other,
+      accountId: c.accountId,
+      side: "b",
+    });
+    const refused = await report(ctx.app, a, other, { reason: "other", seq: fromC.seq });
+    expect(refused.status).toBe(429);
+    expect(await pointers(ctx)).toHaveLength(1);
+  });
+});
+
 describe("a block from a conversation", () => {
   test("A block from a conversation ends it for both and hides it from the blocker", async ({
     ctx,
@@ -721,6 +910,7 @@ describe("a report or a block against the other person's erasure or ban", () => 
               conversationId: id,
               reason: "harassment",
               note: null,
+              seq: null,
               at,
               since: new Date(at.getTime() - DAY),
               limit: 5,
@@ -820,6 +1010,7 @@ describe("a report from a conversation in a race", () => {
       conversationId,
       reason: "harassment",
       note: null,
+      seq: null,
       at,
       since: new Date(at.getTime() - DAY),
       limit: 5,

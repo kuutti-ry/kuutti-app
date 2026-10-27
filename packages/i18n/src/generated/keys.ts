@@ -339,6 +339,9 @@ export type MessageParams = {
   "admin.report.personPage": Record<never, never>;
   "admin.report.photoFailed": Record<never, never>;
   "admin.report.photoRemoved": Record<never, never>;
+  "admin.report.pointedImage": { "state": string };
+  "admin.report.pointedLine": Record<never, never>;
+  "admin.report.pointedTitle": Record<never, never>;
   "admin.report.reason": Record<never, never>;
   "admin.report.reportedFor": { "reason": string };
   "admin.report.showPhoto": Record<never, never>;
@@ -532,11 +535,13 @@ export type MessageParams = {
   "chat.photo.photo": Record<never, never>;
   "chat.photo.removed": Record<never, never>;
   "chat.photo.removedCaption": { "caption": string };
+  "chat.photo.report": Record<never, never>;
   "chat.photo.uploading": { "percent": number };
   "chat.presence.online": Record<never, never>;
   "chat.report.alsoEnds": Record<never, never>;
   "chat.report.copy": Record<never, never>;
   "chat.report.limited": Record<never, never>;
+  "chat.report.photo": Record<never, never>;
   "chat.row.mine": { "preview": string };
   "chat.row.noMessages": Record<never, never>;
   "chat.row.photo": Record<never, never>;
@@ -1391,6 +1396,8 @@ export type MessageParams = {
   "safety.report.done": Record<never, never>;
   "safety.report.failed": Record<never, never>;
   "safety.report.noteLabel": { "max": number };
+  "safety.report.photo.none": Record<never, never>;
+  "safety.report.photo.question": Record<never, never>;
   "safety.report.reason.commercial_use": Record<never, never>;
   "safety.report.reason.harassment": Record<never, never>;
   "safety.report.reason.misrepresentation": Record<never, never>;

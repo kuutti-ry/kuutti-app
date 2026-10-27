@@ -1,10 +1,18 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import type { PhotoId } from "@kuutti/schema";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { Image, type ImageRef } from "expo-image";
 import { useLocales } from "expo-localization";
 import { useState } from "react";
 import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { ConversationActions, SafetyActions, type SafetyOutcome } from "./SafetyActions";
+import {
+  ConversationActions,
+  ConversationPhotoReport,
+  type ReportPhoto,
+  SafetyActions,
+  type SafetyOutcome,
+} from "./SafetyActions";
 
 // Block or report from someone else's card (#84, ADR-030 §11): a labelled
 // button, one dialog, a block only after words that say it is final, a report
@@ -42,13 +50,56 @@ function api(answer: (path: string) => Response | Promise<Response>) {
 const done = () => new Response(null, { status: 204 });
 
 /** The card's part: it holds the dialog open, as ProfileCardView does. */
-function Host({ onGone }: { onGone: (accountId: string) => void }) {
+function Host({
+  onGone,
+  photos,
+}: {
+  onGone: (accountId: string) => void;
+  photos: readonly ReportPhoto[];
+}) {
   const [open, setOpen] = useState(false);
-  return <SafetyActions accountId={SUBJECT} open={open} onOpenChange={setOpen} onGone={onGone} />;
+  return (
+    <SafetyActions
+      accountId={SUBJECT}
+      photos={photos}
+      open={open}
+      onOpenChange={setOpen}
+      onGone={onGone}
+    />
+  );
 }
-const show = async (onGone: (accountId: string) => void = jest.fn()) => {
-  await renderWithTheme(<Host onGone={onGone} />);
+const show = async (
+  onGone: (accountId: string) => void = jest.fn(),
+  photos: readonly ReportPhoto[] = [],
+) => {
+  await renderWithTheme(<Host onGone={onGone} photos={photos} />);
 };
+
+// A card's own photos (#476), as ProfileCardView names them: the main one in
+// the card variant, the rest as thumbs, each heard with its caption and what
+// the check saw, and seen with its caption.
+const BLURHASH = "LEHV6nWB2yk8pyo0adR*.7kCMdnj";
+const MAIN = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01" as PhotoId;
+const SECOND = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a02" as PhotoId;
+const SECOND_HEARD = "Photo 2 of 2. A summer day. Automatic description: One person, outdoors.";
+const PHOTOS: readonly ReportPhoto[] = [
+  { id: MAIN, variant: "card", blurhash: BLURHASH, label: "Photo 1 of 2", text: "Photo 1 of 2" },
+  {
+    id: SECOND,
+    variant: "thumb",
+    blurhash: BLURHASH,
+    label: SECOND_HEARD,
+    text: "Photo 2 of 2. A summer day",
+  },
+];
+const QUESTION = "Is it about one photo?";
+/** The options of Is it about one photo?, as a screen reader hears them, in order. */
+const photoChoices = () =>
+  within(screen.getByLabelText(QUESTION))
+    .getAllByRole("radio")
+    .map((radio) => radio.props.accessibilityLabel);
+const checked = (name: string) =>
+  screen.getByRole("radio", { name }).props.accessibilityState?.checked === true;
 const press = (name: string | RegExp, role: "button" | "radio" = "button") =>
   act(async () => {
     fireEvent.press(screen.getByRole(role, { name }));
@@ -292,6 +343,128 @@ describe("SafetyActions", () => {
     await press("Send report");
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]?.body).toEqual({ accountId: SUBJECT, reason: "harassment" });
+  });
+
+  it("asks whether it is about one photo, Not one photo chosen first, each of the card's photos named as the card names it, and sends the one chosen (#476)", async () => {
+    const sent = api(done);
+    const cache = jest.spyOn(Image, "readFromCacheAsync");
+    await show(jest.fn(), PHOTOS);
+    await press("Block or report");
+    await press("Report and block");
+    // After the reasons, a question of its own, heard with each of its options.
+    expect(screen.getByRole("heading", { name: QUESTION })).toBeTruthy();
+    expect(screen.getByLabelText(QUESTION).props.accessibilityRole).toBe("radiogroup");
+    expect(photoChoices()).toEqual(["✓ Not one photo", "Photo 1 of 2", SECOND_HEARD]);
+    expect(checked("✓ Not one photo")).toBe(true);
+    // Seen beside each picture: its place and its caption, the check's words left to the label.
+    expect(screen.getByText("Photo 2 of 2. A summer day")).toBeTruthy();
+    // The pictures are the ones the card painted, from the phone's cache: nothing is asked of the API.
+    expect(cache.mock.calls).toEqual([[`${MAIN}/card`], [`${SECOND}/thumb`]]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    noProblems();
+    await press(SECOND_HEARD, "radio");
+    expect(photoChoices()).toEqual(["Not one photo", "Photo 1 of 2", `✓ ${SECOND_HEARD}`]);
+    expect(checked(`✓ ${SECOND_HEARD}`)).toBe(true);
+    expect(screen.getByText("✓ Photo 2 of 2. A summer day")).toBeTruthy();
+    // The photo is an addition: a reason is still needed.
+    expect(disabled("Send report")).toBe(true);
+    await press("Something else", "radio");
+    await press("Send report");
+    await screen.findByText(
+      "Thank you. A moderator will look at it, and you will not see each other again.",
+    );
+    expect(sent).toEqual([
+      { path: "/reports", body: { accountId: SUBJECT, reason: "other", photoId: SECOND } },
+    ]);
+  });
+
+  it("leaves the photo out of the report when Not one photo is chosen again (#476)", async () => {
+    const sent = api(done);
+    await show(jest.fn(), PHOTOS);
+    await press("Block or report");
+    await press("Report and block");
+    await press("Photo 1 of 2", "radio");
+    expect(checked("✓ Photo 1 of 2")).toBe(true);
+    await press("Not one photo", "radio");
+    expect(checked("✓ Not one photo")).toBe(true);
+    await press("Harassing, threatening or hateful", "radio");
+    await press("Send report");
+    await waitFor(() => expect(sent).toHaveLength(1));
+    // No key at all: the contract is strict and takes no null.
+    expect(sent[0]?.body).toStrictEqual({ accountId: SUBJECT, reason: "harassment" });
+  });
+
+  it("keeps the photo chosen through a failure and a tap outside the dialog, and holds its choice while a report is on its way (#476)", async () => {
+    let answer: () => Response | Promise<Response> = () => refusal("internal_error", 500);
+    const sent = api(() => answer());
+    await show(jest.fn(), PHOTOS);
+    await press("Block or report");
+    await press("Report and block");
+    await press(SECOND_HEARD, "radio");
+    await press("Something else", "radio");
+    await press("Send report");
+    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(checked(`✓ ${SECOND_HEARD}`)).toBe(true);
+    // Every option waits while a report is on its way, the photos' too.
+    answer = () => new Promise<Response>(() => undefined);
+    await press("Send report");
+    expect(
+      within(screen.getByLabelText(QUESTION))
+        .getAllByRole("radio")
+        .every((radio) => radio.props.accessibilityState?.disabled === true),
+    ).toBe(true);
+    await pressScrim();
+    await press("Block or report");
+    expect(checked(`✓ ${SECOND_HEARD}`)).toBe(true);
+    expect(sent.map((s) => s.body)).toEqual([
+      { accountId: SUBJECT, reason: "other", photoId: SECOND },
+      { accountId: SUBJECT, reason: "other", photoId: SECOND },
+    ]);
+  });
+
+  it("forgets the photo chosen on Cancel, so the next report starts at Not one photo (#476)", async () => {
+    api(done);
+    await show(jest.fn(), PHOTOS);
+    await press("Block or report");
+    await press("Report and block");
+    await press("Photo 1 of 2", "radio");
+    await press("Cancel");
+    await press("Block or report");
+    await press("Report and block");
+    expect(photoChoices()).toEqual(["✓ Not one photo", "Photo 1 of 2", SECOND_HEARD]);
+  });
+
+  it("asks about no photo on a card without photos (#476)", async () => {
+    const cache = jest.spyOn(Image, "readFromCacheAsync");
+    api(done);
+    await show();
+    await press("Block or report");
+    await press("Report and block");
+    expect(screen.getByRole("heading", { name: "What is wrong?" })).toBeTruthy();
+    expect(screen.queryByText(QUESTION)).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Not one photo/ })).toBeNull();
+    expect(cache).not.toHaveBeenCalled();
+  });
+
+  it("shows a photo from the phone's cache where it has it, and its blurhash where it has none (#476)", async () => {
+    const painted = { painted: true } as unknown as ImageRef;
+    jest
+      .spyOn(Image, "readFromCacheAsync")
+      .mockImplementation(async (key) => (key === `${MAIN}/card` ? painted : null));
+    api(done);
+    await show(jest.fn(), PHOTOS);
+    await press("Block or report");
+    await press("Report and block");
+    const picture = (id: string) =>
+      screen.getByTestId(`cached-${id}`, { includeHiddenElements: true }).props as {
+        source: unknown[];
+        placeholder: unknown;
+      };
+    expect(picture(MAIN).source).toEqual([painted]);
+    // A thumb the day's budget refused never reached the cache: the blurhash stands in.
+    expect(picture(SECOND).source).toEqual([]);
+    expect(JSON.stringify(picture(SECOND).placeholder)).toContain(BLURHASH);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("says the day's reports are filed, keeps the words, and offers the block in their place", async () => {
@@ -543,6 +716,7 @@ const ALSO_ENDS =
   "A report also blocks them, for good, and ends this conversation for both of you: you will not see each other here again, even if either of you deletes their account. A block cannot be undone. They are not told.";
 const REPORT = `/conversations/${CONVERSATION}/report`;
 const BLOCK = `/conversations/${CONVERSATION}/block`;
+const POINTS = "The report points the moderators to this photo.";
 
 /** The conversation's API: every block and report on it recorded, answered as told. */
 function conversationApi(answer: (path: string) => Response | Promise<Response>) {
@@ -626,6 +800,9 @@ describe("ConversationActions", () => {
     expect(screen.getByText(COPY)).toBeTruthy();
     expect(screen.getByText(ALSO_ENDS)).toBeTruthy();
     expect(screen.queryByText(ALSO_BLOCKS)).toBeNull();
+    // Points at nothing: a photo is pointed at from its own screen (#476).
+    expect(screen.queryByText(POINTS)).toBeNull();
+    expect(screen.queryByText("Is it about one photo?")).toBeNull();
     await press("Harassing, threatening or hateful", "radio");
     await type("  Uhkaili.  ");
     noProblems();
@@ -831,5 +1008,195 @@ describe("ConversationActions", () => {
     expect(screen.getByText("Ilmoita, estä tai lopeta")).toBeTruthy();
     await press("Lopeta keskustelu");
     expect(screen.getByText("Lopetetaanko tämä keskustelu?")).toBeTruthy();
+  });
+});
+
+// A conversation photo's door (#476, ADR-030 §13): Report this photo under a
+// photo the other person sent opens the conversation's report step at once,
+// saying first that the report points the moderators to the photo, then the
+// copy and the block as from More, and the report names the photo's place.
+
+const LIMITED = "That is enough reports for today. You can send more after midnight.";
+const LATE = "This conversation can no longer be reported.";
+
+function PhotoHost({
+  ended = false,
+  reportable = true,
+  onDone,
+  onStale = jest.fn(),
+}: {
+  ended?: boolean;
+  reportable?: boolean;
+  onDone: (outcome: SafetyOutcome) => void;
+  onStale?: () => void;
+}) {
+  return (
+    <ConversationPhotoReport
+      conversationId={CONVERSATION}
+      seq={4}
+      ended={ended}
+      reportable={reportable}
+      onDone={onDone}
+      onStale={onStale}
+    />
+  );
+}
+/** The report step's lines, in the order they are read. */
+const reportLines = () =>
+  screen
+    .getAllByText(/./)
+    .map((node) => node.props.children)
+    .filter((line) => [POINTS, COPY, ALSO_ENDS, ALSO_BLOCKS].includes(line));
+
+describe("ConversationPhotoReport", () => {
+  it("opens the report step from Report this photo, its title taking the focus, saying the photo first, then the copy and that it ends the conversation, and sends the reason, the note and the photo's place", async () => {
+    const sent = conversationApi(done);
+    const onDone = jest.fn();
+    await renderWithTheme(<PhotoHost onDone={onDone} />);
+    // One labelled button, at least 44 points.
+    expect(pressables(screen.toJSON() as HostNode)).toHaveLength(1);
+    noProblems();
+    const focused = AccessibilityInfo.sendAccessibilityEvent as jest.Mock;
+    await press("Report this photo");
+    expect(screen.getByText("Report and block")).toBeTruthy();
+    expect(focused).toHaveBeenLastCalledWith(expect.anything(), "focus");
+    expect(reportLines()).toEqual([POINTS, COPY, ALSO_ENDS]);
+    // Straight to the report: no choice before it, and no photo to choose.
+    expect(screen.queryByRole("button", { name: "End conversation" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+    expect(screen.queryByText("Is it about one photo?")).toBeNull();
+    noProblems();
+    await press("Harassing, threatening or hateful", "radio");
+    await type("  Lähetti tämän pyytämättä.  ");
+    await press("Send report");
+    expect(sent).toEqual([
+      { path: REPORT, body: { reason: "harassment", note: "Lähetti tämän pyytämättä.", seq: 4 } },
+    ]);
+    expect(onDone).toHaveBeenCalledWith("reported");
+    expect(screen.queryByText("Report and block")).toBeNull();
+  });
+
+  it("says in an ended conversation that the report blocks, not that it ends, and the day's cap without a Block", async () => {
+    const sent = conversationApi(() => refusal("report_budget_exceeded", 429));
+    await renderWithTheme(<PhotoHost ended onDone={jest.fn()} />);
+    await press("Report this photo");
+    expect(reportLines()).toEqual([POINTS, COPY, ALSO_BLOCKS]);
+    await press("Something else", "radio");
+    await press("Send report");
+    expect(screen.getByText(LIMITED)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Block" })).toBeNull();
+    expect(sent).toEqual([{ path: REPORT, body: { reason: "other", seq: 4 } }]);
+  });
+
+  it("offers a Block under the day's cap while the conversation goes on, through the conversation's route", async () => {
+    const sent = conversationApi((path) =>
+      path === REPORT ? refusal("report_budget_exceeded", 429) : done(),
+    );
+    const onDone = jest.fn();
+    await renderWithTheme(<PhotoHost onDone={onDone} />);
+    await press("Report this photo");
+    await press("Something else", "radio");
+    await press("Send report");
+    expect(screen.getByText(CAP)).toBeTruthy();
+    await press("Block");
+    expect(screen.getByText("Block this person?")).toBeTruthy();
+    await press("Block");
+    expect(sent.map((s) => s.path)).toEqual([REPORT, BLOCK]);
+    expect(onDone).toHaveBeenCalledWith("blocked");
+  });
+
+  it("opens at the report step again after Cancel, from the block's confirmation too, with nothing chosen or typed", async () => {
+    conversationApi((path) => (path === REPORT ? refusal("report_budget_exceeded", 429) : done()));
+    await renderWithTheme(<PhotoHost onDone={jest.fn()} />);
+    await press("Report this photo");
+    await press("Something else", "radio");
+    await type("Kept sending these.");
+    await press("Cancel");
+    expect(screen.queryByText("Report and block")).toBeNull();
+    await press("Report this photo");
+    expect(screen.getByText("Report and block")).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: /✓/ })).toBeNull();
+    expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("");
+    await press("Something else", "radio");
+    await press("Send report");
+    await press("Block");
+    await press("Cancel");
+    await press("Report this photo");
+    expect(screen.getByText("Report and block")).toBeTruthy();
+    expect(screen.queryByText("Block this person?")).toBeNull();
+  });
+
+  it("says a report past the window, has the screen read again, keeps the open dialog when the button goes, and has no button once it closes", async () => {
+    conversationApi(() => refusal("report_window_closed", 409));
+    const onStale = jest.fn();
+    const ui = (reportable: boolean) => (
+      <PhotoHost ended reportable={reportable} onDone={jest.fn()} onStale={onStale} />
+    );
+    await renderWithTheme(ui(true));
+    await press("Report this photo");
+    await press("Something else", "radio");
+    await type("Threatened me.");
+    await press("Send report");
+    expect(screen.getByText(LATE)).toBeTruthy();
+    expect(onStale).toHaveBeenCalledTimes(1);
+    expect(disabled("Send report")).toBe(true);
+    await screen.rerender(underProviders(ui(false)));
+    expect(screen.getByText(LATE)).toBeTruthy();
+    expect(screen.getByLabelText(NOTE_LABEL).props.value).toBe("Threatened me.");
+    expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
+    await press("Cancel");
+    expect(screen.queryByText("Report and block")).toBeNull();
+    expect(pressables(screen.toJSON() as HostNode)).toEqual([]);
+  });
+
+  it("says a failed report in the dialog, opened again, when the button went and the dialog was closed while it was sending", async () => {
+    let release: (response: Response) => void = () => undefined;
+    conversationApi(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const ui = (reportable: boolean) => <PhotoHost reportable={reportable} onDone={jest.fn()} />;
+    await renderWithTheme(ui(true));
+    await press("Report this photo");
+    await press("Something else", "radio");
+    await press("Send report");
+    // The screen's read again fails meanwhile, so the button goes; the person closes the dialog.
+    await screen.rerender(underProviders(ui(false)));
+    await pressScrim();
+    expect(screen.queryByText("Report and block")).toBeNull();
+    await act(async () => {
+      release(refusal("internal_error", 500));
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    });
+    expect(await screen.findByText("The report could not be sent. Try again.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
+  });
+
+  it("hands a conversation gone meanwhile on as gone", async () => {
+    conversationApi(() => refusal("not_found", 404));
+    const onDone = jest.fn();
+    await renderWithTheme(<PhotoHost onDone={onDone} />);
+    await press("Report this photo");
+    await press("Something else", "radio");
+    await press("Send report");
+    expect(onDone).toHaveBeenCalledWith("gone");
+    expect(screen.queryByText("Report and block")).toBeNull();
+  });
+
+  it("has no button while the conversation takes no report", async () => {
+    await renderWithTheme(<PhotoHost reportable={false} onDone={jest.fn()} />);
+    expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
+    expect(pressables(screen.toJSON() as HostNode)).toEqual([]);
+  });
+
+  it("speaks the person's language", async () => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag: "fi-FI" }]);
+    conversationApi(done);
+    await renderWithTheme(<PhotoHost onDone={jest.fn()} />);
+    await press("Ilmoita tästä kuvasta");
+    expect(screen.getByText("Ilmoita ja estä")).toBeTruthy();
+    expect(screen.getByText("Ilmoitus ohjaa moderaattorit tähän kuvaan.")).toBeTruthy();
   });
 });

@@ -268,6 +268,8 @@ describe("the foreign keys", () => {
     expect(references.filter((reference) => reference.startsWith("report.")).sort()).toEqual([
       "report.conversation_id -> conversation.id set null",
       "report.decided_by -> identity.id no action",
+      // The photo a card's report points at goes null with the photo (#476).
+      "report.photo_id -> photo.id set null",
       "report.reported_account_id -> account.id no action",
       "report.reporter_account_id -> account.id no action",
       "report.sanction_id -> sanction.id set null",
@@ -352,6 +354,8 @@ describe("the indexes", () => {
     ["report", "report_reporter_created_idx", ["reporter_account_id", "created_at"]],
     ["photo", "photo_message_day_idx", ["account_id", "created_at"]],
     ["report_message", "report_message_photo_idx", ["photo_id"]],
+    // The SET NULL of a deleted photo finds the reports pointing at it (#476).
+    ["report", "report_photo_idx", ["photo_id"]],
     ["notice", "notice_account_created_idx", ["account_id", "created_at"]],
     // The push's read of an account's devices (#102).
     ["push_token", "push_token_account_idx", ["account_id"]],
@@ -382,6 +386,10 @@ describe("the indexes", () => {
     expect(index("report", "report_open_pair_idx")?.where).toBeDefined();
     expect(index("block", "block_pair_idx")?.where).toBeUndefined();
   });
+
+  it("index only the reports that point at a photo (#476)", () => {
+    expect(index("report", "report_photo_idx")?.where).toBeDefined();
+  });
 });
 
 describe("the checks", () => {
@@ -411,8 +419,11 @@ describe("the checks", () => {
     expect(checks("report")).toEqual([
       "report_conversation_check",
       "report_decision_check",
+      // A conversation's report points at a line, a card's at a photo (#476).
+      "report_line_seq_check",
       "report_not_self_check",
       "report_note_check",
+      "report_photo_check",
     ]);
   });
 

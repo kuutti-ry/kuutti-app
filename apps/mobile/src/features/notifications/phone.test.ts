@@ -44,8 +44,8 @@ const ios = (status: number): Status =>
     expires: "never",
     ios: { status },
   }) as Status;
-const android = (status: string, granted = status === "granted"): Status =>
-  ({ status, granted, canAskAgain: true, expires: "never" }) as Status;
+const android = (status: string, canAskAgain = true): Status =>
+  ({ status, granted: status === "granted", canAskAgain, expires: "never" }) as Status;
 
 const token = (seed: string) => (seed + "x".repeat(43)).slice(0, 43);
 type Sent = { method: string; path: string; body: unknown; language: string | null };
@@ -117,13 +117,20 @@ describe("the phone's permission", () => {
     expect(permissionOf(android("granted"))).toBe("unavailable");
   });
 
+  // What expo-notifications answers on Android: from Android 13 the root
+  // status says denied until the phone has said yes, so a phone never asked
+  // reads as denied, and only canAskAgain says that it can still be asked.
   it.each([
-    ["granted", true, "allowed"],
-    ["undetermined", false, "undetermined"],
-    ["denied", false, "denied"],
-  ])("on Android reads the root status %s as %s", (status, granted, expected) => {
+    ["allows them", "allowed", android("granted")],
+    ["was never asked (its root status says denied)", "undetermined", android("denied")],
+    [
+      "refused them for good, or has them off before Android 13",
+      "denied",
+      android("denied", false),
+    ],
+  ])("on Android reads a phone that %s as %s", (_, expected, answer) => {
     jest.replaceProperty(Platform, "OS", "android");
-    expect(permissionOf(android(status, granted))).toBe(expected);
+    expect(permissionOf(answer)).toBe(expected);
   });
 
   it("reads the phone as it stands, asking nothing", async () => {
