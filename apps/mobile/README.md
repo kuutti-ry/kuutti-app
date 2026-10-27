@@ -9,13 +9,14 @@ Expo SDK 57, dev client, Expo Router, web target for previews. `app/` holds rout
 
 ## Builds and updates (EAS, #10)
 
-Native binaries come from EAS Build; JavaScript reaches installed binaries as EAS Updates. The split is the fingerprint rule: `runtimeVersion` follows the `fingerprint` policy, so a change to native code, a native dependency, `app.json` or a config plugin changes the fingerprint and needs a new build, while everything else is an update. `eas-build.yml` compares the fingerprint of `main` with the newest `development` build that finished or is still running and builds only when it differs; before it starts a build it cancels a queued or running build of the same profile and platform, since that one belongs to older code; `deploy.yml` publishes an update for every deploy. Pull requests never build: the free tier is 15 builds per platform a month (TD-2); they get an update on branch `pr-<n>` instead (#9).
+Native binaries come from EAS Build; JavaScript reaches installed binaries as EAS Updates. The split is the fingerprint rule: `runtimeVersion` follows the `fingerprint` policy, so a change to native code, a native dependency, `app.json` or a config plugin changes the fingerprint and needs a new build, while everything else is an update; `eas.json` is left out of the fingerprint (`fingerprint.config.js`, ADR-057). `eas-build.yml` compares the fingerprint of `main` with the newest `development` build that finished or is still running and builds only when it differs; before it starts a build it cancels a queued or running build of the same profile and platform, since that one belongs to older code; `deploy.yml` publishes an update for every deploy. Pull requests never build: the free tier is 15 builds per platform a month (TD-2); they get an update on branch `pr-<n>` instead (#9).
 
 | profile | what | channel | who |
 |---|---|---|---|
 | `development` | dev client, internal distribution: Android APK, iOS ad hoc for registered devices | `staging` | the team, for day-to-day work against Metro or the staging API; it does not apply updates by itself, you pick a branch in the launcher |
 | `preview` | the app as testers run it, internal distribution; checks for an update on every launch and applies it | `staging` | staging testers, and a phone that should follow `main` without anyone doing anything |
-| `production` | store build (AAB, IPA), build number incremented on EAS | `production` | releases on `v*` tags; submission is the stores milestone (#188) |
+| `staging` | the preview app as a store build (AAB), version code incremented on EAS, which EAS submits to Google Play's internal testing track (ADR-057); Android only, started by hand: `gh workflow run eas-build.yml --ref main -f profile=staging` | `staging` | the team, installing from Play |
+| `production` | store build (AAB, IPA), build number incremented on EAS | `production` | releases on `v*` tags; not submitted to a store yet (ADR-057 §7, #193) |
 
 Channels follow the deploy promotion (#8): a merge to `main` deploys the staging API and publishes to `staging`; a `v*` tag deploys prod behind the reviewer and publishes to `production`. Updates are not code-signed for now: Expo sells update signing with its paid plans only, so what may publish is whatever holds `EXPO_TOKEN`, and that token is guarded accordingly (ADR-004, which also says when signing returns). Turning signing on later adds a certificate to `app.json`, hence a new fingerprint and new builds for everyone.
 
@@ -33,6 +34,10 @@ In the dev client, connect to Metro on your machine for local work (the API URL 
 ### Apple account
 
 The app uses the maintainer's individual Apple developer account for ad hoc distribution; Apple organisation enrolment waits for the association's Y-tunnus (TD-4). Apple does not convert an individual account into an organisation, so the app record moves by transfer later; the bundle identifier `fi.kuutti.app`, the EAS project and the certificates are unaffected. Nobody but the maintainer needs an Apple login: EAS holds the distribution certificate and the provisioning profiles.
+
+### Google Play
+
+The association's organisation account on Google Play (developer name Kuutti ry, since 2026-10-27) carries the staging app on its internal testing track, for the team (ADR-057). Play signs what it delivers with its own keys, while the APKs from expo.dev are signed with EAS's keystore, which is Play's upload key: the two cannot install over each other, so a phone uninstalls one to take the other. A tester needs a Google account on the maintainer's list and the opt-in link. The account, the keys, what Google receives and the maintainer's set-up steps: `docs/vendors/google-play.md`.
 
 ### Setting up EAS, once (maintainer)
 

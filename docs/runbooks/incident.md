@@ -112,10 +112,11 @@ Every rotation is in `rotation.md`. What an exposure means:
 | `/kuutti/<env>/telia-signing-key`, `-encryption-key` | The signing key lets somebody act as our client towards Telia; the encryption key opens ID tokens, which carry the identity code (rule 1). Rotate (`rotation.md`, section 4), and tell Telia (below). |
 | `/kuutti/<env>/cloudfront-signing-key` | Anyone holding it can sign photo URLs. Rotate: a second public key, the switch, the removal (`rotation.md`, section 7). |
 | `/kuutti/<env>/db-app-password` | The database admits port 5432 from the box's security group only (`infra/modules/network`), so the password alone opens nothing from outside. Rotate (`rotation.md`, section 1). |
-| `EXPO_TOKEN` | S1 from any environment: it can publish to `production` (ADR-004). Revoke it first: The update path, above, and `rotation.md`, section 10. |
+| `EXPO_TOKEN` | S1 from any environment: it can publish to `production` (ADR-004). Revoke it first: The update path, above, and `rotation.md`, section 10. Through EAS it also reaches Google Play, the Play key and the upload key (ADR-057 §3), which section 10 replaces too. |
 | `DOKPLOY_TOKEN` | The `staging` and `prod` copies deploy the API; the `ci-preview` member's reaches only the `previews` project. Rotate (`rotation.md`, section 9). |
 | `SENTRY_AUTH_TOKEN` | Uploads source maps (`project:releases`, `org:read`). Rotate (`rotation.md`, section 11). |
 | `FONTS_TOKEN` | Reads `kuutti-app-fonts` alone: Saiga's files, which are licensed to Kuutti only. Revoke it (`rotation.md`, section 13); whether Spoke is told is the maintainer's call (ADR-052). |
+| the Google Play service account's key, at EAS | Releases bundles on any of the app's testing tracks and halts them on closed and open ones, and uploads a bundle signed with any key to internal app sharing, whose list is the team's and which shows in no track's history. Delete it in Google Cloud first (`rotation.md`, section 14). A leak of `EXPO_TOKEN`, or of EAS itself, puts it and the upload key out together: both are reset in the same section. |
 | a font file pushed to `kuutti-app` | Public at once, and still reachable after a squash (`refs/pull/<n>/head`). Ask GitHub Support to purge it; whether Spoke is told is the maintainer's call (ADR-052 §7). |
 | the box, or its instance role `kuutti-api-<env>` | The role reads every `/kuutti/<env>/*` parameter, the secret ones included; on staging, every preview runs pull-request code with the same role (`infra/README.md`, Previews, Trust). First the maintainer takes a snapshot of the box's root volume: the rebuild destroys it (`delete_on_termination` in `infra/modules/compute`), and with it the containers' files, Docker's volumes and `/var/log/dokploy-backup.log`. No command for that is in the repository (`aws ec2 create-snapshot` of the instance's root volume; check `--help` first); the snapshot holds secrets, so delete it when the review is done. Then rebuild as `infra/README.md`, Backups and rebuilding the box, says, with the alert address set as in the restore drill below (part 2, step 2). Then rotate every secret under the prefix: `rotation.md` sections 1, 2 (staging), 4 and 7. The HMAC key is the first row of this table. |
 | an owner's GitHub or Expo login, the AWS session | `SECURITY.md`, Maintainer accounts: tell the other owners the same day, revoke sessions and tokens, new second factor first. Recovery paths are in `custody.md`. |
@@ -176,10 +177,10 @@ When the incident touches the bank login (the Telia keys, logins nobody made, th
 
 ### Apple and Google
 
-Steps for the maintainer. None of these names is in the repository yet.
+Steps for the maintainer.
 
 - **Apple**: the app is under the maintainer's individual Apple developer account (`apps/mobile/README.md`). A released binary that must stop reaching people is removed from sale in App Store Connect; a TestFlight build is expired there. Apple is told through App Store Connect when it must know, for example when the developer account itself is affected.
-- **Google**: the Play Console account does not exist yet (M6). Once it does: halt the rollout of a bad release there. Add the account to `custody.md` when it is created.
+- **Google**: the association's Play developer account (`custody.md`) carries the staging app on the internal testing track (ADR-057). A bad release on a closed or open track is halted there in Play Console; an internal testing release cannot be halted, and a new staging build replaces it (`docs/vendors/google-play.md`, When something goes wrong). A lost or leaked Play credential is `rotation.md`, section 14; Google is told through Play Console's help when the developer account itself is affected.
 - A bad JavaScript update is stopped at EAS (The update path), not in the stores.
 
 ## After: the review

@@ -17,7 +17,7 @@ packages/i18n/src/legal.ts
 infra/bootstrap/
 -->
 
-Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has four vendors: Expo, GitHub, Telia and Sentry. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052, ADR-055 and ADR-056.
+Who uses Kuutti, and which outside services it depends on: the direction of every call and what travels on it. It is for a contributor or a reviewer who wants the whole picture before reading the code or `infra/`. It draws staging, the one environment that runs today; production, applied on 2026-10-24 without bank identification (ADR-049), composes the same services less a few ([Deployment](deployment.md), part 5). Outside AWS, Kuutti has five vendors: Expo, GitHub, Telia, Sentry and, for the app's store builds, Google Play. This view draws ADR-001, ADR-004, ADR-005, ADR-006, ADR-014, ADR-016, ADR-017, ADR-018, ADR-025, ADR-029, ADR-031, ADR-032, ADR-041, ADR-043, ADR-052, ADR-055, ADR-056 and ADR-057.
 
 ## Part 1: the people and what their devices reach
 
@@ -71,7 +71,7 @@ flowchart TB
 5. The API: Hono on Node, one process that serves HTTP, the WebSocket and the nightly jobs. It runs in a container on the staging box ([Deployment](deployment.md), part 2).
 6. CloudFront: two distributions. The API's, on `api.staging.kuutti.app`, sends every request to the box except `/media/*`, which it serves from the private media bucket only for a URL the API signed (fifteen minutes, or up to twenty for a photo sent in a conversation). The panel's, on `admin.staging.kuutti.app`, serves the panel's files from its own bucket. Dokploy's control plane and a pull request's preview do not pass through CloudFront: they reach the box directly.
 7. Telia Tunnistus: the broker of Finnish bank IDs; staging uses Telia's pre-production bed and its test persons. The API reads Telia's discovery document and keys at boot. A sign-in sends the browser to Telia, the person logs in at their bank every time, and Telia sends the browser back to the API's callback with a code. The API exchanges the code with a signed client assertion and decrypts the ID token. A pull request's preview has no bank login; a developer's machine uses the mock bank ([Deployment](deployment.md), part 1).
-8. Expo EAS Update: the app's JavaScript bundle. The app checks for an update at each start, on the channel its build names: `staging` for the development and preview builds, `production` for the store build. Updates are not code-signed (ADR-004).
+8. Expo EAS Update: the app's JavaScript bundle. The app checks for an update at each start, on the channel its build names: `staging` for the development and preview builds and for the staging build that Google Play's internal testing track carries, `production` for the production build. Updates are not code-signed (ADR-004).
 9. Sentry, in its EU data region: error reports from the API and the app, with every category of data the SDK would collect by itself switched off in the API. Each is on only where a DSN is set: the parameter `sentry-dsn` for the API, `EXPO_PUBLIC_SENTRY_DSN` for the app.
 10. The website `kuutti.app`, on AWS Amplify Hosting, built from its own repository `kuutti-ry/kuutti-app-site`. The app opens the full legal texts there. No arrow joins the website and the API: the API's browser allowlist on staging names the panel's origin alone.
 11. Push through Expo (#102, ADR-055): the API sends each push to Expo's push service over HTTPS, at most a hundred a request, and Expo hands it to Apple's APNs or Google's FCM, which wake the phone. A push carries the device's token, one line of the app's own words in the device's language (a new message, a new match, today's round) and its kind, never a message's text, a name, an account or the conversation, whose id would pair the two phones for the vendors. The app registers its token with the API (`PUT /push-token`) once the phone lets Kuutti notify; the API sends where the parameter `push` says `expo`, as on staging, and reads receipts back once, fifteen minutes later, to forget tokens Apple or Google no longer know. What Expo receives and keeps: `docs/vendors/expo.md`.
@@ -144,7 +144,7 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Context, part 3: how code reaches the services
-  accDescr: A contributor pushes to the repository on GitHub, which starts GitHub Actions. The workflows push the API image to GHCR, deploy it through Dokploy on the staging box, which pulls it, and exchange their OIDC token for an AWS role to plan and apply the infrastructure. They start native builds on EAS Build, publish JavaScript to EAS Update, put a pull request's web export on EAS Hosting and upload source maps to Sentry. EAS Build, and the website's Amplify, fetch the typeface from the association's private fonts repository with a token of their own, which no workflow holds; the maintainer uploads the panel's copy by hand. The website deploys from its own repository through Amplify.
+  accDescr: A contributor pushes to the repository on GitHub, which starts GitHub Actions. The workflows push the API image to GHCR, deploy it through Dokploy on the staging box, which pulls it, and exchange their OIDC token for an AWS role to plan and apply the infrastructure. They start native builds on EAS Build, publish JavaScript to EAS Update, put a pull request's web export on EAS Hosting and upload source maps to Sentry. EAS Build, and the website's Amplify, fetch the typeface from the association's private fonts repository with a token of their own, which no workflow holds; the maintainer uploads the panel's copy by hand. A staging store build goes from EAS to Google Play's internal testing track, with a service account key that EAS holds. The website deploys from its own repository through Amplify.
   subgraph people3["The people"]
     n28["A contributor or the maintainer"]
   end
@@ -165,6 +165,7 @@ flowchart TB
     n36["EAS Hosting: a pull request's web export"]
   end
   n37["Sentry: the update's source maps"]
+  n42["Google Play: the internal testing track"]
   subgraph site["The website"]
     n38["kuutti-ry/kuutti-app-site, its own repository"]
     n39["Amplify Hosting: kuutti.app"]
@@ -184,6 +185,7 @@ flowchart TB
   n34 -->|"fetches Saiga before the install, FONTS_TOKEN, an EAS secret"| n40
   n39 -->|"fetches Saiga at build, FONTS_TOKEN, the site's own"| n40
   n28 -->|"the maintainer uploads Saiga by hand, pnpm fonts"| n41
+  n34 -->|"submits a staging store build, with the service account key EAS holds"| n42
 ```
 
 ### Steps
@@ -202,16 +204,17 @@ flowchart TB
 39. Amplify Hosting: a push to the site's `main` deploys `kuutti.app`. CI here reads the deployed site's `/legal/versions.json` to hold the app's consent versions to the site's.
 40. `kuutti-ry/kuutti-app-fonts`: the association's private repository of Saiga, Kuutti's typeface, which Spoke Type licensed to Kuutti ry for Kuutti only and which is never public as a file (ADR-052). EAS Build and the website's Amplify read it at a pinned commit, each with a read-only token of its own, and hold every file to its SHA-256. No GitHub workflow reads it or holds a token for it, and a member's laptop reads it with the member's own login (`pnpm fonts`).
 41. The panel's bucket, `fonts/saiga-<version>/`: Saiga's faces, which the maintainer uploads from a laptop, since the panel is built on GitHub's runners, which never have them. The deploy leaves the folder alone, and the panel's CSP allows fonts from its own origin.
+42. Google Play, the association's developer account: a build of the profile `staging`, started by hand, is submitted by EAS to the app's internal testing track once it is built, with the key of a Google service account that EAS holds and no workflow sees ([Delivery](delivery.md), part 4; ADR-057). The team installs the staging app from Play. What Google receives: `docs/vendors/google-play.md`.
 
 ## Where it lives
 
 - The API's outside calls: [lib/ssm.ts](../../apps/api/src/lib/ssm.ts), [lib/config.ts](../../apps/api/src/lib/config.ts) (`loadConfig`, `ssmPrefix`, what a preview drops), [lib/s3.ts](../../apps/api/src/lib/s3.ts), [media/urls.ts](../../apps/api/src/media/urls.ts) (signed URLs), [media/wiring.ts](../../apps/api/src/media/wiring.ts) (Rekognition), [lib/mail.ts](../../apps/api/src/lib/mail.ts) (SES), [lib/sentry.ts](../../apps/api/src/lib/sentry.ts), [identity/oidc-broker.ts](../../apps/api/src/identity/oidc-broker.ts) (Telia, through `@kuutti-ry/tunnistus-oidc`), [research/copy-store.ts](../../apps/api/src/research/copy-store.ts)
 - The clients: [apps/mobile/app.json](../../apps/mobile/app.json) (`updates`, Sentry), [apps/mobile/eas.json](../../apps/mobile/eas.json) (channels), [apps/mobile/src/lib/api-url.ts](../../apps/mobile/src/lib/api-url.ts), [apps/mobile/src/lib/sentry.ts](../../apps/mobile/src/lib/sentry.ts), [apps/admin/src/lib/api.ts](../../apps/admin/src/lib/api.ts), [packages/i18n/src/legal.ts](../../packages/i18n/src/legal.ts) (the website's legal pages)
 - AWS: [infra/modules](../../infra/modules) (`compute`, `media`, `admin`, `research`, `observability`), [infra/envs/staging](../../infra/envs/staging), [infra/bootstrap](../../infra/bootstrap) (OIDC roles, the zone, the SES identity, billing); [infra/README.md](../../infra/README.md), Media, Mail, Admin panel, Research copy, Observability, The website
-- Vendors: [docs/vendors/telia.md](../vendors/telia.md)
+- Vendors: [docs/vendors/telia.md](../vendors/telia.md), [docs/vendors/expo.md](../vendors/expo.md), [docs/vendors/google-play.md](../vendors/google-play.md)
 - Workflows: [.github/workflows](../../.github/workflows), drawn in [Delivery](delivery.md)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (one AWS account, OpenTofu), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (photos through CloudFront), [ADR-006](../adr/006-photo-moderation.md) (Rekognition), [ADR-014](../adr/014-demo-mode.md) §1 (no real bank on a preview), [ADR-016](../adr/016-fresh-bank-login.md) and [ADR-017](../adr/017-tunnistus-oidc-package.md) (the bank login and the Telia kit), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds test persons only), [ADR-025](../adr/025-admin-host.md) (the panel's host), [ADR-029](../adr/029-the-research-copy.md) (the research copy and the researcher's role), [ADR-031](../adr/031-chat.md) and [ADR-032](../adr/032-notification-choices-and-notices.md) (no push yet), [ADR-041](../adr/041-velocity.md) (velocity), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md) (attestation later), [ADR-043](../adr/043-email-confirmation.md) (SES)
-- Issues: #102 (push), #86 (anti-scraping: attestation later), #385 and #196 (mail), #25 (production)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (one AWS account, OpenTofu), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed), [ADR-005](../adr/005-media-pipeline-and-delivery.md) (photos through CloudFront), [ADR-006](../adr/006-photo-moderation.md) (Rekognition), [ADR-014](../adr/014-demo-mode.md) §1 (no real bank on a preview), [ADR-016](../adr/016-fresh-bank-login.md) and [ADR-017](../adr/017-tunnistus-oidc-package.md) (the bank login and the Telia kit), [ADR-018](../adr/018-staging-is-the-demo.md) (staging holds test persons only), [ADR-025](../adr/025-admin-host.md) (the panel's host), [ADR-029](../adr/029-the-research-copy.md) (the research copy and the researcher's role), [ADR-031](../adr/031-chat.md) and [ADR-032](../adr/032-notification-choices-and-notices.md) (no push yet), [ADR-041](../adr/041-velocity.md) (velocity), [ADR-056](../adr/056-attestation-later-no-screenshot-notice.md) (attestation later), [ADR-043](../adr/043-email-confirmation.md) (SES), [ADR-057](../adr/057-google-play-internal-testing.md) (the staging app on Google Play)
+- Issues: #102 (push), #86 (anti-scraping: attestation later), #385 and #196 (mail), #25 (production), #193 (the stores)
 
 ## Open
 

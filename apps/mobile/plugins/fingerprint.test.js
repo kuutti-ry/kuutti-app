@@ -48,3 +48,34 @@ it("is one fingerprint whether the machine has Saiga or not", () => {
   expect([without.embeds, withIt.embeds]).toEqual([false, true]);
   expect(withIt.hash).toBe(without.hash);
 }, 120_000);
+
+// eas.json's contents are no part of the fingerprint (fingerprint.config.js,
+// ADR-057): a new profile or submission must not orphan installed builds. An
+// ignored file may stay listed, with no hash.
+it("leaves eas.json's contents out of the fingerprint", async () => {
+  const { createFingerprintAsync } = require("@expo/fingerprint");
+  const { sources } = await createFingerprintAsync(project, { platforms: ["android", "ios"] });
+  const hashed = sources.filter((source) => source.filePath === "eas.json" && source.hash !== null);
+  expect(hashed).toEqual([]);
+}, 120_000);
+
+// What would make eas.json native again: an env a config plugin reads, a
+// prebuild of its own, or a custom build's steps. One of them needs eas.json
+// back in the fingerprint first.
+it("gives no build profile an env, a prebuild command or a custom build config", () => {
+  const { build } = require("../eas.json");
+  const native = Object.entries(build).flatMap(([name, profile]) =>
+    [
+      [name, profile],
+      [`${name}.android`, profile.android],
+      [`${name}.ios`, profile.ios],
+    ]
+      .filter(([, part]) => part !== undefined)
+      .flatMap(([where, part]) =>
+        ["env", "prebuildCommand", "config"]
+          .filter((key) => key in part)
+          .map((key) => `${where}.${key}`),
+      ),
+  );
+  expect(native).toEqual([]);
+});
