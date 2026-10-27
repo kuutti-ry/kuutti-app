@@ -18,6 +18,12 @@
       "environment": "preview",
       "android": { "buildType": "apk" }
     },
+    "staging": {
+      "distribution": "store",
+      "channel": "staging",
+      "environment": "preview",
+      "autoIncrement": true
+    },
     "production": {
       "distribution": "store",
       "channel": "production",
@@ -26,6 +32,9 @@
     }
   },
   "submit": {
+    "staging": {
+      "android": { "track": "internal", "releaseStatus": "completed" }
+    },
     "production": {}
   }
 }
