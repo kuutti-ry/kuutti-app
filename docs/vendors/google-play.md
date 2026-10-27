@@ -4,7 +4,14 @@ What Google Play is to Kuutti, and what Google receives through it. Since 2026-1
 
 ## What Play shows of the association
 
-Once the app is listed, its page and the developer page show the developer name Kuutti ry, the developer e-mail `hello@kuutti.app`, the developer phone number of the account and the website `https://kuutti.app/`. Google shows a full postal address only for merchant accounts, which sell through Play; Kuutti sells nothing.
+Play Console's Play developer profile lists as public account details the organisation's name Kuutti ry, its registered address (public on `kuutti.app` too), the developer phone number of the account and the developer e-mail `hello@kuutti.app`. They come from the account details Google verified, and change there. Once the app is listed, its page and the developer page show them, with the website `https://kuutti.app/`.
+
+The developer page's own content is set under Developer account, Play developer profile. As the console asked on 2026-10-27:
+- the developer icon, 512 by 512, and the header image, 4096 by 2304, each a JPEG or an opaque 24-bit PNG of at most 1 MB. Google's help asks for a 32-bit PNG icon, but the console refuses transparency;
+- a promotional text of at most 140 characters, translations optional: "A free dating app for Finland by Kuutti ry, a non-profit association. No ads, nothing to buy, one real person behind every account.";
+- the website, and a featured app, which must be published. Google's help says the profile needs at least one published app.
+
+The icon is the app's own and the header the site's dawn and water colours around the app's splash image, both placeholders until the designer draws them.
 
 ## What Google receives
 
@@ -89,7 +96,7 @@ From then on every start of the `staging` profile should reach the testers witho
 
 None of this is needed for internal testing, and all of it is for a closed or public one, which Google reviews:
 
-- the store listing: a 512 by 512 icon, a 1024 by 500 feature graphic, at least two screenshots, a short description of at most 80 characters, in Finnish, Swedish and English (#193), and the Dating category;
+- the store listing: a 512 by 512 icon, a 1024 by 500 feature graphic, at least two screenshots (each within the console's own limits, which for the developer page were stricter than Google's help), a short description of at most 80 characters, in Finnish, Swedish and English (#193), and the Dating category;
 - the app content: the privacy policy (#190), the sign-in details for the reviewers, which bank identification cannot give (#299), no ads, the content rating questionnaire, the target audience 18 and over only with minors' access restricted (Google's policy for dating apps, since October 2025), the data safety form with a web link where an account's deletion is asked, and the child safety standards: a public page on `kuutti.app` against child sexual abuse and exploitation that names the app, the in-app reporting, and a named point of contact (#188);
 - the production build itself (ADR-057 §7).
 
@@ -99,6 +106,8 @@ None of this is needed for internal testing, and all of it is for a closed or pu
 - **The submission fails with "Package not found":** Google's API does not know the app yet. Upload that bundle by hand once (step 5).
 - **"Only releases with status draft may be created on draft app":** the app has never been published. Roll out one release by hand (step 5); if the message comes back after that, submit as `draft` until the setup is done (after step 8).
 - **Play refuses the bundle until a privacy policy is set:** a permission the bundle requests needs one. Enter the site's privacy notice (#190) under App content, Privacy policy; one entry does not complete the setup, so the release is still not reviewed. Then `eas submit --platform android --profile staging --id <build id>`.
+- **The build fails in Run gradlew, at Sentry's source-map upload, with `error: organization not found`:** the `SENTRY_AUTH_TOKEN` in EAS's `preview` environment predates Sentry's present organisation name, and an organisation token carries the slug it was made under. Development builds skip the upload, so a release build is the first to fail, as the first `staging` build did on 2026-10-27; the deprecation warnings above the failure are not it. Make the token again and set it from `apps/mobile` with `pnpm exec eas env:set --environment preview --name SENTRY_AUTH_TOKEN --visibility secret`, the value at the prompt (`docs/runbooks/sentry-setup.md`, section 4).
+- **`eas` asks which account should own the project:** it ran outside `apps/mobile`, where it finds no `app.json`. Linking there writes an `app.json` of its own at that place, to delete. Run `eas` from `apps/mobile`.
 - **The version code is already used:** a bundle with that number was uploaded before. Build again; EAS counts up.
 - **The caller does not have permission:** the service account's invitation has not reached the API yet (up to 48 hours), or lacks Release apps to testing tracks.
 - **A bad release:** an internal testing release cannot be halted. Revert the change on `main` and start the `staging` profile again: the new bundle's higher version code replaces the bad one on the testers' phones. On a closed or open track, halt its rollout in Play Console. A bad JavaScript update is stopped at EAS, not in the store (ADR-004, `docs/runbooks/incident.md`).
@@ -108,6 +117,6 @@ A failed submission shows on its page on expo.dev and in `eas submit:list --stat
 ## Sources, read on 2026-10-27
 
 - Google, Android developer verification: https://developer.android.com/developer-verification/guides/google-play-console (updated 2026-09-30), https://developer.android.com/developer-verification/guides/faq, https://support.google.com/googleplay/android-developer/answer/16984799 (registering Play package names), https://support.google.com/googleplay/android-developer/answer/16761055 (the proof APK).
-- Google Play: https://support.google.com/googleplay/android-developer/answer/9859152 (Create app), https://support.google.com/googleplay/android-developer/answer/9845334 (testing tracks), https://support.google.com/googleplay/android-developer/answer/9844679 (internal app sharing), https://support.google.com/googleplay/android-developer/answer/16285429 (halting a release), https://support.google.com/googleplay/android-developer/answer/10183279 (automatic protection), https://support.google.com/googleplay/android-developer/answer/9842756 (Play App Signing), https://developers.google.com/android-publisher/getting_started (the service account).
+- Google Play: https://support.google.com/googleplay/android-developer/answer/9859152 (Create app), https://support.google.com/googleplay/android-developer/answer/9845334 (testing tracks), https://support.google.com/googleplay/android-developer/answer/9844679 (internal app sharing), https://support.google.com/googleplay/android-developer/answer/16285429 (halting a release), https://support.google.com/googleplay/android-developer/answer/10183279 (automatic protection), https://support.google.com/googleplay/android-developer/answer/9842756 (Play App Signing), https://support.google.com/googleplay/android-developer/answer/9873827 (the developer profile), https://developers.google.com/android-publisher/getting_started (the service account).
 - Google Cloud: https://cloud.google.com/resource-manager/docs/secure-by-default-organizations and https://cloud.google.com/resource-manager/docs/organization-policy/using-constraints (both updated 2026-10-22).
 - Expo: https://docs.expo.dev/submit/android/ (updated 2026-10-09), https://expo.fyi/creating-google-service-account (2026-07-17).
