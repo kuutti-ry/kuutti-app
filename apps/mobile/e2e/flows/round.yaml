@@ -88,14 +88,21 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     visible: "Harassing, threatening or hateful|Häiritsevä, uhkaava tai vihamielinen|Trakasserande, hotfull eller hatisk"
     timeout: 15000
 - tapOn: "Harassing, threatening or hateful|Häiritsevä, uhkaava tai vihamielinen|Trakasserande, hotfull eller hatisk"
+# The note's field carries its label's words as its name, so it is the second
+# of the two. Scrolled to and tapped as itself: since the step asks about one
+# photo too (#476), the label alone can come into view with its field still
+# below the fold, and "below the label" then found the round's bar behind the
+# dialog, whose Send a fish took the tap (a run of 27/10/2026).
 - scrollUntilVisible:
-    element: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    element:
+      text: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+      index: 1
     direction: DOWN
     centerElement: true
     timeout: 60000
 - tapOn:
-    below: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
-    above: "Send report|Lähetä ilmoitus|Skicka anmälan"
+    text: "Anything the moderators should know \\(optional, up to 500 characters\\)|Mitä moderaattoreiden pitäisi tietää \\(vapaaehtoinen, enintään 500 merkkiä\\)|Något moderatorerna bör veta \\(valfritt, högst 500 tecken\\)"
+    index: 1
 - inputText: "Kysyi numeroa"
 # A tap on the label, which is no button, closes the keyboard (README). The
 # field carries the label's words as its name, so the label is the first of
