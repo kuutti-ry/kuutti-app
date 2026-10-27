@@ -15,7 +15,7 @@ Once the app is listed, its page and the developer page show the developer name 
 | The service account's calls: which bundle goes to which track, with which status | the upload (ADR-057 §3) |
 | Later, before a closed or public release: the store listing, the content rating, the target audience (18 and over only), the data safety form, the child safety declaration and the reviewers' way in | Play's review and the store page (#188, #299) |
 
-From the phones, Play itself records installs and updates and, on phones whose owners share usage and diagnostics with Google, crashes and freezes (Android vitals). The app adds no Google library of its own: `expo-application`, which Expo's own modules pull in, carries Google's install-referrer client, and nothing in the app calls it. Google's pre-launch robots also run each uploaded bundle on test phones; in the staging app they stop at the bank login, which they cannot pass.
+From the phones, Play itself records installs and updates and, on phones whose owners share usage and diagnostics with Google, crashes and freezes (Android vitals). The app adds no Google library of its own: `expo-application`, which Expo's own modules pull in, carries Google's install-referrer client, and nothing in the app calls it. Nor does Play add one, while its automatic protection is off (ADR-057 §9). Google's pre-launch robots also run each uploaded bundle on test phones; in the staging app they stop at the bank login, which they cannot pass.
 
 ## The keys
 
@@ -33,7 +33,7 @@ A name already installed on certified phones before the Play app existed counts 
 
 ## What the association sets up, the maintainer's
 
-1. **Create the app.** Play Console, Home, Create app: the name Kuutti; the package name `fi.kuutti.app`, which can never change; Finnish as the default language, the binding one (TD-17); an app, free; `hello@kuutti.app` as the contact e-mail; the declarations. If Create app refuses the name as not registered, do step 2 first.
+1. **Create the app.** Play Console, Home, Create app: the name Kuutti; the package name `fi.kuutti.app`, which can never change; Finnish as the default language, the binding one (TD-17); an app, free; `hello@kuutti.app` as the contact e-mail; the declarations. If Create app refuses the name as not registered, do step 2 first. Then, before any release, automatic protection off (ADR-057 §9): Test and release, App integrity (now Protected with Play), Automatic protection, off for the app, and Share app telemetry with Google off. If the console offers only the per-release switch, say so in #193: every bundle EAS submits would then be protected.
 2. **Prove the name, only if step 1 refused it.** Android developer verification, Register package name: `fi.kuutti.app` and a friendly name, then Add key with EAS's SHA-256 (expo.dev, the project's Credentials, Android, `fi.kuutti.app`; or `eas credentials -p android`), then Upload APK, which shows a snippet. The proof APK is built on EAS so the private key never leaves it, from a local branch that is never pushed:
    - a plugin writes the snippet, and nothing else, as the whole of `assets/adi-registration.properties`:
      ```js
@@ -54,7 +54,7 @@ A name already installed on certified phones before the Play app existed counts 
 3. **The testers, before any key exists.** Two lists of the team's Google accounts, the team alone (ADR-057 §2):
    1. Test and release, Testing, Internal testing, Testers: an e-mail list, at most 100;
    2. Test and release, Internal testing, Internal app sharing, Manage testers: Link availability, Email lists, that list, in place of "Anyone you shared the link with". Internal app sharing takes a bundle signed with any key, and the service account's permission reaches it (ADR-057 §3). This list bounds whose phone such a bundle reaches, and while the app is on internal testing alone the first one does too: a tester also needs access to the app's store listing, and internal app sharing switched on in the Play Store app.
-4. **The service account**, in the association's organisation, with `gcloud` signed in as the owner login. `<org>` is the organisation's id (`gcloud organizations list`), `<project>` the new project's:
+4. **The service account**, in the association's organisation, with `gcloud` signed in as the owner login. `<org>` is the organisation's id (`gcloud organizations list`), `<project>` the new project's; on 2026-10-27 they were made as the project `kuutti-play` and its service account `eas-submit`. The owner login is Organization Administrator, which may grant the policy role but does not hold it:
    ```sh
    # once, if the login lacks it: the role that lifts an organisation policy
    gcloud organizations add-iam-policy-binding <org> --member=user:<owner login> --role=roles/orgpolicy.policyAdmin
@@ -62,7 +62,7 @@ A name already installed on certified phones before the Play app existed counts 
    gcloud services enable androidpublisher.googleapis.com --project=<project>
    gcloud iam service-accounts create eas-submit --project=<project> --display-name="EAS Submit to Google Play"
    ```
-   The service account needs no IAM role. An organisation made on or after 3 May 2024, as the Workspace's would be, refuses service account keys by default, under two constraints, `iam.managed.disableServiceAccountKeyCreation` and the legacy `iam.disableServiceAccountKeyCreation`. The maintainer lifts both for this project alone, each with a file of its own and `gcloud org-policies set-policy <file>`:
+   The service account needs no IAM role. An organisation made on or after 3 May 2024, as the Workspace's would be, refuses service account keys by default, under two constraints, `iam.managed.disableServiceAccountKeyCreation` and the legacy `iam.disableServiceAccountKeyCreation`. `gcloud org-policies describe <constraint> --organization=<org> --effective` says which the organisation enforces; on 2026-10-27 it was the managed one alone. The maintainer lifts each one enforced, for this project alone, with a file of its own and `gcloud org-policies set-policy <file>`:
    ```yaml
    name: projects/<project>/policies/<constraint>
    spec:
@@ -73,7 +73,7 @@ A name already installed on certified phones before the Play app existed counts 
    ```sh
    gcloud iam service-accounts keys create ~/eas-submit.json --iam-account=eas-submit@<project>.iam.gserviceaccount.com
    ```
-   It is uploaded at expo.dev (the project's Credentials, Android, `fi.kuutti.app`, Service credentials, the Google service account key for EAS Submit) or with `eas credentials -p android`. Then `rm ~/eas-submit.json`, and the policy goes back with `gcloud org-policies delete <constraint> --project=<project>` for both, since a rotation lifts it again.
+   It is uploaded at expo.dev (the project's Credentials, Android, `fi.kuutti.app`, Service credentials, the Google service account key for EAS Submit) or with `eas credentials -p android`. Then `rm ~/eas-submit.json`, and the policy goes back with `gcloud org-policies delete <constraint> --project=<project>` for each one lifted, since a rotation lifts it again.
 
    Last, in Play Console, Users and permissions, Invite new users: the service account's e-mail address, with App permissions on Kuutti alone: View app information, Release apps to testing tracks, and Edit and delete draft apps while the app is a draft; no account permission. A permission can take up to 48 hours to reach the API, so invite it before the first build.
 
@@ -108,6 +108,6 @@ A failed submission shows on its page on expo.dev and in `eas submit:list --stat
 ## Sources, read on 2026-10-27
 
 - Google, Android developer verification: https://developer.android.com/developer-verification/guides/google-play-console (updated 2026-09-30), https://developer.android.com/developer-verification/guides/faq, https://support.google.com/googleplay/android-developer/answer/16984799 (registering Play package names), https://support.google.com/googleplay/android-developer/answer/16761055 (the proof APK).
-- Google Play: https://support.google.com/googleplay/android-developer/answer/9859152 (Create app), https://support.google.com/googleplay/android-developer/answer/9845334 (testing tracks), https://support.google.com/googleplay/android-developer/answer/9844679 (internal app sharing), https://support.google.com/googleplay/android-developer/answer/16285429 (halting a release), https://support.google.com/googleplay/android-developer/answer/9842756 (Play App Signing), https://developers.google.com/android-publisher/getting_started (the service account).
+- Google Play: https://support.google.com/googleplay/android-developer/answer/9859152 (Create app), https://support.google.com/googleplay/android-developer/answer/9845334 (testing tracks), https://support.google.com/googleplay/android-developer/answer/9844679 (internal app sharing), https://support.google.com/googleplay/android-developer/answer/16285429 (halting a release), https://support.google.com/googleplay/android-developer/answer/10183279 (automatic protection), https://support.google.com/googleplay/android-developer/answer/9842756 (Play App Signing), https://developers.google.com/android-publisher/getting_started (the service account).
 - Google Cloud: https://cloud.google.com/resource-manager/docs/secure-by-default-organizations and https://cloud.google.com/resource-manager/docs/organization-policy/using-constraints (both updated 2026-10-22).
 - Expo: https://docs.expo.dev/submit/android/ (updated 2026-10-09), https://expo.fyi/creating-google-service-account (2026-07-17).
