@@ -173,6 +173,11 @@ const REASONS = [
 const MODERATOR_ACTIONS = ["Warn", "Hide from others (shadow ban)", "Suspend until a day"];
 
 const actions = () => screen.findByRole("group", { name: ACTIONS });
+/** The sanctions' own status line: the photos above them have theirs (#477). */
+const sanctionStatus = () =>
+  within(screen.getByRole("heading", { name: "Sanctions" }).parentElement as HTMLElement).getByRole(
+    "status",
+  );
 const buttonsIn = (scope: HTMLElement) =>
   within(scope)
     .queryAllByRole("button")
@@ -371,7 +376,7 @@ describe("the actions on a person", () => {
       expect(apply).toBeEnabled();
 
       fireEvent.click(apply);
-      const status = screen.getByRole("status");
+      const status = sanctionStatus();
       await waitFor(() => expect(status).toHaveTextContent(a.done));
       expect(screen.queryByRole("dialog")).toBeNull();
       await waitFor(() => expect(status).toHaveFocus());
@@ -426,7 +431,7 @@ describe("the actions on a person", () => {
     show();
     const { send } = await ready("warn");
     fireEvent.click(send);
-    const status = screen.getByRole("status");
+    const status = sanctionStatus();
     await waitFor(() => expect(status).toHaveTextContent("Applied: Warning."));
     await waitFor(() => expect(asked(calls)).toHaveLength(4));
     expect(asked(calls)[3]).toBe(`GET ${PAGE}`);
@@ -472,7 +477,7 @@ describe("the actions on a person", () => {
       );
       await act(async () => undefined);
       // The sanction was applied: the moderator is not left to wonder, and to apply it twice.
-      expect(screen.getByRole("status")).toHaveTextContent("Applied: Warning.");
+      expect(sanctionStatus()).toHaveTextContent("Applied: Warning.");
       expect(document.activeElement).not.toBe(document.body);
     },
   );
@@ -491,7 +496,7 @@ describe("the actions on a person", () => {
     const { send } = await ready("warn");
     fireEvent.click(send);
     await waitFor(() => expect(asked(calls)).toHaveLength(4));
-    const status = screen.getByRole("status");
+    const status = sanctionStatus();
     await waitFor(() => expect(status).toHaveTextContent("Applied: Warning."));
     expect(status).toHaveFocus();
     // Photos, sanctions, feedback and the audit as they were: each empty.
@@ -512,7 +517,7 @@ describe("the actions on a person", () => {
         fireEvent.keyDown(within(dialog).getByRole("textbox", { name: NOTE }), { key: "Escape" });
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(button).toHaveFocus();
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(sanctionStatus()).toBeEmptyDOMElement();
       // Opened again, the step starts empty.
       const again = press("Warn", await actions()).dialog;
       expect(within(again).getByRole("combobox", { name: "Reason" })).toHaveValue("");
@@ -571,7 +576,7 @@ describe("the actions on a person", () => {
       expect(screen.getByRole("dialog")).toBe(dialog);
       await waitFor(() => expect(send).toBeEnabled());
       expect(screen.getAllByRole("alert")).toHaveLength(1);
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(sanctionStatus()).toBeEmptyDOMElement();
       expect(asked(calls)).toEqual([`GET ${PAGE}`, `GET ${LIST}`, `POST ${route}`]);
     },
   );
@@ -600,7 +605,7 @@ describe("the actions on a person", () => {
     );
     expect(screen.getByRole("dialog")).toBe(dialog);
     await waitFor(() => expect(send).toBeEnabled());
-    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    expect(sanctionStatus()).toBeEmptyDOMElement();
     expect(asked(calls)).toEqual([`GET ${PAGE}`, `GET ${LIST}`, `POST ${LIST}`]);
   });
 
@@ -638,7 +643,7 @@ describe("the actions on a person", () => {
     expect(within(dialog).queryByRole("alert")).toBeNull();
     expect(send).toHaveAttribute("aria-busy", "true");
     second.release(json(answerOf(added), 201));
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Applied: Warning."));
+    await waitFor(() => expect(sanctionStatus()).toHaveTextContent("Applied: Warning."));
     expect(screen.queryByRole("alert")).toBeNull();
     expect(asked(calls).filter((call) => call.startsWith("POST"))).toHaveLength(2);
   });
@@ -662,7 +667,7 @@ describe("the actions on a person", () => {
       fireEvent.click(send);
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
       expect(screen.queryByRole("alert")).toBeNull();
-      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+      expect(sanctionStatus()).toBeEmptyDOMElement();
       expect(button).toHaveFocus();
       expect(asked(calls)).toEqual([`GET ${PAGE}`, `GET ${LIST}`, `POST ${route}`]);
     },
@@ -689,7 +694,7 @@ describe("the actions on a person", () => {
     fireEvent.click(send);
     await waitFor(() => expect(asked(calls)).toHaveLength(3));
     answer.release(json(answerOf(OPEN), step === "warn" ? 201 : 200));
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(done));
+    await waitFor(() => expect(sanctionStatus()).toHaveTextContent(done));
     await waitFor(() => expect(asked(calls)).toHaveLength(5));
     expect(asked(calls)).toEqual([
       `GET ${PAGE}`,
@@ -857,7 +862,7 @@ describe("the sanctions' history", () => {
       const send = within(dialog).getByRole("button", { name: "Lift" });
       expect(send).toHaveFocus();
       fireEvent.click(send);
-      const status = screen.getByRole("status");
+      const status = sanctionStatus();
       await waitFor(() => expect(status).toHaveTextContent(done));
       expect(screen.queryByRole("dialog")).toBeNull();
       const liftedLine = `Lifted: ${when(LOOKED)}. Who: a1b2c3d4, ${role}`;
@@ -944,7 +949,7 @@ describe("the sanctions' history", () => {
       expect(apply).toBeEnabled();
 
       fireEvent.click(apply);
-      const status = screen.getByRole("status");
+      const status = sanctionStatus();
       await waitFor(() => expect(status).toHaveTextContent(done));
       expect(screen.queryByRole("dialog")).toBeNull();
       expect(
@@ -1034,7 +1039,7 @@ describe("the sanctions' history", () => {
     const { send } = await ready("warn");
     fireEvent.click(send);
     expect(await rowOf(TEXT)).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Applied: Warning.");
+    expect(sanctionStatus()).toHaveTextContent("Applied: Warning.");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });

@@ -676,3 +676,259 @@ describe("a photo on a person's page", () => {
     expect(screen.queryByRole("img")).toBeNull();
   });
 });
+
+// Taking an approved photo down (#477): the button beside an approved photo
+// only, a confirm step with the effect in words and no reason preset, the
+// page read again after it, and every refusal in words.
+describe("taking a photo down on a person's page", () => {
+  const STEP = "Take down this photo";
+  const REASON = "Reason the person is told";
+  const DONE = "Taken down. Nobody else is given the photo from now on.";
+  const decisionOf =
+    (n: number, answer: (req: Request) => Promise<Response> | Response): Handler =>
+    (req) =>
+      req.method === "POST" && path(req) === `/admin/photos/${photoId(n)}/decision`
+        ? answer(req)
+        : null;
+  const decided = (n: number) =>
+    json({ photoId: photoId(n), state: "rejected", rejectionReason: "other" });
+  const photo = (n: number, state: string, rejectionReason: string | null = null) => ({
+    id: photoId(n),
+    state,
+    rejectionReason,
+    appealable: false,
+    uploadedAt: UPLOADED,
+  });
+  const decisions = (calls: Request[]) => asked(calls).filter((call) => call.startsWith("POST "));
+
+  /** Opens the step from the keyboard, as it were: the button has the focus when pressed. */
+  async function openStep(at = 0) {
+    const button = (await screen.findAllByRole("button", { name: "Take down…" }))[at];
+    if (!button) throw new Error("no Take down button");
+    button.focus();
+    fireEvent.click(button);
+    return screen.getByRole("dialog", { name: STEP });
+  }
+  const choose = (step: HTMLElement, reason: string) =>
+    fireEvent.change(within(step).getByRole("combobox", { name: REASON }), {
+      target: { value: reason },
+    });
+
+  it("is offered beside an approved photo only, described by the photo's own line", async () => {
+    fetchMock([
+      pageOf(page({ photos: [photo(1, "approved"), photo(2, "rejected", "no_person")] })),
+      sanctionsOf([]),
+    ]);
+    show();
+    const button = await screen.findByRole("button", { name: "Take down…" });
+    expect(screen.getAllByRole("button", { name: "Take down…" })).toHaveLength(1);
+    expect(button).toHaveAccessibleDescription(`approved · ${when(UPLOADED)}`);
+    expect(button.closest("li")).toHaveTextContent(`approved · ${when(UPLOADED)}`);
+  });
+
+  it.each([
+    [1, true],
+    [2, true],
+    [3, false],
+  ])("with %i approved photos, says the person drops out of every round: %s", async (n, says) => {
+    const photos = Array.from({ length: n }, (_, i) => photo(i + 1, "approved"));
+    fetchMock([
+      pageOf(page({ photos: [...photos, photo(9, "rejected", "other")] })),
+      sanctionsOf([]),
+    ]);
+    show();
+    const step = await openStep();
+    const words =
+      "This leaves them fewer than 2 approved photos: until another is approved, nobody is shown their card and they get no round.";
+    if (says) expect(step).toHaveTextContent(words);
+    else expect(step).not.toHaveTextContent("fewer than");
+  });
+
+  it.each(["pending", "queued", "rejected"])("is not offered beside a %s photo", async (state) => {
+    fetchMock([pageOf(page({ photos: [photo(1, state)] })), sanctionsOf([])]);
+    show();
+    await screen.findByRole("button", { name: "Show the photo" });
+    expect(screen.queryByRole("button", { name: "Take down…" })).toBeNull();
+  });
+
+  it("takes the photo down through a confirm step with a reason chosen on purpose, reads the page again and says so", async () => {
+    let current = page({ photos: [photo(1, "approved"), photo(2, "rejected", "no_person")] });
+    const bodies: unknown[] = [];
+    const calls = fetchMock([
+      on(`/admin/accounts/${ID}`, () => json(current)),
+      sanctionsOf([]),
+      decisionOf(1, async (req) => {
+        bodies.push(await req.json());
+        current = page({
+          photos: [photo(1, "rejected", "other"), photo(2, "rejected", "no_person")],
+        });
+        return decided(1);
+      }),
+    ]);
+    show();
+    const step = await openStep();
+    expect(step).toHaveTextContent("Nobody else is given this photo from now on");
+    expect(step).toHaveTextContent("it is not a sanction");
+    // No reason is preset (#250): the step waits for one chosen on purpose.
+    const select = within(step).getByRole("combobox", { name: REASON });
+    expect(select).toHaveValue("");
+    const confirm = within(step).getByRole("button", { name: "Take down" });
+    expect(confirm).toBeDisabled();
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual([
+      "Choose a reason",
+      "Nudity",
+      "No person visible",
+      "Several people",
+      "A child appears",
+      "Violence or weapons",
+      "Contact details, handle or link",
+      "Other",
+    ]);
+    choose(step, "other");
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(bodies).toEqual([{ decision: "take_down", reason: "other" }]);
+    // The line says it and takes the focus, since the button goes with the change.
+    const done = await screen.findByText(DONE);
+    await waitFor(() => expect(done).toHaveFocus());
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Take down…" })).toBeNull());
+    const [first] = screen.getAllByRole("button", { name: "Show the photo" });
+    expect(first?.closest("li")).toHaveTextContent(`rejected · other · ${when(UPLOADED)}`);
+    expect(asked(calls)).toEqual([
+      `GET /admin/accounts/${ID}`,
+      `GET /admin/accounts/${ID}/sanctions`,
+      `POST /admin/photos/${photoId(1)}/decision`,
+      `GET /admin/accounts/${ID}`,
+      `GET /admin/accounts/${ID}/sanctions`,
+    ]);
+  });
+
+  it("clears the line when the next step opens, so a second take-down is said again", async () => {
+    let current = page({ photos: [photo(1, "approved"), photo(2, "approved")] });
+    fetchMock([
+      on(`/admin/accounts/${ID}`, () => json(current)),
+      sanctionsOf([]),
+      decisionOf(1, () => {
+        current = page({ photos: [photo(1, "rejected", "other"), photo(2, "approved")] });
+        return decided(1);
+      }),
+      decisionOf(2, () => {
+        current = page({
+          photos: [photo(1, "rejected", "other"), photo(2, "rejected", "other")],
+        });
+        return decided(2);
+      }),
+    ]);
+    show();
+    let step = await openStep(0);
+    choose(step, "other");
+    fireEvent.click(within(step).getByRole("button", { name: "Take down" }));
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Take down…" })).toHaveLength(1),
+    );
+    expect(screen.getByText(DONE)).toBeInTheDocument();
+
+    step = await openStep(0);
+    expect(screen.queryByText(DONE)).toBeNull();
+    choose(step, "other");
+    fireEvent.click(within(step).getByRole("button", { name: "Take down" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Take down…" })).toBeNull());
+    await waitFor(() => expect(screen.getByText(DONE)).toHaveFocus());
+  });
+
+  it.each([
+    [
+      "taken down meanwhile (409)",
+      () => failure(409, "photo_not_approved"),
+      "The photo is no longer approved: it was taken down meanwhile. Reload the page to see it as it is.",
+    ],
+    [
+      "gone (404)",
+      () => failure(404, "not_found"),
+      "The photo is gone: its owner removed it meanwhile.",
+    ],
+    [
+      "any other failure",
+      () => failure(500, "internal_error"),
+      "The take-down may not have been saved. Reload the page to see where it stands before trying again.",
+    ],
+    [
+      "an answer outside the contract",
+      () => json({ photoId: "p1", state: "rejected", rejectionReason: "other" }),
+      "The take-down may not have been saved. Reload the page to see where it stands before trying again.",
+    ],
+    [
+      "no answer at all",
+      (): Response => {
+        throw new TypeError("Failed to fetch");
+      },
+      "The take-down may not have been saved. Reload the page to see where it stands before trying again.",
+    ],
+  ])("says %s in words, keeps the step open and the page as it was", async (_, answer, words) => {
+    const calls = fetchMock([pageOf(page()), sanctionsOf([]), decisionOf(1, answer)]);
+    show();
+    const step = await openStep();
+    choose(step, "nudity");
+    fireEvent.click(within(step).getByRole("button", { name: "Take down" }));
+    expect(await within(step).findByRole("alert")).toHaveTextContent(words);
+    expect(screen.getByRole("dialog", { name: STEP })).toBe(step);
+    expect(screen.queryByText(DONE)).toBeNull();
+    expect(asked(calls)).toEqual([
+      `GET /admin/accounts/${ID}`,
+      `GET /admin/accounts/${ID}/sanctions`,
+      `POST /admin/photos/${photoId(1)}/decision`,
+    ]);
+  });
+
+  it("leaves a refused take-down to the shell: the step closes with no words of its own (#302)", async () => {
+    const calls = fetchMock([
+      pageOf(page()),
+      sanctionsOf([]),
+      decisionOf(1, () => failure(403, "admin_forbidden")),
+    ]);
+    show();
+    const step = await openStep();
+    choose(step, "other");
+    fireEvent.click(within(step).getByRole("button", { name: "Take down" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText(DONE)).toBeNull();
+    expect(screen.getByRole("button", { name: "Take down…" })).toBeInTheDocument();
+    expect(decisions(calls)).toHaveLength(1);
+    expect(asked(calls).filter((call) => call === `GET /admin/accounts/${ID}`)).toHaveLength(1);
+  });
+
+  it("closes on Cancel or Escape asking nothing, and gives the focus back to its button", async () => {
+    const calls = fetchMock([pageOf(page()), sanctionsOf([])]);
+    show();
+    let step = await openStep();
+    choose(step, "other");
+    fireEvent.click(within(step).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const button = screen.getByRole("button", { name: "Take down…" });
+    expect(button).toHaveFocus();
+
+    step = await openStep();
+    // Opened anew, nothing of the last choice is kept.
+    expect(within(step).getByRole("combobox", { name: REASON })).toHaveValue("");
+    fireEvent.keyDown(within(step).getByRole("combobox", { name: REASON }), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(button).toHaveFocus();
+    expect(decisions(calls)).toEqual([]);
+  });
+
+  it("sends nothing when the form is submitted without a reason, by Enter for one", async () => {
+    const calls = fetchMock([pageOf(page()), sanctionsOf([])]);
+    show();
+    const step = await openStep();
+    const form = within(step).getByRole("combobox", { name: REASON }).closest("form");
+    fireEvent.submit(form as HTMLFormElement);
+    expect(screen.getByRole("dialog", { name: STEP })).toBe(step);
+    expect(decisions(calls)).toEqual([]);
+  });
+});

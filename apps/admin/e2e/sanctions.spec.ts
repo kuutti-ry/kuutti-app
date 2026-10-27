@@ -1,9 +1,9 @@
 import type { Page } from "@playwright/test";
 import { expect, signInAsModerator, test } from "./fixtures.ts";
 
-// A person's page and the actions on it (#306, #308): reached by an account id at the lookup, as
-// a moderator does with one copied from a report or a feedback row. The person is Riikka, a card
-// in Iida's round (e2e/run.ts), whom nothing else in the flows touches.
+// A person's page and the actions on it (#306, #308, #477): reached by an account id at the
+// lookup, as a moderator does with one copied from a report or a feedback row. The person is
+// Riikka, a card in Iida's round (e2e/run.ts), whom nothing else in the flows touches.
 
 const person = () => {
   const account = process.env.E2E_PERSON_ACCOUNT;
@@ -44,7 +44,7 @@ test("a suspension is applied through its confirm step and lifted through anothe
   await ends.fill(earliest.toISOString().slice(0, 10));
   await confirm.click();
   await expect(apply).toBeHidden();
-  await expect(page.getByRole("status")).toHaveText("Applied: Suspension.");
+  await expect(sanctions.getByRole("status")).toHaveText("Applied: Suspension.");
   const entry = sanctions.getByRole("listitem").filter({ hasText: "Unkind words in a round." });
   await expect(entry).toContainText("Suspension");
 
@@ -53,7 +53,7 @@ test("a suspension is applied through its confirm step and lifted through anothe
   await expect(lift).toContainText("The person may sign in again");
   await lift.getByRole("button", { name: "Lift" }).click();
   await expect(lift).toBeHidden();
-  await expect(page.getByRole("status")).toHaveText("Lifted: Suspension.");
+  await expect(sanctions.getByRole("status")).toHaveText("Lifted: Suspension.");
   await expect(entry).toContainText(/Lifted: .+ Who: /);
   await expect(entry.getByRole("button", { name: "Lift" })).toHaveCount(0);
 });
@@ -89,4 +89,37 @@ test("a confirm step is kept by the keyboard and gives the focus back", async ({
   await expect(warn).toBeFocused();
   // Nothing was sent on the way: no step that writes was taken.
   expect(sent).toEqual([]);
+});
+
+test("an approved photo is taken down through its confirm step, and stays in the person's list", async ({
+  page,
+}) => {
+  await openThePage(page);
+  const photos = page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByRole("heading", { name: "Photos", exact: true }) });
+  const items = photos.getByRole("listitem");
+  await expect(items.first()).toBeVisible();
+  const at = (await items.allTextContents()).findIndex((text) => text.startsWith("approved · "));
+  expect(at, "Riikka's card has an approved photo").toBeGreaterThanOrEqual(0);
+  const approved = items.filter({ hasText: /^approved · / });
+  const before = await approved.count();
+
+  await items.nth(at).getByRole("button", { name: "Take down…" }).click();
+  const step = page.getByRole("dialog", { name: "Take down this photo" });
+  await expect(step).toContainText("Nobody else is given this photo from now on");
+  // No reason is preset (#250): the step waits for one chosen on purpose.
+  const confirm = step.getByRole("button", { name: "Take down" });
+  await expect(confirm).toBeDisabled();
+  await step.getByLabel("Reason the person is told").selectOption({ label: "Other" });
+  await confirm.click();
+  await expect(step).toBeHidden();
+
+  // The page is read again: the line says it and has the focus, as the button went with the photo.
+  const status = photos.getByRole("status");
+  await expect(status).toHaveText("Taken down. Nobody else is given the photo from now on.");
+  await expect(status).toBeFocused();
+  await expect(items.nth(at)).toHaveText(/^rejected · other · /);
+  await expect(items.nth(at).getByRole("button", { name: "Take down…" })).toHaveCount(0);
+  await expect(approved).toHaveCount(before - 1);
 });

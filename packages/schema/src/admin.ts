@@ -296,10 +296,16 @@ export const PhotoReviewQueueQuery = z
   })
   .meta({ id: "PhotoReviewQueueQuery" });
 
+/**
+ * approve and reject decide a queued photo; take_down rejects an approved one
+ * (#477, ADR-006 §2). A decision of its own, so that a rejection sent from a
+ * queue read before another moderator's approval is still refused.
+ */
 export const PhotoDecisionRequest = z
   .discriminatedUnion("decision", [
     z.object({ decision: z.literal("approve") }).strict(),
     z.object({ decision: z.literal("reject"), reason: ModeratorRejectionReason }).strict(),
+    z.object({ decision: z.literal("take_down"), reason: ModeratorRejectionReason }).strict(),
   ])
   .meta({ id: "PhotoDecisionRequest" });
 export type PhotoDecisionRequest = z.infer<typeof PhotoDecisionRequest>;
