@@ -1,5 +1,6 @@
 // Public surface of the media slice in apps/mobile (#48). Other slices import from here only.
 
+export { CachedPhoto } from "./CachedPhoto";
 export { captionKey } from "./captions";
 export { listPhotos, uploadPicture, uploadRefusal } from "./client";
 export { PhotoDescriptionText } from "./PhotoDescriptionText";

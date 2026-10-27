@@ -282,18 +282,45 @@ describe("a conversation's photo full size, /chats/photo/[messageId] (#350)", ()
       conversation: CONVERSATION,
       seq: 4,
       blurhash: "LEHV6n",
+      report: null,
     });
   });
 
   it("takes the first of a param that came twice", async () => {
-    params({ messageId: [MESSAGE, "b"], conversation: [CONVERSATION, "d"], seq: ["7", "8"] });
+    params({
+      messageId: [MESSAGE, "b"],
+      conversation: [CONVERSATION, "d"],
+      seq: ["7", "8"],
+      report: ["ended", "open"],
+    });
     await render(<ChatPhotoRoute />);
     expect(propsOf("ChatPhotoScreen")).toEqual({
       messageId: MESSAGE,
       conversation: CONVERSATION,
       seq: 7,
       blurhash: "",
+      report: "ended",
     });
+  });
+
+  it.each(["open", "ended"])(
+    "hands the screen whether the conversation takes a report, %s (#476)",
+    async (report) => {
+      params({ messageId: MESSAGE, conversation: CONVERSATION, seq: "4", report });
+      await render(<ChatPhotoRoute />);
+      expect(propsOf("ChatPhotoScreen")).toMatchObject({ seq: 4, report });
+    },
+  );
+
+  it.each<Record<string, string | readonly string[]>>([
+    { report: "" },
+    { report: "yes" },
+    { report: "OPEN" },
+    { report: ["closed", "open"] },
+  ])("hands no report for %j, which no bubble sends (#476)", async (value) => {
+    params({ messageId: MESSAGE, conversation: CONVERSATION, seq: "4", ...value });
+    await render(<ChatPhotoRoute />);
+    expect(propsOf("ChatPhotoScreen")).toMatchObject({ seq: 4, report: null });
   });
 
   it.each<Record<string, string | readonly string[]>>([
@@ -311,6 +338,7 @@ describe("a conversation's photo full size, /chats/photo/[messageId] (#350)", ()
       conversation: "",
       seq: 0,
       blurhash: "",
+      report: null,
     });
   });
 });
