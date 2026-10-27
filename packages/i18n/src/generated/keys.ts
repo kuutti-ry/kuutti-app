@@ -463,8 +463,9 @@ export type MessageParams = {
   "admin.takeDown.effect": Record<never, never>;
   "admin.takeDown.error.failed": Record<never, never>;
   "admin.takeDown.error.not_found": Record<never, never>;
-  "admin.takeDown.error.photo_not_queued": Record<never, never>;
+  "admin.takeDown.error.photo_not_approved": Record<never, never>;
   "admin.takeDown.title": Record<never, never>;
+  "admin.takeDown.tooFew": { "photos": number };
   "admin.title": Record<never, never>;
   "chat.actions.open": Record<never, never>;
   "chat.actions.title": Record<never, never>;

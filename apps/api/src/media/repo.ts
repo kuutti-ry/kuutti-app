@@ -781,9 +781,9 @@ export async function findPhotoForStaff(
 
 /**
  * A person's decision: the photo's state and reason, and the review row with
- * who decided and when. Keyed on the state the caller read, `from`: a queued
- * photo, or an approved one a person takes down (#477); null when the photo
- * is no longer in it, and nothing is written, so a decision made meanwhile is
+ * who decided and when. Keyed on the state the decision is for, `from`: a
+ * queued photo, or an approved one a person takes down (#477); null when the
+ * photo is not in it, and nothing is written, so a decision made meanwhile is
  * never overwritten. A queued photo is rejected only here and by the night's
  * limit below (#376); nothing is ever deleted by a machine (rules/api.md).
  */

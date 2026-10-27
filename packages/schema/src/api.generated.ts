@@ -1955,8 +1955,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve or reject a photo, or take an approved one down
-         * @description approve makes a queued photo visible to others; reject hides a queued photo, or takes down an approved one (#477), and tells the owner the reason in words, with no appeal. A queued photo takes either decision and an approved one a rejection, once. Nothing is deleted. Written to audit_log.
+         * Approve or reject a queued photo, or take an approved one down
+         * @description approve makes a queued photo visible to others; reject hides it and tells the owner the reason in words. take_down rejects an approved profile photo (#477): nobody else is given it, and the owner is told the reason, with no appeal. Each decision is taken once, on the state it is for. Nothing is deleted. Written to audit_log.
          */
         post: {
             parameters: {
@@ -2018,7 +2018,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorResponse"];
                     };
                 };
-                /** @description photo_not_queued: the photo does not take this decision (still being checked, rejected already, or approved already and asked to be approved). */
+                /** @description photo_not_queued: approve or reject on a photo not waiting for a decision (already decided, or still being checked). photo_not_approved: take_down on a photo that is not approved (taken down already, or never approved). */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -7599,6 +7599,10 @@ export interface components {
         } | {
             /** @enum {string} */
             decision: "reject";
+            reason: components["schemas"]["ModeratorRejectionReason"];
+        } | {
+            /** @enum {string} */
+            decision: "take_down";
             reason: components["schemas"]["ModeratorRejectionReason"];
         };
         /** @enum {string} */

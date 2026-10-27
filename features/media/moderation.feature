@@ -144,18 +144,23 @@ Feature: Photo moderation before anyone else sees a photo
 
   Scenario: A moderator takes down an approved photo with a reason, and the owner is told
     Given an approved profile photo, and another, that a viewer was shown
-    When a moderator rejects the first with a reason
+    When a moderator takes the first down with a reason
     Then the viewer is served only the second, the owner's list shows the reason with no appeal, the review names the moderator, and an audit row records it
     And no sanction, no check note and no deletion follow
 
-  Scenario: An approved photo takes a rejection only, and one taken down stays down
-    Given an approved photo, and one a moderator took down
-    When a moderator approves the first, or decides the second again
-    Then each is refused as not queued and nothing is written
+  Scenario: A rejection from the queue never takes down a photo approved meanwhile
+    Given a queued photo that one moderator approves
+    When another moderator's rejection arrives from the queue they read before
+    Then it is refused as not queued, the photo stays approved, and only the approval is audited
+
+  Scenario: A take-down needs an approved photo, and one taken down stays down
+    Given a queued photo, a pending one, and one a moderator took down
+    When a moderator takes any of them down, or approves the last
+    Then each is refused and nothing is written
 
   Scenario: A photo sent in a conversation is never taken down
     Given a photo the check let through in a conversation
-    When a moderator rejects it
+    When a moderator takes it down
     Then the answer is the 404 of no photo and nothing changes
 
   Scenario: The queue shows queued photos oldest first with what the check saw

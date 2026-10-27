@@ -3,6 +3,7 @@ import { useT } from "@kuutti/i18n/react";
 import {
   AdminAccount,
   type AdminAccountPhoto,
+  PHOTOS_FOR_COMPLETENESS,
   type SanctionEntry,
   SanctionList,
 } from "@kuutti/schema";
@@ -178,6 +179,9 @@ export function AccountPage() {
     );
   }
   const { page, sanctions } = state;
+  // A take-down that leaves fewer approved photos than a complete profile
+  // needs takes the person out of everyone's round, and their own (#477).
+  const approved = page.photos.filter((photo) => photo.state === "approved").length;
   if (page.state === "deleted") {
     return (
       <section aria-labelledby="account-title" className="space-y-6">
@@ -284,6 +288,7 @@ export function AccountPage() {
                 <PersonPhoto
                   key={photo.id}
                   photo={photo}
+                  leavesTooFew={approved <= PHOTOS_FOR_COMPLETENESS}
                   onTakeDownOpen={() => setPhotoDone("")}
                   onTakenDown={takenDown}
                 />
@@ -367,10 +372,12 @@ export function AccountPage() {
  */
 function PersonPhoto({
   photo,
+  leavesTooFew,
   onTakeDownOpen,
   onTakenDown,
 }: {
   photo: AdminAccountPhoto;
+  leavesTooFew: boolean;
   onTakeDownOpen: () => void;
   onTakenDown: () => Promise<void>;
 }) {
@@ -414,6 +421,7 @@ function PersonPhoto({
         <TakeDown
           photoId={photo.id}
           describedBy={line}
+          leavesTooFew={leavesTooFew}
           onOpen={onTakeDownOpen}
           onDone={onTakenDown}
         />

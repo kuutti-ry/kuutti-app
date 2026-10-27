@@ -107,7 +107,7 @@ test("an approved photo is taken down through its confirm step, and stays in the
 
   await items.nth(at).getByRole("button", { name: "Take down…" }).click();
   const step = page.getByRole("dialog", { name: "Take down this photo" });
-  await expect(step).toContainText("Nobody else is shown this photo from now on");
+  await expect(step).toContainText("Nobody else is given this photo from now on");
   // No reason is preset (#250): the step waits for one chosen on purpose.
   const confirm = step.getByRole("button", { name: "Take down" });
   await expect(confirm).toBeDisabled();
@@ -117,7 +117,7 @@ test("an approved photo is taken down through its confirm step, and stays in the
 
   // The page is read again: the line says it and has the focus, as the button went with the photo.
   const status = photos.getByRole("status");
-  await expect(status).toHaveText("Taken down. Nobody else is shown the photo now.");
+  await expect(status).toHaveText("Taken down. Nobody else is given the photo from now on.");
   await expect(status).toBeFocused();
   await expect(items.nth(at)).toHaveText(/^rejected · other · /);
   await expect(items.nth(at).getByRole("button", { name: "Take down…" })).toHaveCount(0);

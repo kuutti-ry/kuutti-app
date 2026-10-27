@@ -305,8 +305,23 @@ describe("photo review queue", () => {
     expect(
       (await decide(app, staff.headers, id, { decision: "reject", reason: "not_reviewed" })).status,
     ).toBe(400);
-    const state = await ctx.client.query("SELECT state FROM photo WHERE id = $1", [id]);
-    expect(state.rows[0]?.state).toBe("queued");
+    // A take-down is a rejection too, with the same list (#477).
+    const approved = await photoIn(ctx, owner.accountId, "approved");
+    for (const body of [
+      { decision: "take_down" },
+      { decision: "take_down", reason: "ugly" },
+      { decision: "take_down", reason: "not_reviewed" },
+    ]) {
+      expect((await decide(app, staff.headers, approved, body)).status).toBe(400);
+    }
+    const states = await ctx.client.query<{ id: string; state: string }>(
+      "SELECT id, state FROM photo WHERE id = ANY($1::uuid[])",
+      [[id, approved]],
+    );
+    expect(Object.fromEntries(states.rows.map((r) => [r.id, r.state]))).toEqual({
+      [id]: "queued",
+      [approved]: "approved",
+    });
     expect(Number((await ctx.client.query("SELECT count(*) AS n FROM audit_log")).rows[0]?.n)).toBe(
       0,
     );
@@ -323,7 +338,7 @@ describe("photo review queue", () => {
       await app.request(`/admin/photos/${id}/card`, { headers: researcher.headers }),
       await decide(app, researcher.headers, id, { decision: "approve" }),
       // Nor take an approved photo down (#477).
-      await decide(app, researcher.headers, approved, { decision: "reject", reason: "other" }),
+      await decide(app, researcher.headers, approved, { decision: "take_down", reason: "other" }),
     ]) {
       expect(res.status).toBe(403);
       expect(await errorCode(res)).toBe("admin_forbidden");
@@ -581,7 +596,7 @@ describe("taking an approved photo down", () => {
     expect((await card(taken, viewer.headers)).status).toBe(200);
     const standing = await standingOf(ctx, owner.accountId);
 
-    const res = await decide(app, staff.headers, taken, { decision: "reject", reason: "other" });
+    const res = await decide(app, staff.headers, taken, { decision: "take_down", reason: "other" });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       photoId: taken,
@@ -651,32 +666,59 @@ describe("taking an approved photo down", () => {
     ]);
   });
 
-  test("An approved photo takes a rejection only, and one taken down stays down", async ({
+  test("A rejection from the queue never takes down a photo approved meanwhile", async ({
     ctx,
   }) => {
+    // Two moderators read the same queue; one approves, and the other's
+    // rejection arrives after it has committed, from the list read before.
     const { app } = await appWith(ctx);
-    const staff = await staffSession(ctx.client);
+    const first = await staffSession(ctx.client);
+    const second = await staffSession(ctx.client);
     const owner = await signedInAccount(ctx.client);
-    const approved = await photoIn(ctx, owner.accountId, "approved");
-    const down = await photoIn(ctx, owner.accountId, "approved");
-    expect(
-      (await decide(app, staff.headers, down, { decision: "reject", reason: "minor" })).status,
-    ).toBe(200);
-    for (const [id, body] of [
-      [approved, { decision: "approve" }],
-      [down, { decision: "reject", reason: "nudity" }],
-      [down, { decision: "approve" }],
-    ] as const) {
-      const res = await decide(app, staff.headers, id, body);
+    const id = await photoIn(ctx, owner.accountId, "queued");
+    expect((await decide(app, first.headers, id, { decision: "approve" })).status).toBe(200);
+    for (const body of [{ decision: "reject", reason: "other" }, { decision: "approve" }]) {
+      const res = await decide(app, second.headers, id, body);
       expect(res.status).toBe(409);
       expect(await errorCode(res)).toBe("photo_not_queued");
     }
+    const after = await ctx.client.query(
+      "SELECT state, rejection_reason FROM photo WHERE id = $1",
+      [id],
+    );
+    expect(after.rows).toEqual([{ state: "approved", rejection_reason: null }]);
+    const audit = await ctx.client.query("SELECT actor_identity_id, action FROM audit_log");
+    expect(audit.rows).toEqual([{ actor_identity_id: first.identityId, action: "photo.approve" }]);
+  });
+
+  test("A take-down needs an approved photo, and one taken down stays down", async ({ ctx }) => {
+    const { app } = await appWith(ctx);
+    const staff = await staffSession(ctx.client);
+    const owner = await signedInAccount(ctx.client);
+    const queued = await photoIn(ctx, owner.accountId, "queued");
+    const pending = await photoIn(ctx, owner.accountId, "pending");
+    const down = await photoIn(ctx, owner.accountId, "approved");
+    expect(
+      (await decide(app, staff.headers, down, { decision: "take_down", reason: "minor" })).status,
+    ).toBe(200);
+    // A queued photo is the queue's to decide; one not yet checked and one
+    // taken down already are nobody's to take down.
+    for (const id of [queued, pending, down]) {
+      const res = await decide(app, staff.headers, id, { decision: "take_down", reason: "nudity" });
+      expect(res.status).toBe(409);
+      expect(await errorCode(res)).toBe("photo_not_approved");
+    }
+    // Nor does the queue's approval bring the taken-down photo back.
+    const again = await decide(app, staff.headers, down, { decision: "approve" });
+    expect(again.status).toBe(409);
+    expect(await errorCode(again)).toBe("photo_not_queued");
     const states = await ctx.client.query<{ id: string; state: string; reason: string | null }>(
       "SELECT id, state, rejection_reason AS reason FROM photo WHERE id = ANY($1::uuid[])",
-      [[approved, down]],
+      [[queued, pending, down]],
     );
     expect(Object.fromEntries(states.rows.map((r) => [r.id, [r.state, r.reason]]))).toEqual({
-      [approved]: ["approved", null],
+      [queued]: ["queued", null],
+      [pending]: ["pending", null],
       [down]: ["rejected", "minor"],
     });
     const audit = await ctx.client.query("SELECT action, subject_id FROM audit_log");
@@ -694,7 +736,7 @@ describe("taking an approved photo down", () => {
       [owner.accountId],
     );
     const sent = rows[0]?.id ?? "";
-    const res = await decide(app, staff.headers, sent, { decision: "reject", reason: "nudity" });
+    const res = await decide(app, staff.headers, sent, { decision: "take_down", reason: "nudity" });
     expect(res.status).toBe(404);
     expect(await errorCode(res)).toBe("not_found");
     const after = await ctx.client.query(
@@ -730,9 +772,9 @@ describe("taking an approved photo down", () => {
     const { logger } = await captureLogger();
     const app = createApp({ config: testConfig(), logger, db, media: testMediaDeps().deps });
     const staff = await staffSession(ctx.client);
-    const res = await decide(app, staff.headers, id, { decision: "reject", reason: "nudity" });
+    const res = await decide(app, staff.headers, id, { decision: "take_down", reason: "nudity" });
     expect(res.status).toBe(409);
-    expect(await errorCode(res)).toBe("photo_not_queued");
+    expect(await errorCode(res)).toBe("photo_not_approved");
     expect(await auditRows(ctx)).toBe(0);
     const after = await ctx.client.query(
       "SELECT p.state, p.rejection_reason, (SELECT count(*) FROM photo_review r WHERE r.photo_id = p.id) AS reviews FROM photo p WHERE p.id = $1",

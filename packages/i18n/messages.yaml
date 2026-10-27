@@ -6315,28 +6315,32 @@ admin.takeDown.title:
   description: "Admin panel, the title of the take-down's confirm step (#477)."
 
 admin.takeDown.effect:
-  en: "Nobody else is shown this photo from now on; the card shows the rest. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction: their standing stays as it is."
+  en: "Nobody else is given this photo from now on; a link to it already given ends within fifteen minutes. The person keeps it in their own list with the reason you choose, and cannot appeal. Nothing is deleted, and it is not a sanction: their standing stays as it is. Should they upload the same picture again, the automatic check looks at it, not a person."
   description: "Admin panel, the take-down's confirm step (#477, ADR-006 §2): what taking down an approved photo does, in words."
+
+admin.takeDown.tooFew:
+  en: "This leaves them fewer than {photos, number} approved photos: until another is approved, nobody is shown their card and they get no round."
+  description: "Admin panel, the take-down's confirm step (#477), only when the person would be left with fewer approved photos than a complete profile needs. {photos} is that number."
 
 admin.takeDown.confirm:
   en: "Take down"
   description: "Admin panel, the confirming button of the take-down's step (#477)."
 
 admin.takeDown.done:
-  en: "Taken down. Nobody else is shown the photo now."
+  en: "Taken down. Nobody else is given the photo from now on."
   description: "Admin panel, a person's page, the status after a photo was taken down (#477)."
 
-admin.takeDown.error.photo_not_queued:
-  en: "The photo is no longer approved: someone took it down meanwhile. Nothing more was changed."
-  description: "Admin panel, the take-down's step (#477): refused, the photo was not approved any more when the request came."
+admin.takeDown.error.photo_not_approved:
+  en: "The photo is no longer approved: it was taken down meanwhile. Reload the page to see it as it is."
+  description: "Admin panel, the take-down's step (#477): refused, the photo was not approved any more when the request came (an earlier try of the same moderator's may have gone through)."
 
 admin.takeDown.error.not_found:
   en: "The photo is gone: its owner removed it meanwhile."
   description: "Admin panel, the take-down's step (#477): refused, the photo no longer exists."
 
 admin.takeDown.error.failed:
-  en: "The photo was not taken down. Try again."
-  description: "Admin panel, the take-down's step (#477): the request failed for any other reason."
+  en: "The take-down may not have been saved. Reload the page to see where it stands before trying again."
+  description: "Admin panel, the take-down's step (#477): the request failed, or its answer was lost or not understood, so the panel cannot tell whether it went through."
 
 admin.account.sanctionsTitle:
   en: "Sanctions"

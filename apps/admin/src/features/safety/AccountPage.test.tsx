@@ -683,7 +683,7 @@ describe("a photo on a person's page", () => {
 describe("taking a photo down on a person's page", () => {
   const STEP = "Take down this photo";
   const REASON = "Reason the person is told";
-  const DONE = "Taken down. Nobody else is shown the photo now.";
+  const DONE = "Taken down. Nobody else is given the photo from now on.";
   const decisionOf =
     (n: number, answer: (req: Request) => Promise<Response> | Response): Handler =>
     (req) =>
@@ -726,6 +726,24 @@ describe("taking a photo down on a person's page", () => {
     expect(button.closest("li")).toHaveTextContent(`approved · ${when(UPLOADED)}`);
   });
 
+  it.each([
+    [1, true],
+    [2, true],
+    [3, false],
+  ])("with %i approved photos, says the person drops out of every round: %s", async (n, says) => {
+    const photos = Array.from({ length: n }, (_, i) => photo(i + 1, "approved"));
+    fetchMock([
+      pageOf(page({ photos: [...photos, photo(9, "rejected", "other")] })),
+      sanctionsOf([]),
+    ]);
+    show();
+    const step = await openStep();
+    const words =
+      "This leaves them fewer than 2 approved photos: until another is approved, nobody is shown their card and they get no round.";
+    if (says) expect(step).toHaveTextContent(words);
+    else expect(step).not.toHaveTextContent("fewer than");
+  });
+
   it.each(["pending", "queued", "rejected"])("is not offered beside a %s photo", async (state) => {
     fetchMock([pageOf(page({ photos: [photo(1, state)] })), sanctionsOf([])]);
     show();
@@ -749,7 +767,7 @@ describe("taking a photo down on a person's page", () => {
     ]);
     show();
     const step = await openStep();
-    expect(step).toHaveTextContent("Nobody else is shown this photo from now on");
+    expect(step).toHaveTextContent("Nobody else is given this photo from now on");
     expect(step).toHaveTextContent("it is not a sanction");
     // No reason is preset (#250): the step waits for one chosen on purpose.
     const select = within(step).getByRole("combobox", { name: REASON });
@@ -774,7 +792,7 @@ describe("taking a photo down on a person's page", () => {
     fireEvent.click(confirm);
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(bodies).toEqual([{ decision: "reject", reason: "other" }]);
+    expect(bodies).toEqual([{ decision: "take_down", reason: "other" }]);
     // The line says it and takes the focus, since the button goes with the change.
     const done = await screen.findByText(DONE);
     await waitFor(() => expect(done).toHaveFocus());
@@ -826,8 +844,8 @@ describe("taking a photo down on a person's page", () => {
   it.each([
     [
       "taken down meanwhile (409)",
-      () => failure(409, "photo_not_queued"),
-      "The photo is no longer approved: someone took it down meanwhile. Nothing more was changed.",
+      () => failure(409, "photo_not_approved"),
+      "The photo is no longer approved: it was taken down meanwhile. Reload the page to see it as it is.",
     ],
     [
       "gone (404)",
@@ -837,19 +855,19 @@ describe("taking a photo down on a person's page", () => {
     [
       "any other failure",
       () => failure(500, "internal_error"),
-      "The photo was not taken down. Try again.",
+      "The take-down may not have been saved. Reload the page to see where it stands before trying again.",
     ],
     [
       "an answer outside the contract",
       () => json({ photoId: "p1", state: "rejected", rejectionReason: "other" }),
-      "The photo was not taken down. Try again.",
+      "The take-down may not have been saved. Reload the page to see where it stands before trying again.",
     ],
     [
       "no answer at all",
       (): Response => {
         throw new TypeError("Failed to fetch");
       },
-      "The photo was not taken down. Try again.",
+      "The take-down may not have been saved. Reload the page to see where it stands before trying again.",
     ],
   ])("says %s in words, keeps the step open and the page as it was", async (_, answer, words) => {
     const calls = fetchMock([pageOf(page()), sanctionsOf([]), decisionOf(1, answer)]);
