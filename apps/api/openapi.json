@@ -5591,7 +5591,8 @@
             "type": "integer",
             "nullable": true,
             "minimum": 1,
-            "maximum": 2147483647
+            "maximum": 2147483647,
+            "default": null
           },
           "pointedPhoto": {
             "$ref": "#/components/schemas/ReportPointedPhoto"
@@ -5617,8 +5618,6 @@
           "decidedBy",
           "sanctionId",
           "copy",
-          "lineSeq",
-          "pointedPhoto",
           "actable"
         ]
       },
@@ -5711,7 +5710,8 @@
           {
             "type": "null"
           }
-        ]
+        ],
+        "default": null
       },
       "ReportActable": {
         "type": "object",

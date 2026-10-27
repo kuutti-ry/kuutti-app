@@ -8281,8 +8281,9 @@ export interface components {
             /** Format: uuid */
             sanctionId: string | null;
             copy: components["schemas"]["ReportCopyLine"][] | null;
+            /** @default null */
             lineSeq: number | null;
-            pointedPhoto: components["schemas"]["ReportPointedPhoto"];
+            pointedPhoto?: components["schemas"]["ReportPointedPhoto"];
             actable: components["schemas"]["ReportActable"][];
         };
         ReportCopyLine: {
@@ -8296,6 +8297,7 @@ export interface components {
         };
         /** @enum {string} */
         ReportMessageSide: "reporter" | "reported";
+        /** @default null */
         ReportPointedPhoto: {
             /** @enum {boolean} */
             removed: true;

@@ -231,10 +231,12 @@ export const ReportDetail = ReportListItem.extend({
   sanctionId: z.uuid().nullable(),
   /** Null for a card's report; the whole conversation otherwise, as the export answers one (ExportedConversation's bound). */
   copy: z.array(ReportCopyLine).max(1_000_000).nullable(),
+  // Both null when absent, so a panel newer than its API still reads the
+  // answer: a pull request's panel runs against staging's API (ADR-025).
   /** The copy's line the reporter pointed at (#476): a photo the other person sent; null when none, and always for a card's. */
-  lineSeq: z.int().min(1).max(MESSAGE_SEQ_MAX).nullable(),
+  lineSeq: z.int().min(1).max(MESSAGE_SEQ_MAX).nullable().default(null),
   /** The card's photo the reporter pointed at; null when none, and always for a conversation's. */
-  pointedPhoto: ReportPointedPhoto.nullable(),
+  pointedPhoto: ReportPointedPhoto.nullable().default(null),
   /** Newest first; empty once decided. */
   actable: z.array(ReportActable).max(100),
 }).meta({ id: "ReportDetail" });

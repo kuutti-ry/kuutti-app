@@ -11,6 +11,7 @@ import {
   ReportCopyLine,
   ReportCopyPhotoParams,
   ReportDecisionRequest,
+  ReportDetail,
   ReportOutcome,
   ReportPointedPhoto,
   ReportQueueQuery,
@@ -250,5 +251,27 @@ describe("the moderators' queue and decision (#311, #312)", () => {
     expect(codes(ReportPointedPhoto, { ...held, state: "gone" })).toEqual(["invalid_value"]);
     expect(codes(ReportPointedPhoto, { ...held, approvedPhotos: -1 })).toEqual(["too_small"]);
     expect(codes(ReportPointedPhoto, { removed: "no" })).toEqual(["invalid_union"]);
+  });
+
+  it("reads an opened report from an API without the pointer as pointing at nothing (#476)", () => {
+    // A pull request's panel runs against staging's API, which may be older than it.
+    const older = {
+      id,
+      reason: "harassment",
+      source: "card",
+      createdAt: at,
+      outcome: null,
+      decidedAt: null,
+      reporter: { accountId: id, filed: 1, upheld: 0 },
+      reported: { accountId: photo, received: 1, sanctions: 0 },
+      note: null,
+      decidedBy: null,
+      sanctionId: null,
+      copy: null,
+      actable: [],
+    };
+    expect(ReportDetail.parse(older)).toMatchObject({ lineSeq: null, pointedPhoto: null });
+    expect(ReportDetail.parse({ ...older, lineSeq: 3 }).lineSeq).toBe(3);
+    expect(codes(ReportDetail, { ...older, lineSeq: 0 })).toEqual(["too_small"]);
   });
 });
