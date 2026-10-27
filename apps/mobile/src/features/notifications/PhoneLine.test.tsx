@@ -26,13 +26,15 @@ const notifications = jest.mocked(Notifications);
 const status = (ios: number, root: string) => ({
   status: root,
   granted: root === "granted",
-  canAskAgain: true,
+  canAskAgain: root !== "denied",
   expires: "never",
   ios: { status: ios },
 });
 const NOT_ASKED = status(0, "undetermined");
 const ALLOWED = status(2, "granted");
 const DENIED = status(1, "denied");
+/** What Android 13 and later answer for a phone never asked: denied, and askable. */
+const ANDROID_NOT_ASKED = { status: "denied", granted: false, canAskAgain: true, expires: "never" };
 const LINES = {
   allowed: "This phone shows Kuutti's notifications.",
   denied:
@@ -141,6 +143,15 @@ describe("PhoneLine", () => {
     expect(await screen.findByText(LINES.allowed)).toBeTruthy();
     expect(notifications.requestPermissionsAsync).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(seen).toHaveLength(1));
+  });
+
+  it("on Android says a phone never asked as such, with its question, though the phone answers denied", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    notifications.getPermissionsAsync.mockResolvedValue(ANDROID_NOT_ASKED as never);
+    await renderWithTheme(<PhoneLine />);
+    expect(await screen.findByText(LINES.undetermined)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Allow notifications" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Open the phone's settings" })).toBeNull();
   });
 
   it("after the phone's no says the refusal and registers nothing", async () => {
