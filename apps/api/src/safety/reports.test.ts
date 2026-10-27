@@ -105,6 +105,64 @@ describe("A report from a card lands with its reason, open, and blocks both ways
   });
 });
 
+describe("a report from a card that points at one photo (#476)", () => {
+  test("a card's report keeps the photo it points at, of the card the reporter was shown, and blocks both ways", async ({
+    ctx,
+  }) => {
+    const { viewer, subjects } = await viewerOf(ctx, 1);
+    const [b] = subjects as [string];
+    // B's card had a second photo, shown too, and a third that was never shown.
+    const first = await cardShown(ctx.client, viewer.accountId, b);
+    const photoOf = async () => {
+      const { rows } = await ctx.client.query<{ id: string }>(
+        `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+         VALUES ($1, md5(random()::text), 'LKO2?U%2Tw=w', 800, 1067, 'approved',
+                 (SELECT coalesce(max(position) + 1, 0) FROM photo
+                  WHERE account_id = $1 AND purpose = 'profile'))
+         RETURNING id`,
+        [b],
+      );
+      return rows[0]?.id ?? "";
+    };
+    const second = await photoOf();
+    await ctx.client.query(
+      "INSERT INTO card_shown (account_id, photo_id, at) VALUES ($1, $2, now())",
+      [viewer.accountId, second],
+    );
+    await photoOf();
+    const answer = await report(ctx, viewer.headers, {
+      accountId: b,
+      reason: "misrepresentation",
+      photoId: second,
+    });
+    expect(answer.status).toBe(204);
+    const kept = await ctx.client.query(
+      "SELECT source, line_seq, photo_id, photo_pointed FROM report WHERE reporter_account_id = $1",
+      [viewer.accountId],
+    );
+    expect(kept.rows).toEqual([
+      { source: "card", line_seq: null, photo_id: second, photo_pointed: true },
+    ]);
+    expect(await blockedBetween(ctx, viewer.accountId, b)).toBe(true);
+    expect(first).not.toBe(second);
+  });
+
+  test("the photo a card's report points at reaches no log line, and the reporter's export does not carry it", async ({
+    ctx,
+  }) => {
+    const { viewer, subjects } = await viewerOf(ctx, 1);
+    const [b] = subjects as [string];
+    const shown = await cardShown(ctx.client, viewer.accountId, b);
+    expect(
+      (await report(ctx, viewer.headers, { accountId: b, reason: "other", photoId: shown })).status,
+    ).toBe(204);
+    expect(JSON.stringify(ctx.logs())).not.toContain(shown);
+    const exported = await exportOf(ctx.app, viewer.headers);
+    expect(exported.reports.items).toHaveLength(1);
+    expect(JSON.stringify(exported.reports)).not.toContain(shown);
+  });
+});
+
 describe("what a report tells, and to whom", () => {
   test("The note reaches no log line, no error detail and no event", async ({ ctx }) => {
     await withMatchingConfig(ctx.client, { reports_per_day: 1 });
@@ -314,6 +372,7 @@ describe("how many, and how often", () => {
               reportedAccountId: subject,
               reason: "other",
               note: null,
+              photoId: null,
               at,
               since: new Date(at.getTime() - 3_600_000),
               limit: 3,
@@ -462,6 +521,9 @@ describe("the report route's edges", () => {
     ["a note of spaces", { note: "   " }],
     ["an account id that is not one", { accountId: "b" }],
     ["an unknown key", { source: "card" }],
+    // A card's pointer is a photo id (#476); a line is a conversation's.
+    ["a photo id that is not one", { photoId: "p" }],
+    ["a line, which is a conversation's pointer", { seq: 1 }],
   ] as const)("refuses %s with 400 and writes nothing", async ([, patch], { ctx }) => {
     const { viewer, subjects } = await viewerOf(ctx, 1);
     const answer = await report(ctx, viewer.headers, {
@@ -487,6 +549,7 @@ describe("the report route's edges", () => {
       reportedAccountId: subjects[0] as string,
       reason: "other",
       note: NOTE,
+      photoId: null,
       at,
       since: dayWindow(at).start,
       limit: 5,

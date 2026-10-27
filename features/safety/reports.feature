@@ -12,6 +12,10 @@ Feature: Reporting somebody from a card or a conversation
   most matching_config.reports_per_day a day per account, the Finnish
   calendar day, and one open report per pair. Kept twelve months from
   filing, whoever of the two is erased meanwhile (features/identity/erasure.feature).
+  A report may point at the one photo it is about (#476, ADR-030 §13): a
+  photo the other person sent in the conversation, or a photo of the card
+  the person was shown; a pointer that does not hold is left out, and the
+  answer is the same.
 
   Scenario Outline: A report from a card lands with its reason, open, and blocks both ways
     Given "A" was shown "B"'s card
@@ -106,3 +110,23 @@ Feature: Reporting somebody from a card or a conversation
     Given "A" reported "B" from a conversation where both sent a photo, and "B" deleted the account since
     When the night prunes the report after twelve months
     Then the copy is gone, "B"'s photo and its objects go with it, and "A"'s photo stays "A"'s
+
+  Scenario: A report from a conversation can point at one photo the other person sent
+    Given "A" and "B" are in a conversation where both sent a photo
+    When "A" reports "B" from it, pointing at "B"'s photo
+    Then the report keeps that line, the copy holds every line as before, and a moderator reads the line pointed at
+
+  Scenario: A pointer that names no photo of the other person's is left out, and the answer is the same
+    Given "A" and "B" are in a conversation, and cards "A" was and was not shown
+    When "A" reports pointing at their own photo, a text, a photo a shadow ban withheld, a line past the end, or a card's photo never shown or not the person's
+    Then each answer is the one without a pointer, the report and the block are written, and no pointer is kept
+
+  Scenario: A report from a card can point at a photo of the card the person was shown
+    Given "A" was shown "B"'s card with two photos
+    When "A" reports "B", pointing at the second photo
+    Then the report keeps that photo, and a moderator sees it on request, one audit row about the report per look
+
+  Scenario: A pointed photo deleted since reads removed for the moderator
+    Given "A" reported "B" from a card, pointing at one of "B"'s photos
+    When "B" deletes that photo
+    Then the report stays, the moderator reads the photo as removed, and asking for it answers 404 and writes nothing

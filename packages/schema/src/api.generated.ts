@@ -2805,7 +2805,7 @@ export interface paths {
         put?: never;
         /**
          * Report the person of a card one was shown, and block them
-         * @description A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.
+         * @description A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel, and the one photo of the card it is about (#476). The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.
          */
         post: {
             parameters: {
@@ -2820,14 +2820,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Filed and blocked; or a report of the same person is still open, and nothing more is written. */
+                /** @description Filed and blocked; or a report of the same person is still open, and nothing more is written. A photo that is not one of the card the person was shown is left out, and the answer is the same. */
                 204: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key. */
+                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account or photo id, an unknown key. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -2948,7 +2948,7 @@ export interface paths {
         put?: never;
         /**
          * Report the other person of a conversation, with a copy of it, and block them
-         * @description The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.
+         * @description The card's reason and note (#351, ADR-030 §12), and the line of the one photo it is about (#476). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.
          */
         post: {
             parameters: {
@@ -2965,14 +2965,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. */
+                /** @description Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. A line that is not a photo the other person sent, as the reporter could read it, is left out, and the answer is the same. */
                 204: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content?: never;
                 };
-                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid. */
+                /** @description Validation failed: a missing or unknown reason, a note blank or over 500 characters, a line that is not a whole number from 1, an unknown key, an id that is not a uuid. */
                 400: {
                     headers: {
                         [name: string]: unknown;
@@ -5458,7 +5458,7 @@ export interface paths {
         };
         /**
          * One report, with the reporter's note and the frozen conversation
-         * @description The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.
+         * @description The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), the photo the report points at (#476: the copy's line, or a card's photo with its id and state, or removed since), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.
          */
         get: {
             parameters: {
@@ -5586,6 +5586,92 @@ export interface paths {
                     };
                 };
                 /** @description not_found: no such report, a party's, or no photo at that line, answered alike. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description media_unavailable: no object storage is configured here. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/reports/{id}/photo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A signed URL for the photo a card's report points at
+         * @description The card variant of the one photo of the card the reporter pointed at (#476), for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The signed URL. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PhotoUrlResponse"];
+                    };
+                };
+                /** @description Validation failed. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description admin_forbidden: the role does not allow this. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+                /** @description not_found: no such report, a party's, one that points at no photo, or a photo removed since, answered alike. */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -7755,10 +7841,17 @@ export interface components {
             accountId: string;
             reason: components["schemas"]["SanctionReason"];
             note?: string;
+            /**
+             * Format: uuid
+             * @description The one photo of the card the report is about (#476). Kept only for a photo of that person the reporter was shown; any other is left out, and the answer is the same.
+             */
+            photoId?: string;
         };
         ConversationReportRequest: {
             reason: components["schemas"]["SanctionReason"];
             note?: string;
+            /** @description The line of the one photo the report is about (#476). Kept only for a photo the other person sent that the reporter could read; any other line is left out, and the answer is the same. */
+            seq?: number;
         };
         NotificationChoices: {
             choices: components["schemas"]["NotificationChoice"][];
@@ -8188,6 +8281,8 @@ export interface components {
             /** Format: uuid */
             sanctionId: string | null;
             copy: components["schemas"]["ReportCopyLine"][] | null;
+            lineSeq: number | null;
+            pointedPhoto: components["schemas"]["ReportPointedPhoto"];
             actable: components["schemas"]["ReportActable"][];
         };
         ReportCopyLine: {
@@ -8201,6 +8296,16 @@ export interface components {
         };
         /** @enum {string} */
         ReportMessageSide: "reporter" | "reported";
+        ReportPointedPhoto: {
+            /** @enum {boolean} */
+            removed: true;
+        } | {
+            /** @enum {boolean} */
+            removed: false;
+            id: components["schemas"]["PhotoId"];
+            state: components["schemas"]["PhotoState"];
+            approvedPhotos: number;
+        } | null;
         ReportActable: {
             /** Format: uuid */
             id: string;

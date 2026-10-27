@@ -231,6 +231,29 @@ export async function wasShown(
   return rows[0]?.shown === true;
 }
 
+/**
+ * One profile photo of the subject's that the viewer was shown (#476): the
+ * one a card's report may point at, as `wasShown` proves the card. Locked
+ * until the caller's transaction ends (`FOR KEY SHARE`, what a row naming it
+ * takes anyway), so it cannot go between this and the caller's write; the
+ * caller holds the subject's account first, in erasure's order. False for a
+ * photo of somebody else, one never shown, and one gone; scoped by the viewer
+ * (rule 6). Whatever its state now: one taken down since was still shown.
+ */
+export async function holdShownPhoto(
+  db: Queryable,
+  input: { viewerAccountId: string; subjectAccountId: string; photoId: string },
+): Promise<boolean> {
+  const { rows } = await db.query(
+    `SELECT 1 FROM photo p
+     WHERE p.id = $3 AND p.account_id = $2 AND p.purpose = 'profile'
+       AND EXISTS (SELECT 1 FROM card_shown s WHERE s.photo_id = p.id AND s.account_id = $1)
+     FOR KEY SHARE OF p`,
+    [input.viewerAccountId, input.subjectAccountId, input.photoId],
+  );
+  return rows.length > 0;
+}
+
 export type CardServed = {
   /** Distinct accounts whose cards the viewer was shown since the day started, before this one. */
   used: number;

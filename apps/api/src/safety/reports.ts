@@ -1,10 +1,16 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import type { ReportOutcome, ReportSource, SanctionReason } from "@kuutti/schema";
-import { copyConversation, lockReportedConversation, reportWindowHolds } from "../chat/index.ts";
+import {
+  copyConversation,
+  counterpartPhotoAt,
+  lockReportedConversation,
+  reportWindowHolds,
+} from "../chat/index.ts";
 import type { Logger } from "../lib/logger.ts";
 import {
   deleteOrphanedObjects,
   eraseReleasedPhotos,
+  holdShownPhoto,
   type MediaStore,
   wasShown,
 } from "../media/index.ts";
@@ -22,7 +28,11 @@ import { blockStandsBetween, insertBlock } from "./blocks.ts";
  * pair. Both are asked before the card is, so neither answer tells whether
  * the other person, or their photos, are still there. The moderators read and
  * decide them in the panel (#311, #312). Kept twelve months from filing,
- * whoever of the two is erased meanwhile; the night prunes the rest.
+ * whoever of the two is erased meanwhile; the night prunes the rest. A report
+ * may point at the one photo it is about (#476, ADR-030 §13): a card's at a
+ * photo of the card the reporter was shown, a conversation's at a photo line
+ * the other person sent; a pointer that does not hold is left out and changes
+ * no answer, and like the note it reaches no log line.
  */
 
 export const REPORTS_PER_DAY_KEY = "reports_per_day";
@@ -38,6 +48,8 @@ export type NewReport = {
   reportedAccountId: string;
   reason: SanctionReason;
   note: string | null;
+  /** The photo of the card the report points at (#476), as the reporter named it; kept only when it holds. */
+  photoId: string | null;
   at: Date;
   /** Start of the cap's day; rows from before it do not count. */
   since: Date;
@@ -99,10 +111,35 @@ export async function recordReport(db: Queryable, input: NewReport): Promise<Rep
         subjectAccountId: input.reportedAccountId,
       }));
     if (!proven) return { outcome: "not_found" };
+    // The photo the report points at (#476), asked only now, so a pointer
+    // changes no answer: one of the card's the reporter was shown, held until
+    // the commit; any other is left out. The reported account is taken first,
+    // in erasure's order (the account, then its photos), so the two never wait
+    // on each other.
+    let photoId: string | null = null;
+    if (input.photoId !== null) {
+      await tx.query("SELECT 1 FROM account WHERE id = $1 FOR KEY SHARE", [
+        input.reportedAccountId,
+      ]);
+      const held = await holdShownPhoto(tx, {
+        viewerAccountId: input.reporterAccountId,
+        subjectAccountId: input.reportedAccountId,
+        photoId: input.photoId,
+      });
+      if (held) photoId = input.photoId;
+    }
     await tx.query(
-      `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, note, created_at)
-       VALUES ($1, $2, 'card', $3::sanction_reason, $4, $5)`,
-      [input.reporterAccountId, input.reportedAccountId, input.reason, input.note, input.at],
+      `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, note, created_at,
+                           photo_id, photo_pointed)
+       VALUES ($1, $2, 'card', $3::sanction_reason, $4, $5, $6::uuid, $6::uuid IS NOT NULL)`,
+      [
+        input.reporterAccountId,
+        input.reportedAccountId,
+        input.reason,
+        input.note,
+        input.at,
+        photoId,
+      ],
     );
     // The reporter's row is held above, so the block finds them live.
     await insertBlock(tx, {
@@ -119,6 +156,8 @@ export type NewConversationReport = {
   conversationId: string;
   reason: SanctionReason;
   note: string | null;
+  /** The line of the photo the report points at (#476), as the reporter named it; kept only when it holds. */
+  seq: number | null;
   at: Date;
   /** Start of the cap's day; rows from before it do not count. */
   since: Date;
@@ -184,12 +223,34 @@ export async function recordConversationReport(
     if (!row) throw new Error("report count returned no row");
     if (row.open) return { outcome: "open" };
     if (row.used >= input.limit) return { outcome: "over_budget", used: row.used };
+    // The photo line the report points at (#476), asked only now and before
+    // the block hides the conversation from the reporter: a photo the other
+    // person sent that the reporter could read; any other line is left out.
+    // Asked of what the reporter could read, never of the copy, which holds a
+    // shadow ban's withheld lines (ADR-030 §12), so it probes nothing.
+    const lineSeq =
+      input.seq !== null &&
+      (await counterpartPhotoAt(tx, {
+        accountId: input.reporterAccountId,
+        conversationId: input.conversationId,
+        seq: input.seq,
+      }))
+        ? input.seq
+        : null;
     const filed = await tx.query<{ id: string }>(
       `INSERT INTO report (reporter_account_id, reported_account_id, source, reason, note,
-                           created_at, conversation_id)
-       VALUES ($1, $2, 'conversation', $3::sanction_reason, $4, $5, $6)
+                           created_at, conversation_id, line_seq)
+       VALUES ($1, $2, 'conversation', $3::sanction_reason, $4, $5, $6, $7)
        RETURNING id`,
-      [input.reporterAccountId, reported, input.reason, input.note, input.at, input.conversationId],
+      [
+        input.reporterAccountId,
+        reported,
+        input.reason,
+        input.note,
+        input.at,
+        input.conversationId,
+        lineSeq,
+      ],
     );
     const reportId = filed.rows[0]?.id;
     if (!reportId) throw new Error("report insert returned no row");

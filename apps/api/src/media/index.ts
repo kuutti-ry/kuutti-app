@@ -32,6 +32,7 @@ export {
 } from "./photos.ts";
 export {
   cardsServedSince,
+  holdShownPhoto,
   listApprovedPhotos,
   listPhotos,
   othersPhotoFetchesSince,

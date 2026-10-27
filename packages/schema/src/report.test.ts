@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
+import { MESSAGE_SEQ_MAX } from "./chat.ts";
 import {
   BlockRequest,
   ConversationReportRequest,
@@ -11,6 +12,7 @@ import {
   ReportCopyPhotoParams,
   ReportDecisionRequest,
   ReportOutcome,
+  ReportPointedPhoto,
   ReportQueueQuery,
   ReportRequest,
 } from "./report.ts";
@@ -22,6 +24,7 @@ const codes = (schema: z.ZodType, input: unknown) =>
   schema.safeParse(input).error?.issues.map((issue) => issue.code) ?? [];
 
 const id = "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b";
+const photo = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a01";
 const at = "2026-10-20T09:00:00.000Z";
 
 describe("a block", () => {
@@ -75,6 +78,24 @@ describe("a report", () => {
       "unrecognized_keys",
     ]);
   });
+
+  it("may point at one photo of the card by its id (#476)", () => {
+    expect(ReportRequest.parse({ accountId: id, reason: "other", photoId: photo })).toEqual({
+      accountId: id,
+      reason: "other",
+      photoId: photo,
+    });
+    expect(codes(ReportRequest, { accountId: id, reason: "other", photoId: "p1" })).toEqual([
+      "invalid_format",
+    ]);
+    expect(codes(ReportRequest, { accountId: id, reason: "other", photoId: null })).toEqual([
+      "invalid_type",
+    ]);
+    // A line is a conversation's pointer, never a card's.
+    expect(codes(ReportRequest, { accountId: id, reason: "other", seq: 3 })).toEqual([
+      "unrecognized_keys",
+    ]);
+  });
 });
 
 describe("a report from a conversation (#351)", () => {
@@ -102,6 +123,29 @@ describe("a report from a conversation (#351)", () => {
     expect(
       codes(ConversationReportRequest, { reason: "other", note: "x".repeat(REPORT_NOTE_MAX + 1) }),
     ).toEqual(["too_big"]);
+  });
+
+  it.each([1, 7, MESSAGE_SEQ_MAX])("may point at the line %i (#476)", (seq) => {
+    expect(ConversationReportRequest.parse({ reason: "other", seq })).toEqual({
+      reason: "other",
+      seq,
+    });
+  });
+
+  it.each([
+    ["no line", 0, "too_small"],
+    ["a line past the last there can be", MESSAGE_SEQ_MAX + 1, "too_big"],
+    ["half a line", 1.5, "invalid_type"],
+    ["a line as text", "3", "invalid_type"],
+    ["a line of null", null, "invalid_type"],
+  ])("refuses %s as the line", (_, seq, code) => {
+    expect(codes(ConversationReportRequest, { reason: "other", seq })).toEqual([code]);
+  });
+
+  it("refuses a card's photo id: the conversation's pointer is its line", () => {
+    expect(codes(ConversationReportRequest, { reason: "other", photoId: photo })).toEqual([
+      "unrecognized_keys",
+    ]);
   });
 });
 
@@ -192,5 +236,19 @@ describe("the moderators' queue and decision (#311, #312)", () => {
     };
     expect(ReportCopyLine.parse({ ...line, photoId: id })).toEqual(line);
     expect(codes(ReportCopyLine, { ...line, side: "a" })).toEqual(["invalid_value"]);
+  });
+
+  it("says a card's pointed photo as removed, or with its id, state and its owner's approved count (#476)", () => {
+    expect(ReportPointedPhoto.parse({ removed: true })).toEqual({ removed: true });
+    const held = { removed: false, id: photo, state: "approved", approvedPhotos: 2 };
+    expect(ReportPointedPhoto.parse(held)).toEqual(held);
+    // A removed photo carries nothing of it, and a held one carries all three.
+    expect(ReportPointedPhoto.parse({ removed: true, id: photo })).toEqual({ removed: true });
+    expect(codes(ReportPointedPhoto, { removed: false, id: photo, state: "approved" })).toEqual([
+      "invalid_type",
+    ]);
+    expect(codes(ReportPointedPhoto, { ...held, state: "gone" })).toEqual(["invalid_value"]);
+    expect(codes(ReportPointedPhoto, { ...held, approvedPhotos: -1 })).toEqual(["too_small"]);
+    expect(codes(ReportPointedPhoto, { removed: "no" })).toEqual(["invalid_union"]);
   });
 });

@@ -5,8 +5,8 @@ export { archiveJob } from "./archive.ts";
 // The person's stored contacts for their export (#103, ADR-031 §11).
 export { exportContacts } from "./contacts.ts";
 // The ban's close, and the halves erasure and the export call (ADR-007 §4);
-// a block's close, and what a report from a conversation reads, and its copy
-// (#351, ADR-030 §12).
+// a block's close, and what a report from a conversation reads, its copy
+// (#351, ADR-030 §12) and the photo line it may point at (#476).
 // The match's conversation (#100): whether two people have one, and the
 // opening that the second like writes; app.ts hands both to the round's
 // routes, since matching imports no slice that imports it.
@@ -15,6 +15,7 @@ export {
   closeConversationsOf,
   conversationBetween,
   copyConversation,
+  counterpartPhotoAt,
   eraseConversationsOf,
   exportConversations,
   lockReportedConversation,
