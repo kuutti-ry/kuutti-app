@@ -9,7 +9,10 @@ name: EAS build
 # builds per platform a month. Install links are on the project's builds page
 # (https://expo.dev/accounts/kuutti/projects/kuutti/builds); a repository
 # variable EAS_BUILDS_ISSUE, if set, mirrors them onto that issue as well.
-# EAS_ENABLED switches this on.
+# EAS_ENABLED switches this on. By hand only, the staging profile: the staging
+# app as an Android app bundle, which EAS submits to Google Play's internal
+# testing track once it is built (ADR-057, #193); EAS holds the Play service
+# account's key, so no GitHub environment holds a Google credential.
 
 on:
   push:
@@ -20,7 +23,7 @@ on:
       profile:
         description: Build profile from eas.json
         type: choice
-        options: [development, preview, production]
+        options: [development, preview, staging, production]
         default: development
       platform:
         type: choice
@@ -94,6 +97,9 @@ jobs:
           platform=all
           if [ "$EVENT" = workflow_dispatch ]; then
             profiles="$INPUT_PROFILE"; platform="$INPUT_PLATFORM"
+            # Android's alone until the association's Apple account can take
+            # the staging app to TestFlight (#193).
+            if [ "$profiles" = staging ]; then platform=android; fi
           elif [ "$IS_TAG" = true ]; then
             profiles="production"
           else
@@ -162,7 +168,11 @@ jobs:
                     pnpm exec eas build:cancel "$id" --non-interactive || echo "could not cancel $id (finished meanwhile)"
                   done
             done
-            pnpm exec eas build --profile "$profile" --platform "$PLATFORM" \
+            # EAS submits the staging bundle itself once it is built (eas.json's
+            # submit profile staging), so the job does not wait for the build.
+            submit=()
+            if [ "$profile" = staging ]; then submit=(--auto-submit); fi
+            pnpm exec eas build --profile "$profile" --platform "$PLATFORM" "${submit[@]}" \
               --message "${GITHUB_REF_NAME} ${GITHUB_SHA::7}" --no-wait --json --non-interactive \
               | jq -c --arg profile "$profile" '.[] | {profile: $profile, id, platform, status}' >> "$RUNNER_TEMP/builds.json"
           done

@@ -21,7 +21,7 @@ apps/mobile/eas.json
 infra/bootstrap/main.tf
 -->
 
-How a change travels from a pull request to the staging box, the phones and, at a release, production: which workflow does what, in which order, and what each step may touch, by its GitHub environment, its AWS role and its secrets, named and never shown. It is for a contributor who wants to know what their pull request sets off, and for a reviewer of `.github/workflows`. The checks of `ci.yml`, `e2e.yml` and `e2e-admin.yml` appear only as far as they gate delivery. The view draws ADR-001, ADR-004, ADR-012, ADR-020, ADR-025, ADR-028 and ADR-051.
+How a change travels from a pull request to the staging box, the phones and, at a release, production: which workflow does what, in which order, and what each step may touch, by its GitHub environment, its AWS role and its secrets, named and never shown. It is for a contributor who wants to know what their pull request sets off, and for a reviewer of `.github/workflows`. The checks of `ci.yml`, `e2e.yml` and `e2e-admin.yml` appear only as far as they gate delivery. The view draws ADR-001, ADR-004, ADR-012, ADR-020, ADR-025, ADR-028, ADR-051 and ADR-057.
 
 Three roles reach AWS, all made by `infra/bootstrap` and assumed by a job's GitHub OIDC token (the third, `kuutti-ci-export`, is the weekly export's, delivers nothing and is not drawn); no AWS credential exists in any secret. `kuutti-ci-plan` is AWS's read-only access less every data read and decryption, and trusts any pull request of this repository and `main`. `kuutti-ci-apply` is power-user access with scoped IAM, and trusts only a job in the GitHub environment `staging` or `prod`. The four GitHub environments: `staging` takes deployments from `main` alone, with no reviewer; `prod` takes `v*` tags alone, behind the maintainer as reviewer; `preview` takes any branch of this repository, with no reviewer since 2026-10-08 (ADR-004 §3); `preview-cleanup` takes `main` alone, with no reviewer (ADR-012 §9).
 
@@ -178,6 +178,32 @@ flowchart TB
 35. `eas-build.yml` on the tag: its release check of the Finnish texts first, in a job without an environment, so that it answers before the reviewer is asked; then the `production` profile for both platforms in the environment `prod`, with `prod`'s `EXPO_TOKEN`.
 36. Production was first applied on 2026-10-24 by the rehearsal tag `v0.64.8-rehearsal.1` (ADR-049): step 34 ran, while the release gate stopped steps 30 to 33 and 35, as it stops any tag while Finnish texts wait for review. The API was then deployed to production by hand, pinned to a verified commit. Planned, #25: steps 29 to 35 in full, CI's deploy of production among them, at the first release.
 
+## Part 4: a store build by hand
+
+```mermaid
+flowchart TB
+  accTitle: Delivery, part 4: a store build by hand
+  accDescr: The maintainer starts eas-build.yml from main with the profile staging. EAS builds the staging app's Android app bundle in the environment staging with EXPO_TOKEN and, once it is built, submits it to Google Play's internal testing track with the service account key EAS holds; no GitHub environment holds a Google credential. The team installs the app from Play. A production build submitted to a closed track is planned.
+  n37["The maintainer starts eas-build.yml from main with the profile staging"]
+  n38["eas build: the staging app's Android app bundle, environment staging, EXPO_TOKEN"]
+  n39["EAS Submit: the bundle to Google Play, with the service account key EAS holds"]
+  n40["Google Play's internal testing track: the team installs from Play"]
+  n41["A production build submitted to a closed track: planned, #193"]:::notbuilt
+  n37 -->|"by hand, from main"| n38
+  n38 -->|"--auto-submit, once it is built"| n39
+  n39 -->|"track internal"| n40
+  n41 -.->|"planned, #193"| n39
+  classDef notbuilt stroke-dasharray: 5 5
+```
+
+### Steps
+
+37. The maintainer starts `eas-build.yml` by hand from `main` with the profile `staging`. The job builds it for Android alone, whatever the platform input says, until the association's Apple account can take the staging app to TestFlight (#193).
+38. `eas build` in the environment `staging` with `EXPO_TOKEN`: the staging app, with the preview build's channel and EAS environment, as an Android app bundle whose version code EAS counts up (`autoIncrement`, with `appVersionSource: remote`). The release gate does not run: the bundle reaches the team only, never the public.
+39. EAS Submit, on Expo's servers: `--auto-submit` hands the finished bundle to the submit profile `staging` of `eas.json`, which uploads it to Google Play with the key of a Google service account that EAS holds (ADR-057). The key never reaches GitHub. EAS uses it for any holder of `EXPO_TOKEN`, and the service account may release the app on its testing tracks and upload to internal app sharing, never to production (ADR-057 §3). Without the key on EAS the job fails after the build is queued, and the bundle reaches nobody until it is submitted by hand. A failed submission shows on expo.dev, never in the job, which ended when the build was queued.
+40. Google Play's internal testing track: the release rolls out to the testers' list, without Google's review while the app's setup is incomplete, and the list holds the team alone, since the app runs the unsigned updates of the `staging` channel (ADR-004 §3). Play signs what it delivers with the keys Google holds; testers install and update the app from Play.
+41. Planned, #193: a production build on a release tag, submitted to a closed track for the beta, once ADR-004 §4 is settled, the release gate passes and production has bank identification (ADR-049).
+
 ## What each job may touch
 
 | Workflow, job | When | GitHub environment | AWS role | Secrets | Switches and variables |
@@ -209,7 +235,7 @@ flowchart TB
 | `e2e-admin.yml` | `main`; a pull request that changes what the panel's flows exercise | none | none | none | none |
 | `auto-approve.yml` | every five minutes, from `main` | none | none | `GITHUB_TOKEN`, `pull-requests: write` | none |
 
-The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `staging`, `prod`, `preview` and `preview-cleanup` alone, never at repository level; the `DOKPLOY_TOKEN` of `preview` and `preview-cleanup` is a member's token for the `previews` project only. `SENTRY_AUTH_TOKEN` is read from `staging` and `prod` only. The role ARNs, the region and the switches are repository variables, not secrets. No workflow fetches Saiga, holds its token or names its cache, since a runner's caches, artifacts and logs are public (ADR-052): `check-workflow-permissions.py` refuses one that does, in the `workflows` check, and `secret-scan.yml` reads every commit of a push or a pull request for a font file.
+The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `staging`, `prod`, `preview` and `preview-cleanup` alone, never at repository level; the `DOKPLOY_TOKEN` of `preview` and `preview-cleanup` is a member's token for the `previews` project only. `SENTRY_AUTH_TOKEN` is read from `staging` and `prod` only. No workflow holds a Google credential: EAS submits the staging app to Google Play with the service account key it holds (part 4, ADR-057). The role ARNs, the region and the switches are repository variables, not secrets. No workflow fetches Saiga, holds its token or names its cache, since a runner's caches, artifacts and logs are public (ADR-052): `check-workflow-permissions.py` refuses one that does, in the `workflows` check, and `secret-scan.yml` reads every commit of a push or a pull request for a font file.
 
 ## Where it lives
 
@@ -217,7 +243,7 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 - Scripts: [.github/scripts](../../.github/scripts) (`aws-oidc.sh`, the OIDC exchange with no third-party action; `dokploy-deploy.sh`; `dokploy-preview.sh`; `wait-healthy.sh`; `check-workflow-permissions.py`)
 - The roles and their trust: [infra/bootstrap/main.tf](../../infra/bootstrap/main.tf); the environments, the rulesets and the variables: [infra/README.md](../../infra/README.md) (After bootstrap: GitHub; Environments, CI; Previews; Admin panel)
 - The app's channels and profiles: [apps/mobile/eas.json](../../apps/mobile/eas.json), [apps/mobile/app.json](../../apps/mobile/app.json)
-- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (plans on pull requests, applies behind environments), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed; who can publish), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) §6 and §7 (the flows in CI), [ADR-025](../adr/025-admin-host.md) §5 to §8 (the panel's deploy and previews), [ADR-028](../adr/028-versioning-and-the-bump.md) (the version), [ADR-049](../adr/049-production-before-the-first-release.md) (production's first apply from a rehearsal tag)
+- ADRs: [ADR-001](../adr/001-infrastructure-as-code.md) (plans on pull requests, applies behind environments), [ADR-004](../adr/004-eas-update-integrity.md) (updates not signed; who can publish), [ADR-012](../adr/012-unattended-preview-cleanup.md) (the sweep), [ADR-020](../adr/020-end-to-end-flows-with-maestro.md) §6 and §7 (the flows in CI), [ADR-025](../adr/025-admin-host.md) §5 to §8 (the panel's deploy and previews), [ADR-028](../adr/028-versioning-and-the-bump.md) (the version), [ADR-049](../adr/049-production-before-the-first-release.md) (production's first apply from a rehearsal tag), [ADR-057](../adr/057-google-play-internal-testing.md) (the staging app on Google Play's internal testing track)
 - Not drawn, since they deliver nothing: `audit.yml`, `dead-code.yml`, `dependency-review.yml`, `scorecard.yml`, and `export.yml`, the weekly copy of what exists only on GitHub, under its own role `kuutti-ci-export`.
 - Issues: #25 (production), #77 (the box's memory, which a deploy and three previews at once have exhausted before)
 
@@ -226,7 +252,7 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 - Which profiles a push to `main` builds. `infra/README.md` (CI) and the header of `eas-build.yml` say `development` and `preview`; the job's code builds `development` alone on a push and leaves `preview` to a start by hand. The view says "a native build" and names neither.
 - The switches `STAGING_ENABLED`, `EAS_ENABLED`, `PREVIEWS_ENABLED`, `EAS_PLATFORMS` and the environments' variables are set on GitHub, not in the repository; the view draws what runs when they are on.
 - Production (#25): applied on 2026-10-24 by a rehearsal tag and set up by hand (ADR-049). The first tag that passes the release gate is the first whose `deploy prod` deploys it.
-- Update signing (ADR-004 §4) is not built: an `EXPO_TOKEN` from any of four environments can publish to the `production` channel, and the `preview` environment has no reviewer, so write access to the repository is the trust of the update path.
+- Update signing (ADR-004 §4) is not built: an `EXPO_TOKEN` from any of four environments can publish to the `production` channel, and the `preview` environment has no reviewer, so write access to the repository is the trust of the update path. Through EAS the same token uses the Play key and the upload key on the app's testing tracks (ADR-057 §3).
 - A pull request's `image` job holds `packages: write` and could push any tag of the API image; a later release would retag only a commit `main` built, and the attestation's source ref tells a pull request's image apart (`infra/README.md`, Build provenance and Previews).
 - `auto-approve.yml` needs the repository's setting that lets Actions approve pull requests; whether it is on is not in the repository.
 - Dokploy versus Kamal is open (CLAUDE.md, Decisions); the deploy steps call Dokploy's API, which a change of tool would replace.
