@@ -76,7 +76,7 @@ When two records disagree, the later one is the row, and its Recorded in names b
 
 ## Where the rows come from
 
-Read on 27 and 28/10/2026, at version 0.72.0:
+Read on 27 and 28/10/2026, at version 0.73.0:
 
 - every `matching_config` key the migrations write, with the code that reads it;
 - the constants in the code that set a rule a person meets, and the `shortcut:` comments that are product decisions;
@@ -371,7 +371,7 @@ What two matched people can send each other, what each sees of the other, and th
 | A person may send this many photos in conversations a Finnish day and try this many sends, refused ones included; the tries are counted in memory, so a restart forgets them. | 10 photos and 30 tries a day | `message_photos_per_day`, `message_photo_attempts_per_day` | ADR-031 §10, Open 16; #101 table; #350; migration 0057 | proposed, 18/10/2026 | |
 | A photo in a conversation is signed only for its two people, in links that live 15 to 20 minutes, logged, and never counted against the day's photo budget. | 15 to 20 minutes | `apps/api/src/media/photos.ts` | ADR-031 §10; ADR-005 History 18/10/2026; ADR-008 History 18/10/2026; #350 | no record | |
 | The one way to give a contact in a conversation is to share a stored one: a message with an e-mail address, a link, a phone number or a handle is refused, and the refusal points to sharing. | share, never write | `apps/api/src/chat/messages.ts` | ADR-031 §3, §11; #103 comments 18/10/2026 | maintainer, 18/10/2026 | |
-| A person keeps up to four contacts in Settings, a phone number, WhatsApp, Telegram and Instagram, each optional and checked by its kind; with nothing stored there is no Share. | four kinds | `CONTACT_KINDS` in `packages/schema/src/contact.ts` | ADR-031 §11, Alternatives; #103 comments 18/10/2026; was a phone number and one free handle by #101's table | maintainer, 18/10/2026 | |
+| A person keeps up to five contacts in Settings, a phone number, WhatsApp, Telegram, Instagram and Snapchat, each optional and checked by its kind; with nothing stored there is no Share. | five kinds | `CONTACT_KINDS` in `packages/schema/src/contact.ts` | ADR-031 §11, Alternatives; #103 comments 18/10/2026; #474 and PR #485 (Snapchat, 28/10/2026); was a phone number and one free handle by #101's table | maintainer, 28/10/2026 | |
 | Sharing is one press, one stored contact at a time, and one way: it shows to the other person at once, who is asked nothing and owes nothing back. | one press | `apps/api/src/chat/contacts.ts` | ADR-031 §11; #103 comments 18/10/2026 | maintainer, 18/10/2026 | |
 | A shared contact shows only while the conversation is open and no block stands; stopping, changing or removing it acts at once, and a close, a ban or an erasure ends every share. |  | `apps/api/src/chat/contacts.ts` | ADR-031 §11 (written with #103's build) | assumption | |
 | A shared contact is shown as text to copy, never a link that opens its app, and no line in the thread announces a share; opening it in its app with one tap, and counting the opens for research, is filed for later. | text to copy | `apps/mobile/src/features/chat/SharedContacts.tsx` | ADR-031 §11, Consequences; #473 | proposed, 25/10/2026 | |
