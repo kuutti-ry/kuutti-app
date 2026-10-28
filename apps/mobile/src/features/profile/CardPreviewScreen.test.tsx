@@ -160,17 +160,20 @@ describe("CardPreviewScreen", () => {
     expect(screen.getByText("Yoga (you too), Hiking")).toBeTruthy();
     expect(screen.getByText("I can whistle with my mouth full.")).toBeTruthy();
     // No fixed-height text container anywhere on the card (CLAUDE.md Accessibility).
+    // A line count is one only where the text is cut at it; a text that
+    // shrinks to fit its lines (the header's title, #467) is never cut.
     const fixed = (node: unknown): boolean => {
       if (Array.isArray(node)) return node.some(fixed);
       if (!node || typeof node !== "object") return false;
       const { type, props, children } = node as {
         type?: string;
-        props?: { style?: unknown; numberOfLines?: number };
+        props?: { style?: unknown; numberOfLines?: number; adjustsFontSizeToFit?: boolean };
         children?: unknown;
       };
       if (type === "Text") {
         const style = ([] as unknown[]).concat(props?.style ?? []) as { height?: unknown }[];
-        if (props?.numberOfLines !== undefined || style.some((s) => s?.height !== undefined)) {
+        const cut = props?.numberOfLines !== undefined && props.adjustsFontSizeToFit !== true;
+        if (cut || style.some((s) => s?.height !== undefined)) {
           return true;
         }
       }

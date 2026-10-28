@@ -11,7 +11,12 @@ import { TOUCH_TARGET } from "@/theme/a11y";
 // content is not plain text cannot be written without an accessibilityLabel.
 const buttonVariants = cva(
   cn(
-    "group shrink-0 flex-row items-center justify-center gap-2 rounded-md",
+    // Every variant has outline's 1 px border, transparent but where a variant
+    // or the disabled look draws it: a choice toggles between default (chosen)
+    // and outline, and a busy button between enabled and disabled, and a
+    // button 2 px narrower re-wrapped a row of chips on every tap (#239). The
+    // background shows through it on every platform.
+    "group shrink-0 flex-row items-center justify-center gap-2 rounded-md border border-transparent",
     Platform.select({
       web: "outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none",
     }),
@@ -19,12 +24,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // A transparent border of outline's width: a choice toggles between
-        // default (chosen) and outline, and without it the chosen chip was 2 px
-        // narrower, so a row of chips re-wrapped on every tap (#239). The
-        // background shows through it on every platform.
         default: cn(
-          "border border-transparent bg-primary active:bg-primary/90",
+          "bg-primary active:bg-primary/90",
           Platform.select({ web: "hover:bg-primary/90" }),
         ),
         destructive: cn(
@@ -32,7 +33,7 @@ const buttonVariants = cva(
           Platform.select({ web: "hover:bg-destructive/90" }),
         ),
         outline: cn(
-          "border border-input bg-background active:bg-accent",
+          "border-input bg-background active:bg-accent",
           Platform.select({ web: "hover:bg-accent" }),
         ),
         secondary: cn(
@@ -63,6 +64,19 @@ const buttonTextVariants = cva("text-base font-semibold", {
   },
   defaultVariants: { variant: "default" },
 });
+
+// Disabled is drawn, not faded (#467): opacity took the label to about 3:1 in
+// the high-contrast sets, which aim at 7:1. No fill and a dashed outline tell
+// it from every enabled variant by shape, in all four sets; the label and an
+// icon take --muted-foreground, which check:contrast holds on the background
+// and on a card, and the outline --input, held at 3:1. Its pressed and hover
+// fills go too: on the web a disabled button's label still takes the hover,
+// and the variant's fill came back behind the muted label.
+const DISABLED = cn(
+  "border-dashed border-input bg-transparent active:bg-transparent",
+  Platform.select({ web: "hover:bg-transparent" }),
+);
+const DISABLED_TEXT = "text-muted-foreground";
 
 /**
  * Plain text labels itself. Anything else (an icon, a composed child) has no
@@ -98,11 +112,13 @@ function Button({
   ...props
 }: ButtonProps) {
   return (
-    <TextClassContext.Provider value={buttonTextVariants({ variant })}>
+    <TextClassContext.Provider
+      value={cn(buttonTextVariants({ variant }), props.disabled && DISABLED_TEXT)}
+    >
       <Pressable
         accessibilityRole={accessibilityRole}
         accessibilityState={{ ...accessibilityState, disabled: props.disabled === true }}
-        className={cn(props.disabled && "opacity-50", buttonVariants({ variant, size }), className)}
+        className={cn(buttonVariants({ variant, size }), props.disabled && DISABLED, className)}
         style={[MINIMUM_TARGET, style]}
         {...props}
       >

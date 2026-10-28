@@ -10,7 +10,10 @@ const TRACK_HEIGHT = 32;
 
 // From React Native Reusables (#12), adapted. On and off differ by the thumb's
 // position, not only by colour, and the label is required: a switch has no
-// text of its own.
+// text of its own. Disabled is drawn as a disabled Button is (#467): no fill,
+// a dashed track and a --muted-foreground thumb, still on its side; faded, it
+// fell below the high-contrast sets' contrast, and a dashed edge on the on
+// track's fill would vanish there (black on navy, white on light blue).
 type SwitchProps = Omit<
   React.ComponentProps<typeof SwitchPrimitives.Root>,
   "accessibilityLabel" | "aria-label"
@@ -31,7 +34,7 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
           web: "outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed",
         }),
         props.checked ? "justify-end bg-primary" : "justify-start bg-background",
-        props.disabled && "opacity-50",
+        props.disabled && "border-dashed bg-transparent",
         className,
       )}
       {...props}
@@ -40,6 +43,7 @@ function Switch({ className, accessibilityLabel, ...props }: SwitchProps) {
         className={cn(
           "size-6 rounded-full",
           props.checked ? "bg-primary-foreground" : "bg-input",
+          props.disabled && "bg-muted-foreground",
           Platform.select({ web: "pointer-events-none block" }),
         )}
       />

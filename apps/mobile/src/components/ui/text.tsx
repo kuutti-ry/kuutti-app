@@ -3,10 +3,11 @@ import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 import { Platform, Text as RNText, type Role } from "react-native";
 import { cn } from "@/lib/utils";
-import { MAX_FONT_SCALE } from "@/theme/a11y";
+import { HEADING_FONT_SCALE, MAX_FONT_SCALE } from "@/theme/a11y";
 
 // From React Native Reusables (#12, TD-9), adapted: text follows the OS font
-// size up to MAX_FONT_SCALE, and no variant shrinks at a web breakpoint.
+// size up to MAX_FONT_SCALE, headings less (HEADING_FONT_SCALE), and no
+// variant shrinks at a web breakpoint.
 // font-sans is Saiga (ADR-052).
 const textVariants = cva(
   cn("font-sans text-base text-foreground", Platform.select({ web: "select-text" })),
@@ -41,6 +42,8 @@ const ROLE: Partial<Record<TextVariant, Role>> = {
 
 const ARIA_LEVEL: Partial<Record<TextVariant, string>> = { h1: "1", h2: "2", h3: "3", h4: "4" };
 
+const FONT_SCALE: Partial<Record<TextVariant, number>> = HEADING_FONT_SCALE;
+
 /** The text classes a parent (a Button, a Card) wants its Text children to take. */
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
@@ -56,7 +59,7 @@ function Text({ className, asChild = false, variant = "default", ...props }: Tex
       className={cn(textVariants({ variant }), textClass, className)}
       role={variant ? ROLE[variant] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant] : undefined}
-      maxFontSizeMultiplier={MAX_FONT_SCALE}
+      maxFontSizeMultiplier={(variant && FONT_SCALE[variant]) ?? MAX_FONT_SCALE}
       {...props}
     />
   );

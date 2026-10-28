@@ -13,14 +13,20 @@ describe("Input", () => {
     expect(input.props.maxFontSizeMultiplier).toBe(2);
     expect(input.props.className).toMatch(/\bmin-h-touch\b/);
     expect(input.props.className).not.toMatch(/opacity-50/);
+    expect(input.props.className).not.toMatch(/\bborder-dashed\b/);
     await fireEvent.changeText(input, "Aino");
     expect(typed).toHaveBeenCalledWith("Aino");
   });
 
-  it("is dimmed when it cannot be edited", async () => {
+  it("looks read-only when it cannot be edited", async () => {
     await renderWithTheme(<Input accessibilityLabel="Locked" editable={false} />);
     const input = screen.getByLabelText("Locked");
     expect(input.props.editable).toBe(false);
-    expect(input.props.className).toMatch(/\bopacity-50\b/);
+    // Drawn, not faded (#467): a dashed outline and the text muted.
+    expect(input.props.className).not.toMatch(/opacity-/);
+    expect(input.props.className).toMatch(/\bborder-dashed\b/);
+    // Not the placeholder's own placeholder:text-muted-foreground.
+    expect(input.props.className).toMatch(/(^| )text-muted-foreground( |$)/);
+    expect(input.props.className).not.toMatch(/\btext-foreground\b/);
   });
 });
