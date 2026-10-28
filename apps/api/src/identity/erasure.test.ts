@@ -236,6 +236,7 @@ describe("account erasure", () => {
         accessHash: "h1",
         accessExpiresAt: new Date(Date.now() + 60_000),
         refreshHash: "h2",
+        familyHash: "h3",
         expiresAt: new Date(Date.now() + 60_000),
         at: new Date(),
       }),
@@ -501,9 +502,9 @@ describe("account erasure and export: the edges", () => {
     const { app } = await appWith(ctx, { media: false });
     const a = await signedInAccount(ctx.client);
     const { rows } = await ctx.client.query<{ id: string; platform: string }>(
-      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at, revoked_at)
-       VALUES ($1, 'android', 'edge-a1', now() + interval '15 minutes', 'edge-r1', now() + interval '90 days', NULL),
-              ($1, 'android', 'edge-a2', now() + interval '15 minutes', 'edge-r2', now() + interval '90 days', now())
+      `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, revoked_at)
+       VALUES ($1, 'android', 'edge-a1', now() + interval '15 minutes', 'edge-r1', 'edge-f1', now() + interval '90 days', NULL),
+              ($1, 'android', 'edge-a2', now() + interval '15 minutes', 'edge-r2', 'edge-f2', now() + interval '90 days', now())
        RETURNING id, platform`,
       [a.accountId],
     );

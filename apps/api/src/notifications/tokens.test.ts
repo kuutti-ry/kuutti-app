@@ -78,10 +78,15 @@ async function anotherDevice(ctx: TestContext, who: Person) {
   devices += 1;
   const accessToken = `tokens-test-access-${process.pid}-${devices}`.padEnd(43, "x");
   const { rows } = await ctx.client.query<{ id: string }>(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at)
-     VALUES ($1, 'android', $2, now() + interval '15 minutes', $3, now() + interval '90 days')
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+     VALUES ($1, 'android', $2, now() + interval '15 minutes', $3, $4, now() + interval '90 days')
      RETURNING id`,
-    [who.accountId, hashToken(accessToken), hashToken(`${accessToken}-refresh`)],
+    [
+      who.accountId,
+      hashToken(accessToken),
+      hashToken(`${accessToken}-refresh`),
+      hashToken(`${accessToken}-family`),
+    ],
   );
   const sessionId = rows[0]?.id;
   if (!sessionId) throw new Error("no second session");

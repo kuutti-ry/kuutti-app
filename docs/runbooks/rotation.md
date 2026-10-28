@@ -199,7 +199,7 @@ The private half signs every photo URL. A profile photo's lives fifteen minutes 
 
 ## 8. Session tokens and sign-in codes: nothing to rotate
 
-There is no session secret. Access and refresh tokens, admin tokens and one-time sign-in codes are random 256-bit values; the database keeps only their SHA-256 hashes (`apps/api/src/identity/sessions.ts`, `admin-session.ts`, `codes.ts`). A refresh rotates both tokens with reuse detection. Admin sessions last eight hours.
+There is no session secret on the server. Access tokens, admin tokens and one-time sign-in codes are random 256-bit values, and a refresh token is two of them, its session's own secret and the part each refresh replaces (ADR-059); the database keeps only their SHA-256 hashes (`apps/api/src/identity/sessions.ts`, `admin-session.ts`, `codes.ts`). A refresh rotates both tokens with reuse detection. Admin sessions last eight hours.
 
 To end every session at once (after a database leak, say), as `kuutti_app` through the tunnel of section 1:
 

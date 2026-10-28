@@ -28,7 +28,7 @@ const tokens = (n: number, accessExpiresInMs = 15 * 60 * 1000): SessionTokens =>
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token(`access${n}`),
   accessExpiresAt: new Date(BASE + accessExpiresInMs).toISOString(),
-  refreshToken: token(`refresh${n}`),
+  refreshToken: `${token("family")}.${token(`refresh${n}`)}`,
   refreshExpiresAt: new Date(BASE + 90 * 24 * 3600 * 1000).toISOString(),
 });
 
@@ -78,6 +78,14 @@ describe("session storage", () => {
   it("treats a value that does not parse as no session", async () => {
     await SecureStore.setItemAsync("kuutti.session", "{not json");
     expect(await loadSession()).toBeNull();
+  });
+
+  it("treats a session stored before ADR-059, whose refresh token was one part, as no session", async () => {
+    // The deploy of #490 ended every such session; the phone goes to the bank without asking the API.
+    const before = { ...tokens(1), refreshToken: token("refresh1") };
+    await SecureStore.setItemAsync("kuutti.session", JSON.stringify(before));
+    expect(await loadSession()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("calls an access token stale thirty seconds before its expiry", () => {
@@ -156,10 +164,12 @@ describe("refresh", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toMatch(/\/auth\/refresh$/);
-    expect(JSON.parse(String(init.body))).toEqual({ refreshToken: token("refresh1") });
+    expect(JSON.parse(String(init.body))).toEqual({
+      refreshToken: `${token("family")}.${token("refresh1")}`,
+    });
     expect(a?.accessToken).toBe(token("access2"));
     expect(b).toEqual(a);
-    expect(currentSession()?.refreshToken).toBe(token("refresh2"));
+    expect(currentSession()?.refreshToken).toBe(tokens(2).refreshToken);
   });
 
   it("signs the device out when the API refuses the refresh token", async () => {

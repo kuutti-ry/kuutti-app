@@ -581,6 +581,93 @@ describe("migrate", () => {
     }
   });
 
+  it("migrations 0086 and 0087 end every phone's session with its push token, leave the staff's, and give each session a family hash it must have (#490, ADR-059)", async () => {
+    const before0086 = migrationsBefore("0086_end_sessions_for_token_family");
+    try {
+      await withTemporaryDatabase(async (url) => {
+        const pool = createPool({ connectionString: url, max: 2 });
+        try {
+          await migrate(pool, before0086);
+          const identity = await pool.query<{ id: string }>(
+            "INSERT INTO identity (hetu_hmac) VALUES ($1) RETURNING id",
+            ["e".repeat(64)],
+          );
+          const identityId = identity.rows[0]?.id;
+          const account = await pool.query<{ id: string }>(
+            "INSERT INTO account (identity_id) VALUES ($1) RETURNING id",
+            [identityId],
+          );
+          const accountId = account.rows[0]?.id;
+          // A live session that has refreshed once, and one signed out, as rows before ADR-059 were.
+          const sessions = await pool.query<{ id: string }>(
+            `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, retired_refresh_hash, expires_at, revoked_at)
+             VALUES ($1, 'ios', 'a1', now() + interval '15 minutes', 'r1', 'r0', now() + interval '90 days', NULL),
+                    ($1, 'android', 'a2', now() + interval '15 minutes', 'r2', NULL, now() + interval '90 days', now())
+             RETURNING id`,
+            [accountId],
+          );
+          await pool.query(
+            `INSERT INTO push_token (account_id, session_id, token, platform, locale)
+             VALUES ($1, $2, 'ExponentPushToken[migration-0086]', 'ios', 'fi')`,
+            [accountId, sessions.rows[0]?.id],
+          );
+          await pool.query(
+            `INSERT INTO admin_session (identity_id, role, access_hash, expires_at)
+             VALUES ($1, 'moderator', 'staff-a1', now() + interval '8 hours')`,
+            [identityId],
+          );
+
+          expect((await migrate(pool, MIGRATIONS)).state).toBe("applied");
+          const count = async (table: string) =>
+            Number(
+              (await pool.query<{ n: string }>(`SELECT count(*) AS n FROM ${table}`)).rows[0]?.n,
+            );
+          expect(await count("session")).toBe(0);
+          expect(await count("push_token")).toBe(0);
+          expect(await count("admin_session")).toBe(1);
+          expect(await count("account")).toBe(1);
+          const columns = await pool.query<{ column_name: string; is_nullable: string }>(
+            `SELECT column_name, is_nullable FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'session'
+               AND column_name IN ('family_hash', 'refresh_hash', 'retired_refresh_hash')
+             ORDER BY column_name`,
+          );
+          expect(columns.rows).toEqual([
+            { column_name: "family_hash", is_nullable: "NO" },
+            { column_name: "refresh_hash", is_nullable: "NO" },
+          ]);
+          const indexes = await pool.query<{ indexname: string }>(
+            "SELECT indexname FROM pg_indexes WHERE tablename = 'session' ORDER BY indexname",
+          );
+          expect(indexes.rows.map((row) => row.indexname)).toEqual([
+            "session_access_hash_unique",
+            "session_account_idx",
+            "session_family_hash_unique",
+            "session_pkey",
+            "session_refresh_hash_unique",
+          ]);
+
+          const insert = (family: string | null, refresh: string) =>
+            pool.query(
+              `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+               VALUES ($1, 'ios', $2, now() + interval '15 minutes', $2, $3, now() + interval '90 days')`,
+              [accountId, refresh, family],
+            );
+          await insert("f1", "r3");
+          await expect(insert(null, "r4")).rejects.toMatchObject({ code: "23502" });
+          await expect(insert("f1", "r5")).rejects.toMatchObject({
+            code: "23505",
+            constraint: "session_family_hash_unique",
+          });
+        } finally {
+          await pool.end();
+        }
+      });
+    } finally {
+      rmSync(before0086, { recursive: true, force: true });
+    }
+  });
+
   it("is a no-op the second time", async () => {
     await withTemporaryDatabase(async (url) => {
       const pool = createPool({ connectionString: url, max: 2 });

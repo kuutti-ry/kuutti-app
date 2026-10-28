@@ -985,7 +985,7 @@ describe("the sign-in doors (ADR-026 §4)", () => {
     const refresh = await app.request("/auth/refresh", {
       method: "POST",
       headers: { ...from(HERE), "content-type": "application/json" },
-      body: JSON.stringify({ refreshToken: "B".repeat(43) }),
+      body: JSON.stringify({ refreshToken: `${"B".repeat(43)}.${"C".repeat(43)}` }),
     });
     expect(refresh.status).toBe(401);
     expect(await errorCode(refresh)).toBe("session_revoked");

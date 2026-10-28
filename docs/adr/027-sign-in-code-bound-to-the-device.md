@@ -57,3 +57,4 @@ RFC 8252 asks for PKCE between the app and its authorization server. Here that s
 ## History
 
 - 2026-10-28, ADR-058 (#472): a session's ninety days count from its last refresh, up to a year from the bank login, so the app of Context that took the code holds the person's tokens as long as it refreshes them at least every ninety days, up to that year. No point changes.
+- 2026-10-28, ADR-059 (#490): an earlier refresh token of a session presented again ends the session for every holder, however many refreshes back it is. That does not reach the app of Context, nor one that starts an attempt of its own (What it does not close): the person's own app never held a token of that session, so none comes back, and the line above stands. No point changes.

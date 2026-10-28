@@ -111,3 +111,4 @@ On 25/10/2026 the maintainer decided: attestation not now, in a defined shape la
 
 - 2026-10-25: written with the rest of #86, on the maintainer's decisions of that day. #86's body holds the research behind it.
 - 2026-10-28, ADR-058 (#472): a refresh token's ninety days count from its last refresh, up to a year from the bank login, so the lifted token under What attestation does not touch works as long as it is refreshed at least every ninety days, up to that year. No point changes.
+- 2026-10-28, ADR-059 (#490): any earlier refresh token of a session presented again ends the session for every holder, so the lifted token under What attestation does not touch works only until the phone's owner next uses the app, however often the script refreshed first. A token the owner reads from their own phone (How a token is read) and uses from a script, with the app left unused, has no second holder, and works as before. No point changes.

@@ -17,6 +17,8 @@ const codes = (schema: z.ZodType, input: unknown) =>
   schema.safeParse(input).error?.issues.map((issue) => issue.code) ?? [];
 
 const token = "Zz09_-".padEnd(43, "q");
+/** A refresh token (ADR-059): the session's secret, a dot, the part each refresh replaces. */
+const refresh = `${token}.${"Rr18-_".padEnd(43, "w")}`;
 /** 256 bits as lowercase hex: the shape of the app's verifier and of its challenge (ADR-027). */
 const hex = "0123456789abcdef".repeat(4);
 const at = "2026-10-01T12:00:00.000Z";
@@ -102,9 +104,27 @@ describe("the one-time code and the session tokens", () => {
     [`${"A".repeat(42)}/`, false],
     [`${"A".repeat(42)}=`, false],
     [`${"A".repeat(42)} `, false],
-  ])("takes %s as a one-time code and a refresh token: %s", (code, ok) => {
+  ])("takes %s as a one-time code: %s", (code, ok) => {
     expect(AuthExchangeRequest.safeParse({ code, verifier: hex }).success).toBe(ok);
-    expect(AuthRefreshRequest.safeParse({ refreshToken: code }).success).toBe(ok);
+  });
+
+  it.each([
+    [refresh, true],
+    [`${"A".repeat(43)}.${"-".repeat(43)}`, true],
+    // One part, as a refresh token was before ADR-059: refused, so its phone signs in again.
+    [token, false],
+    [`${token}.`, false],
+    [`.${token}`, false],
+    [`${token}.${"A".repeat(42)}`, false],
+    [`${token}.${"A".repeat(44)}`, false],
+    [`${"A".repeat(42)}.${token}`, false],
+    [`${token}.${token}.${token}`, false],
+    [`${token}:${token}`, false],
+    [`${token}.${"A".repeat(42)}/`, false],
+    [`${token}.${"A".repeat(42)}=`, false],
+    [`${refresh} `, false],
+  ])("takes %s as a refresh token: %s", (refreshToken, ok) => {
+    expect(AuthRefreshRequest.safeParse({ refreshToken }).success).toBe(ok);
   });
 
   it.each([
@@ -136,7 +156,7 @@ describe("the one-time code and the session tokens", () => {
       "invalid_type",
       "unrecognized_keys",
     ]);
-    expect(codes(AuthRefreshRequest, { refreshToken: token, accessToken: token })).toEqual([
+    expect(codes(AuthRefreshRequest, { refreshToken: refresh, accessToken: token })).toEqual([
       "unrecognized_keys",
     ]);
   });
@@ -145,7 +165,7 @@ describe("the one-time code and the session tokens", () => {
     sessionId: uuid(1),
     accessToken: token,
     accessExpiresAt: at,
-    refreshToken: token,
+    refreshToken: refresh,
     refreshExpiresAt: at,
   };
 
@@ -160,6 +180,8 @@ describe("the one-time code and the session tokens", () => {
   it.each([
     ["an unknown outcome", { outcome: "restored" }],
     ["an access token of the wrong shape", { outcome: "created", accessToken: "x" }],
+    ["an access token of a refresh token's shape", { outcome: "created", accessToken: refresh }],
+    ["a refresh token of one part, as before ADR-059", { outcome: "created", refreshToken: token }],
     ["a session id that is not a uuid", { outcome: "created", sessionId: "s-1" }],
     ["an end that is not a timestamp", { outcome: "created", refreshExpiresAt: "soon" }],
   ])("refuses %s", (_, change) => {

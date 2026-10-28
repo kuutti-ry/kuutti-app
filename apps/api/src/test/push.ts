@@ -111,14 +111,15 @@ export async function deviceOf(
   const at = options.at ?? new Date("2026-10-01T09:00:00.000Z");
   const platform = options.platform ?? "ios";
   const session = await db.query<{ id: string }>(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at, revoked_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, revoked_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
     [
       accountId,
       platform,
       `push-device-access-${process.pid}-${devices}`,
       new Date(at.getTime() + 15 * 60 * 1000),
       `push-device-refresh-${process.pid}-${devices}`,
+      `push-device-family-${process.pid}-${devices}`,
       options.expiresAt ?? new Date(at.getTime() + 365 * 24 * 60 * 60 * 1000),
       options.revokedAt ?? null,
     ],

@@ -1,6 +1,6 @@
 # ADR-058: A phone's session ends ninety days after its last use, and a year after its bank login
 
-- Status: accepted 2026-10-28 (#472, the maintainer's decisions of that day: a ceiling of a year from the bank login, kept with Open 1, recognising any earlier refresh token, as a change of its own; built as written here)
+- Status: accepted 2026-10-28 (#472, the maintainer's decisions of that day: a ceiling of a year from the bank login, kept with Open 1, recognising any earlier refresh token, as a change of its own; built as written here), amended by ADR-059 on 2026-10-28 (§4: reuse detection recognises every earlier refresh token of a session, #490; Open 1 settled; see History)
 - Date: 2026-10-28
 - Follows: TD-1 (every account is a bank login), ADR-016 §3 (what a sign-in costs; amended here), ADR-027 (the sign-in bound to the device), ADR-045 (the app lock gates the screens, never the session), ADR-055 §3 (a push token goes with its session), ADR-056 (what a lifted refresh token can do), `docs/security-checklist.md` (the sessions item), RFC 9700 §4.14.2, OWASP ASVS 5.0 7.1.1, 7.3.1 and 7.3.2; issues #35, #25, #396, #472
 
@@ -24,7 +24,7 @@ The privacy notice on kuutti.app already says, in its How long table, that a ses
 
 Three things already limit a refresh token taken from a phone, one of them less than it seems:
 
-- rotation, one refresh back: the row keeps the hash of the token the last refresh retired, and that token presented again ends the session for both holders (`refreshSession`, `apps/api/src/identity/sessions.ts`). A token two refreshes old reads as unknown and ends nothing (`rotateSession`, `repo.ts`). So a taker who refreshes twice before the owner's next use is not caught: the owner's phone is signed out as if its session had ended, and the taker keeps the session;
+- rotation, one refresh back until ADR-059: the row keeps the hash of the token the last refresh retired, and that token presented again ends the session for both holders (`refreshSession`, `apps/api/src/identity/sessions.ts`). A token two refreshes old reads as unknown and ends nothing (`rotateSession`, `repo.ts`). So a taker who refreshes twice before the owner's next use is not caught: the owner's phone is signed out as if its session had ended, and the taker keeps the session;
 - Log out everywhere ends every device's session at once, and a sanction does the same (ADR-024);
 - the tokens are kept in the phone's secure store, readable while the phone is unlocked and on that device only (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`, `apps/mobile/src/lib/session.ts`), so neither a backup nor a new phone carries them.
 
@@ -42,13 +42,13 @@ Three things already limit a refresh token taken from a phone, one of them less 
 4. **The deviation from NIST SP 800-63B, as ASVS 7.1.1 asks.**
    - NIST's AAL2 asks for an overall reauthentication timeout of no more than 24 hours and an inactivity timeout of no more than an hour (SP 800-63B-4 §2.2.3, both as SHOULD).
    - Kuutti's session meets neither, and did not before this record either. A bank login is a billed identification and a minute of the person's, and a dating app opened daily would send everybody to the bank daily.
-   - What stands in for them: a session bound to one device and rotated with reuse detection one refresh back, the ninety days and the year of points 1 and 2, and the app lock for a phone in somebody else's hand (ADR-045), which is off until the person turns it on.
+   - What stands in for them: a session bound to one device and rotated with reuse detection, one refresh back until ADR-059 and every earlier token since, the ninety days and the year of points 1 and 2, and the app lock for a phone in somebody else's hand (ADR-045), which is off until the person turns it on.
 
 ## Consequences
 
 - At 5,000 active members the year costs some 420 logins a month instead of some 1,700; at 600, some 50 instead of some 200. Registrations, new phones, sign-outs, sanctions and Log out everywhere come on top, as before.
-- A refresh token taken from a phone now works as long as somebody refreshes it at least every ninety days, up to the year. The owner's next refresh ends it only while the taker has refreshed once at most since the owner's last. A taker who refreshes twice first signs the owner out instead, and keeps the session until the year, ninety idle days, a sanction or Log out everywhere. Before this record that session ended ninety days after the bank login at the latest. ADR-056's "lifted 90-day refresh token" and ADR-027's app that took the code read so since this record (their History).
-- Lifting the token takes the phone's secure store, unlocked, on that device (Context). Recognising every earlier token of a session, rather than the last one alone, would close the gap. That needs the refresh token to carry a secret of its session, a column to find it by, and a contract change, so it is a change of its own (Open 1).
+- A refresh token taken from a phone now works as long as somebody refreshes it at least every ninety days, up to the year. Until ADR-059 the owner's next refresh ended it only while the taker had refreshed once at most since the owner's last; a taker who refreshed twice first signed the owner out instead, and kept the session until the year, ninety idle days, a sanction or Log out everywhere. Since ADR-059 the owner's next refresh ends it however often the taker refreshed. Before this record that session ended ninety days after the bank login at the latest. ADR-056's "lifted 90-day refresh token" and ADR-027's app that took the code read so since this record (their History).
+- Lifting the token takes the phone's secure store, unlocked, on that device (Context). Recognising every earlier token of a session, rather than the last one alone, would close the gap. That needs the refresh token to carry a secret of its session, a column to find it by, and a contract change, so it is a change of its own (Open 1), made by ADR-059.
 - A session row can live longer: until the night after its end, a year after the bank login at most. One ended earlier, by a sign-out or a revocation, is kept thirty days after that, and never past the night after its end. `docs/runbooks/police-disclosure.md` says so where it says how long a device is kept. The privacy notice needs no change: it keeps a session in use until it is ended, and one not used ninety days.
 - ADR-016 §3 names the two moments this record adds (its History).
 - `docs/security-checklist.md`'s sessions item, `docs/architecture/sequence-login.md` step 27, `docs/runbooks/capacity.md` (the load smoke's file of tokens), `.claude/rules/api.md` and the contract's description of `refreshExpiresAt` say the same.
@@ -64,8 +64,9 @@ Three things already limit a refresh token taken from a phone, one of them less 
 
 ## Open, the maintainer's
 
-1. Recognising any earlier refresh token of a session, so that the owner's next refresh ends a lifted session however often the taker refreshed (Consequences). The maintainer chose on 2026-10-28 to keep the year with this gap written down, and to design the recognition as a change of its own: #490.
+1. Recognising any earlier refresh token of a session, so that the owner's next refresh ends a lifted session however often the taker refreshed (Consequences). The maintainer chose on 2026-10-28 to keep the year with this gap written down, and to design the recognition as a change of its own: #490. Settled by ADR-059 on 2026-10-28: the refresh token carries a secret of its session, and any earlier token of the session presented again ends it for every holder.
 
 ## History
 
 - 2026-10-28: written with #472, on the maintainer's answers of that day: a year from the bank login, kept once the review had shown that rotation catches reuse one refresh back only (Open 1).
+- 2026-10-28, ADR-059 (#490): Open 1 settled. The refresh token carries a secret of its session, fixed for its life, so any earlier token presented again ends the session for every holder, however often the taker refreshed. §4's reuse detection, the Context and the Consequences say "until ADR-059" where they described the gap as present. Its deploy ends every session once (ADR-059 §7).

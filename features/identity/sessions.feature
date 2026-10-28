@@ -4,7 +4,9 @@ Feature: Device-bound sessions
   a short-lived access token and a single-use refresh token; losing a phone is
   answered by one new bank login and "log out everywhere". A phone in use stays
   signed in: each refresh moves the session's end ninety days on, never past a
-  year from the bank login (ADR-058).
+  year from the bank login (ADR-058). Every refresh token of a session carries
+  its secret, so any retired one presented again ends the session, however
+  often it was refreshed since (ADR-059).
 
   Scenario: An exchanged code yields a session that answers as the account
     Given "A" has completed a bank login and holds the one-time code
@@ -23,6 +25,12 @@ Feature: Device-bound sessions
     When the retired refresh token is presented again
     Then the answer is session_revoked
     And the pair from the first refresh no longer answers either
+
+  Scenario: A refresh token two refreshes old ends the session for both holders
+    Given someone copied a device's refresh token and has refreshed with it twice
+    When the device presents the refresh token it holds
+    Then the answer is session_revoked
+    And the copier's latest pair no longer answers either
 
   Scenario: An expired access token asks for a refresh
     Given a device's access token has passed its fifteen minutes

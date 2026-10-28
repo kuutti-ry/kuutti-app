@@ -17,7 +17,7 @@ const tokens = (seed: string, expiresInMinutes = 15): SessionTokens => ({
   sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
   accessToken: token(`access${seed}`),
   accessExpiresAt: minutes(expiresInMinutes),
-  refreshToken: token(`refresh${seed}`),
+  refreshToken: `${token("family")}.${token(`refresh${seed}`)}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 });
 const json = (body: unknown, status = 200) =>
