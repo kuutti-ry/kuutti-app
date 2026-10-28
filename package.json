@@ -39,6 +39,7 @@
     "version:bump": "node scripts/bump-version.ts",
     "check:licenses": "node scripts/check-licenses.ts",
     "check:adr-index": "node scripts/check-adr-index.ts",
+    "check:decisions": "node scripts/check-decisions.ts",
     "check:docs": "node scripts/check-docs.ts",
     "check:fonts": "node scripts/check-fonts.ts",
     "check:legal-versions": "node packages/i18n/scripts/check-legal-versions.ts",

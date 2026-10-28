@@ -11,8 +11,9 @@
  *       infra/modules/media/
  *       -->
  *
- * - Every view of docs/architecture/ has one (#397), its README aside.
- *   Another folder joins REQUIRED_DIRS in the change that lands it.
+ * - Every view of docs/architecture/ has one (#397), its README aside, and so
+ *   does the register of decisions (#396). Another folder or file joins
+ *   REQUIRED in the change that lands it.
  * - Fails on a required document without a block, a path in a block that is
  *   not in the repository (a rename or a removal changes what is drawn), and a
  *   drawn file this change touches while its document is neither touched nor
@@ -35,7 +36,8 @@ import { join } from "node:path";
 type Doc = { file: string; draws: string[] | undefined };
 
 const ROOT = join(import.meta.dirname, "..");
-const REQUIRED_DIRS = ["docs/architecture"];
+// As in a block: a trailing `/` is a folder and everything in it.
+const REQUIRED = ["docs/architecture/", "docs/decisions.md"];
 // Right under the title, so a block quoted further down is no block.
 const BLOCK = /^# [^\n]*\n\s*<!--\s*draws\s*\n([\s\S]*?)-->/;
 const STILL_TRUE = /^still-true:(.*)$/gim;
@@ -75,7 +77,7 @@ function problemsOf(
   const named = stillTrue(messages);
   for (const doc of docs) {
     if (doc.draws === undefined) {
-      const required = REQUIRED_DIRS.some((dir) => doc.file.startsWith(`${dir}/`));
+      const required = REQUIRED.some((entry) => drawn(doc.file, entry));
       if (required && !doc.file.endsWith("/README.md")) {
         problems.push(`${doc.file} has no "<!-- draws" block: name the files it draws`);
       }
@@ -171,6 +173,14 @@ function selfTest(): void {
       [],
       "",
       ['docs/architecture/new.md has no "<!-- draws" block'],
+    ],
+    [
+      "the register without a block",
+      [{ file: "docs/decisions.md", draws: undefined }],
+      all,
+      [],
+      "",
+      ['docs/decisions.md has no "<!-- draws" block'],
     ],
     [
       "a document elsewhere without one",
