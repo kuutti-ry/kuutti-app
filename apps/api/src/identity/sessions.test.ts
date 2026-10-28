@@ -10,13 +10,16 @@ import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
 import * as repo from "./repo.ts";
-import { describeSession, issueSession, sweepSessions } from "./sessions.ts";
+import { describeSession, issueSession, refreshSession, sweepSessions } from "./sessions.ts";
 
 // features/identity/sessions.feature (#35): scenario names verbatim, plus the
 // route checklist (validation, unauthenticated, wrong-user). Real Postgres,
 // one rolled-back transaction per test; time moves by updating the rows.
 
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+const DAY = 24 * 60 * 60 * 1000;
+/** A bank login on a day of its own, for the sessions' timelines (ADR-058): exact, and no wall clock. */
+const LOGIN = new Date("2026-03-02T08:00:00.000Z");
 
 type Ctx = { client: Parameters<typeof createApp>[0]["db"] };
 
@@ -134,13 +137,20 @@ describe("sessions", () => {
 
   test("A refresh rotates both tokens and retires the old ones", async ({ ctx }) => {
     const a = await device(ctx, await accountRow(ctx, "a"));
+    // A day off the end, which the refresh gives back (ADR-058 §1).
+    await ctx.client.query(
+      "UPDATE session SET expires_at = expires_at - interval '1 day' WHERE id = $1",
+      [a.sessionId],
+    );
     const res = await refresh(ctx.app, a.refreshToken);
     expect(res.status).toBe(200);
     const next = SessionTokens.parse(await res.json());
     expect(next.sessionId).toBe(a.sessionId);
     expect(next.accessToken).not.toBe(a.accessToken);
     expect(next.refreshToken).not.toBe(a.refreshToken);
-    expect(next.refreshExpiresAt).toBe(a.refreshExpiresAt);
+    expect(Date.parse(next.refreshExpiresAt)).toBeGreaterThanOrEqual(
+      Date.parse(a.refreshExpiresAt),
+    );
     expect((await whoami(ctx.app, next.accessToken)).status).toBe(200);
     expect((await whoami(ctx.app, a.accessToken)).code).toBe("unauthenticated");
   });
@@ -165,6 +175,72 @@ describe("sessions", () => {
     expect(res.status).toBe(200);
     expect((await whoami(ctx.app, SessionTokens.parse(await res.json()).accessToken)).status).toBe(
       200,
+    );
+  });
+
+  // The timelines below run on a clock of their own, `ms` after LOGIN.
+  const on = (ctx: Ctx, ms: number) => ({
+    db: ctx.client,
+    now: () => new Date(LOGIN.getTime() + ms),
+  });
+  const after = (ms: number) => new Date(LOGIN.getTime() + ms).toISOString();
+  const signIn = (ctx: Ctx, accountId: string) =>
+    issueSession(on(ctx, 0), { accountId, platform: "ios", userAgent: "test" });
+  const refused = {
+    status: 401,
+    code: "session_revoked",
+    detail: { reason: "unknown_or_expired" },
+  };
+
+  test("A refresh moves the session's end to ninety days on", async ({ ctx }) => {
+    const account = await accountRow(ctx, "a");
+    const a = await signIn(ctx, account);
+    expect(a.refreshExpiresAt).toBe(after(90 * DAY));
+    const next = await refreshSession(on(ctx, 89 * DAY), a.refreshToken);
+    expect(next.sessionId).toBe(a.sessionId);
+    expect(next.accessToken).not.toBe(a.accessToken);
+    expect(next.refreshToken).not.toBe(a.refreshToken);
+    expect(next.refreshExpiresAt).toBe(after(179 * DAY));
+    // The device list reads the same end as the answer.
+    const described = await describeSession(on(ctx, 89 * DAY), {
+      accountId: account,
+      sessionId: a.sessionId,
+    });
+    expect(described.refreshExpiresAt).toBe(next.refreshExpiresAt);
+    // The end's last millisecond still refreshes, and moves it again.
+    const last = await refreshSession(on(ctx, 179 * DAY - 1), next.refreshToken);
+    expect(last.refreshExpiresAt).toBe(after(269 * DAY - 1));
+  });
+
+  test("A phone left for ninety days signs in through the bank again", async ({ ctx }) => {
+    const a = await signIn(ctx, await accountRow(ctx, "a"));
+    const next = await refreshSession(on(ctx, 10 * DAY), a.refreshToken);
+    expect(next.refreshExpiresAt).toBe(after(100 * DAY));
+    await expect(refreshSession(on(ctx, 100 * DAY), next.refreshToken)).rejects.toMatchObject(
+      refused,
+    );
+    // An idle phone is no theft: the row is left to the sweep, not revoked.
+    const row = await ctx.client.query("SELECT revoked_at FROM session WHERE id = $1", [
+      a.sessionId,
+    ]);
+    expect(row.rows).toEqual([{ revoked_at: null }]);
+  });
+
+  test("A year after the bank login even a phone in use signs in again", async ({ ctx }) => {
+    let tokens = await signIn(ctx, await accountRow(ctx, "a"));
+    // Ninety days on from each refresh, until that would pass the year.
+    for (const [day, end] of [
+      [80, 170],
+      [160, 250],
+      [240, 330],
+      [320, 365],
+      [364, 365],
+    ] as const) {
+      tokens = await refreshSession(on(ctx, day * DAY), tokens.refreshToken);
+      expect(tokens.refreshExpiresAt).toBe(after(end * DAY));
+    }
+    await expect(refreshSession(on(ctx, 365 * DAY), tokens.refreshToken)).rejects.toMatchObject(
+      refused,
     );
   });
 

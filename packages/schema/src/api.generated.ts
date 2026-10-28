@@ -7459,7 +7459,7 @@ export interface components {
             refreshToken: string;
             /**
              * Format: date-time
-             * @description After this the device logs in through the bank again.
+             * @description After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058).
              */
             refreshExpiresAt: string;
             /**
@@ -7488,7 +7488,7 @@ export interface components {
             refreshToken: string;
             /**
              * Format: date-time
-             * @description After this the device logs in through the bank again.
+             * @description After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058).
              */
             refreshExpiresAt: string;
         };

@@ -53,3 +53,7 @@ RFC 8252 asks for PKCE between the app and its authorization server. Here that s
 - **Keeping the verifier for the pending mark's ten minutes, so an older tab's code still works:** one verifier would then serve two attempts.
 - **Binding the panel too:** nothing can intercept its return (§4).
 - **A log line that tells a wrong verifier from an unknown code:** one more query on every refused exchange, and noisy, since a code from an older tab (§1) would be logged as one.
+
+## History
+
+- 2026-10-28, ADR-058 (#472): a session's ninety days count from its last refresh, up to a year from the bank login, so the app of Context that took the code holds the person's tokens as long as it refreshes them at least every ninety days, up to that year. No point changes.

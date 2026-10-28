@@ -1,6 +1,6 @@
 # ADR-016: The bank, every time: `prompt=login` and an `auth_time` no older than the attempt
 
-- Status: proposed (built as written here; the maintainer's planning handoff of 2026-10-07 names `prompt=login` as a Kuutti requirement, and this record is the ADR that CLAUDE.md asks for when the identity flow changes)
+- Status: proposed (built as written here; the maintainer's planning handoff of 2026-10-07 names `prompt=login` as a Kuutti requirement, and this record is the ADR that CLAUDE.md asks for when the identity flow changes), amended by ADR-058 on 2026-10-28 (§3: a session ends ninety days after its last use and a year after its bank login, #472; see History)
 - Date: 2026-10-07
 - Follows: TD-1 (one identity per person, verified at the bank), TD-7 (standing and re-registration decided at the callback), CLAUDE.md rules 1 and 6, `docs/vendors/telia.md` (guide 2.4.3: `prompt`, `max_age`; 2.6.4: `auth_time`), `.claude/rules/api.md` Identity and auth; issues #32, #33
 
@@ -18,7 +18,7 @@ Until now the request object carried neither lever, and the confirmations table 
 
 1. **Every request object carries `prompt=login`.** The adapter adds it in `startLogin` for both dialects (Telia and the mock IdP), so that the local flow is the deployed flow. `max_age` is not sent: `prompt=login` is the guide's named mechanism for exactly this, and one lever is one thing to verify at the first pre-production login.
 2. **An `auth_time` earlier than the attempt is refused.** At the callback, after the broker's answer is verified and before anything is derived or written, the login compares the broker's `auth_time` with the attempt's own `created_at`. An authentication more than two minutes older than the attempt (`AUTH_TIME_TOLERANCE_MS`, `login.ts`) is answered `auth_provider_error`, like any other answer that is not a login of this person; nothing is created or counted. The tolerance is for clocks: the broker's and the database's are both disciplined by NTP and differ by seconds, and a reused session is minutes or hours old.
-3. **What this costs.** Every sign-in is an identification event at the broker and, in production, a billed one. Sessions are device-bound and long-lived (#35), so a sign-in happens at registration, on a new device, and after a revocation, not at every app open. The number stays small by the session design, not by skipping the bank.
+3. **What this costs.** Every sign-in is an identification event at the broker and, in production, a billed one. Sessions are device-bound and long-lived (#35), so a sign-in happens at registration, on a new device, and after a revocation, not at every app open; since ADR-058 also after ninety days without use and a year after the bank login. The number stays small by the session design, not by skipping the bank.
 
 ## Consequences
 
@@ -31,3 +31,7 @@ Until now the request object carried neither lever, and the confirmations table 
 
 - PKCE (`code_challenge`, S256): the broker advertises it, the guide does not mention it, and with `private_key_jwt` and a confidential client it defends against code injection only. It needs a column for the verifier; it is a change of its own if wanted. The app's own one-time code is bound to its attempt by ADR-027; this item is Telia's code only.
 - Whether `max_age` is also sent, should Telia turn out to honour one lever and not the other. The first pre-production login answers that.
+
+## History
+
+- 2026-10-28, ADR-058 (#472): §3's long-lived sessions end ninety days after their last refresh and a year after the bank login at most. Until then the ninety days ran from the bank login, so a phone in daily use met the bank every quarter, a billed sign-in §3 did not name.

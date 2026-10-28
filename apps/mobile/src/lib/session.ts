@@ -10,7 +10,8 @@ import { apiBaseUrl } from "./api-url";
  * surface on the web (rule 8). Refreshing is single-flight, so ten requests
  * that meet an expired access token cause one refresh, and a refresh the API
  * refuses signs the device out (the refresh token was retired, revoked or is
- * past its ninety days: the person logs in through their bank again).
+ * past its end, ninety days unused or a year after the bank login, ADR-058:
+ * the person logs in through their bank again).
  */
 export type StoredSession = SessionTokens;
 
@@ -22,15 +23,15 @@ let memory: StoredSession | null = null;
  * A session belongs to the device that signed in through the bank (#35, TD-1):
  * an iOS keychain item with the default accessibility is restored onto a new
  * iPhone from an encrypted backup or a device transfer, and the new phone would
- * resume the ninety-day session without the bank. THIS_DEVICE_ONLY keeps the
- * item out of backups and transfers; Android's Keystore never backs its keys
- * up, so this changes nothing there. The security review of 10/10/2026.
+ * resume the session without the bank. THIS_DEVICE_ONLY keeps the item out of
+ * backups and transfers; Android's Keystore never backs its keys up, so this
+ * changes nothing there. The security review of 10/10/2026.
  *
  * The item is deleted before every write: the keychain keeps an existing
  * item's accessibility on an update (SecItemUpdate rewrites the value only),
- * so a pair stored before this rule would stay migratable for its ninety
- * days. A delete on a missing item is not an error; a crash between the two
- * calls costs the local pair, which a bank login replaces.
+ * so a pair stored before this rule would stay migratable for as long as its
+ * session lived. A delete on a missing item is not an error; a crash between
+ * the two calls costs the local pair, which a bank login replaces.
  */
 const THIS_DEVICE = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 
