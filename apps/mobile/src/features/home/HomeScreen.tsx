@@ -1,13 +1,12 @@
-import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import Settings from "lucide-react-native/icons/settings";
 import Wrench from "lucide-react-native/icons/wrench";
-import { cssInterop } from "nativewind";
-import { Platform, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Ink } from "@/components/ui/ink";
 import { Text } from "@/components/ui/text";
 import { ChatsButton } from "@/features/chat";
 import { useOnboardingGate, useSession } from "@/features/identity";
@@ -16,21 +15,11 @@ import { Notices, PushOffer } from "@/features/notifications";
 import { GateCard, WaitlistCard } from "@/features/pond";
 import { isProduction } from "@/lib/environment";
 import { useT } from "@/lib/locale";
-import { cn } from "@/lib/utils";
-import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 
 // The mark is black ink on transparency (assets/logo-mark.png, made by
-// scripts/logo from docs/design/logo), tinted with the foreground token so it
-// follows all four theme sets: the text colour class is handed over as
-// tintColor, the way Icon does it for lucide. That hand-over is native only;
-// on the web target the ink is inverted under the dark class instead, and both
-// dark foregrounds are near white.
-const Mark = cssInterop(Image, {
-  className: { target: "style", nativeStyleToProp: { color: "tintColor" } },
-});
+// scripts/logo from docs/design/logo), tinted with the foreground token.
 const MARK = require("../../../assets/logo-mark.png");
-const MARK_CLASS = cn("h-24 w-24 text-foreground", Platform.select({ web: "dark:invert" }));
 
 /**
  * The home screen of a signed-in person (#143): where their pond and their
@@ -78,7 +67,7 @@ export function HomeScreen() {
         )}
       </View>
       <ScrollView contentContainerClassName="flex-grow items-center justify-center gap-4 p-6">
-        <Mark source={MARK} contentFit="contain" className={MARK_CLASS} {...DECORATIVE} />
+        <Ink source={MARK} className="h-24 w-24 text-foreground" />
         <Text variant="h1" accessibilityRole="header">
           {t("home.title")}
         </Text>

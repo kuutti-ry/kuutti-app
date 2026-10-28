@@ -1,17 +1,10 @@
 import { PARTY_OPTIONS, PROFILE_FIELDS } from "@kuutti/schema";
 import { act, screen } from "@testing-library/react-native";
 import type React from "react";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { a11yProblems, type HostNode, hiddenNodes, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { Chip } from "./FieldEditor";
 import { GLYPH_FIELDS, OptionGlyph, optionGlyph } from "./glyphs";
-
-/** The nodes hidden from a screen reader: what a decorative glyph renders as. */
-const hidden = (node: HostNode | string | null | undefined): HostNode[] => {
-  if (!node || typeof node === "string") return [];
-  const own = node.props?.accessibilityElementsHidden === true ? [node] : [];
-  return [...own, ...(node.children ?? []).flatMap(hidden)];
-};
 
 const show = (ui: React.ReactElement) =>
   act(async () => {
@@ -57,12 +50,12 @@ describe("the option glyphs (#213)", () => {
     const button = screen.getByRole("button", { name: "Corgi" });
     expect(button).toBeTruthy();
     expect(screen.queryByRole("image")).toBeNull();
-    expect(hidden(screen.toJSON() as HostNode)).toHaveLength(1);
+    expect(hiddenNodes(screen.toJSON() as HostNode)).toHaveLength(1);
     expect(pressables(screen.toJSON() as HostNode).flatMap(a11yProblems)).toEqual([]);
   });
 
   it("is nothing for an option without one, so the chip stays plain text", async () => {
     await show(<OptionGlyph field="politics" option="none_of_them" />);
-    expect(hidden(screen.toJSON() as HostNode)).toEqual([]);
+    expect(hiddenNodes(screen.toJSON() as HostNode)).toEqual([]);
   });
 });

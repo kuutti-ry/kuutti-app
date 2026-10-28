@@ -21,6 +21,7 @@ import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { ContactMark } from "./ContactMark";
 import { shareContact, stopSharing } from "./client";
 
 /**
@@ -161,7 +162,10 @@ export function ContactShare({
           ) : (
             contacts.mine.map(({ kind, value, shared }) => (
               <View key={kind} className="gap-2">
-                <Text>{t("chat.contact.piece", { kind, value })}</Text>
+                <View className="flex-row items-center gap-2">
+                  <ContactMark kind={kind} />
+                  <Text className="flex-1">{t("chat.contact.piece", { kind, value })}</Text>
+                </View>
                 {shared && <Text variant="muted">{t("chat.contact.share.sharedHere")}</Text>}
                 {shared ? (
                   <Button
