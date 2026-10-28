@@ -1,8 +1,8 @@
 import { expect, signInAsModerator, test } from "./fixtures.ts";
 
 // A report from the queue to a decision (#311, #312): Laura reported her conversation with Emmi,
-// pointing at the photo Emmi sent her (e2e/run.ts, #476), and the moderator finds that photo first,
-// shows it, reads the frozen copy and dismisses the report in its own confirm step.
+// pointing at the photo Emmi sent her in the stories (#476), and the moderator finds that photo
+// first, shows it, reads the frozen copy and dismisses the report in its own confirm step.
 
 test("a report is opened, its pointed photo shown, and dismissed through its confirm step", async ({
   page,
