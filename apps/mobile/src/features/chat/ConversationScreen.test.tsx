@@ -596,6 +596,7 @@ describe("one conversation", () => {
     await press("End conversation");
     expect(ended).toEqual([`/conversations/${ID}/unmatch`]);
     expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expect(router.back).not.toHaveBeenCalled();
     expect(takeNotice()).toBe("unmatched");
     expect(takeNotice()).toBeNull();
   });
@@ -2321,6 +2322,7 @@ describe("a conversation's More (#351)", () => {
       },
     ]);
     expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expect(router.back).not.toHaveBeenCalled();
     expect(takeNotice()).toBe("reported");
   });
 
@@ -2335,6 +2337,7 @@ describe("a conversation's More (#351)", () => {
     await press("Block");
     expect(acts()).toEqual([{ path: `/conversations/${ID}/block`, body: null }]);
     expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expect(router.back).not.toHaveBeenCalled();
     expect(takeNotice()).toBe("blocked");
   });
 
@@ -2366,6 +2369,7 @@ describe("a conversation's More (#351)", () => {
       await act(async () => land(done()));
       await settle();
       expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+      expect(router.back).not.toHaveBeenCalled();
       expect(takeNotice()).toBe(outcome);
     },
   );
@@ -2396,6 +2400,7 @@ describe("a conversation's More (#351)", () => {
       await act(async () => land(done()));
       await settle();
       expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+      expect(router.back).not.toHaveBeenCalled();
       expect(takeNotice()).toBe(outcome);
     },
   );

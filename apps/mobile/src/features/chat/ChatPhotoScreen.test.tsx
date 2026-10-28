@@ -103,6 +103,19 @@ const full = () =>
     accessibilityRole?: string;
   };
 
+/**
+ * Back to the list from the photo: down to its conversation first, then the
+ * list is found under the conversation or takes its place (#491;
+ * notice.test.tsx walks the real stack).
+ */
+function expectHandedFromThePhoto() {
+  expect(router.dismissTo.mock.calls).toEqual([
+    [{ pathname: "/chats/[id]", params: { id: CONVERSATION } }],
+    ["/chats"],
+  ]);
+  expect(router.back).not.toHaveBeenCalled();
+}
+
 beforeEach(async () => {
   store.clear();
   router.back.mockReset();
@@ -309,7 +322,7 @@ describe("Report this photo (#476)", () => {
         body: { reason: "harassment", note: "Sent this after I said no.", seq: 4 },
       },
     ]);
-    expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expectHandedFromThePhoto();
     expect(takeNotice()).toBe("reported");
     // The message alone was read: the conversation's detail, which signs a thumb, never.
     expect(calls.filter((c) => c.method === "GET").map((c) => `${c.path}${c.query}`)).toEqual([
@@ -382,6 +395,7 @@ describe("Report this photo (#476)", () => {
     await press("Send report");
     expect(screen.getByText("This conversation can no longer be reported.")).toBeTruthy();
     expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
     await press("Cancel");
     expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
     // The photo stays.
@@ -394,7 +408,7 @@ describe("Report this photo (#476)", () => {
     await reportThis();
     await press("Something else", "radio");
     await press("Send report");
-    expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expectHandedFromThePhoto();
     expect(takeNotice()).toBe("gone");
   });
 
@@ -416,6 +430,7 @@ describe("Report this photo (#476)", () => {
     await act(async () => answer(new Response(null, { status: 204 })));
     await settle();
     expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
     expect(takeNotice()).toBeNull();
     expect(announce).toHaveBeenCalledWith(THANKS);
     announce.mockRestore();
@@ -437,7 +452,7 @@ describe("Report this photo (#476)", () => {
     expect(screen.getByRole("radio", { name: "✓ Something else" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Report this photo" })).toBeNull();
     await press("Send report");
-    expect(router.dismissTo).toHaveBeenCalledWith("/chats");
+    expectHandedFromThePhoto();
     expect(takeNotice()).toBe("reported");
   });
 });
