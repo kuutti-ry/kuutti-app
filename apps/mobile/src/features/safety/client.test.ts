@@ -1,3 +1,4 @@
+import type { PhotoId } from "@kuutti/schema";
 import { saveSession } from "@/lib/session";
 import { blockConversation, blockPerson, reportConversation, reportPerson } from "./client";
 
@@ -85,6 +86,22 @@ describe("the safety client", () => {
       code: "report_window_closed",
       message: "report answered 409",
     });
+  });
+
+  it("sends a report's pointer at one photo as given: a card's photo by its id, a conversation's by its place (#476)", async () => {
+    const seen = answering(
+      new Response(null, { status: 204 }),
+      new Response(null, { status: 204 }),
+    );
+    const photoId = "0b1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a02" as PhotoId;
+    const card = { accountId: SUBJECT, reason: "misrepresentation" as const, photoId };
+    await expect(reportPerson(card)).resolves.toBeUndefined();
+    expect(new URL(seen[0]?.url ?? "").pathname).toBe("/reports");
+    expect(await seen[0]?.json()).toEqual(card);
+    const line = { reason: "harassment" as const, seq: 4 };
+    await expect(reportConversation(SUBJECT, line)).resolves.toBeUndefined();
+    expect(new URL(seen[1]?.url ?? "").pathname).toBe(`/conversations/${SUBJECT}/report`);
+    expect(await seen[1]?.json()).toEqual(line);
   });
 
   it("fails a block from a conversation with its code", async () => {

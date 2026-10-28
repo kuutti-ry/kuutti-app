@@ -2165,6 +2165,51 @@ describe("a photo in a conversation (#350)", () => {
       "?after=1&limit=1",
     ]);
   });
+
+  it.each([
+    ["going on", detail(), "open"],
+    ["archived", detail({ state: "archived" }), "open"],
+    [
+      "ended within the window",
+      detail({ state: "closed", closedHow: "unmatch", counterpart: null }),
+      "ended",
+    ],
+    [
+      "ended past the window",
+      detail({ state: "closed", closedHow: "unmatch", counterpart: null, reportable: false }),
+      null,
+    ],
+  ] as const)(
+    "tells the other person's photo full size whether a conversation %s takes a report, and one's own photo nothing (#476)",
+    async (_, shown, report) => {
+      conversation(shown, [
+        [photoMessage(2, "mine", "Minun"), photoMessage(1, "theirs", "Mökillä", {}, DAY_1)],
+      ]);
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      /** The params of the link a press on the photo of this caption opens. */
+      const link = async (caption: RegExp) => {
+        router.push.mockReset();
+        await userEvent.setup().press(await screen.findByRole("button", { name: caption }));
+        await settle();
+        expect(router.push).toHaveBeenCalledTimes(1);
+        const [[pushed]] = router.push.mock.calls as [[{ params: Record<string, string> }]];
+        return pushed.params;
+      };
+      const theirs = await link(/, Mökillä$/);
+      expect(theirs).toEqual({
+        messageId: idOf(1),
+        conversation: ID,
+        seq: "1",
+        blurhash: BLURHASH,
+        ...(report ? { report } : {}),
+      });
+      // A link's params are strings: a missing one is left out, never undefined.
+      expect(Object.keys(theirs).includes("report")).toBe(report !== null);
+      // One's own photo is no report's, whatever the conversation takes.
+      const mine = await link(/^You, .+, Minun$/);
+      expect(Object.keys(mine)).toEqual(["messageId", "conversation", "seq", "blurhash"]);
+    },
+  );
 });
 
 describe("a conversation's More (#351)", () => {

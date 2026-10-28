@@ -1,5 +1,10 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
-import { REPORT_NOTE_MAX, type SanctionReason } from "@kuutti/schema";
+import {
+  type PhotoId,
+  type PhotoVariant,
+  REPORT_NOTE_MAX,
+  type SanctionReason,
+} from "@kuutti/schema";
 import Ellipsis from "lucide-react-native/icons/ellipsis";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -22,6 +27,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
+import { CachedPhoto } from "@/features/media";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
@@ -51,8 +57,26 @@ export type SafetyOutcome = "blocked" | "reported" | "unmatched" | "gone";
 /** A report's reason and, if the person wrote one, the note. */
 type ReportBody = { reason: SanctionReason; note?: string };
 
+/**
+ * One of a card's own photos, offered by its report step (#476): named as the
+ * card names it, and drawn from the phone's cache, never signed again.
+ */
+export type ReportPhoto = {
+  id: PhotoId;
+  /** The variant the card painted it in, which the phone's cache holds. */
+  variant: PhotoVariant;
+  blurhash: string;
+  /** What a screen reader hears, as on the card: its place, the owner's caption, then what the check saw. */
+  label: string;
+  /** What is seen beside the picture: its place and the owner's caption. */
+  text: string;
+};
+
 /** The steps after which the card leaves the screen. */
 const FINAL: ReadonlySet<Step> = new Set(["blocked", "reported", "gone"]);
+
+/** The picture beside a photo's choice, in points; its button is taller than the 44-point target. */
+const CHOICE_PHOTO = { width: 48, height: 48, borderRadius: 8 };
 
 /**
  * The dialog is bounded by the window, so its middle scrolls rather than
@@ -66,9 +90,13 @@ const WINDOW_SHARE = 0.9;
  * icon button labelled in words, then one dialog. A block is confirmed in
  * words that say it is final, holds through either person's deletion and is
  * not told; a report asks for one of #106's reasons and, if the person likes,
- * a few lines, and says it blocks too, as finally. Each is a button, never a
- * swipe. Once one went through, closing the dialog hands the card to
- * `onGone`, and the screen takes it away; a card the API no longer has is
+ * a few lines, and says it blocks too, as finally. It may name one of the
+ * card's own photos (#476, ADR-030 §13): "Is it about one photo?", "Not one
+ * photo" chosen first, each photo heard as the card names it and drawn from
+ * the phone's cache, so nothing new is signed or counted (ADR-008); a card
+ * without photos asks nothing. Each is a button, never a swipe. Once one
+ * went through, closing the dialog hands the card to `onGone`, and the
+ * screen takes it away; a card the API no longer has is
  * said so and handed back too. The day's cap on reports is said in words,
  * with a Block under it, so nobody is left facing the card. Nothing chosen
  * or typed is lost to a failure or to a stray dismissal: only Cancel and a
@@ -79,12 +107,15 @@ const WINDOW_SHARE = 0.9;
  */
 export function SafetyActions({
   accountId,
+  photos,
   open,
   onOpenChange,
   onGone,
 }: {
   /** The card's person; sent to the API, never shown. */
   accountId: string;
+  /** The card's own photos, in its order, which the report may name one of. */
+  photos: readonly ReportPhoto[];
   /** Held by the card, whose accessibility action opens the dialog too. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -116,9 +147,12 @@ export function SafetyActions({
           blockBody: "safety.block.body",
           reportSays: ["safety.report.alsoBlocks"],
         }}
+        photos={photos}
         requests={{
           block: () => blockPerson(accountId),
-          report: (body) => reportPerson({ accountId, ...body }),
+          // Not one photo leaves the key out: the contract is strict and takes no null.
+          report: (body, photoId) =>
+            reportPerson({ accountId, ...body, ...(photoId ? { photoId } : {}) }),
         }}
         settle="dialog"
         onOutcome={() => onGone(accountId)}
@@ -200,11 +234,7 @@ export function ConversationActions({
         words={{
           title: "chat.actions.title",
           blockBody: "chat.block.body",
-          // The report ends the conversation too, unless it has ended already.
-          reportSays: [
-            "chat.report.copy",
-            ended ? "safety.report.alsoBlocks" : "chat.report.alsoEnds",
-          ],
+          reportSays: conversationReportSays(ended),
         }}
         requests={{
           block: () => blockConversation(conversationId),
@@ -219,17 +249,98 @@ export function ConversationActions({
   );
 }
 
+/** A conversation's report step says that the moderators get a copy, then what its block does there. */
+function conversationReportSays(ended: boolean): PlainMessageKey[] {
+  // The report ends the conversation too, unless it has ended already.
+  return ["chat.report.copy", ended ? "safety.report.alsoBlocks" : "chat.report.alsoEnds"];
+}
+
 /**
- * The one dialog of both doors. `settle` says where an outcome is said: in
+ * Report this photo (#476, ADR-030 §13): under a photo the other person sent,
+ * shown full size, while the conversation takes a report. A labelled button,
+ * at least 44 points, opens the conversation's report step at once, the photo
+ * set: its first line says that the report points the moderators to this
+ * photo, then the copy and the block, as from More, and the report names the
+ * photo's place in the conversation (`seq`). Behind the day's cap a Block is
+ * offered in its place while the conversation has not ended. As with More, a
+ * dialog open when the button went (`reportable` turned false: a refusal for
+ * the window, or the photo no longer shown) keeps its words and its outcome,
+ * and the button stays away once it closes. The outcome is handed to the
+ * screen at once (`onDone`); a refusal for the window to `onStale`.
+ */
+export function ConversationPhotoReport({
+  conversationId,
+  seq,
+  ended,
+  reportable,
+  onDone,
+  onStale,
+}: {
+  conversationId: string;
+  /** The photo's place in the conversation, which the report names. */
+  seq: number;
+  /** The conversation is closed: the report blocks, and has nothing to end. */
+  ended: boolean;
+  /** Whether the button is offered: the conversation takes a report, and the photo is shown. */
+  reportable: boolean;
+  onDone: (outcome: SafetyOutcome) => void;
+  /** A report refused because the window closed meanwhile: the screen offers it no more. */
+  onStale: () => void;
+}) {
+  const { t } = useT();
+  const tap = useHapticTap();
+  const [open, setOpen] = useState(false);
+  // The dialog stays mounted when the button goes, closed or not: a report
+  // sent before it went still says its failure, by opening the dialog again.
+  return (
+    <>
+      {reportable && (
+        <Button
+          variant="outline"
+          onPress={() => {
+            tap();
+            setOpen(true);
+          }}
+        >
+          {t("chat.photo.report")}
+        </Button>
+      )}
+      <SafetyDialog
+        open={open}
+        onOpenChange={setOpen}
+        start="report"
+        offers={{ report: true, block: !ended, unmatch: false }}
+        words={{
+          title: "chat.actions.title",
+          blockBody: "chat.block.body",
+          reportSays: ["chat.report.photo", ...conversationReportSays(ended)],
+        }}
+        requests={{
+          block: () => blockConversation(conversationId),
+          report: (body) => reportConversation(conversationId, { ...body, seq }),
+        }}
+        settle="screen"
+        onOutcome={onDone}
+        onStale={onStale}
+      />
+    </>
+  );
+}
+
+/**
+ * The one dialog of every door. `settle` says where an outcome is said: in
  * the dialog, whose Done hands it on (a card, which stays on the screen
  * until then), or by the screen it is handed to at once (a conversation,
- * which the person leaves for the list).
+ * which the person leaves for the list). `start` is where it opens and where
+ * Cancel leaves it: the choice, or the report itself (a photo's door).
  */
 function SafetyDialog({
   open,
   onOpenChange,
+  start = "choose",
   offers,
   words: texts,
+  photos = [],
   requests,
   settle,
   onOutcome,
@@ -237,6 +348,7 @@ function SafetyDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  start?: "choose" | "report";
   offers: { report: boolean; block: boolean; unmatch: boolean };
   /** The report step's lines say what it does, above the reasons. */
   words: {
@@ -244,9 +356,12 @@ function SafetyDialog({
     blockBody: PlainMessageKey;
     reportSays: readonly PlainMessageKey[];
   };
+  /** A card's own photos, which its report may name one of (#476); none, nothing asked. */
+  photos?: readonly ReportPhoto[];
   requests: {
     block: () => Promise<void>;
-    report: (body: ReportBody) => Promise<void>;
+    /** The photo chosen, or none: only a card's report names one. */
+    report: (body: ReportBody, photoId: PhotoId | null) => Promise<void>;
     unmatch?: () => Promise<void>;
   };
   settle: "dialog" | "screen";
@@ -257,8 +372,10 @@ function SafetyDialog({
   const { t } = useT();
   const tap = useHapticTap();
   const { height } = useWindowDimensions();
-  const [step, setStep] = useState<Step>("choose");
+  const [step, setStep] = useState<Step>(start);
   const [reason, setReason] = useState<SanctionReason | null>(null);
+  // None is Not one photo, chosen as the step opens.
+  const [photo, setPhoto] = useState<PhotoId | null>(null);
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -290,8 +407,9 @@ function SafetyDialog({
   };
 
   const forget = () => {
-    setStep("choose");
+    setStep(start);
     setReason(null);
+    setPhoto(null);
     setNote("");
     setNotice(null);
   };
@@ -380,7 +498,7 @@ function SafetyDialog({
     const words = note.trim();
     return send(
       "reported",
-      () => requests.report({ reason: chosen, ...(words ? { note: words } : {}) }),
+      () => requests.report({ reason: chosen, ...(words ? { note: words } : {}) }, photo),
       "safety.report.failed",
     );
   };
@@ -395,6 +513,21 @@ function SafetyDialog({
     : "chat.report.limited";
   const working = sending && <Text accessibilityLiveRegion="polite">{t("safety.sending")}</Text>;
   const noteLabel = t("safety.report.noteLabel", { max: REPORT_NOTE_MAX });
+  const photoQuestion = t("safety.report.photo.question");
+  /** An option's words, the chosen one marked in words, never by colour alone. */
+  const marked = (chosen: boolean, option: string) =>
+    chosen ? t("settings.selected", { option }) : option;
+  /** What every option of a radio group carries, whether it is chosen. */
+  const radio = (chosen: boolean) =>
+    ({
+      variant: chosen ? "default" : "outline",
+      accessibilityRole: "radio",
+      accessibilityState: { checked: chosen },
+      // react-native-web reads the ARIA prop, not accessibilityState.
+      "aria-checked": chosen,
+      disabled: sending,
+    }) as const;
+  const notOne = marked(photo === null, t("safety.report.photo.none"));
 
   return (
     /* Nothing but its own controls opens it, so a change is always a close. */
@@ -520,17 +653,12 @@ function SafetyDialog({
               >
                 {REASONS.map(({ value, label }) => {
                   const chosen = reason === value;
-                  const name = chosen ? t("settings.selected", { option: t(label) }) : t(label);
+                  const name = marked(chosen, t(label));
                   return (
                     <Button
                       key={value}
-                      variant={chosen ? "default" : "outline"}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: chosen }}
-                      // react-native-web reads the ARIA prop, not accessibilityState.
-                      aria-checked={chosen}
+                      {...radio(chosen)}
                       accessibilityLabel={name}
-                      disabled={sending}
                       onPress={() => {
                         tap();
                         setReason(value);
@@ -541,6 +669,55 @@ function SafetyDialog({
                   );
                 })}
               </View>
+              {/* A card's photos (#476), Not one photo first and chosen: the report is about
+                  the person unless they say otherwise. Each picture comes from the phone's
+                  cache and is silent; its button says which photo it is, as the card does. */}
+              {photos.length > 0 && (
+                <>
+                  <Text variant="small" role="heading" aria-level="3">
+                    {photoQuestion}
+                  </Text>
+                  <View
+                    accessibilityRole="radiogroup"
+                    accessibilityLabel={photoQuestion}
+                    className="gap-2"
+                  >
+                    <Button
+                      {...radio(photo === null)}
+                      accessibilityLabel={notOne}
+                      onPress={() => {
+                        tap();
+                        setPhoto(null);
+                      }}
+                    >
+                      {notOne}
+                    </Button>
+                    {photos.map((option) => {
+                      const chosen = photo === option.id;
+                      return (
+                        <Button
+                          key={option.id}
+                          {...radio(chosen)}
+                          className="justify-start"
+                          accessibilityLabel={marked(chosen, option.label)}
+                          onPress={() => {
+                            tap();
+                            setPhoto(option.id);
+                          }}
+                        >
+                          <CachedPhoto
+                            id={option.id}
+                            variant={option.variant}
+                            blurhash={option.blurhash}
+                            style={CHOICE_PHOTO}
+                          />
+                          <Text className="flex-1">{marked(chosen, option.text)}</Text>
+                        </Button>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
               <Text variant="small">{noteLabel}</Text>
               <Input
                 accessibilityLabel={noteLabel}

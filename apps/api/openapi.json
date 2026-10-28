@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.71.1",
+    "version": "0.72.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -3887,6 +3887,11 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "photoId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The one photo of the card the report is about (#476). Kept only for a photo of that person the reporter was shown; any other is left out, and the answer is the same."
           }
         },
         "required": [
@@ -3905,6 +3910,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 500
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "description": "The line of the one photo the report is about (#476). Kept only for a photo the other person sent that the reporter could read; any other line is left out, and the answer is the same."
           }
         },
         "required": [
@@ -5576,6 +5587,16 @@
             },
             "maxItems": 1000000
           },
+          "lineSeq": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 1,
+            "maximum": 2147483647,
+            "default": null
+          },
+          "pointedPhoto": {
+            "$ref": "#/components/schemas/ReportPointedPhoto"
+          },
           "actable": {
             "type": "array",
             "items": {
@@ -5642,6 +5663,55 @@
           "reporter",
           "reported"
         ]
+      },
+      "ReportPointedPhoto": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "removed": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ]
+              }
+            },
+            "required": [
+              "removed"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "removed": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ]
+              },
+              "id": {
+                "$ref": "#/components/schemas/PhotoId"
+              },
+              "state": {
+                "$ref": "#/components/schemas/PhotoState"
+              },
+              "approvedPhotos": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "removed",
+              "id",
+              "state",
+              "approvedPhotos"
+            ]
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
       },
       "ReportActable": {
         "type": "object",
@@ -9052,7 +9122,7 @@
     "/reports": {
       "post": {
         "summary": "Report the person of a card one was shown, and block them",
-        "description": "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel. The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
+        "description": "A reason from the closed list and, if the person likes, a few lines for the moderators, who read it in the panel, and the one photo of the card it is about (#476). The report blocks both ways in the same transaction. The reported person learns nothing. At most matching_config reports_per_day a day per account, the Finnish calendar day; one open report per pair.",
         "security": [
           {
             "session": []
@@ -9070,10 +9140,10 @@
         },
         "responses": {
           "204": {
-            "description": "Filed and blocked; or a report of the same person is still open, and nothing more is written."
+            "description": "Filed and blocked; or a report of the same person is still open, and nothing more is written. A photo that is not one of the card the person was shown is left out, and the answer is the same."
           },
           "400": {
-            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account id, an unknown key.",
+            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a malformed account or photo id, an unknown key.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9175,7 +9245,7 @@
     "/conversations/{id}/report": {
       "post": {
         "summary": "Report the other person of a conversation, with a copy of it, and block them",
-        "description": "The card's reason and note (#351, ADR-030 §12). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
+        "description": "The card's reason and note (#351, ADR-030 §12), and the line of the one photo it is about (#476). In one transaction: the report naming the conversation, a frozen copy of every message it holds now, both people's, for the moderators, who read it in the panel, the block both ways and the conversation's close. Taken while the conversation is open or archived, and for matching_config report_after_close_days after it closed, so a person blocked can still report what was said. At most matching_config reports_per_day a day, one open report per pair, as from a card. The reported person learns nothing.",
         "security": [
           {
             "session": []
@@ -9204,10 +9274,10 @@
         },
         "responses": {
           "204": {
-            "description": "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written."
+            "description": "Filed, copied, blocked and closed; or a report of the same person is still open, and nothing more is written. A line that is not a photo the other person sent, as the reporter could read it, is left out, and the answer is the same."
           },
           "400": {
-            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, an unknown key, an id that is not a uuid.",
+            "description": "Validation failed: a missing or unknown reason, a note blank or over 500 characters, a line that is not a whole number from 1, an unknown key, an id that is not a uuid.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11651,7 +11721,7 @@
     "/admin/reports/{id}": {
       "get": {
         "summary": "One report, with the reporter's note and the frozen conversation",
-        "description": "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
+        "description": "The queue's item, the reporter's note, the decision, the frozen copy of the conversation for a report made from one (null for a card's), the photo the report points at (#476: the copy's line, or a card's photo with its id and state, or removed since), and the sanctions that may close it while it waits. Written first to audit_log, about the report: conversation.view for a conversation's report, report.view for a card's; a look whose row cannot be written answers nothing of it. Moderators and admins.",
         "security": [
           {
             "session": []
@@ -11795,6 +11865,90 @@
           },
           "404": {
             "description": "not_found: no such report, a party's, or no photo at that line, answered alike.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "media_unavailable: no object storage is configured here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/reports/{id}/photo": {
+      "get": {
+        "summary": "A signed URL for the photo a card's report points at",
+        "description": "The card variant of the one photo of the card the reporter pointed at (#476), for fifteen minutes. Every issuance is a photo.view row about the report, written before the URL is signed. Moderators and admins.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed URL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhotoUrlResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "admin_forbidden: the role does not allow this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "not_found: no such report, a party's, one that points at no photo, or a photo removed since, answered alike.",
             "content": {
               "application/json": {
                 "schema": {

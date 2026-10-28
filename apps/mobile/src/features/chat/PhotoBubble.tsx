@@ -10,6 +10,7 @@ import { DECORATIVE } from "@/theme/a11y";
 import { useHapticTap } from "@/theme/haptics";
 import { useMotionDuration } from "@/theme/useReducedMotion";
 import { bubbleColours, MessageFrame } from "./Bubble";
+import type { ChatPhotoParams } from "./ChatPhotoScreen";
 import { timeOf } from "./time";
 
 /** The thumb's edge in points: the API's thumb is a square (rules/api.md Media). */
@@ -25,19 +26,23 @@ const SQUARE = { width: THUMB_EDGE, height: THUMB_EDGE };
  * photo the socket brought has no URLs yet: the blurhash shows while the
  * screen reads the message again, as it does for a URL that has expired
  * (`onExpired`). A photo that went with its sender is "Photo removed", with
- * the caption if it had one, and opens nothing.
+ * the caption if it had one, and opens nothing. The other person's photo
+ * tells its full size whether the conversation takes a report (#476).
  */
 export function PhotoBubble({
   message,
   conversationId,
   who,
   note,
+  report,
   onExpired,
 }: {
   message: ChatMessage;
   conversationId: string;
   who: string;
   note: string | null;
+  /** Whether the conversation takes a report, and whether it has ended; null when it takes none. */
+  report: ChatPhotoParams["report"];
   onExpired: (message: ChatMessage) => void;
 }) {
   const { t, locale } = useT();
@@ -91,6 +96,8 @@ export function PhotoBubble({
               conversation: conversationId,
               seq: String(message.seq),
               blurhash: photo.blurhash,
+              // Only the other person's photo can be reported; one's own link stays as it was.
+              ...(!mine && report ? { report } : {}),
             },
           });
         }}

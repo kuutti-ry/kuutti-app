@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   index,
   integer,
@@ -220,7 +221,12 @@ export const block = pgTable(
  * made: a card, or a conversation (#351), whose id it keeps while the
  * conversation exists (a conversation goes once both its people are erased,
  * ADR-031 §5; the report stays its twelve months) and whose messages it
- * copies at filing into `report_message`.
+ * copies at filing into `report_message`. A report may point at the one
+ * photo it is about (#476, ADR-030 §13): a conversation's at a line of its
+ * copy (`line_seq`), a card's at a photo of the card the reporter was shown
+ * (`photo_id`, which goes null with the photo, so it holds nothing;
+ * `photo_pointed` keeps that one was named, so the moderator reads the
+ * photo as removed rather than as never pointed at).
  */
 export const reportSource = pgEnum("report_source", ["card", "conversation"]);
 export const reportOutcome = pgEnum("report_outcome", ["dismissed", "acted"]);
@@ -249,6 +255,10 @@ export const report = pgTable(
     conversationId: uuid("conversation_id").references(() => conversation.id, {
       onDelete: "set null",
     }),
+    // The pointer at one photo (#476): a line of the copy, or a photo of the card.
+    lineSeq: integer("line_seq"),
+    photoId: uuid("photo_id").references(() => photo.id, { onDelete: "set null" }),
+    photoPointed: boolean("photo_pointed").notNull().default(false),
   },
   (table) => [
     // The day's count and the export: the reporter's rows by time.
@@ -259,6 +269,8 @@ export const report = pgTable(
     uniqueIndex("report_open_pair_idx")
       .on(table.reporterAccountId, table.reportedAccountId)
       .where(sql`${table.decidedAt} IS NULL`),
+    // The SET NULL on every photo deletion looks reports up by photo; without this it scans.
+    index("report_photo_idx").on(table.photoId).where(sql`${table.photoId} IS NOT NULL`),
     check("report_not_self_check", sql`${table.reporterAccountId} <> ${table.reportedAccountId}`),
     check(
       "report_note_check",
@@ -275,6 +287,16 @@ export const report = pgTable(
     check(
       "report_conversation_check",
       sql`${table.conversationId} IS NULL OR ${table.source} <> 'card'`,
+    ),
+    // A conversation's report points at a line, a card's at a photo, never the other way.
+    check(
+      "report_line_seq_check",
+      sql`${table.lineSeq} IS NULL OR (${table.source} = 'conversation' AND ${table.lineSeq} >= 1)`,
+    ),
+    check(
+      "report_photo_check",
+      sql`(NOT ${table.photoPointed} OR ${table.source} = 'card')
+        AND (${table.photoId} IS NULL OR ${table.photoPointed})`,
     ),
   ],
 );

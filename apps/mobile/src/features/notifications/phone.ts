@@ -22,7 +22,7 @@ export const onPhone = () => Platform.OS === "ios" || Platform.OS === "android";
  * The phone's answer in the app's words. iOS says it in its own status, where
  * a provisional or an ephemeral grant shows the pushes quietly and counts as
  * allowed; an iOS answer without that part is one that could not be read.
- * Android says it in the root status.
+ * Android says it in `granted` and `canAskAgain`, not in the root status.
  */
 export function permissionOf(answer: Notifications.NotificationPermissionsStatus): PhonePermission {
   if (Platform.OS === "ios") {
@@ -40,8 +40,15 @@ export function permissionOf(answer: Notifications.NotificationPermissionsStatus
     }
   }
   if (answer.granted) return "allowed";
-  // expo's PermissionStatus is a string enum, compared here by its value.
-  return (answer.status as string) === "undetermined" ? "undetermined" : "denied";
+  // From Android 13 notifications are off until the phone says yes, and
+  // expo-notifications' root status says denied while they are off, a phone
+  // never asked included (NotificationPermissionsModule.kt). canAskAgain is
+  // false once the phone has refused for good, and before Android 13 for
+  // notifications turned off, which no question turns on.
+  // shortcut: a phone refused once may be asked once more, so it reads as never
+  // asked and is offered the question again; telling the two apart needs the
+  // app to remember that it asked, which expo knows but does not say here.
+  return answer.canAskAgain ? "undetermined" : "denied";
 }
 
 /** The phone's permission as it stands, asking nothing. */

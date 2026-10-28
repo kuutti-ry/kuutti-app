@@ -5,18 +5,11 @@ appId: fi.kuutti.app
 name: Log out everywhere ends this device's session, and reopening the app does not bring it back
 ---
 - runFlow: ../common/sign-in.yaml
-- openLink: kuutti://settings
-- extendedWaitUntil:
-    visible: "Settings|Asetukset|Inställningar"
-    timeout: 15000
-# This device's session has a screen of its own, behind its row under "Account"
-# (#287), below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "This device|Tämä laite|Den här enheten"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "This device|Tämä laite|Den här enheten"
+# This device's session has a screen of its own (#287), opened by its link as
+# common/sign-out.yaml opens it: on Android a swipe through Settings can pass
+# over its row (CI, 27/10/2026: thirty swipes, the row never seen, Settings
+# left at its foot). sign-in-links taps the row itself.
+- openLink: kuutti://settings/device
 - extendedWaitUntil:
     visible: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
     timeout: 15000

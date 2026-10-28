@@ -1,11 +1,13 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
 import { useT } from "@kuutti/i18n/react";
 import {
+  PHOTOS_FOR_COMPLETENESS,
   type ReportActable,
   type ReportCopyLine,
   ReportDecision,
   type ReportDecisionRequest,
   ReportDetail,
+  type ReportPointedPhoto,
   type Sanction,
   type SanctionKind,
 } from "@kuutti/schema";
@@ -23,13 +25,18 @@ import { ScreenTitle } from "../../lib/screen-title.tsx";
 import { usePhotoOnRequest } from "./photo-on-request.ts";
 import { OUTCOME, REASON, SOURCE } from "./report-words.ts";
 import { KIND_WORDS, SanctionActions } from "./Sanctions.tsx";
+import { TakeDown } from "./TakeDown.tsx";
 import { outcomeOf, type Refusals, useSend } from "./use-send.ts";
 
 // One report, worked to a decision (#312, TD-5, ADR-030 §6, §12): its facts,
 // both people linked to their pages with the queue's histories, the
 // reporter's words, and for a conversation's report the copy frozen when it
 // was filed, each line's side said in words and its text shown as text, a
-// photo fetched only on request. Every open is an audit row on the API's side
+// photo fetched only on request. The photo a report points at (#476): a
+// conversation's line, marked in words and listed first under the copy's
+// heading; a card's photo, through the report's own route, removed once its
+// owner deleted it, and while approved taken down beside it (#477), the page
+// updated from the answer. Every open is an audit row on the API's side
 // (conversation.view or report.view), so the page asks once per id, StrictMode
 // included, and never again: after a decision it updates in place from the
 // answer. The decision: a sanction applied here (#308's own actions), which
@@ -143,6 +150,7 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
   const when = (at: string) => formatDateTime(locale, new Date(at));
   const decision = decisionOf(report);
   const reported = report.reported.accountId;
+  const pointed = report.copy?.find((line) => line.seq === report.lineSeq);
 
   // An outcome is said in the status line, and the focus goes there: the
   // button that led to it is gone with the decision area.
@@ -288,16 +296,40 @@ function ReportBody({ opened }: { opened: ReportDetail }) {
         </CardContent>
       </Card>
 
+      {report.pointedPhoto && (
+        <Card className="lg:col-span-2">
+          <CardContent>
+            <CardTitle>{t("admin.report.pointedTitle")}</CardTitle>
+            {report.pointedPhoto.removed ? (
+              <p className="text-muted-foreground italic">{t("admin.report.photoRemoved")}</p>
+            ) : (
+              <PointedPhoto reportId={report.id} photo={report.pointedPhoto} />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {report.copy && (
         <Card className="lg:col-span-2">
           <CardContent>
             <CardTitle>{t("admin.report.copyTitle")}</CardTitle>
+            {/* The line the reporter pointed at first; the conversation keeps its order below. */}
+            {pointed && (
+              <ul className="grid gap-2">
+                <CopyLine reportId={report.id} line={pointed} pointed />
+              </ul>
+            )}
             {report.copy.length === 0 ? (
               <p className="text-muted-foreground">{t("admin.report.copyEmpty")}</p>
             ) : (
               <ol className="grid gap-2">
                 {report.copy.map((line) => (
-                  <CopyLine key={line.seq} reportId={report.id} line={line} />
+                  <CopyLine
+                    key={line.seq}
+                    reportId={report.id}
+                    line={line}
+                    pointed={line.seq === report.lineSeq}
+                  />
                 ))}
               </ol>
             )}
@@ -445,8 +477,20 @@ function DecideStep({
   );
 }
 
-/** One line of the frozen copy: whose and when, then its text as text, never as markup or a link. */
-function CopyLine({ reportId, line }: { reportId: string; line: ReportCopyLine }) {
+/**
+ * One line of the frozen copy: whose and when, then its text as text, never
+ * as markup or a link; the line the reporter pointed at says so in words
+ * (#476), which its Show photo carries as its description.
+ */
+function CopyLine({
+  reportId,
+  line,
+  pointed = false,
+}: {
+  reportId: string;
+  line: ReportCopyLine;
+  pointed?: boolean;
+}) {
   const { t, locale } = useT();
   const head = useId();
   const time = formatDateTime(locale, new Date(line.createdAt));
@@ -454,6 +498,12 @@ function CopyLine({ reportId, line }: { reportId: string; line: ReportCopyLine }
     <li className="space-y-1 rounded-lg border px-3 py-2">
       <p id={head} className="text-xs text-muted-foreground">
         <strong className="text-foreground">{t(SIDE[line.side])}</strong> · {time}
+        {pointed && (
+          <>
+            {" · "}
+            <strong className="text-foreground">{t("admin.report.pointedLine")}</strong>
+          </>
+        )}
       </p>
       {line.body !== null && <p className="whitespace-pre-wrap wrap-anywhere">{line.body}</p>}
       {line.kind === "photo" &&
@@ -508,5 +558,80 @@ function CopyPhoto({
         {t("admin.report.showPhoto")}
       </Button>
     </>
+  );
+}
+
+/**
+ * The photo a card's report points at (#476): its card variant through the
+ * report's own route, fetched only when asked, each look a photo.view row
+ * about the report. While approved it is taken down beside it (#477): the
+ * page updates from the answer and is never read again (another report.view),
+ * and the photo's own status line says so and takes the focus, since the
+ * button goes with the change.
+ */
+function PointedPhoto({
+  reportId,
+  photo,
+}: {
+  reportId: string;
+  photo: Extract<ReportPointedPhoto, { removed: false }>;
+}) {
+  const { t } = useT();
+  const line = useId();
+  const [state, setState] = useState(photo.state);
+  const [done, setDone] = useState("");
+  const status = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (done) status.current?.focus();
+  }, [done]);
+  const { url, failed, pending, show, picture } = usePhotoOnRequest(() =>
+    api.GET("/admin/reports/{id}/photo", { params: { path: { id: reportId } } }),
+  );
+  return (
+    <div className="flex flex-col gap-3">
+      <p ref={status} role="status" tabIndex={-1} className="font-medium empty:sr-only">
+        {done}
+      </p>
+      <p id={line} className="text-muted-foreground">
+        {state}
+      </p>
+      {url ? (
+        <img
+          ref={picture}
+          tabIndex={-1}
+          src={url}
+          alt={t("admin.report.pointedImage", { state })}
+          width={240}
+          height={320}
+          className="h-auto w-full max-w-60 rounded-md"
+        />
+      ) : (
+        <>
+          {failed && <Alert>{t("admin.report.photoFailed")}</Alert>}
+          <Button
+            variant="outline"
+            className="self-start"
+            aria-describedby={line}
+            aria-busy={pending || undefined}
+            onClick={() => void show()}
+          >
+            <Image aria-hidden="true" />
+            {t("admin.report.showPhoto")}
+          </Button>
+        </>
+      )}
+      {state === "approved" && (
+        <TakeDown
+          photoId={photo.id}
+          describedBy={line}
+          leavesTooFew={photo.approvedPhotos <= PHOTOS_FOR_COMPLETENESS}
+          onOpen={() => setDone("")}
+          onDone={async (answer) => {
+            setState(answer.state);
+            setDone(t("admin.takeDown.done"));
+          }}
+        />
+      )}
+    </div>
   );
 }

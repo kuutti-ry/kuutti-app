@@ -12,6 +12,7 @@ import { type App, createApp } from "../app.ts";
 import { eraseAccount } from "../identity/index.ts";
 import { type MediaDeps, objectKey } from "../media/index.ts";
 import { type SignedIn, signedInAccount, staffSession } from "../test/account.ts";
+import { cardShown } from "../test/cards.ts";
 import { conversationBetween, interleaved, photoMessage } from "../test/chat.ts";
 import {
   test as base,
@@ -61,6 +62,8 @@ const open = (app: App, headers: Headers, id: string) =>
   app.request(`/admin/reports/${id}`, { headers });
 const photo = (app: App, headers: Headers, id: string, seq: number | string) =>
   app.request(`/admin/reports/${id}/copy/${seq}/photo`, { headers });
+const pointedPhoto = (app: App, headers: Headers, id: string) =>
+  app.request(`/admin/reports/${id}/photo`, { headers });
 const decide = (app: App, headers: Headers, id: string, body: unknown) =>
   app.request(`/admin/reports/${id}/decision`, {
     method: "POST",
@@ -585,11 +588,159 @@ describe("GET /admin/reports/{id}/copy/{seq}/photo", () => {
     const own = await reportIn(ctx.client, mine, x.accountId, FILED, undefined, "conversation");
     const before = await written(ctx.client);
     for (const id of [own, UNKNOWN]) {
-      const response = await photo(app, m.headers, id, 1);
-      expect(response.status).toBe(503);
-      expect(await errorCode(response)).toBe("media_unavailable");
+      for (const response of [
+        await photo(app, m.headers, id, 1),
+        await pointedPhoto(app, m.headers, id),
+      ]) {
+        expect(response.status).toBe(503);
+        expect(await errorCode(response)).toBe("media_unavailable");
+      }
     }
     expect(await written(ctx.client)).toEqual(before);
+  });
+});
+
+/** A's report of B from B's card, pointing at the photo of it A was shown (#476), filed through the route. */
+async function pointedCardReport(ctx: TestContext, { second = false } = {}) {
+  const [a, b] = await signedInPeople(ctx.client, 2);
+  if (!a || !b) throw new Error("people not written");
+  let shown = await cardShown(ctx.client, a.accountId, b.accountId);
+  if (second) {
+    // The card had a second photo, shown too: the report points at that one.
+    const { rows } = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       VALUES ($1, 'k-second-shown', 'LKO2?U%2Tw=w', 800, 1067, 'approved', 1) RETURNING id`,
+      [b.accountId],
+    );
+    shown = rows[0]?.id ?? "";
+    await ctx.client.query(
+      "INSERT INTO card_shown (account_id, photo_id, at) VALUES ($1, $2, now())",
+      [a.accountId, shown],
+    );
+  }
+  const answer = await ctx.app.request("/reports", {
+    method: "POST",
+    headers: { ...a.headers, "content-type": "application/json" },
+    body: JSON.stringify({ accountId: b.accountId, reason: "misrepresentation", photoId: shown }),
+  });
+  expect(answer.status).toBe(204);
+  const { rows } = await ctx.client.query<{ id: string; key: string }>(
+    `SELECT r.id, p.key FROM report r JOIN photo p ON p.id = r.photo_id
+      WHERE r.reporter_account_id = $1`,
+    [a.accountId],
+  );
+  const row = rows[0];
+  if (!row) throw new Error("report not filed with its photo");
+  return { a, b, id: row.id, photoId: shown, key: row.key };
+}
+
+describe("GET /admin/reports/{id}/photo", () => {
+  test("A report from a card can point at a photo of the card the person was shown", async ({
+    ctx,
+    app,
+  }) => {
+    const moderator = await staffSession(ctx.client);
+    const { id, photoId, key } = await pointedCardReport(ctx, { second: true });
+    expect(key).toBe("k-second-shown");
+    const response = await open(app, moderator.headers, id);
+    const text = await response.text();
+    // The second photo, with its state for a take-down beside it (#477), never the stored key.
+    expect(ReportDetail.parse(JSON.parse(text))).toMatchObject({
+      source: "card",
+      copy: null,
+      lineSeq: null,
+      pointedPhoto: { removed: false, id: photoId, state: "approved", approvedPhotos: 2 },
+    });
+    expect(text).not.toContain(key);
+    expect(await auditOf(ctx.client, "photo.view")).toEqual([]);
+
+    // On request, the card size, each look an audit row about the report.
+    for (let look = 1; look <= 2; look += 1) {
+      const shown = await pointedPhoto(app, moderator.headers, id);
+      expect(shown.status).toBe(200);
+      const answer = PhotoUrlResponse.parse(await shown.json());
+      expect(answer.variant).toBe("card");
+      expect(new URL(answer.url).pathname).toBe(`/${objectKey(key, "card")}`);
+      expect(answer.expiresAt).toBe(new Date(T.getTime() + 15 * 60 * 1000).toISOString());
+      expect(await auditOf(ctx.client, "photo.view")).toHaveLength(look);
+    }
+    expect(await auditOf(ctx.client, "photo.view")).toEqual(
+      Array.from({ length: 2 }, () => ({
+        actor_identity_id: moderator.identityId,
+        action: "photo.view",
+        subject_type: "report",
+        subject_id: id,
+        detail: { variant: "card" },
+      })),
+    );
+  });
+
+  test("A pointed photo deleted since reads removed for the moderator", async ({ ctx, app }) => {
+    const moderator = await staffSession(ctx.client);
+    const { b, id, photoId } = await pointedCardReport(ctx);
+    // The owner removes it: the report stays, its pointer goes null and says one was made.
+    await ctx.client.query("DELETE FROM photo WHERE id = $1 AND account_id = $2", [
+      photoId,
+      b.accountId,
+    ]);
+    const kept = await ctx.client.query(
+      "SELECT photo_id, photo_pointed FROM report WHERE id = $1",
+      [id],
+    );
+    expect(kept.rows).toEqual([{ photo_id: null, photo_pointed: true }]);
+    expect((await opened(app, moderator.headers, id)).pointedPhoto).toEqual({ removed: true });
+    const before = await written(ctx.client);
+    const refused = await pointedPhoto(app, moderator.headers, id);
+    expect(refused.status).toBe(404);
+    expect(await errorCode(refused)).toBe("not_found");
+    expect(await written(ctx.client)).toEqual(before);
+  });
+
+  test("a report that points at nothing, a conversation's report and an unknown id answer 404 alike and write nothing", async ({
+    ctx,
+    app,
+  }) => {
+    const moderator = await staffSession(ctx.client);
+    const { id: card } = await cardReport(ctx);
+    const { id: conversation } = await reportedConversation(ctx);
+    expect((await opened(app, moderator.headers, card)).pointedPhoto).toBeNull();
+    expect((await opened(app, moderator.headers, conversation)).pointedPhoto).toBeNull();
+    const before = await written(ctx.client);
+    for (const id of [card, conversation, UNKNOWN]) {
+      const refused = await pointedPhoto(app, moderator.headers, id);
+      expect(refused.status).toBe(404);
+      expect(await errorCode(refused)).toBe("not_found");
+    }
+    expect((await pointedPhoto(app, moderator.headers, "nope")).status).toBe(400);
+    expect(await written(ctx.client)).toEqual(before);
+  });
+
+  test("the owner's approved photos are counted for the take-down beside it, the pointed one taken down or not", async ({
+    ctx,
+    app,
+  }) => {
+    const moderator = await staffSession(ctx.client);
+    const { b, id, photoId } = await pointedCardReport(ctx);
+    // A second approved photo, and a queued one that does not count.
+    await ctx.client.query(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       VALUES ($1, 'k-second', 'LKO2?U%2Tw=w', 800, 1067, 'approved', 1),
+              ($1, 'k-queued', 'LKO2?U%2Tw=w', 800, 1067, 'queued', 2)`,
+      [b.accountId],
+    );
+    expect((await opened(app, moderator.headers, id)).pointedPhoto).toEqual({
+      removed: false,
+      id: photoId,
+      state: "approved",
+      approvedPhotos: 2,
+    });
+    await ctx.client.query("UPDATE photo SET state = 'rejected' WHERE id = $1", [photoId]);
+    expect((await opened(app, moderator.headers, id)).pointedPhoto).toEqual({
+      removed: false,
+      id: photoId,
+      state: "rejected",
+      approvedPhotos: 1,
+    });
   });
 });
 
@@ -963,6 +1114,16 @@ describe("recusal and the guard", () => {
     const earlier = await accountOf(ctx.client, m.identityId, "deleted");
     const now = await accountOf(ctx.client, m.identityId);
     const byM = await reportIn(ctx.client, earlier, x.accountId, FILED);
+    // M's report points at a photo of X's card (#476): still not M's to look at.
+    const pointed = await ctx.client.query<{ id: string }>(
+      `INSERT INTO photo (account_id, key, blurhash, width, height, state, position)
+       VALUES ($1, 'k-pointed', 'LKO2?U%2Tw=w', 800, 1067, 'approved', 0) RETURNING id`,
+      [x.accountId],
+    );
+    await ctx.client.query("UPDATE report SET photo_id = $2, photo_pointed = true WHERE id = $1", [
+      byM,
+      pointed.rows[0]?.id,
+    ]);
     const conversationId = await conversationBetween(ctx.client, y.accountId, now, {
       openedAt: OPENED_AT,
       messages: [{ from: "b", body: "Moi" }],
@@ -983,6 +1144,7 @@ describe("recusal and the guard", () => {
     const unknown = [
       await body(await open(app, m.headers, UNKNOWN)),
       await body(await photo(app, m.headers, UNKNOWN, sent.seq)),
+      await body(await pointedPhoto(app, m.headers, UNKNOWN)),
       await body(await decide(app, m.headers, UNKNOWN, { outcome: "dismissed" })),
     ];
     const before = await written(ctx.client);
@@ -990,18 +1152,20 @@ describe("recusal and the guard", () => {
       const answers = [
         await open(app, m.headers, id),
         await photo(app, m.headers, id, sent.seq),
+        await pointedPhoto(app, m.headers, id),
         await decide(app, m.headers, id, { outcome: "dismissed" }),
       ];
-      expect(answers.map((answer) => answer.status)).toEqual([404, 404, 404]);
+      expect(answers.map((answer) => answer.status)).toEqual([404, 404, 404, 404]);
       expect(await Promise.all(answers.map(body))).toEqual(unknown);
     }
     expect(await written(ctx.client)).toEqual(before);
 
-    // Another moderator opens both, sees the photo, and decides both.
+    // Another moderator opens both, sees the photos, and decides both.
     for (const id of [byM, aboutM]) {
       expect((await open(app, other.headers, id)).status).toBe(200);
     }
     expect((await photo(app, other.headers, aboutM, sent.seq)).status).toBe(200);
+    expect((await pointedPhoto(app, other.headers, byM)).status).toBe(200);
     for (const id of [byM, aboutM]) {
       expect((await decide(app, other.headers, id, { outcome: "dismissed" })).status).toBe(200);
     }
@@ -1034,6 +1198,7 @@ describe("recusal and the guard", () => {
       for (const answer of [
         await open(app, headers, id),
         await photo(app, headers, id, 1),
+        await pointedPhoto(app, headers, id),
         await decide(app, headers, id, { outcome: "dismissed" }),
       ]) {
         expect(answer.status, what).toBe(status);

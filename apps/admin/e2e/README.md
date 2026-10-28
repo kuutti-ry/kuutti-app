@@ -16,7 +16,7 @@ Playwright's own flags and file names pass through: `pnpm e2e:admin -- --headed`
 
 1. `kuutti_test_admin_e2e` in Postgres and the bucket `kuutti-test-admin-e2e` in the S3 stand-in, both made anew; the database migrated and seeded. Never the shared `kuutti` database or `kuutti-media` bucket: other sessions use them, and the run refuses any database not named `kuutti_test_…` and any server or store not on this computer. The bucket is its own because a photo's objects are named by their content, the same in every database: an erasure in a shared bucket, judging by one database's rows, takes the other database's photos.
 2. The API from source on a free port against both, configured from `env.example` (never `.env`).
-3. The cast's stories (`demo:reset`), so Noa's photos wait in the queue; Mikael signs in once and is made a moderator with the maintainer's command line (`moderator recent`, then `grant`); Laura reports her conversation with Emmi; Iida's round names Riikka, the person of the sanction flow.
+3. The cast's stories (`demo:reset`), so Noa's photos wait in the queue; Mikael signs in once and is made a moderator with the maintainer's command line (`moderator recent`, then `grant`); Emmi sends Laura a photo, and Laura reports their conversation pointing at it (#476); Iida's round names Riikka, the person of the sanction flow.
 4. The panel's production build against that API, on another free port, with the headers of `infra/modules/admin/main.tf` read from the file. The one local addition is the S3 stand-in in `img-src`, where the local API's photo URLs point.
 5. The flows, then everything stopped, the bucket emptied and removed, the database dropped, a Ctrl+C included. A run killed outright leaves both to the next run, which makes them anew.
 
@@ -30,7 +30,7 @@ What each step wrote is in `e2e/.out/setup.log`, the API's log in `e2e/.out/api.
 |---|---|
 | `sign-in.spec.ts` | signs in at the bank and sees what waits; comes back to the screen they asked for; a bank login without a role is refused in words; the host's CSP refuses a style written at run time, and the guard sees it |
 | `photos.spec.ts` | approves one photo and rejects another for a reason chosen on purpose; the picture loads through its signed URL; the count goes down |
-| `report.spec.ts` | opens Laura's report, reads its frozen conversation, dismisses it through its confirm step |
+| `report.spec.ts` | opens Laura's report, finds the photo she pointed at first and shows it under the CSP, reads the frozen conversation, dismisses it through its confirm step |
 | `sanctions.spec.ts` | finds Riikka's page by account id, applies a suspension and lifts it, each through a confirm step; a confirm step by keyboard alone; takes down one of her approved photos for a reason chosen on purpose, and the page says so |
 | `roles.spec.ts` | an admin's screen (`/config`, `/audit`, `/staff`) answers a moderator with its refusal and asks the API nothing |
 

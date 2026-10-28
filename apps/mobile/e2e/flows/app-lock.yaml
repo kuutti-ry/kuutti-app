@@ -32,19 +32,20 @@ name: A passcode set in Settings locks the app at a cold start and back from the
 - waitForAnimationToEnd
 - tapOn: "Set a passcode|Aseta pääsykoodi|Välj en lösenkod"
 
-# Six digits, typed twice; the sixth moves on, there is no button. The field
-# takes the focus as it opens, and lies below its label of the same name.
+# Six digits, typed twice; the sixth moves on, there is no button. No tap on
+# the field: it takes the focus as it opens, and again for the second time,
+# with the number pad up, so a tap "below" the label can land on a key, as at
+# the cold start below (CI, 27/10/2026: a digit more in each, the two did not
+# match). Typed once the screen has settled and focused it.
 - extendedWaitUntil:
     visible: "Choose a passcode of six digits|Valitse kuusinumeroinen pääsykoodi|Välj en lösenkod med sex siffror"
     timeout: 15000
-- tapOn:
-    below: "Choose a passcode of six digits|Valitse kuusinumeroinen pääsykoodi|Välj en lösenkod med sex siffror"
+- waitForAnimationToEnd
 - inputText: "246810"
 - extendedWaitUntil:
     visible: "Type the same six digits again|Kirjoita samat kuusi numeroa uudelleen|Skriv samma sex siffror igen"
     timeout: 15000
-- tapOn:
-    below: "Type the same six digits again|Kirjoita samat kuusi numeroa uudelleen|Skriv samma sex siffror igen"
+- waitForAnimationToEnd
 - inputText: "246810"
 - extendedWaitUntil:
     visible: "A passcode is set\\.|Pääsykoodi on asetettu\\.|En lösenkod är vald\\."

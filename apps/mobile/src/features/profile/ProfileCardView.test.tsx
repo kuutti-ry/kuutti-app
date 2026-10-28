@@ -1,5 +1,6 @@
 import type { ProfileCard } from "@kuutti/schema";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
+import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -251,5 +252,68 @@ describe("ProfileCardView", () => {
       fireEvent.press(screen.getByRole("button", { name: "Done" }));
     });
     await waitFor(() => expect(gone).toHaveBeenCalledWith(bare.accountId));
+  });
+
+  it("offers the card's own photos in its report, named as the card names them and drawn from the phone's cache, signs nothing more, and reports the one chosen (#476)", async () => {
+    const asked: string[] = [];
+    const sent: unknown[] = [];
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const path = new URL(request.url).pathname;
+      asked.push(path);
+      if (request.method === "POST" && path === "/reports") {
+        sent.push(JSON.parse(await request.text()));
+        return new Response(null, { status: 204 });
+      }
+      return json({ error: { code: "not_found", message: "x", requestId: "r" } }, 404);
+    }) as unknown as typeof fetch;
+    const cache = jest.spyOn(Image, "readFromCacheAsync");
+    const sauna = {
+      people: 1,
+      setting: "indoors" as const,
+      scene: ["sauna" as const],
+      objects: [],
+      smile: false,
+      glasses: false,
+      sunglasses: false,
+      facialHair: false,
+    };
+    const card = { ...bare, photos: [photoAt(1), photoAt(2, "summer_day", sauna)] };
+    await renderWithTheme(<ProfileCardView card={card} onGone={jest.fn()} />);
+    await settle();
+    const signed = () => asked.filter((path) => path.startsWith("/photos/"));
+    // The card's own two: the main photo's card variant and the other's thumb.
+    expect(signed()).toEqual([`/photos/${photoAt(1).id}/card`, `/photos/${photoAt(2).id}/thumb`]);
+    const press = (name: string, role: "button" | "radio" = "button") =>
+      act(async () => {
+        fireEvent.press(screen.getByRole(role, { name }));
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      });
+    await press("Block or report");
+    await press("Report and block");
+    const heard =
+      "Photo 2 of 2. A summer day. Automatic description: One person, indoors, in a sauna.";
+    expect(
+      within(screen.getByLabelText("Is it about one photo?"))
+        .getAllByRole("radio")
+        .map((radio) => radio.props.accessibilityLabel),
+    ).toEqual(["✓ Not one photo", "Photo 1 of 2", heard]);
+    // Seen beside its picture: the place and the caption, as under the photo.
+    expect(screen.getByText("Photo 2 of 2. A summer day")).toBeTruthy();
+    // Under the keys the card painted them by, and no URL signed again.
+    expect(cache.mock.calls).toEqual([[`${photoAt(1).id}/card`], [`${photoAt(2).id}/thumb`]]);
+    expect(signed()).toHaveLength(2);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+    await press(heard, "radio");
+    await press("Something else", "radio");
+    await press("Send report");
+    await waitFor(() =>
+      expect(sent).toEqual([
+        { accountId: bare.accountId, reason: "other", photoId: photoAt(2).id },
+      ]),
+    );
+    cache.mockRestore();
   });
 });

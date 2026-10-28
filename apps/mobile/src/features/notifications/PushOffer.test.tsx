@@ -1,6 +1,6 @@
 import { act, screen, userEvent, waitFor } from "@testing-library/react-native";
 import * as Notifications from "expo-notifications";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -24,13 +24,15 @@ const ASKED = "kuutti.preference.pushAsked";
 const status = (ios: number, root: string) => ({
   status: root,
   granted: root === "granted",
-  canAskAgain: true,
+  canAskAgain: root !== "denied",
   expires: "never",
   ios: { status: ios },
 });
 const NOT_ASKED = status(0, "undetermined");
 const ALLOWED = status(2, "granted");
 const DENIED = status(1, "denied");
+/** What Android 13 and later answer for a phone never asked: denied, and askable. */
+const ANDROID_NOT_ASKED = { status: "denied", granted: false, canAskAgain: true, expires: "never" };
 
 /** The phone's question answered: from then on the phone says so when read. */
 const phoneAnswers = (answer: ReturnType<typeof status>) =>
@@ -154,6 +156,13 @@ describe("PushOffer", () => {
     await renderWithTheme(<PushOffer />);
     await settle();
     expect(screen.queryByText(HEADING)).toBeNull();
+  });
+
+  it("offers on Android to a phone never asked, which the phone answers as denied", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    notifications.getPermissionsAsync.mockResolvedValue(ANDROID_NOT_ASKED as never);
+    await renderWithTheme(<PushOffer />);
+    expect(await screen.findByText(HEADING)).toBeTruthy();
   });
 
   it("waits, both answers dimmed, while the phone's question is open, and asks it once", async () => {
