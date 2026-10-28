@@ -226,7 +226,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1997, month: 4, day: 12 },
     individual: 966,
     group: "history",
-    note: "Onboarded without photos: a conversation with Emmi. The report's flow reports Emmi from it as her, which blocks for good (#351).",
+    note: "Onboarded without photos: a conversation with Emmi. The report's flow reports the photo Emmi sent her there, which blocks for good (#351, #476).",
   },
   {
     key: "emmi",
@@ -235,7 +235,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     born: { year: 1995, month: 10, day: 3 },
     individual: 967,
     group: "history",
-    note: "Onboarded without photos: a conversation with Laura, which the report's flow ends; she finds it ended and can still report it (#351).",
+    note: "Onboarded without photos: a conversation with Laura, ending with a photo she sent her, which the report's flow ends; she finds it ended and can still report it (#351, #476).",
   },
   {
     key: "iida",

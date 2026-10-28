@@ -25,8 +25,8 @@ One tap logs a persona in. Nothing in the API or the app knows about them: the b
 | Ville Rantanen | 08/03/1976 | mock bank only | onboarded without photos: a few days of messages with Antti; the chat's flow reads as him (#348) |
 | Elina Järvinen | 21/09/1989 | mock bank only | onboarded without photos: a conversation with Jussi; the contact share's flow shares a contact as her (#103) |
 | Jussi Lehtonen | 02/11/1986 | mock bank only | onboarded without photos: a conversation with Elina; the contact share's flow sees her contact as him (#103) |
-| Laura Saarinen | 12/04/1997 | mock bank only | onboarded without photos: a conversation with Emmi; the report's flow reports Emmi from it as her, which blocks for good (#351) |
-| Emmi Kallio | 03/10/1995 | mock bank only | onboarded without photos: a conversation with Laura, which the report's flow ends; she finds it ended and can still report it (#351) |
+| Laura Saarinen | 12/04/1997 | mock bank only | onboarded without photos: a conversation with Emmi; the report's flow reports the photo Emmi sent her there, which blocks for good (#351, #476) |
+| Emmi Kallio | 03/10/1995 | mock bank only | onboarded without photos: a conversation with Laura, ending with a photo she sent her, which the report's flow ends; she finds it ended and can still report it (#351, #476) |
 | Iida Mattila | 11/03/1990 | mock bank only | onboarded, with a complete profile and three photos: her gate opened by the stories and a round for the day, Henna first; the round's flow likes, passes, likes back and reports as her (#379) |
 | Henna Laaksonen | 27/05/1989 | mock bank only | a card in Iida's round: liked Iida the day before, so she comes first, and Iida's like back is a match (#379) |
 | Katja Rautio | 19/11/1989 | mock bank only | a card in Iida's round (#379) |

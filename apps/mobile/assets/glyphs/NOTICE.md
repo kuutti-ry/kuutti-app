@@ -1,6 +1,6 @@
 # The option glyphs: sources and terms
 
-The files under this directory are shown before an option's name in the profile (#213, ADR-019 §3), every one black and white: ink on transparency, tinted with the text colour by the app. They are not under the repository's licence (`LICENSE`). A party's mark is the party's, trademarked, shown only to name the party: five come from the party's own site (three logo files, two site icons), the rest from Wikimedia Commons and are cross-checked against the party's site on 10/10/2026, as noted. The religious symbols and the zodiac set come from Commons under the terms their file pages state; the Lutheran one is the Evangelical Lutheran Church of Finland's own cross, the church's mark, shown like a party's only to name it (#239). `zodiac/corgi.svg` is drawn for this repository, a placeholder until a better one, and is under its licence.
+The files under this directory are shown before an option's name in the profile (#213, ADR-019 §3), and those under `contact/` before a contact's service in a conversation and in Settings, Ways to reach you (#474); every one black and white: ink on transparency, tinted with the text colour by the app. They are not under the repository's licence (`LICENSE`). A party's mark is the party's, trademarked, shown only to name the party: five come from the party's own site (three logo files, two site icons), the rest from Wikimedia Commons and are cross-checked against the party's site on 10/10/2026, as noted. The religious symbols and the zodiac set come from Commons under the terms their file pages state; the Lutheran one is the Evangelical Lutheran Church of Finland's own cross, the church's mark, shown like a party's only to name it (#239). `zodiac/corgi.svg` is drawn for this repository, a placeholder until a better one, and is under its licence.
 
 "Made black" means every colour became `#000` and every white became transparent; "inverted" means the white mark became ink and the coloured field went; a crop is a change of the viewBox only. Vihreät's and Liike Nyt's header logos are wordmarks; their marks are their site icons, the globe and the sphere.
 
@@ -37,3 +37,16 @@ The files under this directory are shown before an option's name in the profile 
 | `zodiac/pisces.svg` | [Pisces symbol (bold).svg](https://commons.wikimedia.org/wiki/File%3APisces_symbol_%28bold%29.svg) (Wikimedia Commons) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) | Kwamikagami | — |
 
 Public domain on Commons means the file page carries a public-domain tag (a text logo or a simple shape below the threshold of originality, or the author's release). The CC BY-SA 4.0 files (the zodiac set) keep their author and licence here, as the licence asks. The party sites' files were fetched on 10/10/2026 at the maintainer's word; a party that wants its mark shown differently, or not at all, is answered by a change here.
+
+## The services' marks (#474)
+
+The four files under `contact/` are Simple Icons' drawings of the services' marks, release 16.35.0 of 11/10/2026, taken as they are (each one path in a 24-point box, no colour of its own), fetched on 28/10/2026 from jsDelivr's copy of the npm package at the maintainer's word. Simple Icons' own work is CC0 1.0; each mark stays its owner's trademark, shown only to name the service a contact belongs to, beside its name, and nothing in Kuutti says the services endorse it. A phone number's mark is lucide's `phone`, from the installed package (ISC), a placeholder for #410's set.
+
+| file | source | terms | owner of the mark | what was done | SHA-256 |
+|---|---|---|---|---|---|
+| `contact/instagram.svg` | [simple-icons@16.35.0/icons/instagram.svg](https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/instagram.svg) | CC0 1.0 (the drawing); trademark | Meta Platforms | — | `f53af2d1fc5292ba1433b5c1faf50005ce6a997fa302d1816989929f379a59dc` |
+| `contact/telegram.svg` | [simple-icons@16.35.0/icons/telegram.svg](https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/telegram.svg) | CC0 1.0 (the drawing); trademark | Telegram | — | `147fd8f8923e7e5f463fe98c0eb9913bead6b2ae59935728cda141002ec8a7c9` |
+| `contact/whatsapp.svg` | [simple-icons@16.35.0/icons/whatsapp.svg](https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/whatsapp.svg) | CC0 1.0 (the drawing); trademark | Meta Platforms | — | `8fb209a53a61618c3483594b3e070481a35575d6aaecbe00a6fe386670c8fb1c` |
+| `contact/snapchat.svg` | [simple-icons@16.35.0/icons/snapchat.svg](https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/snapchat.svg) | CC0 1.0 (the drawing); trademark | Snap | — | `fbbc31c5544954fbf7525dddbc0d3e79990bb89461f54a94917b6dffc2c5130e` |
+
+An owner who wants its mark shown differently, or not at all, is answered by a change here.

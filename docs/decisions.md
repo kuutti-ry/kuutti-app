@@ -93,7 +93,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 - [Round](#round) (19)
 - [Likes and fish](#likes-and-fish) (19)
 - [Match](#match) (10)
-- [Chat](#chat) (16)
+- [Chat](#chat) (17)
 - [Notifications](#notifications) (21)
 - [E-mail](#e-mail) (11)
 - [Invitations and rewards](#invitations-and-rewards) (16)
@@ -377,6 +377,7 @@ What two matched people can send each other, what each sees of the other, and th
 | Sharing is one press, one stored contact at a time, and one way: it shows to the other person at once, who is asked nothing and owes nothing back. | one press | `apps/api/src/chat/contacts.ts` | ADR-031 §11; #103 comments 18/10/2026 | maintainer, 18/10/2026 | |
 | A shared contact shows only while the conversation is open and no block stands; stopping, changing or removing it acts at once, and a close, a ban or an erasure ends every share. |  | `apps/api/src/chat/contacts.ts` | ADR-031 §11 (written with #103's build) | assumption | |
 | A shared contact is shown as text to copy, never a link that opens its app, and no line in the thread announces a share; opening it in its app with one tap, and counting the opens for research, is filed for later. | text to copy | `apps/mobile/src/features/chat/SharedContacts.tsx` | ADR-031 §11, Consequences; #473 | proposed, 25/10/2026 | |
+| Wherever a contact is shown (the line under a conversation's header, the share dialog's rows, the cards of Ways to reach you), its service's mark stands before its name in one colour, tinted with the text, decorative and hidden from screen readers, bundled with the app and never fetched; a phone number shows a phone. | Simple Icons' marks; lucide's phone | `apps/mobile/src/features/chat/ContactMark.tsx` | #474; ADR-031 §11 and History 28/10/2026; `apps/mobile/assets/glyphs/NOTICE.md` | maintainer, 28/10/2026 | |
 | The other person sees how far one has read ('Read'), and there is no way to switch read receipts off. | always on | `apps/api/src/chat/messages.ts` | ADR-031 §3, Consequences; #101 body (left out on purpose) | maintainer, 17/10/2026 | |
 | The other person sees 'Online' while one has the app connected, and nothing finer, no last-seen time; a shadow-banned person never shows online, and nothing is told across a close or a block. | online or offline | `apps/api/src/chat/presence.ts` | ADR-031 §9; #101 table; #349 | assumption | |
 | The chat has no typing indicator, no 'delivered' state and no message search, and a message cannot be edited, unsent or reacted to. |  | `docs/adr/031-chat.md` | ADR-031 Consequences; #101 body; TD-1 | maintainer, 17/10/2026 | |
