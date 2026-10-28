@@ -26,8 +26,10 @@ module.exports = {
   // pattern does not cover.
   transform: { "\\.mjs$": "babel-jest" },
   // The packages Babel transforms after all: they ship untranspiled modules.
-  // @noble/hashes (the sign-in verifier's SHA-256, ADR-027) is ES modules only.
+  // @noble/hashes (the sign-in verifier's SHA-256, ADR-027) is ES modules only,
+  // and so is standard-navigation, which the real expo-router loads where a
+  // test unmocks it to walk its stack (#491).
   transformIgnorePatterns: [
-    "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|lucide-react-native|nativewind|react-native-css-interop|@rn-primitives/.*|react-native-reanimated|react-native-worklets|i18next|i18next-icu|react-i18next|intl-messageformat|@formatjs/.*|@noble/.*)",
+    "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|lucide-react-native|nativewind|react-native-css-interop|@rn-primitives/.*|react-native-reanimated|react-native-worklets|i18next|i18next-icu|react-i18next|intl-messageformat|@formatjs/.*|@noble/.*|standard-navigation)",
   ],
 };

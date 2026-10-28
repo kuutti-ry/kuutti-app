@@ -72,7 +72,7 @@ export function ChatPhotoScreen({
 }: ChatPhotoParams) {
   const { t } = useT();
   const router = useRouter();
-  const handToList = useHandToList();
+  const handToList = useHandToList(conversation);
   // The conversation as the socket has told it since the link was made: an
   // end meanwhile changes what the report says, with no read (ADR-008).
   const endedLive = useChatLive().conversations[conversation]?.state?.state === "closed";
