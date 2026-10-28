@@ -64,7 +64,7 @@ Three things already limit a refresh token taken from a phone, one of them less 
 
 ## Open, the maintainer's
 
-1. Recognising any earlier refresh token of a session, so that the owner's next refresh ends a lifted session however often the taker refreshed (Consequences). The maintainer chose on 2026-10-28 to keep the year with this gap written down, and to design the recognition as a change of its own.
+1. Recognising any earlier refresh token of a session, so that the owner's next refresh ends a lifted session however often the taker refreshed (Consequences). The maintainer chose on 2026-10-28 to keep the year with this gap written down, and to design the recognition as a change of its own: #490.
 
 ## History
 
