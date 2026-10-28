@@ -3413,11 +3413,46 @@ lock.biometrics.cancel:
   sv: "Avbryt"
   machine: { fi: true, sv: true }
 
-lock.biometrics.failed:
+lock.failed.face:
+  en: "Your face did not unlock Kuutti. Try again, or use another way below."
+  description: "Lock screen, after the phone's face prompt refused or could not run (#418, #464), on a phone whose button says 'Unlock with your face'; a cancel says nothing."
+  fi: "Kasvosi eivät avanneet Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
+  sv: "Ditt ansikte låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
+lock.failed.fingerprint:
+  en: "Your fingerprint did not unlock Kuutti. Try again, or use another way below."
+  description: "Lock screen, after the phone's fingerprint prompt refused or could not run (#418, #464), on a phone whose button says 'Unlock with your fingerprint'; a cancel says nothing."
+  fi: "Sormenjälkesi ei avannut Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
+  sv: "Ditt fingeravtryck låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
+lock.failed.biometrics:
   en: "Your face or fingerprint did not unlock Kuutti. Try again, or use another way below."
-  description: "Lock screen, after the phone's biometric prompt refused or could not run (#418); a cancel says nothing."
+  description: "Lock screen, after the phone's biometric prompt refused or could not run (#418, #464), on a phone whose button says 'Unlock with your face or fingerprint'; a cancel says nothing. On Android such a phone may take only the finger, so the words promise neither."
   fi: "Kasvosi tai sormenjälkesi eivät avanneet Kuuttia. Yritä uudelleen tai käytä toista alla olevaa tapaa."
   sv: "Ditt ansikte eller fingeravtryck låste inte upp Kuutti. Försök igen eller använd ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
+lock.lockout.face:
+  en: "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below."
+  description: "Lock screen, when the phone has paused its face unlock after too many failed tries (#464): the try that brings the pause ends the prompt, and each ask during it answers with no prompt, on a phone whose button says 'Unlock with your face'. Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
+  fi: "Puhelin on keskeyttänyt kasvojentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen tai käytä toista alla olevaa tapaa."
+  sv: "Telefonen har pausat upplåsning med ansikte efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
+lock.lockout.fingerprint:
+  en: "The phone has paused fingerprint unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below."
+  description: "Lock screen, when the phone has paused its fingerprint unlock after too many failed tries (#464): the try that brings the pause ends the prompt, and each ask during it answers with no prompt, on a phone whose button says 'Unlock with your fingerprint'. Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
+  fi: "Puhelin on keskeyttänyt sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen tai käytä toista alla olevaa tapaa."
+  sv: "Telefonen har pausat upplåsning med fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
+lock.lockout.biometrics:
+  en: "The phone has paused face or fingerprint unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below."
+  description: "Lock screen, when the phone has paused its biometrics after too many failed tries (#464): the try that brings the pause ends the prompt, and each ask during it answers with no prompt, on a phone whose button says 'Unlock with your face or fingerprint'. On Android such a phone may take only the finger, so the words say 'or', never that both were paused. Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
+  fi: "Puhelin on keskeyttänyt kasvojen- tai sormenjäljentunnistuksen liian monen yrityksen jälkeen. Lukitse puhelin ja avaa se puhelimen omalla koodilla. Yritä sitten uudelleen tai käytä toista alla olevaa tapaa."
+  sv: "Telefonen har pausat upplåsning med ansikte eller fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
   machine: { fi: true, sv: true }
 
 lock.passcode.label:
@@ -3491,10 +3526,10 @@ lock.settings.biometrics:
   machine: { fi: true, sv: true }
 
 lock.settings.biometricsMissing:
-  en: "This phone has no face or fingerprint unlock set up. A passcode works without one."
-  description: "The lock's settings, instead of the biometrics switch when the phone has none enrolled (#418)."
-  fi: "Tähän puhelimeen ei ole asetettu kasvojen- tai sormenjäljentunnistusta. Pääsykoodi toimii ilman sitä."
-  sv: "Den här telefonen har ingen upplåsning med ansikte eller fingeravtryck. En lösenkod fungerar utan."
+  en: "This phone has no face or fingerprint unlock that Kuutti can use. A passcode works without one."
+  description: "The lock's settings, instead of the biometrics switch when the phone has none Kuutti can use (#418, #464): none enrolled, a face that unlocks only the phone itself (an Android class 1 face), or Face ID that Kuutti was refused in the iPhone's settings."
+  fi: "Tässä puhelimessa ei ole kasvojen- tai sormenjäljentunnistusta, jota Kuutti voi käyttää. Pääsykoodi toimii ilman sitä."
+  sv: "Den här telefonen har ingen upplåsning med ansikte eller fingeravtryck som Kuutti kan använda. En lösenkod fungerar utan."
   machine: { fi: true, sv: true }
 
 lock.settings.biometricsFailed:
@@ -3502,6 +3537,13 @@ lock.settings.biometricsFailed:
   description: "The lock's settings, when the confirming prompt for turning biometrics on did not succeed (#418)."
   fi: "Kasvojasi tai sormenjälkeäsi ei vahvistettu, joten sitä ei otettu käyttöön."
   sv: "Ditt ansikte eller fingeravtryck bekräftades inte, så det slogs inte på."
+  machine: { fi: true, sv: true }
+
+lock.settings.biometricsLockout:
+  en: "The phone has paused face or fingerprint unlock after too many tries, so it was not turned on. Lock the phone and open it with its own code, then try again."
+  description: "The lock's settings, when turning biometrics on met the phone's pause after too many failed tries (#464). Opening the phone with its own code (PIN, pattern, password or iPhone passcode, never Kuutti's passcode) ends every pause on both platforms; Android's first pauses also end after 30 seconds, iOS's never by waiting, so the line names the code alone."
+  fi: "Puhelin on keskeyttänyt kasvojen- tai sormenjäljentunnistuksen liian monen yrityksen jälkeen, joten sitä ei otettu käyttöön. Lukitse puhelin ja avaa se puhelimen omalla koodilla, ja yritä sitten uudelleen."
+  sv: "Telefonen har pausat upplåsning med ansikte eller fingeravtryck efter för många försök, så det slogs inte på. Lås telefonen och öppna den med telefonens egen kod, och försök sedan igen."
   machine: { fi: true, sv: true }
 
 lock.settings.setPasscode:

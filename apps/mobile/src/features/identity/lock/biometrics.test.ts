@@ -3,7 +3,8 @@ import { askBiometrics, biometricsOnThisPhone } from "./biometrics";
 
 // The phone's own face or fingerprint (#418, ADR-045 §5): what this phone
 // offers, for the button's words, and the prompt, which never falls back to
-// the phone's own code and tells a cancel apart from a failure.
+// the phone's own code and tells a cancel and the phone's pause apart from a
+// failure.
 
 const auth = jest.requireMock("expo-local-authentication") as {
   AuthenticationType: { FINGERPRINT: number; FACIAL_RECOGNITION: number; IRIS: number };
@@ -122,9 +123,23 @@ describe("askBiometrics", () => {
     },
   );
 
+  // Android's 30 seconds, its pause until the phone's own code, and iOS's
+  // biometry lockout all come as this one code, with no prompt shown (#464).
+  it("answers lockout when the phone has paused its face or fingerprint after too many tries", async () => {
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "lockout" });
+    await expect(askBiometrics(WORDS)).resolves.toBe("lockout");
+  });
+
+  it.each(["lockout ", "Lockout", "unknown: -8, Biometry is locked out."])(
+    "answers failed, not lockout, for the near miss %p",
+    async (error) => {
+      auth.authenticateAsync.mockResolvedValue({ success: false, error });
+      await expect(askBiometrics(WORDS)).resolves.toBe("failed");
+    },
+  );
+
   it.each([
     "authentication_failed",
-    "lockout",
     "not_enrolled",
     "not_available",
     "passcode_not_set",

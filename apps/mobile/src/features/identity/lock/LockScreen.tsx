@@ -15,6 +15,23 @@ const UNLOCK_WITH: Record<Biometrics, PlainMessageKey> = {
   either: "lock.unlock.biometrics",
 };
 
+/**
+ * A refusal in the kind the button names, as whole sentences, since Finnish
+ * agrees with it (#464): a failure, or the phone's pause after too many tries.
+ */
+const REFUSED: Record<"failed" | "lockout", Record<Biometrics, PlainMessageKey>> = {
+  failed: {
+    face: "lock.failed.face",
+    fingerprint: "lock.failed.fingerprint",
+    either: "lock.failed.biometrics",
+  },
+  lockout: {
+    face: "lock.lockout.face",
+    fingerprint: "lock.lockout.fingerprint",
+    either: "lock.lockout.biometrics",
+  },
+};
+
 /** What a passcode try answered: in, or how many tries are left. */
 export type PasscodeAnswer = { ok: true } | { ok: false; left: number };
 
@@ -54,11 +71,12 @@ export function LockScreen({
     if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
   };
 
-  const askBiometrics = async () => {
+  /** Asks the phone, and says a refusal in the words of the kind that was asked. */
+  const askBiometrics = async (kind: Biometrics) => {
     setBusy(true);
     try {
       const answer = await onBiometrics();
-      say(answer === "failed" ? t("lock.biometrics.failed") : null);
+      say(answer === "failed" || answer === "lockout" ? t(REFUSED[answer][kind]) : null);
     } finally {
       setBusy(false);
     }
@@ -69,7 +87,7 @@ export function LockScreen({
   useEffect(() => {
     if (biometrics === null || asked.current) return;
     asked.current = true;
-    void askBiometrics();
+    void askBiometrics(biometrics);
   });
 
   // One try at a time. The field stays editable, so the number pad stays up
@@ -112,7 +130,7 @@ export function LockScreen({
                 disabled={busy}
                 onPress={() => {
                   tap();
-                  void askBiometrics();
+                  void askBiometrics(biometrics);
                 }}
               >
                 {t(UNLOCK_WITH[biometrics])}
