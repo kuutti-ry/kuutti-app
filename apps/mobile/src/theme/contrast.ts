@@ -23,6 +23,7 @@ const TEXT_PAIRS: ReadonlyArray<readonly [foreground: string, background: string
   ["popover-foreground", "popover"],
   ["primary-foreground", "primary"],
   ["secondary-foreground", "secondary"],
+  // muted-foreground is also every disabled control's label, icon and thumb (#467).
   ["muted-foreground", "muted"],
   ["muted-foreground", "background"],
   ["muted-foreground", "card"],

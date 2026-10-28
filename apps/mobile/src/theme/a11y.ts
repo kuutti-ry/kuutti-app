@@ -21,6 +21,16 @@ export const DECORATIVE = Platform.select({
 export const MAX_FONT_SCALE = 2;
 
 /**
+ * Headings follow it less, the larger they are drawn, as iOS's own type ramp
+ * and Android 14's nonlinear font scaling do (#467): at the largest size h1 is
+ * 39 pt, h2 38, h3 37 and h4 35 over body text's 28, so the levels keep their
+ * order, and the longest Finnish words of the headings outside ScreenHeader
+ * ("Odotellessasi", "yhdistäminen") fit a 320 pt phone unbroken in the system
+ * font. h4 is already about the size of large text and takes MAX_FONT_SCALE.
+ */
+export const HEADING_FONT_SCALE = { h1: 1.25, h2: 1.45, h3: 1.75 } as const;
+
+/**
  * hitSlop that extends a control drawn smaller than the minimum target (a
  * switch, a close icon) to TOUCH_TARGET in both directions.
  */

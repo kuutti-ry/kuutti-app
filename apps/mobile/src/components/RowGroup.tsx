@@ -33,8 +33,10 @@ export function RowGroup({ rows }: { rows: readonly Row[] }) {
   return (
     <Card className="gap-0 py-0">
       {rows.map((row, index) => {
+        // border-0: a Button has a 1 px border on every side (#239, #467),
+        // and a row draws only the hairline under it.
         const edge = cn(
-          "justify-between gap-3 rounded-none px-4 py-3",
+          "justify-between gap-3 rounded-none border-0 px-4 py-3",
           index < rows.length - 1 && "border-b border-border",
         );
         const words = (

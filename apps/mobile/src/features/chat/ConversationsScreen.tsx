@@ -97,7 +97,13 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
           {...DECORATIVE}
         />
       ) : (
-        <View className="h-12 w-12 rounded-full bg-muted" {...DECORATIVE} />
+        // The edge keeps the circle in the high-contrast sets, whose --muted is
+        // the background itself (#467).
+        <View
+          testID={`thumb-${conversation.id}`}
+          className="h-12 w-12 rounded-full border border-border bg-muted"
+          {...DECORATIVE}
+        />
       )}
       <View className="flex-1 gap-0.5">
         <Text className="font-semibold">{name}</Text>
