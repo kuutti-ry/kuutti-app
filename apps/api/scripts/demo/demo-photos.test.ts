@@ -115,7 +115,7 @@ describe("the release in the cache", () => {
 
 describe("the stories' photos in their conversations (#350)", () => {
   test(
-    "give the chat's pair the story's photo, through the pipeline, once, and none without object storage",
+    "give the chat's pair and the report's pair the stories' photos, through the pipeline, once, and none without object storage",
     async ({ ctx }) => {
       const assets = await release();
       const { writer, store, media, logger } = await world(ctx, assets);
@@ -123,46 +123,52 @@ describe("the stories' photos in their conversations (#350)", () => {
       // the pipeline would only spend the test's time.
       const results = await giveStories(writer, ["iida", "henna", "katja", "minna", "riikka"]);
       await giveConversations(ctx.client, results, new Date());
-      const story = PERSONA_CONVERSATIONS.find((c) => c.photo)?.photo;
-      if (!story) throw new Error("no story with a photo");
+      const told = PERSONA_CONVERSATIONS.filter((c) => c.photo);
+      // Ville's to Antti (#350), and Emmi's to Laura, which the report's flow points at (#476).
+      expect(told.map((c) => c.between)).toEqual([
+        ["antti", "ville"],
+        ["laura", "emmi"],
+      ]);
       const deps = { db: ctx.client, logger, media: media.deps, assets };
       expect(await givePhotoMessages(deps, results, new Date())).toEqual({
-        sent: 1,
+        sent: 2,
         already: 0,
         skipped: 0,
       });
       const sent = await ctx.client.query(
         `SELECT m.seq, m.side, m.kind, m.body, p.purpose, p.position, p.key
-       FROM message m JOIN photo p ON p.id = m.photo_id`,
+       FROM message m JOIN photo p ON p.id = m.photo_id ORDER BY m.seq DESC`,
       );
-      expect(sent.rows).toEqual([
-        {
-          seq: 7,
-          side: story.from,
+      expect(sent.rows).toEqual(
+        told.map((c) => ({
+          seq: c.messages.length + 1,
+          side: c.photo?.from,
           kind: "photo",
-          body: story.caption,
+          body: c.photo?.caption,
           purpose: "message",
           position: null,
           key: expect.any(String),
-        },
-      ]);
+        })),
+      );
+      // The same landscape: one content, so both rows name the same objects.
+      expect(new Set(sent.rows.map((row) => row.key)).size).toBe(1);
       const full = store.objects.get(objectKey(sent.rows[0]?.key, "full"));
       const meta = await sharp(Buffer.from(full as Uint8Array)).metadata();
       expect([meta.format, meta.exif]).toEqual(["webp", undefined]);
-      // A second run is answered with the stored message.
+      // A second run is answered with the stored messages.
       expect(await givePhotoMessages(deps, results, new Date())).toEqual({
         sent: 0,
-        already: 1,
+        already: 2,
         skipped: 0,
       });
       // Without object storage, or with no pictures, none; a release without the picture is refused.
       expect(
         await givePhotoMessages({ db: ctx.client, logger, assets }, results, new Date()),
-      ).toEqual({ sent: 0, already: 0, skipped: 1 });
+      ).toEqual({ sent: 0, already: 0, skipped: 2 });
       expect(await givePhotoMessages({ ...deps, assets: null }, results, new Date())).toEqual({
         sent: 0,
         already: 0,
-        skipped: 1,
+        skipped: 2,
       });
       await expect(
         givePhotoMessages(
