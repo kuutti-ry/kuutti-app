@@ -2,7 +2,7 @@ import type { ContactKind } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { clearSession, saveSession } from "@/lib/session";
-import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
+import { a11yProblems, type HostNode, markBefore, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { YourContacts } from "./YourContacts";
 
@@ -109,6 +109,8 @@ describe("Ways to reach you", () => {
     );
     for (const title of ["Phone number", "WhatsApp", "Telegram", "Instagram", "Snapchat"]) {
       expect(screen.getByText(title)).toBeTruthy();
+      // The service's mark before the title (#474), decorative.
+      expect([title, markBefore(screen.toJSON() as HostNode, title)]).toEqual([title, true]);
     }
     expect(
       screen.getByText("A number with its country code, or a Finnish one starting with 0."),
