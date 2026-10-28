@@ -23,9 +23,9 @@ type Notice = "saved" | "removed" | "invalid" | "pace" | "failed" | null;
 const NUMBER: ReadonlySet<ContactKind> = new Set(["phone", "whatsapp"]);
 
 /**
- * The person's contacts (#103), on Settings' Your contacts screen: the line
+ * The person's contacts (#103), on Settings' Ways to reach you screen: the line
  * that nobody sees them until one is shared in a conversation, then a card
- * per kind (phone number, WhatsApp, Telegram, Instagram). While they are
+ * per kind (phone number, WhatsApp, Telegram, Instagram, Snapchat). While they are
  * being read it says so; a read that failed says why, with a way to read them
  * again.
  */

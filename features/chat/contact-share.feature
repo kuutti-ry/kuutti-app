@@ -1,9 +1,9 @@
 # features/chat/contact-share.feature
 Feature: Contacts shared in a conversation
   Messages and profiles refuse contact details; this is the one way through
-  (#103, ADR-031 §11, the maintainer's decisions of 18/10/2026). A person
-  keeps up to four pieces in Settings (a phone number, WhatsApp, Telegram,
-  Instagram), each in the one form of its kind, and nobody sees them. In an
+  (#103, ADR-031 §11, the maintainer's decisions of 18/10/2026, Snapchat's of
+  28/10/2026). A person keeps up to five pieces in Settings (a phone number,
+  WhatsApp, Telegram, Instagram, Snapchat), each in the one form of its kind, and nobody sees them. In an
   open conversation one press shares a piece: the other person sees it at
   once, until its owner stops sharing it, removes or changes it, or the
   conversation closes. No agreement step, no obligation to share back. A
@@ -14,7 +14,7 @@ Feature: Contacts shared in a conversation
 
   Scenario: A person keeps a contact of each kind in its one form, seen by nobody
     Given "A" keeps no contacts and is in a conversation with "B"
-    When "A" keeps a phone number from 0, a WhatsApp number from 00, a Telegram username with its @ and an Instagram one in capitals
+    When "A" keeps a phone number from 0, a WhatsApp number from 00, a Telegram username with its @, an Instagram one in capitals and a Snapchat one with its @ in capitals
     Then each is kept in its one form, the list answers them in the kinds' order, and "B" sees none of them
 
   Scenario Outline: A contact that is not of its kind is refused in words, and nothing is kept
@@ -26,6 +26,7 @@ Feature: Contacts shared in a conversation
       | a phone number with letters in it            | contact_invalid   |
       | a Telegram username of four characters       | contact_invalid   |
       | an Instagram username with two dots in a row | contact_invalid   |
+      | a Snapchat username ending with a hyphen     | contact_invalid   |
       | empty                                        | validation_failed |
       | over sixty-four characters                   | validation_failed |
       | of a kind there is none of                   | validation_failed |

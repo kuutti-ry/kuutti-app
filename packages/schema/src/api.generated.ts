@@ -3994,7 +3994,7 @@ export interface paths {
         };
         /**
          * The caller's stored contacts
-         * @description Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.
+         * @description Up to one phone number, WhatsApp number, Telegram, Instagram and Snapchat username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.
          */
         get: {
             parameters: {
@@ -4043,7 +4043,7 @@ export interface paths {
         get?: never;
         /**
          * Keep a contact
-         * @description Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.
+         * @description Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's and Snapchat's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.
          */
         put: {
             parameters: {
@@ -7310,7 +7310,7 @@ export interface components {
             endedHow: components["schemas"]["ContactShareEnd"];
         };
         /** @enum {string} */
-        ContactKind: "phone" | "whatsapp" | "telegram" | "instagram";
+        ContactKind: "phone" | "whatsapp" | "telegram" | "instagram" | "snapchat";
         /** @enum {string|null} */
         ContactShareEnd: "stopped" | "removed" | "closed" | null;
         StoredContact: {
