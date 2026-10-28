@@ -14,6 +14,7 @@ import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
+import { ContactMark } from "./ContactMark";
 import { fetchContacts, removeContact, saveContact } from "./client";
 
 type Stored = Partial<Record<ContactKind, string | undefined>>;
@@ -85,9 +86,9 @@ export function YourContacts() {
 }
 
 /**
- * One kind as a card, as the e-mail's (#148): its name and what to type, the
- * field with what is kept in its stored form, Save (off while empty or
- * unchanged) and Remove (only while one is kept). What is typed is checked
+ * One kind as a card, as the e-mail's (#148): its mark (#474), its name and
+ * what to type, the field with what is kept in its stored form, Save (off
+ * while empty or unchanged) and Remove (only while one is kept). What is typed is checked
  * on the phone first, with the API's own rule, and a refusal of either is
  * said in words for the kind; a keep or a removal counts with the messages
  * of a minute, and one past them is said as the share dialog says it. The
@@ -146,7 +147,10 @@ function ContactCard({
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>{t("settings.contacts.title", { kind })}</CardTitle>
+        <View className="flex-row items-center gap-2">
+          <ContactMark kind={kind} />
+          <CardTitle className="flex-1">{t("settings.contacts.title", { kind })}</CardTitle>
+        </View>
         <CardDescription>{t("settings.contacts.hint", { kind })}</CardDescription>
       </CardHeader>
       <CardContent className="gap-3">
