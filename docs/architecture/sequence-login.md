@@ -132,7 +132,7 @@ sequenceDiagram
 24. The app takes the pending mark and its verifier, once: reading the mark spends it. No mark, a mark older than ten minutes, or a phone already signed in: the link is refused as `unexpected_link`, and nothing is sent. A code somebody else sent as a link stops here.
 25. The app posts the code and the verifier to `POST /auth/exchange`. The verifier travels only in this body.
 26. One statement spends the code, and only when all hold: its hash matches, the attempt's `code_challenge` is the SHA-256 of the verifier, the attempt belongs to an account, the code is unused and within its minute. Anything else is 401 `auth_code_used`, and a wrong verifier leaves the code unspent (ADR-027 §3). The exchange is no sign-in door, but the address's own limit can answer 429.
-27. The API opens this device's session: a new access token (15 minutes) and refresh token (90 days), 256 random bits each, of which the database keeps only the SHA-256.
+27. The API opens this device's session: a new access token (15 minutes) and refresh token, 256 random bits each, of which the database keeps only the SHA-256. The session ends ninety days on; each refresh moves the end to ninety days from the refresh, never past a year from this login (ADR-058).
 28. The app receives both tokens and the outcome: `created`, `resumed` or `unpaused`. A failure is said on the sign-in screen.
 29. The app keeps the session in the phone's secure store, readable while the phone is unlocked and on this device only.
 30. If the person answered the screens before the bank for this attempt, the app records the answers with `POST /consents` before anything else. The app then asks whether onboarding is finished (#395's sign-in flow).

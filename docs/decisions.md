@@ -85,7 +85,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 
 ## Areas
 
-- [Sign-in and identity](#sign-in-and-identity) (26)
+- [Sign-in and identity](#sign-in-and-identity) (28)
 - [Pond and gate](#pond-and-gate) (31)
 - [Profile](#profile) (35)
 - [Photos](#photos) (38)
@@ -125,8 +125,10 @@ How a person gets in: the consents before the bank, the bank login and what it y
 | The sign-in code works only on the phone that started the login: the app keeps a secret, and the server accepts the code only with it, refusing a wrong secret like an unknown code. |  | `apps/api/src/identity/codes.ts` | ADR-027 §1–§3; #186; PR #327; session 17/10/2026 | maintainer, 17/10/2026 | |
 | The sign-in code lasts 60 seconds; a code from an earlier tap is refused. | 60 seconds | `ONE_TIME_CODE_TTL_MS` in `apps/api/src/identity/codes.ts` | #35; ADR-027 | assumption | |
 | A session belongs to the phone that signed in: its tokens are kept for that device only, so a backup or a new phone needs the bank again, and a lost phone is recovered by one new bank login. |  | `apps/mobile/src/lib/session.ts` | #35; PR #187; ADR-016 §3; session 10/10/2026 | maintainer, 10/10/2026 | |
-| The access token lasts 15 minutes and is renewed by a refresh token that ends 90 days after the bank sign-in, rotated at each use; using the app does not extend the 90 days. | 15 minutes; 90 days | `REFRESH_TOKEN_TTL_MS` in `apps/api/src/identity/sessions.ts` | #35; ADR-016 §3 | assumption | |
-| Open: should a phone's 90 days count from its last use rather than from the bank login, with a ceiling such as a year? Meanwhile from the bank login, so every phone meets the bank, a billed login, every 90 days. | from the bank login | `REFRESH_TOKEN_TTL_MS` in `apps/api/src/identity/sessions.ts` | #472 | proposed, 26/10/2026 | |
+| The access token lasts 15 minutes and is renewed by a refresh token, rotated at each use; a refresh token presented twice ends the session. | 15 minutes | `ACCESS_TOKEN_TTL_MS` in `apps/api/src/identity/sessions.ts` | #35; ADR-016 §3 | assumption | |
+| A phone's session ends 90 days after its last use: each refresh moves the end 90 days on, so a phone used at least once in 90 days stays signed in, and one left alone goes to the bank, a billed login. | 90 days, kept from #35 | `REFRESH_TOKEN_TTL_MS` in `apps/api/src/identity/sessions.ts` | ADR-058 §1; #472; #35; session 28/10/2026 | maintainer, 28/10/2026 | |
+| However often it is used, a phone's session ends a year after its bank login, and the phone goes to the bank again. | a year (365 days) | `SESSION_CEILING_MS` in `apps/api/src/identity/sessions.ts` | ADR-058 §2; #472; session 28/10/2026 | maintainer, 28/10/2026 | |
+| Open: should a refresh recognise every earlier refresh token of its session? Meanwhile only the one the last refresh retired: somebody who lifted a token and refreshes twice before the owner's next use signs the owner out and keeps the session, up to the year. | the last retired token only | `apps/api/src/identity/repo.ts` | ADR-058 Open 1; #472 | proposed, 28/10/2026 | |
 | Onboarding asks one thing per screen, every answer a button: the name (typed, never taken from the bank), gender with an identity label after non-binary, whom one seeks with the sensitive-answers consent, intent, the age window, the pond, photos, and prompts or a bio. | 8 steps | `apps/mobile/src/features/identity/onboarding/OnboardingScreen.tsx` | ADR-010 §10, §12, §15; #146; #174; #418; field sheet 07/10/2026 | maintainer, 22/10/2026 | |
 | An account becomes active once gender, whom one seeks, the age window, the pond and the current terms and privacy are present; research is never required, and active never goes back. |  | `apps/api/src/identity/onboarding.ts` | ADR-010 §6, §10 | no record | |
 | A person may turn on an app lock, the phone's face or fingerprint or a passcode of Kuutti's own. It is off until turned on, offered once after the e-mail and always in Settings, and it covers the screens while the session runs underneath. | off by default | `apps/mobile/src/features/identity/lock/LockProvider.tsx` | ADR-045 §1, §4, §7; #418 | maintainer, 22/10/2026 | |

@@ -55,7 +55,7 @@ Repeat this for each test person with a live account, and for most of them more 
 
 **How the script uses the file:**
 
-- At its start it rotates every token and writes the new one back before it asks for the next, so the file serves the next milestone too, until the refresh tokens expire after 90 days. A session the API refuses is commented out with the day, not deleted, and the script says which line.
+- At its start it rotates every token and writes the new one back before it asks for the next, so the file serves the next milestone too: a session lasts while the smoke runs at least every ninety days, and a year after its sign-in at most (ADR-058). A session the API refuses is commented out with the day, not deleted, and the script says which line.
 - Before it asks anybody anything, it refuses:
   - a file without its `# target` line, or one naming another API than `--target`. An API answers another's token the same as an ended one (`session_revoked`), so without the check, a file pointed at the wrong API would lose every session;
   - a file inside any git work tree, this checkout's or another's;

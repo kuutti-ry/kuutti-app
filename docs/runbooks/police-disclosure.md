@@ -81,7 +81,7 @@ From the schema (`packages/db/src/schema/`). "Erasure" is the person deleting th
 | Conversations and messages (#348, ADR-031): when each conversation opened, its last message, whether it is archived or closed, how and by which side; its two participants and how far each has read; each message's sequence, side, time, kind and words (a photo's caption is its words). A conversation is the record of a match: the second of two standing likes opens it (#100, ADR-038). In production none is opened until rounds are built there (ADR-035 §7); elsewhere the rounds' decisions, the demo stories and the tests write them | `conversation`, `conversation_participant`, `message` | while one of its two people has an account (ADR-031 §5); nothing goes on an archive or a close. At erasure the person's link goes (`account_id` null) and the messages stay for the counterpart, the person's own among them, except those sent under a shadow ban still open, which go; once both people are erased, the conversation goes with its messages |
 | Reports the person filed or received (#84, ADR-030): the reason, the reporter's note if they wrote one, the time, and the moderators' decision with who decided and the sanction it led to; the blocks the person set or received, between the two identities, with the date | `report`, `block` | a report twelve months from filing, swept nightly, whoever of the two is erased; a block as long as the two identities, so it survives erasure |
 | What the person fetched and was shown: these rows name other people's photos. A fetch of a photo sent in a conversation has the purpose `message`, written once per viewer, photo and variant in a five-minute window, two reads at the same instant aside | `photo_access`, `card_shown` | until erasure; a `photo_access` row outlives the photo it names |
-| Devices: platform, a truncated user agent, when created, last used and revoked; no address | `session` | swept nightly 30 days after sign-out or revocation, or once expired (90 days after the device signed in), and at erasure (`apps/api/src/identity/sessions.ts`) |
+| Devices: platform, a truncated user agent, when created, last used and revoked; no address | `session` | swept nightly 30 days after sign-out or revocation, or once expired (90 days after the device's last use, and a year after it signed in at most, ADR-058), and at erasure (`apps/api/src/identity/sessions.ts`) |
 | Consents, export requests, the place at the pond gate | `consent`, `account_export`, `gate` | until erasure |
 | Sanctions, with staff's note | `sanction` | erasure keeps the open bans and suspensions (ADR-024 §8) |
 | Feedback the person sent, in their words | `feedback` | until erasure |
@@ -234,7 +234,7 @@ What expires, and when. A request about an older event may find nothing:
 |---|---|
 | a login attempt | ten minutes, swept nightly |
 | the latest bank login's session index | at the next bank login |
-| a device (`session`), and so when it was last used | 30 days after sign-out or revocation, once expired (90 days after it signed in), or at erasure |
+| a device (`session`), and so when it was last used | 30 days after sign-out or revocation, once expired (90 days after its last use, a year after it signed in at most), or at erasure |
 | whom the person seeks, politics and religion | when the special-category consent is withdrawn, or at erasure |
 | the box's container logs, the API's included | 30 days |
 | Dokploy's nightly backups | 90 days |

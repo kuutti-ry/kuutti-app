@@ -110,3 +110,4 @@ On 25/10/2026 the maintainer decided: attestation not now, in a defined shape la
 ## History
 
 - 2026-10-25: written with the rest of #86, on the maintainer's decisions of that day. #86's body holds the research behind it.
+- 2026-10-28, ADR-058 (#472): a refresh token's ninety days count from its last refresh, up to a year from the bank login, so the lifted token under What attestation does not touch works as long as it is refreshed at least every ninety days, up to that year. No point changes.

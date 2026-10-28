@@ -510,6 +510,10 @@ export async function touchSession(db: Queryable, sessionId: string, at: Date): 
  * not. Only the hash retired by the last rotation is kept: a token two
  * rotations old reads as unknown, which is narrower than the reuse rule but
  * costs nothing, since nobody could have used that token in between.
+ *
+ * The end moves to `nextExpiresAt`, never past `ceilingMs` after the row's
+ * creation, the bank login (ADR-058); once it is reached, the next refresh
+ * finds the end passed.
  */
 export async function rotateSession(
   db: Queryable,
@@ -518,12 +522,15 @@ export async function rotateSession(
     nextAccessHash: string;
     nextAccessExpiresAt: Date;
     nextRefreshHash: string;
+    nextExpiresAt: Date;
+    ceilingMs: number;
     at: Date;
   },
 ): Promise<SessionRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE session
-     SET refresh_hash = $2, retired_refresh_hash = $1, access_hash = $3, access_expires_at = $4, last_used_at = $5
+     SET refresh_hash = $2, retired_refresh_hash = $1, access_hash = $3, access_expires_at = $4, last_used_at = $5,
+       expires_at = LEAST($6::timestamptz, created_at + $7::double precision * interval '1 millisecond')
      WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > $5 AND ${SESSION_ALIVE}
      RETURNING ${SESSION_COLUMNS}`,
     [
@@ -532,6 +539,8 @@ export async function rotateSession(
       input.nextAccessHash,
       input.nextAccessExpiresAt,
       input.at,
+      input.nextExpiresAt,
+      input.ceilingMs,
     ],
   );
   return rows[0] ? sessionFrom(rows[0]) : null;

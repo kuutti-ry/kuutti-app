@@ -21,7 +21,7 @@ One process: HTTP routes, WebSockets through `@hono/node-server`'s own upgrade o
 - The hetu lives only inside the callback handler: parse (accept all century separators `+ - A-F Y X W V U`), check 18+, derive `birth_year` and `birth_month`, compute `HMAC-SHA256(hetu)` with the SSM key, then discard. Never log it and never pass it to a function that could retain it.
 - Re-registration at the callback per TD-7: banned or suspended refuse and increment `refused_attempts`, a suspension with the day it ends (`suspension_ends_at`); inside `reregister_after` refuse with the date; otherwise a fresh account with nothing restored.
 - The app's exchange is bound to its start (ADR-027): `code_challenge` at `/auth/start`, required; `verifier` at `/auth/exchange`; one UPDATE (`consumeAppCode`) spends the code only with its challenge, and a wrong verifier leaves it unspent. Every refusal is `auth_code_used`. The staff path is not bound. This is not Telia's PKCE: nothing new goes to the broker.
-- Session tokens: random 256-bit, hashed at rest, constant-time compare. Device-bound refresh tokens. Admin sessions are 8 hours with no refresh.
+- Session tokens: random 256-bit, hashed at rest, constant-time compare. Device-bound refresh tokens; a refresh moves the session's end to ninety days on, never past a year from the bank login (ADR-058). Admin sessions are 8 hours with no refresh.
 - One identity row per `hetu_hmac`, at most one live account per identity. A ban is set on the identity. `account.state` and `identity.standing` change because of a sanction only through `settleStanding` (`identity/standing.ts`), from the sanctions still open (ADR-024 §2); never write either by hand.
 
 ## Data access

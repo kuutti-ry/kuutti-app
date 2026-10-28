@@ -88,7 +88,8 @@ export const SessionTokens = z
       description: "Single use: /auth/refresh answers with a new pair and retires this one.",
     }),
     refreshExpiresAt: z.iso.datetime().meta({
-      description: "After this the device logs in through the bank again.",
+      description:
+        "After this the device logs in through the bank again. Each refresh moves it to ninety days on, never past a year from the bank login (ADR-058).",
     }),
   })
   .meta({ id: "SessionTokens" });

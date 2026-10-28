@@ -9,9 +9,15 @@ import * as repo from "./repo.ts";
 // exist in plaintext only in the response; the row keeps SHA-256 hashes. A
 // refresh rotates both tokens and retires the old refresh token on the row, so
 // a second presentation of it is recognised as reuse and ends the device.
+// A refresh also moves the session's end (ADR-058): a phone in use stays signed
+// in, one left alone for ninety days, or a year past its bank login, goes to
+// the bank again.
 
 const ACCESS_TOKEN_TTL_MS = 15 * 60 * 1000;
+/** A session ends this long after the bank login or its last refresh (ADR-058 §1). */
 const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+/** And never later than this after its bank login, however often it is used (ADR-058 §2). */
+const SESSION_CEILING_MS = 365 * 24 * 60 * 60 * 1000;
 /** Ended sessions stay this long for the person's device list and for support, then the sweep removes them. */
 const ENDED_SESSION_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -80,6 +86,8 @@ export async function refreshSession(
     nextAccessHash: tokens.accessHash,
     nextAccessExpiresAt: tokens.accessExpiresAt,
     nextRefreshHash: tokens.refreshHash,
+    nextExpiresAt: new Date(now.getTime() + REFRESH_TOKEN_TTL_MS),
+    ceilingMs: SESSION_CEILING_MS,
     at: now,
   });
   if (rotated) {
