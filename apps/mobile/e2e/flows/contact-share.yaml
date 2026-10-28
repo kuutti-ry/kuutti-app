@@ -1,5 +1,5 @@
 # Contacts shared in a conversation (#103, ADR-031): Elina keeps her
-# Instagram username in Settings, Your contacts, where nobody sees it; she
+# Instagram username in Settings, Ways to reach you, where nobody sees it; she
 # opens her conversation with Jussi, shares it with the header's Share contact
 # and sees it marked shared. Jussi signs in and finds it under the
 # conversation's header. Elina signs in again, stops sharing it and removes it
@@ -20,13 +20,13 @@ name: A contact kept in Settings is shared from a conversation's header and show
     timeout: 15000
 # The row sits under Account, below the fold on a phone: scrolled to, then tapped.
 - scrollUntilVisible:
-    element: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+    element: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- tapOn: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+- tapOn: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
 # The cards come once what is kept has been read, the phone number's first;
-# Instagram's is the last of four, below the fold. A field is its label.
+# Instagram's is the fourth of five, below the fold. A field is its label.
 - extendedWaitUntil:
     visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
     timeout: 15000
@@ -140,11 +140,11 @@ name: A contact kept in Settings is shared from a conversation's header and show
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
 - scrollUntilVisible:
-    element: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+    element: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
     direction: DOWN
     centerElement: true
     timeout: 60000
-- tapOn: "Your contacts|Yhteystietosi|Dina kontaktuppgifter"
+- tapOn: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
 - extendedWaitUntil:
     visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
     timeout: 15000

@@ -447,7 +447,7 @@ describe("the e-mail and the account screens", () => {
     await saveSession(tokens);
     await renderWithTheme(<ContactsSettingsScreen />);
     expect(await screen.findByText("Phone number")).toBeTruthy();
-    expectPinnedHeader("Your contacts", "Back");
+    expectPinnedHeader("Ways to reach you", "Back");
     expect(screen.getByLabelText("Your Instagram username")).toBeTruthy();
     noProblems();
   });
