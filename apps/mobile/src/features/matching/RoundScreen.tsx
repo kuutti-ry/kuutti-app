@@ -6,7 +6,14 @@ import Heart from "lucide-react-native/icons/heart";
 import Undo2 from "lucide-react-native/icons/undo-2";
 import X from "lucide-react-native/icons/x";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Platform, ScrollView, type Text as TextNode, View } from "react-native";
+import {
+  AccessibilityInfo,
+  Platform,
+  ScrollView,
+  type Text as TextNode,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
@@ -39,6 +46,16 @@ const REVISIT: Readonly<Record<RoundChoice, PlainMessageKey>> = {
 
 /** A card that answers somebody's like takes a like back, never a fish (ADR-039 §2). */
 const ANSWERS_A_LIKE: ReadonlySet<RoundReason> = new Set(["liked_you", "fish"]);
+
+/**
+ * From this OS font scale, Undo in the header is its icon alone (#467, the
+ * maintainer's of 28/10/2026): its word grows with the text and the title
+ * beside it shrinks to fit, below body text from x1.45 on a 360 pt phone in
+ * Finnish. Android's 130 % and iOS's largest standard size. It keeps its
+ * spoken label and its 44 pt target; one-handed, at the thumb, it keeps its
+ * word, having the room.
+ */
+const WORDLESS_UNDO_FONT_SCALE = 1.3;
 
 /**
  * Today's round (#379, ADR-034): one card at a time through the card others
@@ -113,9 +130,13 @@ export function RoundScreen() {
   // Where the decision buttons sit (#82): for the right hand or the left,
   // and one-handed in a column on that side with Undo among them.
   const { settings: placement } = useDecisionButtons();
+  const { fontScale } = useWindowDimensions();
+  // Android sends its scale as a float: 130 % arrives as 1.2999999523.
+  const wordless = !placement.oneHanded && fontScale >= Math.fround(WORDLESS_UNDO_FONT_SCALE);
   const undo = round.canUndo && (
     <Button
       variant="ghost"
+      size={wordless ? "icon" : "default"}
       className={cn(placement.oneHanded && "w-full")}
       accessibilityLabel={t("round.undo.label")}
       onPress={() => {
@@ -124,7 +145,7 @@ export function RoundScreen() {
       }}
     >
       <Icon as={Undo2} />
-      <Text>{t("round.undo")}</Text>
+      {!wordless && <Text>{t("round.undo")}</Text>}
     </Button>
   );
 

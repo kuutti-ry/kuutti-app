@@ -90,7 +90,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 - [Profile](#profile) (35)
 - [Photos](#photos) (38)
 - [Filters](#filters) (18)
-- [Round](#round) (19)
+- [Round](#round) (20)
 - [Likes and fish](#likes-and-fish) (19)
 - [Match](#match) (10)
 - [Chat](#chat) (17)
@@ -309,6 +309,7 @@ Today's round: who gets one, whom it holds, in what order, and what the person c
 | Every card says why it is there, one reason from a closed list by precedence: liked you or fish, then relaxed (naming the field), then seen before, then matches your filters. | five reasons | `packages/schema/src/matching.ts` | ADR-042 §9; ADR-034 §1; #99 comment 21/10/2026; TD-12 | maintainer, 21/10/2026 | |
 | The round screen shows one card at a time with its reason; like, pass and the fish are buttons, never a swipe, with an Undo on the last decision, and every refusal is said in words. | one card at a time | `apps/mobile/src/features/matching/RoundScreen.tsx` | #379; ADR-034 History 20/10/2026; CLAUDE.md Accessibility | assumption | |
 | The decision buttons suit the right hand by default (Pass left, Like right) or the left, mirrored, each keeping its shape, word and icon; a one-handed mode stacks Undo, the fish, Pass and Like in one column on that side; the choice is kept on the phone alone. | right hand by default | `apps/mobile/src/lib/decision-buttons.tsx` | #82 comment 21/10/2026; PR #399 | maintainer, 21/10/2026 | |
+| At a large text size, Undo in the round's header is its icon alone, so the title beside it keeps its size: at 2x on a 360 pt phone, in Finnish, 34 pt instead of 16 (body text 28; 27 pt on a 320 pt phone). It keeps its spoken label and its 44 pt target, and one-handed, at the thumb, its word. | from 1.3x (Android's 130 %, iOS's largest standard size) | `WORDLESS_UNDO_FONT_SCALE` in `apps/mobile/src/features/matching/RoundScreen.tsx` | #467; session 28/10/2026 | maintainer, 28/10/2026 | |
 | A like or a pass can be changed until midnight in Finland, then it is final; a card left undecided expires with the day. | until midnight | `apps/api/src/matching/rounds.ts` | ADR-034 §5; #96 comment 19/10/2026 | maintainer, 19/10/2026 | |
 | Whatever the panel sets, a round never holds more than fifty cards in all, the liked-you places first. | 50 | `ROUND_ENTRIES_MAX` in `packages/schema/src/matching.ts` | ADR-035 Consequences, History 20/10/2026 | assumption | |
 | Rounds run on basic logic until the research partner has spoken: a cap on how many rounds one person appears in a day, a round sized to the pool, random places, an exposure floor, other orderings and the research buckets all wait, and nothing reads the cap's row. | first cut; the cap of 40 unused | `impression_cap_per_day`; `apps/api/src/jobs/round-builder.ts` | ADR-035 Context, Left for later; #95 comments 20/10/2026; migration 0007; the cap of 40 by TD-11 (ADR-002 Context, ADR-015 §5) | maintainer, 20/10/2026 | |
