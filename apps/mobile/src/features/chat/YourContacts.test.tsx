@@ -6,7 +6,7 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
 import { YourContacts } from "./YourContacts";
 
-// The contacts a person keeps (#103), on Settings' Your contacts screen: the
+// The contacts a person keeps (#103), on Settings' Ways to reach you screen: the
 // read with its loading line and its failure, a card per kind with its field
 // as the kind wants it, Save off while empty or unchanged, the phone's own
 // check before the API's, the stored form shown back, Remove only while one
@@ -89,7 +89,7 @@ beforeEach(async () => {
   });
 });
 
-describe("Your contacts", () => {
+describe("Ways to reach you", () => {
   it("says it is loading, then a card per kind with what is kept, each field as its kind wants it", async () => {
     let answer: (response: Response) => void = () => undefined;
     contactsApi({}, [
@@ -98,20 +98,22 @@ describe("Your contacts", () => {
       }) as unknown as Response,
     ]);
     await renderWithTheme(<YourContacts />);
-    expect(screen.getByText("Loading your contacts…").props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByText("Loading your contact details…").props.accessibilityLiveRegion).toBe(
+      "polite",
+    );
     await act(async () =>
       answer(json({ contacts: [{ kind: "phone", value: "+358401234567", updatedAt: AT }] })),
     );
     await screen.findByText(
       "Keep the ways to reach you outside the app here. Nobody sees them until you share one in a conversation, with the button at its top. A change or a removal shows at once wherever you shared it.",
     );
-    for (const title of ["Phone number", "WhatsApp", "Telegram", "Instagram"]) {
+    for (const title of ["Phone number", "WhatsApp", "Telegram", "Instagram", "Snapchat"]) {
       expect(screen.getByText(title)).toBeTruthy();
     }
     expect(
       screen.getByText("A number with its country code, or a Finnish one starting with 0."),
     ).toBeTruthy();
-    expect(screen.getAllByText("Your username, with or without the @ before it.")).toHaveLength(2);
+    expect(screen.getAllByText("Your username, with or without the @ before it.")).toHaveLength(3);
     expect(field("Your phone number").props.value).toBe("+358401234567");
     expect(field("Your WhatsApp number").props.value).toBe("");
     for (const [name, number] of [
@@ -119,6 +121,7 @@ describe("Your contacts", () => {
       ["Your WhatsApp number", true],
       ["Your Telegram username", false],
       ["Your Instagram username", false],
+      ["Your Snapchat username", false],
     ] as const) {
       expect(field(name).props).toMatchObject({
         maxLength: 64,
@@ -200,6 +203,12 @@ describe("Your contacts", () => {
       "aino..k",
       "That does not look like an Instagram username: up to 30 letters, digits, dots and underscores, never a dot first, last or two in a row.",
     ],
+    [
+      "a Snapchat username ending with a hyphen",
+      "snapchat",
+      "aino-",
+      "That does not look like a Snapchat username: 3 to 15 letters, digits, dots, underscores and hyphens, starting with a letter and ending with a letter or a digit.",
+    ],
   ])(
     "refuses %s on the phone, before any request, in words for its kind",
     async (_what, kind, typed, said) => {
@@ -210,6 +219,7 @@ describe("Your contacts", () => {
         whatsapp: ["Your WhatsApp number", "Save your WhatsApp number"],
         telegram: ["Your Telegram username", "Save your Telegram username"],
         instagram: ["Your Instagram username", "Save your Instagram username"],
+        snapchat: ["Your Snapchat username", "Save your Snapchat username"],
       };
       const [input, save] = names[kind];
       await type(input, typed);
@@ -317,7 +327,7 @@ describe("Your contacts", () => {
   it("says the read failed, why, and reads again with Try again", async () => {
     contactsApi({ instagram: "aino.k" }, [refusal("internal_error", 500)]);
     await renderWithTheme(<YourContacts />);
-    expect(await screen.findByText("Your contacts could not be loaded.")).toBeTruthy();
+    expect(await screen.findByText("Your contact details could not be loaded.")).toBeTruthy();
     noProblems();
     await press("Try again");
     await waitFor(() => expect(field("Your Instagram username").props.value).toBe("aino.k"));

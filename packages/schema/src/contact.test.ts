@@ -88,6 +88,30 @@ describe("a stored piece in its one form (#103)", () => {
   ])("refuses %j as an Instagram username (%s)", (typed) => {
     expect(normaliseContact("instagram", typed)).toBeNull();
   });
+
+  it.each([
+    ["@Aino.K", "aino.k"],
+    ["abc", "abc"],
+    ["ville-2026_x", "ville-2026_x"],
+    [`a${"b".repeat(14)}`, `a${"b".repeat(14)}`],
+    ["  @Ville.Snaps  ", "ville.snaps"],
+  ])("takes the Snapchat username %j as %j, in lower case", (typed, stored) => {
+    expect(normaliseContact("snapchat", typed)).toBe(stored);
+  });
+
+  it.each([
+    ["ab", "two characters, one short"],
+    [`a${"b".repeat(15)}`, "sixteen, one over"],
+    ["1abc", "a digit first"],
+    ["_abc", "an underscore first"],
+    ["aino-", "a hyphen last"],
+    ["aino.", "a dot last"],
+    ["aino k", "a space"],
+    ["aino+k", "a plus"],
+    ["@", "the @ alone"],
+  ])("refuses %j as a Snapchat username (%s)", (typed) => {
+    expect(normaliseContact("snapchat", typed)).toBeNull();
+  });
 });
 
 describe("the contracts", () => {
@@ -100,11 +124,11 @@ describe("the contracts", () => {
     expect(PutContactRequest.safeParse({ value: "@aino", kind: "phone" }).success).toBe(false);
   });
 
-  it("hold one piece per kind at most, and only the four kinds", () => {
+  it("hold one piece per kind at most, and only the five kinds", () => {
     const at = "2026-10-18T10:00:00.000Z";
     const piece = { kind: "phone", value: "+358401234567", updatedAt: at };
     expect(StoredContacts.safeParse({ contacts: [piece] }).success).toBe(true);
-    expect(StoredContacts.safeParse({ contacts: Array(5).fill(piece) }).success).toBe(false);
+    expect(StoredContacts.safeParse({ contacts: Array(6).fill(piece) }).success).toBe(false);
     expect(StoredContacts.safeParse({ contacts: [{ ...piece, kind: "email" }] }).success).toBe(
       false,
     );

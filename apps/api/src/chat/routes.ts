@@ -221,7 +221,7 @@ const contactsRoute = createRoute({
   path: "/contacts",
   summary: "The caller's stored contacts",
   description:
-    "Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
+    "Up to one phone number, WhatsApp number, Telegram, Instagram and Snapchat username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
   ...bearer,
   responses: {
     200: { description: "The stored pieces.", ...json(StoredContacts) },
@@ -234,7 +234,7 @@ const keepContactRoute = createRoute({
   path: "/contacts/{kind}",
   summary: "Keep a contact",
   description:
-    "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
+    "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's and Snapchat's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
   ...bearer,
   request: {
     params: ContactKindParams,

@@ -144,7 +144,7 @@ const sourceOf = (testID: string) =>
 const ATTACHED = "Photo attached. The words in the field go under it.";
 /** The plain-text rule's refusal, with the way through it (#103). */
 const CONTACT_DETAILS =
-  "A message cannot carry an e-mail address, a link, a phone number or a social media handle. To give your number or a username, keep it in Settings, under Your contacts, and share it from the top of the conversation.";
+  "A message cannot carry an e-mail address, a link, a phone number or a social media handle. To give your number or a username, keep it in Settings, under Ways to reach you, and share it from the top of the conversation.";
 const attached = () => screen.queryByText(ATTACHED);
 
 /** An upload the test answers itself, so the sending row can be seen on the way. */
@@ -869,7 +869,7 @@ describe("contacts in a conversation (#103)", () => {
     set(detail({ contacts: { mine: [], theirs: [] } }));
     await press("Share your Instagram");
     expect(
-      screen.getByText("Save this contact under Settings, Your contacts, first."),
+      screen.getByText("Save this contact under Settings, Ways to reach you, first."),
     ).toBeTruthy();
     expect(detailReads()).toBe(before + 1);
     expect(screen.queryByText("Instagram: aino.k")).toBeNull();

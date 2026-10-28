@@ -2,13 +2,14 @@ import { z } from "zod";
 
 /**
  * Contacts a person keeps and shares in a conversation (#103, ADR-031 §11;
- * the maintainer's decision of 18/10/2026): a phone number, WhatsApp (a
- * number), Telegram and Instagram (a username). A piece is stored first,
+ * the maintainer's decisions of 18/10/2026 and, for Snapchat, 28/10/2026): a
+ * phone number, WhatsApp (a number), Telegram, Instagram and Snapchat (a
+ * username). A piece is stored first,
  * seen by nobody, and shown to the other person of a conversation only while
  * its owner shares it there. Messages and profiles refuse contact details
  * (contactDetailsIn); this is the one way through.
  */
-export const CONTACT_KINDS = ["phone", "whatsapp", "telegram", "instagram"] as const;
+export const CONTACT_KINDS = ["phone", "whatsapp", "telegram", "instagram", "snapchat"] as const;
 export const ContactKind = z.enum(CONTACT_KINDS).meta({ id: "ContactKind" });
 export type ContactKind = z.infer<typeof ContactKind>;
 
@@ -18,6 +19,7 @@ export const CONTACT_INPUT_MAX = 64;
 const PHONE = /^\+[1-9]\d{6,14}$/;
 const TELEGRAM = /^[A-Za-z][A-Za-z0-9_]{4,31}$/;
 const INSTAGRAM = /^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9._]{1,30}$/;
+const SNAPCHAT = /^[a-z][a-z0-9._-]{1,13}[a-z0-9]$/;
 
 /**
  * The one form a piece is stored and shown in, or null when what was typed
@@ -31,6 +33,9 @@ const INSTAGRAM = /^(?!\.)(?!.*\.\.)(?!.*\.$)[a-z0-9._]{1,30}$/;
  * - Instagram: the username without its @, in lower case (Instagram reads
  *   it so), 1 to 30 letters, digits, dots and underscores, never a dot first,
  *   last or twice in a row (Instagram's rule).
+ * - Snapchat: the username without its @, in lower case (Snapchat ignores
+ *   case), 3 to 15 letters, digits, dots, underscores and hyphens, starting
+ *   with a letter and ending with a letter or a digit (Snapchat's rule).
  */
 export function normaliseContact(kind: ContactKind, input: string): string | null {
   const raw = input.normalize("NFKC").trim();
@@ -51,6 +56,10 @@ export function normaliseContact(kind: ContactKind, input: string): string | nul
     case "instagram": {
       const name = raw.replace(/^@/, "").toLowerCase();
       return INSTAGRAM.test(name) ? name : null;
+    }
+    case "snapchat": {
+      const name = raw.replace(/^@/, "").toLowerCase();
+      return SNAPCHAT.test(name) ? name : null;
     }
   }
 }

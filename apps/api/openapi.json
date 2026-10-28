@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.72.1",
+    "version": "0.73.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -1961,7 +1961,8 @@
           "phone",
           "whatsapp",
           "telegram",
-          "instagram"
+          "instagram",
+          "snapchat"
         ]
       },
       "ContactShareEnd": {
@@ -4472,7 +4473,7 @@
                 "shared"
               ]
             },
-            "maxItems": 4
+            "maxItems": 5
           },
           "theirs": {
             "type": "array",
@@ -4492,7 +4493,7 @@
                 "value"
               ]
             },
-            "maxItems": 4
+            "maxItems": 5
           }
         },
         "required": [
@@ -4667,7 +4668,7 @@
             "items": {
               "$ref": "#/components/schemas/StoredContact"
             },
-            "maxItems": 4
+            "maxItems": 5
           }
         },
         "required": [
@@ -10263,7 +10264,7 @@
     "/contacts": {
       "get": {
         "summary": "The caller's stored contacts",
-        "description": "Up to one phone number, WhatsApp number, Telegram and Instagram username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
+        "description": "Up to one phone number, WhatsApp number, Telegram, Instagram and Snapchat username, in that order, each in its stored form. Nobody else sees them until the caller shares one in a conversation.",
         "security": [
           {
             "session": []
@@ -10296,7 +10297,7 @@
     "/contacts/{kind}": {
       "put": {
         "summary": "Keep a contact",
-        "description": "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
+        "description": "Stores the piece of that kind in its one form (normaliseContact: a number in E.164, a Finnish one from 0 to +358; a username without its @, Instagram's and Snapchat's in lower case), replacing the one kept before. A shared piece that changes shows its new value in the conversations where it is shared, at once. Counts against matching_config messages_per_minute.",
         "security": [
           {
             "session": []

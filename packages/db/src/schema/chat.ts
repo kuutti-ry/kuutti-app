@@ -130,10 +130,17 @@ export const message = pgTable(
 
 /**
  * The kinds of contact a person may keep and share in a conversation (#103,
- * the maintainer's decision of 18/10/2026): a phone number, WhatsApp (a
- * number), Telegram and Instagram (a username).
+ * the maintainer's decisions of 18/10/2026 and, for Snapchat, 28/10/2026): a
+ * phone number, WhatsApp (a number), Telegram, Instagram and Snapchat (a
+ * username).
  */
-export const contactKind = pgEnum("contact_kind", ["phone", "whatsapp", "telegram", "instagram"]);
+export const contactKind = pgEnum("contact_kind", [
+  "phone",
+  "whatsapp",
+  "telegram",
+  "instagram",
+  "snapchat",
+]);
 /** How a share ended: its owner stopped it, the stored piece was removed, or the conversation closed. */
 export const contactShareEnd = pgEnum("contact_share_end", ["stopped", "removed", "closed"]);
 
