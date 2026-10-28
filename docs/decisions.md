@@ -90,7 +90,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 - [Profile](#profile) (35)
 - [Photos](#photos) (38)
 - [Filters](#filters) (18)
-- [Round](#round) (19)
+- [Round](#round) (20)
 - [Likes and fish](#likes-and-fish) (19)
 - [Match](#match) (10)
 - [Chat](#chat) (17)
@@ -103,7 +103,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 - [Retention](#retention) (28)
 - [Limits](#limits) (13)
 - [Product constraints](#product-constraints) (13)
-- [Other](#other) (18)
+- [Other](#other) (21)
 - [Found on the way](#found-on-the-way)
 
 ## Sign-in and identity
@@ -311,6 +311,7 @@ Today's round: who gets one, whom it holds, in what order, and what the person c
 | Every card says why it is there, one reason from a closed list by precedence: liked you or fish, then relaxed (naming the field), then seen before, then matches your filters. | five reasons | `packages/schema/src/matching.ts` | ADR-042 §9; ADR-034 §1; #99 comment 21/10/2026; TD-12 | maintainer, 21/10/2026 | |
 | The round screen shows one card at a time with its reason; like, pass and the fish are buttons, never a swipe, with an Undo on the last decision, and every refusal is said in words. | one card at a time | `apps/mobile/src/features/matching/RoundScreen.tsx` | #379; ADR-034 History 20/10/2026; CLAUDE.md Accessibility | assumption | |
 | The decision buttons suit the right hand by default (Pass left, Like right) or the left, mirrored, each keeping its shape, word and icon; a one-handed mode stacks Undo, the fish, Pass and Like in one column on that side; the choice is kept on the phone alone. | right hand by default | `apps/mobile/src/lib/decision-buttons.tsx` | #82 comment 21/10/2026; PR #399 | maintainer, 21/10/2026 | |
+| At a large text size, Undo in the round's header is its icon alone, so the title beside it keeps its size: at 2x on a 360 pt phone, in Finnish, 34 pt instead of 16 (body text 28; 27 pt on a 320 pt phone). It keeps its spoken label and its 44 pt target, and one-handed, at the thumb, its word. | from 1.3x (Android's 130 %, iOS's largest standard size) | `WORDLESS_UNDO_FONT_SCALE` in `apps/mobile/src/features/matching/RoundScreen.tsx` | #467; session 28/10/2026 | maintainer, 28/10/2026 | |
 | A like or a pass can be changed until midnight in Finland, then it is final; a card left undecided expires with the day. | until midnight | `apps/api/src/matching/rounds.ts` | ADR-034 §5; #96 comment 19/10/2026 | maintainer, 19/10/2026 | |
 | Whatever the panel sets, a round never holds more than fifty cards in all, the liked-you places first. | 50 | `ROUND_ENTRIES_MAX` in `packages/schema/src/matching.ts` | ADR-035 Consequences, History 20/10/2026 | assumption | |
 | Rounds run on basic logic until the research partner has spoken: a cap on how many rounds one person appears in a day, a round sized to the pool, random places, an exposure floor, other orderings and the research buckets all wait, and nothing reads the cap's row. | first cut; the cap of 40 unused | `impression_cap_per_day`; `apps/api/src/jobs/round-builder.ts` | ADR-035 Context, Left for later; #95 comments 20/10/2026; migration 0007; the cap of 40 by TD-11 (ADR-002 Context, ADR-015 §5) | maintainer, 20/10/2026 | |
@@ -698,6 +699,9 @@ Languages, legal texts, accessibility, feedback from the app, and the moderation
 | Meaning is never carried by colour alone: pass and like differ in shape, label and position, and there is no red and green pair. |  | `CLAUDE.md` | CLAUDE.md Accessibility | inherited, CLAUDE.md | |
 | Every touch target is at least 44 points. | 44 pt | `TOUCH_TARGET` in `apps/mobile/src/theme/a11y.ts` | CLAUDE.md Accessibility; .claude/rules/mobile.md; docs/accessibility-checklist.md | inherited, CLAUDE.md | |
 | Text grows with the phone's font size up to twice its size, and layouts hold at that size. | 2x | `MAX_FONT_SCALE` in `apps/mobile/src/theme/a11y.ts` | .claude/rules/mobile.md; #12 | assumption | |
+| Headings grow less than text with the phone's font size, the larger they are, as iOS's type ramp and Android 14's font scaling do, and each level stays larger than the one below. | h1 1.25x, h2 1.45x, h3 1.75x; h4 like text | `HEADING_FONT_SCALE` in `apps/mobile/src/theme/a11y.ts` | #467; session 28/10/2026 (h1 1.25x and h2 1.5x chosen; h2 1.45x and h3 1.75x an agent's, so that no level outgrows the one above) | maintainer, 28/10/2026 | |
+| A screen's title is one line that shrinks as far as its width needs, so that no word breaks in the middle in any language. | one line | `apps/mobile/src/components/ScreenHeader.tsx` | #467; session 28/10/2026 | maintainer, 28/10/2026 | |
+| A disabled or read-only control is drawn, never faded: no fill, a dashed outline, and its label, icon or thumb in the muted colour, held to the set's contrast (7:1 in high contrast). | dashed outline | `apps/mobile/src/components/ui/button.tsx`, `input.tsx`, `switch.tsx`, `label.tsx` | #467; session 28/10/2026 | maintainer, 28/10/2026 | |
 | Colours meet WCAG AA in both themes: 4.5:1 for text and 3:1 for the outline of a control. | 4.5:1; 3:1 | `apps/mobile/src/theme/contrast.ts` | CLAUDE.md Accessibility; #12 | inherited, CLAUDE.md | |
 | The high-contrast token sets meet 7:1 for text, beyond what CLAUDE.md asks. | 7:1 | `apps/mobile/src/theme/contrast.ts` | #12 | assumption | |
 | Feedback from the app is a form under Account in Settings: one of four kinds (bug, idea, complaint, praise) and a few lines, no attachments; the app adds its version, platform and language, and the words never reach a log line or a research event. | 4 kinds | `packages/schema/src/feedback.ts` | ADR-023 §1, §3, §5; #171; session 15/10/2026 | maintainer, 15/10/2026 | |

@@ -1,8 +1,8 @@
 import type { ProfileCard, RoundEntry, RoundResponse } from "@kuutti/schema";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, AppState, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Dimensions, Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -1068,6 +1068,43 @@ describe("where the decision buttons sit (#82)", () => {
     expect(controls()).toEqual(["Undo your last decision", "Send a fish", "Pass", "Like"]);
     expect(inColumn("Undo your last decision")).toBe(false);
     noProblems();
+  });
+
+  // jest's window reports a font scale of 2; these set their own (#467).
+  const atFontScale = (fontScale: number) =>
+    jest.spyOn(Dimensions, "get").mockReturnValue({ width: 375, height: 812, scale: 3, fontScale });
+
+  it.each([
+    ["the default size", 1, true],
+    ["just under 130 %", 1.29, true],
+    ["130 %", 1.3, false],
+    // What Android sends: its scale is a float (1.2999999523).
+    ["130 % as Android sends it", Math.fround(1.3), false],
+    ["iOS's largest standard size", 1.353, false],
+    ["the app's largest", 2, false],
+  ] as const)(
+    "draws Undo in the header at %s (x%s) with its word: %s, and always with its label and target",
+    async (_size, fontScale, worded) => {
+      atFontScale(fontScale);
+      await placed(null);
+      await press("Pass");
+      const undo = screen.getByRole("button", { name: "Undo your last decision" });
+      expect(within(undo).queryByText("Undo") !== null).toBe(worded);
+      expect(undo.props.className).toMatch(worded ? /\bpx-5\b/ : /(^| )p-2( |$)/);
+      expect(inColumn("Undo your last decision")).toBe(false);
+      noProblems();
+      await press("Undo your last decision");
+      expect(heading("Katja, 32")).toBeTruthy();
+    },
+  );
+
+  it("keeps Undo's word one-handed at the largest text, where it has the thumb's room", async () => {
+    atFontScale(2);
+    await placed({ oneHanded: true });
+    await press("Pass");
+    const undo = screen.getByRole("button", { name: "Undo your last decision" });
+    expect(inColumn("Undo your last decision")).toBe(true);
+    expect(within(undo).getByText("Undo")).toBeTruthy();
   });
 
   it("mirrors them for the left hand: Like at the left, Pass at the right, the fish on the left", async () => {

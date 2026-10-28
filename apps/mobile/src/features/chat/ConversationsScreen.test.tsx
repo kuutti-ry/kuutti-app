@@ -313,6 +313,21 @@ describe("the home screen's Conversations button", () => {
 });
 
 describe("the thumbs of the list", () => {
+  it("leave an edged circle in their place without a photo, which a high-contrast set's --muted would hide (#467)", async () => {
+    api(() =>
+      json({
+        open: [
+          summary(ID(1), { counterpart: { deleted: false, name: "Sanna", age: 31, thumb: null } }),
+        ],
+        archived: [],
+      }),
+    );
+    await renderWithTheme(<ConversationsScreen />);
+    await screen.findByRole("button", { name: /^Sanna/ });
+    const place = screen.getByTestId(`thumb-${ID(1)}`, { includeHiddenElements: true });
+    expect(place.props.className).toMatch(/\bborder border-border bg-muted\b/);
+  });
+
   it("are signed on the first read and on a pull, carried on a look back, and dropped once the conversation ended", async () => {
     const thumb = (n: number) => ({
       photoId: PHOTO,

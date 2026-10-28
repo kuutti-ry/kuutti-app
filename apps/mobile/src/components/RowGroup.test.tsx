@@ -38,6 +38,14 @@ describe("RowGroup", () => {
     const theme = screen.getByRole("button", { name: "Theme" });
     expect(theme.props.accessibilityValue).toEqual({ text: "Dark" });
     expect(theme.props.accessibilityHint).toBeUndefined();
+    // Only a hairline under each row but the last, not the Button's own
+    // border on every side (#467).
+    for (const row of [basics, prompts]) {
+      expect(row.props.className).toMatch(/\bborder-0\b.*\bborder-b border-border\b/);
+      expect(row.props.className).not.toMatch(/(^| )border( |$)/);
+    }
+    expect(theme.props.className).toMatch(/\bborder-0\b/);
+    expect(theme.props.className).not.toMatch(/(^| )border(-b)?( |$)/);
     await fireEvent.press(basics);
     expect(open).toHaveBeenCalledTimes(1);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
