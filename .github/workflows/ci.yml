@@ -200,6 +200,8 @@ jobs:
         run: pnpm check:scenarios --list
       - name: Every ADR is in docs/adr/README.md with its status (#203)
         run: pnpm check:adr-index --self-test
+      - name: Every matching_config key has a row in docs/decisions.md (#396)
+        run: pnpm check:decisions --self-test
       # A pull request is compared with its base as merged, the merge commit's
       # first parent; on main the blocks alone are checked. Dependabot cannot
       # write a Still-true line, and its pins change nothing a view draws.
