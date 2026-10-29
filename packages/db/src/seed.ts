@@ -195,6 +195,10 @@ export const MATCHING_CONFIG_V2 = {
   round_size: 10,
   // #98 (ADR-036, migration 0070): ten likes a day for everybody, the first cut's.
   like_budget_balanced: 10,
+  // #513 (ADR-041 History, migration 0088): a card shows every photo in the card
+  // size, so a full round looked at whole stays under the photo rule; the
+  // maintainer's of 29/10/2026, where version 1 took 120.
+  auto_shadow_ban_photo_fetches: 200,
 } as const;
 
 /**

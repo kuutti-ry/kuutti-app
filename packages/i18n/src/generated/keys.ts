@@ -995,6 +995,8 @@ export type MessageParams = {
   "profile.card.open": Record<never, never>;
   "profile.card.photoLabel": { "position": number; "total": number };
   "profile.card.photoLabelCaption": { "position": number; "total": number; "caption": string };
+  "profile.card.photoNext": Record<never, never>;
+  "profile.card.photoPrevious": Record<never, never>;
   "profile.card.sharedOption": { "option": string };
   "profile.card.title": Record<never, never>;
   "profile.clear": Record<never, never>;

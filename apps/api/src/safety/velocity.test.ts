@@ -191,10 +191,10 @@ const json = (headers: Record<string, string>, body: unknown) => ({
 describe("the photo rule", () => {
   describe("Other people's photos fetched within the hour shadow-ban the fetcher at the threshold", () => {
     test.for([
-      [118, "not sanctioned"],
+      [198, "not sanctioned"],
       [
-        119,
-        "shadow-banned by nobody for the reason scraping, by the rule photo_fetches counting 120",
+        199,
+        "shadow-banned by nobody for the reason scraping, by the rule photo_fetches counting 200",
       ],
     ] as const)("%i earlier: %s", async ([earlier], { ctx, app }) => {
       const a = await signedInAccount(ctx.client);
@@ -218,7 +218,7 @@ describe("the photo rule", () => {
       const url = await fetched(app, a, photo, "card");
       expect(url.variant).toBe("card");
       expect(await sanctionsOf(ctx.client, a.accountId)).toEqual(
-        earlier === 119 ? [byRule("photo_fetches", 120)] : [],
+        earlier === 199 ? [byRule("photo_fetches", 200)] : [],
       );
     });
   });
@@ -227,7 +227,7 @@ describe("the photo rule", () => {
     ctx,
     app,
   }) => {
-    // Each kind alone, 119 of it: any one of them counted would meet the rule.
+    // Each kind alone, 199 of it: any one of them counted would meet the rule.
     const kinds = [
       { variant: "thumb", own: false, purpose: "profile" },
       { variant: "card", own: true, purpose: "profile" },
@@ -245,7 +245,7 @@ describe("the photo rule", () => {
         ctx.client,
         a.accountId,
         kind.own ? own : photo,
-        spread(119),
+        spread(199),
         kind.variant,
         kind.purpose,
       );
@@ -257,7 +257,7 @@ describe("the photo rule", () => {
   test("A fetch as old as the window does not count", async ({ ctx, app }) => {
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, [ago(60 * MINUTE), ...spread(118)]);
+    await handed(ctx.client, a.accountId, photo, [ago(60 * MINUTE), ...spread(198)]);
     await fetched(app, a, photo);
     expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([]);
   });
@@ -265,26 +265,26 @@ describe("the photo rule", () => {
   test("a fetch a millisecond inside the window counts", async ({ ctx, app }) => {
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, [ago(60 * MINUTE - 1), ...spread(118)]);
+    await handed(ctx.client, a.accountId, photo, [ago(60 * MINUTE - 1), ...spread(198)]);
     await fetched(app, a, photo);
-    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 120)]);
+    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 200)]);
   });
 
   test("A thumb is never checked, and the next card is", async ({ ctx, app }) => {
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, spread(120));
+    await handed(ctx.client, a.accountId, photo, spread(200));
     await fetched(app, a, photo, "thumb");
     expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([]);
     await fetched(app, a, photo, "card");
-    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 121)]);
+    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 201)]);
   });
 
   test("an erased or unknown account is never checked", async ({ ctx }) => {
     const { logger, lines } = await captureLogger();
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, spread(120));
+    await handed(ctx.client, a.accountId, photo, spread(200));
     await ctx.client.query("UPDATE account SET state = 'deleted' WHERE id = $1", [a.accountId]);
     const deps = { db: ctx.client, logger, now: () => T };
     await checkPhotoFetches(deps, a.accountId);
@@ -297,7 +297,7 @@ describe("the photo rule", () => {
   test("a fetch refused changes nothing and checks nothing", async ({ ctx, app }) => {
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, spread(120));
+    await handed(ctx.client, a.accountId, photo, spread(200));
     // A photo never shown, a shown one in the full size (ADR-056 §3), and the
     // day's card budget spent: none is issued, none is checked.
     const stranger = await signedInAccount(ctx.client);
@@ -325,7 +325,7 @@ describe("the photo rule", () => {
       const moderator = await staffSession(ctx.client);
       const a = await signedInAccount(ctx.client);
       const photo = await othersPhoto(ctx.client, a);
-      await handed(ctx.client, a.accountId, photo, spread(119));
+      await handed(ctx.client, a.accountId, photo, spread(199));
       if (standing === "shadow-banned by a moderator") {
         await ctx.client.query(
           `INSERT INTO sanction (identity_id, account_id, kind, reason, note, created_by, created_at)
@@ -368,7 +368,7 @@ describe("the photo rule", () => {
       const deps = (db: Queryable) => ({ db, logger, now: () => T });
       const a = await signedInAccount(pool);
       const photo = await othersPhoto(pool, a);
-      await handed(pool, a.accountId, photo, spread(120));
+      await handed(pool, a.accountId, photo, spread(200));
       const firstPid = await pidOf(first);
       const secondPid = await pidOf(second);
       await first.query("BEGIN");
@@ -381,7 +381,7 @@ describe("the photo rule", () => {
       await first.query("COMMIT");
       await racing.outcome;
       await second.query("COMMIT");
-      expect(await sanctionsOf(pool, a.accountId)).toEqual([byRule("photo_fetches", 120)]);
+      expect(await sanctionsOf(pool, a.accountId)).toEqual([byRule("photo_fetches", 200)]);
     });
   });
 
@@ -390,14 +390,14 @@ describe("the photo rule", () => {
       const { logger, lines } = await captureLogger();
       const deps = { db: second, logger, now: () => T };
       const below = await signedInAccount(pool);
-      await handed(pool, below.accountId, await othersPhoto(pool, below), spread(118));
+      await handed(pool, below.accountId, await othersPhoto(pool, below), spread(198));
       const hidden = await signedInAccount(pool);
-      await handed(pool, hidden.accountId, await othersPhoto(pool, hidden), spread(150));
+      await handed(pool, hidden.accountId, await othersPhoto(pool, hidden), spread(250));
       await pool.query(
         `INSERT INTO sanction (identity_id, account_id, kind, reason, note, created_at,
                                rule, rule_count, rule_first_at)
          SELECT identity_id, id, 'shadow_ban', 'scraping', 'Applied by the automatic rule.', $2,
-                'photo_fetches', 120, $3
+                'photo_fetches', 200, $3
            FROM account WHERE id = $1`,
         [hidden.accountId, ago(MINUTE), ago(HOUR)],
       );
@@ -434,9 +434,9 @@ describe("the photo rule", () => {
     await roundWithOne(ctx.client, a);
     const round = await roundRead(app, a);
     const photo = round.entries?.[0]?.card.photos[0]?.id as string;
-    await handed(ctx.client, a.accountId, photo, spread(119));
+    await handed(ctx.client, a.accountId, photo, spread(199));
     const url = await fetched(app, a, photo);
-    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 120)]);
+    expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([byRule("photo_fetches", 200)]);
     expect(await fetched(app, a, photo)).toEqual(url);
     expect(await roundRead(app, a)).toEqual(round);
   });
@@ -445,7 +445,7 @@ describe("the photo rule", () => {
     const moderator = await staffSession(ctx.client);
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, spread(119));
+    await handed(ctx.client, a.accountId, photo, spread(199));
     await fetched(app, a, photo);
     const { rows } = await ctx.client.query<{ id: string }>(
       "SELECT id FROM sanction WHERE account_id = $1 AND rule = 'photo_fetches'",
@@ -469,7 +469,7 @@ describe("the photo rule", () => {
     const moderator = await staffSession(ctx.client);
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    const earlier = spread(119);
+    const earlier = spread(199);
     await handed(ctx.client, a.accountId, photo, earlier);
     await fetched(app, a, photo);
     const list = AutomaticBanQueue.parse(
@@ -481,7 +481,7 @@ describe("the photo rule", () => {
       expect.objectContaining({
         accountId: a.accountId,
         rule: "photo_fetches",
-        count: 120,
+        count: 200,
         firstAt: earlier[0]?.toISOString(),
         createdAt: T.toISOString(),
       }),
@@ -523,7 +523,7 @@ describe("values set in the panel", () => {
     await withMatchingConfig(ctx.client, { auto_shadow_ban_photo_fetches_minutes: 10 });
     const a = await signedInAccount(ctx.client);
     const photo = await othersPhoto(ctx.client, a);
-    await handed(ctx.client, a.accountId, photo, spread(119, ago(30 * MINUTE)));
+    await handed(ctx.client, a.accountId, photo, spread(199, ago(30 * MINUTE)));
     await fetched(app, a, photo);
     expect(await sanctionsOf(ctx.client, a.accountId)).toEqual([]);
   });
