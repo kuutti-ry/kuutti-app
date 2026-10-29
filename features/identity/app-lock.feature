@@ -56,10 +56,20 @@ Feature: The app lock
     Then the phone's prompt is asked with no fallback to the phone's code and with the weak class allowed
     And a cancel is told apart from a failure
 
+  Scenario: A pause by the phone after too many tries is said as a pause, not as a failure
+    Given the lock screen with the face, on a phone that has paused it after too many tries
+    When the lock asks for the face
+    Then it says the phone has paused face unlock and how that ends, and the face, the passcode and the bank are still there
+
   Scenario: Turning biometrics on asks for the face or finger once
     Given a person in the lock's settings on a phone with a face enrolled
     When they turn the face or fingerprint on
     Then the phone's prompt is asked once, and the lock is on only if it answered yes
+
+  Scenario: The lock's settings ask the phone again when the app comes back
+    Given a person in the lock's settings on a phone with no face or fingerprint set up
+    When they set up a finger in the phone's own settings and come back to Kuutti
+    Then the switch for the face or fingerprint is offered, and the line that the phone has none is gone
 
   Scenario: A lock that cannot be read keeps the app locked with the bank as the way out
     Given a person signed in, and a stored lock that cannot be read

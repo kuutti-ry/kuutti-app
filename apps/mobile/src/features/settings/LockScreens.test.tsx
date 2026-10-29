@@ -4,11 +4,11 @@ import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
-import { AccessibilityInfo, Platform } from "react-native";
+import { AccessibilityInfo, AppState, Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { LockOfferScreen } from "./LockOfferScreen";
 import { LockSettingsScreen } from "./LockSettingsScreen";
 
@@ -40,9 +40,12 @@ const stored = () => JSON.parse(store.get("kuutti.lock") ?? "null") as StoredLoc
 
 const TEXT = {
   explain: /^Lock Kuutti on this phone, so that somebody else holding it/,
-  missing: "This phone has no face or fingerprint unlock set up. A passcode works without one.",
+  missing:
+    "This phone has no face or fingerprint unlock that Kuutti can use. A passcode works without one.",
   biometrics: "Face or fingerprint",
   failed: "Your face or fingerprint was not confirmed, so it was not turned on.",
+  paused:
+    "The phone has paused face or fingerprint unlock after too many tries, so it was not turned on. Lock the phone and open it with its own code, then try again.",
   setPasscode: "Set a passcode",
   choose: "Choose a passcode of six digits",
   repeat: "Type the same six digits again",
@@ -229,21 +232,42 @@ describe("the face or fingerprint", () => {
   });
 
   describe.each([
-    ["a face that does not match", { success: false, error: "authentication_failed" }],
-    ["a phone locked out of its biometrics", { success: false, error: "lockout" }],
-    ["the person putting the prompt away", { success: false, error: "user_cancel" }],
-  ] as const)("%s", (_what, answer) => {
-    it("leaves it off and says so in an assertive live region, aloud on iOS", async () => {
+    ["a face that does not match", { success: false, error: "authentication_failed" }, "failed"],
+    [
+      "a phone that has paused its biometrics after too many tries",
+      { success: false, error: "lockout" },
+      "paused",
+    ],
+    ["the person putting the prompt away", { success: false, error: "user_cancel" }, "failed"],
+  ] as const)("%s", (_what, answer, said) => {
+    it("leaves it off and says why in an assertive live region, aloud on iOS", async () => {
       jest.replaceProperty(Platform, "OS", "ios");
       phoneWithFace(answer);
       await show(<LockSettingsScreen />);
       await press(biometricsSwitch());
       expect(checked(biometricsSwitch())).toBe(false);
       expect(stored()).toBeNull();
-      expect(screen.getByText(TEXT.failed).props.accessibilityLiveRegion).toBe("assertive");
-      expect(announced()).toEqual([TEXT.failed]);
+      expect(screen.getByText(TEXT[said]).props.accessibilityLiveRegion).toBe("assertive");
+      expect(announced()).toEqual([TEXT[said]]);
+      // Only its own reason.
+      expect(screen.queryByText(TEXT[said === "failed" ? "paused" : "failed"])).toBeNull();
       expect(graceGroup()).toBeNull();
     });
+  });
+
+  it("trades the pause's words for the failure's when the next try fails, and takes them away on a yes", async () => {
+    phoneWithFace({ success: false, error: "lockout" });
+    await show(<LockSettingsScreen />);
+    await press(biometricsSwitch());
+    expect(screen.getByText(TEXT.paused)).toBeTruthy();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "authentication_failed" });
+    await press(biometricsSwitch());
+    expect(screen.queryByText(TEXT.paused)).toBeNull();
+    expect(screen.getByText(TEXT.failed)).toBeTruthy();
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    await press(biometricsSwitch());
+    expect(screen.queryByText(TEXT.failed)).toBeNull();
+    expect(checked(biometricsSwitch())).toBe(true);
   });
 
   it("leaves the saying of a refusal to the live region on Android", async () => {
@@ -294,6 +318,116 @@ describe("the face or fingerprint", () => {
     await settle();
     expect(biometricsSwitch().props.accessibilityState.disabled).toBe(false);
     expect(checked(biometricsSwitch())).toBe(true);
+  });
+});
+
+describe("coming back to the app", () => {
+  // Android's settings, where a finger is set up, put Kuutti in the
+  // background; the lock asks the phone on return only while it is on (#464).
+  let listeners: Array<{ event: string; listener: (state: string) => void; remove: jest.Mock }>;
+  beforeEach(() => {
+    listeners = [];
+    jest.spyOn(AppState, "addEventListener").mockImplementation((event, listener) => {
+      const entry = { event, listener: listener as (state: string) => void, remove: jest.fn() };
+      listeners.push(entry);
+      return { remove: entry.remove } as never;
+    });
+  });
+  const toApp = async (state: string) => {
+    await act(async () => {
+      for (const entry of listeners) if (entry.event === "change") entry.listener(state);
+    });
+    await settle();
+  };
+  /** Away to the phone's own settings and back, as iOS and Android report it. */
+  const awayAndBack = async () => {
+    await toApp("inactive");
+    await toApp("background");
+    await toApp("active");
+  };
+  const enrolFinger = () => {
+    auth.hasHardwareAsync.mockResolvedValue(true);
+    auth.isEnrolledAsync.mockResolvedValue(true);
+    auth.supportedAuthenticationTypesAsync.mockResolvedValue([1]);
+  };
+
+  it("The lock's settings ask the phone again when the app comes back", async () => {
+    await show(<LockSettingsScreen />);
+    expect(screen.getByText(TEXT.missing)).toBeTruthy();
+    expect(screen.queryByRole("switch")).toBeNull();
+    enrolFinger();
+    await awayAndBack();
+    expect(screen.queryByText(TEXT.missing)).toBeNull();
+    expect(checked(biometricsSwitch())).toBe(false);
+    noProblems();
+  });
+
+  it("asks the phone nothing as the app goes away, only as it comes back", async () => {
+    await show(<LockSettingsScreen />);
+    const asked = auth.hasHardwareAsync.mock.calls.length;
+    await toApp("inactive");
+    await toApp("background");
+    expect(auth.hasHardwareAsync).toHaveBeenCalledTimes(asked);
+    await toApp("active");
+    expect(auth.hasHardwareAsync).toHaveBeenCalledTimes(asked + 1);
+  });
+
+  it("says the phone has none once its face or finger was removed meanwhile", async () => {
+    phoneWithFace({ success: true });
+    await show(<LockSettingsScreen />);
+    expect(biometricsSwitch()).toBeTruthy();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.getByText(TEXT.missing)).toBeTruthy();
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("asks again on the lock's offer too, which has the same controls", async () => {
+    await show(<LockOfferScreen />);
+    expect(screen.getByText(TEXT.missing)).toBeTruthy();
+    enrolFinger();
+    await awayAndBack();
+    expect(screen.queryByText(TEXT.missing)).toBeNull();
+    expect(biometricsSwitch()).toBeTruthy();
+  });
+
+  it("asks nothing after a trip through inactive alone, so iOS's Face ID question keeps its refusal said", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    // Don't Allow on iOS's question whether Kuutti may use Face ID: the
+    // prompt fails, and from then on the phone answers that it has none.
+    phoneWithFace({ success: false, error: "not_available" });
+    await show(<LockSettingsScreen />);
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    const asked = auth.hasHardwareAsync.mock.calls.length;
+    await press(biometricsSwitch());
+    await toApp("inactive");
+    await toApp("active");
+    expect(auth.hasHardwareAsync).toHaveBeenCalledTimes(asked);
+    expect(screen.getByText(TEXT.failed)).toBeTruthy();
+    expect(checked(biometricsSwitch())).toBe(false);
+    expect(screen.queryByText(TEXT.missing)).toBeNull();
+    // A later trip away asks again, and the phone's answer stands.
+    await awayAndBack();
+    expect(screen.getByText(TEXT.missing)).toBeTruthy();
+  });
+
+  it("asks once for each trip away, however often it comes back active", async () => {
+    await show(<LockSettingsScreen />);
+    const asked = auth.hasHardwareAsync.mock.calls.length;
+    await awayAndBack();
+    await toApp("inactive");
+    await toApp("active");
+    expect(auth.hasHardwareAsync).toHaveBeenCalledTimes(asked + 1);
+  });
+
+  it("stops listening once the screen is left", async () => {
+    const view = await renderWithTheme(<LockSettingsScreen />);
+    await settle();
+    const own = listeners.filter((entry) => entry.event === "change");
+    expect(own).toHaveLength(1);
+    await view.rerender(underProviders(<View />));
+    await settle();
+    expect(own[0]?.remove).toHaveBeenCalledTimes(1);
   });
 });
 

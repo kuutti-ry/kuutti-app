@@ -671,9 +671,14 @@ export type MessageParams = {
   "lock.bank": Record<never, never>;
   "lock.bank.explain": Record<never, never>;
   "lock.biometrics.cancel": Record<never, never>;
-  "lock.biometrics.failed": Record<never, never>;
   "lock.biometrics.prompt": Record<never, never>;
   "lock.cover": Record<never, never>;
+  "lock.failed.biometrics": Record<never, never>;
+  "lock.failed.face": Record<never, never>;
+  "lock.failed.fingerprint": Record<never, never>;
+  "lock.lockout.biometrics": Record<never, never>;
+  "lock.lockout.face": Record<never, never>;
+  "lock.lockout.fingerprint": Record<never, never>;
   "lock.offer.done": Record<never, never>;
   "lock.offer.notNow": Record<never, never>;
   "lock.offer.title": Record<never, never>;
@@ -686,6 +691,7 @@ export type MessageParams = {
   "lock.settings.always": Record<never, never>;
   "lock.settings.biometrics": Record<never, never>;
   "lock.settings.biometricsFailed": Record<never, never>;
+  "lock.settings.biometricsLockout": Record<never, never>;
   "lock.settings.biometricsMissing": Record<never, never>;
   "lock.settings.changePasscode": Record<never, never>;
   "lock.settings.explain": Record<never, never>;

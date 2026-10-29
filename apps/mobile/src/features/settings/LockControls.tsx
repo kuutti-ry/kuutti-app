@@ -1,5 +1,6 @@
+import type { PlainMessageKey } from "@kuutti/i18n";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -13,6 +14,12 @@ import { Choice } from "./Choice";
 function announce(words: string) {
   if (Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
 }
+
+/** Why the face or fingerprint was not turned on: not confirmed, or paused by the phone (#464). */
+const REFUSED: Record<"failed" | "lockout", PlainMessageKey> = {
+  failed: "lock.settings.biometricsFailed",
+  lockout: "lock.settings.biometricsLockout",
+};
 
 /**
  * A new passcode, typed twice (#418): the sixth digit of the first moves on
@@ -73,23 +80,37 @@ export function LockControls() {
   const lock = useLock();
   const [choosing, setChoosing] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState(false);
+  const [refused, setRefused] = useState<"failed" | "lockout" | null>(null);
   const biometricsOn = lock.settings?.biometrics ?? false;
-  // What the phone has now: a face or finger may have been set up or removed since the app started.
+  // What the phone has now: a face or finger may have been set up or removed
+  // since the app started, or in the phone's settings while this screen
+  // waited, which the lock asks about on return only while it is on (#464).
+  // Back from the background only: iOS's Face ID prompt and its question
+  // whether Kuutti may use Face ID pass through "inactive" alone, and a
+  // refusal there would read as a phone without any.
   const { recheck } = lock;
   useEffect(() => {
     void recheck();
+    let away = false;
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "background") away = true;
+      if (next === "active" && away) {
+        away = false;
+        void recheck();
+      }
+    });
+    return () => subscription.remove();
   }, [recheck]);
 
   const toggleBiometrics = async (wanted: boolean) => {
     tap();
     setBusy(true);
-    setRefused(false);
+    setRefused(null);
     try {
       const answer = await lock.setBiometrics(wanted);
-      if (answer === "failed") {
-        setRefused(true);
-        announce(t("lock.settings.biometricsFailed"));
+      if (answer !== "ok") {
+        setRefused(answer);
+        announce(t(REFUSED[answer]));
       }
     } finally {
       setBusy(false);
@@ -120,8 +141,8 @@ export function LockControls() {
               onCheckedChange={(wanted) => void toggleBiometrics(wanted)}
             />
           </View>
-          {refused && (
-            <Text accessibilityLiveRegion="assertive">{t("lock.settings.biometricsFailed")}</Text>
+          {refused !== null && (
+            <Text accessibilityLiveRegion="assertive">{t(REFUSED[refused])}</Text>
           )}
         </View>
       )}

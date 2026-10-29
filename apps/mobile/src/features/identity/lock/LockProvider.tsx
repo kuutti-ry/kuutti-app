@@ -38,10 +38,13 @@ export type LockApi = {
   holding: boolean;
   /** What this phone can open it with; null when nothing is enrolled, undefined while asked. */
   biometrics: Biometrics | null | undefined;
-  /** Asks the phone again what it has, as Settings opens. */
+  /** Asks the phone again what it has, as Settings opens and as the app comes back to it. */
   recheck: () => Promise<void>;
-  /** Turning biometrics on asks for the face or finger once; "failed" leaves it off. */
-  setBiometrics: (on: boolean) => Promise<"ok" | "failed">;
+  /**
+   * Turning biometrics on asks for the face or finger once; anything but a
+   * yes leaves it off, and "lockout" says the phone has paused it (#464).
+   */
+  setBiometrics: (on: boolean) => Promise<"ok" | "failed" | "lockout">;
   setPasscode: (code: string) => Promise<void>;
   removePasscode: () => Promise<void>;
   setGrace: (minutes: GraceMinutes) => Promise<void>;
@@ -109,7 +112,8 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
   // The phone's face or finger may be added or removed while Kuutti is away:
-  // asked again as the lock comes back, and as Settings opens (`recheck`).
+  // asked again as the lock comes back, and as Settings opens or comes back
+  // (`recheck`, #464).
   const recheck = React.useCallback(async () => {
     setAvailable(await biometricsOnThisPhone());
   }, []);
@@ -299,7 +303,11 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
       biometrics,
       recheck,
       setBiometrics: async (wanted) => {
-        if (wanted && (await ask()) !== "ok") return "failed";
+        if (wanted) {
+          const answer = await ask();
+          if (answer === "lockout") return "lockout";
+          if (answer !== "ok") return "failed";
+        }
         await change((current) => ({ ...current, biometrics: wanted }));
         return "ok";
       },
