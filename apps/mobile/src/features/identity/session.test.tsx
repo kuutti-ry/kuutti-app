@@ -16,7 +16,7 @@ const tokens = (seed = "a", sessionId = SESSION_ID) => ({
   sessionId,
   accessToken: token(`access${seed}`),
   accessExpiresAt: "2030-01-01T00:15:00.000Z",
-  refreshToken: token(`refresh${seed}`),
+  refreshToken: `${token("family")}.${token(`refresh${seed}`)}`,
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 });
 

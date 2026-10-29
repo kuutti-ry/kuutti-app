@@ -67,10 +67,15 @@ export const AuthExchangeRequest = z
   .meta({ id: "AuthExchangeRequest" });
 export type AuthExchangeRequest = z.infer<typeof AuthExchangeRequest>;
 
-/** 32 random bytes as base64url, like the one-time code: the shape of both session tokens. */
+/** 32 random bytes as base64url, like the one-time code: the shape of the access token. */
 const SESSION_TOKEN_PATTERN = ONE_TIME_CODE_PATTERN;
-/** An access or refresh token's shape; the chat's socket takes the access token in its first frame (#349). */
+/** An access token's shape; the chat's socket takes it in its first frame (#349). */
 export const SessionToken = z.string().regex(SESSION_TOKEN_PATTERN);
+/**
+ * The refresh token (ADR-059): the session's own secret, fixed for its life,
+ * a dot, and the part each refresh replaces; 32 random bytes as base64url each.
+ */
+const RefreshToken = z.string().regex(/^[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}$/);
 
 /**
  * What a login hands the device (#35): a short-lived access token for the
@@ -84,8 +89,9 @@ export const SessionTokens = z
       .meta({ description: "This device's session; the app keeps it with the tokens." }),
     accessToken: SessionToken.meta({ description: "Bearer token; valid until accessExpiresAt." }),
     accessExpiresAt: z.iso.datetime(),
-    refreshToken: SessionToken.meta({
-      description: "Single use: /auth/refresh answers with a new pair and retires this one.",
+    refreshToken: RefreshToken.meta({
+      description:
+        "Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059).",
     }),
     refreshExpiresAt: z.iso.datetime().meta({
       description:
@@ -104,7 +110,7 @@ export const AuthExchangeResponse = SessionTokens.extend({
 export type AuthExchangeResponse = z.infer<typeof AuthExchangeResponse>;
 
 export const AuthRefreshRequest = z
-  .object({ refreshToken: SessionToken })
+  .object({ refreshToken: RefreshToken })
   .strict()
   .meta({ id: "AuthRefreshRequest" });
 export type AuthRefreshRequest = z.infer<typeof AuthRefreshRequest>;

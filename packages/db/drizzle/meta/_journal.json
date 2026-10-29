@@ -603,6 +603,20 @@
       "when": 1793201154359,
       "tag": "0085_contact_snapchat",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1793216282643,
+      "tag": "0086_end_sessions_for_token_family",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793216311252,
+      "tag": "0087_session_family_hash",
+      "breakpoints": true
     }
   ]
 }

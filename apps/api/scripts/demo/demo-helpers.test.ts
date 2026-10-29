@@ -57,7 +57,7 @@ function scripted(overrides: Record<string, Route> = {}) {
         sessionId: "6f1c2b9e-7a4d-4c3b-9e8f-0a1b2c3d4e5f",
         accessToken: TOKEN,
         accessExpiresAt: "2026-10-11T09:15:00.000Z",
-        refreshToken: "R".repeat(43),
+        refreshToken: `${"F".repeat(43)}.${"R".repeat(43)}`,
         refreshExpiresAt: "2026-11-10T09:00:00.000Z",
       }),
     "GET /auth/session": () =>

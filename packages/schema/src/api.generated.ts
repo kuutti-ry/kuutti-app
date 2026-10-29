@@ -7455,7 +7455,7 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             accessExpiresAt: string;
-            /** @description Single use: /auth/refresh answers with a new pair and retires this one. */
+            /** @description Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059). */
             refreshToken: string;
             /**
              * Format: date-time
@@ -7484,7 +7484,7 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             accessExpiresAt: string;
-            /** @description Single use: /auth/refresh answers with a new pair and retires this one. */
+            /** @description Single use: /auth/refresh answers with a new pair and retires this one. Any retired token of the session presented again ends the session (ADR-059). */
             refreshToken: string;
             /**
              * Format: date-time

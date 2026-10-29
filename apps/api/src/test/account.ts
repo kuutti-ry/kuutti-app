@@ -41,16 +41,19 @@ export async function signedInAccount(
   if (!accountId) throw new Error("test account not written");
 
   const accessToken = randomBytes(32).toString("base64url");
-  const refreshToken = randomBytes(32).toString("base64url");
+  // The refresh token's shape (ADR-059): the session's secret, a dot, the rotating part.
+  const family = randomBytes(32).toString("base64url");
+  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
   const now = Date.now();
   const session = await db.query<{ id: string }>(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at)
-     VALUES ($1, 'ios', $2, $3, $4, $5) RETURNING id`,
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+     VALUES ($1, 'ios', $2, $3, $4, $5, $6) RETURNING id`,
     [
       accountId,
       hashToken(accessToken),
       new Date(now + 15 * 60 * 1000),
       hashToken(refreshToken),
+      hashToken(family),
       new Date(now + 90 * 24 * 60 * 60 * 1000),
     ],
   );
@@ -74,16 +77,18 @@ export async function signInAs(
   accountId: string,
 ): Promise<{ accountId: string; headers: { authorization: string } }> {
   const accessToken = randomBytes(32).toString("base64url");
-  const refreshToken = randomBytes(32).toString("base64url");
+  const family = randomBytes(32).toString("base64url");
+  const refreshToken = `${family}.${randomBytes(32).toString("base64url")}`;
   const now = Date.now();
   await db.query(
-    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, expires_at)
-     VALUES ($1, 'ios', $2, $3, $4, $5)`,
+    `INSERT INTO session (account_id, platform, access_hash, access_expires_at, refresh_hash, family_hash, expires_at)
+     VALUES ($1, 'ios', $2, $3, $4, $5, $6)`,
     [
       accountId,
       hashToken(accessToken),
       new Date(now + 15 * 60 * 1000),
       hashToken(refreshToken),
+      hashToken(family),
       new Date(now + 90 * 24 * 60 * 60 * 1000),
     ],
   );

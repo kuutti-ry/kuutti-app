@@ -59,8 +59,10 @@ Repeat this for each test person with a live account, and for most of them more 
 - Before it asks anybody anything, it refuses:
   - a file without its `# target` line, or one naming another API than `--target`. An API answers another's token the same as an ended one (`session_revoked`), so without the check, a file pointed at the wrong API would lose every session;
   - a file inside any git work tree, this checkout's or another's;
-  - a file others can read, a line that is not a refresh token, and a token given twice (a refresh token presented twice ends its session, #35).
+  - a file others can read, a line that is not a refresh token, and two tokens of one session, the same one twice among them (any earlier token of a session presented again ends it, ADR-059).
 - It never prints a token, an account or a photo id.
+
+A file written before #490's deploy holds refresh tokens of the old shape, 43 characters with no dot, and the script refuses its first one as not a refresh token before it asks anybody anything. Those sessions are gone anyway, since the deploy deleted every session (ADR-059): delete the file and sign the test persons in again as above.
 
 Never put a phone's session in the file: rotating it would sign the phone out at its next refresh (reuse, #35). The file holds bearer tokens for test persons; delete it when a milestone's runs are done unless it is to be kept.
 

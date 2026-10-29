@@ -345,7 +345,6 @@ describe("the indexes", () => {
     ["feedback", "feedback_account_created_idx", ["account_id", "created_at"]],
     ["feedback", "feedback_handled_created_idx", ["handled_at", "created_at"]],
     ["card_shown", "card_shown_photo_idx", ["photo_id"]],
-    ["session", "session_retired_refresh_hash_idx", ["retired_refresh_hash"]],
     ["auth_request", "auth_request_expires_at_idx", ["expires_at"]],
     ["photo_review", "photo_review_decision_idx", ["decision", "checked_at"]],
     ["photo_check_note", "photo_check_note_account_at_idx", ["account_id", "at"]],
@@ -534,6 +533,20 @@ describe("the enums", () => {
       ),
     );
     expect([...used].sort()).toEqual(Object.keys(enums).sort());
+  });
+});
+
+describe("a device's session (#35, ADR-059)", () => {
+  it("finds a token by its hash, and a refresh token's family by the hash of its secret, one row each", () => {
+    const columns = byName.get("session")?.columns ?? [];
+    expect(
+      columns
+        .filter((column) => column.isUnique)
+        .map((column) => column.name)
+        .sort(),
+    ).toEqual(["access_hash", "family_hash", "refresh_hash"]);
+    expect(columns.find((column) => column.name === "family_hash")?.notNull).toBe(true);
+    expect(columns.map((column) => column.name)).not.toContain("retired_refresh_hash");
   });
 });
 

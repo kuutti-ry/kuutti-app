@@ -915,11 +915,14 @@ function readSessions(file: string, target: URL): Sessions | string {
     if (!AuthRefreshRequest.shape.refreshToken.safeParse(token).success) {
       return `line ${line + 1} of ${file} is not a refresh token`;
     }
-    const first = seen.get(token);
+    // Keyed by the session's secret, the part before the dot: any two tokens of one session
+    // presented end it (reuse, ADR-059), the same token twice among them.
+    const family = token.slice(0, token.indexOf("."));
+    const first = seen.get(family);
     if (first !== undefined) {
-      return `line ${line + 1} of ${file} repeats line ${first + 1}: a refresh token presented twice ends its session (reuse, #35)`;
+      return `line ${line + 1} of ${file} holds a token of the session of line ${first + 1}: two refresh tokens of one session presented end it (reuse, ADR-059)`;
     }
-    seen.set(token, line);
+    seen.set(family, line);
     tokens.push({ line, token });
   }
   // An API answers another's token as it answers an ended one (session_revoked): read against
@@ -1608,7 +1611,9 @@ async function standInRuns(
 ): Promise<number> {
   const dir = mkdtempSync(join(tmpdir(), "kuutti-load-smoke-"));
   let runs = 0;
-  const token = () => randomBytes(32).toString("base64url");
+  const part = () => randomBytes(32).toString("base64url");
+  /** A refresh token's shape (ADR-059): the session's secret, a dot, the part a refresh replaces. */
+  const token = () => `${part()}.${part()}`;
   const sessionsFile = (name: string, text: string, mode = 0o600) => {
     const path = join(dir, name);
     writeFileSync(path, text);
@@ -2020,11 +2025,21 @@ async function standInRuns(
       [
         "a token twice",
         sessionsFile("j", ours(idle.url, one, one)),
-        "repeats line 2: a refresh token presented twice ends its session (reuse, #35)",
+        "holds a token of the session of line 2: two refresh tokens of one session presented end it (reuse, ADR-059)",
+      ],
+      [
+        "two tokens of one session",
+        sessionsFile("j2", ours(idle.url, one, `${one.slice(0, 43)}.${part()}`)),
+        "holds a token of the session of line 2: two refresh tokens of one session presented end it (reuse, ADR-059)",
       ],
       [
         "a line that is no token",
         sessionsFile("k", ours(idle.url, "not-a-token")),
+        "is not a refresh token",
+      ],
+      [
+        "a token of the shape before ADR-059, one part",
+        sessionsFile("k2", ours(idle.url, part())),
         "is not a refresh token",
       ],
       [
@@ -2154,9 +2169,10 @@ async function standIn(
     if (route === "POST /auth/refresh") {
       const presented = (JSON.parse(body) as { refreshToken?: string }).refreshToken ?? "";
       if (!refresh.delete(presented)) return refused(401, "session_revoked");
+      const family = presented.split(".")[0] ?? "";
       const next = {
         access: randomBytes(32).toString("base64url"),
-        refresh: randomBytes(32).toString("base64url"),
+        refresh: `${family}.${randomBytes(32).toString("base64url")}`,
       };
       refresh.add(next.refresh);
       access.add(next.access);

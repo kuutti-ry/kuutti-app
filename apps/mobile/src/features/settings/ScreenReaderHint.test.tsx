@@ -124,7 +124,7 @@ describe("the screen-reader hint", () => {
       sessionId: "6f1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
       accessToken: `access${"x".repeat(37)}`,
       accessExpiresAt: "2030-01-01T00:15:00.000Z",
-      refreshToken: `refresh${"x".repeat(36)}`,
+      refreshToken: `${"f".repeat(43)}.refresh${"x".repeat(36)}`,
       refreshExpiresAt: "2030-04-01T00:00:00.000Z",
     });
     await renderWithTheme(<ScreenReaderHint />);

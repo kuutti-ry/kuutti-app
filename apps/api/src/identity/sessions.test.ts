@@ -1,22 +1,36 @@
+import { randomBytes } from "node:crypto";
 import type { Queryable } from "@kuutti/db";
 import { ErrorResponse, SessionTokens } from "@kuutti/schema";
 import { generateHetu } from "@kuutti-ry/tunnistus-oidc/hetu";
+import fc from "fast-check";
 import type { QueryResultRow } from "pg";
 import { describe, expect } from "vitest";
 import { createApp } from "../app.ts";
+import { hashToken } from "../lib/auth-middleware.ts";
 import { applySanction } from "../safety/index.ts";
 import { staffSession } from "../test/account.ts";
 import { CHALLENGE, VERIFIER } from "../test/attempt.ts";
 import { captureLogger, test, testConfig } from "../test/harness.ts";
 import type { BrokerIdentity, IdentityBroker } from "./broker.ts";
 import * as repo from "./repo.ts";
-import { describeSession, issueSession, refreshSession, sweepSessions } from "./sessions.ts";
+import {
+  describeSession,
+  endSession,
+  issueSession,
+  refreshSession,
+  sweepSessions,
+} from "./sessions.ts";
 
 // features/identity/sessions.feature (#35): scenario names verbatim, plus the
 // route checklist (validation, unauthenticated, wrong-user). Real Postgres,
 // one rolled-back transaction per test; time moves by updating the rows.
 
 const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+/** The refresh token (ADR-059): the session's secret, a dot, the part each refresh replaces. */
+const REFRESH = /^[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{43}$/;
+const familyOf = (refreshToken: string) => refreshToken.slice(0, 43);
+const secondOf = (refreshToken: string) => refreshToken.slice(44);
+const part = () => randomBytes(32).toString("base64url");
 const DAY = 24 * 60 * 60 * 1000;
 /** A bank login on a day of its own, for the sessions' timelines (ADR-058): exact, and no wall clock. */
 const LOGIN = new Date("2026-03-02T08:00:00.000Z");
@@ -118,7 +132,7 @@ describe("sessions", () => {
     expect(exchanged.status).toBe(200);
     const tokens = SessionTokens.parse(await exchanged.json());
     expect(tokens.accessToken).toMatch(TOKEN);
-    expect(tokens.refreshToken).toMatch(TOKEN);
+    expect(tokens.refreshToken).toMatch(REFRESH);
     expect(tokens.accessToken).not.toBe(tokens.refreshToken);
 
     const me = await whoami(app, tokens.accessToken);
@@ -147,7 +161,10 @@ describe("sessions", () => {
     const next = SessionTokens.parse(await res.json());
     expect(next.sessionId).toBe(a.sessionId);
     expect(next.accessToken).not.toBe(a.accessToken);
-    expect(next.refreshToken).not.toBe(a.refreshToken);
+    expect(next.refreshToken).toMatch(REFRESH);
+    // The session's secret stays; the part a refresh replaces does not.
+    expect(familyOf(next.refreshToken)).toBe(familyOf(a.refreshToken));
+    expect(secondOf(next.refreshToken)).not.toBe(secondOf(a.refreshToken));
     expect(Date.parse(next.refreshExpiresAt)).toBeGreaterThanOrEqual(
       Date.parse(a.refreshExpiresAt),
     );
@@ -165,6 +182,23 @@ describe("sessions", () => {
     expect((await refresh(ctx.app, next.refreshToken)).status).toBe(401);
     const row = await ctx.client.query("SELECT revoked_reason FROM session");
     expect(row.rows[0]).toEqual({ revoked_reason: "refresh_reuse" });
+  });
+
+  test("A refresh token two refreshes old ends the session for both holders", async ({ ctx }) => {
+    const owner = await device(ctx, await accountRow(ctx, "a"));
+    const once = SessionTokens.parse(await (await refresh(ctx.app, owner.refreshToken)).json());
+    const copier = SessionTokens.parse(await (await refresh(ctx.app, once.refreshToken)).json());
+    expect((await whoami(ctx.app, copier.accessToken)).status).toBe(200);
+
+    const back = await refresh(ctx.app, owner.refreshToken);
+    expect(back.status).toBe(401);
+    expect(await errorCode(back)).toBe("session_revoked");
+    expect((await whoami(ctx.app, copier.accessToken)).code).toBe("session_revoked");
+    expect((await refresh(ctx.app, copier.refreshToken)).status).toBe(401);
+    const row = await ctx.client.query("SELECT revoked_reason FROM session WHERE id = $1", [
+      owner.sessionId,
+    ]);
+    expect(row.rows).toEqual([{ revoked_reason: "refresh_reuse" }]);
   });
 
   test("An expired access token asks for a refresh", async ({ ctx }) => {
@@ -331,8 +365,22 @@ describe("sessions", () => {
   test("refresh: validation, an unknown token, and a refresh past its ninety days", async ({
     ctx,
   }) => {
-    expect((await refresh(ctx.app, "short")).status).toBe(400);
-    const unknown = await refresh(ctx.app, "B".repeat(43));
+    // Short, the shape before ADR-059 (one part), a part too long or short,
+    // three parts, another separator, a character outside base64url.
+    for (const malformed of [
+      "short",
+      part(),
+      `${part()}x.${part()}`,
+      `${part()}.${part().slice(1)}`,
+      `${part()}.${part()}.${part()}`,
+      `${part()}:${part()}`,
+      `${part()}.${part().slice(1)}+`,
+    ]) {
+      const res = await refresh(ctx.app, malformed);
+      expect(res.status, malformed).toBe(400);
+      expect(await errorCode(res)).toBe("validation_failed");
+    }
+    const unknown = await refresh(ctx.app, `${"B".repeat(43)}.${"C".repeat(43)}`);
     expect(unknown.status).toBe(401);
     expect(await errorCode(unknown)).toBe("session_revoked");
     const a = await device(ctx, await accountRow(ctx, "a"));
@@ -346,9 +394,32 @@ describe("sessions", () => {
     const a = await device(ctx, account);
     const b = await device(ctx, account);
     const c = await device(ctx, account);
+    const next = await refreshSession({ db: ctx.client, now: () => new Date() }, c.refreshToken);
     const dump = JSON.stringify((await ctx.client.query("SELECT * FROM session")).rows);
-    for (const secret of [a.accessToken, a.refreshToken]) expect(dump).not.toContain(secret);
+    for (const tokens of [a, next]) {
+      for (const secret of [
+        tokens.accessToken,
+        tokens.refreshToken,
+        familyOf(tokens.refreshToken),
+        secondOf(tokens.refreshToken),
+      ]) {
+        expect(dump).not.toContain(secret);
+      }
+    }
     expect(dump).not.toMatch(/\b\d{1,3}(\.\d{1,3}){3}\b/); // never an address
+    // What the row keeps: the SHA-256 of the refresh token whole, and of its secret.
+    const hashes = await ctx.client.query(
+      "SELECT refresh_hash, family_hash FROM session WHERE id = ANY($1)",
+      [[a.sessionId, c.sessionId]],
+    );
+    expect(hashes.rows).toEqual(
+      expect.arrayContaining(
+        [a, next].map((tokens) => ({
+          refresh_hash: hashToken(tokens.refreshToken),
+          family_hash: hashToken(familyOf(tokens.refreshToken)),
+        })),
+      ),
+    );
 
     await ctx.client.query(
       "UPDATE session SET revoked_at = now() - interval '31 days' WHERE id = $1",
@@ -489,6 +560,141 @@ describe("sessions", () => {
   });
 });
 
+describe("a refresh token's family (ADR-059)", () => {
+  const now = (ctx: Ctx) => ({ db: ctx.client, now: () => new Date() });
+  const over = (reason: "reuse" | "unknown_or_expired") => ({
+    status: 401,
+    code: "session_revoked",
+    detail: { reason },
+  });
+  const ending = async (ctx: Ctx, sessionId: string) =>
+    (
+      await ctx.client.query("SELECT revoked_at, revoked_reason FROM session WHERE id = $1", [
+        sessionId,
+      ])
+    ).rows;
+
+  test("any earlier refresh token of a session, however many refreshes old, ends it for every holder", async ({
+    ctx,
+  }) => {
+    let runs = 0;
+    await fc.assert(
+      fc.asyncProperty(fc.integer({ min: 1, max: 6 }), fc.nat(), async (refreshes, pick) => {
+        runs += 1;
+        const chain = [await device(ctx, await accountRow(ctx, `family-${runs}`))];
+        for (let i = 0; i < refreshes; i += 1) {
+          const last = chain[chain.length - 1]?.refreshToken ?? "";
+          chain.push(await refreshSession(now(ctx), last));
+        }
+        const earlier = chain[pick % refreshes];
+        const live = chain[refreshes];
+        if (!earlier || !live) throw new Error("no chain");
+        expect(new Set(chain.map((tokens) => familyOf(tokens.refreshToken))).size).toBe(1);
+        await expect(refreshSession(now(ctx), earlier.refreshToken)).rejects.toMatchObject(
+          over("reuse"),
+        );
+        expect((await whoami(ctx.app, live.accessToken)).code).toBe("session_revoked");
+        await expect(refreshSession(now(ctx), live.refreshToken)).rejects.toMatchObject(
+          over("unknown_or_expired"),
+        );
+        expect(await ending(ctx, live.sessionId)).toEqual([
+          { revoked_at: expect.any(Date), revoked_reason: "refresh_reuse" },
+        ]);
+      }),
+      { numRuns: 20, seed: 490 },
+    );
+  });
+
+  test("a made-up token around a session's genuine secret ends the session, since only a holder of one of its tokens knows that part", async ({
+    ctx,
+  }) => {
+    const a = await device(ctx, await accountRow(ctx, "a"));
+    await expect(
+      refreshSession(now(ctx), `${familyOf(a.refreshToken)}.${part()}`),
+    ).rejects.toMatchObject(over("reuse"));
+    expect((await whoami(ctx.app, a.accessToken)).code).toBe("session_revoked");
+    await expect(refreshSession(now(ctx), a.refreshToken)).rejects.toMatchObject(
+      over("unknown_or_expired"),
+    );
+  });
+
+  test("a token whose secret no session has reads as unknown and ends nothing, even around the live token's other part", async ({
+    ctx,
+  }) => {
+    const a = await device(ctx, await accountRow(ctx, "a"));
+    for (const madeUp of [
+      `${part()}.${secondOf(a.refreshToken)}`,
+      `${part()}.${part()}`,
+      `${secondOf(a.refreshToken)}.${familyOf(a.refreshToken)}`,
+    ]) {
+      await expect(refreshSession(now(ctx), madeUp)).rejects.toMatchObject(
+        over("unknown_or_expired"),
+      );
+    }
+    expect(await ending(ctx, a.sessionId)).toEqual([{ revoked_at: null, revoked_reason: null }]);
+    expect((await refresh(ctx.app, a.refreshToken)).status).toBe(200);
+  });
+
+  test("a signed-out session keeps its end: its live token reads as over, an earlier one as reuse, and neither writes", async ({
+    ctx,
+  }) => {
+    const a = await device(ctx, await accountRow(ctx, "a"));
+    const next = await refreshSession(now(ctx), a.refreshToken);
+    await endSession(now(ctx), a.sessionId);
+    const ended = await ending(ctx, a.sessionId);
+    expect(ended).toEqual([{ revoked_at: expect.any(Date), revoked_reason: "logout" }]);
+    await expect(refreshSession(now(ctx), next.refreshToken)).rejects.toMatchObject(
+      over("unknown_or_expired"),
+    );
+    await expect(refreshSession(now(ctx), a.refreshToken)).rejects.toMatchObject(over("reuse"));
+    expect(await ending(ctx, a.sessionId)).toEqual(ended);
+  });
+
+  /**
+   * The test's transaction with a second refresh of the same token slipped in
+   * once, just before or just after the first one's rotation: as if the other
+   * had taken the row's lock first, or had waited for this one's commit. The
+   * rotation is keyed by the live hash, so exactly one of the two rotates.
+   */
+  test.for(["before", "after"] as const)(
+    "Of two refreshes racing with the live token one wins, and the loser ends the session for both: the other commits %s the rotation",
+    async (order, { ctx }) => {
+      const a = await device(ctx, await accountRow(ctx, "a"));
+      const rotation = /^\s*UPDATE session\s+SET refresh_hash/;
+      const others: Array<PromiseSettledResult<SessionTokens>> = [];
+      const other = async () => {
+        others.push(...(await Promise.allSettled([refreshSession(now(ctx), a.refreshToken)])));
+      };
+      let ran = false;
+      const db: Queryable = {
+        async query<R extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) {
+          const turn = !ran && rotation.test(text);
+          if (turn) ran = true;
+          if (turn && order === "before") await other();
+          const result = await ctx.client.query<R>(text, values);
+          if (turn && order === "after") await other();
+          return result;
+        },
+      };
+      const mine = await Promise.allSettled([
+        refreshSession({ db, now: () => new Date() }, a.refreshToken),
+      ]);
+      expect(ran).toBe(true);
+      const [won, lost] = order === "before" ? [...others, ...mine] : [...mine, ...others];
+      expect(lost).toMatchObject({ status: "rejected", reason: over("reuse") });
+      if (won?.status !== "fulfilled") throw new Error("neither refresh rotated");
+      expect(won.value.sessionId).toBe(a.sessionId);
+      expect((await whoami(ctx.app, won.value.accessToken)).code).toBe("session_revoked");
+      await expect(refreshSession(now(ctx), won.value.refreshToken)).rejects.toMatchObject(
+        over("unknown_or_expired"),
+      );
+      expect(await ending(ctx, a.sessionId)).toEqual([
+        { revoked_at: expect.any(Date), revoked_reason: "refresh_reuse" },
+      ]);
+    },
+  );
+});
+
 describe("how a session stands for an open socket (#349)", () => {
   test("live to its last instant as the guard reads it, still live under a shadow ban which it names, then expired by the access token or the session's own end", async ({
     ctx,
@@ -578,6 +784,7 @@ describe("a session only for an account the guard lets in (ADR-024 §4)", () => 
         accessHash: "access-hash",
         accessExpiresAt: new Date(at.getTime() + 60_000),
         refreshHash: "refresh-hash",
+        familyHash: "family-hash",
         expiresAt: new Date(at.getTime() + 60_000),
         at,
       });

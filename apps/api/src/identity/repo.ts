@@ -398,13 +398,14 @@ export async function insertSession(
     accessHash: string;
     accessExpiresAt: Date;
     refreshHash: string;
+    familyHash: string;
     expiresAt: Date;
     at: Date;
   },
 ): Promise<SessionRow | null> {
   const { rows } = await db.query<Row>(
-    `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, expires_at, created_at, last_used_at)
-     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $8
+    `INSERT INTO session (account_id, platform, user_agent, access_hash, access_expires_at, refresh_hash, family_hash, expires_at, created_at, last_used_at)
+     SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $9
      WHERE EXISTS (
        SELECT 1 FROM account a JOIN identity i ON i.id = a.identity_id
        WHERE a.id = $1 AND i.standing = 'ok'
@@ -418,6 +419,7 @@ export async function insertSession(
       input.accessHash,
       input.accessExpiresAt,
       input.refreshHash,
+      input.familyHash,
       input.expiresAt,
       input.at,
     ],
@@ -507,9 +509,8 @@ export async function touchSession(db: Queryable, sessionId: string, at: Date): 
 
 /**
  * Rotates in place when the presented hash is the live one; null when it is
- * not. Only the hash retired by the last rotation is kept: a token two
- * rotations old reads as unknown, which is narrower than the reuse rule but
- * costs nothing, since nobody could have used that token in between.
+ * not, and then `findSessionByFamilyHash` tells a retired token of the session
+ * from an unknown one (ADR-059).
  *
  * The end moves to `nextExpiresAt`, never past `ceilingMs` after the row's
  * creation, the bank login (ADR-058); once it is reached, the next refresh
@@ -529,7 +530,7 @@ export async function rotateSession(
 ): Promise<SessionRow | null> {
   const { rows } = await db.query<Row>(
     `UPDATE session
-     SET refresh_hash = $2, retired_refresh_hash = $1, access_hash = $3, access_expires_at = $4, last_used_at = $5,
+     SET refresh_hash = $2, access_hash = $3, access_expires_at = $4, last_used_at = $5,
        expires_at = LEAST($6::timestamptz, created_at + $7::double precision * interval '1 millisecond')
      WHERE refresh_hash = $1 AND revoked_at IS NULL AND expires_at > $5 AND ${SESSION_ALIVE}
      RETURNING ${SESSION_COLUMNS}`,
@@ -546,15 +547,22 @@ export async function rotateSession(
   return rows[0] ? sessionFrom(rows[0]) : null;
 }
 
-export async function findSessionByRetiredRefreshHash(
+/**
+ * The session a refresh token belongs to, by the hash of its family part, the
+ * secret the session keeps for its life (ADR-059); `live` when the presented
+ * token is the session's live one, so a session that ended by itself is told
+ * from a retired token coming back.
+ */
+export async function findSessionByFamilyHash(
   db: Queryable,
-  retiredRefreshHash: string,
-): Promise<SessionRow | null> {
+  input: { familyHash: string; refreshHash: string },
+): Promise<(SessionRow & { live: boolean }) | null> {
   const { rows } = await db.query<Row>(
-    `SELECT ${SESSION_COLUMNS} FROM session WHERE retired_refresh_hash = $1`,
-    [retiredRefreshHash],
+    `SELECT ${SESSION_COLUMNS}, refresh_hash = $2 AS live FROM session WHERE family_hash = $1`,
+    [input.familyHash, input.refreshHash],
   );
-  return rows[0] ? sessionFrom(rows[0]) : null;
+  const row = rows[0];
+  return row ? { ...sessionFrom(row), live: row.live as boolean } : null;
 }
 
 export async function findSessionForAccount(
