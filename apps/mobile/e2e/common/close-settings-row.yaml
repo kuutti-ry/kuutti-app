@@ -1,12 +1,13 @@
 # Closes a row of Settings that holds its setting in place (#511) if it is
 # open, so the next flow finds Settings as a person first does. ROW and INSIDE
-# as in open-settings-row.yaml; the row is scrolled to from below it, or from
-# above with DIRECTION: DOWN.
+# as in open-settings-row.yaml; the row is scrolled to from below it. A flow
+# that comes to the row from above scrolls down to it first: Maestro takes a
+# scroll's direction as written, never from a variable.
 appId: fi.kuutti.app
 ---
 - scrollUntilVisible:
     element: ${ROW}
-    direction: ${DIRECTION || "UP"}
+    direction: UP
     centerElement: true
     timeout: 60000
 - runFlow:
