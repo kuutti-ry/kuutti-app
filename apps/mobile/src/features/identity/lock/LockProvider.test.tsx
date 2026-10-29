@@ -643,6 +643,94 @@ describe("the phone's face or fingerprint on the lock", () => {
     await act(async () => undefined);
     expect(screen.queryByText(LOCKED)).toBeNull();
   });
+
+  // Android 16 answers a recheck during its pause with the pause's own code,
+  // which the module reads as nothing enrolled (#499).
+  const FACE = { name: "Unlock with your face" };
+  /** The lock on with the face and Straight away, its first ask answered by the phone's pause. */
+  async function pausedAtStart() {
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "lockout" });
+    await start({ lock: withPasscode({ biometrics: true, graceMinutes: 0 }) });
+    expect(screen.getByRole("button", FACE)).toBeEnabled();
+  }
+  const awayAndBack = async () => {
+    await toApp("background");
+    await toApp("active");
+  };
+
+  it("A pause keeps the button when the phone says on return that it has none", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.getByRole("button", FACE)).toBeEnabled();
+    // An answer other than the pause forgets it: none then means none.
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await fireEvent.press(screen.getByRole("button", FACE));
+    await act(async () => undefined);
+    await awayAndBack();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+    expect(screen.getByRole("button", { name: BANK })).toBeEnabled();
+  });
+
+  it("forgets the pause after a cancel too", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+    await fireEvent.press(screen.getByRole("button", FACE));
+    await act(async () => undefined);
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
+
+  it("forgets the pause after a yes, so the lock that comes back offers no face the phone lacks", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    await fireEvent.press(screen.getByRole("button", FACE));
+    await act(async () => undefined);
+    expect(screen.queryByText(LOCKED)).toBeNull();
+    // Should the lock that comes back ask before the phone has answered, it is put away.
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
+
+  it("forgets the pause once the phone says again what it has", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    // The pause over, the phone names its face again.
+    await awayAndBack();
+    expect(screen.getByRole("button", FACE)).toBeEnabled();
+    // The face removed after that: none now means none.
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
+
+  it("forgets the pause with the session", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    await pausedAtStart();
+    await act(async () => session.signOut());
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await act(async () => lock.recheck());
+    expect(lock.biometrics).toBeNull();
+  });
+
+  it("keeps nothing on iOS, whose module counts a pause as enrolled, so none there means none", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    await pausedAtStart();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByRole("button", FACE)).toBeNull();
+  });
 });
 
 describe("the lock's settings", () => {

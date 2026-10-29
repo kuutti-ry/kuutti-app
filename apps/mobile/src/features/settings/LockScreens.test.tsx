@@ -382,6 +382,23 @@ describe("coming back to the app", () => {
     expect(screen.queryByRole("switch")).toBeNull();
   });
 
+  it("keeps the switch through Android 16's pause, which the module reads as none (#499)", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    phoneWithFace({ success: false, error: "lockout" });
+    await show(<LockSettingsScreen />);
+    await press(biometricsSwitch());
+    expect(screen.getByText(TEXT.paused)).toBeTruthy();
+    auth.isEnrolledAsync.mockResolvedValue(false);
+    await awayAndBack();
+    expect(screen.queryByText(TEXT.missing)).toBeNull();
+    expect(checked(biometricsSwitch())).toBe(false);
+    // The pause over, the switch turns it on.
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    await press(biometricsSwitch());
+    expect(checked(biometricsSwitch())).toBe(true);
+    expect(screen.queryByText(TEXT.paused)).toBeNull();
+  });
+
   it("asks again on the lock's offer too, which has the same controls", async () => {
     await show(<LockOfferScreen />);
     expect(screen.getByText(TEXT.missing)).toBeTruthy();

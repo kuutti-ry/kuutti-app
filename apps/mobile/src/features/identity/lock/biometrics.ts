@@ -14,6 +14,9 @@ export type Biometrics = "face" | "fingerprint" | "either";
  * What this phone can open the lock with, or null when nothing is enrolled
  * (#418). On Android "enrolled" counts the weak class too, where some phones'
  * face unlock is, as the prompt below accepts it (the maintainer's proposal 3).
+ * On Android 16 it is null during the phone's pause too: the phone answers
+ * with its pause's own code, which the module reads as nothing enrolled, and
+ * the lock keeps the kind it knew while its last ask answered the pause (#499).
  *
  * shortcut: on Android the kind is the hardware the phone declares (the
  * module reads the package manager's features), not what is enrolled or what

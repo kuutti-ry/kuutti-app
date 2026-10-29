@@ -61,6 +61,12 @@ Feature: The app lock
     When the lock asks for the face
     Then it says the phone has paused face unlock and how that ends, and the face, the passcode and the bank are still there
 
+  Scenario: A pause keeps the button when the phone says on return that it has none
+    Given the lock screen with the face, on a phone that has paused it after too many tries
+    When the app comes back on Android and the phone's answer reads as no face or fingerprint, as Android 16's pause does
+    Then the face's button is still there
+    And once an ask answers other than the pause, none means none again
+
   Scenario: Turning biometrics on asks for the face or finger once
     Given a person in the lock's settings on a phone with a face enrolled
     When they turn the face or fingerprint on
