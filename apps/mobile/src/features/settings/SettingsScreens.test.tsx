@@ -12,6 +12,7 @@ import { LanguageChoices } from "./LanguageChoices";
 import { LegalSummary } from "./LegalSummary";
 import { LicensesScreen } from "./LicensesScreen";
 import { LICENCES, type LicenceList } from "./licences";
+import { rememberOpenRow } from "./open-rows";
 import { PackageLicenseScreen } from "./PackageLicenseScreen";
 import { SettingsScreen } from "./SettingsScreen";
 import { SourcePanel } from "./SourcePanel";
@@ -56,13 +57,14 @@ const tokens = {
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
-/** Settings with the rows named open, as the phone keeps them (#511). */
-const settingsWith = async (...open: string[]) => {
-  store.set("kuutti.preference.settingsOpen", JSON.stringify(open));
+/** Settings with the row named open, as the app left it (#511). */
+const settingsWith = async (open: string) => {
+  rememberOpenRow(open);
   await renderWithTheme(<SettingsScreen />);
 };
 
 beforeEach(async () => {
+  rememberOpenRow(null);
   store.clear();
   deviceLanguage("en-US");
   router.back.mockReset();
@@ -99,7 +101,7 @@ describe("the theme's choices", () => {
     await renderWithTheme(<ThemeChoices />);
     expect(screen.getByLabelText("Theme").props.accessibilityRole).toBe("radiogroup");
     noProblems();
-    expect(screen.getByRole("radio", { name: "✓ System" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "✓ Same as the phone" })).toBeTruthy();
     await fireEvent.press(screen.getByRole("radio", { name: "Dark" }));
     await waitFor(() => expect(store.get("kuutti.preference.scheme")).toBe("dark"));
     expect(mockSetColorScheme).toHaveBeenLastCalledWith("dark");
@@ -136,7 +138,7 @@ describe("the language's choices", () => {
     expect(await screen.findByLabelText("Språk")).toBeTruthy();
     await waitFor(() => expect(store.get("kuutti.preference.locale")).toBe("sv"));
     // Back to the phone's language clears the choice.
-    await fireEvent.press(screen.getByRole("radio", { name: "Telefonens språk" }));
+    await fireEvent.press(screen.getByRole("radio", { name: "Samma som telefonen" }));
     expect(await screen.findByLabelText("Kieli")).toBeTruthy();
     await waitFor(() => expect(store.get("kuutti.preference.locale")).toBeUndefined());
   });
@@ -172,8 +174,9 @@ describe("the legal texts under their rows", () => {
   });
 
   it("open under their rows for a signed-out device too", async () => {
-    await settingsWith("terms", "privacy");
+    await settingsWith("terms");
     expect(screen.getByText(/^DRAFT: Kuutti is a free dating service/)).toBeTruthy();
+    await settingsWith("privacy");
     expect(screen.getByText(/^DRAFT: Kuutti stores your year and month of birth/)).toBeTruthy();
   });
 });
@@ -424,13 +427,20 @@ describe("the account's rows", () => {
     noProblems();
   });
 
-  it("hold the export, the break and the deletion, for a person", async () => {
+  it("hold I found someone, the break and the deletion, for a person", async () => {
     await saveSession(tokens);
     await settingsWith("account");
-    expect(await screen.findByRole("button", { name: "Download my data" })).toBeTruthy();
-    for (const name of ["Download my data", "Take a break", "Delete my account"]) {
+    for (const name of ["I found someone", "Take a break", "Delete my account"]) {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
+    expect(screen.queryByRole("button", { name: "Download my data" })).toBeNull();
+    noProblems();
+  });
+
+  it("hold the copy of one's data under a row of its own (#511)", async () => {
+    await saveSession(tokens);
+    await settingsWith("export");
+    expect(await screen.findByRole("button", { name: "Download my data" })).toBeTruthy();
     noProblems();
   });
 

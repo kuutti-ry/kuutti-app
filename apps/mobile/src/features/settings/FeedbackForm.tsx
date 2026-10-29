@@ -2,6 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import { FEEDBACK_TEXT_MAX, type FeedbackKind, type FeedbackPlatform } from "@kuutti/schema";
 import { useState } from "react";
 import { Platform, View } from "react-native";
+import { Notice } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
@@ -68,9 +69,9 @@ export function FeedbackForm() {
       {session.status !== "signed-in" ? (
         <Text variant="muted">{t("settings.session.none")}</Text>
       ) : state === "sent" ? (
-        <View className="gap-3" accessibilityLiveRegion="polite">
+        <View className="gap-3">
           <Text variant="title">{t("feedback.thanks.title")}</Text>
-          <Text>{t("feedback.thanks.body")}</Text>
+          <Notice words={t("feedback.thanks.body")} />
           <Button
             variant="outline"
             onPress={() => {
@@ -123,9 +124,10 @@ export function FeedbackForm() {
             }}
           />
           {(state === "failed" || state === "limited") && (
-            <Text accessibilityLiveRegion="assertive">
-              {state === "limited" ? t("feedback.limited") : t("feedback.failed")}
-            </Text>
+            <Notice
+              refused
+              words={state === "limited" ? t("feedback.limited") : t("feedback.failed")}
+            />
           )}
           <Button
             disabled={!kind || words.length === 0 || state === "sending"}

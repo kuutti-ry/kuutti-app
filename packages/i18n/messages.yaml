@@ -2721,10 +2721,10 @@ settings.theme.label:
   machine: { fi: true, sv: true }
 
 settings.theme.system:
-  en: System
-  description: Settings sheet, theme choice that follows the phone's light or dark setting. Keep it short, it sits on a button.
-  fi: Järjestelmä
-  sv: System
+  en: "Same as the phone"
+  description: "The theme option that follows the phone's light or dark setting, and the Theme row's value while it is chosen (#143, #511)."
+  fi: "Sama kuin puhelimessa"
+  sv: "Samma som telefonen"
   machine: { fi: true, sv: true }
 
 settings.theme.light:
@@ -2763,10 +2763,10 @@ settings.language.label:
   machine: { fi: true, sv: true }
 
 settings.language.system:
-  en: Phone's language
-  description: Settings sheet, language choice that follows the phone's language setting.
-  fi: Puhelimen kieli
-  sv: Telefonens språk
+  en: "Same as the phone"
+  description: "The language option that follows the phone's language, and the Language row's value while it is chosen (#13, #511)."
+  fi: "Sama kuin puhelimessa"
+  sv: "Samma som telefonen"
   machine: { fi: true, sv: true }
 
 about.source.title:
@@ -3694,10 +3694,10 @@ signIn.tryAgain:
   machine: { fi: true, sv: true }
 
 settings.session.label:
-  en: This device
-  description: "Settings, title of the row and of the screen with the log-out buttons, under Account (#287)."
-  fi: Tämä laite
-  sv: Den här enheten
+  en: "Logging out"
+  description: "Title of the row under Account in Settings with Log out and Log out everywhere (#35, #511); named for what it holds, it was This device."
+  fi: "Uloskirjautuminen"
+  sv: "Utloggning"
   machine: { fi: true, sv: true }
 
 settings.group.account:
@@ -7155,10 +7155,10 @@ account.delete.title:
   machine: { fi: true, sv: true }
 
 account.delete.body:
-  en: "Your photos, your devices and your data go now and cannot be brought back. A new account is possible after {days, plural, one {# day} other {# days}}."
-  description: Deletion confirmation, text; {days} is the cooldown before the same person may register again.
-  fi: "Kuvasi, laitteesi ja tietosi poistuvat nyt, eikä niitä voi palauttaa. Uuden tilin voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
-  sv: "Dina foton, dina enheter och dina uppgifter försvinner nu och kan inte tas tillbaka. Ett nytt konto är möjligt efter {days, plural, one {# dag} other {# dagar}}."
+  en: "Your profile, photos, matches and contacts go now and cannot be brought back. Messages you sent stay with the people who received them, under 'Deleted user'. What safety and the law require is kept for a time, as the privacy policy says. A new account is possible after {days, plural, one {# day} other {# days}}."
+  description: "Deletion confirmation, text (#51, ADR-007; reworded #511): says only what an erasure does, the messages kept for their receivers under 'Deleted user' (chat's counterpart name) and what safety and law keep; {days} is the cooldown before the same person may register again."
+  fi: "Profiilisi, kuvasi, matchisi ja yhteystietosi poistuvat nyt, eikä niitä voi palauttaa. Lähettämäsi viestit jäävät vastaanottajille nimellä 'Poistettu käyttäjä'. Se, mitä turvallisuus ja laki vaativat, säilytetään jonkin aikaa, kuten tietosuojaseloste kertoo. Uuden tilin voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
+  sv: "Din profil, dina foton, matcher och kontaktuppgifter försvinner nu och kan inte tas tillbaka. Meddelanden du skickat stannar hos dem som fick dem, under 'Raderad användare'. Det som säkerheten och lagen kräver sparas en tid, som dataskyddsbeskrivningen säger. Ett nytt konto är möjligt efter {days, plural, one {# dag} other {# dagar}}."
   machine: { fi: true, sv: true }
 
 account.delete.confirm:
@@ -8909,13 +8909,6 @@ settings.section.appearance:
   sv: "Utseende och språk"
   machine: { fi: true, sv: true }
 
-settings.section.agreements:
-  en: "Legal"
-  description: "Settings, heading of the section with the two consents and the terms and privacy texts (#287)."
-  fi: "Oikeudellista"
-  sv: "Juridiskt"
-  machine: { fi: true, sv: true }
-
 settings.theme.withContrast:
   en: "{theme}, high contrast"
   description: "Summary of the theme row while high contrast is on (#287); {theme} is the chosen theme's name."
@@ -8979,11 +8972,18 @@ settings.contacts.label:
   sv: "Hur man når dig"
   machine: { fi: true, sv: true }
 
-settings.contacts.kept:
-  en: "{kept, plural, =0 {None kept} one {One kept} other {# kept}}"
-  description: "Value of the Ways to reach you row in Settings (#511, #376): how many of the five kinds of contact the person keeps."
-  fi: "{kept, plural, =0 {Ei yhtään tallennettu} one {Yksi tallennettu} other {# tallennettu}}"
-  sv: "{kept, plural, =0 {Inget sparat} one {Ett sparat} other {# sparade}}"
+settings.contacts.none:
+  en: "None kept"
+  description: "Value of the Ways to reach you row in Settings while no contact is kept (#511, #376)."
+  fi: "Ei yhtään tallennettu"
+  sv: "Inget sparat"
+  machine: { fi: true, sv: true }
+
+settings.contacts.separator:
+  en: ", "
+  description: "Between the names of the kinds kept, in the Ways to reach you row's value (#511): \"Phone number, Instagram\"."
+  fi: ", "
+  sv: ", "
   machine: { fi: true, sv: true }
 
 settings.notifications.label:
@@ -9932,6 +9932,90 @@ settings.sensitive.title:
   description: "Settings, title of the special-category consent's row and of the screen with its switch (#287)."
   fi: "Arkaluonteiset vastaukset"
   sv: "Känsliga svar"
+  machine: { fi: true, sv: true }
+
+row.state.open:
+  en: "open"
+  description: "Said on iOS after the value of a row of Settings that is open (#511): iOS says expanded for an open row but nothing for a closed one, so the state is said in words. Lower case: it follows the value after a comma."
+  fi: "auki"
+  sv: "öppen"
+  machine: { fi: true, sv: true }
+
+row.state.closed:
+  en: "closed"
+  description: "Said on iOS after the value of a row of Settings that is closed (#511); see row.state.open."
+  fi: "kiinni"
+  sv: "stängd"
+  machine: { fi: true, sv: true }
+
+row.state.withValue:
+  en: "{value}, {state}"
+  description: "A row's value and its state as iOS says them (#511): {value} is the row's value (the theme chosen, a consent on or off), {state} row.state.open or row.state.closed."
+  fi: "{value}, {state}"
+  sv: "{value}, {state}"
+  machine: { fi: true, sv: true }
+
+account.found.consequence:
+  en: "Changes nothing else."
+  description: "Under the I found someone button in Settings › Your account (#511, #83): what pressing it does beyond telling Kuutti."
+  fi: "Ei muuta mitään muuta."
+  sv: "Ändrar inget annat."
+  machine: { fi: true, sv: true }
+
+account.break.consequence:
+  en: "You are hidden and logged out. Nothing is deleted."
+  description: "Under the Take a break button in Settings › Your account (#511, #170)."
+  fi: "Sinut piilotetaan ja kirjataan ulos. Mitään ei poisteta."
+  sv: "Du döljs och loggas ut. Inget raderas."
+  machine: { fi: true, sv: true }
+
+account.delete.consequence:
+  en: "Your account goes for good. A new one is possible after {days, plural, one {# day} other {# days}}."
+  description: "Under the Delete my account button in Settings › Your account (#511); {days} is the cooldown before the same person may register again."
+  fi: "Tilisi poistuu pysyvästi. Uuden voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
+  sv: "Ditt konto försvinner för gott. Ett nytt är möjligt efter {days, plural, one {# dag} other {# dagar}}."
+  machine: { fi: true, sv: true }
+
+settings.export.label:
+  en: "A copy of your data"
+  description: "Title of the row under Privacy and security in Settings that hands over the export (#511, #51)."
+  fi: "Kopio tiedoistasi"
+  sv: "En kopia av dina uppgifter"
+  machine: { fi: true, sv: true }
+
+settings.section.contact:
+  en: "Notifications and contacts"
+  description: "Heading of the Settings section with the notifications, the e-mail and the contacts to share (#511)."
+  fi: "Ilmoitukset ja yhteystiedot"
+  sv: "Aviseringar och kontaktuppgifter"
+  machine: { fi: true, sv: true }
+
+settings.section.security:
+  en: "Privacy and security"
+  description: "Settings, heading of the third section (#511): the lock, the two consents and a copy of one's data."
+  fi: "Yksityisyys ja turvallisuus"
+  sv: "Integritet och säkerhet"
+  machine: { fi: true, sv: true }
+
+settings.section.community:
+  en: "Community"
+  description: "Heading of the Settings section with the invitations and the feedback to the moderators (#511)."
+  fi: "Yhteisö"
+  sv: "Gemenskap"
+  machine: { fi: true, sv: true }
+
+settings.notifications.blocked:
+  en: "Not allowed on this phone"
+  description: "Value of the Notifications row while this phone does not let Kuutti notify it (#511, #102): whatever the choices, nothing arrives."
+  fi: "Estetty tässä puhelimessa"
+  sv: "Inte tillåtet på den här telefonen"
+  machine: { fi: true, sv: true }
+
+settings.notifications.notAsked:
+  en: "Not asked on this phone yet"
+  description: "Value of the Notifications row while this phone has not been asked whether Kuutti may notify it (#511, #102)."
+  fi: "Ei vielä kysytty tässä puhelimessa"
+  sv: "Inte frågat på den här telefonen än"
   machine: { fi: true, sv: true }
 
 settings.state.on:

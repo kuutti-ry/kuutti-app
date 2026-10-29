@@ -30,9 +30,9 @@ const NUMBER: ReadonlySet<ContactKind> = new Set(["phone", "whatsapp"]);
  * a part per kind (phone number, WhatsApp, Telegram, Instagram, Snapchat),
  * with a hairline between them rather than cards inside the list's card.
  * While they are being read it says so; a read that failed says why, with a
- * way to read them again. How many are kept goes to `onStored`, for the row.
+ * way to read them again. The kinds kept go to `onStored`, for the row.
  */
-export function YourContacts({ onStored }: { onStored?: (kept: number) => void }) {
+export function YourContacts({ onStored }: { onStored?: (kept: readonly ContactKind[]) => void }) {
   const { t } = useT();
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [error, setError] = useState<unknown>(null);
@@ -62,7 +62,7 @@ export function YourContacts({ onStored }: { onStored?: (kept: number) => void }
   }, []);
   useEffect(read, [read]);
   useEffect(() => {
-    if (state === "ready") onStored?.(Object.values(stored).filter(Boolean).length);
+    if (state === "ready") onStored?.(CONTACT_KINDS.filter((kind) => stored[kind]));
   }, [state, stored, onStored]);
 
   if (state === "loading") {
@@ -217,15 +217,23 @@ function ContactCard({
   );
 }
 
-/** How many are kept, for the row's value; a module's function, so the row's read stays the same one. */
-const readKept = () => fetchContacts().then((contacts) => contacts.length);
+/** The kinds kept, in the list's order, for the row's value; a module's function, so the row's read stays the same one. */
+const readKept = () =>
+  fetchContacts().then((contacts) =>
+    CONTACT_KINDS.filter((kind) => contacts.some((contact) => contact.kind === kind)),
+  );
 
-/** The Ways to reach you row's value in Settings (#376, #511): how many are kept. */
+/** The Ways to reach you row's value in Settings (#376, #511): the kinds kept, by name, or none. */
 export function useContactsSummary(enabled: boolean) {
   const { t } = useT();
-  const { data, stored } = useRowData(readKept, enabled);
-  return {
-    summary: data === undefined ? undefined : t("settings.contacts.kept", { kept: data }),
-    stored,
-  };
+  const { data, stored } = useRowData<readonly ContactKind[]>(readKept, enabled);
+  const summary =
+    data === undefined
+      ? undefined
+      : data.length === 0
+        ? t("settings.contacts.none")
+        : data
+            .map((kind) => t("settings.contacts.title", { kind }))
+            .join(t("settings.contacts.separator"));
+  return { summary, stored };
 }

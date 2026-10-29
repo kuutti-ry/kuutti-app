@@ -8,6 +8,7 @@ export type MessageParams = {
   "account.break.button": Record<never, never>;
   "account.break.comesBack": Record<never, never>;
   "account.break.confirm": Record<never, never>;
+  "account.break.consequence": Record<never, never>;
   "account.break.failed": Record<never, never>;
   "account.break.hidden": Record<never, never>;
   "account.break.intro": Record<never, never>;
@@ -22,6 +23,7 @@ export type MessageParams = {
   "account.delete.cancel": Record<never, never>;
   "account.delete.close": Record<never, never>;
   "account.delete.confirm": Record<never, never>;
+  "account.delete.consequence": { "days": number };
   "account.delete.failed": Record<never, never>;
   "account.delete.title": Record<never, never>;
   "account.delete.working": Record<never, never>;
@@ -90,6 +92,7 @@ export type MessageParams = {
   "account.export.saved": Record<never, never>;
   "account.export.title": Record<never, never>;
   "account.export.working": Record<never, never>;
+  "account.found.consequence": Record<never, never>;
   "account.foundThem.button": Record<never, never>;
   "account.foundThem.failed": Record<never, never>;
   "account.foundThem.intro": Record<never, never>;
@@ -1385,6 +1388,9 @@ export type MessageParams = {
   "round.title": Record<never, never>;
   "round.undo": Record<never, never>;
   "round.undo.label": Record<never, never>;
+  "row.state.closed": Record<never, never>;
+  "row.state.open": Record<never, never>;
+  "row.state.withValue": { "value": string; "state": string };
   "safety.actions.block": Record<never, never>;
   "safety.actions.blockHint": Record<never, never>;
   "safety.actions.cancel": Record<never, never>;
@@ -1421,16 +1427,17 @@ export type MessageParams = {
   "settings.contacts.input": { "kind": string };
   "settings.contacts.intro": Record<never, never>;
   "settings.contacts.invalid": { "kind": string };
-  "settings.contacts.kept": { "kept": number };
   "settings.contacts.label": Record<never, never>;
   "settings.contacts.loadFailed": Record<never, never>;
   "settings.contacts.loading": Record<never, never>;
+  "settings.contacts.none": Record<never, never>;
   "settings.contacts.remove": Record<never, never>;
   "settings.contacts.removed": Record<never, never>;
   "settings.contacts.removeLabel": { "kind": string };
   "settings.contacts.save": Record<never, never>;
   "settings.contacts.saved": Record<never, never>;
   "settings.contacts.saveLabel": { "kind": string };
+  "settings.contacts.separator": Record<never, never>;
   "settings.contacts.title": { "kind": string };
   "settings.decisionButtons.explain": Record<never, never>;
   "settings.decisionButtons.hand": Record<never, never>;
@@ -1443,6 +1450,7 @@ export type MessageParams = {
   "settings.email.label": Record<never, never>;
   "settings.email.none": Record<never, never>;
   "settings.email.unconfirmed": { "address": string };
+  "settings.export.label": Record<never, never>;
   "settings.group.account": Record<never, never>;
   "settings.highContrast": Record<never, never>;
   "settings.invite.code.label": Record<never, never>;
@@ -1483,7 +1491,9 @@ export type MessageParams = {
   "settings.logoutAll": Record<never, never>;
   "settings.notifications.allOff": Record<never, never>;
   "settings.notifications.allOn": Record<never, never>;
+  "settings.notifications.blocked": Record<never, never>;
   "settings.notifications.label": Record<never, never>;
+  "settings.notifications.notAsked": Record<never, never>;
   "settings.notifications.someOn": { "on": number; "off": number };
   "settings.open": Record<never, never>;
   "settings.photoDescriptions.explain": Record<never, never>;
@@ -1501,8 +1511,10 @@ export type MessageParams = {
   "settings.photoDescriptions.tell.people": Record<never, never>;
   "settings.photoDescriptions.tell.title": Record<never, never>;
   "settings.research.title": Record<never, never>;
-  "settings.section.agreements": Record<never, never>;
   "settings.section.appearance": Record<never, never>;
+  "settings.section.community": Record<never, never>;
+  "settings.section.contact": Record<never, never>;
+  "settings.section.security": Record<never, never>;
   "settings.selected": { "option": string };
   "settings.sensitive.title": Record<never, never>;
   "settings.session.label": Record<never, never>;

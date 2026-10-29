@@ -9,6 +9,7 @@ import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { LockOfferScreen } from "./LockOfferScreen";
+import { rememberOpenRow } from "./open-rows";
 import { SettingsScreen } from "./SettingsScreen";
 
 // The app's lock as the person sets it (#418, ADR-045): in Settings, under
@@ -74,7 +75,7 @@ const show = async (ui: React.ReactElement) => {
 };
 /** Settings with the lock's row open, as the phone keeps it (#511). */
 const showLock = async () => {
-  store.set("kuutti.preference.settingsOpen", JSON.stringify(["lock"]));
+  rememberOpenRow("lock");
   await show(<SettingsScreen />);
 };
 const press = async (element: ReturnType<typeof screen.getByRole>) => {
@@ -111,6 +112,7 @@ function phoneWithFace(answer: { success: true } | { success: false; error: stri
 }
 
 beforeEach(async () => {
+  rememberOpenRow(null);
   store.clear();
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   router.replace.mockReset();
@@ -433,23 +435,25 @@ describe("coming back to the app", () => {
   });
 
   it("stops listening once the screen is left", async () => {
-    store.set("kuutti.preference.settingsOpen", JSON.stringify(["lock"]));
+    rememberOpenRow("lock");
     const view = await renderWithTheme(<SettingsScreen />);
     await settle();
+    // The lock's, and the notifications row's look at the phone's permission beside it.
     const own = listeners.filter((entry) => entry.event === "change");
-    expect(own).toHaveLength(1);
+    expect(own.length).toBeGreaterThan(0);
     await view.rerender(underProviders(<View />));
     await settle();
-    expect(own[0]?.remove).toHaveBeenCalledTimes(1);
+    for (const entry of own) expect(entry.remove).toHaveBeenCalledTimes(1);
   });
 
-  it("stops listening once its row is closed (#511)", async () => {
+  it("keeps its panel while its row is closed, so a passcode half typed waits for it (#511)", async () => {
     await showLock();
-    const own = listeners.filter((entry) => entry.event === "change");
-    expect(own).toHaveLength(1);
+    await press(button(TEXT.setPasscode));
+    await type(TEXT.choose, "135792");
     await press(button("Lock"));
-    expect(screen.queryByText(TEXT.explain)).toBeNull();
-    expect(own[0]?.remove).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText(TEXT.repeat)).toBeNull();
+    await press(button("Lock"));
+    expect(screen.getByLabelText(TEXT.repeat)).toBeTruthy();
   });
 });
 

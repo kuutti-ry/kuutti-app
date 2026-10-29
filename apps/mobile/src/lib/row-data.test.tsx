@@ -54,7 +54,11 @@ describe("useRowData", () => {
   });
 
   it("reads again each time the list is back in front", async () => {
-    const read = jest.fn(async () => read.mock.calls.length);
+    let reads = 0;
+    const read = jest.fn(async () => {
+      reads += 1;
+      return reads;
+    });
     const { result } = await renderHook(() => useRowData(read, true));
     await settle();
     expect(result.current.data).toBe(1);

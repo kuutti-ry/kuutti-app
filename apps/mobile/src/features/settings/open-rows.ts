@@ -1,46 +1,34 @@
 import { useCallback, useEffect, useState } from "react";
-import { readPreference, writePreference } from "@/lib/preferences";
 
-/** The keys stored; anything that is not a list of names is none open. */
-function readOpenRows(raw: string | null): string[] {
-  if (raw === null) return [];
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-  return Array.isArray(parsed) ? parsed.filter((key) => typeof key === "string") : [];
+// The row of Settings left open, while the app runs (#511): back from the
+// licences or from home, the list is as it was; a cold start has every row
+// closed. Kept in memory alone, never on the phone (the maintainer, 29/10/2026).
+let remembered: string | null = null;
+
+/** Sets the row the list opens with next, as a row's press or a link does; null closes them all. */
+export function rememberOpenRow(key: string | null) {
+  remembered = key;
 }
 
 /**
- * Which of Settings' rows are open (#511), kept on the phone so that the
- * list comes back as it was left; all closed the first time. `also` is open
- * besides, for a link that names a row (the screen-reader hint's way to the
- * photo descriptions), also when the link comes while the list is open, and
- * is kept with the rest once a row is pressed.
+ * Which row of Settings is open (#511): one at a time, so that opening a row
+ * closes the one that was open, and the list stays short enough to scan.
+ * `asked` opens a row as a link names it (the screen-reader hint's way to the
+ * photo descriptions, a flow's way to logging out), also when the link comes
+ * while the list is open. Every row opened while the list is on screen keeps
+ * its panel mounted until the list goes (`opened`), so what was typed under a
+ * row that closed waits for it to open again.
  */
-export function useOpenRows(also?: string) {
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(also ? [also] : []));
+export function useOpenRow(asked?: string) {
+  const [open, setOpen] = useState<string | null>(() => asked ?? remembered);
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(open ? [open] : []));
   useEffect(() => {
-    let mounted = true;
-    void readPreference("settingsOpen").then((stored) => {
-      if (mounted) setOpen((now) => new Set([...readOpenRows(stored), ...now]));
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    if (asked) setOpen(asked);
+  }, [asked]);
   useEffect(() => {
-    if (also) setOpen((now) => (now.has(also) ? now : new Set([...now, also])));
-  }, [also]);
-  const toggle = useCallback((key: string) => {
-    setOpen((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(key)) next.add(key);
-      void writePreference("settingsOpen", JSON.stringify([...next]));
-      return next;
-    });
-  }, []);
-  return { open, toggle };
+    rememberOpenRow(open);
+    if (open) setOpened((was) => (was.has(open) ? was : new Set([...was, open])));
+  }, [open]);
+  const toggle = useCallback((key: string) => setOpen((now) => (now === key ? null : key)), []);
+  return { open, opened, toggle };
 }

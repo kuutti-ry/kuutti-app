@@ -474,5 +474,7 @@ export function useEmailSummary(enabled: boolean) {
         : data.confirmed
           ? data.email
           : t("settings.email.unconfirmed", { address: data.email });
-  return { summary, stored };
+  // An address waiting for its code does not reach the person yet: the row marks it (#511).
+  const alert = data !== undefined && data.email !== null && !data.confirmed;
+  return { summary, alert, stored };
 }

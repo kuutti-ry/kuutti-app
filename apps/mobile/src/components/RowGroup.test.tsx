@@ -1,8 +1,9 @@
 import { fireEvent, screen } from "@testing-library/react-native";
-import { Text } from "react-native";
+import Sun from "lucide-react-native/icons/sun";
+import { Platform, Text } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
-import { RowGroup } from "./RowGroup";
+import { type Row, RowGroup } from "./RowGroup";
 
 // The rows of a list (#227, #287): a row that opens a screen is a button named
 // by its title, with the summary as the hint and the state as the value; a
@@ -53,9 +54,9 @@ describe("RowGroup", () => {
     );
   });
 
-  it("opens a row's panel under it, said as expanded, with the hairline under the panel (#511)", async () => {
+  describe("a row that holds its panel (#511)", () => {
     const toggle = jest.fn();
-    const rows = (expanded: boolean) => [
+    const rows = (expanded: boolean, extra: Partial<Row> = {}): Row[] => [
       {
         key: "theme",
         title: "Theme",
@@ -64,28 +65,106 @@ describe("RowGroup", () => {
         panel: <Text>the choices</Text>,
         expanded,
         onPress: toggle,
+        ...extra,
       },
       { key: "licences", title: "Licences", onPress: () => {} },
     ];
-    const view = await renderWithTheme(<RowGroup rows={rows(false)} />);
     const theme = () => screen.getByRole("button", { name: "Theme" });
-    expect(theme().props.accessibilityState).toMatchObject({ expanded: false });
-    expect(theme().props.accessibilityValue).toEqual({ text: "Dark" });
-    expect(screen.queryByText("the choices")).toBeNull();
-    // A row that opens a screen says nothing of open or closed.
-    expect(
-      screen.getByRole("button", { name: "Licences" }).props.accessibilityState?.expanded,
-    ).toBeUndefined();
-    await fireEvent.press(theme());
-    expect(toggle).toHaveBeenCalledTimes(1);
-    await view.rerender(underProviders(<RowGroup rows={rows(true)} />));
-    expect(theme().props.accessibilityState).toMatchObject({ expanded: true });
-    expect(screen.getByText("the choices")).toBeTruthy();
-    // The hairline goes under the row and its panel together, not between them.
-    expect(theme().props.className).not.toMatch(/\bborder-b\b/);
-    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
-      [],
-    );
+    beforeEach(() => toggle.mockReset());
+    afterEach(() => jest.restoreAllMocks());
+
+    it("opens under itself, with the hairline under the panel, not between them", async () => {
+      const view = await renderWithTheme(<RowGroup rows={rows(false)} />);
+      expect(screen.queryByText("the choices")).toBeNull();
+      await fireEvent.press(theme());
+      expect(toggle).toHaveBeenCalledTimes(1);
+      await view.rerender(underProviders(<RowGroup rows={rows(true)} />));
+      expect(screen.getByText("the choices")).toBeTruthy();
+      expect(theme().props.className).not.toMatch(/\bborder-b\b/);
+      expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+        [],
+      );
+    });
+
+    it("on iOS says its state in words after its value, since iOS says no collapsed", async () => {
+      jest.replaceProperty(Platform, "OS", "ios");
+      const view = await renderWithTheme(<RowGroup rows={rows(false)} />);
+      expect(theme().props.accessibilityValue).toEqual({ text: "Dark, closed" });
+      expect(theme().props.accessibilityState?.expanded).toBeUndefined();
+      await view.rerender(underProviders(<RowGroup rows={rows(true, { value: undefined })} />));
+      expect(theme().props.accessibilityValue).toEqual({ text: "open" });
+      // A row that opens a screen says nothing of open or closed.
+      expect(
+        screen.getByRole("button", { name: "Licences" }).props.accessibilityValue?.text,
+      ).toBeUndefined();
+    });
+
+    it("on Android is heard as expanded or collapsed, and TalkBack's action opens it", async () => {
+      jest.replaceProperty(Platform, "OS", "android");
+      await renderWithTheme(<RowGroup rows={rows(false)} />);
+      expect(theme().props.accessibilityState).toMatchObject({ expanded: false });
+      expect(theme().props.accessibilityValue).toEqual({ text: "Dark" });
+      expect(theme().props.accessibilityActions).toEqual([{ name: "expand", label: "Theme" }]);
+      await fireEvent(theme(), "accessibilityAction", { nativeEvent: { actionName: "expand" } });
+      expect(toggle).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByRole("button", { name: "Licences" }).props.accessibilityActions,
+      ).toBeUndefined();
+    });
+
+    it("keeps a panel once opened mounted while closed, out of sight and of a screen reader's reach", async () => {
+      await renderWithTheme(<RowGroup rows={rows(false, { kept: true })} />);
+      expect(screen.queryByText("the choices")).toBeNull();
+      const hidden = screen.getByText("the choices", { includeHiddenElements: true });
+      let wrapper = hidden.parent;
+      while (wrapper && wrapper.props.importantForAccessibility === undefined)
+        wrapper = wrapper.parent;
+      expect(wrapper?.props).toMatchObject({
+        accessibilityElementsHidden: true,
+        importantForAccessibility: "no-hide-descendants",
+      });
+      expect(wrapper?.props.className).toMatch(/\bhidden\b/);
+    });
+
+    it("tells once for each opening that its panel is laid out", async () => {
+      const opened = jest.fn();
+      const view = await renderWithTheme(<RowGroup rows={rows(true, { onOpened: opened })} />);
+      const panel = () => {
+        let node = screen.getByText("the choices").parent;
+        while (node && node.props.onLayout === undefined) node = node.parent;
+        if (!node) throw new Error("no panel");
+        return node;
+      };
+      await fireEvent(panel(), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
+      });
+      await fireEvent(panel(), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 2 } },
+      });
+      expect(opened).toHaveBeenCalledTimes(1);
+      expect(opened.mock.calls[0]?.[0]).toEqual({
+        wrapper: expect.anything(),
+        header: expect.anything(),
+      });
+      await view.rerender(
+        underProviders(<RowGroup rows={rows(false, { onOpened: opened, kept: true })} />),
+      );
+      await view.rerender(
+        underProviders(<RowGroup rows={rows(true, { onOpened: opened, kept: true })} />),
+      );
+      await fireEvent(panel(), "layout", {
+        nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
+      });
+      expect(opened).toHaveBeenCalledTimes(2);
+    });
+
+    it("draws a picture before the title, silent, and sets it and the chevron by the first line", async () => {
+      await renderWithTheme(<RowGroup rows={rows(false, { icon: Sun })} />);
+      expect(theme().props.className).toMatch(/\bitems-start\b/);
+      expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+        [],
+      );
+    });
   });
 
   it("reads a row with nothing to open, its detail as the value", async () => {

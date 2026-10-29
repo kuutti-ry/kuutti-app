@@ -3,6 +3,7 @@ import type { NotificationChoice, NotificationKind } from "@kuutti/schema";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Notice } from "@/components/Notice";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
@@ -11,6 +12,7 @@ import { useRowData } from "@/lib/row-data";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchChoices, saveChoice } from "./client";
 import { PhoneLine } from "./PhoneLine";
+import { usePhonePermission } from "./usePhonePermission";
 
 const WORDS: Record<NotificationKind, { label: PlainMessageKey; hint: PlainMessageKey }> = {
   round: { label: "notifications.kind.round.label", hint: "notifications.kind.round.hint" },
@@ -46,6 +48,8 @@ export function NotificationChoices({
   const [view, setView] = useState<ChoicesView>({ status: "loading" });
   const [busy, setBusy] = useState<NotificationKind | null>(null);
   const [failed, setFailed] = useState(false);
+  // Which failure the words are, so a second one is said again.
+  const [failures, setFailures] = useState(0);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -74,7 +78,10 @@ export function NotificationChoices({
       const { choices } = await saveChoice(kind, enabled);
       if (mounted.current) setView({ status: "ready", choices });
     } catch {
-      if (mounted.current) setFailed(true);
+      if (mounted.current) {
+        setFailed(true);
+        setFailures((n) => n + 1);
+      }
     } finally {
       if (mounted.current) setBusy(null);
     }
@@ -108,7 +115,7 @@ export function NotificationChoices({
             </View>
           );
         })}
-      {failed && <Text accessibilityLiveRegion="assertive">{t("notifications.saveFailed")}</Text>}
+      {failed && <Notice refused words={t("notifications.saveFailed")} answer={failures} />}
     </>
   );
 }
@@ -116,18 +123,30 @@ export function NotificationChoices({
 /** The choices alone, for the row's value; a module's function, so the row's read stays the same one. */
 const readChoices = () => fetchChoices().then(({ choices }) => choices);
 
-/** The Notifications row's value in Settings (#376, #511): all on, all off, or how many of them are on. */
+/**
+ * The Notifications row's value in Settings (#376, #511): that the phone
+ * refuses them, marked, since nothing then reaches the person whatever the
+ * switches say; that the phone was not asked yet; or all on, all off, or how
+ * many of them are on.
+ */
 export function useNotificationsSummary(enabled: boolean) {
   const { t } = useT();
   const { data, stored } = useRowData<readonly NotificationChoice[]>(readChoices, enabled);
+  const { permission } = usePhonePermission();
   const on = data?.filter((choice) => choice.enabled).length ?? 0;
-  const summary =
-    data === undefined
-      ? undefined
-      : on === data.length
-        ? t("settings.notifications.allOn")
-        : on === 0
-          ? t("settings.notifications.allOff")
-          : t("settings.notifications.someOn", { on, off: data.length - on });
-  return { summary, stored };
+  const blocked = enabled && permission === "denied";
+  const summary = !enabled
+    ? undefined
+    : blocked
+      ? t("settings.notifications.blocked")
+      : permission === "undetermined"
+        ? t("settings.notifications.notAsked")
+        : data === undefined
+          ? undefined
+          : on === data.length
+            ? t("settings.notifications.allOn")
+            : on === 0
+              ? t("settings.notifications.allOff")
+              : t("settings.notifications.someOn", { on, off: data.length - on });
+  return { summary, alert: blocked, stored };
 }

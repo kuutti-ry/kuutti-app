@@ -4,6 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Notice } from "@/components/Notice";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
@@ -152,7 +153,11 @@ export function ConsentSwitch({
     void consent.set(on);
   };
   return (
-    <View className="gap-2">
+    <View className="gap-3">
+      {/* What it is first, as every row of Settings says it (#511). */}
+      <Text>
+        {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : t(EXPLAIN[kind])}
+      </Text>
       {/* The words toggle the switch too, as the high-contrast row's do: a
           thumb or a test reaches them without aiming at the thumb-sized
           switch at the screen's edge. */}
@@ -165,11 +170,8 @@ export function ConsentSwitch({
           onCheckedChange={set}
         />
       </View>
-      <Text variant="muted">
-        {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : t(EXPLAIN[kind])}
-      </Text>
       <LegalTextLink kind={kind} />
-      {consent.failed && <Text accessibilityLiveRegion="assertive">{t(FAILED[kind])}</Text>}
+      {consent.failed && <Notice refused words={t(FAILED[kind])} />}
     </View>
   );
 }
