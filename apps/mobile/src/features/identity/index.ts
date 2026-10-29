@@ -3,7 +3,7 @@
 export { AccountActions } from "./AccountActions";
 export { BreakScreen } from "./BreakScreen";
 export { type ConsentState, ConsentSwitch, useConsentStates } from "./ConsentSwitches";
-export { EmailCard, EmailScreen } from "./EmailCard";
+export { EmailCard, EmailScreen, useEmailSummary } from "./EmailCard";
 export { LegalTextLink } from "./LegalTextLink";
 export {
   LockProvider,

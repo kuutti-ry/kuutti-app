@@ -8,11 +8,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
+import { useRowData } from "@/lib/row-data";
+import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 import { ContactMark } from "./ContactMark";
 import { fetchContacts, removeContact, saveContact } from "./client";
@@ -24,13 +25,14 @@ type Notice = "saved" | "removed" | "invalid" | "pace" | "failed" | null;
 const NUMBER: ReadonlySet<ContactKind> = new Set(["phone", "whatsapp"]);
 
 /**
- * The person's contacts (#103), under Settings' Ways to reach you row (#511): the line
- * that nobody sees them until one is shared in a conversation, then a card
- * per kind (phone number, WhatsApp, Telegram, Instagram, Snapchat). While they are
- * being read it says so; a read that failed says why, with a way to read them
- * again.
+ * The person's contacts (#103), under Settings' Ways to reach you row (#511):
+ * the line that nobody sees them until one is shared in a conversation, then
+ * a part per kind (phone number, WhatsApp, Telegram, Instagram, Snapchat),
+ * with a hairline between them rather than cards inside the list's card.
+ * While they are being read it says so; a read that failed says why, with a
+ * way to read them again. How many are kept goes to `onStored`, for the row.
  */
-export function YourContacts() {
+export function YourContacts({ onStored }: { onStored?: (kept: number) => void }) {
   const { t } = useT();
   const [state, setState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [error, setError] = useState<unknown>(null);
@@ -59,6 +61,9 @@ export function YourContacts() {
     );
   }, []);
   useEffect(read, [read]);
+  useEffect(() => {
+    if (state === "ready") onStored?.(Object.values(stored).filter(Boolean).length);
+  }, [state, stored, onStored]);
 
   if (state === "loading") {
     return (
@@ -73,20 +78,21 @@ export function YourContacts() {
   return (
     <View className="gap-6">
       <Text>{t("settings.contacts.intro")}</Text>
-      {CONTACT_KINDS.map((kind) => (
-        <ContactCard
-          key={kind}
-          kind={kind}
-          stored={stored[kind] ?? null}
-          onStored={(value) => setStored((was) => ({ ...was, [kind]: value ?? undefined }))}
-        />
+      {CONTACT_KINDS.map((kind, index) => (
+        <View key={kind} className={cn(index > 0 && "border-t border-border pt-6")}>
+          <ContactCard
+            kind={kind}
+            stored={stored[kind] ?? null}
+            onStored={(value) => setStored((was) => ({ ...was, [kind]: value ?? undefined }))}
+          />
+        </View>
       ))}
     </View>
   );
 }
 
 /**
- * One kind as a card, as the e-mail's (#148): its mark (#474), its name and
+ * One kind, as the e-mail's (#148): its mark (#474), its name and
  * what to type, the field with what is kept in its stored form, Save (off
  * while empty or unchanged) and Remove (only while one is kept). What is typed is checked
  * on the phone first, with the API's own rule, and a refusal of either is
@@ -145,15 +151,17 @@ function ContactCard({
   const unchanged = stored !== null && normaliseContact(kind, words) === stored;
   const number = NUMBER.has(kind);
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
+    <View className="gap-3">
+      <View className="gap-1.5">
         <View className="flex-row items-center gap-2">
           <ContactMark kind={kind} />
-          <CardTitle className="flex-1">{t("settings.contacts.title", { kind })}</CardTitle>
+          <Text variant="title" className="flex-1">
+            {t("settings.contacts.title", { kind })}
+          </Text>
         </View>
-        <CardDescription>{t("settings.contacts.hint", { kind })}</CardDescription>
-      </CardHeader>
-      <CardContent className="gap-3">
+        <Text variant="muted">{t("settings.contacts.hint", { kind })}</Text>
+      </View>
+      <View className="gap-3">
         <Input
           accessibilityLabel={t("settings.contacts.input", { kind })}
           value={typed}
@@ -204,7 +212,20 @@ function ContactCard({
             {t("settings.contacts.remove")}
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </View>
+    </View>
   );
+}
+
+/** How many are kept, for the row's value; a module's function, so the row's read stays the same one. */
+const readKept = () => fetchContacts().then((contacts) => contacts.length);
+
+/** The Ways to reach you row's value in Settings (#376, #511): how many are kept. */
+export function useContactsSummary(enabled: boolean) {
+  const { t } = useT();
+  const { data, stored } = useRowData(readKept, enabled);
+  return {
+    summary: data === undefined ? undefined : t("settings.contacts.kept", { kept: data }),
+    stored,
+  };
 }

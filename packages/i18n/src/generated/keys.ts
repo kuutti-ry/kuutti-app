@@ -1421,6 +1421,7 @@ export type MessageParams = {
   "settings.contacts.input": { "kind": string };
   "settings.contacts.intro": Record<never, never>;
   "settings.contacts.invalid": { "kind": string };
+  "settings.contacts.kept": { "kept": number };
   "settings.contacts.label": Record<never, never>;
   "settings.contacts.loadFailed": Record<never, never>;
   "settings.contacts.loading": Record<never, never>;
@@ -1440,6 +1441,8 @@ export type MessageParams = {
   "settings.decisionButtons.right": Record<never, never>;
   "settings.decisionButtons.withOneHanded": { "hand": string };
   "settings.email.label": Record<never, never>;
+  "settings.email.none": Record<never, never>;
+  "settings.email.unconfirmed": { "address": string };
   "settings.group.account": Record<never, never>;
   "settings.highContrast": Record<never, never>;
   "settings.invite.code.label": Record<never, never>;
@@ -1463,6 +1466,7 @@ export type MessageParams = {
   "settings.invite.open.withdrawLabel": { "date": string };
   "settings.invite.share": Record<never, never>;
   "settings.invite.shareFailed": Record<never, never>;
+  "settings.invite.waiting": { "waiting": number };
   "settings.invite.withdraw.body": Record<never, never>;
   "settings.invite.withdraw.cancel": Record<never, never>;
   "settings.invite.withdraw.close": Record<never, never>;
@@ -1477,7 +1481,10 @@ export type MessageParams = {
   "settings.lock.label": Record<never, never>;
   "settings.logout": Record<never, never>;
   "settings.logoutAll": Record<never, never>;
+  "settings.notifications.allOff": Record<never, never>;
+  "settings.notifications.allOn": Record<never, never>;
   "settings.notifications.label": Record<never, never>;
+  "settings.notifications.someOn": { "on": number; "off": number };
   "settings.open": Record<never, never>;
   "settings.photoDescriptions.explain": Record<never, never>;
   "settings.photoDescriptions.hint.body": Record<never, never>;

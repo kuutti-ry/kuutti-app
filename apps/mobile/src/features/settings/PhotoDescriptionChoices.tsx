@@ -38,9 +38,7 @@ export function PhotoDescriptionChoices() {
       <Text>{t("settings.photoDescriptions.explain")}</Text>
       {row("shown", t("settings.photoDescriptions.show"), t("settings.photoDescriptions.showHint"))}
       <View className="gap-3">
-        <Text variant="h3" accessibilityRole="header">
-          {t("settings.photoDescriptions.tell.title")}
-        </Text>
+        <Text variant="title">{t("settings.photoDescriptions.tell.title")}</Text>
         {row("people", t("settings.photoDescriptions.tell.people"))}
         {row("face", t("settings.photoDescriptions.tell.face"))}
         {row("objects", t("settings.photoDescriptions.tell.objects"))}

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
+import { useRowData } from "@/lib/row-data";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchChoices, saveChoice } from "./client";
 import { PhoneLine } from "./PhoneLine";
@@ -32,9 +33,14 @@ type ChoicesView =
  * the server so every phone of the person's and every later sender reads the
  * same. A press saves at once; while it is on its way the switch waits, and a
  * failure is said in words with the switch as it was. Above the switches,
- * whether this phone lets Kuutti notify it at all (#102, ADR-055 §9).
+ * whether this phone lets Kuutti notify it at all (#102, ADR-055 §9). The
+ * choices as read or stored go to `onStored`, for the row above (#511).
  */
-export function NotificationChoices() {
+export function NotificationChoices({
+  onStored,
+}: {
+  onStored?: (choices: readonly NotificationChoice[]) => void;
+}) {
   const { t } = useT();
   const tap = useHapticTap();
   const [view, setView] = useState<ChoicesView>({ status: "loading" });
@@ -56,6 +62,9 @@ export function NotificationChoices() {
     );
   }, []);
   useEffect(read, [read]);
+  useEffect(() => {
+    if (view.status === "ready") onStored?.(view.choices);
+  }, [view, onStored]);
 
   const set = async (kind: NotificationKind, enabled: boolean) => {
     tap();
@@ -102,4 +111,23 @@ export function NotificationChoices() {
       {failed && <Text accessibilityLiveRegion="assertive">{t("notifications.saveFailed")}</Text>}
     </>
   );
+}
+
+/** The choices alone, for the row's value; a module's function, so the row's read stays the same one. */
+const readChoices = () => fetchChoices().then(({ choices }) => choices);
+
+/** The Notifications row's value in Settings (#376, #511): all on, all off, or how many of them are on. */
+export function useNotificationsSummary(enabled: boolean) {
+  const { t } = useT();
+  const { data, stored } = useRowData<readonly NotificationChoice[]>(readChoices, enabled);
+  const on = data?.filter((choice) => choice.enabled).length ?? 0;
+  const summary =
+    data === undefined
+      ? undefined
+      : on === data.length
+        ? t("settings.notifications.allOn")
+        : on === 0
+          ? t("settings.notifications.allOff")
+          : t("settings.notifications.someOn", { on, off: data.length - on });
+  return { summary, stored };
 }

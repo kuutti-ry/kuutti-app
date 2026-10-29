@@ -12,6 +12,7 @@ import { Text } from "@/components/ui/text";
 import { DEAL_BREAKERS_PATH } from "@/features/profile";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
+import { useRowData } from "@/lib/row-data";
 import { useHapticTap } from "@/theme/haptics";
 import { clearEmail, confirmEmailCode, fetchEmail, saveEmail, sendEmailCode } from "./email-client";
 import { useLockOfferDue } from "./lock/LockProvider";
@@ -83,12 +84,19 @@ type Load =
  * The optional e-mail (#148, TD-18) as a card: the honest reason first, the
  * address, save and remove, and the code that confirms it (#385, ADR-043).
  * Never shown to anybody else and never a login; the API keeps it out of
- * every log line. On its own screen in Settings (#287), and as the last of
- * the later screens. While the address is being read it says so, and a read
- * that failed says why, with a way to read it again; nothing for a
- * signed-out device.
+ * every log line. Under its row in Settings (#287, #511), where the row's
+ * title stands for the card's (`inRow`) and what the card holds goes to
+ * `onStored` for the row to say, and as the last of the later screens. While
+ * the address is being read it says so, and a read that failed says why,
+ * with a way to read it again; nothing for a signed-out device.
  */
-export function EmailCard() {
+export function EmailCard({
+  inRow = false,
+  onStored,
+}: {
+  inRow?: boolean;
+  onStored?: (email: AccountEmailResponse) => void;
+}) {
   const { t } = useT();
   const session = useSession();
   const signedIn = session.status === "signed-in";
@@ -129,7 +137,7 @@ export function EmailCard() {
       <LoadFailed headline={t("account.email.loadFailed")} error={load.error} onRetry={read} />
     );
   }
-  return <EmailForm first={load.email} />;
+  return <EmailForm first={load.email} inRow={inRow} onStored={onStored} />;
 }
 
 /**
@@ -139,7 +147,15 @@ export function EmailCard() {
  * the code expired. Every call clears the last notice and says its own, in a
  * live region and, on iOS, aloud.
  */
-function EmailForm({ first }: { first: AccountEmailResponse }) {
+function EmailForm({
+  first,
+  inRow,
+  onStored,
+}: {
+  first: AccountEmailResponse;
+  inRow: boolean;
+  onStored?: (email: AccountEmailResponse) => void;
+}) {
   const { t, locale } = useT();
   const tap = useHapticTap();
   // Together, so an answer can tell whether the person has typed in the field
@@ -151,6 +167,7 @@ function EmailForm({ first }: { first: AccountEmailResponse }) {
   // Which answer the notice is: each one a fresh live region, so Android says
   // the same words again for a second code within the minute.
   const [answers, setAnswers] = useState(0);
+  useEffect(() => onStored?.(stored), [stored, onStored]);
   // Whole sentences one after another; nothing is inflected around them.
   const wordsOf = (lines: readonly Said[]): string =>
     lines
@@ -254,6 +271,67 @@ function EmailForm({ first }: { first: AccountEmailResponse }) {
 
   const words = said.length === 0 ? null : wordsOf(said);
   const address = typed.trim();
+  const fields = (
+    <>
+      {/* Its name in sight too, as the code's field has it, not only for a screen reader. */}
+      <Text variant="small">{t("account.email.label")}</Text>
+      <Input
+        accessibilityLabel={t("account.email.label")}
+        value={typed}
+        maxLength={EMAIL_MAX}
+        autoCapitalize="none"
+        autoCorrect={false}
+        inputMode="email"
+        onChangeText={(text) => {
+          setSaid([]);
+          setForm((form) => ({ ...form, typed: text }));
+        }}
+      />
+      {stored.email !== null && (
+        <Text variant="muted">
+          {stored.confirmed ? t("account.email.confirmed") : t("account.email.unconfirmed")}
+        </Text>
+      )}
+      <Button
+        disabled={busy || address.length === 0 || address === stored.email}
+        onPress={() => void run(() => keep(() => saveEmail(address)))}
+      >
+        {t("account.email.save")}
+      </Button>
+      {stored.email !== null && !stored.confirmed && (
+        <CodeSection
+          expiresAt={stored.codeExpiresAt}
+          code={code}
+          busy={busy}
+          onCode={(text) => {
+            setSaid([]);
+            setCode(text.replace(/\D/g, "").slice(0, EMAIL_CODE_LENGTH));
+          }}
+          onConfirm={() => void run(confirm)}
+          onSend={() => void run(send)}
+        />
+      )}
+      {words !== null && (
+        <Text key={answers} accessibilityLiveRegion="assertive">
+          {words}
+        </Text>
+      )}
+      {stored.email !== null && (
+        <Button variant="outline" disabled={busy} onPress={() => void run(() => keep(clearEmail))}>
+          {t("account.email.clear")}
+        </Button>
+      )}
+    </>
+  );
+  // In a row of Settings the row's title names it: no card inside the list's card (#511).
+  if (inRow) {
+    return (
+      <View className="gap-3">
+        <Text>{t("account.email.explain")}</Text>
+        {fields}
+      </View>
+    );
+  }
   return (
     <Card className="w-full max-w-md">
       <View accessibilityLabel={t("account.email.title")} className="gap-4">
@@ -261,58 +339,7 @@ function EmailForm({ first }: { first: AccountEmailResponse }) {
           <CardTitle>{t("account.email.title")}</CardTitle>
           <CardDescription>{t("account.email.explain")}</CardDescription>
         </CardHeader>
-        <CardContent className="gap-3">
-          <Input
-            accessibilityLabel={t("account.email.label")}
-            value={typed}
-            maxLength={EMAIL_MAX}
-            autoCapitalize="none"
-            autoCorrect={false}
-            inputMode="email"
-            onChangeText={(text) => {
-              setSaid([]);
-              setForm((form) => ({ ...form, typed: text }));
-            }}
-          />
-          {stored.email !== null && (
-            <Text variant="muted">
-              {stored.confirmed ? t("account.email.confirmed") : t("account.email.unconfirmed")}
-            </Text>
-          )}
-          <Button
-            disabled={busy || address.length === 0 || address === stored.email}
-            onPress={() => void run(() => keep(() => saveEmail(address)))}
-          >
-            {t("account.email.save")}
-          </Button>
-          {stored.email !== null && !stored.confirmed && (
-            <CodeSection
-              expiresAt={stored.codeExpiresAt}
-              code={code}
-              busy={busy}
-              onCode={(text) => {
-                setSaid([]);
-                setCode(text.replace(/\D/g, "").slice(0, EMAIL_CODE_LENGTH));
-              }}
-              onConfirm={() => void run(confirm)}
-              onSend={() => void run(send)}
-            />
-          )}
-          {words !== null && (
-            <Text key={answers} accessibilityLiveRegion="assertive">
-              {words}
-            </Text>
-          )}
-          {stored.email !== null && (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onPress={() => void run(() => keep(clearEmail))}
-            >
-              {t("account.email.clear")}
-            </Button>
-          )}
-        </CardContent>
+        <CardContent className="gap-3">{fields}</CardContent>
       </View>
     </Card>
   );
@@ -429,4 +456,23 @@ export function EmailScreen() {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
+}
+
+/**
+ * The e-mail row's value in Settings (#376, #511): the address once
+ * confirmed, the address and that it waits for its code, or that there is
+ * none; nothing until it has been read.
+ */
+export function useEmailSummary(enabled: boolean) {
+  const { t } = useT();
+  const { data, stored } = useRowData(fetchEmail, enabled);
+  const summary =
+    data === undefined
+      ? undefined
+      : data.email === null
+        ? t("settings.email.none")
+        : data.confirmed
+          ? data.email
+          : t("settings.email.unconfirmed", { address: data.email });
+  return { summary, stored };
 }

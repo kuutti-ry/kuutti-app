@@ -26,17 +26,10 @@ import LaterFieldRoute from "../app/profile/later/[field]";
 // biome-ignore lint/style/noRestrictedImports: a route file, not a slice internal
 import ProfileSectionRoute from "../app/profile/section/[id]";
 import RoundRoute from "../app/round";
-import AccountSettingsRoute from "../app/settings/account";
-import DeviceRoute from "../app/settings/device";
-import EmailSettingsRoute from "../app/settings/email";
-import FeedbackRoute from "../app/settings/feedback";
 import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
-import InviteSettingsRoute from "../app/settings/invite";
-import LegalRoute from "../app/settings/legal/[kind]";
 import LicensesRoute from "../app/settings/licenses";
 import PackageLicenseRoute from "../app/settings/licenses/[id]";
-import SourceRoute from "../app/settings/source";
 import TechRoute from "../app/tech";
 
 // The route files of app/ (rules/layout.md: routes only, thin): each renders
@@ -131,20 +124,12 @@ jest.mock("@/features/settings", () => {
   const probe = (name: string) => (props: object) =>
     createElement(Text, { testID: name }, JSON.stringify(props));
   return {
-    AccountScreen: probe("AccountScreen"),
-    DeviceScreen: probe("DeviceScreen"),
-    EmailSettingsScreen: probe("EmailSettingsScreen"),
-    FeedbackScreen: probe("FeedbackScreen"),
     FoundThemScreen: probe("FoundThemScreen"),
-    InvitationsSettingsScreen: probe("InvitationsSettingsScreen"),
-    LegalScreen: probe("LegalScreen"),
-    legalKindOf: (value: unknown) => (value === "privacy" ? value : "terms"),
     LicensesScreen: probe("LicensesScreen"),
     LockOfferScreen: probe("LockOfferScreen"),
     PackageLicenseScreen: probe("PackageLicenseScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
     SettingsScreen: probe("SettingsScreen"),
-    SourceScreen: probe("SourceScreen"),
     TechConfigScreen: probe("TechConfigScreen"),
   };
 });
@@ -188,14 +173,8 @@ describe("the screens without params", () => {
     ["/profile/deal-breakers", DealBreakersRoute, "DealBreakersScreen"],
     ["/round", RoundRoute, "RoundScreen"],
     ["/settings", SettingsRoute, "SettingsScreen"],
-    ["/settings/account", AccountSettingsRoute, "AccountScreen"],
-    ["/settings/device", DeviceRoute, "DeviceScreen"],
-    ["/settings/email", EmailSettingsRoute, "EmailSettingsScreen"],
-    ["/settings/feedback", FeedbackRoute, "FeedbackScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
-    ["/settings/invite", InviteSettingsRoute, "InvitationsSettingsScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
-    ["/settings/source", SourceRoute, "SourceScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);
@@ -434,21 +413,6 @@ describe("the profile's routes with a param", () => {
     params({});
     await render(<LaterFieldRoute />);
     expect(propsOf("LaterFieldScreen")).toEqual({ field: "" });
-  });
-
-  it.each([
-    [
-      "a legal text's kind, the first of two",
-      LegalRoute,
-      "LegalScreen",
-      { kind: ["privacy", "terms"] },
-      "privacy",
-    ],
-    ["the terms for a link naming no text", LegalRoute, "LegalScreen", {}, "terms"],
-  ] as const)("hands %s to its screen (#287)", async (_what, Route, name, given, kind) => {
-    params({ ...given });
-    await render(<Route />);
-    expect(propsOf(name)).toEqual({ kind });
   });
 
   it("hands a section's id to its screen, and an empty one when the link has none", async () => {

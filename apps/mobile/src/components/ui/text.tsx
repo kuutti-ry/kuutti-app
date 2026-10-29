@@ -19,6 +19,8 @@ const textVariants = cva(
         h2: "text-3xl font-semibold tracking-tight",
         h3: "text-2xl font-semibold tracking-tight",
         h4: "text-xl font-semibold tracking-tight",
+        // A heading inside a card or an open row of Settings (#511): the body's size, bold.
+        title: "font-semibold",
         lead: "text-xl text-muted-foreground",
         large: "text-lg font-semibold",
         small: "text-sm font-medium",
@@ -38,9 +40,16 @@ const ROLE: Partial<Record<TextVariant, Role>> = {
   h2: "heading",
   h3: "heading",
   h4: "heading",
+  title: "heading",
 };
 
-const ARIA_LEVEL: Partial<Record<TextVariant, string>> = { h1: "1", h2: "2", h3: "3", h4: "4" };
+const ARIA_LEVEL: Partial<Record<TextVariant, string>> = {
+  h1: "1",
+  h2: "2",
+  h3: "3",
+  h4: "4",
+  title: "4",
+};
 
 const FONT_SCALE: Partial<Record<TextVariant, number>> = HEADING_FONT_SCALE;
 

@@ -3,9 +3,8 @@ import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
-import { FeedbackScreen } from "./FeedbackScreen";
+import { FeedbackForm } from "./FeedbackForm";
 
 // Give feedback (#171, ADR-023): the kind in words, the words themselves, the
 // build read by the app; thanks after a send; the cap and a failure in their
@@ -65,14 +64,15 @@ beforeEach(async () => {
   await clearSession();
 });
 
-describe("the feedback screen", () => {
+describe("the feedback form, under its row in Settings (#511)", () => {
   it("sends the kind, the words and the build, says thank you, and offers the empty form again", async () => {
     const sent = api(() => new Response(null, { status: 204 }));
     await saveSession(tokens);
-    await renderWithTheme(<FeedbackScreen />);
+    await renderWithTheme(<FeedbackForm />);
     // The session loads first; the form follows.
     await screen.findByLabelText("Your feedback");
-    expectPinnedHeader("Give feedback", "Back");
+    // The field's name is in sight too, not only for a screen reader.
+    expect(screen.getByText("Your feedback")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "What is it about?" })).toBeTruthy();
     noProblems();
     await press("An idea", "radio");
@@ -104,7 +104,7 @@ describe("the feedback screen", () => {
   it("keeps Send off until a kind is chosen and something is written", async () => {
     const sent = api(() => new Response(null, { status: 204 }));
     await saveSession(tokens);
-    await renderWithTheme(<FeedbackScreen />);
+    await renderWithTheme(<FeedbackForm />);
     // The session loads first; the form follows.
     await screen.findByLabelText("Your feedback");
     expect(sendButton().props.accessibilityState?.disabled).toBe(true);
@@ -128,7 +128,7 @@ describe("the feedback screen", () => {
       ),
     );
     await saveSession(tokens);
-    await renderWithTheme(<FeedbackScreen />);
+    await renderWithTheme(<FeedbackForm />);
     // The session loads first; the form follows.
     await screen.findByLabelText("Your feedback");
     await press("Praise", "radio");
@@ -148,7 +148,7 @@ describe("the feedback screen", () => {
 
   it("says there is no session on a signed-out device", async () => {
     api(() => new Response(null, { status: 204 }));
-    await renderWithTheme(<FeedbackScreen />);
+    await renderWithTheme(<FeedbackForm />);
     expect(screen.getByText("No session on this device.")).toBeTruthy();
     expect(screen.queryByLabelText("Your feedback")).toBeNull();
   });

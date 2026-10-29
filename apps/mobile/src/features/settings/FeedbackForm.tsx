@@ -12,7 +12,6 @@ import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { Choice } from "./Choice";
 import { sendFeedback } from "./feedback-client";
-import { SettingsPage } from "./SettingsPage";
 
 /** The four kinds in the order the person reads them; the panel's own order is the contract's. */
 const KINDS: ReadonlyArray<{ value: FeedbackKind; label: PlainMessageKey }> = [
@@ -29,13 +28,14 @@ const platformOf = (os: string): FeedbackPlatform =>
 type State = "idle" | "sending" | "sent" | "failed" | "limited";
 
 /**
- * Give feedback (#171, ADR-023): a kind, a few lines, Send. The app's version,
+ * Give feedback (#171, ADR-023), under its row in Settings (#511): a kind, a
+ * few lines, Send. The app's version,
  * the platform and the language go along, read by the app and never typed.
  * The kind is chosen in words (the ticked option, never a colour alone);
  * after a send the screen says thank you and offers the empty form again.
  * The day's cap and a failure are said in their own words, the words kept.
  */
-export function FeedbackScreen() {
+export function FeedbackForm() {
   const { t, locale } = useT();
   const tap = useHapticTap();
   const session = useSession();
@@ -64,14 +64,12 @@ export function FeedbackScreen() {
   };
 
   return (
-    <SettingsPage title={t("feedback.title")}>
+    <>
       {session.status !== "signed-in" ? (
         <Text variant="muted">{t("settings.session.none")}</Text>
       ) : state === "sent" ? (
         <View className="gap-3" accessibilityLiveRegion="polite">
-          <Text variant="h3" accessibilityRole="header">
-            {t("feedback.thanks.title")}
-          </Text>
+          <Text variant="title">{t("feedback.thanks.title")}</Text>
           <Text>{t("feedback.thanks.body")}</Text>
           <Button
             variant="outline"
@@ -85,7 +83,7 @@ export function FeedbackScreen() {
         </View>
       ) : (
         <>
-          <Text variant="muted">{t("feedback.explain")}</Text>
+          <Text>{t("feedback.explain")}</Text>
           {/* The question in sight above the four kinds; the group carries it as its name too. */}
           {/* role, not accessibilityRole: the primitive sets role from its variant, and small has none. */}
           <Text variant="small" role="heading" aria-level="3">
@@ -108,6 +106,8 @@ export function FeedbackScreen() {
               />
             ))}
           </View>
+          {/* The field's name in sight too, not only for a screen reader. */}
+          <Text variant="small">{t("feedback.text.label")}</Text>
           <Input
             accessibilityLabel={t("feedback.text.label")}
             value={text}
@@ -138,6 +138,6 @@ export function FeedbackScreen() {
           </Button>
         </>
       )}
-    </SettingsPage>
+    </>
   );
 }

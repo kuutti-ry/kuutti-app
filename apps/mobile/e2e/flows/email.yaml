@@ -16,19 +16,19 @@ name: A malformed e-mail is refused in words, a valid one is saved, and it can b
     timeout: 15000
 - waitForAnimationToEnd
 - assertVisible:
-    text: "Save the address|Tallenna osoite|Spara adressen"
+    text: "Send a confirmation code|Lähetä vahvistuskoodi|Skicka en bekräftelsekod"
     enabled: false
 # The keyboard stays up: Save is above it, and hiding it taps whatever lies below.
 - tapOn: "E-mail address|Sähköpostiosoite|E-postadress"
 - inputText: "not-an-address"
-- tapOn: "Save the address|Tallenna osoite|Spara adressen"
+- tapOn: "Send a confirmation code|Lähetä vahvistuskoodi|Skicka en bekräftelsekod"
 - extendedWaitUntil:
     visible: "That does not look like an e-mail address\\.|Tuo ei näytä sähköpostiosoitteelta\\.|Det ser inte ut som en e-postadress\\."
     timeout: 15000
 - tapOn: "not-an-address"
 - eraseText: 30
 - inputText: "sanna.demo@example.com"
-- tapOn: "Save the address|Tallenna osoite|Spara adressen"
+- tapOn: "Send a confirmation code|Lähetä vahvistuskoodi|Skicka en bekräftelsekod"
 # Saved, and its code on the way without a tap of its own; the time is the
 # phone's clock, so the flow matches any.
 - extendedWaitUntil:

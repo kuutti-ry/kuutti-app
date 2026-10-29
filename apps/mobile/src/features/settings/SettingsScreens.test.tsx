@@ -7,17 +7,14 @@ import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
-import { AccountScreen } from "./AccountScreen";
-import { DeviceScreen } from "./DeviceScreen";
-import { EmailSettingsScreen } from "./EmailSettingsScreen";
-import { InvitationsSettingsScreen } from "./InvitationsSettingsScreen";
+import { DeviceActions } from "./DeviceActions";
 import { LanguageChoices } from "./LanguageChoices";
-import { LegalScreen, legalKindOf } from "./LegalScreen";
+import { LegalSummary } from "./LegalSummary";
 import { LicensesScreen } from "./LicensesScreen";
 import { LICENCES, type LicenceList } from "./licences";
 import { PackageLicenseScreen } from "./PackageLicenseScreen";
 import { SettingsScreen } from "./SettingsScreen";
-import { SourceScreen } from "./SourceScreen";
+import { SourcePanel } from "./SourcePanel";
 import { ThemeChoices } from "./ThemeChoices";
 
 // The screens behind the settings rows (#287), each with the pinned way back
@@ -152,23 +149,20 @@ describe("the language's choices", () => {
   });
 });
 
-describe("the legal screens", () => {
-  it("show the terms with their version, to anybody, and the way back leads back", async () => {
-    await renderWithTheme(<LegalScreen kind="terms" />);
-    expectPinnedHeader("Terms of use", "Back");
-    await fireEvent.press(screen.getByRole("button", { name: "Back" }));
-    expect(router.back).toHaveBeenCalledTimes(1);
+describe("the legal texts under their rows", () => {
+  it("show the terms with their version, to anybody", async () => {
+    await renderWithTheme(<LegalSummary kind="terms" />);
     expect(screen.getByText(/^DRAFT: Kuutti is a free dating service/)).toBeTruthy();
     // The version, as the link to the full text on the website (#208).
     expect(
       screen.getByRole("link", { name: /^Read the full text on kuutti\.app \(version \S+\)$/ }),
     ).toBeTruthy();
+    noProblems();
   });
 
   it("show the privacy text, and lead to the full policy at its version", async () => {
     const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
-    await renderWithTheme(<LegalScreen kind="privacy" />);
-    expectPinnedHeader("Privacy", "Back");
+    await renderWithTheme(<LegalSummary kind="privacy" />);
     expect(screen.getByText(/^DRAFT: Kuutti stores your year and month of birth/)).toBeTruthy();
     await fireEvent.press(screen.getByRole("link", { name: /^Read the full text/ }));
     expect(open).toHaveBeenCalledWith(
@@ -177,11 +171,10 @@ describe("the legal screens", () => {
     open.mockRestore();
   });
 
-  it("read a link's kind, and take anything else as the terms", () => {
-    expect(legalKindOf("privacy")).toBe("privacy");
-    expect(legalKindOf("terms")).toBe("terms");
-    expect(legalKindOf("cookies")).toBe("terms");
-    expect(legalKindOf(undefined)).toBe("terms");
+  it("open under their rows for a signed-out device too", async () => {
+    await settingsWith("terms", "privacy");
+    expect(screen.getByText(/^DRAFT: Kuutti is a free dating service/)).toBeTruthy();
+    expect(screen.getByText(/^DRAFT: Kuutti stores your year and month of birth/)).toBeTruthy();
   });
 });
 
@@ -202,11 +195,17 @@ describe("the consents' rows", () => {
   });
 });
 
-describe("the source screen", () => {
-  it("offers the source at the address the API names, to anybody", async () => {
-    await renderWithTheme(<SourceScreen />);
-    expectPinnedHeader("Source code", "Back");
-    expect(await screen.findByText("https://github.com/kuutti-ry/kuutti-app")).toBeTruthy();
+describe("the source code under its row", () => {
+  it("offers the source at the address the API names, to anybody, set to the left", async () => {
+    await renderWithTheme(<SourcePanel />);
+    const address = await screen.findByText("https://github.com/kuutti-ry/kuutti-app");
+    expect(address).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "https://github.com/kuutti-ry/kuutti-app" }).props.className,
+    ).toMatch(/\bself-start\b/);
+    expect(
+      screen.getByText(/free software under the AGPL-3.0 licence/).props.className,
+    ).not.toMatch(/text-center/);
     noProblems();
   });
 
@@ -214,7 +213,7 @@ describe("the source screen", () => {
     globalThis.fetch = jest.fn(async () => {
       throw new TypeError("Network request failed");
     }) as unknown as typeof fetch;
-    await renderWithTheme(<SourceScreen />);
+    await renderWithTheme(<SourcePanel />);
     await settle();
     expect(screen.getByText(/free software under the AGPL-3.0 licence/)).toBeTruthy();
     expect(screen.queryByText("https://github.com/kuutti-ry/kuutti-app")).toBeNull();
@@ -374,11 +373,10 @@ describe("a package's licence screen (#416)", () => {
   });
 });
 
-describe("this device's screen", () => {
+describe("this device, under its row", () => {
   it("logs this device out", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<DeviceScreen />);
-    expectPinnedHeader("This device", "Back");
+    await renderWithTheme(<DeviceActions />);
     noProblems();
     await fireEvent.press(await screen.findByRole("button", { name: "Log out" }));
     expect(await screen.findByText("No session on this device.")).toBeTruthy();
@@ -397,7 +395,7 @@ describe("this device's screen", () => {
       }
       return answers(input, init);
     }) as unknown as typeof fetch;
-    await renderWithTheme(<DeviceScreen />);
+    await renderWithTheme(<DeviceActions />);
     await fireEvent.press(await screen.findByRole("button", { name: "Log out everywhere" }));
     await settle();
     expect(screen.getByRole("button", { name: "Log out everywhere" })).toBeTruthy();
@@ -405,22 +403,31 @@ describe("this device's screen", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Log out everywhere" }));
     expect(await screen.findByText("No session on this device.")).toBeTruthy();
   });
+
+  it("says there is no session on a signed-out device, whose list has the row all the same", async () => {
+    await settingsWith("device");
+    await settle();
+    expect(screen.getByText("No session on this device.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Log out" })).toBeNull();
+  });
 });
 
-describe("the account's screens and rows", () => {
-  it("hold the e-mail card for a person", async () => {
+describe("the account's rows", () => {
+  it("hold the e-mail for a person, the row's title standing for the card's", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<EmailSettingsScreen />);
-    expect(await screen.findByText("A way to stay in touch")).toBeTruthy();
-    expectPinnedHeader("E-mail", "Back");
-    expect(screen.getByRole("button", { name: "Save the address" })).toBeTruthy();
+    await settingsWith("email");
+    expect(await screen.findByRole("button", { name: "Send a confirmation code" })).toBeTruthy();
+    expect(screen.queryByText("A way to stay in touch")).toBeNull();
+    expect(screen.getByText(/^Optional\. A way for Kuutti to reach you/)).toBeTruthy();
+    // The field's name is in sight, not only for a screen reader.
+    expect(screen.getByText("E-mail address")).toBeTruthy();
+    noProblems();
   });
 
   it("hold the export, the break and the deletion, for a person", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<AccountScreen />);
+    await settingsWith("account");
     expect(await screen.findByRole("button", { name: "Download my data" })).toBeTruthy();
-    expectPinnedHeader("Your account", "Back");
     for (const name of ["Download my data", "Take a break", "Delete my account"]) {
       expect(await screen.findByRole("button", { name })).toBeTruthy();
     }
@@ -451,17 +458,9 @@ describe("the account's screens and rows", () => {
 
   it("hold the invitations for a person (#107)", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<InvitationsSettingsScreen />);
+    await settingsWith("invitations");
     expect(await screen.findByRole("button", { name: "Make an invitation" })).toBeTruthy();
-    expectPinnedHeader("Invitations", "Back");
     noProblems();
-  });
-
-  it("say there is no session on the invitations screen of a signed-out device (#107)", async () => {
-    await renderWithTheme(<InvitationsSettingsScreen />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByText("Loading your invitations…")).toBeNull();
   });
 
   describe("keep a field low on the page above the keyboard (#103)", () => {
@@ -520,19 +519,5 @@ describe("the account's screens and rows", () => {
         os.restore();
       }
     });
-  });
-
-  it("say there is no session on a signed-out device, the e-mail screen and the account screen alike", async () => {
-    await renderWithTheme(<EmailSettingsScreen />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByText("A way to stay in touch")).toBeNull();
-  });
-
-  it("say there is no session on the account screen of a signed-out device", async () => {
-    await renderWithTheme(<AccountScreen />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Delete my account" })).toBeNull();
   });
 });

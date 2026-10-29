@@ -17,7 +17,8 @@ function readOpenRows(raw: string | null): string[] {
  * Which of Settings' rows are open (#511), kept on the phone so that the
  * list comes back as it was left; all closed the first time. `also` is open
  * besides, for a link that names a row (the screen-reader hint's way to the
- * photo descriptions), and is kept with the rest once a row is pressed.
+ * photo descriptions), also when the link comes while the list is open, and
+ * is kept with the rest once a row is pressed.
  */
 export function useOpenRows(also?: string) {
   const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(also ? [also] : []));
@@ -30,6 +31,9 @@ export function useOpenRows(also?: string) {
       mounted = false;
     };
   }, []);
+  useEffect(() => {
+    if (also) setOpen((now) => (now.has(also) ? now : new Set([...now, also])));
+  }, [also]);
   const toggle = useCallback((key: string) => {
     setOpen((previous) => {
       const next = new Set(previous);

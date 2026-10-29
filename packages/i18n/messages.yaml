@@ -7423,10 +7423,10 @@ account.email.label:
   machine: { fi: true, sv: true }
 
 account.email.save:
-  en: "Save the address"
-  description: "Button that saves the e-mail (#148)."
-  fi: "Tallenna osoite"
-  sv: "Spara adressen"
+  en: "Send a confirmation code"
+  description: "Button that keeps the e-mail typed and mails a code to confirm it (#148, #385); named for what it does, since it mails one (the maintainer, 29/10/2026, #511). The only button of the e-mail: Settings has no Save buttons."
+  fi: "Lähetä vahvistuskoodi"
+  sv: "Skicka en bekräftelsekod"
   machine: { fi: true, sv: true }
 
 account.email.clear:
@@ -8958,6 +8958,20 @@ settings.email.label:
   sv: "E-post"
   machine: { fi: true, sv: true }
 
+settings.email.none:
+  en: "None given"
+  description: "Value of the E-mail row in Settings while no address is kept (#511, #376): the row's second line and what a screen reader hears as its value."
+  fi: "Ei annettu"
+  sv: "Ingen angiven"
+  machine: { fi: true, sv: true }
+
+settings.email.unconfirmed:
+  en: "{address}, not confirmed yet"
+  description: "Value of the E-mail row in Settings while the address waits for its code (#511, #385); {address} is the e-mail address as typed, never inflected. A confirmed address is the value alone."
+  fi: "{address}, ei vielä vahvistettu"
+  sv: "{address}, inte bekräftad än"
+  machine: { fi: true, sv: true }
+
 settings.contacts.label:
   en: "Ways to reach you"
   description: "Title of the row under Account in Settings and of the screen it opens (#103): the phone number and the usernames a person keeps to share in a conversation. Never \"contacts\" alone, which reads as the phone's address book (the maintainer, 28/10/2026); the screens that point here use these words."
@@ -8965,11 +8979,39 @@ settings.contacts.label:
   sv: "Hur man når dig"
   machine: { fi: true, sv: true }
 
+settings.contacts.kept:
+  en: "{kept, plural, =0 {None kept} one {One kept} other {# kept}}"
+  description: "Value of the Ways to reach you row in Settings (#511, #376): how many of the five kinds of contact the person keeps."
+  fi: "{kept, plural, =0 {Ei yhtään tallennettu} one {Yksi tallennettu} other {# tallennettu}}"
+  sv: "{kept, plural, =0 {Inget sparat} one {Ett sparat} other {# sparade}}"
+  machine: { fi: true, sv: true }
+
 settings.notifications.label:
   en: "Notifications"
   description: "Title of the row under Account in Settings and of the screen it opens (#176): which kinds of notification the person allows. Short."
   fi: "Ilmoitukset"
   sv: "Aviseringar"
+  machine: { fi: true, sv: true }
+
+settings.notifications.allOn:
+  en: "All on"
+  description: "Value of the Notifications row in Settings while every kind is on (#511, #376)."
+  fi: "Kaikki päällä"
+  sv: "Alla på"
+  machine: { fi: true, sv: true }
+
+settings.notifications.allOff:
+  en: "All off"
+  description: "Value of the Notifications row in Settings while every kind is off (#511, #376)."
+  fi: "Kaikki pois päältä"
+  sv: "Alla av"
+  machine: { fi: true, sv: true }
+
+settings.notifications.someOn:
+  en: "{on, number} on, {off, number} off"
+  description: "Value of the Notifications row in Settings while some kinds are on and some off (#511, #376); {on} and {off} are how many kinds, each at least 1."
+  fi: "{on, number} päällä, {off, number} pois"
+  sv: "{on, number} på, {off, number} av"
   machine: { fi: true, sv: true }
 
 notifications.intro:
@@ -9204,6 +9246,13 @@ settings.invite.label:
   fi: "Kutsut"
   sv: "Inbjudningar"
   max_length: 24
+  machine: { fi: true, sv: true }
+
+settings.invite.waiting:
+  en: "{waiting, plural, =0 {None waiting to be used} one {One waiting to be used} other {# waiting to be used}}"
+  description: "Value of the Invitations row in Settings once the person may invite (#511, #376): how many invitations they made wait to be used."
+  fi: "{waiting, plural, =0 {Ei yhtään odottamassa} one {Yksi odottaa käyttöä} other {# odottaa käyttöä}}"
+  sv: "{waiting, plural, =0 {Ingen väntar på att användas} one {En väntar på att användas} other {# väntar på att användas}}"
   machine: { fi: true, sv: true }
 
 settings.invite.loading:

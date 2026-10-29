@@ -7,9 +7,10 @@ import { useT } from "@/lib/locale";
 
 /**
  * The source-code offer of AGPL-3.0 section 13 (#16): the address the running
- * service names in /health. Shown to every user, in every build, on its own
- * screen under "About Kuutti" in Settings, beside the version and the build
- * (#287), and on the tech config screen beside the API's commit. The address
+ * service names in /health. Shown to every user, in every build, under its
+ * row in "About Kuutti" in Settings, beside the version and the build (#287,
+ * #511), and on the tech config screen beside the API's commit. Set to the
+ * left, as the legal texts' links are. The address
  * is text as well as a link, so the offer stands where no browser opens. The
  * contract only admits https URLs. Each screen carries the heading.
  *
@@ -20,12 +21,11 @@ import { useT } from "@/lib/locale";
 export function SourceOffer({ source }: { source: string }) {
   const { t } = useT();
   return (
-    <View className="w-full max-w-md items-center gap-2">
-      <Text variant="muted" className="text-center">
-        {t("about.source.body")}
-      </Text>
+    <View className="w-full max-w-md gap-2">
+      <Text>{t("about.source.body")}</Text>
       <Button
         variant="ghost"
+        className="self-start px-0"
         accessibilityRole="link"
         accessibilityLabel={source}
         accessibilityHint={t("about.source.open")}

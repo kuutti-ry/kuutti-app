@@ -5,15 +5,19 @@ import type { ReactNode } from "react";
 import { Platform, View } from "react-native";
 import { type Row, RowGroup } from "@/components/RowGroup";
 import { Text } from "@/components/ui/text";
-import { YourContacts } from "@/features/chat";
+import { useContactsSummary, YourContacts } from "@/features/chat";
 import {
+  AccountActions,
   type ConsentState,
   ConsentSwitch,
+  EmailCard,
   useConsentStates,
+  useEmailSummary,
   useLock,
   useSession,
 } from "@/features/identity";
-import { NotificationChoices } from "@/features/notifications";
+import { NotificationChoices, useNotificationsSummary } from "@/features/notifications";
+import { Invitations, useInvitationsSummary } from "@/features/rewards";
 import { buildInfo } from "@/lib/build";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useLocaleSettings, useT } from "@/lib/locale";
@@ -22,12 +26,16 @@ import { useHapticTap } from "@/theme/haptics";
 import { useTheme } from "@/theme/ThemeProvider";
 import { SCHEMES } from "./Choice";
 import { DecisionButtonChoices } from "./DecisionButtonChoices";
+import { DeviceActions } from "./DeviceActions";
+import { FeedbackForm } from "./FeedbackForm";
 import { LanguageChoices } from "./LanguageChoices";
+import { LegalSummary } from "./LegalSummary";
 import { LockControls } from "./LockControls";
 import { LICENCES } from "./licences";
 import { useOpenRows } from "./open-rows";
 import { PhotoDescriptionChoices } from "./PhotoDescriptionChoices";
 import { SettingsPage } from "./SettingsPage";
+import { SourcePanel } from "./SourcePanel";
 import { ThemeChoices } from "./ThemeChoices";
 
 /** The title of a consent's row (#287): the settings' own words, in every language. */
@@ -50,24 +58,25 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
 
 /**
  * The person's own settings, after login, in every build (#143): one long
- * list of sections (#511), in the order of #376. A setting that is chosen
- * in place opens under its row, with a chevron pointing down, and closes
- * again; which rows are open is kept on the phone. A row that starts a flow
- * of its own (a code to confirm, a form, a text to read) still opens its
- * screen, with a chevron pointing right. Appearance and language (the OS's
- * and the phone's by default, kept across restarts, the photo descriptions
- * of #296 and the decision buttons of #82); the account, this device and its
- * lock (#418), the e-mail, the contacts to share in a conversation (#103),
- * the notifications (#176), the invitations (#107), the feedback to the
- * moderators (#171), and the export, the break and the deletion last (#51,
- * #148, #170); the legal part, the two consents (#46, #146) and the texts
- * they refer to; about Kuutti, the version, the source offer of AGPL-3.0
- * section 13 (visible to everybody) and the licences. A row's second line is
- * its value (the theme, a consent on or off, a version), never a description
- * of the row its title already names (#376). A link may name a row to open
- * (`/settings?open=photoDescriptions`). The tech config screen keeps what is
- * technical beyond the version (the API, the native build, a test error) and
- * exists outside production only.
+ * list of sections (#511), in the order of #376. Every row opens what it
+ * holds under itself, with a chevron pointing down, and closes it again;
+ * which rows are open is kept on the phone. The licences alone open a screen
+ * of their own, with a chevron pointing right: a list of every package is no
+ * setting. Appearance and language (the OS's and the phone's by default,
+ * kept across restarts, the photo descriptions of #296 and the decision
+ * buttons of #82); the account, this device and its lock (#418), the
+ * e-mail, the contacts to share in a conversation (#103), the notifications
+ * (#176), the invitations (#107), the feedback to the moderators (#171), and
+ * the export, the break and the deletion last (#51, #148, #170); the legal
+ * part, the two consents (#46, #146) and the texts they refer to; about
+ * Kuutti, the version, the source offer of AGPL-3.0 section 13 (visible to
+ * everybody) and the licences. A row's second line is its value (the theme,
+ * a consent on or off, the address, how many contacts are kept), never a
+ * description of the row its title already names (#376); a row's value reads
+ * what its panel holds and follows what the panel stores. A link may name a
+ * row to open (`/settings?open=device`). The tech config screen keeps what
+ * is technical beyond the version (the API, the native build, a test error)
+ * and exists outside production only.
  */
 export function SettingsScreen() {
   const { t } = useT();
@@ -118,6 +127,10 @@ export function SettingsScreen() {
   const signedIn = session.status === "signed-in";
   const lockWords = useLock().settings === null ? t("settings.state.off") : t("settings.state.on");
   const consents = useConsentStates();
+  const email = useEmailSummary(signedIn);
+  const contacts = useContactsSummary(signedIn);
+  const notifications = useNotificationsSummary(signedIn);
+  const invitations = useInvitationsSummary(signedIn);
   /** A consent's state in words, for its row; nothing while it is unknown. */
   const consentWords = (state: ConsentState): string | undefined =>
     state === "on"
@@ -174,9 +187,8 @@ export function SettingsScreen() {
           // Always there: a device with no session says so on its screen, and
           // a flow signing out finds the row whatever the session is.
           {
-            key: "device",
+            ...holding("device", <DeviceActions />),
             title: t("settings.session.label"),
-            onPress: go("/settings/device"),
           },
           // The lock is this phone's, beside its session (#418); the web preview has none.
           ...(signedIn && Platform.OS !== "web"
@@ -192,32 +204,39 @@ export function SettingsScreen() {
           ...(signedIn
             ? [
                 {
-                  key: "email",
+                  ...holding("email", <EmailCard inRow onStored={email.stored} />),
                   title: t("settings.email.label"),
-                  onPress: go("/settings/email"),
+                  summary: email.summary,
+                  value: email.summary,
                 },
                 {
-                  ...holding("contacts", <YourContacts />),
+                  ...holding("contacts", <YourContacts onStored={contacts.stored} />),
                   title: t("settings.contacts.label"),
+                  summary: contacts.summary,
+                  value: contacts.summary,
                 },
                 {
-                  ...holding("notifications", <NotificationChoices />),
+                  ...holding(
+                    "notifications",
+                    <NotificationChoices onStored={notifications.stored} />,
+                  ),
                   title: t("settings.notifications.label"),
+                  summary: notifications.summary,
+                  value: notifications.summary,
                 },
                 {
-                  key: "invitations",
+                  ...holding("invitations", <Invitations onStored={invitations.stored} />),
                   title: t("settings.invite.label"),
-                  onPress: go("/settings/invite"),
+                  summary: invitations.summary,
+                  value: invitations.summary,
                 },
                 {
-                  key: "feedback",
+                  ...holding("feedback", <FeedbackForm />),
                   title: t("feedback.title"),
-                  onPress: go("/settings/feedback"),
                 },
                 {
-                  key: "account",
+                  ...holding("account", <AccountActions />),
                   title: t("account.title"),
-                  onPress: go("/settings/account"),
                 },
               ]
             : []),
@@ -229,18 +248,16 @@ export function SettingsScreen() {
           // The two withdrawable consents, each saying whether it is on; nothing signed out.
           ...(signedIn ? [consentRow("research"), consentRow("special_category")] : []),
           {
-            key: "terms",
+            ...holding("terms", <LegalSummary kind="terms" />),
             title: t("legal.terms.title"),
             summary: t("onboarding.consents.version", { version: CONSENT_VERSIONS.terms ?? "" }),
-            onPress: go("/settings/legal/terms"),
           },
           {
-            key: "privacy",
+            ...holding("privacy", <LegalSummary kind="privacy" />),
             title: t("legal.privacy.title"),
             summary: t("onboarding.consents.version", {
               version: CONSENT_VERSIONS.privacy ?? "",
             }),
-            onPress: go("/settings/legal/privacy"),
           },
         ]}
       />
@@ -256,9 +273,8 @@ export function SettingsScreen() {
             detail: version ?? "?",
           },
           {
-            key: "source",
+            ...holding("source", <SourcePanel />),
             title: t("about.source.title"),
-            onPress: go("/settings/source"),
           },
           {
             key: "licenses",

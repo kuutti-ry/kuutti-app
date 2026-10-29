@@ -84,6 +84,30 @@ const consentsAnswer = {
   },
 };
 
+const CHOICES = [
+  { kind: "round", enabled: true },
+  { kind: "message", enabled: true },
+  { kind: "match", enabled: true },
+  { kind: "moderation", enabled: true },
+];
+const INVITATIONS = {
+  canInvite: true,
+  redeemable: false,
+  reward: { fish: 1, likes: 0 },
+  open: [{ id: "8c1e6d2a-6a43-4c55-9d0b-3f1a2b3c4d5e", createdAt: "2026-10-28T10:00:00.000Z" }],
+  counted: 0,
+  earned: { fish: 0, likes: 0 },
+};
+const HEALTH = {
+  status: "ok",
+  version: "0.0.0-test",
+  commit: "abc1234",
+  builtAt: "2026-09-13T00:00:00.000Z",
+  source: "https://github.com/kuutti-ry/kuutti-app",
+  db: "ok",
+  migrations: "current",
+};
+
 beforeEach(async () => {
   mockBuild.mockReturnValue({ version: "0.19.0", commit: "abc1234def5678" });
   store.clear();
@@ -95,6 +119,12 @@ beforeEach(async () => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/consents") return json(consentsAnswer);
     if (url.pathname === "/contacts") return json({ contacts: [] });
+    if (url.pathname === "/account/email") {
+      return json({ email: "aino@example.fi", confirmed: false, codeExpiresAt: null });
+    }
+    if (url.pathname === "/account/notifications") return json({ choices: CHOICES });
+    if (url.pathname === "/invitations") return json(INVITATIONS);
+    if (url.pathname === "/health") return json(HEALTH);
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
   await clearSession();
@@ -182,16 +212,7 @@ describe("the settings screen", () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    for (const name of [
-      "This device",
-      "E-mail",
-      "Ways to reach you",
-      "Notifications",
-      "Invitations",
-      "Give feedback",
-      "Your account",
-      "Source code",
-    ]) {
+    for (const name of ["This device", "Give feedback", "Your account", "Source code"]) {
       expect([name, row(name).props.accessibilityHint]).toEqual([name, undefined]);
       expect([name, row(name).props.accessibilityValue?.text]).toEqual([name, undefined]);
     }
@@ -221,28 +242,14 @@ describe("the settings screen", () => {
     expect(screen.getByRole("heading", { name: "Inställningar" })).toBeTruthy();
   });
 
-  it("opens the screen of each row that starts a flow of its own", async () => {
+  it("opens a screen for the licences alone, a list of every package rather than a setting", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
-    const expected: Array<[string, string]> = [
-      ["Terms of use", "/settings/legal/terms"],
-      ["Privacy", "/settings/legal/privacy"],
-      ["Source code", "/settings/source"],
-      ["Licences", "/settings/licenses"],
-      ["This device", "/settings/device"],
-      ["E-mail", "/settings/email"],
-      ["Invitations", "/settings/invite"],
-      ["Give feedback", "/settings/feedback"],
-      ["Your account", "/settings/account"],
-    ];
-    for (const [name, path] of expected) {
-      // A screen's row is no disclosure: nothing to say open or closed.
-      expect([name, row(name).props.accessibilityState?.expanded]).toEqual([name, undefined]);
-      await press(row(name));
-      expect(router.push).toHaveBeenLastCalledWith(path);
-    }
-    expect(router.push).toHaveBeenCalledTimes(expected.length);
+    expect(row("Licences").props.accessibilityState?.expanded).toBeUndefined();
+    await press(row("Licences"));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenLastCalledWith("/settings/licenses");
   });
 
   it("opens each setting in place under its row, said as expanded, and closes it again (#511)", async () => {
@@ -263,6 +270,14 @@ describe("the settings screen", () => {
         "Sensitive answers",
         () => screen.queryByRole("switch", { name: "Store my sensitive answers" }),
       ],
+      ["This device", () => screen.queryByRole("button", { name: "Log out everywhere" })],
+      ["E-mail", () => screen.queryByRole("button", { name: "Send a confirmation code" })],
+      ["Invitations", () => screen.queryByRole("button", { name: "Make an invitation" })],
+      ["Give feedback", () => screen.queryByRole("radio", { name: "A bug" })],
+      ["Your account", () => screen.queryByRole("button", { name: "Download my data" })],
+      ["Terms of use", () => screen.queryByText(/^DRAFT: Kuutti is a free dating service/)],
+      ["Privacy", () => screen.queryByText(/^DRAFT: Kuutti stores your year and month/)],
+      ["Source code", () => screen.queryByText("https://github.com/kuutti-ry/kuutti-app")],
     ];
     for (const [name, inside] of panels) {
       expect([name, expanded(name), inside()]).toEqual([name, false, null]);
@@ -362,6 +377,77 @@ describe("the settings screen", () => {
     expect(
       screen.getByRole("switch", { name: "Take part in research" }).props.accessibilityState,
     ).toMatchObject({ checked: false });
+  });
+
+  it("says what the e-mail, the contacts, the notifications and the invitations hold, as their rows' values (#511)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    await waitFor(() =>
+      expect(row("E-mail").props.accessibilityValue).toEqual({
+        text: "aino@example.fi, not confirmed yet",
+      }),
+    );
+    expect(row("Ways to reach you").props.accessibilityValue).toEqual({ text: "None kept" });
+    expect(row("Notifications").props.accessibilityValue).toEqual({ text: "All on" });
+    expect(row("Invitations").props.accessibilityValue).toEqual({
+      text: "One waiting to be used",
+    });
+    // The value is the second line, heard once: not again as a hint.
+    for (const name of ["E-mail", "Ways to reach you", "Notifications", "Invitations"]) {
+      expect([name, row(name).props.accessibilityHint]).toEqual([name, undefined]);
+      expect(within(row(name)).getByText(row(name).props.accessibilityValue.text)).toBeTruthy();
+    }
+  });
+
+  it("follows what a panel stores in its row's value at once (#511)", async () => {
+    const answers = globalThis.fetch;
+    globalThis.fetch = jest.fn(async (input: Request | string, init?: RequestInit) => {
+      const request = input instanceof Request ? input : new Request(input, init);
+      const url = new URL(request.url);
+      if (request.method === "PUT" && url.pathname === "/account/notifications/message") {
+        return json({
+          choices: CHOICES.map((c) => (c.kind === "message" ? { ...c, enabled: false } : c)),
+        });
+      }
+      if (request.method === "PUT" && url.pathname === "/contacts/instagram") {
+        return json({
+          kind: "instagram",
+          value: "aino.reads",
+          updatedAt: "2026-10-29T10:00:00.000Z",
+        });
+      }
+      return answers(input, init);
+    }) as unknown as typeof fetch;
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    await press(row("Notifications"));
+    await press(await screen.findByRole("switch", { name: "Messages" }));
+    await waitFor(() =>
+      expect(row("Notifications").props.accessibilityValue).toEqual({ text: "3 on, 1 off" }),
+    );
+    await press(row("Ways to reach you"));
+    await act(async () => {
+      fireEvent.changeText(await screen.findByLabelText("Your Instagram username"), "aino.reads");
+    });
+    await press(screen.getByRole("button", { name: "Save your Instagram username" }));
+    await waitFor(() =>
+      expect(row("Ways to reach you").props.accessibilityValue).toEqual({ text: "One kept" }),
+    );
+  });
+
+  it("says no value on those rows while what they hold could not be read; their panels say why", async () => {
+    globalThis.fetch = jest.fn(async () =>
+      json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
+    ) as unknown as typeof fetch;
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    await act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+    for (const name of ["E-mail", "Ways to reach you", "Notifications", "Invitations"]) {
+      expect([name, row(name).props.accessibilityValue?.text]).toEqual([name, undefined]);
+    }
   });
 
   it("says Off for a consent not given (#287)", async () => {

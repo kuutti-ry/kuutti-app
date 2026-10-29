@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, Platform, Share, View } from "react-native";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -151,69 +150,63 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <View className="gap-6">
-        {/* The screen carries the title (#287); the card says what the export is. */}
-        <CardHeader>
-          <CardDescription>{t("account.export.explain")}</CardDescription>
-        </CardHeader>
-        <CardContent className="gap-3">
-          {words !== null && (
-            <Text accessibilityLiveRegion={notice === "export_saved" ? "polite" : "assertive"}>
-              {words}
-            </Text>
-          )}
-          {(busy.kind === "exporting" || busy.kind === "deleting") && (
-            <Text accessibilityLiveRegion="polite">
-              {busy.kind === "exporting"
-                ? t("account.export.working")
-                : t("account.delete.working")}
-            </Text>
-          )}
-          <Button
-            variant="outline"
-            accessibilityLabel={t("account.export.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => void exportData()}
-          >
-            <Text>{t("account.export.button")}</Text>
-          </Button>
-          {/* "Löysin hänet" (#83): telling Kuutti one found somebody, which changes nothing else. */}
-          <Button
-            variant="outline"
-            accessibilityLabel={t("account.foundThem.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => {
-              tap();
-              router.push("/settings/found-them");
-            }}
-          >
-            <Text>{t("account.foundThem.button")}</Text>
-          </Button>
-          {/* Taking a break (#170): the screen says what happens before anything does. */}
-          <Button
-            variant="outline"
-            accessibilityLabel={t("account.break.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => {
-              tap();
-              router.push("/account/break");
-            }}
-          >
-            <Text>{t("account.break.button")}</Text>
-          </Button>
-          <Button
-            variant="destructive"
-            accessibilityLabel={t("account.delete.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => {
-              tap();
-              setConfirming(true);
-            }}
-          >
-            <Text>{t("account.delete.button")}</Text>
-          </Button>
-        </CardContent>
+    <View className="gap-3">
+      {/* The row carries the title (#287, #511); this says what the export is. */}
+      <Text>{t("account.export.explain")}</Text>
+      <View className="gap-3">
+        {words !== null && (
+          <Text accessibilityLiveRegion={notice === "export_saved" ? "polite" : "assertive"}>
+            {words}
+          </Text>
+        )}
+        {(busy.kind === "exporting" || busy.kind === "deleting") && (
+          <Text accessibilityLiveRegion="polite">
+            {busy.kind === "exporting" ? t("account.export.working") : t("account.delete.working")}
+          </Text>
+        )}
+        <Button
+          variant="outline"
+          accessibilityLabel={t("account.export.button")}
+          disabled={busy.kind !== "idle"}
+          onPress={() => void exportData()}
+        >
+          <Text>{t("account.export.button")}</Text>
+        </Button>
+        {/* "Löysin hänet" (#83): telling Kuutti one found somebody, which changes nothing else. */}
+        <Button
+          variant="outline"
+          accessibilityLabel={t("account.foundThem.button")}
+          disabled={busy.kind !== "idle"}
+          onPress={() => {
+            tap();
+            router.push("/settings/found-them");
+          }}
+        >
+          <Text>{t("account.foundThem.button")}</Text>
+        </Button>
+        {/* Taking a break (#170): the screen says what happens before anything does. */}
+        <Button
+          variant="outline"
+          accessibilityLabel={t("account.break.button")}
+          disabled={busy.kind !== "idle"}
+          onPress={() => {
+            tap();
+            router.push("/account/break");
+          }}
+        >
+          <Text>{t("account.break.button")}</Text>
+        </Button>
+        <Button
+          variant="destructive"
+          accessibilityLabel={t("account.delete.button")}
+          disabled={busy.kind !== "idle"}
+          onPress={() => {
+            tap();
+            setConfirming(true);
+          }}
+        >
+          <Text>{t("account.delete.button")}</Text>
+        </Button>
       </View>
 
       <Dialog open={confirming} onOpenChange={(open) => !open && setConfirming(false)}>
@@ -234,6 +227,6 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </View>
   );
 }

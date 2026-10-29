@@ -225,7 +225,7 @@ describe("EmailCard, reading the address", () => {
     await show(<EmailCard />);
     expect(screen.getByText("A way to stay in touch")).toBeTruthy();
     expect(screen.getByText(/never a login/)).toBeTruthy();
-    expect(disabled("Save the address")).toBe(true);
+    expect(disabled("Send a confirmation code")).toBe(true);
     for (const text of [TEXT.unconfirmed, TEXT.confirmed, TEXT.send, TEXT.codeLabel]) {
       expect(screen.queryByText(text)).toBeNull();
     }
@@ -238,7 +238,7 @@ describe("EmailCard, reading the address", () => {
     await show(<EmailCard />);
     expect(screen.getByText(TEXT.confirmed)).toBeTruthy();
     expect(screen.getByLabelText("E-mail address").props.value).toBe("aino@example.fi");
-    expect(disabled("Save the address")).toBe(true);
+    expect(disabled("Send a confirmation code")).toBe(true);
     for (const name of [TEXT.confirm, TEXT.send, TEXT.sendAgain]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
@@ -444,7 +444,7 @@ describe("EmailCard, the code", () => {
       heard();
     }
     await type(screen.getByLabelText("E-mail address"), "aino@example.org");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     heard();
   };
 
@@ -553,7 +553,7 @@ describe("EmailCard, the code", () => {
       await show(<EmailCard />);
       await press(button(TEXT.send));
       expect(screen.getByLabelText("E-mail address").props.value).toBe("aino@example.org");
-      expect(disabled("Save the address")).toBe(true);
+      expect(disabled("Send a confirmation code")).toBe(true);
       expect(spoken()).toBe(TEXT.codeSent());
     });
 
@@ -563,7 +563,7 @@ describe("EmailCard, the code", () => {
       await type(screen.getByLabelText("E-mail address"), "aino@example.net");
       await press(button(TEXT.send));
       expect(screen.getByLabelText("E-mail address").props.value).toBe("aino@example.net");
-      expect(disabled("Save the address")).toBe(false);
+      expect(disabled("Send a confirmation code")).toBe(false);
       expect(screen.getByText(TEXT.unconfirmed)).toBeTruthy();
     });
   });
@@ -605,7 +605,7 @@ describe("EmailCard, saving and removing", () => {
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "  aino@example.fi ");
     noProblems();
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(spoken()).toBe(`Saved. ${TEXT.codeSent()}`);
     expect(screen.getByText(TEXT.unconfirmed)).toBeTruthy();
     expect(screen.getByText(TEXT.codeSent())).toBeTruthy();
@@ -619,7 +619,7 @@ describe("EmailCard, saving and removing", () => {
     const { server, calls } = fakeApi({ email: "aino@example.fi", confirmed: true });
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "aino@example.org");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(screen.getByText(TEXT.unconfirmed)).toBeTruthy();
     expect(screen.getByText(TEXT.codeSent())).toBeTruthy();
     expect(server.email).toBe("aino@example.org");
@@ -634,7 +634,7 @@ describe("EmailCard, saving and removing", () => {
     );
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "Aino@example.fi");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(spoken()).toBe("Saved.");
     expect(calls).toEqual(["GET /account/email", "PUT /account/email"]);
   });
@@ -647,7 +647,7 @@ describe("EmailCard, saving and removing", () => {
     );
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "Aino@example.fi");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(spoken()).toBe("Saved.");
     expect(screen.getByText(TEXT.confirmed)).toBeTruthy();
     expect(screen.queryByLabelText(TEXT.codeLabel)).toBeNull();
@@ -662,7 +662,7 @@ describe("EmailCard, saving and removing", () => {
     refuse("POST /account/email/code", () => refusal("mail_unavailable", 503));
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "aino@example.fi");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(spoken()).toBe("Saved. The code could not be sent just now. Try again later.");
     expect(screen.getByText(TEXT.unconfirmed)).toBeTruthy();
     expect(button(TEXT.send)).toBeTruthy();
@@ -675,7 +675,7 @@ describe("EmailCard, saving and removing", () => {
     const { server, calls } = fakeApi();
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "aino");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(screen.getByText("That does not look like an e-mail address.")).toBeTruthy();
     expect(screen.queryByText(TEXT.unconfirmed)).toBeNull();
     expect(server.email).toBeNull();
@@ -687,7 +687,7 @@ describe("EmailCard, saving and removing", () => {
     refuse("PUT /account/email", () => refusal("internal_error", 500));
     await show(<EmailCard />);
     await type(screen.getByLabelText("E-mail address"), "aino@example.fi");
-    await press(button("Save the address"));
+    await press(button("Send a confirmation code"));
     expect(screen.getByText("The address could not be saved. Try again.")).toBeTruthy();
     expect(screen.queryByText("That does not look like an e-mail address.")).toBeNull();
     // Typing again clears the line.
