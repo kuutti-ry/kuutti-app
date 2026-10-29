@@ -6902,6 +6902,13 @@ account.export.failed:
   sv: Nedladdningen misslyckades. Försök igen.
   machine: { fi: true, sv: true }
 
+account.export.saved:
+  en: Done. The file is where you chose.
+  description: "Account card, once the export's file is handed over (#465): saved in the folder the person picked on Android, sent where they chose from the share sheet on iOS, downloaded on the web preview. Not shown when they back out of the picker or the sheet. Read out by the screen reader after the system's sheet closes."
+  fi: Valmis. Tiedosto on nyt siellä, minne sen valitsit.
+  sv: Klart. Filen finns nu där du valde.
+  machine: { fi: true, sv: true }
+
 account.export.limited:
   en: That is enough copies for today. You can download your data again after midnight.
   description: Account card, the export refused because the day's copies (matching_config exports_per_day, #237) are used up; the day rolls at midnight in Finland. Never a number, the cap is a tunable.

@@ -86,6 +86,7 @@ export const sv: Readonly<Record<string, string>> = {
   "account.export.sanction.reason.other": "Annat skäl",
   "account.export.sanction.reason.scraping": "Kopiering eller insamling av andras profiler",
   "account.export.sanction.reason.under_age": "Under 18 år",
+  "account.export.saved": "Klart. Filen finns nu där du valde.",
   "account.export.title": "Dina Kuutti-uppgifter",
   "account.export.working": "Förbereder dina uppgifter…",
   "account.foundThem.button": "Jag hittade någon",

@@ -86,6 +86,7 @@ export const en: Readonly<Record<string, string>> = {
   "account.export.sanction.reason.other": "Another reason",
   "account.export.sanction.reason.scraping": "Copying or collecting other people's profiles",
   "account.export.sanction.reason.under_age": "Under 18",
+  "account.export.saved": "Done. The file is where you chose.",
   "account.export.title": "Your Kuutti data",
   "account.export.working": "Preparing your data…",
   "account.foundThem.button": "I found someone",

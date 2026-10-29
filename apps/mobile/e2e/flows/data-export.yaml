@@ -3,8 +3,10 @@
 # that is the share sheet, on Android the system's folder picker; both are
 # the system's, in the phone's language, so the flow asserts only that the
 # app's own failure line never shows, and closes what opened. The file's
-# contents are held by erasure.test.ts. Sanna; read only: the day's three
-# copies are not spent by one run, and the cap is counted per account.
+# contents are held by erasure.test.ts. Sanna; read only: on Android the
+# folder is asked for before the API (#465), so a run spends none of the
+# day's three copies; iOS's sheet needs the file, so a run there spends one,
+# and the cap is counted per account.
 appId: fi.kuutti.app
 name: Download my data hands the person's file over
 ---
@@ -28,7 +30,8 @@ name: Download my data hands the person's file over
     notVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 20000
 # iOS's sheet is swiped down by its top; Android's folder picker is closed
-# by the back key, which the app takes as a cancelled download.
+# by the back key, which the app takes as a cancelled download, before
+# anything is fetched.
 - runFlow:
     when:
       platform: iOS
@@ -41,9 +44,11 @@ name: Download my data hands the person's file over
       platform: Android
     commands:
       - back
-# The account screen comes back, the button still on it.
+# The account screen comes back, the button still on it, and nothing says
+# a file was saved.
 - extendedWaitUntil:
     visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
     timeout: 15000
 - assertNotVisible: "The download did not work\\. Try again\\.|Lataus ei onnistunut\\. Yritä uudelleen\\.|Nedladdningen misslyckades\\. Försök igen\\."
 - assertNotVisible: "That is enough copies for today\\..*|Tältä päivältä kopioita on jo tarpeeksi\\..*|Det räcker med kopior för i dag\\..*"
+- assertNotVisible: "Done\\. The file is where you chose\\.|Valmis\\. Tiedosto on nyt siellä, minne sen valitsit\\.|Klart\\. Filen finns nu där du valde\\."

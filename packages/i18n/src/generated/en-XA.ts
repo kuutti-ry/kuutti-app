@@ -86,6 +86,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "account.export.sanction.reason.other": "［ÁÁñóóthéér rééáášóóñ］",
   "account.export.sanction.reason.scraping": "［Çóópýýííñg óór çóóllééçtííñg óóthéér pééóópléé'š próófíílééš］",
   "account.export.sanction.reason.under_age": "［ÚÚñdéér 18］",
+  "account.export.saved": "［Dóóñéé. Théé fííléé ííš whééréé ýýóóúú çhóóšéé.］",
   "account.export.title": "［ÝÝóóúúr Kúúúúttíí dáátáá］",
   "account.export.working": "［Préépáárííñg ýýóóúúr dáátáá…］",
   "account.foundThem.button": "［ÍÍ fóóúúñd šóómééóóñéé］",
