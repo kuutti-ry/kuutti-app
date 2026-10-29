@@ -602,17 +602,46 @@ describe("the phone's face or fingerprint on the lock", () => {
     expect(store.has("kuutti.lock")).toBe(false);
   });
 
-  it("leaves biometrics off when the confirming prompt does not succeed", async () => {
+  it.each([
+    ["user_cancel", "failed"],
+    ["authentication_failed", "failed"],
+    ["lockout", "lockout"],
+  ])(
+    "leaves biometrics off when the confirming prompt ends with %s, answering %s",
+    async (error, expected) => {
+      enrol();
+      auth.authenticateAsync.mockResolvedValue({ success: false, error });
+      await start();
+      let answer: string | undefined;
+      await act(async () => {
+        answer = await lock.setBiometrics(true);
+      });
+      expect(answer).toBe(expected);
+      expect(lock.settings).toBeNull();
+      expect(store.has("kuutti.lock")).toBe(false);
+    },
+  );
+
+  it("A pause by the phone after too many tries is said as a pause, not as a failure", async () => {
     enrol();
-    auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
-    await start();
-    let answer: string | undefined;
-    await act(async () => {
-      answer = await lock.setBiometrics(true);
-    });
-    expect(answer).toBe("failed");
-    expect(lock.settings).toBeNull();
-    expect(store.has("kuutti.lock")).toBe(false);
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "lockout" });
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(
+      screen.getByText(
+        "The phone has paused face unlock after too many tries. Lock the phone and open it with its own code, then try again, or use another way below.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/did not unlock/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock with your face" })).toBeEnabled();
+    expect(screen.getByLabelText(FIELD)).toBeTruthy();
+    expect(screen.getByRole("button", { name: BANK })).toBeEnabled();
+    // The pause over, the button's next ask opens it.
+    auth.authenticateAsync.mockResolvedValue({ success: true });
+    await fireEvent.press(screen.getByRole("button", { name: "Unlock with your face" }));
+    await act(async () => undefined);
+    expect(screen.queryByText(LOCKED)).toBeNull();
   });
 });
 
