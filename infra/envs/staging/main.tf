@@ -123,6 +123,8 @@ module "observability" {
   db_identifier  = module.data.identifier
   log_group_name = module.compute.log_group_name
   alert_email    = var.alert_email
+  # The test bed is free (#471): only a loop, in a build or by hand, gets here.
+  bank_identifications_per_day = 100
 }
 
 # Non-secret configuration the API reads at boot from /kuutti/staging/ (TD-19).

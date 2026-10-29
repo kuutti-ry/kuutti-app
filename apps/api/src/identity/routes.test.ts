@@ -747,6 +747,87 @@ describe("the callback's refusals and failures", () => {
   });
 });
 
+describe("the count of bank identifications (#471)", () => {
+  /** The lines the alarm's metric filter counts, one for each identification Telia bills. */
+  const identifications = (logs: () => Array<Record<string, unknown>>) =>
+    logs().filter((line) => line.msg === "identified at the bank");
+
+  test("every identification the bank passes on leaves one line with its platform and nothing of the person, whatever the login becomes", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, ADULT_HETU);
+    expect(
+      (await (await exchange(app, await codeFrom(await callback(app, await start(app))))).json())
+        .outcome,
+    ).toBe("created");
+    const android = await app.request(
+      `/auth/start?platform=android&locale=sv&code_challenge=${CHALLENGE}`,
+    );
+    const androidState = new URL(android.headers.get("location") ?? "").searchParams.get("state");
+    const resumed = await exchange(app, await codeFrom(await callback(app, androidState ?? "")));
+    expect((await resumed.json()).outcome).toBe("resumed");
+    // A refusal after the bank is billed too: the bank told us who it was.
+    await ctx.client.query("UPDATE identity SET standing = 'banned'");
+    expect(refusal(await callback(app, await start(app))).error).toBe("auth_banned");
+
+    const lines = identifications(logs);
+    expect(lines.map((line) => line.platform)).toEqual(["ios", "android", "ios"]);
+    const standard = ["level", "time", "pid", "hostname", "requestId", "msg"];
+    for (const line of lines) {
+      expect(line.level).toBe(30);
+      expect(Object.keys(line).filter((key) => !standard.includes(key))).toEqual(["platform"]);
+    }
+    // Each in its own request, beside that request's own lines.
+    expect(new Set(lines.map((line) => line.requestId)).size).toBe(3);
+  });
+
+  test("a minor's identification is counted before the refusal", async ({ ctx }) => {
+    const { app, logs } = await appWith(ctx, MINOR_HETU);
+    expect(refusal(await callback(app, await start(app))).error).toBe("auth_under_18");
+    expect(identifications(logs).map((line) => line.platform)).toEqual(["ios"]);
+  });
+
+  test("a cancel at the bank, an error answer, a failed token call, a stale or invalid answer and a replayed return leave no line", async ({
+    ctx,
+  }) => {
+    const { app, logs } = await appWith(ctx, ADULT_HETU);
+    const cancelled = await app.request(
+      `/auth/callback?error=access_denied&state=${encodeURIComponent(await start(app))}`,
+    );
+    expect(refusal(cancelled).error).toBe("auth_cancelled");
+    const failed = await app.request(
+      `/auth/callback?error=server_error&state=${encodeURIComponent(await start(app))}`,
+    );
+    expect(refusal(failed).error).toBe("auth_provider_error");
+    for (const code of ["broken", "refused", "garbage"]) {
+      expect(refusal(await callback(app, await start(app), code)).error).toBe(
+        "auth_provider_error",
+      );
+    }
+    expect(identifications(logs)).toEqual([]);
+
+    // One good return, then the same return again: one line, for the one claim.
+    const state = await start(app);
+    await codeFrom(await callback(app, state));
+    expect(refusal(await callback(app, state)).error).toBe("auth_state_mismatch");
+    expect(identifications(logs)).toHaveLength(1);
+
+    // An authentication older than the attempt is no login of this person (ADR-016 §2).
+    const anHourAgo = new Date(Date.now() - 60 * 60_000);
+    const stale = await appWith(ctx, ADULT_HETU, { authenticatedAt: anHourAgo });
+    expect(refusal(await callback(stale.app, await start(stale.app))).error).toBe(
+      "auth_provider_error",
+    );
+    expect(identifications(stale.logs)).toEqual([]);
+
+    const invalid = await appWith(ctx, "010190-123B");
+    expect(refusal(await callback(invalid.app, await start(invalid.app))).error).toBe(
+      "auth_provider_error",
+    );
+    expect(identifications(invalid.logs)).toEqual([]);
+  });
+});
+
 describe("the exchange", () => {
   async function loggedIn(ctx: { client: Parameters<typeof createApp>[0]["db"] }) {
     const { app } = await appWith(ctx, ADULT_HETU);
