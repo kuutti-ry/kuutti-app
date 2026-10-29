@@ -937,6 +937,45 @@ describe("what the socket withholds", () => {
     ]);
   });
 
+  it("A shadow-banned reader's mark reaches no counterpart until the lift", async () => {
+    const { a, b, id } = await pair();
+    const ban = await applySanction(ctx.pool, {
+      accountId: a.accountId,
+      kind: "shadow_ban",
+      reason: "commercial_use",
+      note: "Sends the same link to everybody.",
+      actor: null,
+      at: new Date(Date.now() - 1000),
+    });
+    const pb = await signedIn(b.accessToken, [{ id, seq: 0 }]);
+    expect((await send(b.headers, id, "Hei")).status).toBe(201);
+    expect((await markRead(a.headers, id, 1)).status).toBe(204);
+    // A later frame for B, after which A's mark would have come.
+    const other = await signedInAccount(ctx.pool);
+    const later = await conversationBetween(ctx.pool, other.accountId, b.accountId);
+    expect((await send(other.headers, later, "Moi")).status).toBe(201);
+    await pb.next(isMessage(later, 1));
+    // The resume's mark alone.
+    expect(pb.frames.filter((f) => f.type === "read" && f.conversationId === id)).toEqual([
+      { type: "read", conversationId: id, upTo: 0 },
+    ]);
+    // B's other phone resumes with the mark from before the ban.
+    const again = await signedIn(b.accessToken, [{ id, seq: 1 }]);
+    expect(again.frames.filter((f) => f.type === "read" && f.conversationId === id)).toEqual([
+      { type: "read", conversationId: id, upTo: 0 },
+    ]);
+    // Lifted, A's next read reaches B as anybody's does.
+    await ctx.pool.query("UPDATE sanction SET lifted_at = now() WHERE id = $1", [ban.id]);
+    expect((await send(b.headers, id, "Oletko siellä?")).status).toBe(201);
+    expect((await markRead(a.headers, id, 2)).status).toBe(204);
+    expect(await pb.next((f) => f.type === "read" && f.conversationId === id)).toEqual({
+      type: "read",
+      conversationId: id,
+      upTo: 2,
+    });
+    for (const p of [pb, again]) p.close();
+  });
+
   it("A shadow ban put on while the socket is open hides the person at the next ping", async () => {
     const { a, b, id } = await pair();
     const pb = await signedIn(b.accessToken, [{ id, seq: 0 }]);

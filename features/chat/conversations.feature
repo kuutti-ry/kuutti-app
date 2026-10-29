@@ -101,6 +101,18 @@ Feature: Conversations and their text messages
     When the shadow ban is lifted
     Then "B" sees both
 
+  Scenario: A shadow-banned reader's mark is withheld from the counterpart until the ban is lifted
+    Given "A" read "B"'s first line before a shadow ban, and "B" wrote again after it
+    When "A" reads it, writes a line of its own and marks that one too, while shadow-banned
+    Then "B" sees "A"'s mark where it stood before the ban
+    When the shadow ban is lifted
+    Then "B" sees all three lines read
+
+  Scenario: What a shadow ban withheld stays withheld in a conversation that ended before the lift
+    Given "A" read what "B" and "C" wrote, then wrote to each under a shadow ban and read that too
+    When "B" ends theirs, "A" is banned, which ends "C"'s, and the shadow ban is lifted afterwards
+    Then "B" and "C" each read their own line alone, "A"'s mark where it stood before the ban, and nothing unread
+
   Scenario: A ban closes the person's conversations, and a suspension closes none
     Given "A" is in conversations with "B" and "C"
     When "A" is suspended

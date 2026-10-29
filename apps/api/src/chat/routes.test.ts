@@ -607,6 +607,154 @@ describe("who may reach a conversation", () => {
     expect((await listOf(ctx.app, b)).open[0]?.unread).toBe(2);
   });
 
+  test("A shadow-banned reader's mark is withheld from the counterpart until the ban is lifted", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    let clock = new Date();
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => clock });
+    expect((await send(app, b, id, "Ensimmäinen")).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 1)).status).toBe(204);
+    clock = new Date(clock.getTime() + 60_000);
+    const ban = await applySanction(ctx.client, {
+      accountId: a.accountId,
+      kind: "shadow_ban",
+      reason: "commercial_use",
+      note: "Sends the same link to everybody.",
+      actor: null,
+      at: clock,
+    });
+    clock = new Date(clock.getTime() + 60_000);
+    expect((await send(app, b, id, "Toinen")).status).toBe(201);
+    // A reads B's second line, writes one of its own, withheld, and its phone
+    // marks that one too: a mark past anything B can read (#470).
+    expect((await markRead(ctx.app, a, id, 2)).status).toBe(204);
+    expect((await send(app, a, id, "Kolmas")).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 3)).status).toBe(204);
+    // Nothing tells A: its own mark moved as anybody's does.
+    expect(
+      await count(
+        ctx,
+        "SELECT read_up_to AS n FROM conversation_participant WHERE conversation_id = $1 AND account_id = $2",
+        [id, a.accountId],
+      ),
+    ).toBe(3);
+    // B sees the mark where it stood before the ban, and A's line stays off B's page.
+    expect((await detailOf(ctx.app, b, id)).counterpartReadUpTo).toBe(1);
+    expect(await pageOf(ctx.app, b, id)).toEqual([2, 1]);
+    clock = new Date(clock.getTime() + 60_000);
+    await ctx.client.query("UPDATE sanction SET lifted_at = $2 WHERE id = $1", [ban.id, clock]);
+    expect((await detailOf(ctx.app, b, id)).counterpartReadUpTo).toBe(3);
+    expect(await pageOf(ctx.app, b, id)).toEqual([3, 2, 1]);
+  });
+
+  test("What a shadow ban withheld stays withheld in a conversation that ended before the lift", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const c = await person(ctx, "Cia");
+    // A is side a with B and side b with C.
+    const withB = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    const withC = await conversationBetween(ctx.client, c.accountId, a.accountId);
+    let clock = new Date();
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => clock });
+    for (const [who, id] of [
+      [b, withB],
+      [c, withC],
+    ] as const) {
+      expect((await send(app, who, id, "Hei")).status).toBe(201);
+      expect((await markRead(ctx.app, a, id, 1)).status).toBe(204);
+    }
+    clock = new Date(clock.getTime() + 60_000);
+    const shadowBan = await applySanction(ctx.client, {
+      accountId: a.accountId,
+      kind: "shadow_ban",
+      reason: "other",
+      note: "An automatic rule's ban.",
+      actor: null,
+      at: clock,
+    });
+    clock = new Date(clock.getTime() + 60_000);
+    for (const id of [withB, withC]) {
+      expect((await send(app, a, id, `Moi ${MARK}`)).status).toBe(201);
+      expect((await markRead(ctx.app, a, id, 2)).status).toBe(204);
+    }
+    // B ends the conversation with a silent A; then an admin bans A, which
+    // ends C's, while the automatic shadow ban still waits for its review.
+    clock = new Date(clock.getTime() + 60_000);
+    expect(
+      (await app.request(`/conversations/${withB}/unmatch`, { method: "POST", headers: b.headers }))
+        .status,
+    ).toBe(204);
+    clock = new Date(clock.getTime() + 60_000);
+    await applySanction(ctx.client, {
+      accountId: a.accountId,
+      kind: "ban",
+      reason: "commercial_use",
+      note: "Sends the same link to everybody.",
+      actor: null,
+      at: clock,
+    });
+    // The review reverses the shadow ban afterwards.
+    clock = new Date(clock.getTime() + 60_000);
+    await ctx.client.query("UPDATE sanction SET lifted_at = $2 WHERE id = $1", [
+      shadowBan.id,
+      clock,
+    ]);
+    for (const [who, id] of [
+      [b, withB],
+      [c, withC],
+    ] as const) {
+      expect(await pageOf(ctx.app, who, id)).toEqual([1]);
+      expect((await detailOf(ctx.app, who, id)).counterpartReadUpTo).toBe(1);
+      const row = (await listOf(ctx.app, who)).archived.find((r) => r.id === id);
+      expect(row).toMatchObject({ state: "closed", unread: 0, lastMessage: { preview: "Hei" } });
+      expect(JSON.stringify(await listOf(ctx.app, who))).not.toContain(MARK);
+    }
+    // The lines stay, for the reports' copies and A's export.
+    expect(await messagesIn(ctx, withB)).toBe(2);
+  });
+
+  test("a shadow ban lifted while the conversation was open shows what it held after the conversation ends", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    let clock = new Date();
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => clock });
+    expect((await send(app, b, id, "Hei")).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 1)).status).toBe(204);
+    clock = new Date(clock.getTime() + 60_000);
+    const ban = await applySanction(ctx.client, {
+      accountId: a.accountId,
+      kind: "shadow_ban",
+      reason: "other",
+      note: "An automatic rule's ban.",
+      actor: null,
+      at: clock,
+    });
+    clock = new Date(clock.getTime() + 60_000);
+    expect((await send(app, a, id, "Moi")).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 2)).status).toBe(204);
+    clock = new Date(clock.getTime() + 60_000);
+    await ctx.client.query("UPDATE sanction SET lifted_at = $2 WHERE id = $1", [ban.id, clock]);
+    // B ends it after the lift: what the lift showed stays shown.
+    clock = new Date(clock.getTime() + 60_000);
+    expect(
+      (await app.request(`/conversations/${id}/unmatch`, { method: "POST", headers: b.headers }))
+        .status,
+    ).toBe(204);
+    expect(await pageOf(ctx.app, b, id)).toEqual([2, 1]);
+    expect((await detailOf(ctx.app, b, id)).counterpartReadUpTo).toBe(2);
+  });
+
   test("A ban closes the person's conversations, and a suspension closes none", async ({ ctx }) => {
     const a = await person(ctx, "Aino");
     const b = await person(ctx, "Bea");

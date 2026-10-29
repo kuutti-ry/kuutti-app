@@ -73,7 +73,8 @@ import { visibleState } from "./standing.ts";
 // The conversations (#348, ADR-031 §5): the person's link goes and their open
 // conversations close; the messages stay for the counterpart, who reads
 // "Deleted user" (TD-7's kept side), except those the counterpart never
-// received (sent under a shadow ban still open), which go; a conversation
+// received (sent under a shadow ban that withholds them, ADR-031 §4), which
+// go, with their read mark put back to what the counterpart saw; a conversation
 // whose other person was erased before goes whole. The export carries the
 // person's own messages and the counterpart's as a time and a length.
 // The stored contacts go (#103, ADR-031 §11); the shares, ended by the
@@ -124,7 +125,7 @@ export type ErasureSummary = {
   researchSubjects: number;
   /** The conversations whose link to the person was cut (#348); their messages stay for the counterpart. */
   conversations: number;
-  /** The person's messages the counterpart never received, under a shadow ban still open (#348). */
+  /** The person's messages the counterpart never received, under a shadow ban that withholds them (#348, #470). */
   withheldMessages: number;
   /** Conversations whose other person was erased before: nobody is left to keep them for (#348). */
   emptiedConversations: number;
@@ -192,7 +193,7 @@ export async function eraseAccount(deps: ErasureDeps, accountId: string): Promis
     // tombstone nulls the address and its confirmation. Not in the summary.
     await repo.deleteEmailRows(tx, accountId);
     const feedback = await deleteFeedbackOfAccount(tx, accountId);
-    // Before the sanctions go: what an open shadow ban withheld is known by it (ADR-031 §5).
+    // Before the sanctions go: what a shadow ban withheld is known by it (ADR-031 §5).
     const chat = await eraseConversationsOf(
       { db: tx, logger: deps.logger, now: () => at },
       accountId,

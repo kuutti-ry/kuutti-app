@@ -384,7 +384,7 @@ export async function copyConversation(
 export type ConversationErasure = {
   /** The participant rows whose link was cut. */
   conversations: number;
-  /** Messages the counterpart never received (an open shadow ban), deleted. */
+  /** Messages the counterpart never received (a shadow ban that withholds them), deleted. */
   withheld: number;
   /** Conversations nobody is linked to any more, the other person erased before, deleted. */
   emptied: number;
@@ -394,8 +394,9 @@ export type ConversationErasure = {
 
 /**
  * The chat's part of an erasure (ADR-007 §4, ADR-031 §5), inside its
- * transaction: what the counterpart never received goes while the shadow ban
- * that withheld it is still on record; the person's open and archived
+ * transaction: what the counterpart never received goes, and the read mark
+ * goes back to what they saw, while the shadow ban that withheld them is
+ * still on record (#470); the person's open and archived
  * conversations close, which ends what either person shared there (#103);
  * the person's stored contacts go; the person's link is cut. The messages
  * stay for the counterpart, under "Deleted user" (TD-7), and the shares as
@@ -407,6 +408,7 @@ export async function eraseConversationsOf(
   accountId: string,
 ): Promise<ConversationErasure> {
   const withheld = await repo.deleteWithheldMessagesOf(deps.db, accountId);
+  await repo.holdWithheldMarksOf(deps.db, accountId);
   // A photo a report's copy holds outlives the erasure (#351), but not in the
   // conversation: it reads "Photo removed" there, as any of the person's photos.
   await repo.detachPhotosOf(deps.db, accountId);

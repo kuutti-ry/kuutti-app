@@ -42,6 +42,18 @@ const send = (
     body: JSON.stringify({ clientId: randomUUID(), body }),
   });
 
+const markRead = (
+  app: ReturnType<typeof createApp>,
+  who: { headers: Record<string, string> },
+  id: string,
+  upTo: number,
+) =>
+  app.request(`/conversations/${id}/read`, {
+    method: "POST",
+    headers: { ...who.headers, "content-type": "application/json" },
+    body: JSON.stringify({ upTo }),
+  });
+
 const keep = (
   app: ReturnType<typeof createApp>,
   who: { headers: Record<string, string> },
@@ -72,6 +84,7 @@ describe("the chat in an erasure and an export", () => {
     const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => clock });
     expect((await send(app, a, id, "Hei Bea")).status).toBe(201);
     expect((await send(app, b, id, "Moi Aino")).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 2)).status).toBe(204);
     clock = new Date(clock.getTime() + 60_000);
     await applySanction(ctx.client, {
       accountId: a.accountId,
@@ -83,8 +96,16 @@ describe("the chat in an erasure and an export", () => {
     });
     clock = new Date(clock.getTime() + 60_000);
     expect((await send(app, a, id, `Withheld ${MARK}`)).status).toBe(201);
+    // A's phone marks its own withheld line: a mark B never saw (#470).
+    expect((await markRead(ctx.app, a, id, 3)).status).toBe(204);
 
     await eraseAccount({ db: ctx.client, logger, now: () => clock }, a.accountId);
+
+    // The mark is what B saw, and stays so once the ban has gone with the account.
+    const detail = ConversationDetail.parse(
+      await (await ctx.app.request(`/conversations/${id}`, { headers: b.headers })).json(),
+    );
+    expect(detail.counterpartReadUpTo).toBe(2);
 
     const page = MessagePage.parse(
       await (await ctx.app.request(`/conversations/${id}/messages`, { headers: b.headers })).json(),
@@ -125,6 +146,56 @@ describe("the chat in an erasure and an export", () => {
       [id],
     );
     expect(conversation.rows[0]).toEqual({ closed_how: "erasure", closed_by: "a" });
+  });
+
+  test("an erasure keeps from the counterpart what a shadow ban lifted after the end withheld", async ({
+    ctx,
+  }) => {
+    const a = await person(ctx, "Aino");
+    const b = await person(ctx, "Bea");
+    const id = await conversationBetween(ctx.client, a.accountId, b.accountId);
+    let clock = new Date();
+    const { logger } = await captureLogger();
+    const app = createApp({ config: testConfig(), logger, db: ctx.client, now: () => clock });
+    expect((await send(app, b, id, "Moi Aino")).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 1)).status).toBe(204);
+    clock = new Date(clock.getTime() + 60_000);
+    const ban = await applySanction(ctx.client, {
+      accountId: a.accountId,
+      kind: "shadow_ban",
+      reason: "other",
+      note: "An automatic rule's ban.",
+      actor: null,
+      at: clock,
+    });
+    clock = new Date(clock.getTime() + 60_000);
+    expect((await send(app, a, id, `Withheld ${MARK}`)).status).toBe(201);
+    expect((await markRead(ctx.app, a, id, 2)).status).toBe(204);
+    // B ends it, the ban is lifted afterwards, and then A deletes the account,
+    // which takes the lifted ban with it (ADR-024 §8).
+    clock = new Date(clock.getTime() + 60_000);
+    expect(
+      (await app.request(`/conversations/${id}/unmatch`, { method: "POST", headers: b.headers }))
+        .status,
+    ).toBe(204);
+    clock = new Date(clock.getTime() + 60_000);
+    await ctx.client.query("UPDATE sanction SET lifted_at = $2 WHERE id = $1", [ban.id, clock]);
+
+    await eraseAccount({ db: ctx.client, logger, now: () => clock }, a.accountId);
+
+    const page = MessagePage.parse(
+      await (await ctx.app.request(`/conversations/${id}/messages`, { headers: b.headers })).json(),
+    );
+    expect(page.messages.map((m) => m.seq)).toEqual([1]);
+    const detail = ConversationDetail.parse(
+      await (await ctx.app.request(`/conversations/${id}`, { headers: b.headers })).json(),
+    );
+    expect(detail.counterpartReadUpTo).toBe(1);
+    const bodies = await ctx.client.query<{ body: string }>(
+      "SELECT body FROM message WHERE conversation_id = $1 ORDER BY seq",
+      [id],
+    );
+    expect(bodies.rows.map((r) => r.body)).toEqual(["Moi Aino"]);
   });
 
   test("The export carries the person's own messages and the counterpart's as a time and a length", async ({

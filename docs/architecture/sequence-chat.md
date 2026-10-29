@@ -74,7 +74,7 @@ sequenceDiagram
 12. If this is the account's first visible socket, each counterpart of its open and archived conversations is told `presence` online. A shadow-banned account is never online to anybody (ADR-024 §6), and nothing is told across a close or a block.
 13. The phone answers `ready` with `resume`, naming each conversation it holds and the newest sequence it has of each.
 14. The hub reads the person's conversations through their own participant rows (rule 6) and, for each one named, at most one page of the messages after its sequence. A phone further behind reads the rest over HTTP (`?after=`) when it opens the conversation: a `shortcut:` in `chat/live.ts`.
-15. The phone gets the presence of every conversation it did not name first, since it resumes before its list has loaded; then, for each one named, the missing messages in order, the counterpart's read mark, presence and the conversation's state, or `gone` for one it may not see.
+15. The phone gets the presence of every conversation it did not name first, since it resumes before its list has loaded; then, for each one named, the missing messages in order, the counterpart's read mark as the person may see it (held where a shadow ban withholds it, #470), presence and the conversation's state, or `gone` for one it may not see.
 16. Every `WS_PING_INTERVAL_MS` the socket asks the session by its id: an ended session or an expired access token closes it as in step 7. A shadow ban put on or lifted since hides or shows the account, and the counterparts are told.
 17. The API sends `ping`.
 18. The phone answers `pong`. None within `WS_PONG_TIMEOUT_MS` closes the socket with 1001, `pong_timeout`.
@@ -144,7 +144,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   accTitle: Chat, part 3: read marks, ends, and a lost connection
-  accDescr: A read mark is sent over HTTP and moves only up. On commit a trigger notifies, and the writer's side gets a read frame. An archive, a return from it or a close sends each side the conversation's state, and an ended session closes its sockets at once. When a phone's connection drops, the other person sees it go offline, and the phone reconnects with a growing wait and resumes from Postgres. A lost listener or a deploy closes every socket with restarting, and the phones resume the same way.
+  accDescr: A read mark is sent over HTTP and moves only up. On commit a trigger notifies, and the writer's side gets a read frame, unless a shadow ban of the reader withholds the mark. An archive, a return from it or a close sends each side the conversation's state, and an ended session closes its sockets at once. When a phone's connection drops, the other person sees it go offline, and the phone reconnects with a growing wait and resumes from Postgres. A lost listener or a deploy closes every socket with restarting, and the phones resume the same way.
   autonumber 36
   participant phone as The sender's phone
   participant api as The API
@@ -154,7 +154,7 @@ sequenceDiagram
   api->>db: Move the reader's mark up, never down, never past the newest message, not at all once closed
   api->>other: 204
   db->>api: On commit, when the mark moved, a notification with the conversation, the reader's side and the mark
-  api->>phone: A read frame, to the writer's side only, never in a closed conversation
+  api->>phone: A read frame with the mark as the writer may see it, to the writer's side only, never in a closed conversation, none while a shadow ban withholds it
   db->>api: On commit, a notification when a conversation is archived, brought back or closed
   api->>phone: A conversation frame with its state as each side may read it, to both sides' live sockets
   db->>api: On commit, a notification when a session is revoked or deleted
@@ -177,7 +177,7 @@ sequenceDiagram
 37. The mark moves up only, never past the newest message, and not at all in a closed conversation: a close stops both marks where it found them, so a mark moving after an end cannot tell an end from a block (ADR-030 §12).
 38. The reader's phone gets 204, in a closed conversation too.
 39. On commit, and only when the mark moved, the read trigger notifies with the conversation, the reader's side and the new mark.
-40. The other side's live sockets, the writer's, get a `read` frame with the mark. A closed conversation delivers none.
+40. The other side's live sockets, the writer's, get a `read` frame with the mark as the writer's own row reads it. A closed conversation delivers none. Nor does a mark that a shadow ban of the reader withholds (#470): the writer sees the reader's mark go no further than the newest message from before the ban, as they see the reader never online. The true mark shows at the lift on the next read over HTTP or resume, and live with the reader's next mark; a frame that moved nothing would still say the reader is reading.
 41. On commit, the conversation trigger notifies when a conversation is archived (the night's archive, see The night's jobs), brought back by a new message, or closed (an end, a block, a report, a ban, an erasure). Since migration 0063 it does not fire when only the close's kind or side is rewritten.
 42. Each side's live sockets get a `conversation` frame with its state as that side may read it: open, archived, closed as one of the two endings a person reads, or `gone` for its blocker. A block has a notification of its own, which reaches the blocker's side alone; the other person hears only the close's frame, as for any end, so no frame tells a block or a report from an end (ADR-030 §6 and §12).
 43. On commit, the session trigger notifies when a session is revoked or deleted: a logout, a break, a sanction, an erasure, the night's sweep.

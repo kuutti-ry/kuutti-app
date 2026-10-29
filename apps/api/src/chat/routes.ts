@@ -90,7 +90,7 @@ const readRoute = createRoute({
   path: "/conversations/{id}",
   summary: "One conversation",
   description:
-    "The summary, the longest message the composer may send, the highest sequence the counterpart has read, and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
+    "The summary, the longest message the composer may send, how far the counterpart has read as the caller may see it (a shadow ban of the counterpart's holds it where the ban began, #470), and the contacts (#103): the caller's stored pieces, each shared here or not, and the counterpart's pieces shared with the caller now. In a closed conversation nothing is shared either way.",
   ...bearer,
   request: { params: ConversationParams },
   responses: {
@@ -106,7 +106,7 @@ const pageRoute = createRoute({
   path: "/conversations/{id}/messages",
   summary: "A page of messages",
   description:
-    "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban still open is not among them.",
+    "With before, the messages under that sequence, newest first; with after, the ones above it, oldest first (what is new since the last one the phone holds); with neither, the newest. At most limit, 50 by default, 100 at most. A counterpart's message sent during a shadow ban that is still open, or that was lifted only after the conversation ended, is not among them.",
   ...bearer,
   request: { params: ConversationParams, query: MessagesQuery },
   responses: {
