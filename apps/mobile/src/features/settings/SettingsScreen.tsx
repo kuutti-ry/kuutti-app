@@ -109,7 +109,14 @@ export function SettingsScreen() {
   const session = useSession();
   const { open: link } = useLocalSearchParams<{ open?: string | string[] }>();
   const asked = typeof link === "string" ? link : undefined;
-  const { open, opened, toggle } = useOpenRow(asked);
+  const { open, opened, toggle } = useOpenRow(
+    asked,
+    session.status === "signed-in"
+      ? session.sessionId
+      : session.status === "signed-out"
+        ? null
+        : undefined,
+  );
   const { scrollProps, reveal } = useReveal();
   const signedIn = session.status === "signed-in";
 

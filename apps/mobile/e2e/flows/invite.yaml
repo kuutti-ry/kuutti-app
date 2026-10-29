@@ -1,5 +1,5 @@
-# Invitations (#107, ADR-044): a row under Account in Settings whose screen
-# says what an invitation earns, makes one and shows its code this once
+# Invitations (#107, ADR-044): a row under Community in Settings that says,
+# under itself, what an invitation earns, makes one and shows its code this once
 # (Kuutti keeps only its hash), hands the invitation's message to the
 # system's share sheet, and withdraws the open invitation after asking.
 # Sanna's profile passed the gate's test (`pnpm demo:reset` counts the
@@ -18,13 +18,12 @@ name: An invitation made in Settings shows its code once, is shared, and is with
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Account, below the fold on a phone.
-- scrollUntilVisible:
-    element: "(Invitations|Kutsut|Inbjudningar)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Invitations|Kutsut|Inbjudningar)(, .*)?"
+# The row sits under Community (#511), below the fold on a phone, and opens in place.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Invitations|Kutsut|Inbjudningar)(, .*)?"
+      INSIDE: "Make an invitation|Tee kutsu|Skapa en inbjudan|Loading your invitations…|Ladataan kutsujasi…|Laddar dina inbjudningar…"
 - extendedWaitUntil:
     visible: "Make an invitation|Tee kutsu|Skapa en inbjudan"
     timeout: 15000

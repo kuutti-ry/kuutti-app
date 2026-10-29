@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react-native";
+import { act, fireEvent, screen } from "@testing-library/react-native";
 import Sun from "lucide-react-native/icons/sun";
 import { Platform, Text } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -126,36 +126,36 @@ describe("RowGroup", () => {
       expect(wrapper?.props.className).toMatch(/\bhidden\b/);
     });
 
-    it("tells once for each opening that its panel is laid out", async () => {
+    it("tells once for each opening, a frame after its panel is drawn", async () => {
       const opened = jest.fn();
+      const frame = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
       const view = await renderWithTheme(<RowGroup rows={rows(true, { onOpened: opened })} />);
-      const panel = () => {
-        let node = screen.getByText("the choices").parent;
-        while (node && node.props.onLayout === undefined) node = node.parent;
-        if (!node) throw new Error("no panel");
-        return node;
-      };
-      await fireEvent(panel(), "layout", {
-        nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
-      });
-      await fireEvent(panel(), "layout", {
-        nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 2 } },
-      });
+      await frame();
       expect(opened).toHaveBeenCalledTimes(1);
       expect(opened.mock.calls[0]?.[0]).toEqual({
         wrapper: expect.anything(),
         header: expect.anything(),
       });
+      // Drawn again while open, it tells nothing more.
+      await view.rerender(underProviders(<RowGroup rows={rows(true, { onOpened: opened })} />));
+      await frame();
+      expect(opened).toHaveBeenCalledTimes(1);
       await view.rerender(
         underProviders(<RowGroup rows={rows(false, { onOpened: opened, kept: true })} />),
       );
+      await frame();
       await view.rerender(
         underProviders(<RowGroup rows={rows(true, { onOpened: opened, kept: true })} />),
       );
-      await fireEvent(panel(), "layout", {
-        nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
-      });
+      await frame();
       expect(opened).toHaveBeenCalledTimes(2);
+    });
+
+    it("never lets its wrapper be flattened away, which would measure as its header alone", async () => {
+      await renderWithTheme(<RowGroup rows={rows(true)} />);
+      let node = screen.getByText("the choices").parent;
+      while (node && node.props.collapsable === undefined) node = node.parent;
+      expect(node?.props.collapsable).toBe(false);
     });
 
     it("draws a picture before the title, silent, and sets it and the chevron by the first line", async () => {

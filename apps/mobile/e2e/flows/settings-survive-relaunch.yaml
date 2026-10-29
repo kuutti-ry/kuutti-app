@@ -1,9 +1,10 @@
 # What the person chose in Settings stays across closing the app (#12, #55):
-# the session (no bank login again), the theme and the language, and which
-# of Settings' rows were left open (#511). Sanna; the flow ends on the system
-# theme and the phone's language with both rows closed, as it began. The
-# theme and the language each open under their row, and the row's summary
-# says what is chosen.
+# the session (no bank login again), the theme and the language. Which row
+# was open stays only while the app runs (#511): the cold start opens
+# Settings with every row closed. Sanna; the flow ends on the phone's theme
+# and language with every row closed, as it began. The theme and the
+# language each open under their row, one row at a time, and the row's
+# summary says what is chosen.
 appId: fi.kuutti.app
 name: The session, the theme and the language survive closing and reopening the app
 ---
@@ -12,26 +13,35 @@ name: The session, the theme and the language survive closing and reopening the 
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# Settings can come back where the sign-in left it, scrolled down to This
-# device, and the row is in the first section: back to the top first.
+# Settings can come back where the sign-in left it, scrolled down to Logging
+# out, and the rows are in the first section: back to the top first.
 - scrollUntilVisible:
     element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
     direction: UP
-    timeout: 30000
-# Each row says what is chosen, which Maestro reads after its title; the
-# chosen option itself is ticked under the row.
+    timeout: 60000
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Theme|Teema|Tema)(, .*)?"
       INSIDE: "High contrast|Suuri kontrasti|Hög kontrast"
-- tapOn: "Dark|Tumma|Mörkt"
+# Tapped only while not chosen: chosen, by a run that stopped half-way, the
+# words are the theme row's own value too.
+- runFlow:
+    when:
+      notVisible: "✓ Dark|✓ Tumma|✓ Mörkt"
+    commands:
+      - tapOn: "Dark|Tumma|Mörkt"
 - assertVisible: "✓ Dark|✓ Tumma|✓ Mörkt"
+# Opening the language closes the theme: one row at a time. The list open
+# is told by Suomi, a language this flow never chooses: the row's own value
+# names the language chosen, Svenska after the restart. (A tick would not do:
+# after the restart the theme's list, open above it, has one too.)
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Language|Kieli|Språk)(, .*)?"
-      INSIDE: ".*Svenska.*"
+      INSIDE: ".*Suomi.*"
+- assertNotVisible: "High contrast|Suuri kontrasti|Hög kontrast"
 - tapOn: ".*Svenska.*"
 - assertVisible: "Utseende och språk"
 
@@ -43,30 +53,31 @@ name: The session, the theme and the language survive closing and reopening the 
     visible: "Inställningar"
     timeout: 15000
 
-# Kept across the restart, both rows still open with their choices ticked;
-# then back as it began.
+# Kept across the restart: the language, and the theme ticked under its row;
+# every row closed at the cold start. Then back as it began.
 - scrollUntilVisible:
     element: "Utseende och språk"
     direction: UP
-    timeout: 30000
-- assertVisible: "Hög kontrast"
+    timeout: 60000
+- assertNotVisible: ".*✓.*Svenska.*"
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "Tema(, .*)?"
+      INSIDE: "Hög kontrast"
 - assertVisible: "✓ Mörkt"
-- tapOn: "System"
-- assertVisible: "✓ System"
-- scrollUntilVisible:
-    element: ".*✓.*Svenska.*"
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- tapOn: "Telefonens språk"
-- assertVisible: "✓ Phone's language|✓ Puhelimen kieli|✓ Telefonens språk"
+- tapOn: "Samma som telefonen"
+- assertVisible: "✓ Samma som telefonen"
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "Språk(, .*)?"
+      INSIDE: ".*Suomi.*"
+- assertVisible: ".*✓.*Svenska.*"
+- tapOn: "Samma som telefonen"
+- assertVisible: "✓ Same as the phone|✓ Sama kuin puhelimessa|✓ Samma som telefonen"
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
       ROW: "(Language|Kieli|Språk)(, .*)?"
-      INSIDE: ".*Svenska.*"
-- runFlow:
-    file: ../common/close-settings-row.yaml
-    env:
-      ROW: "(Theme|Teema|Tema)(, .*)?"
-      INSIDE: "High contrast|Suuri kontrasti|Hög kontrast"
+      INSIDE: ".*Suomi.*"

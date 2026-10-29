@@ -10,19 +10,20 @@ name: The language choice in Settings changes the app's language at once
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# Settings can come back where the sign-in left it, scrolled down to This
-# device, and the row is in the first section: back to the top first.
+# Settings can come back scrolled down, and the row is in the first section:
+# back to the top first.
 - scrollUntilVisible:
     element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
     direction: UP
-    timeout: 30000
+    timeout: 60000
 # The row says the language chosen, which Maestro reads after its title; it
-# opens in place, and the choices are the rows' words that change.
+# opens in place, and the choices are the rows' words that change. The list
+# open is told by its ticked choice, which no row's value has.
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
       ROW: "(Language|Kieli|Språk)(, .*)?"
-      INSIDE: ".*Svenska.*"
+      INSIDE: ".*✓.*"
 - tapOn: ".*Suomi.*"
 - assertVisible: "Ulkoasu ja kieli"
 - assertVisible: ".*✓.*Suomi.*"
@@ -31,11 +32,11 @@ name: The language choice in Settings changes the app's language at once
 - tapOn: ".*English.*"
 - assertVisible: "Appearance and language"
 # Back to the phone's language and the row closed, so the next flow finds the app as a person would.
-- tapOn: "Phone's language"
+- tapOn: "Same as the phone"
 - assertVisible: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
       ROW: "(Language|Kieli|Språk)(, .*)?"
-      INSIDE: ".*Svenska.*"
+      INSIDE: ".*✓.*"
 - assertVisible: "Settings|Asetukset|Inställningar"

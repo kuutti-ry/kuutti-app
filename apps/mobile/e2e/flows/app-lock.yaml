@@ -18,10 +18,10 @@ name: A passcode set in Settings locks the app at a cold start and back from the
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The lock's row is this device's, under its session's row (#287) below the
-# fold on a phone; it says On or Off after its title, and opens in place
-# (#511). The flow ends signed out, where the row is not shown; the phone
-# keeps it open for the next sign-in, whose flows open it the same way.
+# The lock's row is under Privacy and security (#511), below the fold on a
+# phone; it says On or Off after its title, and opens in place. The flow ends
+# signed out, where the row is not shown, and the next sign-in finds every
+# row closed.
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:

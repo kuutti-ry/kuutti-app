@@ -19,7 +19,10 @@ name: A malformed e-mail is refused in words, a valid one is saved, and it can b
     text: "Send a confirmation code|Lähetä vahvistuskoodi|Skicka en bekräftelsekod"
     enabled: false
 # The keyboard stays up: Save is above it, and hiding it taps whatever lies below.
-- tapOn: "E-mail address|Sähköpostiosoite|E-postadress"
+# The field's name stands over it too (#511): the second of the two is the field.
+- tapOn:
+    text: "E-mail address|Sähköpostiosoite|E-postadress"
+    index: 1
 - inputText: "not-an-address"
 - tapOn: "Send a confirmation code|Lähetä vahvistuskoodi|Skicka en bekräftelsekod"
 - extendedWaitUntil:

@@ -18,7 +18,7 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Account, below the fold on a phone, and opens in place (#511).
+# The row sits under Notifications and contacts, below the fold on a phone, and opens in place (#511).
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:
@@ -34,17 +34,14 @@ name: A contact kept in Settings is shared from a conversation's header and show
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible:
-    text: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
-    enabled: false
 - tapOn: "Your Instagram username|Instagram-käyttäjänimesi|Ditt användarnamn på Instagram"
 - inputText: "elina.lukupiiri"
-# The page keeps the focused field in sight just above the keyboard, with the
-# card's title above it (the hint between them is Telegram's too); Save stays
-# under the keyboard. A tap on the title, which is no button and the brand's
-# name in every language, closes it (README, the keyboard).
+# There is no Save (#511): leaving the field keeps it. The page keeps the
+# focused field in sight just above the keyboard, with the kind's title
+# above it (the hint between them is Telegram's too). A tap on the title,
+# which is no button and the brand's name in every language, closes the
+# keyboard and leaves the field (README, the keyboard).
 - tapOn: "Instagram"
-- tapOn: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."
     timeout: 15000
@@ -138,7 +135,7 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row comes back open, as it was left.
+# Signed in anew, she finds every row closed (#511): the row is opened again.
 - runFlow:
     file: ../common/open-settings-row.yaml
     env:

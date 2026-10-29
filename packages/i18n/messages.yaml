@@ -3728,6 +3728,62 @@ settings.logoutAll:
   sv: Logga ut överallt
   machine: { fi: true, sv: true }
 
+settings.logout.explain:
+  en: "This phone only. You log in again with your bank."
+  description: "Under Log out in Settings › Logging out (#511, #35)."
+  fi: "Vain tämä puhelin. Kirjaudut uudelleen pankkitunnuksilla."
+  sv: "Bara den här telefonen. Du loggar in igen med din bank."
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.explain:
+  en: "Every phone logged in as you, this one too: for a lost or lent phone."
+  description: "Under Log out everywhere in Settings › Logging out (#511, #35)."
+  fi: "Kaikki puhelimet, joilla olet kirjautuneena, myös tämä: kadonnutta tai lainattua puhelinta varten."
+  sv: "Alla telefoner där du är inloggad, även den här: för en borttappad eller utlånad telefon."
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.title:
+  en: "Log out on every phone?"
+  description: "Title of the question before logging out everywhere (#511; the maintainer, 29/10/2026)."
+  fi: "Kirjaudutaanko ulos kaikilla puhelimilla?"
+  sv: "Logga ut på alla telefoner?"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.body:
+  en: "Every phone, this one too, needs your bank to log in again."
+  description: "Text of the question before logging out everywhere (#511)."
+  fi: "Jokainen puhelin, myös tämä, tarvitsee taas pankkitunnuksesi kirjautumiseen."
+  sv: "Varje telefon, även den här, behöver din bank för att logga in igen."
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.yes:
+  en: "Log out on every phone"
+  description: "The question's button that logs out everywhere (#511): an outline, the deletion alone is red. It answers the title in its words, and its name differs from the row's button behind the question, which a screen reader and the end-to-end flows tell apart by name."
+  fi: "Kirjaudu ulos kaikilla puhelimilla"
+  sv: "Logga ut på alla telefoner"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.no:
+  en: "Stay logged in"
+  description: "The question's button that changes nothing (#511)."
+  fi: "Pysy kirjautuneena"
+  sv: "Förbli inloggad"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.close:
+  en: "Close"
+  description: "Screen-reader label of the question's close control (#511): closing it changes nothing."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.failed:
+  en: "Not logged out everywhere. Check your connection and try again."
+  description: "Said under Log out everywhere when the API did not end the sessions (#511): this phone stays logged in."
+  fi: "Uloskirjautuminen kaikkialta ei onnistunut. Tarkista yhteys ja yritä uudelleen."
+  sv: "Utloggningen överallt lyckades inte. Kontrollera anslutningen och försök igen."
+  machine: { fi: true, sv: true }
+
 admin.title:
   en: Kuutti admin
   description: Moderation panel, page heading. The panel is English only (TD-17), so admin.* keys need no fi or sv.
@@ -9711,10 +9767,10 @@ feedback.title:
   machine: { fi: true, sv: true }
 
 feedback.explain:
-  en: "A few lines to the moderators: what went wrong, what you would like, what bothers you, or what works. Sent with the app's version, the platform and your language, nothing else. Nobody is mailed."
-  description: "Feedback screen, the line above the form (#171): what is sent along with the words, and that no mail follows."
-  fi: "Muutama rivi moderaattoreille: mikä meni pieleen, mitä toivoisit, mikä häiritsee tai mikä toimii. Mukana lähtevät sovelluksen versio, alusta ja kielesi, ei muuta. Kenellekään ei lähetetä sähköpostia."
-  sv: "Några rader till moderatorerna: vad som gick fel, vad du önskar, vad som stör eller vad som fungerar. Med följer appens version, plattformen och ditt språk, inget annat. Ingen får e-post."
+  en: "A few lines to the moderators: what went wrong, what you would like, what bothers you, or what works. The moderators see that it came from your account; nobody else does. The app's version, the platform and your language go with it. Nobody is mailed."
+  description: "Feedback, the line above the form (#171, #511): who sees the sender (the moderators see the account, ADR-023 §6), what is sent along with the words, and that no mail follows."
+  fi: "Muutama rivi moderaattoreille: mikä meni pieleen, mitä toivoisit, mikä häiritsee tai mikä toimii. Moderaattorit näkevät, että viesti tuli tililtäsi; kukaan muu ei näe. Mukana lähtevät sovelluksen versio, alusta ja kielesi. Kenellekään ei lähetetä sähköpostia."
+  sv: "Några rader till moderatorerna: vad som gick fel, vad du önskar, vad som stör dig eller vad som fungerar. Moderatorerna ser att det kom från ditt konto; ingen annan gör det. Appens version, plattformen och ditt språk följer med. Ingen får e-post."
   machine: { fi: true, sv: true }
 
 feedback.kind.label:

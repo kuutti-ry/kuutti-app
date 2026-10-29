@@ -5,6 +5,7 @@ import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
 import { AccessibilityInfo, DeviceEventEmitter, Platform, StyleSheet, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
+import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
 import { EmailCard, EmailScreen } from "./EmailCard";
@@ -613,6 +614,44 @@ describe("EmailCard, saving and removing", () => {
     expect(server).toEqual({ email: "aino@example.fi", confirmed: false, codeExpiresAt: LATER });
     expect(calls).toEqual(["GET /account/email", "PUT /account/email", "POST /account/email/code"]);
     noProblems();
+  });
+
+  it("sends from the keyboard's own key as the button does, and nothing for the address kept (#511)", async () => {
+    const { calls } = fakeApi({ email: "aino@example.fi", confirmed: true });
+    await show(<EmailCard />);
+    const input = screen.getByLabelText("E-mail address");
+    expect(input.props).toMatchObject({ autoComplete: "email", returnKeyType: "send" });
+    await act(async () => {
+      fireEvent(input, "submitEditing");
+    });
+    expect(calls).toEqual(["GET /account/email"]);
+    await type(input, "aino@example.org");
+    await act(async () => {
+      fireEvent(screen.getByLabelText("E-mail address"), "submitEditing");
+    });
+    await waitFor(() =>
+      expect(calls).toEqual([
+        "GET /account/email",
+        "PUT /account/email",
+        "POST /account/email/code",
+      ]),
+    );
+  });
+
+  it("tells the row of Settings an address typed and not sent, and no longer once sent (#511)", async () => {
+    fakeApi();
+    const report = jest.fn();
+    await show(
+      <UnsavedRow row="email" report={report}>
+        <EmailCard inRow />
+      </UnsavedRow>,
+    );
+    // In a row the row's title stands for the card's.
+    expect(screen.queryByText("A way to stay in touch")).toBeNull();
+    await type(screen.getByLabelText("E-mail address"), "aino@example.fi");
+    expect(report).toHaveBeenLastCalledWith("email", "email", true);
+    await press(button("Send a confirmation code"));
+    expect(report).toHaveBeenLastCalledWith("email", "email", false);
   });
 
   it("changing a confirmed address unconfirms it and sends the new one its code", async () => {

@@ -75,7 +75,7 @@ const show = async (ui: React.ReactElement) => {
 };
 /** Settings with the lock's row open, as the phone keeps it (#511). */
 const showLock = async () => {
-  rememberOpenRow("lock");
+  rememberOpenRow("lock", tokens.sessionId);
   await show(<SettingsScreen />);
 };
 const press = async (element: ReturnType<typeof screen.getByRole>) => {
@@ -112,7 +112,7 @@ function phoneWithFace(answer: { success: true } | { success: false; error: stri
 }
 
 beforeEach(async () => {
-  rememberOpenRow(null);
+  rememberOpenRow(null, null);
   store.clear();
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   router.replace.mockReset();
@@ -435,7 +435,7 @@ describe("coming back to the app", () => {
   });
 
   it("stops listening once the screen is left", async () => {
-    rememberOpenRow("lock");
+    rememberOpenRow("lock", tokens.sessionId);
     const view = await renderWithTheme(<SettingsScreen />);
     await settle();
     // The lock's, and the notifications row's look at the phone's permission beside it.

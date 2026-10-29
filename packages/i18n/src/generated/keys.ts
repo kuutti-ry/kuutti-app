@@ -1500,7 +1500,15 @@ export type MessageParams = {
   "settings.licenses.summary": { "packages": number };
   "settings.lock.label": Record<never, never>;
   "settings.logout": Record<never, never>;
+  "settings.logout.explain": Record<never, never>;
   "settings.logoutAll": Record<never, never>;
+  "settings.logoutAll.confirm.body": Record<never, never>;
+  "settings.logoutAll.confirm.close": Record<never, never>;
+  "settings.logoutAll.confirm.no": Record<never, never>;
+  "settings.logoutAll.confirm.title": Record<never, never>;
+  "settings.logoutAll.confirm.yes": Record<never, never>;
+  "settings.logoutAll.explain": Record<never, never>;
+  "settings.logoutAll.failed": Record<never, never>;
   "settings.notifications.allOff": Record<never, never>;
   "settings.notifications.allOn": Record<never, never>;
   "settings.notifications.blocked": Record<never, never>;

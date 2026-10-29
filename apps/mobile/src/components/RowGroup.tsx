@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react-native";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import ChevronUp from "lucide-react-native/icons/chevron-up";
-import { type ReactNode, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -31,7 +31,7 @@ export type Row = {
   expanded?: boolean;
   /** Keeps a closed panel mounted and hidden, so what was typed in it waits for the row to open again. */
   kept?: boolean;
-  /** Called once each time the panel opens, as it is first laid out, with the row's two parts. */
+  /** Called once each time the panel opens, a frame after it is drawn, with the row's two parts. */
   onOpened?: (parts: { wrapper: View; header: View }) => void;
 };
 
@@ -65,11 +65,21 @@ function RowView({ row, last }: { row: Row; last: boolean }) {
   const { t } = useT();
   const wrapper = useRef<View>(null);
   const header = useRef<View>(null);
-  // Whether the open panel has been laid out since it opened: onOpened is called once for each opening.
-  const told = useRef(false);
   const holds = row.panel !== undefined;
   const open = holds && row.expanded === true;
-  if (!open) told.current = false;
+  // Once for each opening, a frame after the commit, when the new renderer has
+  // laid the panel out: a panel's own onLayout does not reach us on a phone.
+  const opened = useRef(row.onOpened);
+  opened.current = row.onOpened;
+  useEffect(() => {
+    if (!open) return;
+    // Both views are there: the commit that opened the row set them before
+    // this effect, and the frame dies with the row.
+    const frame = requestAnimationFrame(() => {
+      opened.current?.({ wrapper: wrapper.current as View, header: header.current as View });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   const hairline = !last && "border-b border-border";
   // border-0: a Button has a 1 px border on every side (#239, #467), and a
   // row draws only the hairline under it; a row with a panel, under the panel.
@@ -151,18 +161,15 @@ function RowView({ row, last }: { row: Row; last: boolean }) {
   if (!holds) return button;
   const shown = open || row.kept === true;
   return (
-    <View ref={wrapper} className={cn(hairline)}>
+    // Never flattened away: the last row of a card has no border of its own,
+    // and a flattened wrapper measures as its header alone (#511).
+    <View ref={wrapper} collapsable={false} className={cn(hairline)}>
       {button}
       {shown && (
         <View
           className={cn("gap-4 px-4 pb-4", !open && "hidden")}
           accessibilityElementsHidden={!open}
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
-          onLayout={() => {
-            if (!open || told.current || !wrapper.current || !header.current) return;
-            told.current = true;
-            row.onOpened?.({ wrapper: wrapper.current, header: header.current });
-          }}
         >
           {row.panel}
         </View>

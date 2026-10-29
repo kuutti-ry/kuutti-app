@@ -285,6 +285,14 @@ function EmailForm({
         autoCapitalize="none"
         autoCorrect={false}
         inputMode="email"
+        autoComplete="email"
+        // The keyboard's own key does what the button under the field does.
+        returnKeyType="send"
+        onSubmitEditing={() => {
+          if (!busy && address.length > 0 && address !== stored.email) {
+            void run(() => keep(() => saveEmail(address)));
+          }
+        }}
         onChangeText={(text) => {
           setSaid([]);
           setForm((form) => ({ ...form, typed: text }));

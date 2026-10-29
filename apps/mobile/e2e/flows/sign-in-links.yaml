@@ -17,17 +17,13 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# This device's session has a screen of its own, behind its row under "Account"
-# (#287), below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "This device|Tämä laite|Den här enheten"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "This device|Tämä laite|Den här enheten"
-- extendedWaitUntil:
-    visible: "Log out|Kirjaudu ulos|Logga ut"
-    timeout: 15000
+# Logging out opens under its row, the last section's first (#287, #511),
+# below the fold on a phone: scrolled to, then opened, unless it is open.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Logging out|Uloskirjautuminen|Utloggning)(, .*)?"
+      INSIDE: "Log out|Kirjaudu ulos|Logga ut"
 # No such screen: home.
 - openLink: kuutti://auth/return
 - extendedWaitUntil:

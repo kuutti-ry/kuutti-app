@@ -461,7 +461,7 @@ describe("Ways to reach you", () => {
     await view.rerender(
       underProviders(
         <UnsavedRow row="contacts" report={report}>
-          <></>
+          {null}
         </UnsavedRow>,
       ),
     );

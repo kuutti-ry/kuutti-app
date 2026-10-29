@@ -125,7 +125,7 @@ const phoneAnswer = (status: "granted" | "denied" | "undetermined") => ({
 
 beforeEach(async () => {
   // Every row closed, as at a cold start (#511).
-  rememberOpenRow(null);
+  rememberOpenRow(null, null);
   notifications.getPermissionsAsync.mockResolvedValue(phoneAnswer("granted"));
   mockBuild.mockReturnValue({ version: "0.19.0", commit: "abc1234def5678" });
   store.clear();
@@ -396,38 +396,57 @@ describe("the settings screen", () => {
     expect(expanded("Language")).toBe(true);
     expect([...store.keys()].filter((key) => key.includes("settingsOpen"))).toEqual([]);
     // A cold start forgets it.
-    rememberOpenRow(null);
+    rememberOpenRow(null, null);
     await renderWithTheme(<SettingsScreen />);
     expect(expanded("Language")).toBe(false);
   });
 
-  it("brings the screen reader to the row a link opened, once its panel is laid out", async () => {
+  it("opens with the row left open only in the session that left it (#511)", async () => {
+    const wait = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+    // Left open while somebody was logged in; the phone is logged out now.
+    rememberOpenRow("theme", tokens.sessionId);
+    await renderWithTheme(<SettingsScreen />);
+    await wait();
+    expect(expanded("Theme")).toBe(false);
+    // Left open while logged out, and still logged out.
+    rememberOpenRow("theme", null);
+    await renderWithTheme(<SettingsScreen />);
+    await wait();
+    expect(expanded("Theme")).toBe(true);
+  });
+
+  it("keeps Logging out open through the logout, saying so, and the next session finds every row closed (#511)", async () => {
+    const wait = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await wait();
+    await press(row("Logging out"));
+    await press(screen.getByRole("button", { name: "Log out" }));
+    expect(await screen.findByText("No session on this device.")).toBeTruthy();
+    expect(expanded("Logging out")).toBe(true);
+    // Somebody logs in on the phone.
+    await saveSession({ ...tokens, sessionId: "0b2a7d4e-5c1f-4e8a-9d3b-7f6e5d4c3b2a" });
+    await renderWithTheme(<SettingsScreen />);
+    await wait();
+    expect(expanded("Logging out")).toBe(false);
+  });
+
+  it("brings the screen reader to the row a link opened, once its panel is drawn", async () => {
     const focus = jest
       .spyOn(AccessibilityInfo, "sendAccessibilityEvent")
       .mockImplementation(() => undefined);
     const params = jest
       .spyOn(expoRouter, "useLocalSearchParams")
       .mockReturnValue({ open: "photoDescriptions" });
+    const frame = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
     try {
       await renderWithTheme(<SettingsScreen />);
-      let panel = screen.getByRole("switch", { name: "Show under photos" }).parent;
-      while (panel && panel.props.onLayout === undefined) panel = panel.parent;
-      await act(async () => {
-        fireEvent(panel as never, "layout", {
-          nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
-        });
-      });
+      await frame();
       expect(focus).toHaveBeenCalledWith(expect.anything(), "focus");
       // A row the person opens takes no focus away from them.
       focus.mockClear();
       await press(row("Theme"));
-      let other = screen.getByRole("switch", { name: "High contrast" }).parent;
-      while (other && other.props.onLayout === undefined) other = other.parent;
-      await act(async () => {
-        fireEvent(other as never, "layout", {
-          nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
-        });
-      });
+      await frame();
       expect(focus).not.toHaveBeenCalled();
     } finally {
       params.mockRestore();
@@ -436,7 +455,7 @@ describe("the settings screen", () => {
   });
 
   it("opens the row a link names, in place of the one left open", async () => {
-    rememberOpenRow("theme");
+    rememberOpenRow("theme", null);
     const params = jest
       .spyOn(expoRouter, "useLocalSearchParams")
       .mockReturnValue({ open: "photoDescriptions" });
