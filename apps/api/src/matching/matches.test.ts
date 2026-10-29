@@ -473,7 +473,7 @@ describe("the same moment", () => {
       const liking = watched(decide({ ...deps, db: second }, MATCHES, choice(b, "like")));
       expect(await waitsFor(pool, secondPid, firstPid, liking.settled)).toBe(true);
       await first.query("COMMIT");
-      expect(await liking.outcome).toEqual({ match: null });
+      expect(await liking.outcome).toEqual({ match: null, fishToSend: true });
       await second.query("COMMIT");
       expect((await pool.query("SELECT 1 FROM conversation")).rows).toHaveLength(0);
     });

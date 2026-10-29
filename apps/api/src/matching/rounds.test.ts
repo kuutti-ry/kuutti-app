@@ -194,14 +194,14 @@ describe("reading today's round", () => {
     const [b] = await cast(ctx, 1);
     if (!b) throw new Error("cast not written");
     await roundFor(ctx.client, a, [b], YESTERDAY);
-    expect(await readToday(app, a)).toEqual({ day: TODAY, entries: null });
+    expect(await readToday(app, a)).toEqual({ day: TODAY, entries: null, fishToSend: true });
   });
 
   test("a round with no cards answers an empty list", async ({ ctx, app }) => {
     const [a] = await cast(ctx, 1);
     if (!a) throw new Error("cast not written");
     await roundFor(ctx.client, a, []);
-    expect(await readToday(app, a)).toEqual({ day: TODAY, entries: [] });
+    expect(await readToday(app, a)).toEqual({ day: TODAY, entries: [], fishToSend: true });
   });
 
   test("a card budget used up answers 429 with its wait in Retry-After", async ({ ctx, app }) => {

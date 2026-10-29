@@ -3044,7 +3044,7 @@ errors.relaxations_changed:
 
 errors.fish_budget_exceeded:
   en: "You cannot send a fish just now. You can still like."
-  description: "Today's round (429 with Retry-After, #378, ADR-039): the person has sent matching_config fish_budget fish within fish_window_days, rolling; Retry-After says when the next can go. Nothing was saved. Never a number or a period: both are tunables, and the window is rolling, not a calendar week."
+  description: "Today's round (429 with Retry-After, #378, ADR-039): the person has sent matching_config fish_budget fish within fish_window_days, rolling (one a day since #475), and no earned fish waits; Retry-After says when the next can go. The round screen says it when another phone sent the day's fish meanwhile, and takes the fish button away; it never names the day of the next. Nothing was saved. Never a number or a period: both are tunables."
   fi: "Et voi lähettää kalaa juuri nyt. Voit silti tykätä."
   sv: "Du kan inte skicka en fisk just nu. Du kan fortfarande gilla."
   machine: { fi: true, sv: true }
@@ -7903,17 +7903,10 @@ round.short.failed:
 
 round.fish:
   en: "Send a fish"
-  description: "Decision button on a round card, above like and pass, a filled rounded square with a fish (#378, ADR-039): a like with a mark, first in the other person's round; matching_config fish_budget of them in a rolling fish_window_days. Not offered on a card that liked the reader or sent a fish. Never a number or a period on the button: both are tunables. The word fish is the app's own (ADR-039 Open 1), for the native review."
+  description: "Decision button on a round card, above like and pass, a filled rounded square with a fish (#378, ADR-039): a like with a mark, first in the other person's round; matching_config fish_budget of them in a rolling fish_window_days. Not offered on a card that liked the reader or sent a fish, nor once no fish can go today (the day's is sent and no earned one waits), except on the card that holds it (#475). Never a number or a period on the button: both are tunables. The word fish is the app's own (ADR-039 Open 1), for the native review."
   fi: "Lähetä kala"
   sv: "Skicka en fisk"
   max_length: 24
-  machine: { fi: true, sv: true }
-
-round.fish.refused:
-  en: "You cannot send a fish just now, but you can still like. The earliest day for the next one: {date}"
-  description: "Round screen when a fish was refused (429 fish_budget_exceeded, #378, ADR-039): matching_config fish_budget fish in a rolling fish_window_days, so never a number or a period in the words (as errors.fish_budget_exceeded); {date} is the first day the next can go, d.M.yyyy, from Retry-After; after a colon, as the sign-in's cooldown has it. Nothing was saved; the card stays for a like or a pass."
-  fi: "Et voi lähettää kalaa juuri nyt, mutta voit silti tykätä. Seuraavan kalan aikaisin päivä: {date}"
-  sv: "Du kan inte skicka en fisk just nu, men du kan fortfarande gilla. Tidigaste dag för nästa: {date}"
   machine: { fi: true, sv: true }
 
 round.like:

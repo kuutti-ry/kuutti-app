@@ -116,7 +116,7 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     visible: "Thank you\\. A moderator will look at it, and you will not see each other again\\.|Kiitos\\. Moderaattori katsoo ilmoituksen, eikä teitä näytetä enää toisillenne\\.|Tack\\. En moderator tittar på anmälan, och ni ser inte varandra igen\\."
     timeout: 15000
 - tapOn: "Done|Valmis|Klar"
-# The last card takes Iida's fish of the week.
+# The last card takes Iida's fish of the day (one a day since #475).
 - extendedWaitUntil:
     visible: "Send a fish|Lähetä kala|Skicka en fisk"
     timeout: 15000

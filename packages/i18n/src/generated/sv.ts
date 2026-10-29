@@ -982,7 +982,6 @@ export const sv: Readonly<Record<string, string>> = {
   "round.empty": "I dag finns det ingen att visa dig. Kom tillbaka i morgon.",
   "round.failed": "Dagens runda kunde inte läsas in.",
   "round.fish": "Skicka en fisk",
-  "round.fish.refused": "Du kan inte skicka en fisk just nu, men du kan fortfarande gilla. Tidigaste dag för nästa: {date}",
   "round.gone": "Kortet är inte längre tillgängligt.",
   "round.home.open": "Dagens runda",
   "round.like": "Gilla",

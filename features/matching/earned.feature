@@ -25,17 +25,17 @@ Feature: Earned likes and fish, used by themselves
     Then "E" is liked within the day's likes, and the earned like stays spent on "D"
 
   Scenario: An earned fish is used once the window's fish are sent, and the next without one is refused
-    Given "A" sent a fish three days ago, has one earned fish, and a round was built for "A" today with "B" and "C"
+    Given fish_window_days is 7, "A" sent a fish three days ago, has one earned fish, and a round was built for "A" today with "B" and "C"
     When "A" sends a fish to "B" and then to "C"
     Then the fish to "B" is sent with the earned fish, and the fish to "C" is refused as fish_budget_exceeded
 
   Scenario: A fish an earned fish paid for is left out of the window
-    Given "A" sent a fish yesterday with an earned fish, has one more earned fish, and a round was built for "A" today with "B"
+    Given fish_window_days is 7, "A" sent a fish yesterday with an earned fish, has one more earned fish, and a round was built for "A" today with "B"
     When "A" sends a fish to "B"
     Then it is sent with the window's own fish, and the second earned fish is not spent
 
   Scenario: A fish changed to a like gives its earned fish back, and a like made a fish keeps its earned like
-    Given like_budget_balanced is 1, "A" sent a fish three days ago, has one earned like and one earned fish, and a round was built for "A" today with "B" and "C"
+    Given like_budget_balanced is 1, fish_window_days is 7, "A" sent a fish three days ago, has one earned like and one earned fish, and a round was built for "A" today with "B" and "C"
     When "A" likes "B", likes "C", makes "C" a fish, and changes "C" back to a like
     Then the earned like stays spent on "C", and the earned fish is given back
 

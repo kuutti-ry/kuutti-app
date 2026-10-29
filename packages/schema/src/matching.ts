@@ -122,6 +122,16 @@ export const RelaxationParams = z
   .meta({ id: "RelaxationParams" });
 
 /**
+ * Whether the fish's budget lets the caller send one today (#475, ADR-039
+ * §3, §6): one of the window's own, or one their invitations earned waiting
+ * (ADR-044 §8). The day's likes, which a fish counts in too, are not asked
+ * (ADR-036 Open 1). The round offers Send a fish only while it is true, and
+ * on the card that holds the fish. Never a count, nor anything of the fish
+ * others sent.
+ */
+const fishToSend = z.boolean();
+
+/**
  * Today's round: the Finnish day it is, and its cards in order; null while
  * the person has no round for the day, which the first read builds once their
  * matching has opened (#95, ADR-035), and an empty list for a round with
@@ -133,6 +143,7 @@ export const RoundResponse = z
   .object({
     day: z.iso.date(),
     entries: z.array(RoundEntry).max(ROUND_ENTRIES_MAX).nullable(),
+    fishToSend,
   })
   .meta({ id: "RoundResponse" });
 export type RoundResponse = z.infer<typeof RoundResponse>;
@@ -153,10 +164,14 @@ export type RoundDecisionUpdate = z.infer<typeof RoundDecisionUpdate>;
  * The answer to a decision (#100): the conversation the card's like is part
  * of, a match made by this like or before it; null for a pass and for a like
  * that made none. Nothing says whether the other person liked, unless it is a
- * match.
+ * match. `fishToSend` as the round says it, after this decision: a fish sent
+ * may spend the last, one changed to a like or a pass gives it back (#475).
  */
 export const RoundDecisionAnswer = z
-  .object({ match: z.object({ conversationId: z.uuid() }).strict().nullable() })
+  .object({
+    match: z.object({ conversationId: z.uuid() }).strict().nullable(),
+    fishToSend,
+  })
   .strict()
   .meta({ id: "RoundDecisionAnswer" });
 export type RoundDecisionAnswer = z.infer<typeof RoundDecisionAnswer>;

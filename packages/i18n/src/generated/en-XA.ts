@@ -1352,7 +1352,6 @@ export const enXA: Readonly<Record<string, string>> = {
   "round.empty": "［Thééréé ííš ñóóbóódýý tóó šhóów ýýóóúú tóódááýý. Çóóméé bááçk tóómóórróów.］",
   "round.failed": "［Tóódááýý'š róóúúñd dííd ñóót lóóáád.］",
   "round.fish": "［Šééñd áá fííšh］",
-  "round.fish.refused": "［ÝÝóóúú çááññóót šééñd áá fííšh júúšt ñóów, búút ýýóóúú çááñ štííll lííkéé. Théé ééáárlííééšt dááýý fóór théé ñééxt óóñéé: {date}］",
   "round.gone": "［Tháát çáárd ííš ñóó lóóñgéér áávááííláábléé.］",
   "round.home.open": "［Tóódááýý'š róóúúñd］",
   "round.like": "［Lííkéé］",

@@ -1,12 +1,15 @@
 # features/matching/fish.feature
 Feature: The fish, a like that says a little more
   A fish (#378, ADR-039; the maintainer, 20/10/2026) is a like with a mark:
-  fish_budget of them in any fish_window_days, rolling, one in seven. It
-  goes to the front of the other person's liked-you places, ahead of
-  ordinary likes, oldest first within each, labelled as a fish. It is a
-  like for every other rule: the day's likes, the expiry, the match, and
-  the sender learns nothing unless it becomes a match. Nobody can buy or
-  earn one, and nothing counts how many a person received.
+  fish_budget of them in any fish_window_days, rolling, one a day (the
+  maintainer, 29/10/2026, #475; one in seven before). It goes to the front
+  of the other person's liked-you places, ahead of ordinary likes, oldest
+  first within each, labelled as a fish. It is a like for every other rule:
+  the day's likes, the expiry, the match, and the sender learns nothing
+  unless it becomes a match. The sender's own round says whether a fish can
+  go today, and nothing of when the next comes. Nobody can buy one, an
+  invitation may earn one (earned.feature), and nothing counts how many a
+  person received.
 
   Scenario: A fish sent today is at the front of the recipient's next round, ahead of every ordinary like
     Given "B" liked "A" two days ago, and "C" sent "A" a fish yesterday
@@ -26,10 +29,20 @@ Feature: The fish, a like that says a little more
       | L2     | 4     | liked you |
       | L3     | 5     | liked you |
 
-  Scenario: A second fish within seven days is refused with the time the next one comes, and nothing is written
-    Given "A" sent a fish three days ago
+  Scenario: A second fish the same day is refused until midnight, and nothing is written
+    Given "A" sent a fish today
+    When "A" sends a fish on another card of today
+    Then it is refused as fish_budget_exceeded, with the wait until midnight, and the card stays undecided
+
+  Scenario: Yesterday's fish has left the window, and today's goes
+    Given "A" sent a fish yesterday
     When "A" sends a fish on a card of today
-    Then it is refused as fish_budget_exceeded, with the wait until four days from now, and the card stays undecided
+    Then the fish is sent
+
+  Scenario: A round read after the day's fish offers no other fish today
+    Given "A" sent a fish today
+    When "A" reads today's round
+    Then it says no fish can go today
 
   Scenario: A fish changed to a like or a pass the same day is given back
     Given "A" sent a fish today

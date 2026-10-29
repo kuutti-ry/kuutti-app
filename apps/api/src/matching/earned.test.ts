@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse } from "@kuutti/schema";
+import { ErrorResponse, RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { conversationBetween, openConversation } from "../chat/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
@@ -89,7 +89,27 @@ async function likeBudget(db: Queryable, n: number) {
   );
 }
 
+/**
+ * The fish's window as a new version of fish_window_days: a week, version 1's
+ * (migration 0072), so a fish of earlier days is still in it; one day since
+ * #475 (migration 0088).
+ */
+async function fishWindow(db: Queryable, days: number) {
+  await db.query(
+    `INSERT INTO matching_config (version, key, value, created_by)
+     SELECT max(version) + 1, 'fish_window_days', $1::jsonb, 'test'
+       FROM matching_config WHERE key = 'fish_window_days'`,
+    [JSON.stringify(days)],
+  );
+}
+
 const codeOf = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
+
+/** What the answer to a decision says of the caller's fish after it (#475). */
+async function fishToSendAfter(answer: Response) {
+  expect(answer.status).toBe(200);
+  return RoundDecisionAnswer.parse(await answer.json()).fishToSend;
+}
 
 async function decisionsOf(db: Queryable, entries: readonly string[]) {
   const { rows } = await db.query<{ id: string; decision: string | null; fish: boolean }>(
@@ -210,6 +230,7 @@ describe("earned fish", () => {
   }) => {
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
+    await fishWindow(ctx.client, 7);
     await fishBefore(ctx.client, a, x, 3);
     await earnedUnits(ctx.client, a.accountId, { fish: 1 });
     const entries = await roundOf(ctx.client, a, [b, c]);
@@ -229,6 +250,7 @@ describe("earned fish", () => {
   test("A fish an earned fish paid for is left out of the window", async ({ ctx }) => {
     const [a, b, x] = await cast(ctx.client, 3);
     if (!a || !b || !x) throw new Error("cast not written");
+    await fishWindow(ctx.client, 7);
     const paid = await fishBefore(ctx.client, a, x, 1);
     await earnedUnits(ctx.client, a.accountId, { fish: 1 }, daysBefore(3));
     await ctx.client.query(
@@ -254,6 +276,7 @@ describe("earned fish", () => {
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
     await likeBudget(ctx.client, 1);
+    await fishWindow(ctx.client, 7);
     await fishBefore(ctx.client, a, x, 3);
     await earnedUnits(ctx.client, a.accountId, { likes: 1, fish: 1 });
     const entries = await roundOf(ctx.client, a, [b, c]);
@@ -285,6 +308,7 @@ describe("earned fish", () => {
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
     await likeBudget(ctx.client, 1);
+    await fishWindow(ctx.client, 7);
     await fishBefore(ctx.client, a, x, 3);
     await earnedUnits(ctx.client, a.accountId, { likes: 1 });
     const entries = await roundOf(ctx.client, a, [b, c]);
@@ -300,6 +324,23 @@ describe("earned fish", () => {
     expect(await unitsOf(ctx.client, a.accountId)).toEqual([
       { kind: "like", spent: false, entryId: null },
     ]);
+  });
+
+  test("an earned fish waiting keeps a fish to send once the day's own is sent, and none once it is spent too (#475)", async ({
+    ctx,
+  }) => {
+    const [a, b, c] = await cast(ctx.client, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await earnedUnits(ctx.client, a.accountId, { fish: 1 });
+    await roundOf(ctx.client, a, [b, c]);
+    const app = await appAt(ctx.client);
+
+    expect(await fishToSendAfter(await choose(app, a, 1, "fish"))).toBe(true);
+    const read = await app.request("/rounds/today", { headers: a.headers });
+    expect(RoundResponse.parse(await read.json()).fishToSend).toBe(true);
+    expect(await fishToSendAfter(await choose(app, a, 2, "fish"))).toBe(false);
+    // The earned one given back by a like is waiting again.
+    expect(await fishToSendAfter(await choose(app, a, 2, "like"))).toBe(true);
   });
 
   test("a unit stays spent when the entry it paid for goes, an erased candidate's", async ({
@@ -348,7 +389,7 @@ describe("two devices", () => {
       const racing = watched(decide(deps(second), MATCHES, choice(3, "like")));
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
-      expect(await racing.outcome).toEqual({ match: null });
+      expect(await racing.outcome).toEqual({ match: null, fishToSend: true });
       await second.query("COMMIT");
       expect(await decisionsOf(pool, entries)).toEqual(["like", "pass", "like"]);
       expect(await unitsOf(pool, a)).toEqual([{ kind: "like", spent: true, entryId: entries[2] }]);
