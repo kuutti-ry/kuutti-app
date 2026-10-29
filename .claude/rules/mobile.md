@@ -36,6 +36,7 @@ Stack: Expo SDK 57, React Native 0.86, React 19, TypeScript, dev client (`expo s
 - Glyph sets never imitate console vendors' trademarked shapes or names.
 - Text is Saiga (ADR-052) through `font-sans`, which `Text`, `Input`, `Label` and the dialog's title and description carry; a new text primitive carries it too. Saiga has no 600: `font-semibold` is Bold (`tailwind.config.js`), and no tabular figures. A build without Saiga, and every web preview, is in the system font: a screen never depends on Saiga's metrics.
 - The Android theme declares `android:forceDarkAllowed=false` (`plugins/withNoForceDark.js`, #27): the app follows the system scheme and ships its own dark and high-contrast sets, so a launcher's forced dark mode (MIUI) must not repaint them.
+- It also declares `android:useBoundsForWidth=false` (`plugins/withAdvanceWidths.js`, #518): React Native 0.86 measures text by its glyphs' advances, and Android 15's TextView, by default for an app that targets API 35 or later, breaks lines by their ink, so a label sized to its own width lost its last word. Remove it only once React Native measures by the ink too.
 
 ## Notifications
 
