@@ -994,6 +994,8 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.card.open": "［Šéééé ýýóóúúr çáárd］",
   "profile.card.photoLabel": "［Phóótóó {position, number} óóf {total, number}］",
   "profile.card.photoLabelCaption": "［Phóótóó {position, number} óóf {total, number}. {caption}］",
+  "profile.card.photoNext": "［Ñééxt phóótóó］",
+  "profile.card.photoPrevious": "［Préévííóóúúš phóótóó］",
   "profile.card.sharedOption": "［{option} (ýýóóúú tóóóó)］",
   "profile.card.title": "［ÝÝóóúúr çáárd］",
   "profile.clear": "［Çlééáár théé ááñšwéér］",

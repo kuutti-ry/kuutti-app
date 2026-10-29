@@ -413,7 +413,7 @@ describe("PII in logs", () => {
     );
     await ctx.client.query(
       `INSERT INTO photo_access (account_id, photo_id, variant, at)
-       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 119) g`,
+       SELECT $1, $2, 'card', $3::timestamptz - g * interval '1 second' FROM generate_series(1, 199) g`,
       [a.accountId, photo, new Date(tick)],
     );
     const probe = `?${new URLSearchParams({ hetu: FIXTURES.hetu, email: FIXTURES.email, text: FIXTURES.message })}`;
@@ -428,7 +428,7 @@ describe("PII in logs", () => {
     }
     const banned = lines().filter((line) => line.msg === "automatic shadow ban");
     expect(banned.map(({ rule, count }) => ({ rule, count }))).toEqual([
-      { rule: "photo_fetches", count: 120 },
+      { rule: "photo_fetches", count: 200 },
       { rule: "round_reads", count: 30 },
     ]);
     for (const line of banned) {

@@ -9,36 +9,36 @@ Feature: Velocity rules
   before it answers, and changing no answer. A thumb, a person's own photos and a conversation's photos never
   count. The round's reads are counted in memory, so nothing about them is
   stored. The thresholds are the maintainer's of 21/10/2026, matching_config
-  rows like every other rule's: 120 photos in 60 minutes, cards served off
+  rows like every other rule's: 200 photos in 60 minutes, cards served off
   (0) while the round bounds them, 30 reads of the round in one minute.
 
   Scenario Outline: Other people's photos fetched within the hour shadow-ban the fetcher at the threshold
-    Given auto_shadow_ban_photo_fetches is 120 and auto_shadow_ban_photo_fetches_minutes is 60
+    Given auto_shadow_ban_photo_fetches is 200 and auto_shadow_ban_photo_fetches_minutes is 60
     And "A" was handed <earlier> URLs of other people's photos in the card and full sizes in the last 59 minutes
     When "A" fetches one more in the card size
     Then the fetch answers 200 with its URL and "A" is <outcome>
 
     Examples:
       | earlier | outcome                                                                                 |
-      | 118     | not sanctioned                                                                          |
-      | 119     | shadow-banned by nobody for the reason scraping, by the rule photo_fetches counting 120 |
+      | 198     | not sanctioned                                                                          |
+      | 199     | shadow-banned by nobody for the reason scraping, by the rule photo_fetches counting 200 |
 
   Scenario: Thumbs, the person's own photos and a conversation's photos do not count
-    Given auto_shadow_ban_photo_fetches is 120
-    And "A" was handed 119 URLs in the last hour of other people's thumbs, of their own photos and of photos sent in conversations
+    Given auto_shadow_ban_photo_fetches is 200
+    And "A" was handed 199 URLs in the last hour of other people's thumbs, of their own photos and of photos sent in conversations
     When "A" fetches another person's photo in the card size
     Then "A" is not sanctioned
 
   Scenario: A fetch as old as the window does not count
-    Given auto_shadow_ban_photo_fetches is 120 and auto_shadow_ban_photo_fetches_minutes is 60
-    And "A" was handed one URL of another person's photo exactly 60 minutes ago and 118 since
+    Given auto_shadow_ban_photo_fetches is 200 and auto_shadow_ban_photo_fetches_minutes is 60
+    And "A" was handed one URL of another person's photo exactly 60 minutes ago and 198 since
     When "A" fetches one more in the card size
     Then "A" is not sanctioned
 
   Scenario: A thumb is never checked, and the next card is
-    Given auto_shadow_ban_photo_fetches is 120 and "A" was handed 120 card URLs of other people's photos in the last hour
+    Given auto_shadow_ban_photo_fetches is 200 and "A" was handed 200 card URLs of other people's photos in the last hour
     When "A" fetches a thumb, and then a photo in the card size
-    Then "A" is not sanctioned after the thumb, and shadow-banned by the rule photo_fetches counting 121 after the card
+    Then "A" is not sanctioned after the thumb, and shadow-banned by the rule photo_fetches counting 201 after the card
 
   Scenario Outline: Reads of the round within a minute shadow-ban the reader at the threshold
     Given auto_shadow_ban_round_reads is 30 and auto_shadow_ban_round_reads_minutes is 1
@@ -86,7 +86,7 @@ Feature: Velocity rules
     Then "A" is shadow-banned by the rule cards_served counting 45
 
   Scenario Outline: A velocity rule writes nothing on a person already out of sight, or on staff
-    Given auto_shadow_ban_photo_fetches is 120 and "A" was handed 119 URLs of other people's photos in the last hour
+    Given auto_shadow_ban_photo_fetches is 200 and "A" was handed 199 URLs of other people's photos in the last hour
     And "A" is <standing>
     When "A" fetches one more in the card size
     Then the fetch answers 200 with its URL and no sanction is written
@@ -98,26 +98,26 @@ Feature: Velocity rules
       | a moderator                             |
 
   Scenario: Two fetches at the threshold at the same moment shadow-ban the person once
-    Given auto_shadow_ban_photo_fetches is 120 and "A" was handed 120 URLs of other people's photos in the last hour
+    Given auto_shadow_ban_photo_fetches is 200 and "A" was handed 200 URLs of other people's photos in the last hour
     When the photo rule is checked for "A" twice at the same moment
-    Then "A" has one shadow ban, by the rule photo_fetches counting 120
+    Then "A" has one shadow ban, by the rule photo_fetches counting 200
 
   Scenario: A person a velocity rule shadow-banned gets the answers they got before
-    Given a rule shadow-banned "A" at their 120th fetch of another person's photo
+    Given a rule shadow-banned "A" at their 200th fetch of another person's photo
     When "A" fetches the same photo again and reads today's round
     Then every answer is as before the ban
 
   Scenario: After a reversal only the fetches that follow count
-    Given a rule shadow-banned "A" at their 120th fetch, and a moderator reversed it
+    Given a rule shadow-banned "A" at their 200th fetch, and a moderator reversed it
     When "A" fetches one more in the card size
     Then "A" is not sanctioned
 
   Scenario: A velocity ban waits on the moderators' list with its rule, its count and its first fetch
-    Given a rule shadow-banned "A" at their 120th fetch of another person's photo
+    Given a rule shadow-banned "A" at their 200th fetch of another person's photo
     When a moderator reads the automatic shadow bans
-    Then the list names the rule photo_fetches, the count 120 and the time of the first counted fetch
+    Then the list names the rule photo_fetches, the count 200 and the time of the first counted fetch
 
   Scenario: No line of a velocity check names a person or carries a fixture
-    Given "A" was handed 119 URLs of other people's photos
+    Given "A" was handed 199 URLs of other people's photos
     When "A" fetches one more and "B" reads today's round 30 times within the minute, each request carrying the fixtures
     Then the checks' lines carry the rule and its count only, and no line carries a fixture or the photos' owners

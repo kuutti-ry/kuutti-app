@@ -2,9 +2,10 @@ import type { ProfileCard } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { Image } from "expo-image";
 import * as SecureStore from "expo-secure-store";
+import { AccessibilityInfo } from "react-native";
 import { saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { ProfileCardView } from "./ProfileCardView";
 
 // A card as others see it (#47, #150): what it shows when the person has
@@ -28,6 +29,12 @@ const photoAt = (
   description,
 });
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 10)));
+/** A tap on the photo's right half: the next one comes to the front (#513). */
+const next = () =>
+  act(async () => {
+    fireEvent.press(screen.getByRole("button", { name: "Next photo" }));
+    await new Promise<void>((resolve) => setTimeout(resolve, 10));
+  });
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 
 const bare: ProfileCard = {
@@ -146,13 +153,23 @@ describe("ProfileCardView", () => {
       />,
     );
     await settle();
-    expect(screen.getByLabelText("Photo 1 of 3. A summer day")).toBeTruthy();
-    expect(screen.getByLabelText("Photo 2 of 3")).toBeTruthy();
-    expect(screen.getByLabelText("Photo 3 of 3. With a four-legged friend")).toBeTruthy();
-    // Visible under the photo, hidden from the accessibility tree: the label above carries it.
-    for (const line of ["A summer day", "With a four-legged friend"]) {
-      expect(screen.getByText(line, { includeHiddenElements: true })).toBeTruthy();
-      expect(screen.queryByText(line)).toBeNull();
+    // The photo in front, its line under it: visible, hidden from the accessibility
+    // tree, since the label carries it; the next one's comes with it.
+    const lines = ["A summer day", null, "With a four-legged friend"];
+    const labels = [
+      "Photo 1 of 3. A summer day",
+      "Photo 2 of 3",
+      "Photo 3 of 3. With a four-legged friend",
+    ];
+    for (const [at, label] of labels.entries()) {
+      if (at > 0) await next();
+      expect(screen.getByLabelText(label)).toBeTruthy();
+      for (const line of lines) {
+        if (line === null) continue;
+        const under = screen.queryByText(line, { includeHiddenElements: true });
+        expect(under !== null).toBe(line === lines[at]);
+        expect(screen.queryByText(line)).toBeNull();
+      }
     }
   });
 
@@ -185,7 +202,9 @@ describe("ProfileCardView", () => {
     await settle();
     // The caption first, then the machine's words, named as such; a photo without a description says nothing more.
     expect(screen.getByLabelText(`Photo 1 of 3. A summer day. ${lakesideWords}`)).toBeTruthy();
+    await next();
     expect(screen.getByLabelText(`Photo 2 of 3. ${saunaWords}`)).toBeTruthy();
+    await next();
     expect(screen.getByLabelText("Photo 3 of 3")).toBeTruthy();
     expect(screen.queryByText(lakesideWords, { includeHiddenElements: true })).toBeNull();
 
@@ -202,11 +221,14 @@ describe("ProfileCardView", () => {
     expect(
       await screen.findByLabelText(`Photo 1 of 3. A summer day. ${lakesideNoFace}`),
     ).toBeTruthy();
+    expect(screen.getByText(lakesideNoFace, { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText(lakesideNoFace)).toBeNull();
+    await next();
     expect(screen.getByLabelText(`Photo 2 of 3. ${saunaNoFace}`)).toBeTruthy();
-    for (const words of [lakesideNoFace, saunaNoFace]) {
-      expect(screen.getByText(words, { includeHiddenElements: true })).toBeTruthy();
-      expect(screen.queryByText(words)).toBeNull();
-    }
+    // Under the photo in front only.
+    expect(screen.queryByText(lakesideNoFace, { includeHiddenElements: true })).toBeNull();
+    expect(screen.getByText(saunaNoFace, { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.queryByText(saunaNoFace)).toBeNull();
   });
   it("has no block or report on the owner's own card", async () => {
     await renderWithTheme(<ProfileCardView card={bare} />);
@@ -282,8 +304,10 @@ describe("ProfileCardView", () => {
     await renderWithTheme(<ProfileCardView card={card} onGone={jest.fn()} />);
     await settle();
     const signed = () => asked.filter((path) => path.startsWith("/photos/"));
-    // The card's own two: the main photo's card variant and the other's thumb.
-    expect(signed()).toEqual([`/photos/${photoAt(1).id}/card`, `/photos/${photoAt(2).id}/thumb`]);
+    // The main photo's card variant, and the other's once it came to the front.
+    expect(signed()).toEqual([`/photos/${photoAt(1).id}/card`]);
+    await next();
+    expect(signed()).toEqual([`/photos/${photoAt(1).id}/card`, `/photos/${photoAt(2).id}/card`]);
     const press = (name: string, role: "button" | "radio" = "button") =>
       act(async () => {
         fireEvent.press(screen.getByRole(role, { name }));
@@ -301,7 +325,7 @@ describe("ProfileCardView", () => {
     // Seen beside its picture: the place and the caption, as under the photo.
     expect(screen.getByText("Photo 2 of 2. A summer day")).toBeTruthy();
     // Under the keys the card painted them by, and no URL signed again.
-    expect(cache.mock.calls).toEqual([[`${photoAt(1).id}/card`], [`${photoAt(2).id}/thumb`]]);
+    expect(cache.mock.calls).toEqual([[`${photoAt(1).id}/card`], [`${photoAt(2).id}/card`]]);
     expect(signed()).toHaveLength(2);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
@@ -315,5 +339,81 @@ describe("ProfileCardView", () => {
       ]),
     );
     cache.mockRestore();
+  });
+
+  it("shows one photo at a time, the next and the previous by a tap on either half, asks for each once when it first comes to the front, and says which came (#513)", async () => {
+    const asked: string[] = [];
+    globalThis.fetch = jest.fn(async (input: Request | string) => {
+      asked.push(new URL(input instanceof Request ? input.url : input).pathname);
+      return json({ error: { code: "not_found", message: "x", requestId: "r" } }, 404);
+    }) as unknown as typeof fetch;
+    const said = jest.spyOn(AccessibilityInfo, "announceForAccessibility");
+    said.mockClear();
+    const card = { ...bare, photos: [photoAt(1), photoAt(2, "summer_day"), photoAt(3)] };
+    await renderWithTheme(<ProfileCardView card={card} onGone={jest.fn()} />);
+    await settle();
+    const button = (name: string) => screen.getByRole("button", { name });
+    const dimmed = (name: string) => button(name).props.accessibilityState?.disabled === true;
+    // One photo heard at a time; nothing beyond it asked for (prefetch counts as exposure).
+    expect(screen.getAllByRole("image").map((image) => image.props.accessibilityLabel)).toEqual([
+      "Photo 1 of 3",
+    ]);
+    expect(asked).toEqual([`/photos/${photoAt(1).id}/card`]);
+    expect([dimmed("Previous photo"), dimmed("Next photo")]).toEqual([true, false]);
+    await fireEvent.press(button("Previous photo"));
+    expect(said).not.toHaveBeenCalled();
+
+    await next();
+    expect(screen.getAllByRole("image").map((image) => image.props.accessibilityLabel)).toEqual([
+      "Photo 2 of 3. A summer day",
+    ]);
+    expect(said).toHaveBeenLastCalledWith("Photo 2 of 3. A summer day");
+    expect([dimmed("Previous photo"), dimmed("Next photo")]).toEqual([false, false]);
+    await act(async () => {
+      fireEvent.press(button("Previous photo"));
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+    });
+    expect(said).toHaveBeenLastCalledWith("Photo 1 of 3");
+    await next();
+    await next();
+    expect(said).toHaveBeenLastCalledWith("Photo 3 of 3");
+    expect([dimmed("Previous photo"), dimmed("Next photo")]).toEqual([false, true]);
+    await fireEvent.press(button("Next photo"));
+    expect(screen.getByLabelText("Photo 3 of 3")).toBeTruthy();
+    // Each signed once, in the card size, however often it came back to the front.
+    expect(asked).toEqual([1, 2, 3].map((n) => `/photos/${photoAt(n).id}/card`));
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+    said.mockRestore();
+  });
+
+  it("has no Previous or Next on a card with one photo (#513)", async () => {
+    await renderWithTheme(<ProfileCardView card={{ ...bare, photos: [photoAt(1)] }} />);
+    await settle();
+    expect(screen.getByLabelText("Photo 1 of 1")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Previous photo" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next photo" })).toBeNull();
+  });
+
+  it("starts the next person's card at their main photo (#513)", async () => {
+    const first = { ...bare, photos: [photoAt(1), photoAt(2)] };
+    await renderWithTheme(<ProfileCardView card={first} />);
+    await settle();
+    await next();
+    expect(screen.getByLabelText("Photo 2 of 2")).toBeTruthy();
+    const second = {
+      ...bare,
+      accountId: "7a1c1c4e-9a8e-4a0b-9c3a-0c8d1e2f3a4b",
+      photos: [photoAt(3), photoAt(4)],
+    };
+    await screen.rerender(underProviders(<ProfileCardView card={second} />));
+    await settle();
+    expect(screen.getAllByRole("image").map((image) => image.props.accessibilityLabel)).toEqual([
+      "Photo 1 of 2",
+    ]);
+    expect(
+      screen.getByRole("button", { name: "Previous photo" }).props.accessibilityState,
+    ).toMatchObject({ disabled: true });
   });
 });

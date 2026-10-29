@@ -2626,6 +2626,20 @@ profile.card.photoLabelCaption:
   sv: "Foto {position, number} av {total, number}. {caption}"
   machine: { fi: true, sv: true }
 
+profile.card.photoPrevious:
+  en: "Previous photo"
+  description: "The left half of a card's photo (#513), a button: a tap shows the card's previous photo in its place; dimmed on the first."
+  fi: "Edellinen kuva"
+  sv: "Föregående foto"
+  machine: { fi: true, sv: true }
+
+profile.card.photoNext:
+  en: "Next photo"
+  description: "The right half of a card's photo (#513), a button: a tap shows the card's next photo in its place; dimmed on the last."
+  fi: "Seuraava kuva"
+  sv: "Nästa foto"
+  machine: { fi: true, sv: true }
+
 profile.card.sharedOption:
   en: "{option} (you too)"
   description: "An answer on a card that the viewer gave as well (#150): a hobby or a language both answered, marked in words, never a count."
