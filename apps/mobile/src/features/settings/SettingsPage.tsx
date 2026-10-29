@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import { type ReactNode, type RefObject, useCallback, useRef } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -83,7 +84,15 @@ export function SettingsPage({
   const router = useRouter();
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScreenHeader title={title} backLabel={t("settings.back")} onBack={() => router.back()} />
+      <ScreenHeader
+        title={title}
+        backLabel={t("settings.back")}
+        onBack={() => {
+          // A field the arrow leaves counts as left, and saves (#511).
+          Keyboard.dismiss();
+          router.back();
+        }}
+      />
       <KeyboardAvoidingView
         className="flex-1"
         behavior="padding"

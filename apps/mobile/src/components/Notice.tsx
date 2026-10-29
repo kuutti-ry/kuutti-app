@@ -19,7 +19,7 @@ export function Notice({
   refused?: boolean;
   answer?: number;
 }) {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a new answer with the same words is said again.
+  // A new answer with the same words is said again, hence the answer among the dependencies.
   useEffect(() => {
     if (Platform.OS === "ios") {
       AccessibilityInfo.announceForAccessibilityWithOptions(words, { queue: true });

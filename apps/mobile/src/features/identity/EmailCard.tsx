@@ -13,6 +13,7 @@ import { DEAL_BREAKERS_PATH } from "@/features/profile";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
 import { useRowData } from "@/lib/row-data";
+import { useReportUnsaved } from "@/lib/unsaved";
 import { useHapticTap } from "@/theme/haptics";
 import { clearEmail, confirmEmailCode, fetchEmail, saveEmail, sendEmailCode } from "./email-client";
 import { useLockOfferDue } from "./lock/LockProvider";
@@ -168,6 +169,8 @@ function EmailForm({
   // the same words again for a second code within the minute.
   const [answers, setAnswers] = useState(0);
   useEffect(() => onStored?.(stored), [stored, onStored]);
+  // An address typed and not sent is not kept: Settings asks before it is left (#511).
+  useReportUnsaved("email", typed.trim() !== "" && typed.trim() !== (stored.email ?? ""));
   // Whole sentences one after another; nothing is inflected around them.
   const wordsOf = (lines: readonly Said[]): string =>
     lines

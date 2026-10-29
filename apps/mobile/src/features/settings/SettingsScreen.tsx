@@ -2,7 +2,7 @@ import { CONSENT_VERSIONS, LOCALE_NAMES } from "@kuutti/i18n";
 import type { WithdrawableConsentKind } from "@kuutti/schema";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import CircleAlert from "lucide-react-native/icons/circle-alert";
-import type { ReactNode } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
 import { AccessibilityInfo, Keyboard, Platform, View } from "react-native";
 import { type Row, RowGroup } from "@/components/RowGroup";
 import { Icon } from "@/components/ui/icon";
@@ -20,11 +20,13 @@ import {
   useSession,
 } from "@/features/identity";
 import { NotificationChoices, useNotificationsSummary } from "@/features/notifications";
+import { ConfirmLeaveDialog, useConfirmLeave } from "@/features/profile";
 import { Invitations, useInvitationsSummary } from "@/features/rewards";
 import { buildInfo } from "@/lib/build";
 import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useLocaleSettings, useT } from "@/lib/locale";
 import { usePhotoDescriptionSettings } from "@/lib/photo-descriptions";
+import { UnsavedRow } from "@/lib/unsaved";
 import { useHapticTap } from "@/theme/haptics";
 import { useTheme } from "@/theme/ThemeProvider";
 import { SCHEMES } from "./Choice";
@@ -51,15 +53,30 @@ const CONSENT_TITLE = {
 /** The mark of a setting that does not do what it says (#511): its words are in the row's value. */
 const ALERT = <Icon as={CircleAlert} testID="row-alert" className="mt-0.5 text-foreground" />;
 
-/** A heading and its rows; a section with no rows (signed out) is not drawn. */
+/** The rows whose panels hold something not saved (#511), and the word for them. */
+const Unsaved = createContext<{ rows: ReadonlySet<string>; words: string }>({
+  rows: new Set(),
+  words: "",
+});
+
+/**
+ * A heading and its rows; a section with no rows (signed out) is not drawn.
+ * A row whose panel holds something not saved says so as its value, marked.
+ */
 function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
+  const unsaved = useContext(Unsaved);
   if (rows.length === 0) return null;
+  const shown = rows.map((row) =>
+    unsaved.rows.has(row.key)
+      ? { ...row, summary: unsaved.words, value: unsaved.words, mark: ALERT }
+      : row,
+  );
   return (
     <View className="gap-2">
       <Text variant="large" role="heading" aria-level="2">
         {title}
       </Text>
-      <RowGroup rows={rows} />
+      <RowGroup rows={shown} />
     </View>
   );
 }
@@ -96,10 +113,31 @@ export function SettingsScreen() {
   const { scrollProps, reveal } = useReveal();
   const signedIn = session.status === "signed-in";
 
+  // Which fields under which rows hold something not saved (#511): marked
+  // on the row, and asked about before the list is left.
+  const [unsaved, setUnsaved] = useState<ReadonlyMap<string, ReadonlySet<string>>>(new Map());
+  const report = useCallback((row: string, field: string, holds: boolean) => {
+    setUnsaved((was) => {
+      const fields = was.get(row) ?? new Set<string>();
+      if (fields.has(field) === holds) return was;
+      const next = new Set(fields);
+      if (holds) next.add(field);
+      else next.delete(field);
+      return new Map(was).set(row, next);
+    });
+  }, []);
+  const unsavedRows = [...unsaved].filter(([, fields]) => fields.size > 0).map(([row]) => row);
+  // Leaving with nothing refused needs no word: a change not sent goes on the way out.
+  const leaving = useConfirmLeave(unsavedRows.length > 0, () => undefined);
+
   /** A row that holds its setting, open or closed, with its picture. */
   const holding = (key: string, panel: ReactNode) => ({
     key,
-    panel,
+    panel: (
+      <UnsavedRow row={key} report={report}>
+        {panel}
+      </UnsavedRow>
+    ),
     icon: ROW_ICONS[key],
     expanded: open === key,
     kept: opened.has(key),
@@ -166,158 +204,175 @@ export function SettingsScreen() {
 
   return (
     <SettingsPage title={t("settings.title")} scrollProps={scrollProps}>
-      <View className="gap-8">
-        <Section
-          title={t("settings.section.appearance")}
-          rows={[
-            // The language first: somebody who chose one they cannot read finds it at the top.
-            {
-              ...holding("language", <LanguageChoices />),
-              title: t("settings.language.label"),
-              summary: languageSummary,
-              value: languageSummary,
-            },
-            {
-              ...holding("theme", <ThemeChoices />),
-              title: t("settings.theme.label"),
-              summary: themeSummary,
-              value: themeSummary,
-            },
-            {
-              ...holding("photoDescriptions", <PhotoDescriptionChoices />),
-              title: t("settings.photoDescriptions.label"),
-              summary: descriptionsSummary,
-              value: descriptionsSummary,
-            },
-            {
-              ...holding("decisionButtons", <DecisionButtonChoices />),
-              title: t("settings.decisionButtons.label"),
-              summary: buttonsSummary,
-              value: buttonsSummary,
-            },
-          ]}
-        />
-        <Section
-          title={t("settings.section.contact")}
-          rows={only(signedIn, [
-            {
-              ...holding("notifications", <NotificationChoices onStored={notifications.stored} />),
-              title: t("settings.notifications.label"),
-              summary: notifications.summary,
-              value: notifications.summary,
-              mark: notifications.alert ? ALERT : undefined,
-            },
-            {
-              ...holding("email", <EmailCard inRow onStored={email.stored} />),
-              title: t("settings.email.label"),
-              summary: email.summary,
-              value: email.summary,
-              mark: email.alert ? ALERT : undefined,
-            },
-            {
-              ...holding("contacts", <YourContacts onStored={contacts.stored} />),
-              title: t("settings.contacts.label"),
-              summary: contacts.summary,
-              value: contacts.summary,
-            },
-          ])}
-        />
-        <Section
-          title={t("settings.section.security")}
-          rows={[
-            // The lock is this phone's (#418); the web preview has none.
-            ...only(signedIn && Platform.OS !== "web", [
+      <ConfirmLeaveDialog
+        asking={leaving.asking}
+        leave={leaving.leave}
+        keep={() => {
+          leaving.keep();
+          // Back to where it was not saved.
+          const first = unsavedRows[0];
+          if (first !== undefined && open !== first) toggle(first);
+        }}
+      />
+      <Unsaved.Provider value={{ rows: new Set(unsavedRows), words: t("settings.row.unsaved") }}>
+        <View className="gap-8">
+          <Section
+            title={t("settings.section.appearance")}
+            rows={[
+              // The language first: somebody who chose one they cannot read finds it at the top.
               {
-                ...holding("lock", <LockControls />),
-                title: t("settings.lock.label"),
-                summary: lockWords,
-                value: lockWords,
+                ...holding("language", <LanguageChoices />),
+                title: t("settings.language.label"),
+                summary: languageSummary,
+                value: languageSummary,
               },
-            ]),
-            // The two withdrawable consents, each saying whether it is on; nothing signed out.
-            ...only(signedIn, [
-              consentRow("research"),
-              consentRow("special_category"),
               {
-                ...holding("export", <ExportData />),
-                title: t("settings.export.label"),
+                ...holding("theme", <ThemeChoices />),
+                title: t("settings.theme.label"),
+                summary: themeSummary,
+                value: themeSummary,
               },
-            ]),
-          ]}
-        />
-        <Section
-          title={t("settings.section.community")}
-          rows={only(signedIn, [
-            {
-              ...holding("invitations", <Invitations onStored={invitations.stored} />),
-              title: t("settings.invite.label"),
-              summary: invitations.summary,
-              value: invitations.summary,
-            },
-            {
-              ...holding("feedback", <FeedbackForm />),
-              title: t("feedback.title"),
-            },
-          ])}
-        />
-        <Section
-          title={t("settings.about.title")}
-          rows={[
-            {
-              key: "version",
-              icon: ROW_ICONS.version,
-              title: t("settings.version.label"),
-              summary: commit
-                ? t("settings.version.commit", { commit: commit.slice(0, 7) })
-                : undefined,
-              detail: version ?? "?",
-            },
-            {
-              ...holding("terms", <LegalSummary kind="terms" />),
-              title: t("legal.terms.title"),
-              summary: t("onboarding.consents.version", { version: CONSENT_VERSIONS.terms ?? "" }),
-            },
-            {
-              ...holding("privacy", <LegalSummary kind="privacy" />),
-              title: t("legal.privacy.title"),
-              summary: t("onboarding.consents.version", {
-                version: CONSENT_VERSIONS.privacy ?? "",
-              }),
-            },
-            {
-              ...holding("source", <SourcePanel />),
-              title: t("about.source.title"),
-            },
-            {
-              key: "licenses",
-              icon: ROW_ICONS.licenses,
-              title: t("settings.licenses.label"),
-              summary: t("settings.licenses.summary", { packages: LICENCES.packages.length }),
-              onPress: () => {
-                tap();
-                router.push("/settings/licenses");
-              },
-            },
-          ]}
-        />
-        <Section
-          title={t("settings.group.account")}
-          rows={[
-            // Always there: a device with no session says so under it, and a
-            // flow signing out finds the row whatever the session is.
-            {
-              ...holding("device", <DeviceActions />),
-              title: t("settings.session.label"),
-            },
-            ...only(signedIn, [
               {
-                ...holding("account", <AccountActions />),
-                title: t("account.title"),
+                ...holding("photoDescriptions", <PhotoDescriptionChoices />),
+                title: t("settings.photoDescriptions.label"),
+                summary: descriptionsSummary,
+                value: descriptionsSummary,
               },
-            ]),
-          ]}
-        />
-      </View>
+              {
+                ...holding("decisionButtons", <DecisionButtonChoices />),
+                title: t("settings.decisionButtons.label"),
+                summary: buttonsSummary,
+                value: buttonsSummary,
+              },
+            ]}
+          />
+          <Section
+            title={t("settings.section.contact")}
+            rows={only(signedIn, [
+              {
+                ...holding(
+                  "notifications",
+                  <NotificationChoices onStored={notifications.stored} />,
+                ),
+                title: t("settings.notifications.label"),
+                summary: notifications.summary,
+                value: notifications.summary,
+                mark: notifications.alert ? ALERT : undefined,
+              },
+              {
+                ...holding("email", <EmailCard inRow onStored={email.stored} />),
+                title: t("settings.email.label"),
+                summary: email.summary,
+                value: email.summary,
+                mark: email.alert ? ALERT : undefined,
+              },
+              {
+                ...holding("contacts", <YourContacts onStored={contacts.stored} />),
+                title: t("settings.contacts.label"),
+                summary: contacts.summary,
+                value: contacts.summary,
+              },
+            ])}
+          />
+          <Section
+            title={t("settings.section.security")}
+            rows={[
+              // The lock is this phone's (#418); the web preview has none.
+              ...only(signedIn && Platform.OS !== "web", [
+                {
+                  ...holding("lock", <LockControls />),
+                  title: t("settings.lock.label"),
+                  summary: lockWords,
+                  value: lockWords,
+                },
+              ]),
+              // The two withdrawable consents, each saying whether it is on; nothing signed out.
+              ...only(signedIn, [
+                consentRow("research"),
+                consentRow("special_category"),
+                {
+                  ...holding("export", <ExportData />),
+                  title: t("settings.export.label"),
+                },
+              ]),
+            ]}
+          />
+          <Section
+            title={t("settings.section.community")}
+            rows={only(signedIn, [
+              {
+                ...holding("invitations", <Invitations onStored={invitations.stored} />),
+                title: t("settings.invite.label"),
+                summary: invitations.summary,
+                value: invitations.summary,
+              },
+              {
+                ...holding("feedback", <FeedbackForm />),
+                title: t("feedback.title"),
+              },
+            ])}
+          />
+          <Section
+            title={t("settings.about.title")}
+            rows={[
+              {
+                key: "version",
+                icon: ROW_ICONS.version,
+                title: t("settings.version.label"),
+                summary: commit
+                  ? t("settings.version.commit", { commit: commit.slice(0, 7) })
+                  : undefined,
+                detail: version ?? "?",
+              },
+              {
+                ...holding("terms", <LegalSummary kind="terms" />),
+                title: t("legal.terms.title"),
+                summary: t("onboarding.consents.version", {
+                  version: CONSENT_VERSIONS.terms ?? "",
+                }),
+              },
+              {
+                ...holding("privacy", <LegalSummary kind="privacy" />),
+                title: t("legal.privacy.title"),
+                summary: t("onboarding.consents.version", {
+                  version: CONSENT_VERSIONS.privacy ?? "",
+                }),
+              },
+              {
+                ...holding("source", <SourcePanel />),
+                title: t("about.source.title"),
+              },
+              {
+                key: "licenses",
+                icon: ROW_ICONS.licenses,
+                title: t("settings.licenses.label"),
+                summary: t("settings.licenses.summary", { packages: LICENCES.packages.length }),
+                onPress: () => {
+                  tap();
+                  router.push("/settings/licenses");
+                },
+              },
+            ]}
+          />
+          <Section
+            title={t("settings.group.account")}
+            rows={[
+              // Always there: a device with no session says so under it, and a
+              // flow signing out finds the row whatever the session is.
+              {
+                ...holding("device", <DeviceActions />),
+                title: t("settings.session.label"),
+              },
+              ...only(signedIn, [
+                {
+                  ...holding("account", <AccountActions />),
+                  title: t("account.title"),
+                },
+              ]),
+            ]}
+          />
+        </View>
+      </Unsaved.Provider>
     </SettingsPage>
   );
 }

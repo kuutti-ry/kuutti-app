@@ -9550,10 +9550,10 @@ settings.contacts.title:
   machine: { fi: true, sv: true }
 
 settings.contacts.hint:
-  en: "{kind, select, phone {A number with its country code, or a Finnish one starting with 0.} whatsapp {The number your WhatsApp uses, with its country code or starting with 0.} telegram {Your username, with or without the @ before it.} instagram {Your username, with or without the @ before it.} snapchat {Your username, with or without the @ before it.} other {A way to reach you.}}"
-  description: "Under the title of one card on the Ways to reach you screen (#103): what to type. The app stores a number as +358…, a username without its @ (an Instagram or Snapchat one in lower case)."
-  fi: "{kind, select, phone {Numero maatunnuksen kanssa tai suomalainen numero, joka alkaa nollalla.} whatsapp {Numero, jota WhatsApp käyttää, maatunnuksen kanssa tai nollalla alkavana.} telegram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} instagram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} snapchat {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} other {Tapa tavoittaa sinut.}}"
-  sv: "{kind, select, phone {Ett nummer med landsnummer, eller ett finskt nummer som börjar med 0.} whatsapp {Numret som WhatsApp använder, med landsnummer eller med 0 först.} telegram {Ditt användarnamn, med eller utan @ före.} instagram {Ditt användarnamn, med eller utan @ före.} snapchat {Ditt användarnamn, med eller utan @ före.} other {Ett sätt att nå dig.}}"
+  en: "{kind, select, phone {With or without the 0 at the start. For another country's number, choose its code first.} whatsapp {The number your WhatsApp uses. With or without the 0 at the start.} telegram {Your username, with or without the @ before it.} instagram {Your username, with or without the @ before it.} snapchat {Your username, with or without the @ before it.} other {A way to reach you.}}"
+  description: "Under the title of one kind under the Ways to reach you row (#103, #511): what to type. A number is typed after its country code, which stands beside the field (+358 unless another is chosen), with or without the 0 a country dials at home; the app stores it as +358…, a username without its @ (an Instagram or Snapchat one in lower case). No example number: one that looks real belongs to someone."
+  fi: "{kind, select, phone {Alun nollan kanssa tai ilman. Toisen maan numerolle valitse ensin sen maatunnus.} whatsapp {Numero, jota WhatsApp käyttää. Alun nollan kanssa tai ilman.} telegram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} instagram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} snapchat {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} other {Tapa tavoittaa sinut.}}"
+  sv: "{kind, select, phone {Med eller utan 0 först. För ett nummer från ett annat land, välj först dess landsnummer.} whatsapp {Numret som WhatsApp använder. Med eller utan 0 först.} telegram {Ditt användarnamn, med eller utan @ före.} instagram {Ditt användarnamn, med eller utan @ före.} snapchat {Ditt användarnamn, med eller utan @ före.} other {Ett sätt att nå dig.}}"
   machine: { fi: true, sv: true }
 
 settings.contacts.input:
@@ -9561,20 +9561,6 @@ settings.contacts.input:
   description: "Accessible name of the text field of one card on the Ways to reach you screen (#103)."
   fi: "{kind, select, phone {Puhelinnumerosi} whatsapp {WhatsApp-numerosi} telegram {Telegram-käyttäjänimesi} instagram {Instagram-käyttäjänimesi} snapchat {Snapchat-käyttäjänimesi} other {Yhteystietosi}}"
   sv: "{kind, select, phone {Ditt telefonnummer} whatsapp {Ditt WhatsApp-nummer} telegram {Ditt användarnamn på Telegram} instagram {Ditt användarnamn på Instagram} snapchat {Ditt användarnamn på Snapchat} other {Din kontaktuppgift}}"
-  machine: { fi: true, sv: true }
-
-settings.contacts.save:
-  en: "Save"
-  description: "The button of one card on the Ways to reach you screen that keeps what was typed (#103). Short; its screen-reader name is settings.contacts.saveLabel, which starts with these words."
-  fi: "Tallenna"
-  sv: "Spara"
-  machine: { fi: true, sv: true }
-
-settings.contacts.saveLabel:
-  en: "{kind, select, phone {Save your phone number} whatsapp {Save your WhatsApp number} telegram {Save your Telegram username} instagram {Save your Instagram username} snapchat {Save your Snapchat username} other {Save}}"
-  description: "What a screen reader says for the Save button of one card on the Ways to reach you screen (#103). Must start with the words of settings.contacts.save."
-  fi: "{kind, select, phone {Tallenna puhelinnumerosi} whatsapp {Tallenna WhatsApp-numerosi} telegram {Tallenna Telegram-käyttäjänimesi} instagram {Tallenna Instagram-käyttäjänimesi} snapchat {Tallenna Snapchat-käyttäjänimesi} other {Tallenna}}"
-  sv: "{kind, select, phone {Spara ditt telefonnummer} whatsapp {Spara ditt WhatsApp-nummer} telegram {Spara ditt användarnamn på Telegram} instagram {Spara ditt användarnamn på Instagram} snapchat {Spara ditt användarnamn på Snapchat} other {Spara}}"
   machine: { fi: true, sv: true }
 
 settings.contacts.remove:
@@ -9605,6 +9591,13 @@ settings.contacts.removed:
   sv: "Borttaget. Det är borta även där du delade det."
   machine: { fi: true, sv: true }
 
+settings.contacts.stillSaved:
+  en: "Still saved. Remove takes it away."
+  description: "Said under a contact's field of Settings when it was emptied and left (#511): an emptied field takes nothing away, the kept one comes back, and Remove is the way to take it away, since a removal ends every share of it (the maintainer, 29/10/2026)."
+  fi: "Yhä tallennettu. Poista vie sen pois."
+  sv: "Fortfarande sparat. Ta bort tar bort det."
+  machine: { fi: true, sv: true }
+
 settings.contacts.invalid:
   en: "{kind, select, phone {That does not look like a phone number. Write it with its country code (+358…) or as a Finnish number starting with 0.} whatsapp {That does not look like a phone number. Write it with its country code (+358…) or as a Finnish number starting with 0.} telegram {That does not look like a Telegram username: 5 to 32 letters, digits and underscores, starting with a letter.} instagram {That does not look like an Instagram username: up to 30 letters, digits, dots and underscores, never a dot first, last or two in a row.} snapchat {That does not look like a Snapchat username: 3 to 15 letters, digits, dots, underscores and hyphens, starting with a letter and ending with a letter or a digit.} other {Check what you typed.}}"
   description: "Said on a card of the Ways to reach you screen when what was typed is not one of its kind (#103): the phone checks first, the API's contact_invalid says the same. Nothing was saved; the words stay in the field."
@@ -9617,6 +9610,97 @@ settings.contacts.failed:
   description: "Said on a card of the Ways to reach you screen when a save or a removal failed for any other reason (#103); the words stay in the field."
   fi: "Mikään ei muuttunut. Tarkista yhteys ja yritä uudelleen."
   sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
+  machine: { fi: true, sv: true }
+
+settings.contacts.retry:
+  en: "Try again"
+  description: "Under a contact's field of Settings after a save that failed or went past the minute's messages (#511): sends the words again."
+  fi: "Yritä uudelleen"
+  sv: "Försök igen"
+  machine: { fi: true, sv: true }
+
+settings.contacts.country:
+  en: "Country code"
+  description: "Screen-reader label of the country code beside a number's field (#511), and the title of the list of countries it opens."
+  fi: "Maatunnus"
+  sv: "Landsnummer"
+  machine: { fi: true, sv: true }
+
+settings.contacts.countryValue:
+  en: "{country}, {code}"
+  description: "The country code as heard (#511): {country} is the country's name in the app's language, nominative, {code} its calling code (+358)."
+  fi: "{country}, {code}"
+  sv: "{country}, {code}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.countryHint:
+  en: "Opens the list of countries"
+  description: "Screen-reader hint of the country code beside a number's field (#511)."
+  fi: "Avaa maiden luettelon"
+  sv: "Öppnar listan över länder"
+  machine: { fi: true, sv: true }
+
+settings.contacts.phoneShort:
+  en: "A digit or more seems to be missing."
+  description: "Said under a number's field when it is too short for its country code (#511); nothing was saved, the words stay."
+  fi: "Numerosta näyttää puuttuvan numero tai useampi."
+  sv: "Det verkar saknas en siffra eller fler."
+  machine: { fi: true, sv: true }
+
+settings.contacts.phoneLong:
+  en: "The number has too many digits."
+  description: "Said under a number's field when it is too long for its country code (#511)."
+  fi: "Numerossa on liian monta numeroa."
+  sv: "Numret har för många siffror."
+  machine: { fi: true, sv: true }
+
+settings.contacts.phoneInvalid:
+  en: "That is not a phone number with the code {code}. Check it, or choose another code."
+  description: "Said under a number's field when it is no number under the code chosen (#511); {code} is the calling code (+358), never a country's name, which Finnish would inflect."
+  fi: "Tämä ei ole puhelinnumero maatunnuksella {code}. Tarkista se tai valitse toinen maatunnus."
+  sv: "Det är inget telefonnummer med landsnumret {code}. Kontrollera det, eller välj ett annat landsnummer."
+  machine: { fi: true, sv: true }
+
+settings.country.search:
+  en: "Search"
+  description: "Visible label over the search field of the list of countries (#511)."
+  fi: "Hae"
+  sv: "Sök"
+  machine: { fi: true, sv: true }
+
+settings.country.searchLabel:
+  en: "Search by country or code"
+  description: "Screen-reader label of the search field of the list of countries (#511): a name in the app's language or in English, or the code's digits."
+  fi: "Hae maan tai maatunnuksen mukaan"
+  sv: "Sök på land eller landsnummer"
+  machine: { fi: true, sv: true }
+
+settings.country.none:
+  en: "No country matches. Search by name or by code, such as 46."
+  description: "Said in the list of countries when a search finds none (#511)."
+  fi: "Yksikään maa ei vastaa hakua. Hae nimellä tai maatunnuksella, esimerkiksi 46."
+  sv: "Inget land matchar. Sök på namn eller landsnummer, till exempel 46."
+  machine: { fi: true, sv: true }
+
+settings.country.near:
+  en: "Near Finland"
+  description: "Heading of the first part of the list of countries (#511): Finland, Sweden, Estonia and Norway."
+  fi: "Suomen lähellä"
+  sv: "Nära Finland"
+  machine: { fi: true, sv: true }
+
+settings.country.all:
+  en: "All countries"
+  description: "Heading of the list of every country a number can have (#511), alphabetical in the app's language."
+  fi: "Kaikki maat"
+  sv: "Alla länder"
+  machine: { fi: true, sv: true }
+
+settings.country.close:
+  en: "Close"
+  description: "Label of the list of countries' close control (#511): the code stays as it was."
+  fi: "Sulje"
+  sv: "Stäng"
   machine: { fi: true, sv: true }
 
 feedback.title:
@@ -9953,6 +10037,13 @@ row.state.withValue:
   description: "A row's value and its state as iOS says them (#511): {value} is the row's value (the theme chosen, a consent on or off), {state} row.state.open or row.state.closed."
   fi: "{value}, {state}"
   sv: "{value}, {state}"
+  machine: { fi: true, sv: true }
+
+settings.row.unsaved:
+  en: "Not saved"
+  description: "Value of a row of Settings whose panel holds something not saved (#511): a contact refused or not sent, an address typed and not sent, feedback not sent; marked beside it."
+  fi: "Ei tallennettu"
+  sv: "Inte sparat"
   machine: { fi: true, sv: true }
 
 account.found.consequence:

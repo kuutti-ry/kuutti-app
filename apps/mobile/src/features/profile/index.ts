@@ -2,7 +2,7 @@
 
 export { BioEditor } from "./BioEditor";
 export { CardPreviewScreen } from "./CardPreviewScreen";
-export { holdLinkWhileUnsaved } from "./ConfirmLeave";
+export { ConfirmLeaveDialog, holdLinkWhileUnsaved, useConfirmLeave } from "./ConfirmLeave";
 export { DEAL_BREAKERS_PATH, DealBreakersScreen } from "./DealBreakersScreen";
 export { profileErrorText } from "./errorText";
 export { fieldLabelKey, optionKey } from "./keys";

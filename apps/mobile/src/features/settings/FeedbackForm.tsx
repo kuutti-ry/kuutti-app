@@ -10,6 +10,7 @@ import { useSession } from "@/features/identity";
 import { ApiError } from "@/lib/api";
 import { buildInfo } from "@/lib/build";
 import { useT } from "@/lib/locale";
+import { useReportUnsaved } from "@/lib/unsaved";
 import { useHapticTap } from "@/theme/haptics";
 import { Choice } from "./Choice";
 import { sendFeedback } from "./feedback-client";
@@ -44,6 +45,8 @@ export function FeedbackForm() {
   const [text, setText] = useState("");
   const [state, setState] = useState<State>("idle");
   const words = text.trim();
+  // Words not sent go nowhere: Settings asks before they are left (#511).
+  useReportUnsaved("feedback", state !== "sent" && words.length > 0);
 
   const send = async () => {
     if (!kind || words.length === 0) return;

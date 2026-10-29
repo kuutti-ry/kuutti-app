@@ -2,7 +2,7 @@ import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
+import { AccessibilityInfo, Platform } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
@@ -349,6 +349,45 @@ describe("the settings screen", () => {
     expect(screen.getByLabelText("Your feedback").props.value).toBe("The round loads slowly.");
   });
 
+  it("marks a row whose panel holds something not saved, and asks before the list is left (#511)", async () => {
+    const navigation = (
+      jest.requireMock("expo-router") as {
+        __navigation: { emit: (name: string, event: unknown) => void; dispatch: jest.Mock };
+      }
+    ).__navigation;
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    await press(row("Ways to reach you"));
+    await act(async () => {
+      fireEvent.changeText(await screen.findByLabelText("Your Telegram username"), "aino");
+    });
+    await act(async () => {
+      fireEvent(screen.getByLabelText("Your Telegram username"), "blur");
+    });
+    await press(row("Theme"));
+    // Closed, the row says it, marked, and what was typed waits under it.
+    expect(row("Ways to reach you").props.accessibilityValue).toEqual({
+      text: "Not saved, closed",
+    });
+    expect(
+      within(row("Ways to reach you")).queryAllByTestId("row-alert", {
+        includeHiddenElements: true,
+      }),
+    ).not.toHaveLength(0);
+    // The arrow, the back key or a swipe: held, and asked.
+    const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+    await act(async () => {
+      navigation.emit("beforeRemove", event);
+    });
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(await screen.findByText("Leave without saving?")).toBeTruthy();
+    // Keep editing goes back to where it was not saved.
+    await press(screen.getByRole("button", { name: "Keep editing" }));
+    expect(expanded("Ways to reach you")).toBe(true);
+    expect(screen.getByLabelText("Your Telegram username").props.value).toBe("aino");
+  });
+
   it("opens with the row left open while the app runs, and keeps nothing on the phone (#511)", async () => {
     const view = await renderWithTheme(<SettingsScreen />);
     await press(row("Language"));
@@ -360,6 +399,40 @@ describe("the settings screen", () => {
     rememberOpenRow(null);
     await renderWithTheme(<SettingsScreen />);
     expect(expanded("Language")).toBe(false);
+  });
+
+  it("brings the screen reader to the row a link opened, once its panel is laid out", async () => {
+    const focus = jest
+      .spyOn(AccessibilityInfo, "sendAccessibilityEvent")
+      .mockImplementation(() => undefined);
+    const params = jest
+      .spyOn(expoRouter, "useLocalSearchParams")
+      .mockReturnValue({ open: "photoDescriptions" });
+    try {
+      await renderWithTheme(<SettingsScreen />);
+      let panel = screen.getByRole("switch", { name: "Show under photos" }).parent;
+      while (panel && panel.props.onLayout === undefined) panel = panel.parent;
+      await act(async () => {
+        fireEvent(panel as never, "layout", {
+          nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
+        });
+      });
+      expect(focus).toHaveBeenCalledWith(expect.anything(), "focus");
+      // A row the person opens takes no focus away from them.
+      focus.mockClear();
+      await press(row("Theme"));
+      let other = screen.getByRole("switch", { name: "High contrast" }).parent;
+      while (other && other.props.onLayout === undefined) other = other.parent;
+      await act(async () => {
+        fireEvent(other as never, "layout", {
+          nativeEvent: { layout: { x: 0, y: 0, width: 1, height: 1 } },
+        });
+      });
+      expect(focus).not.toHaveBeenCalled();
+    } finally {
+      params.mockRestore();
+      focus.mockRestore();
+    }
   });
 
   it("opens the row a link names, in place of the one left open", async () => {
@@ -479,7 +552,10 @@ describe("the settings screen", () => {
     await act(async () => {
       fireEvent.changeText(await screen.findByLabelText("Your Instagram username"), "aino.reads");
     });
-    await press(screen.getByRole("button", { name: "Save your Instagram username" }));
+    // Leaving the field keeps it (#511).
+    await act(async () => {
+      fireEvent(screen.getByLabelText("Your Instagram username"), "blur");
+    });
     await waitFor(() =>
       expect(row("Ways to reach you").props.accessibilityValue).toEqual({
         text: "Instagram, open",
