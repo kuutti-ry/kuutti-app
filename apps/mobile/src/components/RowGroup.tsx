@@ -1,4 +1,6 @@
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
+import ChevronUp from "lucide-react-native/icons/chevron-up";
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { Button } from "@/components/ui/button";
@@ -18,8 +20,11 @@ export type Row = {
   mark?: ReactNode;
   /** A fact at the right of a row that opens nothing (a version number). */
   detail?: string;
-  /** Opens the row's screen; a row without one is read, not pressed. */
+  /** Opens the row's screen, or opens and closes its panel; a row without one is read, not pressed. */
   onPress?: () => void;
+  /** What the row holds in place (#511): drawn under it while `expanded`, the press opening and closing it. */
+  panel?: ReactNode;
+  expanded?: boolean;
 };
 
 /**
@@ -28,16 +33,24 @@ export type Row = {
  * summary saying what is in it, the mark or the value saying its state, and
  * the chevron saying it opens. The label stays the title alone, so a row is
  * found by its name whatever its state. A row with nothing to open is plain.
+ * A row with a panel opens it under itself instead (#511): its chevron points
+ * down while closed and up while open, and a screen reader hears it as
+ * expanded or collapsed. Nothing moves on the way: the panel is there or not,
+ * so reduce motion has nothing to stop.
  */
 export function RowGroup({ rows }: { rows: readonly Row[] }) {
   return (
     <Card className="gap-0 py-0">
       {rows.map((row, index) => {
+        const holds = row.panel !== undefined;
+        const open = holds && row.expanded === true;
+        const hairline = index < rows.length - 1 && "border-b border-border";
         // border-0: a Button has a 1 px border on every side (#239, #467),
-        // and a row draws only the hairline under it.
+        // and a row draws only the hairline under it; a row with a panel,
+        // under the panel.
         const edge = cn(
           "justify-between gap-3 rounded-none border-0 px-4 py-3",
-          index < rows.length - 1 && "border-b border-border",
+          !holds && hairline,
         );
         const words = (
           <View className="flex-1 gap-0.5">
@@ -66,7 +79,7 @@ export function RowGroup({ rows }: { rows: readonly Row[] }) {
             </View>
           );
         }
-        return (
+        const button = (
           <Button
             key={row.key}
             variant="ghost"
@@ -74,13 +87,26 @@ export function RowGroup({ rows }: { rows: readonly Row[] }) {
             // A summary that is the state is heard once, as the value.
             accessibilityHint={row.summary !== row.value ? row.summary : undefined}
             accessibilityValue={row.value ? { text: row.value } : undefined}
+            accessibilityState={holds ? { expanded: open } : undefined}
+            // react-native-web reads the ARIA prop, not accessibilityState.
+            aria-expanded={holds ? open : undefined}
             className={edge}
             onPress={row.onPress}
           >
             {words}
             {row.mark}
-            <Icon as={ChevronRight} className="text-muted-foreground" />
+            <Icon
+              as={holds ? (open ? ChevronUp : ChevronDown) : ChevronRight}
+              className="text-muted-foreground"
+            />
           </Button>
+        );
+        if (!holds) return button;
+        return (
+          <View key={row.key} className={cn(hairline)}>
+            {button}
+            {open && <View className="gap-4 px-4 pb-4">{row.panel}</View>}
+          </View>
         );
       })}
     </Card>

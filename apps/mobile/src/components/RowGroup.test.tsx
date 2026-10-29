@@ -1,7 +1,7 @@
 import { fireEvent, screen } from "@testing-library/react-native";
 import { Text } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { renderWithTheme } from "@/test/render";
+import { renderWithTheme, underProviders } from "@/test/render";
 import { RowGroup } from "./RowGroup";
 
 // The rows of a list (#227, #287): a row that opens a screen is a button named
@@ -48,6 +48,41 @@ describe("RowGroup", () => {
     expect(theme.props.className).not.toMatch(/(^| )border(-b)?( |$)/);
     await fireEvent.press(basics);
     expect(open).toHaveBeenCalledTimes(1);
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+  });
+
+  it("opens a row's panel under it, said as expanded, with the hairline under the panel (#511)", async () => {
+    const toggle = jest.fn();
+    const rows = (expanded: boolean) => [
+      {
+        key: "theme",
+        title: "Theme",
+        summary: "Dark",
+        value: "Dark",
+        panel: <Text>the choices</Text>,
+        expanded,
+        onPress: toggle,
+      },
+      { key: "licences", title: "Licences", onPress: () => {} },
+    ];
+    const view = await renderWithTheme(<RowGroup rows={rows(false)} />);
+    const theme = () => screen.getByRole("button", { name: "Theme" });
+    expect(theme().props.accessibilityState).toMatchObject({ expanded: false });
+    expect(theme().props.accessibilityValue).toEqual({ text: "Dark" });
+    expect(screen.queryByText("the choices")).toBeNull();
+    // A row that opens a screen says nothing of open or closed.
+    expect(
+      screen.getByRole("button", { name: "Licences" }).props.accessibilityState?.expanded,
+    ).toBeUndefined();
+    await fireEvent.press(theme());
+    expect(toggle).toHaveBeenCalledTimes(1);
+    await view.rerender(underProviders(<RowGroup rows={rows(true)} />));
+    expect(theme().props.accessibilityState).toMatchObject({ expanded: true });
+    expect(screen.getByText("the choices")).toBeTruthy();
+    // The hairline goes under the row and its panel together, not between them.
+    expect(theme().props.className).not.toMatch(/\bborder-b\b/);
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
     );

@@ -1,8 +1,9 @@
 # What the person chose in Settings stays across closing the app (#12, #55):
-# the session (no bank login again), the theme and the language. Sanna; the
-# flow ends on the system theme and the phone's language, as it began. The
-# theme and the language each have a screen behind their row (#287), and the
-# row's summary says what is chosen.
+# the session (no bank login again), the theme and the language, and which
+# of Settings' rows were left open (#511). Sanna; the flow ends on the system
+# theme and the phone's language with both rows closed, as it began. The
+# theme and the language each open under their row, and the row's summary
+# says what is chosen.
 appId: fi.kuutti.app
 name: The session, the theme and the language survive closing and reopening the app
 ---
@@ -18,25 +19,21 @@ name: The session, the theme and the language survive closing and reopening the 
     direction: UP
     timeout: 30000
 # Each row says what is chosen, which Maestro reads after its title; the
-# chosen option itself is ticked on the row's screen.
-- extendedWaitUntil:
-    visible: "(Theme|Teema|Tema)(, .*)?"
-    timeout: 15000
-- tapOn: "(Theme|Teema|Tema)(, .*)?"
-- extendedWaitUntil:
-    visible: "Dark|Tumma|Mörkt"
-    timeout: 15000
+# chosen option itself is ticked under the row.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Theme|Teema|Tema)(, .*)?"
+      INSIDE: "High contrast|Suuri kontrasti|Hög kontrast"
 - tapOn: "Dark|Tumma|Mörkt"
 - assertVisible: "✓ Dark|✓ Tumma|✓ Mörkt"
-- tapOn: "Back|Takaisin|Tillbaka"
-- tapOn: "(Language|Kieli|Språk)(, .*)?"
-- extendedWaitUntil:
-    visible: ".*Svenska.*"
-    timeout: 15000
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Language|Kieli|Språk)(, .*)?"
+      INSIDE: ".*Svenska.*"
 - tapOn: ".*Svenska.*"
-- assertVisible: "Språk"
-- tapOn: "Tillbaka"
-- assertVisible: "Inställningar"
+- assertVisible: "Utseende och språk"
 
 - stopApp
 - runFlow: ../common/open-app.yaml
@@ -46,13 +43,30 @@ name: The session, the theme and the language survive closing and reopening the 
     visible: "Inställningar"
     timeout: 15000
 
-# Kept across the restart, each ticked on its screen; then back as it began.
-- tapOn: "Tema(, .*)?"
+# Kept across the restart, both rows still open with their choices ticked;
+# then back as it began.
+- scrollUntilVisible:
+    element: "Utseende och språk"
+    direction: UP
+    timeout: 30000
+- assertVisible: "Hög kontrast"
 - assertVisible: "✓ Mörkt"
 - tapOn: "System"
 - assertVisible: "✓ System"
-- tapOn: "Tillbaka"
-- tapOn: "Språk(, .*)?"
-- assertVisible: ".*✓.*Svenska.*"
+- scrollUntilVisible:
+    element: ".*✓.*Svenska.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
 - tapOn: "Telefonens språk"
 - assertVisible: "✓ Phone's language|✓ Puhelimen kieli|✓ Telefonens språk"
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "(Language|Kieli|Språk)(, .*)?"
+      INSIDE: ".*Svenska.*"
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "(Theme|Teema|Tema)(, .*)?"
+      INSIDE: "High contrast|Suuri kontrasti|Hög kontrast"

@@ -5,7 +5,7 @@
 # asked again (ADR-010 §13, #219). Noa seeks everyone; she answers the same
 # again, which is no change (#147). Research is not offered: it is asked
 # before the bank, never in onboarding (#250, #418). The flow ends where it
-# began: consent given, everyone sought.
+# began: consent given, everyone sought, the consent's row closed.
 appId: fi.kuutti.app
 name: Withdrawing the sensitive-answers consent asks whom one seeks again with the consent, and keeps the age window
 ---
@@ -14,14 +14,14 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     env:
       PERSONA: Noa Salmi
 - openLink: kuutti://settings
-# The consent has a screen of its own, behind its row (#287); the row says
-# whether it is on, which Maestro reads after its title.
-- scrollUntilVisible:
-    element: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
+# The consent opens under its row (#287, #511); the row says whether it is
+# on, which Maestro reads after its title. Withdrawn, it sends Noa home to
+# onboarding; the row is closed at the end, from a Settings opened anew.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
+      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
 # A switch's text, to Maestro, is its value ("1" on, "0" off), right of its words.
 - extendedWaitUntil:
     visible:
@@ -94,3 +94,17 @@ name: Withdrawing the sensitive-answers consent asks whom one seeks again with t
     timeout: 15000
 - assertNotVisible: "What ages\\?|Minkä ikäisiä\\?|Vilka åldrar\\?"
 - assertNotVisible: "Help us learn how matching works|Auta meitä oppimaan, miten yhdistäminen toimii|Hjälp oss lära hur matchningen fungerar"
+- openLink: kuutti://settings
+- extendedWaitUntil:
+    visible: "Settings|Asetukset|Inställningar"
+    timeout: 15000
+- scrollUntilVisible:
+    element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
+    direction: UP
+    timeout: 30000
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "(Sensitive answers|Arkaluonteiset vastaukset|Känsliga svar)(, .*)?"
+      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Store my sensitive answers|Tallenna arkaluonteiset vastaukseni|Spara mina känsliga svar"
+      DIRECTION: DOWN

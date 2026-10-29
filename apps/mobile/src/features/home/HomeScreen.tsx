@@ -40,19 +40,9 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
+      {/* The wrench left and the gear right (#511), the gear alone on the right in production. */}
       <View className="flex-row justify-between px-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          accessibilityLabel={t("home.settings.open")}
-          onPress={() => {
-            tap();
-            router.push("/settings");
-          }}
-        >
-          <Icon as={Settings} />
-        </Button>
-        {technical && (
+        {technical ? (
           <Button
             variant="ghost"
             size="icon"
@@ -64,7 +54,20 @@ export function HomeScreen() {
           >
             <Icon as={Wrench} />
           </Button>
+        ) : (
+          <View />
         )}
+        <Button
+          variant="ghost"
+          size="icon"
+          accessibilityLabel={t("home.settings.open")}
+          onPress={() => {
+            tap();
+            router.push("/settings");
+          }}
+        >
+          <Icon as={Settings} />
+        </Button>
       </View>
       <ScrollView contentContainerClassName="flex-grow items-center justify-center gap-4 p-6">
         <Ink source={MARK} className="h-24 w-24 text-foreground" />

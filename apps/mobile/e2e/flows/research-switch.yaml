@@ -1,21 +1,20 @@
 # The research opt-in stays reachable after onboarding as a switch under the
-# app's settings (ADR-010 §9, TD-5; a screen of its own behind its row since #287): on, it records the consent and stays on
-# when Settings is opened again; off, it withdraws it. Sanna never took part;
-# the flow ends with the switch off.
+# app's settings (ADR-010 §9, TD-5; under its own row since #287, which opens
+# in place since #511): on, it records the consent and stays on when Settings
+# is opened again; off, it withdraws it. Sanna never took part; the flow ends
+# with the switch off and the row closed.
 appId: fi.kuutti.app
 name: The research switch in Settings records the opt-in and withdraws it again
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
-# The consent has a screen of its own, behind its row (#287). The row says
-# whether it is on, which Maestro reads after its title; on the screen the
-# switch is toggled by its words.
-- scrollUntilVisible:
-    element: "(Research|Tutkimus|Forskning)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Research|Tutkimus|Forskning)(, .*)?"
+# The row says whether it is on, which Maestro reads after its title; under
+# it, once the consent is read, the switch is toggled by its words.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Research|Tutkimus|Forskning)(, .*)?"
+      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - extendedWaitUntil:
     visible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     timeout: 15000
@@ -27,21 +26,18 @@ name: The research switch in Settings records the opt-in and withdraws it again
       rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
     timeout: 15000
 
+# Home first, so Settings is read again rather than shown as it was; the row
+# comes back open, as it was left.
 - openLink: kuutti://
-# A link is answered as soon as it is sent, before the screen has changed: with
-# Settings opened straight over the consent's screen, whose header is the row's
-# title, the scroll found the header and tapped it (CI on main, 14/10/2026).
-# So home first, the consent's screen gone, and Settings over that.
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område"
     timeout: 15000
 - openLink: kuutti://settings
-- scrollUntilVisible:
-    element: "(Research|Tutkimus|Forskning)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Research|Tutkimus|Forskning)(, .*)?"
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Research|Tutkimus|Forskning)(, .*)?"
+      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Take part in research|Osallistu tutkimukseen|Delta i forskningen"
 - extendedWaitUntil:
     visible: "Anonymised events about how you use Kuutti, under a separate research identifier\\..*|Anonymisoituja tapahtumia Kuutin käytöstäsi.*|Anonymiserade händelser om hur du använder Kuutti.*"
     timeout: 15000
@@ -55,3 +51,8 @@ name: The research switch in Settings records the opt-in and withdraws it again
       rightOf: "Take part in research|Osallistu tutkimukseen|Delta i forskningen"
     timeout: 15000
 - assertNotVisible: "The research choice could not be saved\\. Try again\\.|Tutkimusvalintaa ei voitu tallentaa\\. Yritä uudelleen\\.|Forskningsvalet kunde inte sparas\\. Försök igen\\."
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "(Research|Tutkimus|Forskning)(, .*)?"
+      INSIDE: "Reading your choice…|Luetaan valintaasi…|Läser ditt val…|Take part in research|Osallistu tutkimukseen|Delta i forskningen"

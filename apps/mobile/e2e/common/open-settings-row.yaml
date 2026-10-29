@@ -1,0 +1,21 @@
+# Opens a row of Settings that holds its setting in place (#511), unless it is
+# open already: the phone keeps which rows were left open, so a row may come
+# back open, from an earlier flow or from this one. ROW is the row's pattern,
+# as Maestro reads its title and value; INSIDE is what its open panel shows at
+# once, right under the row (its loading line too, for a panel that reads the
+# API first). The row is scrolled to from above it.
+appId: fi.kuutti.app
+---
+- scrollUntilVisible:
+    element: ${ROW}
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- runFlow:
+    when:
+      notVisible: ${INSIDE}
+    commands:
+      - tapOn: ${ROW}
+- extendedWaitUntil:
+    visible: ${INSIDE}
+    timeout: 15000

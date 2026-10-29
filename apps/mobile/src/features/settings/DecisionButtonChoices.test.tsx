@@ -1,11 +1,10 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
-import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
-import { DecisionButtonsScreen } from "./DecisionButtonsScreen";
+import { DecisionButtonChoices } from "./DecisionButtonChoices";
 
-// The Decision buttons screen (#82): the pinned way back, the two hands as a
+// The decision buttons in their Settings row (#82, #511): the two hands as a
 // labelled radio group, the one-handed switch with what it does, every
 // control labelled and 44 pt, each change kept on the phone.
 
@@ -19,10 +18,9 @@ const oneHanded = () =>
 
 beforeEach(() => store.clear());
 
-describe("the decision buttons screen", () => {
+describe("the decision buttons' choices", () => {
   it("says what it moves, offers the two hands with the right chosen, and one-handed off", async () => {
-    await renderWithTheme(<DecisionButtonsScreen />);
-    expectPinnedHeader("Decision buttons", "Back");
+    await renderWithTheme(<DecisionButtonChoices />);
     expect(screen.getByText(/^Where Like and Pass sit on today's round/)).toBeTruthy();
     expect(screen.getByLabelText("Which hand").props.accessibilityRole).toBe("radiogroup");
     expect(chosen(/Right hand/)).toBe(true);
@@ -31,12 +29,12 @@ describe("the decision buttons screen", () => {
     expect(screen.getByText(/^Undo, the fish, Pass and Like in one column/)).toBeTruthy();
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // The way back, the two hands and the switch.
-    expect(found).toHaveLength(4);
+    // The two hands and the switch.
+    expect(found).toHaveLength(3);
   });
 
   it("keeps each change on the phone, from the choices, the switch and its words", async () => {
-    await renderWithTheme(<DecisionButtonsScreen />);
+    await renderWithTheme(<DecisionButtonChoices />);
     await fireEvent.press(screen.getByRole("radio", { name: /Left hand/ }));
     await waitFor(() => expect(stored()).toEqual({ hand: "left", oneHanded: false }));
     expect(chosen(/Left hand/)).toBe(true);
@@ -51,7 +49,7 @@ describe("the decision buttons screen", () => {
 
   it("starts from what the phone holds", async () => {
     store.set(KEY, JSON.stringify({ hand: "left", oneHanded: true }));
-    await renderWithTheme(<DecisionButtonsScreen />);
+    await renderWithTheme(<DecisionButtonChoices />);
     await waitFor(() => expect(chosen(/Left hand/)).toBe(true));
     expect(oneHanded()).toBe(true);
   });

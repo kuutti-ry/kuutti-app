@@ -72,7 +72,10 @@ describe("the screen-reader hint", () => {
     const reader = screenReader(true);
     await renderWithTheme(<ScreenReaderHint />);
     await fireEvent.press(await screen.findByRole("button", { name: "Open the setting" }));
-    expect(router.push).toHaveBeenCalledWith("/settings/photo-descriptions");
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: "/settings",
+      params: { open: "photoDescriptions" },
+    });
     await waitFor(() => expect(store.get(SEEN)).toBe("true"));
     // The screen reader switched off and on again this launch: nothing more.
     await reader.change(false);

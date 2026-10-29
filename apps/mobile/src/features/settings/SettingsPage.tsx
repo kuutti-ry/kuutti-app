@@ -6,8 +6,8 @@ import { ScreenHeader } from "@/components/ScreenHeader";
 import { useT } from "@/lib/locale";
 
 /**
- * One screen a settings row opens (#287): the pinned way back to the list, and
- * the setting below it. A field low on the page stays in sight above the
+ * One screen a settings row opens (#287), and the list itself (#511): the
+ * pinned way back, and the settings below it. A field low on the page stays in sight above the
  * keyboard (#103, the contacts' last card): iOS insets the scroll view and
  * scrolls the field up itself. Android draws the app edge to edge, so the
  * window no longer resizes for the keyboard (as in the conversation's

@@ -1,0 +1,19 @@
+# Closes a row of Settings that holds its setting in place (#511) if it is
+# open, so the next flow finds Settings as a person first does. ROW and INSIDE
+# as in open-settings-row.yaml; the row is scrolled to from below it, or from
+# above with DIRECTION: DOWN.
+appId: fi.kuutti.app
+---
+- scrollUntilVisible:
+    element: ${ROW}
+    direction: ${DIRECTION || "UP"}
+    centerElement: true
+    timeout: 60000
+- runFlow:
+    when:
+      visible: ${INSIDE}
+    commands:
+      - tapOn: ${ROW}
+- extendedWaitUntil:
+    notVisible: ${INSIDE}
+    timeout: 15000

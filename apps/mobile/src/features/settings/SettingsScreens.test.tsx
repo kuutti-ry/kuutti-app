@@ -8,22 +8,20 @@ import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { AccountScreen } from "./AccountScreen";
-import { ConsentScreen, consentKindOf } from "./ConsentScreen";
-import { ContactsSettingsScreen } from "./ContactsSettingsScreen";
 import { DeviceScreen } from "./DeviceScreen";
 import { EmailSettingsScreen } from "./EmailSettingsScreen";
 import { InvitationsSettingsScreen } from "./InvitationsSettingsScreen";
-import { LanguageScreen } from "./LanguageScreen";
+import { LanguageChoices } from "./LanguageChoices";
 import { LegalScreen, legalKindOf } from "./LegalScreen";
 import { LicensesScreen } from "./LicensesScreen";
 import { LICENCES, type LicenceList } from "./licences";
-import { NotificationsSettingsScreen } from "./NotificationsSettingsScreen";
 import { PackageLicenseScreen } from "./PackageLicenseScreen";
+import { SettingsScreen } from "./SettingsScreen";
 import { SourceScreen } from "./SourceScreen";
-import { ThemeScreen } from "./ThemeScreen";
+import { ThemeChoices } from "./ThemeChoices";
 
-// The screens behind the settings rows (#287): each holds one setting, with
-// the pinned way back to the list.
+// The screens behind the settings rows (#287), each with the pinned way back
+// to the list, and what the rows that open in place hold (#511).
 
 // NativeWind's colour-scheme setter needs its compiled stylesheet, which the
 // test runner has none of: the provider's call is seen, not applied.
@@ -61,6 +59,11 @@ const tokens = {
 const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
 const noProblems = () =>
   expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual([]);
+/** Settings with the rows named open, as the phone keeps them (#511). */
+const settingsWith = async (...open: string[]) => {
+  store.set("kuutti.preference.settingsOpen", JSON.stringify(open));
+  await renderWithTheme(<SettingsScreen />);
+};
 
 beforeEach(async () => {
   store.clear();
@@ -94,12 +97,10 @@ beforeEach(async () => {
   await clearSession();
 });
 
-describe("the theme screen", () => {
+describe("the theme's choices", () => {
   it("keeps the theme and the contrast across restarts, the OS being the default", async () => {
-    await renderWithTheme(<ThemeScreen />);
-    // The radio group carries the title's words too, so the pinned-header check reads them inside the scroll.
-    expect(screen.getByRole("heading", { name: "Theme" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+    await renderWithTheme(<ThemeChoices />);
+    expect(screen.getByLabelText("Theme").props.accessibilityRole).toBe("radiogroup");
     noProblems();
     expect(screen.getByRole("radio", { name: "✓ System" })).toBeTruthy();
     await fireEvent.press(screen.getByRole("radio", { name: "Dark" }));
@@ -111,12 +112,12 @@ describe("the theme screen", () => {
 
   it("applies a stored theme at the next start", async () => {
     store.set("kuutti.preference.scheme", "light");
-    await renderWithTheme(<ThemeScreen />);
+    await renderWithTheme(<ThemeChoices />);
     expect(await screen.findByRole("radio", { name: "✓ Light" })).toBeTruthy();
   });
 
   it("turns high contrast on and off from its label too", async () => {
-    await renderWithTheme(<ThemeScreen />);
+    await renderWithTheme(<ThemeChoices />);
     await fireEvent.press(screen.getByText("High contrast"));
     await waitFor(() => expect(store.get("kuutti.preference.highContrast")).toBe("true"));
     expect(
@@ -127,25 +128,24 @@ describe("the theme screen", () => {
   });
 });
 
-describe("the language screen", () => {
+describe("the language's choices", () => {
   it("follows the phone's language, and the in-app choice beats it and is stored", async () => {
     deviceLanguage("fi-FI", "en-US");
-    await renderWithTheme(<LanguageScreen />);
-    expect(screen.getByRole("heading", { name: "Kieli" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Takaisin" })).toBeTruthy();
+    await renderWithTheme(<LanguageChoices />);
+    expect(screen.getByLabelText("Kieli").props.accessibilityRole).toBe("radiogroup");
     noProblems();
     // Languages are listed under their own names, whatever the app's language is.
     await fireEvent.press(screen.getByRole("radio", { name: "Svenska" }));
-    expect(await screen.findByRole("heading", { name: "Språk" })).toBeTruthy();
+    expect(await screen.findByLabelText("Språk")).toBeTruthy();
     await waitFor(() => expect(store.get("kuutti.preference.locale")).toBe("sv"));
     // Back to the phone's language clears the choice.
     await fireEvent.press(screen.getByRole("radio", { name: "Telefonens språk" }));
-    expect(await screen.findByRole("heading", { name: "Kieli" })).toBeTruthy();
+    expect(await screen.findByLabelText("Kieli")).toBeTruthy();
     await waitFor(() => expect(store.get("kuutti.preference.locale")).toBeUndefined());
   });
 
   it("shows a flag in front of each language, but not in its accessible name", async () => {
-    await renderWithTheme(<LanguageScreen />);
+    await renderWithTheme(<LanguageChoices />);
     const swedish = screen.getByRole("radio", { name: "Svenska" });
     expect(swedish.props.accessibilityLabel).toBe("Svenska");
     expect(screen.getByText("🇦🇽 Svenska")).toBeTruthy();
@@ -185,11 +185,10 @@ describe("the legal screens", () => {
   });
 });
 
-describe("the consent screens", () => {
+describe("the consents' rows", () => {
   it("hold the research consent's switch with its words for a person", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<ConsentScreen kind="research" />);
-    expectPinnedHeader("Research", "Back");
+    await settingsWith("research");
     expect(await screen.findByRole("switch", { name: "Take part in research" })).toBeTruthy();
     expect(screen.queryByText("Store my sensitive answers")).toBeNull();
     noProblems();
@@ -197,24 +196,9 @@ describe("the consent screens", () => {
 
   it("hold the sensitive answers' switch alone", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<ConsentScreen kind="special_category" />);
-    expectPinnedHeader("Sensitive answers", "Back");
+    await settingsWith("special_category");
     expect(await screen.findByRole("switch", { name: "Store my sensitive answers" })).toBeTruthy();
     expect(screen.queryByText("Take part in research")).toBeNull();
-  });
-
-  it("hold nothing for a signed-out device", async () => {
-    await renderWithTheme(<ConsentScreen kind="research" />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByRole("switch")).toBeNull();
-  });
-
-  it("read a link's kind, and take anything else as the research one", () => {
-    expect(consentKindOf("special_category")).toBe("special_category");
-    expect(consentKindOf("research")).toBe("research");
-    expect(consentKindOf("marketing")).toBe("research");
-    expect(consentKindOf(undefined)).toBe("research");
   });
 });
 
@@ -423,7 +407,7 @@ describe("this device's screen", () => {
   });
 });
 
-describe("the e-mail and the account screens", () => {
+describe("the account's screens and rows", () => {
   it("hold the e-mail card for a person", async () => {
     await saveSession(tokens);
     await renderWithTheme(<EmailSettingsScreen />);
@@ -445,17 +429,15 @@ describe("the e-mail and the account screens", () => {
 
   it("hold the contacts for a person (#103)", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<ContactsSettingsScreen />);
+    await settingsWith("contacts");
     expect(await screen.findByText("Phone number")).toBeTruthy();
-    expectPinnedHeader("Ways to reach you", "Back");
     expect(screen.getByLabelText("Your Instagram username")).toBeTruthy();
     noProblems();
   });
 
   it("hold the notification choices and the phone's own permission for a person (#176, #102)", async () => {
     await saveSession(tokens);
-    await renderWithTheme(<NotificationsSettingsScreen />);
-    expectPinnedHeader("Notifications", "Back");
+    await settingsWith("notifications");
     expect(
       screen.getByText(
         "What you choose here decides what Kuutti tells your phones. A notification says only that there is something, never what or from whom. Each kind is on until you switch it off.",
@@ -465,13 +447,6 @@ describe("the e-mail and the account screens", () => {
       await screen.findByText("This phone has not been asked yet whether Kuutti may notify it."),
     ).toBeTruthy();
     noProblems();
-  });
-
-  it("say there is no session on the notifications screen of a signed-out device (#176)", async () => {
-    await renderWithTheme(<NotificationsSettingsScreen />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByText("Loading your choices…")).toBeNull();
   });
 
   it("hold the invitations for a person (#107)", async () => {
@@ -487,13 +462,6 @@ describe("the e-mail and the account screens", () => {
     await settle();
     expect(screen.getByText("No session on this device.")).toBeTruthy();
     expect(screen.queryByText("Loading your invitations…")).toBeNull();
-  });
-
-  it("say there is no session on the contacts screen of a signed-out device (#103)", async () => {
-    await renderWithTheme(<ContactsSettingsScreen />);
-    await settle();
-    expect(screen.getByText("No session on this device.")).toBeTruthy();
-    expect(screen.queryByText("Phone number")).toBeNull();
   });
 
   describe("keep a field low on the page above the keyboard (#103)", () => {
@@ -514,7 +482,8 @@ describe("the e-mail and the account screens", () => {
       });
     const open = async () => {
       await saveSession(tokens);
-      await renderWithTheme(<ContactsSettingsScreen />);
+      // The contacts' last card, low in the long list of Settings (#511).
+      await settingsWith("contacts");
       expect(await screen.findByLabelText("Your Instagram username")).toBeTruthy();
       // The view reads its place from the layout event, which it keeps (persist).
       await act(async () => {

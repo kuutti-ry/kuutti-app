@@ -1,7 +1,7 @@
 # The language choice in Settings changes the app's language at once, and
 # the phone's language takes it back (#164, the first feature flow; the
 # texts are those of packages/i18n/messages.yaml in all three languages).
-# The language has a screen behind its row (#287).
+# The language's choices open under its row (#511).
 appId: fi.kuutti.app
 name: The language choice in Settings changes the app's language at once
 ---
@@ -16,20 +16,26 @@ name: The language choice in Settings changes the app's language at once
     element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
     direction: UP
     timeout: 30000
-# The row says the language chosen, which Maestro reads after its title.
-- tapOn: "(Language|Kieli|Språk)(, .*)?"
-- extendedWaitUntil:
-    visible: ".*Suomi.*"
-    timeout: 15000
+# The row says the language chosen, which Maestro reads after its title; it
+# opens in place, and the choices are the rows' words that change.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Language|Kieli|Språk)(, .*)?"
+      INSIDE: ".*Svenska.*"
 - tapOn: ".*Suomi.*"
-- assertVisible: "Kieli"
+- assertVisible: "Ulkoasu ja kieli"
 - assertVisible: ".*✓.*Suomi.*"
 - tapOn: ".*Svenska.*"
-- assertVisible: "Språk"
+- assertVisible: "Utseende och språk"
 - tapOn: ".*English.*"
-- assertVisible: "Language"
-# Back to the phone's language, so the next flow finds the app as a person would.
+- assertVisible: "Appearance and language"
+# Back to the phone's language and the row closed, so the next flow finds the app as a person would.
 - tapOn: "Phone's language"
-- assertVisible: "Language|Kieli|Språk"
-- tapOn: "Back|Takaisin|Tillbaka"
+- assertVisible: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "(Language|Kieli|Språk)(, .*)?"
+      INSIDE: ".*Svenska.*"
 - assertVisible: "Settings|Asetukset|Inställningar"

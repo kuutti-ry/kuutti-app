@@ -1,5 +1,5 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
-import { act, fireEvent, screen, within } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
@@ -9,8 +9,10 @@ import { expectPinnedHeader } from "@/test/layout";
 import { renderWithTheme } from "@/test/render";
 import { SettingsScreen } from "./SettingsScreen";
 
-// The settings as a list of sections (#287): each row names a screen, says
-// what is chosen in it, and opens it; the account's rows need a person.
+// The settings as one list of sections (#287, #511): each row names a
+// setting and says what is chosen in it; a setting chosen in place opens
+// under its row and closes again, the rest open their screens; the account's
+// rows need a person.
 
 // NativeWind's colour-scheme setter needs its compiled stylesheet, which the
 // test runner has none of: the provider's call is seen, not applied.
@@ -34,9 +36,11 @@ const auth = jest.requireMock("expo-local-authentication") as Record<
   | "authenticateAsync",
   jest.Mock
 >;
-const { __router: router } = jest.requireMock("expo-router") as {
+const expoRouter = jest.requireMock("expo-router") as {
   __router: { back: jest.Mock; push: jest.Mock };
+  useLocalSearchParams: () => Record<string, string>;
 };
+const { __router: router } = expoRouter;
 
 function deviceLanguage(...tags: string[]) {
   (useLocales as jest.Mock).mockReturnValue(tags.map((languageTag) => ({ languageTag })));
@@ -50,6 +54,8 @@ const tokens = {
   refreshExpiresAt: "2030-04-01T00:00:00.000Z",
 };
 const row = (name: string) => screen.getByRole("button", { name });
+const expanded = (name: string) => row(name).props.accessibilityState?.expanded as boolean;
+const openStored = () => JSON.parse(store.get("kuutti.preference.settingsOpen") ?? "null");
 /** A press, and the screen settled after it, as the other screens' tests press. */
 const press = (element: ReturnType<typeof screen.getByRole>) =>
   act(async () => {
@@ -88,6 +94,7 @@ beforeEach(async () => {
   globalThis.fetch = jest.fn(async (input: Request | string) => {
     const url = new URL(input instanceof Request ? input.url : input);
     if (url.pathname === "/consents") return json(consentsAnswer);
+    if (url.pathname === "/contacts") return json({ contacts: [] });
     return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
   }) as unknown as typeof fetch;
   await clearSession();
@@ -214,35 +221,106 @@ describe("the settings screen", () => {
     expect(screen.getByRole("heading", { name: "Inställningar" })).toBeTruthy();
   });
 
-  it("opens each row's screen", async () => {
+  it("opens the screen of each row that starts a flow of its own", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
     const expected: Array<[string, string]> = [
-      ["Theme", "/settings/theme"],
-      ["Language", "/settings/language"],
-      ["Photo descriptions", "/settings/photo-descriptions"],
-      ["Decision buttons", "/settings/decision-buttons"],
-      ["Research", "/settings/consent/research"],
-      ["Sensitive answers", "/settings/consent/special_category"],
       ["Terms of use", "/settings/legal/terms"],
       ["Privacy", "/settings/legal/privacy"],
       ["Source code", "/settings/source"],
       ["Licences", "/settings/licenses"],
       ["This device", "/settings/device"],
-      ["Lock", "/settings/lock"],
       ["E-mail", "/settings/email"],
-      ["Ways to reach you", "/settings/contacts"],
-      ["Notifications", "/settings/notifications"],
       ["Invitations", "/settings/invite"],
       ["Give feedback", "/settings/feedback"],
       ["Your account", "/settings/account"],
     ];
     for (const [name, path] of expected) {
+      // A screen's row is no disclosure: nothing to say open or closed.
+      expect([name, row(name).props.accessibilityState?.expanded]).toEqual([name, undefined]);
       await press(row(name));
       expect(router.push).toHaveBeenLastCalledWith(path);
     }
     expect(router.push).toHaveBeenCalledTimes(expected.length);
+  });
+
+  it("opens each setting in place under its row, said as expanded, and closes it again (#511)", async () => {
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    // Each row, and something only its open panel shows.
+    const panels: Array<[string, () => unknown]> = [
+      ["Theme", () => screen.queryByRole("switch", { name: "High contrast" })],
+      ["Language", () => screen.queryByRole("radio", { name: "Svenska" })],
+      ["Photo descriptions", () => screen.queryByRole("switch", { name: "Show under photos" })],
+      ["Decision buttons", () => screen.queryByRole("radio", { name: "Left hand" })],
+      ["Lock", () => screen.queryByRole("button", { name: "Set a passcode" })],
+      ["Ways to reach you", () => screen.queryByLabelText("Your Instagram username")],
+      ["Notifications", () => screen.queryByText(/^What you choose here decides/)],
+      ["Research", () => screen.queryByRole("switch", { name: "Take part in research" })],
+      [
+        "Sensitive answers",
+        () => screen.queryByRole("switch", { name: "Store my sensitive answers" }),
+      ],
+    ];
+    for (const [name, inside] of panels) {
+      expect([name, expanded(name), inside()]).toEqual([name, false, null]);
+      await press(row(name));
+      expect([name, expanded(name)]).toEqual([name, true]);
+      expect(await waitFor(inside)).toBeTruthy();
+    }
+    // Opening a row opens no screen.
+    expect(router.push).not.toHaveBeenCalled();
+    expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
+      [],
+    );
+    for (const [name, inside] of panels) {
+      await press(row(name));
+      expect([name, expanded(name), inside()]).toEqual([name, false, null]);
+    }
+  });
+
+  it("keeps on the phone which rows are open, and opens them so the next time (#511)", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    expect(openStored()).toBeNull();
+    await press(row("Language"));
+    await press(row("Theme"));
+    expect(openStored()).toEqual(["language", "theme"]);
+    await press(row("Language"));
+    expect(openStored()).toEqual(["theme"]);
+    await renderWithTheme(<SettingsScreen />);
+    await waitFor(() => expect(expanded("Theme")).toBe(true));
+    expect(expanded("Language")).toBe(false);
+    expect(screen.getByRole("switch", { name: "High contrast" })).toBeTruthy();
+  });
+
+  it("opens the row a link names, beside those kept open, and keeps it once a row is pressed", async () => {
+    store.set("kuutti.preference.settingsOpen", JSON.stringify(["theme"]));
+    const params = jest
+      .spyOn(expoRouter, "useLocalSearchParams")
+      .mockReturnValue({ open: "photoDescriptions" });
+    try {
+      await renderWithTheme(<SettingsScreen />);
+      expect(expanded("Photo descriptions")).toBe(true);
+      await waitFor(() => expect(expanded("Theme")).toBe(true));
+      expect(openStored()).toEqual(["theme"]);
+      await press(row("Language"));
+      expect(openStored()).toEqual(["theme", "photoDescriptions", "language"]);
+    } finally {
+      params.mockRestore();
+    }
+  });
+
+  it("opens none when what the phone kept is not a list of rows", async () => {
+    for (const kept of ["{", JSON.stringify({ theme: true }), JSON.stringify([1, "theme"])]) {
+      store.set("kuutti.preference.settingsOpen", kept);
+      await renderWithTheme(<SettingsScreen />);
+      await act(() => new Promise<void>((resolve) => setTimeout(resolve, 20)));
+      // A list's names count, whatever else it holds.
+      expect([kept, expanded("Theme")]).toEqual([kept, kept.startsWith("[")]);
+      expect(expanded("Language")).toBe(false);
+    }
   });
 
   it("follows the phone's language", async () => {
@@ -261,6 +339,29 @@ describe("the settings screen", () => {
     expect(row("Sensitive answers").props.accessibilityValue).toEqual({
       text: "Update the app to change it",
     });
+  });
+
+  it("says a consent's new state on its row as soon as the switch under it stores it (#511)", async () => {
+    let research: unknown[] = consentsAnswer.consents;
+    globalThis.fetch = jest.fn(async (input: Request | string) => {
+      const request = input instanceof Request ? input : new Request(input);
+      const url = new URL(request.url);
+      if (request.method === "DELETE" && url.pathname === "/consents/research") {
+        research = [{ ...consentsAnswer.consents[0], withdrawnAt: "2026-10-29T10:00:00.000Z" }];
+      }
+      if (url.pathname.startsWith("/consents"))
+        return json({ ...consentsAnswer, consents: research });
+      return json({ error: { code: "not_found", message: "no", requestId: "r" } }, 404);
+    }) as unknown as typeof fetch;
+    await saveSession(tokens);
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Your account" });
+    await press(row("Research"));
+    await press(await screen.findByRole("switch", { name: "Take part in research" }));
+    await waitFor(() => expect(row("Research").props.accessibilityValue).toEqual({ text: "Off" }));
+    expect(
+      screen.getByRole("switch", { name: "Take part in research" }).props.accessibilityState,
+    ).toMatchObject({ checked: false });
   });
 
   it("says Off for a consent not given (#287)", async () => {
@@ -349,14 +450,15 @@ describe("the lock's row (#418)", () => {
     auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
   });
 
-  it("stands after This device for a person on the phone, says Off until the lock is on, and opens its screen", async () => {
+  it("stands after This device for a person on the phone, says Off until the lock is on, and opens in place", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });
     expect(row("Lock").props.accessibilityValue).toEqual({ text: "Off" });
     expect(within(row("Lock")).getByText("Off")).toBeTruthy();
     await press(row("Lock"));
-    expect(router.push).toHaveBeenLastCalledWith("/settings/lock");
+    expect(screen.getByText(/^Lock Kuutti on this phone, so that somebody else/)).toBeTruthy();
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it("says On while the lock is on, read once the face has opened it", async () => {

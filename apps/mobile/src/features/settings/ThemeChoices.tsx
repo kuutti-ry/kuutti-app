@@ -4,14 +4,13 @@ import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/locale";
 import { useTheme } from "@/theme/ThemeProvider";
 import { Choice, SCHEMES } from "./Choice";
-import { SettingsPage } from "./SettingsPage";
 
-/** The theme, the OS's by default and kept across restarts, and high contrast with it (#143, #287). */
-export function ThemeScreen() {
+/** The theme, the OS's by default and kept across restarts, and high contrast with it (#143, #287), in its Settings row (#511). */
+export function ThemeChoices() {
   const { t } = useT();
   const theme = useTheme();
   return (
-    <SettingsPage title={t("settings.theme.label")}>
+    <>
       <View
         accessibilityRole="radiogroup"
         accessibilityLabel={t("settings.theme.label")}
@@ -39,6 +38,6 @@ export function ThemeScreen() {
           onCheckedChange={theme.setHighContrast}
         />
       </View>
-    </SettingsPage>
+    </>
   );
 }

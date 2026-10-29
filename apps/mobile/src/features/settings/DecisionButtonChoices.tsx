@@ -6,7 +6,6 @@ import { Text } from "@/components/ui/text";
 import { type Hand, useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
 import { Choice } from "./Choice";
-import { SettingsPage } from "./SettingsPage";
 
 /** The two hands, in the order they are offered; the right is the default. */
 const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [
@@ -15,17 +14,17 @@ const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [
 ];
 
 /**
- * The Decision buttons screen (#82): which hand the round's Like and Pass
+ * The decision buttons (#82), in their Settings row (#511): which hand the round's Like and Pass
  * are placed for, and one-handed mode, which puts Undo, the fish, Pass and
  * Like in one column on that side. Kept on the phone
  * (src/lib/decision-buttons.tsx); the buttons keep their words and shapes
  * wherever they sit.
  */
-export function DecisionButtonsScreen() {
+export function DecisionButtonChoices() {
   const { t } = useT();
   const { settings, set } = useDecisionButtons();
   return (
-    <SettingsPage title={t("settings.decisionButtons.label")}>
+    <>
       <Text>{t("settings.decisionButtons.explain")}</Text>
       <View
         accessibilityRole="radiogroup"
@@ -54,6 +53,6 @@ export function DecisionButtonsScreen() {
         </View>
         <Text variant="muted">{t("settings.decisionButtons.oneHandedHint")}</Text>
       </View>
-    </SettingsPage>
+    </>
   );
 }

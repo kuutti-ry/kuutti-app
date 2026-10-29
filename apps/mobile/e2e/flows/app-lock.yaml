@@ -1,6 +1,6 @@
 # The app's lock (#418, ADR-045) with a passcode of Kuutti's own: set in
-# Settings › Lock, typed twice, with "Straight away" for the time in the
-# background; a cold start shows the lock, a wrong passcode is refused in
+# Settings › Lock, under its row (#511), typed twice, with "Straight away"
+# for the time in the background; a cold start shows the lock, a wrong passcode is refused in
 # words with the tries left, the right one opens home; back from the
 # background the lock stands again, and "Sign in with the bank instead" signs
 # the phone out, which the sign-in screen then says. Face and fingerprint are
@@ -19,16 +19,14 @@ name: A passcode set in Settings locks the app at a cold start and back from the
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
 # The lock's row is this device's, under its session's row (#287) below the
-# fold on a phone; it says On or Off after its title.
-- scrollUntilVisible:
-    element: "(Lock|Lukitus|Lås)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Lock|Lukitus|Lås)(, .*)?"
-- extendedWaitUntil:
-    visible: "Lock Kuutti on this phone, so that somebody else holding it cannot open your matches and conversations\\. The lock stays on this phone, and logging out turns it off\\.|Lukitse Kuutti tällä puhelimella, jotta kukaan muu puhelinta pitelevä ei pääse matcheihisi ja keskusteluihisi\\. Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen\\.|Lås Kuutti på den här telefonen, så att ingen annan som håller i den kan öppna dina matcher och samtal\\. Låset gäller bara den här telefonen, och när du loggar ut stängs det av\\."
-    timeout: 15000
+# fold on a phone; it says On or Off after its title, and opens in place
+# (#511). The flow ends signed out, where the row is not shown; the phone
+# keeps it open for the next sign-in, whose flows open it the same way.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Lock|Lukitus|Lås)(, .*)?"
+      INSIDE: "Lock Kuutti on this phone, so that somebody else holding it cannot open your matches and conversations\\. The lock stays on this phone, and logging out turns it off\\.|Lukitse Kuutti tällä puhelimella, jotta kukaan muu puhelinta pitelevä ei pääse matcheihisi ja keskusteluihisi\\. Lukitus koskee vain tätä puhelinta, ja uloskirjautuminen poistaa sen\\.|Lås Kuutti på den här telefonen, så att ingen annan som håller i den kan öppna dina matcher och samtal\\. Låset gäller bara den här telefonen, och när du loggar ut stängs det av\\."
 - waitForAnimationToEnd
 - tapOn: "Set a passcode|Aseta pääsykoodi|Välj en lösenkod"
 
