@@ -36,7 +36,10 @@ export type LockApi = {
    * opened under the lock would run before anybody unlocked it.
    */
   holding: boolean;
-  /** What this phone can open it with; null when nothing is enrolled, undefined while asked. */
+  /**
+   * What this phone can open it with; null when nothing is enrolled, undefined
+   * while asked. On Android it is kept through a pause the lock saw (#499).
+   */
   biometrics: Biometrics | null | undefined;
   /** Asks the phone again what it has, as Settings opens and as the app comes back to it. */
   recheck: () => Promise<void>;
@@ -114,8 +117,20 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
   // The phone's face or finger may be added or removed while Kuutti is away:
   // asked again as the lock comes back, and as Settings opens or comes back
   // (`recheck`, #464).
+  // The phone's last answer on Android was its pause (#499). Android 16 then
+  // answers a recheck with its pause's own code, which the module reads as
+  // nothing enrolled, so a recheck that finds none keeps the kind the pause
+  // came with, until an ask answers otherwise, a recheck finds a kind, or the
+  // session ends. iOS's module counts a pause as enrolled already.
+  // shortcut: a pause the lock did not see (from before a cold start, or
+  // another app's) still reads as none, and a face or finger removed while a
+  // seen pause is remembered keeps its button and switch until the next ask
+  // answers; a native read of the phone's own answer lifts both (ADR-045 §5).
+  const paused = React.useRef(false);
   const recheck = React.useCallback(async () => {
-    setAvailable(await biometricsOnThisPhone());
+    const kind = await biometricsOnThisPhone();
+    if (kind !== null) paused.current = false;
+    setAvailable((known) => (kind === null && paused.current ? known : kind));
   }, []);
 
   const on = unreadable || lockIsOn(settings ?? null);
@@ -132,6 +147,7 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (status === "loading" || settings === undefined) return;
     if (status === "signed-out") {
+      paused.current = false;
       setPhase("open");
       if (settings !== null || unreadable) {
         setSettings(null);
@@ -213,6 +229,7 @@ export function LockProvider({ children }: { children: React.ReactNode }) {
         prompt: t("lock.biometrics.prompt"),
         cancel: t("lock.biometrics.cancel"),
       });
+      paused.current = Platform.OS === "android" && answer === "lockout";
       return answer;
     } finally {
       asking.current = false;
