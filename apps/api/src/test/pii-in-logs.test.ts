@@ -689,8 +689,10 @@ describe("PII in logs", () => {
     const tokens = (await own.json()) as { accessToken: string; refreshToken: string };
     expect((await exchange(code, FIXTURES.verifier)).status).toBe(401);
 
-    // The login left its line, so the absence below is not for want of lines.
+    // The login left its lines, so the absence below is not for want of lines:
+    // the decision's, and the identification the alarm counts (#471).
     expect(lines().some((l) => l.msg === "bank login")).toBe(true);
+    expect(lines().some((l) => l.msg === "identified at the bank")).toBe(true);
     expect(leakedFixtures(lines())).toEqual([]);
     const out = JSON.stringify(lines());
     for (const secret of [hetu, code, tokens.accessToken, tokens.refreshToken]) {
