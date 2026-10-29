@@ -86,6 +86,10 @@ module "observability" {
   db_identifier  = module.data.identifier
   log_group_name = module.compute.log_group_name
   alert_email    = var.alert_email
+  # Telia bills each identification (#471). The S package holds 200 a month,
+  # so a day of 50 spends a quarter of it; the maintainer resets this to twice a
+  # normal day once production has one.
+  bank_identifications_per_day = 50
 }
 
 # Non-secret configuration the API reads at boot from /kuutti/prod/ (TD-19).

@@ -9,9 +9,10 @@
 #
 # Cost: standard alarms at 0.10 USD and custom metrics at 0.30 USD each (the
 # 5xx and Rekognition metrics, the exposure-budget one of #52, the
-# nightly-failure one of #194 and the box's free memory of #77), plus the box's
-# PutMetricData once a minute, about 44,000 calls a month at 0.01 USD a
-# thousand: about 2.80 USD a month per environment at list price; query
+# nightly-failure one of #194, the box's free memory of #77 and the bank
+# identifications of #471), plus the box's PutMetricData once a minute, about
+# 44,000 calls a month at 0.01 USD a thousand: about 3.20 USD a month per
+# environment at list price; query
 # definitions and the topic are free. The probe from outside the box,
 # which is what catches a stopped container, is probe.tf (#29): a Route 53
 # health check with its alarm and topic in us-east-1.
@@ -206,6 +207,40 @@ resource "aws_cloudwatch_log_metric_filter" "rekognition_calls" {
   }
 }
 
+# Every identification the bank passes on is one line, written once the
+# broker's answer is verified and fresh and before anything is decided
+# ({"msg":"identified at the bank","platform":"ios",...}, #471, ADR-016 §3): in
+# production Telia bills each one, refused or not, and the AWS budget does not
+# see it. A day far above the usual is a loop in a build or somebody signing in
+# again and again; the mail comes the same day rather than with the invoice.
+resource "aws_cloudwatch_log_metric_filter" "bank_identifications" {
+  name           = "${local.name}-bank-identifications"
+  log_group_name = var.log_group_name
+  pattern        = "{ $.msg = \"identified at the bank\" }"
+
+  metric_transformation {
+    name          = "BankIdentifications"
+    namespace     = local.namespace
+    value         = "1"
+    default_value = "0"
+  }
+}
+
+resource "aws_cloudwatch_metric_alarm" "bank_identifications" {
+  alarm_name          = "${local.name}-bank-identifications"
+  alarm_description   = "The bank passed on ${var.bank_identifications_per_day} or more identifications within a day (#471), each billed by Telia in production. First steps: docs/runbooks/alerts.md."
+  namespace           = local.namespace
+  metric_name         = "BankIdentifications"
+  statistic           = "Sum"
+  period              = 86400
+  evaluation_periods  = 1
+  threshold           = var.bank_identifications_per_day
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  treat_missing_data  = "notBreaching" # a quiet day logs none
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+  ok_actions          = [aws_sns_topic.alerts.arn]
+}
+
 # Saved Logs Insights queries: the first three things to run when an alarm
 # fires. pino levels: 50 error, 60 fatal.
 resource "aws_cloudwatch_query_definition" "errors_by_route" {
@@ -237,6 +272,17 @@ resource "aws_cloudwatch_query_definition" "boot" {
     | fields @timestamp, level, msg, port, commit, version, applied, state
     | sort @timestamp desc
     | limit 50
+  EOT
+}
+
+# The bank-identifications alarm's day, split by platform (ios, android, admin).
+resource "aws_cloudwatch_query_definition" "bank_identifications" {
+  name            = "${local.name}/bank-identifications-by-platform"
+  log_group_names = [var.log_group_name]
+  query_string    = <<-EOT
+    filter msg = "identified at the bank"
+    | stats count() as identifications by platform
+    | sort identifications desc
   EOT
 }
 

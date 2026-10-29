@@ -46,6 +46,11 @@ variable "budget_refusals_per_day" {
   default     = 100
 }
 
+variable "bank_identifications_per_day" {
+  description = "Identifications the bank passes on within one day that raise the alarm (#471). Each environment sets its own: production's are billed by Telia, staging's test bed is free."
+  type        = number
+}
+
 variable "memory_available_mb" {
   description = "Available memory on the API box, in MiB, under which for five minutes the memory-low alarm mails (#77, ADR-046)."
   type        = number

@@ -16,6 +16,22 @@ Where things stand (2026-10-07):
 
 Sales entry, for the record: https://www.telia.fi/yrityksille/palvelut/tietoturva/tunnistautuminen (*Telia Tunnistus*, "ota yhteyttä").
 
+## The bill (#471)
+
+Production is billed from its first traffic; the pre-production bed is free. The 2025 offer was the S package, 55 € a month with 200 logins; the agreement signed on 20.10.2026 (TVP00648) is the one to read for what holds now (#25). In the trust network the law caps what a bank may charge a broker at 3 cents for each identification it passes on (Act 617/2009 §12 c); what Telia charges Kuutti, and for which events, is not public.
+
+What Kuutti counts: one API line `identified at the bank` for each callback whose broker answer is verified and fresh, before the rule decides anything, so a new account, a resume, the end of a break, a staff sign-in and a refusal each count once; a cancel at the bank, a failed token call and an answer older than its attempt (ADR-016 §2) do not. The observability module sums the lines as `BankIdentifications` in `Kuutti/<env>` and mails when a day reaches `bank_identifications_per_day` (`docs/runbooks/alerts.md`). The month's count, to choose the package from, is the metric's sum over the month (the alarm's row has the command); a package change asked for before the middle of a month applies from the next.
+
+Questions for the commercial contact, with the date and the answer once they come:
+
+| question | why it matters | answer |
+|---|---|---|
+| Which events are billed: only an identification whose data reaches us, or also a chooser opened and left, a cancel at the bank, or an answer from Telia's own web session? | whether the count above is the bill, or a starting point; if starts or cancels are billed, the doors' numbers (ADR-026 §5) and the WAF rule of #41 are the bound to revisit | |
+| What does a login past the package cost, and what are the larger packages? | the price of a day the alarm mails about | |
+| Did TVP00648 change anything in the 2025 offer? | the figures above | |
+
+Months counted, once production has bank identification: none yet.
+
 ## What Telia needs from us (guide section 2.1)
 
 | item | ours |
