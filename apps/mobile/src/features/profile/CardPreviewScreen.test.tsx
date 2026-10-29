@@ -134,8 +134,14 @@ describe("CardPreviewScreen", () => {
       order.indexOf("I can whistle with my mouth full."),
     );
     await waitFor(() => expect(calls).toContain(`/photos/${PHOTO_A}/card`));
-    expect(calls).toContain(`/photos/${PHOTO_B}/thumb`);
-    expect(calls.filter((p) => p.endsWith("/full"))).toEqual([]);
+    // The next photo only once it comes to the front (#513), in the card size as well.
+    expect(calls.filter((p) => p.includes(PHOTO_B))).toEqual([]);
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Next photo" }));
+      await settle();
+    });
+    expect(calls).toContain(`/photos/${PHOTO_B}/card`);
+    expect(calls.filter((p) => p.endsWith("/full") || p.endsWith("/thumb"))).toEqual([]);
     const found = pressables(screen.toJSON() as HostNode);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
     await act(async () => {
