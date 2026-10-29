@@ -50,6 +50,7 @@
         }
       ],
       "./plugins/withNoForceDark.js",
+      "./plugins/withAdvanceWidths.js",
       "./plugins/withSaiga.js",
       "expo-local-authentication",
       [
