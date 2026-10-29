@@ -67,9 +67,10 @@ export const conversation = pgTable(
 
 /**
  * One row per side. `read_up_to` is the highest sequence the person has read
- * (#349 fans it out as the read receipt); it never goes down. `account_id`
- * goes null at the person's erasure and the row stays, so the counterpart
- * keeps the conversation under "Deleted user".
+ * (#349 fans it out as the read receipt); it never goes down, except at the
+ * person's erasure, where a shadow ban's held mark goes back to what the
+ * counterpart saw (#470). `account_id` goes null at the person's erasure and
+ * the row stays, so the counterpart keeps the conversation under "Deleted user".
  */
 export const conversationParticipant = pgTable(
   "conversation_participant",

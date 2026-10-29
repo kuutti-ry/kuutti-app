@@ -26,7 +26,7 @@ A moderator cannot watch everything, and the first hours of an abuser cost the m
 
 - An abuser's first hours are stopped without a moderator, and without telling them which rule they met.
 - Three verified people can hide somebody until a moderator looks, longer when the review is late. The limits: a bank login per reporter, a proof of contact for every report, distinct identities, dismissed reports not counted, a reversal resetting the evidence.
-- False positives fall on ordinary people: a popular greeting to five new matches, many openers after an absence. Their lines arrive at the reversal, under their old times. The moderator judges the message rules by counts and times, never the text.
+- False positives fall on ordinary people: a popular greeting to five new matches, many openers after an absence. Their lines arrive at the reversal, under their old times, in a conversation still open; in one that ended before the reversal never, nor their read mark (#470, ADR-031 §4). The moderator judges the message rules by counts and times, never the text.
 - A crash between the trigger's commit and the check misses that event until the next one.
 - Every opener and every filed report takes the person's sanction lock for a few milliseconds; fine at 5,000 people.
 - ADR-031 Open 5's two tells (an archive moving, a gap in the sequence) become more frequent.
@@ -54,3 +54,4 @@ A moderator cannot watch everything, and the first hours of an abuser cost the m
 
 - 2026-10-19: written with #105's build, on the maintainer's parameters of that day.
 - 2026-10-21 (#86, ADR-041): three more rules on the same seam, `photo_fetches`, `cards_served` and `round_reads` (migrations 0074 and 0075), with the reason `scraping` where §1's three keep `other` (Open 1 taken for them alone). §2's check runs after a URL of another person's photo in the card or full size and after a served read of today's round, handed to the photo and round routes by `app.ts`; since those are reads, each is measured first without the lock, with the person's standing (`standingOf`, the statement the lock path now reads too), and takes it only when a rule is met there and the person is in sight. The round's reads are counted in memory only. Open 6 is settled.
+- 2026-10-29 (#470, ADR-031 §4): a reversal releases a false positive's held lines, and shows its read mark, only in a conversation still open; in one that ended before it, by an end, a block or an admin's ban put on top, nothing appears. The read mark is held where the ban began meanwhile, as presence is.

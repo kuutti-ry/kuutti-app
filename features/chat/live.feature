@@ -78,6 +78,13 @@ Feature: The chat's live socket
     When "A" writes to "B"
     Then A's phone gets the message and B's gets nothing of it, and B never hears A online
 
+  Scenario: A shadow-banned reader's mark reaches no counterpart until the lift
+    Given "A" is shadow-banned and "B"'s phone is on the socket
+    When "B" writes and "A" reads it
+    Then B's phone hears no read mark, and B's other phone resumes with the mark from before the ban
+    When the ban is lifted and "A" reads "B"'s next line
+    Then B's phone gets that mark
+
   Scenario: A shadow ban put on while the socket is open hides the person at the next ping
     Given "A" and "B" are on the socket in their conversation, and B hears A online
     When "A" is shadow-banned and the ping comes

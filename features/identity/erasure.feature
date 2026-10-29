@@ -139,9 +139,10 @@ Feature: Account deletion per the erasure table
     Then each report says whether it came from a card or a conversation, and nothing of the copy or C's words is in the export
 
   Scenario: Erasure leaves the counterpart "Deleted user" and the messages, and closes the conversation
-    Given "A" and "B" wrote to each other, and "A" wrote once more under a shadow ban still open
+    Given "A" and "B" wrote to each other, and "A" wrote once more under a shadow ban still open and read it
     When "A" deletes the account
     Then "B" reads every message "B" could read before, under "Deleted user", in a conversation closed as deleted
+    And "A"'s read mark where "B" saw it, never past what "B" can read
     And "A"'s link to it is gone, the withheld message too, and "B" cannot write
 
   Scenario: The export carries the person's own messages and the counterpart's as a time and a length

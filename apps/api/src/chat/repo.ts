@@ -36,14 +36,46 @@ const VISIBLE_TO_CALLER = `NOT ${CALLER_BLOCKED}
   AND (c.closed_how IS DISTINCT FROM 'block' OR c.closed_by IS DISTINCT FROM me.side)`;
 
 /**
+ * A shadow ban (`s`) of the account that withholds from the other person of
+ * conversation `c` what the account did under it (ADR-024 §6, #105): one
+ * still open, or one lifted only after the conversation had ended, so a lift
+ * never shows an ended conversation anything new (#470).
+ */
+// shortcut: the lift's time and the close's are each the request's, not the
+// commit's, so an admin's ban and a moderator's lift of the same person within
+// one wait on the sanction lock can be stored in the wrong order; taking the
+// time after `lockAccountForSanction` in the sanctions' writes would close it.
+const withholdingBan = (account: string) => `s.account_id = ${account} AND s.kind = 'shadow_ban'
+    AND (s.lifted_at IS NULL OR s.lifted_at > c.closed_at)`;
+const WITHHOLDING_BAN = withholdingBan("them.account_id");
+
+/** A read mark held to the newest message of conversation `c` from before `began`. */
+const markBefore = (mark: string, began: string) => `least(${mark}, coalesce((
+      SELECT max(pm.seq) FROM message pm
+      WHERE pm.conversation_id = c.id AND pm.created_at < ${began}), 0))`;
+
+/**
  * The messages the caller may read: their own, and the counterpart's except
- * those sent during a shadow ban that is still open (ADR-024 §6, #105),
- * which appear once it is lifted.
+ * those sent during a shadow ban that withholds them, which appear once it
+ * is lifted while the conversation is open.
  */
 const MESSAGE_VISIBLE = `(m.side = me.side OR NOT EXISTS (
   SELECT 1 FROM sanction s
-  WHERE s.account_id = them.account_id AND s.kind = 'shadow_ban'
-    AND s.lifted_at IS NULL AND s.created_at <= m.created_at))`;
+  WHERE ${WITHHOLDING_BAN} AND s.created_at <= m.created_at))`;
+
+/**
+ * The counterpart's read mark as the caller sees it. Under a shadow ban that
+ * withholds, it goes no further than the newest message from before the
+ * earliest such ban began, as presence shows nobody online (ADR-031 §9):
+ * a mark moving beside a missing photo and no Online is a pattern only a
+ * shadow ban makes (#470). The mark only rises, so nothing read before the
+ * ban stops showing as read, and the true mark shows at the lift.
+ */
+// shortcut: a line from before the ban that the person reads only after it
+// began still shows as read; the mark as it stood when the ban began, a
+// column written by the ban, would close that.
+const COUNTERPART_READ_UP_TO = `CASE WHEN wb.began IS NULL THEN them.read_up_to
+    ELSE ${markBefore("them.read_up_to", "wb.began")} END`;
 
 const FROM_CALLER = `FROM conversation_participant me
   JOIN conversation c ON c.id = me.conversation_id
@@ -112,7 +144,7 @@ const conversationFrom = (r: Row): ConversationRow => ({
 // (`markRead`), so a count there could never be read away.
 const CONVERSATION_COLUMNS = `c.id, c.opened_at, c.last_message_at, c.next_seq, c.archived_at,
   c.closed_at, c.closed_how, me.side, me.read_up_to,
-  them.account_id AS counterpart_id, them.read_up_to AS counterpart_read_up_to,
+  them.account_id AS counterpart_id, ${COUNTERPART_READ_UP_TO} AS counterpart_read_up_to,
   (them.account_id IS NOT NULL AND blocked_between(me.account_id, them.account_id)) AS blocked,
   p.display_name AS counterpart_name, a.birth_year, a.birth_month,
   lm.seq AS last_seq, lm.side AS last_side, lm.kind AS last_kind, lm.body AS last_body,
@@ -127,7 +159,9 @@ const CONVERSATION_JOINS = `LEFT JOIN account a ON a.id = them.account_id
   LEFT JOIN LATERAL (
     SELECT m.seq, m.side, m.kind, m.body, m.created_at FROM message m
     WHERE m.conversation_id = c.id AND ${MESSAGE_VISIBLE}
-    ORDER BY m.seq DESC LIMIT 1) lm ON true`;
+    ORDER BY m.seq DESC LIMIT 1) lm ON true
+  LEFT JOIN LATERAL (
+    SELECT min(s.created_at) AS began FROM sanction s WHERE ${WITHHOLDING_BAN}) wb ON true`;
 
 /** The caller's conversations, newest first by the last message they may see, else by the opening. */
 export async function listConversations(
@@ -525,20 +559,38 @@ export async function detachPhotosOf(db: Queryable, accountId: string): Promise<
 
 /**
  * The erased person's messages that the counterpart never received: sent
- * during a shadow ban still open (ADR-024 §6). The ban goes with the
- * erasure (ADR-024 §8), so they would appear afterwards; they go first.
+ * during a shadow ban that withholds them (ADR-024 §6). The ban goes with
+ * the erasure (ADR-024 §8), so they would appear afterwards; they go first.
  */
 export async function deleteWithheldMessagesOf(db: Queryable, accountId: string): Promise<number> {
   const result = await db.query(
     `DELETE FROM message m
-     USING conversation_participant me
+     USING conversation_participant me, conversation c
      WHERE me.account_id = $1 AND m.conversation_id = me.conversation_id AND m.side = me.side
+       AND c.id = me.conversation_id
        AND EXISTS (SELECT 1 FROM sanction s
-                   WHERE s.account_id = $1 AND s.kind = 'shadow_ban'
-                     AND s.lifted_at IS NULL AND s.created_at <= m.created_at)`,
+                   WHERE ${withholdingBan("$1")} AND s.created_at <= m.created_at)`,
     [accountId],
   );
   return result.rowCount ?? 0;
+}
+
+/**
+ * The erased person's read marks as the counterpart saw them: held where a
+ * shadow ban withheld them (#470). The ban goes with the erasure, so the mark
+ * the person moved under it would show afterwards, under "Deleted user";
+ * it goes back to what was shown, first. Nobody saw it higher.
+ */
+export async function holdWithheldMarksOf(db: Queryable, accountId: string): Promise<void> {
+  await db.query(
+    `UPDATE conversation_participant me
+     SET read_up_to = ${markBefore("me.read_up_to", "wb.began")}
+     FROM conversation c,
+          LATERAL (SELECT min(s.created_at) AS began FROM sanction s
+                   WHERE ${withholdingBan("$1")}) wb
+     WHERE me.account_id = $1 AND c.id = me.conversation_id AND wb.began IS NOT NULL`,
+    [accountId],
+  );
 }
 
 /** Cuts the person's link to their conversations (TD-7): the rows stay for the counterpart. The conversations it was cut from. */
