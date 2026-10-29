@@ -95,15 +95,20 @@ export async function signInAs(
   return { accountId, headers: { authorization: `Bearer ${accessToken}` } };
 }
 
-/** matching_config rows a test needs, upserted inside its transaction (rolled back with it). */
+/**
+ * matching_config values a test needs, inside its transaction (rolled back
+ * with it): each the key's next version, as the panel writes one, so it is
+ * the value read whatever version a migration left last (0088's second
+ * version of the photo rule, #513).
+ */
 export async function withMatchingConfig(
   db: Queryable,
   values: Record<string, unknown>,
 ): Promise<void> {
   for (const [key, value] of Object.entries(values)) {
     await db.query(
-      `INSERT INTO matching_config (version, key, value, created_by) VALUES (1, $1, $2::jsonb, 'test')
-       ON CONFLICT (key, version) DO UPDATE SET value = EXCLUDED.value`,
+      `INSERT INTO matching_config (version, key, value, created_by)
+       SELECT coalesce(max(version), 0) + 1, $1, $2::jsonb, 'test' FROM matching_config WHERE key = $1`,
       [key, JSON.stringify(value)],
     );
   }
