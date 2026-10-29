@@ -101,7 +101,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 - [Break and erasure](#break-and-erasure) (30)
 - [Research](#research) (31)
 - [Retention](#retention) (28)
-- [Limits](#limits) (13)
+- [Limits](#limits) (14)
 - [Product constraints](#product-constraints) (13)
 - [Other](#other) (21)
 - [Found on the way](#found-on-the-way)
@@ -656,6 +656,7 @@ How much one person may fetch, send or ask for in a day or a minute.
 | A person may be handed at most so many photo links a Finnish day, counted per size. | thumb 600, card 300, full 60 | `photo_fetches_per_day` | ADR-008 §1; #52; migration 0010 | assumption | |
 | Open: a card budget below a round's size refuses the whole round read? Meanwhile the read answers 'too many' with a wait, for the whole round. | whole read refused | `apps/api/src/matching/round-routes.ts` | ADR-034 Open 7; ADR-008 | proposed, 19/10/2026 | |
 | At most three copies of one's own data a Finnish day; the fourth is refused in words until midnight. | 3 a day | `exports_per_day` | ADR-007 History 13/10/2026; #237 comment 13/10/2026; migration 0040 | maintainer, 13/10/2026 | |
+| A copy counts when the zip leaves the API. On Android the folder is chosen before the API is asked, so backing out of the picker spends none; iOS's share sheet needs the file, so closing it without sharing spends one. |  | `apps/mobile/src/features/identity/AccountActions.tsx` | ADR-007 History 29/10/2026; #465 | maintainer, 29/10/2026 | |
 | Each photo in an export is logged as a full-size fetch and counts against later fetches, but the export itself is never refused by that budget. |  | `apps/api/src/identity/export.ts` | ADR-007 History 13/10/2026; #237 comment 13/10/2026 | maintainer, 13/10/2026 | |
 | At most five pieces of feedback a Finnish day; the sixth is refused in words until midnight. | 5 a day | `feedback_per_day` | ADR-023 §2, Consequences; #171; migration 0042 | proposed, 15/10/2026 | |
 | Daily budgets and caps run on the calendar day in Finland, midnight to midnight in Helsinki, not a rolling 24 hours; the cap on consent changes is the one exception. | Finnish calendar day | `apps/api/src/lib/finnish-day.ts` | ADR-008 §2; ADR-034 §3 | assumption | |

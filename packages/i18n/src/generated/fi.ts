@@ -86,6 +86,7 @@ export const fi: Readonly<Record<string, string>> = {
   "account.export.sanction.reason.other": "Muu syy",
   "account.export.sanction.reason.scraping": "Muiden profiilien kopiointi tai kerääminen",
   "account.export.sanction.reason.under_age": "Alle 18-vuotias",
+  "account.export.saved": "Valmis. Tiedosto on nyt siellä, minne sen valitsit.",
   "account.export.title": "Kuutti-tietosi",
   "account.export.working": "Valmistellaan tietojasi…",
   "account.foundThem.button": "Löysin hänet",
