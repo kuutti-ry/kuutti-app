@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse } from "@kuutti/schema";
+import { ErrorResponse, RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { conversationBetween, openConversation } from "../chat/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
@@ -90,6 +90,12 @@ async function likeBudget(db: Queryable, n: number) {
 }
 
 const codeOf = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
+
+/** What the answer to a decision says of the caller's fish after it (#475). */
+async function fishToSendAfter(answer: Response) {
+  expect(answer.status).toBe(200);
+  return RoundDecisionAnswer.parse(await answer.json()).fishToSend;
+}
 
 async function decisionsOf(db: Queryable, entries: readonly string[]) {
   const { rows } = await db.query<{ id: string; decision: string | null; fish: boolean }>(
@@ -302,6 +308,23 @@ describe("earned fish", () => {
     ]);
   });
 
+  test("an earned fish waiting keeps a fish to send once the day's own is sent, and none once it is spent too (#475)", async ({
+    ctx,
+  }) => {
+    const [a, b, c] = await cast(ctx.client, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await earnedUnits(ctx.client, a.accountId, { fish: 1 });
+    await roundOf(ctx.client, a, [b, c]);
+    const app = await appAt(ctx.client);
+
+    expect(await fishToSendAfter(await choose(app, a, 1, "fish"))).toBe(true);
+    const read = await app.request("/rounds/today", { headers: a.headers });
+    expect(RoundResponse.parse(await read.json()).fishToSend).toBe(true);
+    expect(await fishToSendAfter(await choose(app, a, 2, "fish"))).toBe(false);
+    // The earned one given back by a like is waiting again.
+    expect(await fishToSendAfter(await choose(app, a, 2, "like"))).toBe(true);
+  });
+
   test("a unit stays spent when the entry it paid for goes, an erased candidate's", async ({
     ctx,
   }) => {
@@ -348,7 +371,7 @@ describe("two devices", () => {
       const racing = watched(decide(deps(second), MATCHES, choice(3, "like")));
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
-      expect(await racing.outcome).toEqual({ match: null });
+      expect(await racing.outcome).toEqual({ match: null, fishToSend: true });
       await second.query("COMMIT");
       expect(await decisionsOf(pool, entries)).toEqual(["like", "pass", "like"]);
       expect(await unitsOf(pool, a)).toEqual([{ kind: "like", spent: true, entryId: entries[2] }]);

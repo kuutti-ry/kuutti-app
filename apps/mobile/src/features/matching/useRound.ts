@@ -10,7 +10,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { ApiError } from "@/lib/api";
-import { decide, fetchRound, RoundRefusal, relaxToday, reportSeen, undoRelaxation } from "./client";
+import { decide, fetchRound, relaxToday, reportSeen, undoRelaxation } from "./client";
 
 export type RoundView =
   | { status: "loading" }
@@ -20,28 +20,22 @@ export type RoundView =
   | { status: "budget" }
   | { status: "ready"; round: RoundResponse };
 
-/**
- * What the screen says above the round, once, after something the person did
- * not see coming: words, or the refused fish with an instant inside the day
- * the next can go.
- */
-export type RoundNotice =
-  | Extract<
-      PlainMessageKey,
-      | "errors.round_expired"
-      | "errors.match_made"
-      | "errors.like_budget_exceeded"
-      | "errors.fish_budget_exceeded"
-      | "errors.already_relaxed"
-      | "errors.relaxations_changed"
-      | "errors.card_budget_exceeded"
-      | "round.short.nobody"
-      | "round.short.failed"
-      | "round.gone"
-      | "round.decision.failed"
-      | "round.newDay"
-    >
-  | { fishAgain: Date };
+/** What the screen says above the round, once, after something the person did not see coming. */
+export type RoundNotice = Extract<
+  PlainMessageKey,
+  | "errors.round_expired"
+  | "errors.match_made"
+  | "errors.like_budget_exceeded"
+  | "errors.fish_budget_exceeded"
+  | "errors.already_relaxed"
+  | "errors.relaxations_changed"
+  | "errors.card_budget_exceeded"
+  | "round.short.nobody"
+  | "round.short.failed"
+  | "round.gone"
+  | "round.decision.failed"
+  | "round.newDay"
+>;
 
 /** The card on the screen, with the day its round is of. */
 export type RoundCard = { day: string; entry: RoundEntry };
@@ -52,16 +46,15 @@ const statusOf = (error: unknown) => (error instanceof ApiError ? error.status :
 /** The Finnish day of an instant, only ever compared: a round is Finland's day (ADR-034). */
 const finnishDay = (at: Date | number) => formatDate("fi", at, { timeZone: "Europe/Helsinki" });
 
-/** Half a day: an instant this far inside a day names it even from a phone clock a little off. */
-const HALF_DAY = 12 * 60 * 60 * 1000;
-
 /**
  * Today's round on the phone (#379, ADR-034): read once, then one card at a
  * time, the first one not yet decided. A decision is a button, dimmed while
  * one is on its way, so nothing repeats. The last decision can be taken back
  * (ADR-034 §5): Undo brings its card back, and the decision stands until
  * another one replaces it. A like that made a match is final (ADR-038 §3),
- * so nothing offers it back. Each card reports itself seen once.
+ * so nothing offers it back. Each card reports itself seen once. Whether a
+ * fish can go today comes with the round and with every decision's answer
+ * (#475), never from a read of its own (ADR-008).
  *
  * A day that ended while the screen was open is read anew: the API refuses
  * the old day's writes (409 `round_expired`), and the screen says why it
@@ -224,7 +217,7 @@ export function useRound() {
         const answer = await decide(day, position, decision);
         const round = onDay(day);
         if (!round) return;
-        decided(round, decision);
+        decided({ ...round, fishToSend: answer.fishToSend }, decision);
         setRevisit(null);
         setLast(answer.match ? null : position);
         setMatch(answer.match?.conversationId ?? null);
@@ -232,8 +225,7 @@ export function useRound() {
         // Nothing to say of another day's card: the new round was read already.
         const round = onDay(day);
         if (!round) return;
-        const refusal = error instanceof RoundRefusal ? error : undefined;
-        const code = refusal?.code;
+        const code = codeOf(error);
         if (code === "round_expired") {
           read("errors.round_expired");
         } else if (code === "match_made") {
@@ -242,21 +234,15 @@ export function useRound() {
           setRevisit(null);
           setLast(null);
           setNotice("errors.match_made");
-        } else if (refusal?.status === 404) {
+        } else if (statusOf(error) === 404) {
           drop(day, position);
           setNotice("round.gone");
         } else if (code === "like_budget_exceeded") {
           setNotice("errors.like_budget_exceeded");
-        } else if (refusal?.code === "fish_budget_exceeded") {
-          // When the next fish can go, from the wait the refusal names (ADR-039 §3).
-          // The wait ends at a Finnish midnight, so the day is named from half a
-          // day past it: a phone clock a little behind never names the day before.
-          const wait = refusal.retryAfter;
-          setNotice(
-            wait === null
-              ? "errors.fish_budget_exceeded"
-              : { fishAgain: new Date(Date.now() + wait * 1000 + HALF_DAY) },
-          );
+        } else if (code === "fish_budget_exceeded") {
+          // Another phone sent the week's fish meanwhile (#475): the fish leaves the bar.
+          showRound({ ...round, fishToSend: false });
+          setNotice("errors.fish_budget_exceeded");
         } else {
           setNotice("round.decision.failed");
         }
@@ -264,7 +250,7 @@ export function useRound() {
         setBusy(false);
       }
     },
-    [rewrite, onDay, read, drop],
+    [rewrite, onDay, read, drop, showRound],
   );
 
   /**

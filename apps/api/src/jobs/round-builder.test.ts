@@ -374,7 +374,7 @@ describe("when a round is built", () => {
 
     const read = await readToday(await appAt(ctx.client, NOON), ctx.client, a);
 
-    expect(read).toEqual({ day: DAY, entries: null });
+    expect(read).toEqual({ day: DAY, entries: null, fishToSend: true });
     expect(await roundOf(ctx.client, a)).toBeNull();
   });
 
@@ -389,7 +389,11 @@ describe("when a round is built", () => {
       db: ctx.client,
       now: () => NOON,
     });
-    expect(await readToday(app, ctx.client, a)).toEqual({ day: DAY, entries: null });
+    expect(await readToday(app, ctx.client, a)).toEqual({
+      day: DAY,
+      entries: null,
+      fishToSend: true,
+    });
     expect(await roundOf(ctx.client, a)).toBeNull();
   });
 

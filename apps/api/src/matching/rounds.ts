@@ -21,7 +21,7 @@ import type { Logger } from "../lib/logger.ts";
 import { matchingConfigNumber } from "../lib/matching-config.ts";
 import { dayWindow, secondsUntil } from "../media/index.ts";
 import { track } from "../research/index.ts";
-import { entriesPaidBy, releaseEarned, spendEarned } from "../rewards/index.ts";
+import { earnedFishWaiting, entriesPaidBy, releaseEarned, spendEarned } from "../rewards/index.ts";
 
 // Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
 // Finnish calendar day, each card with why it is there, when the phone
@@ -99,13 +99,15 @@ const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
 
 /**
  * The fish (#378, ADR-039, the maintainer's of 20/10/2026): a like with a
- * mark, `fish_budget` of them in any `fish_window_days`, rolling, counted
- * from the person's standing fish under the round's lock, so one changed
- * back the same day is given back. A fish is a like for every other rule:
- * the day's likes, the expiry, the match. On a card of somebody whose like or
+ * mark, `fish_budget` of them in each period of `fish_window_days` counted
+ * from a Monday, so 7 is the calendar week, Monday to Sunday in Finland (the
+ * maintainer's of 29/10/2026, #475; a rolling window until then). Counted
+ * from the person's standing fish under the round's lock, so one changed back
+ * the same day is given back. A fish is a like for every other rule: the
+ * day's likes, the expiry, the match. On a card of somebody whose like or
  * fish waits on the person it would answer a like, and is a like. Past the
- * window's budget a fish an invitation earned is used by itself (#107,
- * ADR-044 §8), and the fish it paid for are left out of the window.
+ * period's budget a fish an invitation earned is used by itself (#107,
+ * ADR-044 §8), and the fish it paid for are left out of the count.
  */
 const FISH_BUDGET_KEY = "fish_budget";
 const FISH_WINDOW_KEY = "fish_window_days";
@@ -115,6 +117,47 @@ function addDays(day: string, days: number): string {
   const at = new Date(`${day}T12:00:00Z`);
   at.setUTCDate(at.getUTCDate() + days);
   return at.toISOString().slice(0, 10);
+}
+
+/** A Monday, from which the fish's periods are counted. */
+const FISH_PERIODS_FROM = Date.parse("1970-01-05");
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The person's standing fish of the period that holds today against the
+ * budget, those an earned fish paid for left out, and the day the next period
+ * begins: one count for the refusal's wait and for whether the round offers a
+ * fish (#475), so the two never disagree. A window of 0, which the panel
+ * allows, reads as a day. A card's own fish is never counted against it,
+ * since a fish is counted only for a card that holds none.
+ */
+async function fishSent(
+  db: Queryable,
+  accountId: string,
+  today: string,
+): Promise<{ sent: number; budget: number; next: string }> {
+  const budget = await matchingConfigNumber(db, FISH_BUDGET_KEY);
+  const window = Math.max(1, await matchingConfigNumber(db, FISH_WINDOW_KEY));
+  const into = Math.round((Date.parse(today) - FISH_PERIODS_FROM) / DAY_MS) % window;
+  const from = addDays(today, -into);
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n
+       FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND e.fish AND r.day >= $2::date AND e.id <> ALL($3::uuid[])`,
+    [accountId, from, await entriesPaidBy(db, accountId, "fish")],
+  );
+  return { sent: rows[0]?.n ?? 0, budget, next: addDays(from, window) };
+}
+
+/**
+ * Whether the person can send a fish today (#475): one of the period's own,
+ * or an earned one waiting (ADR-044 §8). Never a count, and nothing of the
+ * fish anybody sent the person (ADR-039 §6); a shadow-banned person's is
+ * worked out the same way.
+ */
+async function fishToSendOf(db: Queryable, accountId: string, today: string): Promise<boolean> {
+  const { sent, budget } = await fishSent(db, accountId, today);
+  return sent < budget || (await earnedFishWaiting(db, accountId));
 }
 
 /** What a person reads back of their own decision: a like with the mark is a fish. */
@@ -255,13 +298,14 @@ export async function readTodaysRound(
       ORDER BY e.position`,
     [accountId, day],
   );
+  const fishToSend = await fishToSendOf(deps.db, accountId, day);
   const round = rows[0];
-  if (!round) return { day, entries: null };
+  if (!round) return { day, entries: null, fishToSend };
   await deps.db.query(
     "UPDATE rounds SET opened_at = $3 WHERE id = $1 AND account_id = $2 AND opened_at IS NULL",
     [round.id, accountId, at],
   );
-  return { day, entries: await entriesOf(accountId, rows, cardOf, dealBreakers) };
+  return { day, entries: await entriesOf(accountId, rows, cardOf, dealBreakers), fishToSend };
 }
 
 /** The day named, checked against today before anything is read: an ended day's round answers round_expired, a later one is nobody's yet. */
@@ -328,13 +372,14 @@ export async function markSeen(
  * A like or a fish past its budget spends a unit the person's invitations
  * earned, in this transaction, and a change of it gives the unit back (#107,
  * ADR-044 §8); the reward table is the rewards slice's, reached through its
- * index.ts.
+ * index.ts. The answer says whether a fish can still go today, which a fish
+ * sent or changed back moves (#475), read in this transaction after the write.
  */
 export async function decide(
   deps: RoundDeps,
   matches: Matches,
   input: { accountId: string; day: string; position: number; decision: RoundChoice },
-): Promise<{ match: string | null }> {
+): Promise<{ match: string | null; fishToSend: boolean }> {
   const { at, today } = todayOrRefuse(deps, input.day);
   const decision: RoundDecision = input.decision === "pass" ? "pass" : "like";
   const written = await transaction(deps.db, async (tx) => {
@@ -382,7 +427,11 @@ export async function decide(
     await tx.query(PAIR_LOCK, [input.accountId, entry.candidate_id]);
     const standing = await matches.between(tx, input.accountId, entry.candidate_id);
     if (entry.decision === decision && entry.fish === fish) {
-      return { match: decision === "like" ? standing : null, decided: null };
+      return {
+        match: decision === "like" ? standing : null,
+        fishToSend: await fishToSendOf(tx, input.accountId, today),
+        decided: null,
+      };
     }
     if (standing && entry.decision === "like") {
       throw new AppError(409, "match_made", "This like made a match and stays");
@@ -414,30 +463,13 @@ export async function decide(
         });
       }
     }
-    // The person's fish of the last fish_window_days, this card's aside and
-    // those an earned fish paid for, under the round's lock; past the budget
-    // the fish takes an earned one, and with none the next comes back when the
-    // oldest leaves the window.
+    // The person's fish of the period, under the round's lock; past the
+    // budget the fish takes an earned one, and with none the next can go at
+    // the midnight that begins the next period, a Monday's with a week.
     if (fish && !entry.fish) {
-      const budget = await matchingConfigNumber(tx, FISH_BUDGET_KEY);
-      const window = await matchingConfigNumber(tx, FISH_WINDOW_KEY);
-      const sent = await tx.query<{ n: number; oldest: string | null }>(
-        `SELECT count(*)::int AS n, min(r.day)::text AS oldest
-           FROM round_entries e JOIN rounds r ON r.id = e.round_id
-          WHERE r.account_id = $1 AND e.fish AND e.id <> $2 AND r.day > $3::date - $4::int
-            AND e.id <> ALL($5::uuid[])`,
-        [
-          input.accountId,
-          entry.id,
-          today,
-          window,
-          await entriesPaidBy(tx, input.accountId, "fish"),
-        ],
-      );
-      const [row] = sent.rows;
+      const count = await fishSent(tx, input.accountId, today);
       if (
-        row &&
-        row.n >= budget &&
+        count.sent >= count.budget &&
         !(await spendEarned(tx, {
           accountId: input.accountId,
           kind: "fish",
@@ -445,11 +477,8 @@ export async function decide(
           at,
         }))
       ) {
-        // With a budget of none there is no oldest, and nothing before the day rolls.
-        const back = row.oldest
-          ? dayWindow(new Date(`${addDays(row.oldest, window)}T12:00:00Z`)).start
-          : dayWindow(at).end;
-        throw new AppError(429, "fish_budget_exceeded", "The window's fish are sent", {
+        const back = dayWindow(new Date(`${count.next}T12:00:00Z`)).start;
+        throw new AppError(429, "fish_budget_exceeded", "The period's fish are sent", {
           retryAfterSeconds: secondsUntil(back, at),
         });
       }
@@ -510,6 +539,9 @@ export async function decide(
     }
     return {
       match,
+      // After this decision's write, under the round's lock: the answer says
+      // what it left, and is known before any push of the match starts (ADR-055 §5).
+      fishToSend: await fishToSendOf(tx, input.accountId, today),
       decided: {
         reason: entry.reason,
         seenAt: entry.seen_at,
@@ -541,7 +573,7 @@ export async function decide(
       matches.made?.({ accountId: decided.candidateId });
     }
   }
-  return { match: written.match };
+  return { match: written.match, fishToSend: written.fishToSend };
 }
 
 /**

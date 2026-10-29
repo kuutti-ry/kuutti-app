@@ -68,6 +68,7 @@ const entry = (
 const ROUND: RoundResponse = {
   day: DAY,
   entries: [entry(1, "Henna", "liked_you"), entry(2, "Katja"), entry(4, "Minna", "seen_before")],
+  fishToSend: true,
 };
 
 type Call = { method: string; path: string; body: unknown };
@@ -91,7 +92,7 @@ function api(answer: Answer = () => undefined, round: RoundResponse = ROUND) {
     if (given) return given;
     if (call.path === "/rounds/today") return json(round);
     if (call.path.endsWith("/seen")) return noContent();
-    if (call.path.endsWith("/decision")) return json({ match: null });
+    if (call.path.endsWith("/decision")) return json({ match: null, fishToSend: true });
     if (call.path === "/blocks") return noContent();
     return refusal("not_found", 404);
   }) as unknown as typeof fetch;
@@ -213,6 +214,7 @@ describe("today's round", () => {
     api(undefined, {
       day: DAY,
       entries: [entry(1, "Henna", "liked_you", "pass"), entry(2, "Katja")],
+      fishToSend: true,
     });
     await show();
     expect(heading("Katja, 32")).toBeTruthy();
@@ -220,7 +222,11 @@ describe("today's round", () => {
   });
 
   it("says when every card was decided earlier today that the round is done", async () => {
-    api(undefined, { day: DAY, entries: [entry(1, "Henna", "liked_you", "like")] });
+    api(undefined, {
+      day: DAY,
+      entries: [entry(1, "Henna", "liked_you", "like")],
+      fishToSend: true,
+    });
     await show();
     expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
   });
@@ -231,7 +237,11 @@ describe("today's round", () => {
   ] as const)(
     "says %s in its own words, with no card and no button to decide",
     async (_what, entries, words) => {
-      const sent = api(undefined, { day: DAY, entries: entries === null ? null : [...entries] });
+      const sent = api(undefined, {
+        day: DAY,
+        entries: entries === null ? null : [...entries],
+        fishToSend: true,
+      });
       await show();
       expect(screen.getByText(words)).toBeTruthy();
       expect(screen.queryByRole("button", { name: "Like" })).toBeNull();
@@ -244,7 +254,9 @@ describe("today's round", () => {
     const sent = api((call) => {
       if (call.path === "/rounds/today") {
         reads += 1;
-        return json(reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+        return json(
+          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+        );
       }
       if (call.path.startsWith(`/rounds/${DAY}/`) && call.path.endsWith("/decision")) {
         return refusal("round_expired", 409);
@@ -264,7 +276,9 @@ describe("today's round", () => {
     const sent = api((call) => {
       if (call.path === "/rounds/today") {
         reads += 1;
-        return json(reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+        return json(
+          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+        );
       }
       if (call.path === `/rounds/${DAY}/entries/1/seen`) return refusal("round_expired", 409);
       return undefined;
@@ -281,7 +295,7 @@ describe("today's round", () => {
     jest.spyOn(Date, "now").mockReturnValue(NOON);
     const sent = api((call) =>
       call.path === `/rounds/${DAY}/entries/1/decision`
-        ? json({ match: { conversationId: CONVERSATION } })
+        ? json({ match: { conversationId: CONVERSATION }, fishToSend: true })
         : undefined,
     );
     await show();
@@ -325,7 +339,7 @@ describe("today's round", () => {
   it("goes on with the round from a match without opening the conversation", async () => {
     api((call) =>
       call.path.endsWith("/decision")
-        ? json({ match: { conversationId: CONVERSATION } })
+        ? json({ match: { conversationId: CONVERSATION }, fishToSend: true })
         : undefined,
     );
     await show();
@@ -390,7 +404,11 @@ describe("today's round", () => {
   });
 
   it("sends a fish from a card that answers nobody's like, and says it back after Undo (#378)", async () => {
-    const sent = api(undefined, { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")] });
+    const sent = api(undefined, {
+      day: DAY,
+      entries: [entry(2, "Katja"), entry(4, "Minna")],
+      fishToSend: true,
+    });
     await show();
     const buttons = screen
       .getAllByRole("button")
@@ -416,7 +434,7 @@ describe("today's round", () => {
   ] as const)(
     "offers no fish on a card that %s, which a like answers (ADR-039 §2)",
     async (_what, reason, label) => {
-      api(undefined, { day: DAY, entries: [entry(1, "Henna", reason)] });
+      api(undefined, { day: DAY, entries: [entry(1, "Henna", reason)], fishToSend: true });
       await show();
       expect(screen.getByText(label)).toBeTruthy();
       expect(screen.getByRole("button", { name: "Like" })).toBeTruthy();
@@ -424,64 +442,65 @@ describe("today's round", () => {
     },
   );
 
-  it("says the earliest day for the next fish when the week's fish is sent, and keeps the card for a like", async () => {
-    // 10:00 UTC on 20.10.; the window opens at midnight in Finland before 23.10. (21:00 UTC on 22.10.).
-    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T10:00:00Z"));
-    const wait = (Date.parse("2026-10-22T21:00:00Z") - Date.parse("2026-10-20T10:00:00Z")) / 1000;
+  it("offers no fish once the week's is sent, and says nothing of the next (#475)", async () => {
+    api(undefined, {
+      day: DAY,
+      entries: [entry(2, "Katja"), entry(4, "Minna")],
+      fishToSend: false,
+    });
+    await show();
+    const buttons = screen
+      .getAllByRole("button")
+      .map((button) => button.props.accessibilityLabel)
+      .filter((label) => ["Send a fish", "Pass", "Like"].includes(label));
+    expect(buttons).toEqual(["Pass", "Like"]);
+    expect(screen.queryByText(/fish/i)).toBeNull();
+    noProblems();
+  });
+
+  it("takes the fish away once it is sent, and gives it back when that card's fish becomes a like (#475)", async () => {
+    let fishSent = false;
+    const sent = api(
+      (call) => {
+        if (!call.path.endsWith("/decision")) return undefined;
+        fishSent = (call.body as { decision: string }).decision === "fish";
+        return json({ match: null, fishToSend: !fishSent });
+      },
+      { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")], fishToSend: true },
+    );
+    await show();
+    await press("Send a fish");
+    expect(heading("Minna, 34")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send a fish" })).toBeNull();
+    noProblems();
+    // The card that holds the fish reads it back, selected, and it can be changed.
+    await press("Undo your last decision");
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Send a fish" }).props.accessibilityState,
+    ).toMatchObject({ selected: true });
+    await press("Like");
+    expect(heading("Minna, 34")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Send a fish" })).toBeTruthy();
+    expect(sent.decisions()).toEqual([`${DAY}/2 fish`, `${DAY}/2 like`]);
+  });
+
+  it("takes the fish away when another phone sent the week's meanwhile, and keeps the card for a like", async () => {
     api(
       (call) =>
         call.path.endsWith("/decision") && (call.body as { decision: string }).decision === "fish"
-          ? refusal("fish_budget_exceeded", 429, { "retry-after": String(wait) })
+          ? refusal("fish_budget_exceeded", 429, { "retry-after": "43200" })
           : undefined,
-      { day: DAY, entries: [entry(2, "Katja")] },
+      { day: DAY, entries: [entry(2, "Katja")], fishToSend: true },
     );
     await show();
     await press("Send a fish");
-    expect(
-      screen.getByText(
-        "You cannot send a fish just now, but you can still like. The earliest day for the next one: 23.10.2026",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByText("You cannot send a fish just now. You can still like.")).toBeTruthy();
     expect(heading("Katja, 32")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Send a fish" })).toBeNull();
     await press("Like");
     expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
   });
-
-  it("names the right day for the next fish when the phone's clock is a minute behind", async () => {
-    // The API counts the wait from its 10:00 UTC to midnight in Finland before
-    // 23.10.; the phone thinks it is 9:59, so the wait ends at 23:59 on 22.10. by its clock.
-    jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T09:59:00Z"));
-    const wait = (Date.parse("2026-10-22T21:00:00Z") - Date.parse("2026-10-20T10:00:00Z")) / 1000;
-    api(
-      (call) =>
-        call.path.endsWith("/decision")
-          ? refusal("fish_budget_exceeded", 429, { "retry-after": String(wait) })
-          : undefined,
-      { day: DAY, entries: [entry(2, "Katja")] },
-    );
-    await show();
-    await press("Send a fish");
-    expect(screen.getByText(/The earliest day for the next one: 23\.10\.2026$/)).toBeTruthy();
-  });
-
-  it.each([
-    ["no wait", {}],
-    ["a wait that is no number", { "retry-after": "soon" }],
-  ] as const)(
-    "says the week's fish is sent without a day when the refusal names %s",
-    async (_what, headers) => {
-      api(
-        (call) =>
-          call.path.endsWith("/decision")
-            ? refusal("fish_budget_exceeded", 429, headers)
-            : undefined,
-        { day: DAY, entries: [entry(2, "Katja")] },
-      );
-      await show();
-      await press("Send a fish");
-      expect(screen.getByText("You cannot send a fish just now. You can still like.")).toBeTruthy();
-    },
-  );
 
   it("takes a card that was liked into a match elsewhere as liked, when its first decision here is refused", async () => {
     api((call) =>
@@ -580,7 +599,9 @@ describe("today's round", () => {
     const sent = api((call) => {
       if (call.path === "/rounds/today") {
         reads += 1;
-        return json(reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+        return json(
+          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+        );
       }
       if (call.path === `/rounds/${DAY}/entries/1/seen`) {
         return new Promise<Response>((resolve) => {
@@ -621,8 +642,11 @@ describe("today's round", () => {
   });
 
   it.each([
-    ["a like recorded", () => json({ match: null })],
-    ["a like that made a match", () => json({ match: { conversationId: CONVERSATION } })],
+    ["a like recorded", () => json({ match: null, fishToSend: true })],
+    [
+      "a like that made a match",
+      () => json({ match: { conversationId: CONVERSATION }, fishToSend: true }),
+    ],
     ["the day ended", () => refusal("round_expired", 409)],
     ["the card gone", () => refusal("not_found", 404)],
     ["a failure", () => refusal("internal", 500)],
@@ -638,7 +662,11 @@ describe("today's round", () => {
           return json(
             reads === 1
               ? ROUND
-              : { day: NEXT_DAY, entries: [entry(1, "Riikka"), entry(2, "Saara")] },
+              : {
+                  day: NEXT_DAY,
+                  entries: [entry(1, "Riikka"), entry(2, "Saara")],
+                  fishToSend: true,
+                },
           );
         }
         if (call.path === `/rounds/${DAY}/entries/1/seen`) {
@@ -771,7 +799,7 @@ describe("today's round", () => {
     const sent = api((call) =>
       call.path.endsWith("/decision")
         ? new Promise<Response>((resolve) => {
-            release = () => resolve(json({ match: null }));
+            release = () => resolve(json({ match: null, fishToSend: true }));
           })
         : undefined,
     );
@@ -800,7 +828,7 @@ describe("today's round", () => {
     api((call) =>
       call.path.endsWith("/decision")
         ? new Promise<Response>((resolve) => {
-            release = () => resolve(json({ match: null }));
+            release = () => resolve(json({ match: null, fishToSend: true }));
           })
         : undefined,
     );
@@ -893,6 +921,7 @@ describe("today's round", () => {
     api((call) => (call.path.startsWith("/photos/") ? failure() : undefined), {
       day: DAY,
       entries: [withPhoto, entry(2, "Katja")],
+      fishToSend: true,
     });
     await show();
     await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
@@ -920,8 +949,8 @@ describe("today's round", () => {
         reads += 1;
         return json(
           reads === 1
-            ? { day: DAY, entries: [withPhoto] }
-            : { day: NEXT_DAY, entries: [entry(1, "Riikka")] },
+            ? { day: DAY, entries: [withPhoto], fishToSend: true }
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
         );
       }
       if (call.path.endsWith("/decision")) return refusal("round_expired", 409);
@@ -945,7 +974,9 @@ describe("a round left open past midnight", () => {
     return api((call) => {
       if (call.path !== "/rounds/today") return undefined;
       reads += 1;
-      return json(reads === 1 ? first : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+      return json(
+        reads === 1 ? first : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+      );
     });
   };
 
@@ -961,7 +992,11 @@ describe("a round left open past midnight", () => {
     "is read anew when the app comes back on the next day, and says so: %s",
     async (_what, entries, words) => {
       const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
-      const sent = days({ day: DAY, entries: entries === null ? null : [...entries] });
+      const sent = days({
+        day: DAY,
+        entries: entries === null ? null : [...entries],
+        fishToSend: true,
+      });
       await show();
       expect(screen.getByText(words)).toBeTruthy();
       now.mockReturnValue(AFTER_MIDNIGHT);
@@ -978,7 +1013,11 @@ describe("a round left open past midnight", () => {
 
   it("is not read again when the app comes back on the same day", async () => {
     const now = jest.spyOn(Date, "now").mockReturnValue(NOON);
-    const sent = days({ day: DAY, entries: [entry(1, "Henna", "liked_you", "like")] });
+    const sent = days({
+      day: DAY,
+      entries: [entry(1, "Henna", "liked_you", "like")],
+      fishToSend: true,
+    });
     await show();
     now.mockReturnValue(LATE_EVENING);
     await appBecomes("active");
@@ -990,7 +1029,11 @@ describe("a round left open past midnight", () => {
   it("is not read again when the phone's clock is still on the day before the API's", async () => {
     // The API's midnight has passed; the phone says 23:59 on 20.10.
     const now = jest.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-20T20:59:00Z"));
-    const sent = days({ day: NEXT_DAY, entries: [entry(1, "Henna", "liked_you", "like")] });
+    const sent = days({
+      day: NEXT_DAY,
+      entries: [entry(1, "Henna", "liked_you", "like")],
+      fishToSend: true,
+    });
     await show();
     await appBecomes("active");
     // Its clock reaches the round's day.
@@ -1006,10 +1049,12 @@ describe("a round left open past midnight", () => {
     const sent = api((call) => {
       if (call.path === "/rounds/today") {
         reads += 1;
-        return json(reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")] });
+        return json(
+          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+        );
       }
       if (call.path === `/rounds/${DAY}/entries/1/decision`) {
-        return json({ match: { conversationId: CONVERSATION } });
+        return json({ match: { conversationId: CONVERSATION }, fishToSend: true });
       }
       return undefined;
     });
@@ -1033,7 +1078,11 @@ describe("a round left open past midnight", () => {
 
 describe("where the decision buttons sit (#82)", () => {
   const KEY = "kuutti.preference.decisionButtons";
-  const STRANGERS: RoundResponse = { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")] };
+  const STRANGERS: RoundResponse = {
+    day: DAY,
+    entries: [entry(2, "Katja"), entry(4, "Minna")],
+    fishToSend: true,
+  };
   const CONTROLS = ["Undo your last decision", "Send a fish", "Pass", "Like"];
   /** The round's own controls, in the order a screen reader meets them. */
   const controls = () =>
@@ -1147,7 +1196,7 @@ describe("where the decision buttons sit (#82)", () => {
     "keeps Undo at the thumb on the %s, one-handed, after the round's last decision, and it still takes it back",
     async (hand, side) => {
       store.set(KEY, JSON.stringify({ hand, oneHanded: true }));
-      api(undefined, { day: DAY, entries: [entry(2, "Katja")] });
+      api(undefined, { day: DAY, entries: [entry(2, "Katja")], fishToSend: true });
       await show();
       await settle();
       await press("Pass");
@@ -1166,7 +1215,11 @@ describe("where the decision buttons sit (#82)", () => {
 
   it("shows no Undo, one-handed, at a round's end with nothing to take back", async () => {
     store.set(KEY, JSON.stringify({ oneHanded: true }));
-    api(undefined, { day: DAY, entries: [entry(2, "Katja", "matches_filters", "pass")] });
+    api(undefined, {
+      day: DAY,
+      entries: [entry(2, "Katja", "matches_filters", "pass")],
+      fishToSend: true,
+    });
     await show();
     await settle();
     expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
@@ -1176,7 +1229,7 @@ describe("where the decision buttons sit (#82)", () => {
 
   it("leaves the fish out of the column on a card that answers a like", async () => {
     store.set(KEY, JSON.stringify({ oneHanded: true }));
-    api(undefined, { day: DAY, entries: [entry(1, "Henna", "liked_you")] });
+    api(undefined, { day: DAY, entries: [entry(1, "Henna", "liked_you")], fishToSend: true });
     await show();
     await settle();
     expect(controls()).toEqual(["Pass", "Like"]);
@@ -1194,7 +1247,7 @@ describe("the short pool (#99, ADR-042)", () => {
     ],
     relaxed: [],
   };
-  const EMPTY: RoundResponse = { day: DAY, entries: [] };
+  const EMPTY: RoundResponse = { day: DAY, entries: [], fishToSend: true };
   const relaxedCard: RoundEntry = { ...entry(5, "Liisa", "relaxed"), relaxedField: "smoking" };
   const INCLUDE = "Include those who did not answer: Smoking. About 10 more people";
   const ASIDE = "Set aside for today: Smoking. A few more people";
@@ -1250,7 +1303,11 @@ describe("the short pool (#99, ADR-042)", () => {
         }
         return undefined;
       },
-      { day: DAY, entries: [entry(1, "Henna", "matches_filters", "like"), relaxedCard] },
+      {
+        day: DAY,
+        entries: [entry(1, "Henna", "matches_filters", "like"), relaxedCard],
+        fishToSend: true,
+      },
     );
     await show();
     expect(heading("Liisa, 35")).toBeTruthy();
@@ -1300,6 +1357,7 @@ describe("the short pool (#99, ADR-042)", () => {
     api(undefined, {
       day: DAY,
       entries: [{ ...entry(1, "Henna"), notAnswered: ["smoking", "languages"] }],
+      fishToSend: true,
     });
     await show();
     expect(screen.getByText("Did not answer: Smoking")).toBeTruthy();
@@ -1366,6 +1424,7 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
   const round = (decision: RoundEntry["decision"] = null): RoundResponse => ({
     day: DAY,
     entries: [entry(1, "Henna", "matches_filters", "like"), { ...relaxedCard, decision }],
+    fishToSend: true,
   });
 
   it.each([
@@ -1394,7 +1453,7 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
     api(
       (call) =>
         call.path === RELAXATIONS ? json({ short: false, offers: [], relaxed: [] }) : undefined,
-      { day: DAY, entries: [{ ...relaxedCard }, entry(6, "Saara")] },
+      { day: DAY, entries: [{ ...relaxedCard }, entry(6, "Saara")], fishToSend: true },
     );
     await show();
     await press("Like");
@@ -1416,7 +1475,7 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
         if (call.path === RELAXATIONS) return refusal("relaxations_changed", 409);
         return undefined;
       },
-      { day: DAY, entries: [] },
+      { day: DAY, entries: [], fishToSend: true },
     );
     await show();
 

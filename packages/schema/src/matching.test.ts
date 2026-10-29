@@ -11,6 +11,7 @@ import {
   RelaxationUndone,
   ROUND_ENTRIES_MAX,
   RoundDayParams,
+  RoundDecisionAnswer,
   RoundDecisionUpdate,
   RoundEntry,
   RoundEntryParams,
@@ -79,18 +80,50 @@ describe("a decision", () => {
   });
 });
 
+describe("the answer to a decision", () => {
+  it("names a match or none, and says whether a fish can still go (#475)", () => {
+    const match = { conversationId: "7d8f3c2a-1b4e-4c6d-9e0f-2a3b4c5d6e7f" };
+    expect(RoundDecisionAnswer.parse({ match, fishToSend: false })).toEqual({
+      match,
+      fishToSend: false,
+    });
+    expect(RoundDecisionAnswer.parse({ match: null, fishToSend: true })).toEqual({
+      match: null,
+      fishToSend: true,
+    });
+  });
+
+  it.each([
+    ["no word on the fish", { match: null }, "invalid_type"],
+    ["the fish as a count", { match: null, fishToSend: 1 }, "invalid_type"],
+    ["anything else", { match: null, fishToSend: true, liked: true }, "unrecognized_keys"],
+  ] as const)("refuses %s", (_, input, code) => {
+    expect(codes(RoundDecisionAnswer, input)).toEqual([code]);
+  });
+});
+
 describe("today's round", () => {
   it("names its day, and has no cards before it is built", () => {
-    expect(RoundResponse.parse({ day: "2026-10-19", entries: null })).toEqual({
+    expect(RoundResponse.parse({ day: "2026-10-19", entries: null, fishToSend: true })).toEqual({
       day: "2026-10-19",
       entries: null,
+      fishToSend: true,
     });
-    expect(codes(RoundResponse, { day: "2026-10-19" })).toEqual(["invalid_type"]);
+    expect(codes(RoundResponse, { day: "2026-10-19", fishToSend: true })).toEqual(["invalid_type"]);
+  });
+
+  it("says whether a fish can go today, never how many (#475)", () => {
+    expect(codes(RoundResponse, { day: "2026-10-19", entries: null })).toEqual(["invalid_type"]);
+    expect(codes(RoundResponse, { day: "2026-10-19", entries: null, fishToSend: 0 })).toEqual([
+      "invalid_type",
+    ]);
   });
 
   it("holds at most the round's most cards", () => {
     const tooMany = Array.from({ length: ROUND_ENTRIES_MAX + 1 }, () => ({}));
-    expect(codes(RoundResponse, { day: "2026-10-19", entries: tooMany })).toContain("too_big");
+    expect(
+      codes(RoundResponse, { day: "2026-10-19", entries: tooMany, fishToSend: true }),
+    ).toContain("too_big");
   });
 });
 

@@ -1353,7 +1353,6 @@ export type MessageParams = {
   "round.empty": Record<never, never>;
   "round.failed": Record<never, never>;
   "round.fish": Record<never, never>;
-  "round.fish.refused": { "date": string };
   "round.gone": Record<never, never>;
   "round.home.open": Record<never, never>;
   "round.like": Record<never, never>;

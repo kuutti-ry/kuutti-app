@@ -1,4 +1,4 @@
-import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
+import type { PlainMessageKey } from "@kuutti/i18n";
 import type { RoundChoice, RoundReason } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Fish from "lucide-react-native/icons/fish";
@@ -26,7 +26,7 @@ import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
 import { ShortPool } from "./ShortPool";
-import { type RoundCard, type RoundNotice, useRound } from "./useRound";
+import { type RoundCard, useRound } from "./useRound";
 
 /** Why a card is in the round, in words (TD-12): the label every card carries, never a score. */
 const REASON: Readonly<Record<RoundReason, PlainMessageKey>> = {
@@ -64,7 +64,10 @@ const WORDLESS_UNDO_FONT_SCALE = 1.3;
  * an outlined rectangle at the left, like a filled pill at the right, each
  * with its word and its icon, no red and green; the fish (#378), a like with
  * a mark, a filled rounded square above them, on a card that answers nobody's
- * like. Undo in the header brings the last card back. Where they sit is the
+ * like, while a fish can go today and on the card that holds it (#475): once
+ * the week's is sent it is left out, as on a liked-you card, and nothing says
+ * when the next comes, which is Monday's (the maintainer's of 29/10/2026).
+ * Undo in the header brings the last card back. Where they sit is the
  * person's (#82): for the right hand as above, or mirrored for the left; and
  * one-handed, Undo, the fish, Pass and Like in one column at the bottom on
  * that side, Undo brought down from the header, within a thumb's reach. A like that
@@ -80,7 +83,7 @@ const WORDLESS_UNDO_FONT_SCALE = 1.3;
  * appears, under the header, in sight however far the card was scrolled.
  */
 export function RoundScreen() {
-  const { t, locale } = useT();
+  const { t } = useT();
   const router = useRouter();
   const tap = useHapticTap();
   const round = useRound();
@@ -108,13 +111,7 @@ export function RoundScreen() {
   const focus = useCallback((node: TextNode | null) => {
     if (node) AccessibilityInfo.sendAccessibilityEvent(node, "focus");
   }, []);
-  const say = (said: RoundNotice) =>
-    typeof said === "string"
-      ? t(said)
-      : t("round.fish.refused", {
-          date: formatDate(locale, said.fishAgain, { timeZone: "Europe/Helsinki" }),
-        });
-  const words = notice === null ? null : say(notice);
+  const words = notice === null ? null : t(notice);
   // iOS has no live regions; Android's speak the same words already.
   useEffect(() => {
     if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
@@ -279,9 +276,10 @@ export function RoundScreen() {
           />
         )}
       </ScrollView>
-      {match === null && current && (
+      {match === null && current && view.status === "ready" && (
         <DecisionBar
           card={current}
+          fishToSend={view.round.fishToSend}
           busy={round.busy}
           left={placement.hand === "left"}
           oneHanded={placement.oneHanded}
@@ -310,9 +308,12 @@ export function RoundScreen() {
  * right hand (Pass, Like) or mirrored for the left, the fish above on the
  * hand's side; one-handed, a column on that side, Undo first and Like last,
  * nearest the thumb. Each keeps its shape, word and icon wherever it sits.
+ * The fish is there while one can go today, and on the card that holds it,
+ * read back selected and open to change (#475).
  */
 function DecisionBar({
   card,
+  fishToSend,
   busy,
   left,
   oneHanded,
@@ -320,6 +321,8 @@ function DecisionBar({
   onChoose,
 }: {
   card: RoundCard;
+  /** Whether a fish can go today, as the round and each decision's answer say (#475). */
+  fishToSend: boolean;
   busy: boolean;
   left: boolean;
   oneHanded: boolean;
@@ -329,7 +332,7 @@ function DecisionBar({
 }) {
   const { t } = useT();
   const { entry } = card;
-  const fish = !ANSWERS_A_LIKE.has(entry.reason) && (
+  const fish = !ANSWERS_A_LIKE.has(entry.reason) && (fishToSend || entry.decision === "fish") && (
     <Button
       variant="secondary"
       className={cn("rounded-lg", oneHanded ? "w-full" : left ? "self-start" : "self-end")}

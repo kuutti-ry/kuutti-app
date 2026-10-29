@@ -1,12 +1,16 @@
 # features/matching/fish.feature
 Feature: The fish, a like that says a little more
   A fish (#378, ADR-039; the maintainer, 20/10/2026) is a like with a mark:
-  fish_budget of them in any fish_window_days, rolling, one in seven. It
-  goes to the front of the other person's liked-you places, ahead of
-  ordinary likes, oldest first within each, labelled as a fish. It is a
-  like for every other rule: the day's likes, the expiry, the match, and
-  the sender learns nothing unless it becomes a match. Nobody can buy or
-  earn one, and nothing counts how many a person received.
+  fish_budget of them in each fish_window_days counted from a Monday, one a
+  calendar week, Monday to Sunday in Finland (the maintainer, 29/10/2026,
+  #475; one in any seven days, rolling, before). It goes to the front
+  of the other person's liked-you places, ahead of ordinary likes, oldest
+  first within each, labelled as a fish. It is a like for every other rule:
+  the day's likes, the expiry, the match, and the sender learns nothing
+  unless it becomes a match. The sender's own round says whether a fish can
+  go today, and nothing of when the next comes: on Monday. Nobody can buy one, an
+  invitation may earn one (earned.feature), and nothing counts how many a
+  person received.
 
   Scenario: A fish sent today is at the front of the recipient's next round, ahead of every ordinary like
     Given "B" liked "A" two days ago, and "C" sent "A" a fish yesterday
@@ -26,10 +30,25 @@ Feature: The fish, a like that says a little more
       | L2     | 4     | liked you |
       | L3     | 5     | liked you |
 
-  Scenario: A second fish within seven days is refused with the time the next one comes, and nothing is written
-    Given "A" sent a fish three days ago
+  Scenario: A second fish in the same calendar week is refused until Monday, and nothing is written
+    Given "A" sent a fish on Tuesday, and it is Friday
     When "A" sends a fish on a card of today
-    Then it is refused as fish_budget_exceeded, with the wait until four days from now, and the card stays undecided
+    Then it is refused as fish_budget_exceeded, with the wait until the midnight that begins Monday, and the card stays undecided
+
+  Scenario: Last week's fish is behind Monday's midnight, and a fish goes at 00:01
+    Given "A" sent a fish on Sunday
+    When "A" sends a fish on a card of Monday at 00:01
+    Then the fish is sent
+
+  Scenario: A fish of last Sunday is last week's, though fewer than seven days ago
+    Given "A" sent a fish on Sunday, and it is Friday
+    When "A" sends a fish on a card of today
+    Then the fish is sent
+
+  Scenario: A round read after the week's fish offers no other fish this week
+    Given "A" sent a fish today
+    When "A" reads today's round
+    Then it says no fish can go today
 
   Scenario: A fish changed to a like or a pass the same day is given back
     Given "A" sent a fish today
