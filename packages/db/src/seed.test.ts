@@ -136,6 +136,7 @@ describe("seed", () => {
           default_pond: "paakaupunkiseutu",
           round_size: 10,
           like_budget_balanced: 10,
+          auto_shadow_ban_photo_fetches: 200,
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
       } finally {

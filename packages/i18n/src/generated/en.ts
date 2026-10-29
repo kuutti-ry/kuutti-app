@@ -997,6 +997,8 @@ export const en: Readonly<Record<string, string>> = {
   "profile.card.open": "See your card",
   "profile.card.photoLabel": "Photo {position, number} of {total, number}",
   "profile.card.photoLabelCaption": "Photo {position, number} of {total, number}. {caption}",
+  "profile.card.photoNext": "Next photo",
+  "profile.card.photoPrevious": "Previous photo",
   "profile.card.sharedOption": "{option} (you too)",
   "profile.card.title": "Your card",
   "profile.clear": "Clear the answer",

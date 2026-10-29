@@ -635,6 +635,8 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.card.open": "Katso korttisi",
   "profile.card.photoLabel": "Kuva {position, number} / {total, number}",
   "profile.card.photoLabelCaption": "Kuva {position, number} / {total, number}. {caption}",
+  "profile.card.photoNext": "Seuraava kuva",
+  "profile.card.photoPrevious": "Edellinen kuva",
   "profile.card.sharedOption": "{option} (sinäkin)",
   "profile.card.title": "Korttisi",
   "profile.clear": "Tyhjennä vastaus",

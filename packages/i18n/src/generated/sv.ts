@@ -627,6 +627,8 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.card.open": "Se ditt kort",
   "profile.card.photoLabel": "Foto {position, number} av {total, number}",
   "profile.card.photoLabelCaption": "Foto {position, number} av {total, number}. {caption}",
+  "profile.card.photoNext": "Nästa foto",
+  "profile.card.photoPrevious": "Föregående foto",
   "profile.card.sharedOption": "{option} (du också)",
   "profile.card.title": "Ditt kort",
   "profile.clear": "Rensa svaret",
