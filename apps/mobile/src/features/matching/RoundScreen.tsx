@@ -65,9 +65,9 @@ const WORDLESS_UNDO_FONT_SCALE = 1.3;
  * with its word and its icon, no red and green; the fish (#378), a like with
  * a mark, a filled rounded square above them, on a card that answers nobody's
  * like, while a fish can go today and on the card that holds it (#475): once
- * the day's is sent it is left out, as on a liked-you card, and nothing says
- * when the next comes, with the next round. Undo in the header brings the last
- * card back. Where they sit is the
+ * the week's is sent it is left out, as on a liked-you card, and nothing says
+ * when the next comes, which is Monday's (the maintainer's of 29/10/2026).
+ * Undo in the header brings the last card back. Where they sit is the
  * person's (#82): for the right hand as above, or mirrored for the left; and
  * one-handed, Undo, the fish, Pass and Like in one column at the bottom on
  * that side, Undo brought down from the header, within a thumb's reach. A like that
@@ -332,9 +332,6 @@ function DecisionBar({
 }) {
   const { t } = useT();
   const { entry } = card;
-  // shortcut: nothing says when the next fish comes, which is right while
-  // fish_window_days is 1 and the next round brings it; a longer window would
-  // need the day it comes back, a field of its own (ADR-039 Consequences).
   const fish = !ANSWERS_A_LIKE.has(entry.reason) && (fishToSend || entry.decision === "fish") && (
     <Button
       variant="secondary"

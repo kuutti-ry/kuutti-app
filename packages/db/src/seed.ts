@@ -66,8 +66,8 @@ export const MATCHING_CONFIG_V1 = {
   photo_closer_look_reject: 75,
   // #376 (migration 0068): a photo nobody decided in two weeks is rejected as not reviewed.
   photo_queue_reject_days: 14,
-  // #378 (ADR-039, migration 0072): a fish a person may send in any seven days,
-  // rolling; one a day since version 2 (below).
+  // #378 (ADR-039, migration 0072): a fish a person may send in each seven
+  // days from a Monday, the calendar week (#475; rolling until then).
   fish_budget: 1,
   fish_window_days: 7,
   // #56: profile photo tips; the tips rule reads these against photo_review signals.
@@ -195,8 +195,6 @@ export const MATCHING_CONFIG_V2 = {
   round_size: 10,
   // #98 (ADR-036, migration 0070): ten likes a day for everybody, the first cut's.
   like_budget_balanced: 10,
-  // #475 (ADR-039 §3, migration 0088): one fish a day, the maintainer's of 29/10/2026.
-  fish_window_days: 1,
 } as const;
 
 /**

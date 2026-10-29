@@ -89,20 +89,6 @@ async function likeBudget(db: Queryable, n: number) {
   );
 }
 
-/**
- * The fish's window as a new version of fish_window_days: a week, version 1's
- * (migration 0072), so a fish of earlier days is still in it; one day since
- * #475 (migration 0088).
- */
-async function fishWindow(db: Queryable, days: number) {
-  await db.query(
-    `INSERT INTO matching_config (version, key, value, created_by)
-     SELECT max(version) + 1, 'fish_window_days', $1::jsonb, 'test'
-       FROM matching_config WHERE key = 'fish_window_days'`,
-    [JSON.stringify(days)],
-  );
-}
-
 const codeOf = async (answer: Response) => ErrorResponse.parse(await answer.json()).error.code;
 
 /** What the answer to a decision says of the caller's fish after it (#475). */
@@ -230,7 +216,6 @@ describe("earned fish", () => {
   }) => {
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
-    await fishWindow(ctx.client, 7);
     await fishBefore(ctx.client, a, x, 3);
     await earnedUnits(ctx.client, a.accountId, { fish: 1 });
     const entries = await roundOf(ctx.client, a, [b, c]);
@@ -250,7 +235,6 @@ describe("earned fish", () => {
   test("A fish an earned fish paid for is left out of the window", async ({ ctx }) => {
     const [a, b, x] = await cast(ctx.client, 3);
     if (!a || !b || !x) throw new Error("cast not written");
-    await fishWindow(ctx.client, 7);
     const paid = await fishBefore(ctx.client, a, x, 1);
     await earnedUnits(ctx.client, a.accountId, { fish: 1 }, daysBefore(3));
     await ctx.client.query(
@@ -276,7 +260,6 @@ describe("earned fish", () => {
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
     await likeBudget(ctx.client, 1);
-    await fishWindow(ctx.client, 7);
     await fishBefore(ctx.client, a, x, 3);
     await earnedUnits(ctx.client, a.accountId, { likes: 1, fish: 1 });
     const entries = await roundOf(ctx.client, a, [b, c]);
@@ -308,7 +291,6 @@ describe("earned fish", () => {
     const [a, b, c, x] = await cast(ctx.client, 4);
     if (!a || !b || !c || !x) throw new Error("cast not written");
     await likeBudget(ctx.client, 1);
-    await fishWindow(ctx.client, 7);
     await fishBefore(ctx.client, a, x, 3);
     await earnedUnits(ctx.client, a.accountId, { likes: 1 });
     const entries = await roundOf(ctx.client, a, [b, c]);

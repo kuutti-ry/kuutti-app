@@ -123,7 +123,7 @@ export const RelaxationParams = z
 
 /**
  * Whether the fish's budget lets the caller send one today (#475, ADR-039
- * §3, §6): one of the window's own, or one their invitations earned waiting
+ * §3, §6): one of the week's own, or one their invitations earned waiting
  * (ADR-044 §8). The day's likes, which a fish counts in too, are not asked
  * (ADR-036 Open 1). The round offers Send a fish only while it is true, and
  * on the card that holds the fish. Never a count, nor anything of the fish

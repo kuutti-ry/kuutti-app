@@ -9,13 +9,15 @@ import { people } from "../test/people.ts";
 import { exportRounds, saveRound } from "./rounds.ts";
 
 // The fish (#378, ADR-039, features/matching/fish.feature): its budget in a
-// rolling window and the wait a refusal names, given back the same day, a
+// calendar week, Monday to Sunday (#475), and the wait a refusal names, given back the same day, a
 // like for the day's likes and the match, a like on a card that answers one,
 // the event, and what the sender and the export read. Its place in the other
 // person's round is jobs/round-builder.test.ts.
 
-/** 12:00 in Finland, one Friday. */
+/** 12:00 in Finland, one Friday; its week began on Monday 12 October. */
 const T = new Date("2026-10-16T09:00:00.000Z");
+/** The midnight in Helsinki that begins the next Monday, 19 October. */
+const NEXT_MONDAY = new Date("2026-10-18T21:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TODAY = finnishDay(T);
 
@@ -67,8 +69,8 @@ async function sentBefore(db: Queryable, sender: Person, to: Person, days: numbe
   );
 }
 
-const choose = (app: App, who: Person, position: number, decision: string) =>
-  app.request(`/rounds/${TODAY}/entries/${position}/decision`, {
+const choose = (app: App, who: Person, position: number, decision: string, day = TODAY) =>
+  app.request(`/rounds/${day}/entries/${position}/decision`, {
     method: "PUT",
     headers: { ...who.headers, "content-type": "application/json" },
     body: JSON.stringify({ decision }),
@@ -127,41 +129,12 @@ describe("the fish", () => {
     expect(round?.entries.map((entry) => entry.decision)).toEqual(["fish"]);
   });
 
-  test("A second fish the same day is refused until midnight, and nothing is written", async ({
+  test("A second fish in the same calendar week is refused until Monday, and nothing is written", async ({
     ctx,
   }) => {
     const [a, b, c] = await cast(ctx.client, 3);
     if (!a || !b || !c) throw new Error("cast not written");
-    const roundId = await roundOf(ctx.client, a, [b, c]);
-    const app = await appAt(ctx.client);
-    expect((await choose(app, a, 1, "fish")).status).toBe(200);
-
-    const refused = await choose(app, a, 2, "fish");
-
-    expect(refused.status).toBe(429);
-    expect(await codeOf(refused)).toBe("fish_budget_exceeded");
-    // Today's fish leaves the window of a day at the next midnight in Helsinki, twelve hours on.
-    expect(Number(refused.headers.get("retry-after"))).toBe(12 * 3600);
-    expect(await entriesOf(ctx.client, roundId)).toEqual([
-      { decision: "like", fish: true },
-      { decision: null, fish: false },
-    ]);
-  });
-
-  test("Yesterday's fish has left the window, and today's goes", async ({ ctx }) => {
-    const [a, b, c] = await cast(ctx.client, 3);
-    if (!a || !b || !c) throw new Error("cast not written");
-    await sentBefore(ctx.client, a, b, 1, true);
-    await roundOf(ctx.client, a, [c]);
-    expect((await choose(await appAt(ctx.client), a, 1, "fish")).status).toBe(200);
-  });
-
-  test("a window of seven days counts a fish of three days ago, and names the midnight it leaves", async ({
-    ctx,
-  }) => {
-    await setConfig(ctx.client, "fish_window_days", 7);
-    const [a, b, c] = await cast(ctx.client, 3);
-    if (!a || !b || !c) throw new Error("cast not written");
+    // Tuesday, 13 October.
     await sentBefore(ctx.client, a, b, 3, true);
     const roundId = await roundOf(ctx.client, a, [c]);
     const app = await appAt(ctx.client);
@@ -171,27 +144,61 @@ describe("the fish", () => {
 
     expect(refused.status).toBe(429);
     expect(await codeOf(refused)).toBe("fish_budget_exceeded");
-    // The fish of three days ago leaves the window at the midnight that begins
-    // the fourth day from now: 2026-10-20 00:00 in Helsinki, 21:00 UTC the day before.
-    const back = new Date("2026-10-19T21:00:00.000Z");
-    expect(Number(refused.headers.get("retry-after"))).toBe((back.getTime() - T.getTime()) / 1000);
+    expect(Number(refused.headers.get("retry-after"))).toBe(
+      (NEXT_MONDAY.getTime() - T.getTime()) / 1000,
+    );
     expect(await entriesOf(ctx.client, roundId)).toEqual([{ decision: null, fish: false }]);
   });
 
-  test("a fish of seven days ago has left a window of seven, and the next goes", async ({
+  test("Last week's fish is behind Monday's midnight, and a fish goes at 00:01", async ({
     ctx,
   }) => {
-    await setConfig(ctx.client, "fish_window_days", 7);
     const [a, b, c] = await cast(ctx.client, 3);
     if (!a || !b || !c) throw new Error("cast not written");
-    await sentBefore(ctx.client, a, b, 7, true);
+    // Sunday, 18 October, then a round of Monday, 19 October.
+    await sentBefore(ctx.client, a, b, -2, true);
+    await roundOf(ctx.client, a, [c], -3);
+    const app = await appAt(ctx.client, new Date(NEXT_MONDAY.getTime() + 60_000));
+
+    expect(await fishToSendOn(app, a)).toBe(true);
+    expect(await fishToSendAfter(await choose(app, a, 1, "fish", "2026-10-19"))).toBe(false);
+  });
+
+  test("A fish of last Sunday is last week's, though fewer than seven days ago", async ({
+    ctx,
+  }) => {
+    const [a, b, c] = await cast(ctx.client, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    // Sunday, 11 October: five days ago, in the week before.
+    await sentBefore(ctx.client, a, b, 5, true);
     await roundOf(ctx.client, a, [c]);
     const app = await appAt(ctx.client);
     expect(await fishToSendOn(app, a)).toBe(true);
     expect((await choose(app, a, 1, "fish")).status).toBe(200);
   });
 
-  test("the refusal is said in the request's language, and with no budget at all it waits for the day", async ({
+  test.for([
+    ["a day", 1],
+    ["0, which reads as a day,", 0],
+  ] as const)(
+    "a window of %s set in the panel counts today's fish alone, the next from midnight",
+    async ([, days], { ctx }) => {
+      await setConfig(ctx.client, "fish_window_days", days);
+      const [a, b, c, d] = await cast(ctx.client, 4);
+      if (!a || !b || !c || !d) throw new Error("cast not written");
+      await sentBefore(ctx.client, a, b, 1, true);
+      await roundOf(ctx.client, a, [c, d]);
+      const app = await appAt(ctx.client);
+
+      expect(await fishToSendAfter(await choose(app, a, 1, "fish"))).toBe(false);
+      const refused = await choose(app, a, 2, "fish");
+
+      expect(refused.status).toBe(429);
+      expect(Number(refused.headers.get("retry-after"))).toBe(12 * 3600);
+    },
+  );
+
+  test("the refusal is said in the request's language, and with no budget at all it waits for Monday", async ({
     ctx,
   }) => {
     await setConfig(ctx.client, "fish_budget", 0);
@@ -207,7 +214,9 @@ describe("the fish", () => {
     expect(ErrorResponse.parse(await refused.json()).error.message).toBe(
       "Du kan inte skicka en fisk just nu. Du kan fortfarande gilla.",
     );
-    expect(Number(refused.headers.get("retry-after"))).toBe(12 * 3600);
+    expect(Number(refused.headers.get("retry-after"))).toBe(
+      (NEXT_MONDAY.getTime() - T.getTime()) / 1000,
+    );
   });
 
   test("A fish changed to a like or a pass the same day is given back", async ({ ctx }) => {
@@ -351,7 +360,7 @@ describe("the fish", () => {
 });
 
 describe("whether a fish can go today (#475)", () => {
-  test("A round read after the day's fish offers no other fish today", async ({ ctx }) => {
+  test("A round read after the week's fish offers no other fish this week", async ({ ctx }) => {
     const [a, b, c] = await cast(ctx.client, 3);
     if (!a || !b || !c) throw new Error("cast not written");
     await roundOf(ctx.client, a, [b, c]);
@@ -383,7 +392,7 @@ describe("whether a fish can go today (#475)", () => {
     },
   );
 
-  test("a fish on a liked-you card is a like and leaves the day's fish to send", async ({
+  test("a fish on a liked-you card is a like and leaves the week's fish to send", async ({
     ctx,
   }) => {
     const [a, b] = await cast(ctx.client, 2);

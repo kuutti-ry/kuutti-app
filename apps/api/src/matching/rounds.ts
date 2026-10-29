@@ -99,43 +99,58 @@ const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
 
 /**
  * The fish (#378, ADR-039, the maintainer's of 20/10/2026): a like with a
- * mark, `fish_budget` of them in any `fish_window_days`, rolling (one a day
- * since #475), counted from the person's standing fish under the round's
- * lock, so one changed back the same day is given back. A fish is a like for
- * every other rule: the day's likes, the expiry, the match. On a card of
- * somebody whose like or fish waits on the person it would answer a like, and
- * is a like. Past the window's budget a fish an invitation earned is used by
- * itself (#107, ADR-044 §8), and the fish it paid for are left out of the window.
+ * mark, `fish_budget` of them in each period of `fish_window_days` counted
+ * from a Monday, so 7 is the calendar week, Monday to Sunday in Finland (the
+ * maintainer's of 29/10/2026, #475; a rolling window until then). Counted
+ * from the person's standing fish under the round's lock, so one changed back
+ * the same day is given back. A fish is a like for every other rule: the
+ * day's likes, the expiry, the match. On a card of somebody whose like or
+ * fish waits on the person it would answer a like, and is a like. Past the
+ * period's budget a fish an invitation earned is used by itself (#107,
+ * ADR-044 §8), and the fish it paid for are left out of the count.
  */
 const FISH_BUDGET_KEY = "fish_budget";
 const FISH_WINDOW_KEY = "fish_window_days";
 
+/** A Finnish day `days` after another, both as YYYY-MM-DD. */
+function addDays(day: string, days: number): string {
+  const at = new Date(`${day}T12:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
+}
+
+/** A Monday, from which the fish's periods are counted. */
+const FISH_PERIODS_FROM = Date.parse("1970-01-05");
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
- * The person's standing fish of the last `fish_window_days` against the
- * budget, those an earned fish paid for left out, with the oldest day among
- * them: one count for the refusal's wait and for whether the round offers a
- * fish (#475), so the two never disagree. A card's own fish is never counted
- * against it, since a fish is counted only for a card that holds none.
+ * The person's standing fish of the period that holds today against the
+ * budget, those an earned fish paid for left out, and the day the next period
+ * begins: one count for the refusal's wait and for whether the round offers a
+ * fish (#475), so the two never disagree. A window of 0, which the panel
+ * allows, reads as a day. A card's own fish is never counted against it,
+ * since a fish is counted only for a card that holds none.
  */
 async function fishSent(
   db: Queryable,
   accountId: string,
   today: string,
-): Promise<{ sent: number; budget: number; window: number; oldest: string | null }> {
+): Promise<{ sent: number; budget: number; next: string }> {
   const budget = await matchingConfigNumber(db, FISH_BUDGET_KEY);
-  const window = await matchingConfigNumber(db, FISH_WINDOW_KEY);
-  const { rows } = await db.query<{ n: number; oldest: string | null }>(
-    `SELECT count(*)::int AS n, min(r.day)::text AS oldest
+  const window = Math.max(1, await matchingConfigNumber(db, FISH_WINDOW_KEY));
+  const into = Math.round((Date.parse(today) - FISH_PERIODS_FROM) / DAY_MS) % window;
+  const from = addDays(today, -into);
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n
        FROM round_entries e JOIN rounds r ON r.id = e.round_id
-      WHERE r.account_id = $1 AND e.fish AND r.day > $2::date - $3::int
-        AND e.id <> ALL($4::uuid[])`,
-    [accountId, today, window, await entriesPaidBy(db, accountId, "fish")],
+      WHERE r.account_id = $1 AND e.fish AND r.day >= $2::date AND e.id <> ALL($3::uuid[])`,
+    [accountId, from, await entriesPaidBy(db, accountId, "fish")],
   );
-  return { sent: rows[0]?.n ?? 0, budget, window, oldest: rows[0]?.oldest ?? null };
+  return { sent: rows[0]?.n ?? 0, budget, next: addDays(from, window) };
 }
 
 /**
- * Whether the person can send a fish today (#475): one of the window's own,
+ * Whether the person can send a fish today (#475): one of the period's own,
  * or an earned one waiting (ADR-044 §8). Never a count, and nothing of the
  * fish anybody sent the person (ADR-039 §6); a shadow-banned person's is
  * worked out the same way.
@@ -143,13 +158,6 @@ async function fishSent(
 async function fishToSendOf(db: Queryable, accountId: string, today: string): Promise<boolean> {
   const { sent, budget } = await fishSent(db, accountId, today);
   return sent < budget || (await earnedFishWaiting(db, accountId));
-}
-
-/** A Finnish day `days` after another, both as YYYY-MM-DD. */
-function addDays(day: string, days: number): string {
-  const at = new Date(`${day}T12:00:00Z`);
-  at.setUTCDate(at.getUTCDate() + days);
-  return at.toISOString().slice(0, 10);
 }
 
 /** What a person reads back of their own decision: a like with the mark is a fish. */
@@ -455,9 +463,9 @@ export async function decide(
         });
       }
     }
-    // The person's fish of the window, under the round's lock; past the
-    // budget the fish takes an earned one, and with none the next comes back
-    // when the oldest leaves the window.
+    // The person's fish of the period, under the round's lock; past the
+    // budget the fish takes an earned one, and with none the next can go at
+    // the midnight that begins the next period, a Monday's with a week.
     if (fish && !entry.fish) {
       const count = await fishSent(tx, input.accountId, today);
       if (
@@ -469,11 +477,8 @@ export async function decide(
           at,
         }))
       ) {
-        // With a budget of none there is no oldest, and nothing before the day rolls.
-        const back = count.oldest
-          ? dayWindow(new Date(`${addDays(count.oldest, count.window)}T12:00:00Z`)).start
-          : dayWindow(at).end;
-        throw new AppError(429, "fish_budget_exceeded", "The window's fish are sent", {
+        const back = dayWindow(new Date(`${count.next}T12:00:00Z`)).start;
+        throw new AppError(429, "fish_budget_exceeded", "The period's fish are sent", {
           retryAfterSeconds: secondsUntil(back, at),
         });
       }

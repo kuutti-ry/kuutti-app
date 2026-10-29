@@ -442,7 +442,7 @@ describe("today's round", () => {
     },
   );
 
-  it("offers no fish once the day's is sent, and says nothing of the next (#475)", async () => {
+  it("offers no fish once the week's is sent, and says nothing of the next (#475)", async () => {
     api(undefined, {
       day: DAY,
       entries: [entry(2, "Katja"), entry(4, "Minna")],
@@ -485,7 +485,7 @@ describe("today's round", () => {
     expect(sent.decisions()).toEqual([`${DAY}/2 fish`, `${DAY}/2 like`]);
   });
 
-  it("takes the fish away when another phone sent the day's meanwhile, and keeps the card for a like", async () => {
+  it("takes the fish away when another phone sent the week's meanwhile, and keeps the card for a like", async () => {
     api(
       (call) =>
         call.path.endsWith("/decision") && (call.body as { decision: string }).decision === "fish"

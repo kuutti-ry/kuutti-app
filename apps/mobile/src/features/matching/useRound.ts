@@ -240,7 +240,7 @@ export function useRound() {
         } else if (code === "like_budget_exceeded") {
           setNotice("errors.like_budget_exceeded");
         } else if (code === "fish_budget_exceeded") {
-          // Another phone sent the day's fish meanwhile (#475): the fish leaves the bar.
+          // Another phone sent the week's fish meanwhile (#475): the fish leaves the bar.
           showRound({ ...round, fishToSend: false });
           setNotice("errors.fish_budget_exceeded");
         } else {

@@ -62,7 +62,7 @@ const todayRoute = createRoute({
   path: "/rounds/today",
   summary: "Today's round",
   description:
-    "The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in fish_window_days or an earned one, never how many; the day's likes are not asked. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
+    "The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many; the day's likes are not asked. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).",
   ...bearer,
   responses: {
     200: { description: "Today's round.", ...json(RoundResponse) },
@@ -95,7 +95,7 @@ const decisionRoute = createRoute({
   path: "/rounds/{day}/entries/{position}/decision",
   summary: "Like or pass a card",
   description:
-    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in any fish_window_days; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend is the round's after this decision.",
+    "Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend is the round's after this decision.",
   ...bearer,
   request: {
     params: RoundEntryParams,
@@ -114,7 +114,7 @@ const decisionRoute = createRoute({
       "round_expired: the day named has ended; match_made: the card's like made a match and stays. Nothing was written.",
     ),
     429: errorContent(
-      "like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within fish_window_days and no earned fish is left, Retry-After the wait until the next can go. Nothing was written.",
+      "like_budget_exceeded: the day's likes are used up and no earned like is left, Retry-After the wait until the day rolls; fish_budget_exceeded: matching_config fish_budget fish were sent within the period and no earned fish is left, Retry-After the wait until the midnight that begins the next period, a Monday's. Nothing was written.",
     ),
   },
 });

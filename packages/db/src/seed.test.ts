@@ -128,7 +128,7 @@ describe("seed", () => {
         });
         expect(byKey).toEqual(MATCHING_CONFIG_V1);
         // Version 2 (ADR-010 §11): the one pond is the capital region, and it wins over version 1;
-        // the round is ten cards (#95, ADR-035), ten likes a day (#98, ADR-036), and one fish a day (#475, ADR-039 §3).
+        // the round is ten cards (#95, ADR-035), and ten likes a day (#98, ADR-036).
         const later = Object.fromEntries(
           config.rows.filter((r) => r.version === 2).map((r) => [r.key, r.value]),
         );
@@ -136,7 +136,6 @@ describe("seed", () => {
           default_pond: "paakaupunkiseutu",
           round_size: 10,
           like_budget_balanced: 10,
-          fish_window_days: 1,
         });
         expect(later).toEqual(MATCHING_CONFIG_V2);
       } finally {
