@@ -18,4 +18,5 @@ Refs #
 - [ ] Screen-reader walk stated here: which changed screens were walked with VoiceOver and TalkBack (no unlabelled control, no path that only a gesture opens), on which phones, by whom; or that they were not walked, and why, with an `Unwalked: <screens>` line in the commit message (`.claude/rules/mobile.md`).
 - [ ] A drawing whose `<!-- draws` files this changes is redrawn with its steps, or a commit message says `Still-true: <file>` (ADR-047, `pnpm check:docs`).
 - [ ] New dependency: maintained, pinned, any install script named here, licence inside `scripts/license-policy.json`.
+- [ ] Tests added, changed or removed at every level that applies, and the ones guarding a rule seen to fail when it breaks (ADR-021, the `write-tests` skill). Named here: the levels left out, and why.
 - [ ] `pnpm typecheck && pnpm lint && pnpm test` pass locally.
