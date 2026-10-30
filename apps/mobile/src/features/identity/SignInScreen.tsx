@@ -56,6 +56,19 @@ const REFUSALS: ReadonlyMap<string, PlainMessageKey> = new Map([
 ]);
 
 /**
+ * The refusals that rest on the person, not on the attempt: another try today
+ * only repeats them, and every try is a bank identification (#466). Their
+ * button says what it does rather than that trying again may help, and it
+ * stays, since the phone may be somebody else's.
+ */
+const LASTING_REFUSALS: ReadonlySet<string> = new Set([
+  "auth_under_18",
+  "auth_banned",
+  "auth_suspended",
+  "auth_cooldown",
+]);
+
+/**
  * The bank login's two halves on the phone (#36, rules/mobile.md Auth): the
  * button opens the API's /auth/start in the system browser (never a WebView:
  * the bank's cookies stay out of the app), and the return through the deep
@@ -105,7 +118,7 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     return () => subscription.remove();
   }, []);
 
-  // A refusal can arrive while this screen is shown: "Try again" opens the
+  // A refusal can arrive while this screen is shown: the button opens the
   // browser from here, and the link comes back to the same screen with its
   // answer. The first state alone would go on saying that the bank is open.
   // A refusal also ends the answers held for that attempt (#418): the phone
@@ -201,6 +214,11 @@ export function SignInScreen({ code, error, until }: SignInParams) {
     return t(REFUSALS.get(failure.code) ?? "signIn.error.generic");
   };
 
+  const buttonText =
+    phase.kind === "error" && !LASTING_REFUSALS.has(phase.code)
+      ? t("signIn.tryAgain")
+      : t("signIn.button");
+
   if (Platform.OS !== "web" && agreed === false && phase.kind === "idle") {
     return (
       <BeforeSignIn
@@ -281,15 +299,13 @@ export function SignInScreen({ code, error, until }: SignInParams) {
           phase.kind !== "exchanging" &&
           phase.kind !== "done" && (
             <Button
-              accessibilityLabel={
-                phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")
-              }
+              accessibilityLabel={buttonText}
               className="w-full max-w-md"
               // Never past the screens before the bank: a refusal shown on a
               // phone that has not answered them goes back to them first.
               onPress={() => (agreed ? void open() : setPhase({ kind: "idle" }))}
             >
-              <Text>{phase.kind === "error" ? t("signIn.tryAgain") : t("signIn.button")}</Text>
+              <Text>{buttonText}</Text>
             </Button>
           )}
       </ScrollView>

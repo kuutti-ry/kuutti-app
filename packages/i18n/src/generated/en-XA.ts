@@ -1557,7 +1557,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "settings.title": "［Šééttííñgš］",
   "settings.version.commit": "［Búúííld {commit}］",
   "settings.version.label": "［Vééršííóóñ］",
-  "signIn.agreements.research": "［ÉÉííthéér ááñšwéér táákééš ýýóóúú óóñ tóó ýýóóúúr bááñk.］",
+  "signIn.agreements.research": "［ÉÉííthéér ááñšwéér táákééš ýýóóúú óóñ tóó théé šíígñ-ííñ wííth ýýóóúúr bááñk.］",
   "signIn.agreements.title": "［Bééfóóréé ýýóóúú šíígñ ííñ］",
   "signIn.button": "［Šíígñ ííñ wííth ýýóóúúr bááñk］",
   "signIn.done": "［ÝÝóóúú ááréé šíígñééd ííñ.］",
