@@ -2,9 +2,9 @@
 # The dev client opens the bundle by its launcher link, never through the launcher
 # screen. Signed in, the app shows the home screen's area card or an onboarding
 # step under its welcome title; signed out, the sign-in screen, with its button or,
-# after a refusal, the button to try again, or on a phone that has not recorded
-# the current wordings the screens before the bank (#418), which bank-login.yaml
-# taps through. With the app's lock on, a cold start shows the lock over all of
+# after a refusal that may pass, the button to try again (#466), or on a phone that
+# has not recorded the current wordings the screens before the bank (#418), which
+# bank-login.yaml taps through. With the app's lock on, a cold start shows the lock over all of
 # it (ADR-045): one of our screens too, and left standing, since the lock's
 # flow expects it; sign-out.yaml leaves it through the bank. "Kuutti" alone
 # would match the dev client's loading screen, and the lock's plain cover,

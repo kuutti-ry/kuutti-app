@@ -299,6 +299,8 @@ describe("the settings screen", () => {
     expect(router.push).toHaveBeenLastCalledWith("/settings/licenses");
   });
 
+  // Eighteen presses, each a render of the whole list and role queries over it:
+  // about 2 s, and past jest's 5 s on a computer with every core taken.
   it("opens each setting in place under its row, one at a time, said as open, and closes it again (#511)", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
@@ -346,7 +348,7 @@ describe("the settings screen", () => {
     await press(row("Your account"));
     expect(expanded("Your account")).toBe(false);
     expect(screen.queryByRole("button", { name: "Delete my account" })).toBeNull();
-  });
+  }, 20_000);
 
   it("keeps what was typed under a row that closed, for when it opens again (#511)", async () => {
     await saveSession(tokens);

@@ -1563,7 +1563,7 @@ export const en: Readonly<Record<string, string>> = {
   "settings.title": "Settings",
   "settings.version.commit": "Build {commit}",
   "settings.version.label": "Version",
-  "signIn.agreements.research": "Either answer takes you on to your bank.",
+  "signIn.agreements.research": "Either answer takes you on to the sign-in with your bank.",
   "signIn.agreements.title": "Before you sign in",
   "signIn.button": "Sign in with your bank",
   "signIn.done": "You are signed in.",
