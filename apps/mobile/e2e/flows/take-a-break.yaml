@@ -23,6 +23,15 @@ name: Taking a break signs the person out everywhere, and the next bank login br
     env:
       ROW: "(Your account|Tilisi|Ditt konto)(, .*)?"
       INSIDE: "I found someone|Löysin hänet|Jag hittade någon"
+# The last row cannot be centred, so its panel may open with only a sliver of
+# its first button in sight, which is all the subflow waits for. The page's own
+# reveal usually brings the rest up; in a run of 30/10/2026 it did not, and the
+# tap waited 17 s for a button under the fold.
+- scrollUntilVisible:
+    element: "Take a break|Pidä tauko|Ta en paus"
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
 - tapOn: "Take a break|Pidä tauko|Ta en paus"
 - extendedWaitUntil:
     visible: "Take a break from Kuutti|Pidä tauko Kuutista|Ta en paus från Kuutti"
