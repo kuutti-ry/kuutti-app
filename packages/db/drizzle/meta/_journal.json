@@ -624,6 +624,13 @@
       "when": 1793284714604,
       "tag": "0088_photo_fetches_two_hundred",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1793359954163,
+      "tag": "0089_waitlist_seeks",
+      "breakpoints": true
     }
   ]
 }

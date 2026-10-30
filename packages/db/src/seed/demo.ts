@@ -57,6 +57,8 @@ export {
 export { PHOTOS_MANIFEST } from "./photos-manifest.ts";
 export {
   apportion,
+  BAR_PEOPLE,
+  barOf,
   DEMO_EPOCH,
   DEMO_LABEL_PREFIX,
   DEMO_SEED,
@@ -87,6 +89,7 @@ export {
   DEMO_SUBJECT_PREFIX,
   deleteIdentities,
   demoHetuHmac,
+  PLACEHOLDER_PHOTO_PREFIX,
   type RemoveResult,
   removePopulation,
   type WriteResult,

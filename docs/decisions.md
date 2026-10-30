@@ -86,7 +86,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 ## Areas
 
 - [Sign-in and identity](#sign-in-and-identity) (28)
-- [Pond and gate](#pond-and-gate) (31)
+- [Pond and gate](#pond-and-gate) (40)
 - [Profile](#profile) (35)
 - [Photos](#photos) (38)
 - [Filters](#filters) (18)
@@ -153,7 +153,16 @@ Where a person waits: the ponds, the public waitlist counter, and the gate that 
 | No sentence inflects a pond's name; the name stands on a line of its own in the nominative. |  | `packages/i18n/messages.yaml` | ADR-010 §3, §12; ADR-013 §11 | inherited, TD-17 | |
 | A pool stays within one pond; ponds by postal code, as the field sheet proposes, and parent ponds that widen a pool wait for a later decision. |  | `apps/api/src/jobs/pond-gate.ts` | ADR-015 §2; ADR-010 §10, §12; #146 | proposed, 08/10/2026 | |
 | The waitlist is the people themselves, bank-verified accounts with a pond; no e-mail list and no web form. |  | `apps/api/src/pond/waitlist.ts` | ADR-013 §1; CLAUDE.md rule 8 | inherited, TD-1 | |
-| The public counter shows each pond's total, its gender split and those still finishing their profile, only when every published figure, the undeclared included, holds at least k people; below k a pond shows nothing. The app and the public see the same figures. | k = 10 | `packages/schema/src/waitlist.ts` | ADR-013 §3, §4; #54; session 24/09/2026 | maintainer, 24/09/2026 | |
+| The public counter shows each pond's total, its gender split and those still finishing their profile, only when every published figure, the undeclared included, holds at least k people; below k a pond shows nothing. The app's card shows the total and those finishing from the same answer; the bar is the app's alone (the rows below). | k = 10 | `packages/schema/src/waitlist.ts` | ADR-013 §3, §4; #54; session 24/09/2026 | maintainer, 24/09/2026 | |
+| The home card draws whom the people of the person's own pond seek as one bar, men at one end, women at the other and everyone in the middle as their overlap, in place of the gender split's line; the total and those finishing stay. |  | `apps/mobile/src/features/pond/SeeksBar.tsx` | ADR-013 §12; #507 | maintainer, 26/10/2026 | |
+| The bar counts finished profiles only, on a current sensitive-answers consent: those who seek men and not women, both, or women and not men. Non-binary in the seek set moves no band, and somebody who seeks neither is in the total and in no band. | 3 bands | `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 §12; #507 | maintainer, 29/10/2026 | |
+| The bar says percentages, never counts, and only when every band holds at least k people; a band under k hides the whole bar. | k = 10 | `packages/schema/src/waitlist.ts` | ADR-013 §13; #507; session 30/10/2026 | maintainer, 30/10/2026 | |
+| The bar's percentages move in steps of five, at least 5 and adding up to 100, because whole percentages near k gave away how many people are in no band. | 5 % | `SEEKS_SHARE_STEP` in `packages/schema/src/waitlist.ts` | ADR-013 §13; #507 | assumption | |
+| The bar's bands move on their own, once at least k people have come, gone or changed band, whether or not the total moved; moving with the total could say what one person who finished seeks. A move of the bands alone leaves the public day. | steps of k | `packages/schema/src/waitlist.ts` | ADR-013 §14; #507 | assumption | |
+| The bar is read from a temporary signed-in route for the caller's own pond; the public counter carries no band. | `GET /ponds/seeks` | `apps/api/src/pond/routes.ts` | ADR-013 §15; #507; #500; session 30/10/2026 | maintainer, 30/10/2026 | |
+| Open: the sensitive-answers consent says whom one seeks is stored only to match and never shown; does a new consent version name the bar's statistic, or does the bar go? Meanwhile the night counts no bands in production, and every other environment does. | none in production | `countsBands` in `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 §16; #507; `legal.special_category.summary` | proposed, 30/10/2026 | |
+| Open: once the bar joins the counter with #500's rename, are its shares public, or still for the caller's own pond? Meanwhile behind the session. | behind the session | `apps/api/src/pond/routes.ts` | ADR-013 §15; #500; #507 | proposed, 30/10/2026 | |
+| Open: keep the gender split in the public answer, now that the card does not draw it and no reader of the route is known? Meanwhile it stays. | stays | `packages/schema/src/waitlist.ts` | ADR-013 Consequences; #507 | proposed, 30/10/2026 | |
 | The counter says a number only where at least k people stand behind it; k has a floor of 10 in code, which the panel may raise but never lower. | 10 | `waitlist_k`; `WAITLIST_K_MIN` in `packages/schema/src/waitlist.ts` | ADR-013 §5; .claude/rules/schema.md; migration 0017 | inherited, CLAUDE.md | |
 | Open: raise the counter's k above its floor? Meanwhile 10. | 10 | `waitlist_k` | ADR-013 Consequences; #54; #250 | proposed, 27/09/2026 | |
 | The counter counts registered, active and shadow-banned accounts in good standing with a pond, a shadow ban counting like active so it cannot be found out; suspended, banned and deleted accounts are left out. Open: should paused accounts count? Meanwhile they do not. | paused not counted | `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 §2, Consequences; #54; #250 | proposed, 27/09/2026 | |
@@ -571,7 +580,7 @@ Taking a break, telling Kuutti you found someone, the copy of your own data, and
 | Erasure takes the photos the person sent in conversations, which then read 'Photo removed'; a photo a report's copy names is kept for the moderators until that report is pruned. |  | `apps/api/src/identity/erasure.ts` | ADR-031 §10; ADR-030 §12; ADR-007 History 18/10/2026, 19/10/2026; #350 | assumption | |
 | Erasure deletes lifted sanctions and warnings, while open bans and suspensions stay on the identity; the export lists the sanctions with kind, reason, dates and whether somebody looked again, never who and never staff's note. |  | `apps/api/src/identity/erasure.ts` | ADR-024 §8; ADR-007 History 16/10/2026 | assumption | |
 | An erased inviter's open invitations go and a redeemed one stays for its friend with the inviter cut; an erased friend's counted invitation keeps its count, so the inviter keeps what it earned; each export carries its own side only. |  | `apps/api/src/rewards/invitations.ts` | ADR-044 §10; ADR-007 History 22/10/2026 | assumption | |
-| Open: an erased person stays in their pond's standing figures until the pond next moves; accept that, or take them out at erasure, which shows the departure? Meanwhile they stay. | stays until the pond moves | `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 What stays possible | proposed, 27/09/2026 | |
+| Open: an erased person stays in their pond's standing figures, the bar's bands among them, until the pond next moves, and a withdrawn sensitive-answers consent leaves the same in the bands; accept that, or take them out, which shows the departure? Meanwhile they stay. | stays until the pond moves | `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 What stays possible | proposed, 27/09/2026 | |
 
 ## Research
 

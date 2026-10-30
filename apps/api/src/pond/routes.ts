@@ -4,6 +4,7 @@ import {
   GateResponse,
   PondChoice,
   PondList,
+  PondSeeksResponse,
   WaitlistResponse,
 } from "@kuutti/schema";
 import type { MiddlewareHandler } from "hono";
@@ -12,7 +13,7 @@ import { callerOf } from "../lib/auth-middleware.ts";
 import type { AppEnv } from "../lib/env.ts";
 import { AppError } from "../lib/errors.ts";
 import * as repo from "./repo.ts";
-import { readWaitlist } from "./waitlist.ts";
+import { readPondSeeks, readWaitlist } from "./waitlist.ts";
 
 const errorContent = (description: string) => ({
   description,
@@ -79,6 +80,22 @@ const gateRoute = createRoute({
   },
 });
 
+// shortcut: a route of its own for the home card's bar, so that the public
+// counter's answer stays as it is while #500 renames it (#507, ADR-013 §12).
+// It goes into `GET /ponds/counter` with that rename.
+const seeksRoute = createRoute({
+  method: "get",
+  path: "/ponds/seeks",
+  summary: "Whom the people of the caller's pond seek",
+  description:
+    "Whole percentages of the three bands of the caller's own pond, from finished profiles: those who seek men, those who seek both women and men, and those who seek women. Null until every band holds at least k people. The bands move only once at least k finished profiles have come or gone. Counted once a day.",
+  ...bearer,
+  responses: {
+    200: { description: "The shares, or null.", ...json(PondSeeksResponse) },
+    401: unauthenticated,
+  },
+});
+
 /**
  * How the route learns the caller's gate. Handed in by the app: the count
  * reads across slices and lives with the nightly jobs (rules/layout.md), and
@@ -95,7 +112,8 @@ export function pondRoutes(
   readGate: GateReader,
 ) {
   const app = new OpenAPIHono<AppEnv>();
-  for (const path of new Set([listRoute, chooseRoute, gateRoute].map((r) => r.getRoutingPath()))) {
+  const guarded = [listRoute, chooseRoute, gateRoute, seeksRoute];
+  for (const path of new Set(guarded.map((r) => r.getRoutingPath()))) {
     app.use(path, requireSession);
   }
 
@@ -104,6 +122,13 @@ export function pondRoutes(
     // Never cached by anybody in between: it is one person's.
     c.header("Cache-Control", "no-store");
     return c.json(await readGate(accountId), 200);
+  });
+
+  app.openapi(seeksRoute, async (c) => {
+    const { accountId } = callerOf(c);
+    // Never cached by anybody in between: the answer is the caller's pond's.
+    c.header("Cache-Control", "no-store");
+    return c.json({ seeks: await readPondSeeks(deps.db, accountId) }, 200);
   });
 
   app.openapi(waitlistRoute, async (c) => {

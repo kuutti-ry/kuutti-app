@@ -16,7 +16,7 @@ import type { NightlyJob } from "./jobs/nightly.ts";
 import { gateJob } from "./jobs/pond-gate.ts";
 import { roundsJob } from "./jobs/round-builder.ts";
 import type { RoundPushDeps } from "./jobs/round-push.ts";
-import { ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
+import { countsBands, ensureFirstSnapshot, waitlistJob } from "./jobs/waitlist-snapshot.ts";
 import type { Config } from "./lib/config.ts";
 import type { Logger } from "./lib/logger.ts";
 import { mailerFor } from "./lib/mail.ts";
@@ -258,6 +258,7 @@ export async function boot({
     media.setup.mode === "off" || config.APP_ENV === "production"
       ? undefined
       : { db: pool, now, store: s3CopyStore(createS3Client(config), config.S3_BUCKET) };
+  const waitlist = { db: pool, logger, now, bands: countsBands(config.APP_ENV) };
   const jobs: NightlyJob[] = [
     { name: "sweep-sessions", run: () => sweepSessions({ db: pool, now }) },
     { name: "sweep-admin-sessions", run: () => sweepAdminSessions({ db: pool, now }) },
@@ -276,7 +277,7 @@ export async function boot({
     // and the gate, so a person let back in is counted the same night.
     { name: "end-suspensions", run: async () => ({ ended: await endSuspensions(pool, now()) }) },
     // The day's waitlist figures (#54): taken once a day, served all day.
-    waitlistJob({ db: pool, logger, now }),
+    waitlistJob(waitlist),
     // Who is let into each pond, and for whom matching opens (#94).
     gateJob({ db: pool, logger, now }),
     // The invitations whose redeemer's profile the gate's count has seen tonight (#107, ADR-044 §7).
@@ -317,7 +318,7 @@ export async function boot({
   }
   // A database with no figures yet gets its first ones now, so the public route has a day to serve.
   // Logged, never thrown, like a nightly job: the counter is not worth a boot, and the night tries again.
-  await ensureFirstSnapshot({ db: pool, logger, now }).catch((err: unknown) =>
+  await ensureFirstSnapshot(waitlist).catch((err: unknown) =>
     logger.error({ job: "waitlist-snapshot", err }, "first waitlist snapshot failed"),
   );
 

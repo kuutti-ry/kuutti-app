@@ -49,10 +49,27 @@ describe("plurals in every language", () => {
     expect(tIn(locale)("errors.rate_limited", { seconds })).toContain(phrase);
   });
 
+  it.each([
+    [
+      "en",
+      "Of the people with a finished profile who are looking for men or women, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
+    ],
+    [
+      "fi",
+      "Valmiin profiilin tehneistä miehiä tai naisia etsivistä 30 prosenttia etsii miehiä. 20 prosenttia etsii kaikkia. 50 prosenttia etsii naisia.",
+    ],
+    [
+      "sv",
+      "Av personerna med färdig profil som söker män eller kvinnor söker 30 procent män. 20 procent söker alla. 50 procent söker kvinnor.",
+    ],
+  ] as const)("say the bar of a pond in three sentences in %s", (locale, text) => {
+    const shares = { men: 30, everyone: 20, women: 50 };
+    expect(tIn(locale)("pond.waitlist.seeks.label", shares)).toBe(text);
+  });
+
   it("format the numbers of a message with the language's grouping and a decimal comma", () => {
-    expect(tIn("en")("pond.waitlist.split", { women: 1200, men: 10, nonBinary: 10.5 })).toBe(
-      `1${nbsp}200 women, 10 men, 10,5 non-binary`,
-    );
+    expect(tIn("en")("pond.waitlist.small", { k: 1200 })).toContain(`1${nbsp}200 people`);
+    expect(tIn("en")("pond.waitlist.seeks.men", { share: 10.5 })).toBe("10,5 % men");
     expect(tIn("sv")("photos.count", { photos: 1, max: 6 })).toBe("1 foto, högst 6");
   });
 });

@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { Gender, PreferencesUpdate, ProfileUpdate } from "@kuutti/schema";
+import { bioOrPromptsComplete, Gender, PreferencesUpdate, ProfileUpdate } from "@kuutti/schema";
 import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { describe, expect, it } from "vitest";
 import { migrate } from "../migrate.ts";
@@ -8,6 +8,8 @@ import { MATCHING_CONFIG_V1, SEED_IDENTITIES, seed } from "../seed.ts";
 import { withTemporaryDatabase } from "../test/temporary-database.ts";
 import {
   apportion,
+  BAR_PEOPLE,
+  barOf,
   DEMO_EPOCH,
   DEMO_SIZE_MAX,
   generatePopulation,
@@ -20,6 +22,7 @@ import { createRandom } from "./rng.ts";
 import {
   DEMO_SUBJECT_PREFIX,
   demoHetuHmac,
+  PLACEHOLDER_PHOTO_PREFIX,
   removePopulation,
   writePopulation,
 } from "./write-population.ts";
@@ -222,6 +225,41 @@ describe("the synthetic population", () => {
     );
   });
 
+  it("fills every band of the bar, and more than k of each, from 250 people up", () => {
+    const k = MATCHING_CONFIG_V1.waitlist_k;
+    for (const band of Object.values(BAR_PEOPLE)) expect(band).toBeGreaterThan(k);
+    for (const size of [250, 300, 1234, DEMO_SIZE_MAX]) {
+      for (let seed = 0; seed < 10; seed += 1) {
+        const made = generatePopulation({ size, seed });
+        expect(barOf(made), `size ${size}, seed ${seed}`).toEqual(BAR_PEOPLE);
+      }
+    }
+    // Too small to hold them: it says how many it has, and fills what it can.
+    expect(barOf(generatePopulation({ size: 40 })).seeksEveryone).toBeLessThan(
+      BAR_PEOPLE.seeksEveryone,
+    );
+  });
+
+  it("gives the bar people who could be finished, with the terms of an older wording", () => {
+    const filling = people.filter((p) => p.fillsTheBar);
+    expect(filling).toHaveLength(50);
+    for (const person of filling) {
+      expect(person.state, person.label).toBe("active");
+      const profile = person.profile;
+      expect(profile, person.label).not.toBeNull();
+      if (!profile) continue;
+      const words = { ...profile, answeredPrompts: profile.prompts.length };
+      expect(bioOrPromptsComplete(words), person.label).toBe(true);
+      const older = person.consents.filter((c) => c.olderWording).map((c) => c.kind);
+      expect(older, person.label).toEqual(["terms"]);
+    }
+    for (const person of people) {
+      if (!person.fillsTheBar) {
+        expect(person.consents.some((c) => c.olderWording)).toBe(false);
+      }
+    }
+  });
+
   it("speaks three languages, and leaves room for what a profile can lack", () => {
     const profiles = people.flatMap((p) => (p.profile ? [p.profile] : []));
     const shown = new Set(people.flatMap((p) => p.consents.map((c) => c.localeShown)));
@@ -277,7 +315,19 @@ describe("writing the population", () => {
         );
         expect(
           await count("SELECT count(*) AS n FROM consent WHERE version = 'test-terms-1'"),
-        ).toBe(276);
+        ).toBe(276 - 50);
+        // The people of the bar, and nobody else, have a photo: two that have no picture.
+        expect(
+          await count("SELECT count(*) AS n FROM consent WHERE version = 'demo-older-wording'"),
+        ).toBe(50);
+        expect(
+          await count(
+            `SELECT count(*) AS n FROM photo
+             WHERE state = 'approved' AND purpose = 'profile' AND key LIKE $1`,
+            [`${PLACEHOLDER_PHOTO_PREFIX}%`],
+          ),
+        ).toBe(100);
+        expect(await count("SELECT count(*) AS n FROM photo")).toBe(100);
         expect(await count("SELECT count(*) AS n FROM consent WHERE kind = 'research'")).toBe(0);
         expect(
           await count("SELECT count(*) AS n FROM consent WHERE version = 'test-special-1'"),

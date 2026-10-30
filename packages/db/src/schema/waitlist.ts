@@ -26,5 +26,10 @@ export const waitlistSnapshot = pgTable("waitlist_snapshot", {
   man: integer("man").notNull(),
   nonBinary: integer("non_binary").notNull(),
   finishing: integer("finishing").notNull(),
+  // Finished profiles by whom they seek (#507): moved by their own sum, read only
+  // as shares. A row written before them stands at zero, which says nothing.
+  seeksMen: integer("seeks_men").notNull().default(0),
+  seeksEveryone: integer("seeks_everyone").notNull().default(0),
+  seeksWomen: integer("seeks_women").notNull().default(0),
   takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
 });
