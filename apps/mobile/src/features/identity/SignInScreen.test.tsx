@@ -304,7 +304,7 @@ describe("SignInScreen", () => {
     expect(
       await screen.findByText("Kuutti is for adults. You are welcome once you are 18."),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
   });
 
   it("shows a refusal that arrives while the screen is shown, after another try", async () => {
@@ -315,7 +315,7 @@ describe("SignInScreen", () => {
     ).toBeTruthy();
 
     // Another try: the bank opens, and what the last link said is put away.
-    await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
     expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
     expect(router.setParams).toHaveBeenCalledWith({
       code: undefined,
@@ -331,7 +331,7 @@ describe("SignInScreen", () => {
     expect(screen.queryByText(/Your bank opens in the browser/)).toBeNull();
 
     // And with the same one again, after one more try.
-    await fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Sign in with your bank" }));
     await view.rerender(underProviders(<SignInScreen />));
     expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
     await view.rerender(underProviders(<SignInScreen error="auth_banned" />));
@@ -341,6 +341,82 @@ describe("SignInScreen", () => {
   it("shows the cooldown with its date in the app's locale", async () => {
     await renderWithTheme(<SignInScreen error="auth_cooldown" until="2026-10-22T10:00:00.000Z" />);
     expect(await screen.findByText(/The earliest day for a new one: 22.10.2026/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+  });
+
+  describe("the button under a refusal (#466)", () => {
+    it.each([["auth_under_18"], ["auth_banned"], ["auth_suspended"], ["auth_cooldown"]])(
+      "offers the sign-in, not another try, under %s, a refusal that lasts",
+      async (error) => {
+        await renderWithTheme(<SignInScreen error={error} />);
+        const button = await screen.findByRole("button", { name: "Sign in with your bank" });
+        // The label a screen reader says and the words on the button, each on its own.
+        expect(button.props.accessibilityLabel).toBe("Sign in with your bank");
+        expect(screen.getByText("Sign in with your bank")).toBeTruthy();
+        expect(screen.queryByText("Try again")).toBeNull();
+        const found = pressables(screen.toJSON() as HostNode);
+        expect(found).toHaveLength(1);
+        expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+      },
+    );
+
+    it.each([
+      ["auth_code_used"],
+      ["auth_state_mismatch"],
+      ["auth_provider_error"],
+      ["auth_cancelled"],
+      ["auth_rate_limited"],
+      ["rate_limited"],
+      ["auth_unavailable"],
+      ["unexpected_link"],
+      ["something_else"],
+      ["toString"],
+    ])("keeps Try again under %s, a refusal that may pass", async (error) => {
+      await renderWithTheme(<SignInScreen error={error} />);
+      const button = await screen.findByRole("button", { name: "Try again" });
+      expect(button.props.accessibilityLabel).toBe("Try again");
+      expect(screen.getByText("Try again")).toBeTruthy();
+      expect(screen.queryByText("Sign in with your bank")).toBeNull();
+    });
+
+    it("follows the refusal on the screen when the next one is of the other kind", async () => {
+      const view = await renderWithTheme(<SignInScreen error="auth_cooldown" />);
+      expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+      await view.rerender(underProviders(<SignInScreen error="auth_cancelled" />));
+      expect(await screen.findByRole("button", { name: "Try again" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Sign in with your bank" })).toBeNull();
+      await view.rerender(underProviders(<SignInScreen error="auth_suspended" />));
+      expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    });
+
+    it("keeps the bank one press away after a cooldown: the phone may be somebody else's", async () => {
+      const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+      await renderWithTheme(
+        <SignInScreen error="auth_cooldown" until="2026-10-22T10:00:00.000Z" />,
+      );
+      expect(await screen.findByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
+      await pressStart(openURL);
+      expect(lastStart(openURL).url).toBe(`${apiBaseUrl()}/auth/start?platform=ios&locale=en`);
+      expect(await screen.findByText(/Your bank opens in the browser/)).toBeTruthy();
+      expect(screen.queryByText(/The earliest day for a new one/)).toBeNull();
+    });
+
+    it.each([
+      ["fi-FI", "Kirjaudu pankkitunnuksilla", "Yritä uudelleen"],
+      ["sv-FI", "Logga in med din bank", "Försök igen"],
+    ])("says each button in the language of a %s phone", async (languageTag, signIn, tryAgain) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      try {
+        const view = await renderWithTheme(<SignInScreen error="auth_banned" />);
+        expect(await screen.findByRole("button", { name: signIn })).toBeTruthy();
+        await view.rerender(underProviders(<SignInScreen error="auth_cancelled" />));
+        expect(await screen.findByRole("button", { name: tryAgain })).toBeTruthy();
+      } finally {
+        (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
+      }
+    });
   });
 
   it("names the day a suspension ends, the start of that day in Finland", async () => {
@@ -350,7 +426,7 @@ describe("SignInScreen", () => {
       await screen.findByText("This account is suspended. You can sign in again from: 22.10.2026"),
     ).toBeTruthy();
     expect(screen.queryByText("This account is suspended for now.")).toBeNull();
-    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sign in with your bank" })).toBeTruthy();
   });
 
   it("reads the suspension's day in Finland's zone, whatever the phone's", async () => {
@@ -897,20 +973,26 @@ describe("SignInScreen: the screens before the bank (#418, ADR-010 §15)", () =>
     expect(await screen.findByText("Before you sign in")).toBeTruthy();
   });
 
-  it("leads a refusal's Try again back to the screens before the bank on a phone that never answered them", async () => {
-    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
-    await renderWithTheme(<SignInScreen error="auth_cancelled" />);
-    expect(await screen.findByText("Sign-in did not complete")).toBeTruthy();
-    const tryAgain = await screen.findByRole("button", { name: "Try again" });
-    expect(pressables(screen.toJSON() as HostNode)).toHaveLength(1);
-    await fireEvent.press(tryAgain);
-    expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
-    expect(openURL).not.toHaveBeenCalled();
-    // Answered, the bank is one press away, with the refusal put behind.
-    await agree("Not now");
-    expect(screen.queryByText("Sign-in did not complete")).toBeNull();
-    await pressStart(openURL);
-  });
+  it.each([
+    ["Try again", "auth_cancelled"],
+    ["Sign in with your bank", "auth_cooldown"],
+  ])(
+    "leads a refusal's %s back to the screens before the bank on a phone that never answered them",
+    async (name, error) => {
+      const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+      await renderWithTheme(<SignInScreen error={error} />);
+      expect(await screen.findByText("Sign-in did not complete")).toBeTruthy();
+      const button = await screen.findByRole("button", { name });
+      expect(pressables(screen.toJSON() as HostNode)).toHaveLength(1);
+      await fireEvent.press(button);
+      expect(await screen.findByRole("heading", { name: "Before you sign in" })).toBeTruthy();
+      expect(openURL).not.toHaveBeenCalled();
+      // Answered, the bank is one press away, with the refusal put behind.
+      await agree("Not now");
+      expect(screen.queryByText("Sign-in did not complete")).toBeNull();
+      await pressStart(openURL);
+    },
+  );
 
   it("signs in a code that returns to a process which lost its answers, posting nothing", async () => {
     // Android may end the app while the browser is open: the answers went with it,
