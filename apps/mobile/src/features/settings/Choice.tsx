@@ -16,6 +16,8 @@ export const SCHEMES: ReadonlyArray<{ value: SchemePreference; label: PlainMessa
  */
 export function Choice(props: {
   label: string;
+  /** What a screen reader says in its place, where the label is marks rather than words. */
+  spoken?: string;
   flag?: string;
   chosen: boolean;
   /** Not pressable for now, as while the group's answer is on its way. */
@@ -23,7 +25,8 @@ export function Choice(props: {
   onPress: () => void;
 }) {
   const { t } = useT();
-  const name = props.chosen ? t("settings.selected", { option: props.label }) : props.label;
+  const marked = (option: string) => (props.chosen ? t("settings.selected", { option }) : option);
+  const name = marked(props.label);
   return (
     <Button
       variant={props.chosen ? "default" : "outline"}
@@ -31,7 +34,7 @@ export function Choice(props: {
       accessibilityState={{ checked: props.chosen }}
       // react-native-web reads the ARIA prop, not accessibilityState.
       aria-checked={props.chosen}
-      accessibilityLabel={name}
+      accessibilityLabel={marked(props.spoken ?? props.label)}
       className="grow"
       disabled={props.disabled}
       onPress={props.onPress}

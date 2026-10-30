@@ -13,6 +13,8 @@ function withReveal(reveal: (part: View) => void) {
   );
 }
 
+afterEach(() => jest.restoreAllMocks());
+
 describe("useRevealOn", () => {
   it("asks the page to show the part a frame after something new is in it, once for each", async () => {
     const reveal = jest.fn();
@@ -37,17 +39,37 @@ describe("useRevealOn", () => {
   });
 
   it("asks nothing for a part not drawn, nor once the panel has gone", async () => {
+    // Frames held back until the test runs them. Under jest a frame is a timer of
+    // no delay, which on a busy machine fired between the rerender and the unmount
+    // below, and the test failed with nothing wrong.
+    const frames = new Map<number, (time: number) => void>();
+    let last = 0;
+    jest.spyOn(globalThis, "requestAnimationFrame").mockImplementation((run) => {
+      last += 1;
+      frames.set(last, run);
+      return last;
+    });
+    jest.spyOn(globalThis, "cancelAnimationFrame").mockImplementation((id) => {
+      frames.delete(Number(id));
+    });
+    const runFrames = () => {
+      for (const [id, run] of frames) {
+        frames.delete(id);
+        run(0);
+      }
+    };
+
     const reveal = jest.fn();
     const hook = await renderHook(({ shown }: { shown: string | null }) => useRevealOn(shown), {
       initialProps: { shown: "made" as string | null },
       wrapper: withReveal(reveal),
     });
-    await frame();
+    runFrames();
     expect(reveal).not.toHaveBeenCalled();
     hook.result.current.current = {} as View;
     await hook.rerender({ shown: "again" });
     await hook.unmount();
-    await frame();
+    runFrames();
     expect(reveal).not.toHaveBeenCalled();
   });
 

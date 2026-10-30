@@ -5350,7 +5350,7 @@ photos.description.face.facialHair:
 
 settings.decisionButtons.label:
   en: "Decision buttons"
-  description: "Settings, title of the row in Appearance and language and of its screen (#82): where Like and Pass sit on today's round, for the right hand or the left, and one-handed mode."
+  description: "Settings, title of the row in Appearance and language and of its screen (#82): where Like and Pass sit on today's round, for the right hand or the left, one-handed mode, and the marks they carry (#520)."
   fi: "Valintapainikkeet"
   sv: "Valknappar"
   machine: { fi: true, sv: true }
@@ -5395,6 +5395,48 @@ settings.decisionButtons.oneHandedHint:
   description: "Decision buttons screen, under the one-handed switch (#82): what it does. The fish is the app's word for the super-like (ADR-039)."
   fi: "Kumoa, kala, Ohita ja Tykkää yhdessä sarakkeessa alhaalla kätesi puolella, peukalon ulottuvilla."
   sv: "Ångra, fisken, Hoppa över och Gilla i en kolumn längst ner på din hands sida, inom räckhåll för tummen."
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.style:
+  en: "Button style"
+  description: "Decision buttons screen, the name of the radio group of the marks Like and Pass carry (#520), heard by a screen reader."
+  fi: "Painikkeiden tyyli"
+  sv: "Knappstil"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.style.kuutti:
+  en: "Kuutti"
+  description: "Decision buttons screen, a choice (#520), the default: Like and Pass carry the app's own heart and cross. The app's name."
+  fi: "Kuutti"
+  sv: "Kuutti"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.style.shapes:
+  en: "✕ and ○"
+  description: "Decision buttons screen, a choice (#520): Like carries the ✕ and Pass the ○ of a game controller, in that order. Keep the two marks as they are. It names no console and no maker, on purpose (.claude/rules/mobile.md)."
+  fi: "✕ ja ○"
+  sv: "✕ och ○"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.style.shapes.spoken:
+  en: "Cross and circle"
+  description: "Decision buttons screen, what a screen reader says for the choice shown as ✕ and ○ (#520): the two marks in words."
+  fi: "Risti ja ympyrä"
+  sv: "Kryss och cirkel"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.style.letters:
+  en: "A and B"
+  description: "Decision buttons screen, a choice (#520): Like carries the A and Pass the B of a game controller, in that order. Keep the two letters as they are, in every language. It names no console and no maker, on purpose (.claude/rules/mobile.md)."
+  fi: "A ja B"
+  sv: "A och B"
+  machine: { fi: true, sv: true }
+
+settings.decisionButtons.styleHint:
+  en: "Like and Pass can carry a game controller's marks in place of their icons: the first mark is Like, the second Pass. Their words stay."
+  description: "Decision buttons screen, under the style choices (#520): what they do, and which mark is which. The words stay because the mark alone means nothing to anyone who does not play."
+  fi: "Tykkää ja Ohita voivat saada kuvakkeidensa tilalle peliohjaimen merkit: ensimmäinen merkki on Tykkää, toinen Ohita. Sanat pysyvät."
+  sv: "Gilla och Hoppa över kan få en spelkontrolls tecken i stället för sina ikoner: det första tecknet är Gilla, det andra Hoppa över. Orden står kvar."
   machine: { fi: true, sv: true }
 
 settings.decisionButtons.withOneHanded:
