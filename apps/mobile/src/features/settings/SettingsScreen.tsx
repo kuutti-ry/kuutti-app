@@ -87,9 +87,9 @@ function Section({ title, rows }: { title: string; rows: readonly Row[] }) {
  * list in six sections (#511): appearance and language; notifications and
  * contacts; privacy and security; community; about Kuutti; and the account
  * last, with logging out and the deletion. Every row opens what it holds
- * under itself, one row at a time, with a chevron pointing down; the
- * licences alone open a screen of their own, with a chevron pointing right,
- * since a list of every package is no setting. The row left open is the one
+ * under itself, one row at a time, with a chevron pointing down; support
+ * when it's hard and the licences open a screen of their own, with a chevron
+ * pointing right, since neither is a setting. The row left open is the one
  * the list opens with while the app runs, and a row opened low on the list
  * is brought into sight. A row's second line is its value (the theme, a
  * consent on or off, the address, the contacts kept), never a description of
@@ -309,18 +309,30 @@ export function SettingsScreen() {
             />
             <Section
               title={t("settings.section.community")}
-              rows={only(signedIn, [
+              rows={[
+                // Always there: somebody signed out may need it as much as anybody (#510).
                 {
-                  ...holding("invitations", <Invitations onStored={invitations.stored} />),
-                  title: t("settings.invite.label"),
-                  summary: invitations.summary,
-                  value: invitations.summary,
+                  key: "support",
+                  icon: ROW_ICONS.support,
+                  title: t("settings.support.label"),
+                  onPress: () => {
+                    tap();
+                    router.push("/settings/support");
+                  },
                 },
-                {
-                  ...holding("feedback", <FeedbackForm />),
-                  title: t("feedback.title"),
-                },
-              ])}
+                ...only(signedIn, [
+                  {
+                    ...holding("invitations", <Invitations onStored={invitations.stored} />),
+                    title: t("settings.invite.label"),
+                    summary: invitations.summary,
+                    value: invitations.summary,
+                  },
+                  {
+                    ...holding("feedback", <FeedbackForm />),
+                    title: t("feedback.title"),
+                  },
+                ]),
+              ]}
             />
             <Section
               title={t("settings.about.title")}

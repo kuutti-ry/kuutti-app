@@ -6,4 +6,5 @@ export { LockOfferScreen } from "./LockOfferScreen";
 export { PackageLicenseScreen } from "./PackageLicenseScreen";
 export { ScreenReaderHint } from "./ScreenReaderHint";
 export { SettingsScreen } from "./SettingsScreen";
+export { SupportScreen } from "./SupportScreen";
 export { TechConfigScreen } from "./TechConfigScreen";

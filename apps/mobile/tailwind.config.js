@@ -27,6 +27,8 @@ module.exports = {
         ring: token("ring"),
         // The scrim behind a dialog; not a text surface, so outside check:contrast.
         overlay: token("overlay"),
+        // Behind a logo made for a light page (#510); no text sits on it.
+        "logo-plate": token("logo-plate"),
       },
       borderRadius: {
         lg: "var(--radius)",

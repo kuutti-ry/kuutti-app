@@ -161,9 +161,12 @@ describe("the settings screen", () => {
     const headings = ["Appearance and language", "About Kuutti", "Account"];
     for (const name of headings) expect(screen.getByRole("heading", { name })).toBeTruthy();
     // A section with no row for a device without a person is not drawn (#511).
-    for (const name of ["Notifications and contacts", "Privacy and security", "Community"]) {
+    for (const name of ["Notifications and contacts", "Privacy and security"]) {
       expect(screen.queryByRole("heading", { name })).toBeNull();
     }
+    // Community stays for its one row a device without a person keeps (#510).
+    expect(row("Support when it's hard")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Invitations" })).toBeNull();
     // Logging out says there is no session; the rest of the account needs a person.
     expect(row("Logging out")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "A copy of your data" })).toBeNull();
@@ -218,6 +221,7 @@ describe("the settings screen", () => {
       "Sensitive answers",
       "A copy of your data",
       "Community",
+      "Support when it's hard",
       "Invitations",
       "Give feedback",
       "About Kuutti",
@@ -275,7 +279,16 @@ describe("the settings screen", () => {
     expect(screen.getByRole("heading", { name: "Inställningar" })).toBeTruthy();
   });
 
-  it("opens a screen for the licences alone, a list of every package rather than a setting", async () => {
+  it("opens a page for support when it's hard, signed in or not (#510)", async () => {
+    await renderWithTheme(<SettingsScreen />);
+    await screen.findByRole("button", { name: "Logging out" });
+    expect(row("Support when it's hard").props.accessibilityValue?.text).toBeUndefined();
+    await press(row("Support when it's hard"));
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenLastCalledWith("/settings/support");
+  });
+
+  it("opens a screen for the licences, a list of every package rather than a setting", async () => {
     await saveSession(tokens);
     await renderWithTheme(<SettingsScreen />);
     await screen.findByRole("button", { name: "Your account" });

@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { SupportLink } from "@/components/SupportLink";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -103,7 +104,8 @@ const WINDOW_SHARE = 0.9;
  * report that went through forget it. A failure that lands after the dialog
  * was closed opens it again where it was. Live regions speak each outcome on
  * Android; iOS has none, so the outcome is announced there, and the focus
- * moves to each step's title.
+ * moves to each step's title. What went through ends on the way to the support
+ * page (#510), above Done.
  */
 export function SafetyActions({
   accountId,
@@ -776,6 +778,8 @@ function SafetyDialog({
                     : t("safety.gone")}
               </DialogTitle>
             </DialogHeader>
+            {/* Not for a card that was gone already: nothing went through. */}
+            {step !== "gone" && <SupportLink onLeave={dismiss} />}
             <DialogFooter>
               <Button onPress={dismiss}>{t("safety.done")}</Button>
             </DialogFooter>
