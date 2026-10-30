@@ -67,10 +67,25 @@ Feature: The app lock
     Then the face's button is still there
     And once an ask answers other than the pause, none means none again
 
+  Scenario: The lock screen says why the face it was set with is gone
+    Given the lock set with the face, on an iPhone that does not let Kuutti use its Face ID
+    When the lock screen shows
+    Then it says so in the button's place, and the passcode and the bank are still there
+
   Scenario: Turning biometrics on asks for the face or finger once
     Given a person in the lock's settings on a phone with a face enrolled
     When they turn the face or fingerprint on
     Then the phone's prompt is asked once, and the lock is on only if it answered yes
+
+  Scenario: Face ID kept from Kuutti is said as that, with the way to turn it on
+    Given a person in the lock's settings on an iPhone that does not let Kuutti use its Face ID
+    When the lock's settings ask the phone
+    Then they say so with a button to the phone's settings, in place of the switch and of the line that the phone has none
+
+  Scenario: Don't Allow at iOS's question is said as that at once
+    Given a person in the lock's settings on an iPhone that has not yet asked about Kuutti
+    When they turn the face or fingerprint on and answer Don't Allow
+    Then the lock stays off, and the screen says the iPhone does not let Kuutti use Face ID, not that the face was not confirmed
 
   Scenario: The lock's settings ask the phone again when the app comes back
     Given a person in the lock's settings on a phone with no face or fingerprint set up

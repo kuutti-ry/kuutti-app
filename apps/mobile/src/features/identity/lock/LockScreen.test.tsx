@@ -29,6 +29,8 @@ const REFUSAL = {
     either: `The phone has paused face or fingerprint unlock after too many tries. ${PAUSED_UNTIL}`,
   },
 } as const;
+const DENIED =
+  "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings, or use another way below.";
 const UNLOCK = {
   face: "Unlock with your face",
   fingerprint: "Unlock with your fingerprint",
@@ -52,6 +54,7 @@ function deferred<T>() {
 
 type Props = {
   biometrics: Biometrics | null;
+  denied: boolean;
   passcode: boolean;
   onBiometrics: jest.Mock<Promise<BiometricAnswer>, []>;
   onPasscode: jest.Mock<Promise<PasscodeAnswer>, [string]>;
@@ -62,6 +65,7 @@ type Props = {
 async function show(over: Partial<Props> = {}) {
   const props: Props = {
     biometrics: null,
+    denied: false,
     passcode: true,
     onBiometrics: jest.fn(async (): Promise<BiometricAnswer> => "cancelled"),
     onPasscode: jest.fn(async (_code: string): Promise<PasscodeAnswer> => ({ ok: false, left: 4 })),
@@ -308,6 +312,48 @@ describe("LockScreen", () => {
       await act(async () => answer.resolve("cancelled"));
       expect(button("Unlock with your face")).toBeEnabled();
       expect(button(BANK)).toBeEnabled();
+    });
+  });
+
+  describe("an iPhone not letting Kuutti use Face ID (#505)", () => {
+    it("says so where the button would be, above the passcode and the bank, and asks nothing", async () => {
+      const { onBiometrics } = await show({ denied: true });
+      expect(screen.getByText(DENIED)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Unlock with/ })).toBeNull();
+      expect(field()).toBeTruthy();
+      expect(button(BANK)).toBeTruthy();
+      expect(onBiometrics).not.toHaveBeenCalled();
+      const flat = JSON.stringify(screen.toJSON());
+      expect(flat.indexOf(DENIED)).toBeLessThan(flat.indexOf(FIELD));
+      noProblems();
+    });
+
+    it("is said aloud when an ask meets it, and shown only for as long as the phone says it", async () => {
+      const { view, props } = await show({
+        biometrics: "face",
+        onBiometrics: jest.fn(async (): Promise<BiometricAnswer> => "denied"),
+      });
+      expect(announced()).toEqual([DENIED]);
+      await view.rerender(underProviders(<LockScreen {...props} biometrics={null} denied />));
+      expect(screen.getByText(DENIED)).toBeTruthy();
+      await view.rerender(underProviders(<LockScreen {...props} />));
+      expect(screen.queryByText(DENIED)).toBeNull();
+      expect(button(UNLOCK.face)).toBeTruthy();
+    });
+
+    it.each([
+      [
+        "fi-FI",
+        "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista tai käyttää toista alla olevaa tapaa.",
+      ],
+      [
+        "sv-FI",
+        "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar eller använda ett annat sätt nedan.",
+      ],
+    ])("speaks %s", async (languageTag, words) => {
+      (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+      await show({ denied: true });
+      expect(screen.getByText(words)).toBeTruthy();
     });
   });
 

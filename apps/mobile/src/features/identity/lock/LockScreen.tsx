@@ -45,6 +45,7 @@ export type PasscodeAnswer = { ok: true } | { ok: false; left: number };
  */
 export function LockScreen({
   biometrics,
+  denied,
   passcode,
   onBiometrics,
   onPasscode,
@@ -52,6 +53,8 @@ export function LockScreen({
 }: {
   /** The phone's kind when the person chose it and the phone still has it; null otherwise. */
   biometrics: Biometrics | null;
+  /** The person chose the face, and this iPhone is not letting Kuutti use it (#505). */
+  denied: boolean;
   passcode: boolean;
   onBiometrics: () => Promise<BiometricAnswer>;
   onPasscode: (code: string) => Promise<PasscodeAnswer>;
@@ -77,6 +80,8 @@ export function LockScreen({
     try {
       const answer = await onBiometrics();
       say(answer === "failed" || answer === "lockout" ? t(REFUSED[answer][kind]) : null);
+      // Its line comes with `denied`, and goes with it; only an iPhone answers this.
+      if (answer === "denied") AccessibilityInfo.announceForAccessibility(t("lock.denied"));
     } finally {
       setBusy(false);
     }
@@ -136,6 +141,7 @@ export function LockScreen({
                 {t(UNLOCK_WITH[biometrics])}
               </Button>
             )}
+            {denied && <Text>{t("lock.denied")}</Text>}
             {passcode && (
               <PasscodeField
                 label={t("lock.passcode.label")}

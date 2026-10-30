@@ -3480,6 +3480,13 @@ lock.lockout.biometrics:
   sv: "Telefonen har pausat upplåsning med ansikte eller fingeravtryck efter för många försök. Lås telefonen och öppna den med telefonens egen kod. Försök sedan igen eller använd ett annat sätt nedan."
   machine: { fi: true, sv: true }
 
+lock.denied:
+  en: "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings, or use another way below."
+  description: "Lock screen, on an iPhone only, where the unlock button would be, when the person chose the face and iOS answers that Face ID is not available to Kuutti (#505): after Don't Allow at iOS's question, with Kuutti's Face ID switch off in the iPhone's settings, and now and then for neither, so the words never say the person refused it. Below it are the passcode, if one is set, and the bank."
+  fi: "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista tai käyttää toista alla olevaa tapaa."
+  sv: "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar eller använda ett annat sätt nedan."
+  machine: { fi: true, sv: true }
+
 lock.passcode.label:
   en: "Your Kuutti passcode"
   description: "Lock screen, the label of the six-digit field (#418); Kuutti's own passcode, not the phone's."
@@ -3552,9 +3559,16 @@ lock.settings.biometrics:
 
 lock.settings.biometricsMissing:
   en: "This phone has no face or fingerprint unlock that Kuutti can use. A passcode works without one."
-  description: "The lock's settings, instead of the biometrics switch when the phone has none Kuutti can use (#418, #464): none enrolled, a face that unlocks only the phone itself (an Android class 1 face), or Face ID that Kuutti was refused in the iPhone's settings."
+  description: "The lock's settings, instead of the biometrics switch when the phone has none Kuutti can use (#418, #464): none enrolled, or a face that unlocks only the phone itself (an Android class 1 face). An iPhone that keeps Face ID from Kuutti has lock.settings.biometricsDenied instead (#505)."
   fi: "Tässä puhelimessa ei ole kasvojen- tai sormenjäljentunnistusta, jota Kuutti voi käyttää. Pääsykoodi toimii ilman sitä."
   sv: "Den här telefonen har ingen upplåsning med ansikte eller fingeravtryck som Kuutti kan använda. En lösenkod fungerar utan."
+  machine: { fi: true, sv: true }
+
+lock.settings.biometricsDenied:
+  en: "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings. A passcode works without it."
+  description: "The lock's settings and its offer, on an iPhone only, instead of the biometrics switch when iOS answers that Face ID is not available to Kuutti (#505): after Don't Allow at iOS's question, with Kuutti's Face ID switch off in the iPhone's settings, and now and then for neither, so the words never say the person refused it. The button 'Open the phone's settings' follows."
+  fi: "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista. Pääsykoodi toimii ilman sitä."
+  sv: "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar. En lösenkod fungerar utan."
   machine: { fi: true, sv: true }
 
 lock.settings.biometricsFailed:
@@ -9255,7 +9269,7 @@ notifications.phone.unavailable:
 
 notifications.phone.openSettings:
   en: "Open the phone's settings"
-  description: "The Notifications screen (#102, ADR-055 §9), the button under a refusal: opens Kuutti's page in the phone's own settings, on iOS and Android. A button label."
+  description: "The Notifications screen (#102, ADR-055 §9) and the lock's settings on an iPhone (#505), the button under a refusal: opens Kuutti's page in the phone's own settings, on iOS and Android. A button label."
   fi: "Avaa puhelimen asetukset"
   sv: "Öppna telefonens inställningar"
   machine: { fi: true, sv: true }
