@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# PostToolUse hook on Bash: after a `gh pr merge` that merged, tell the agent
-# to check every issue the pull request refers to against what landed, and to
-# close it or say what is left (CLAUDE.md, Git). stdout is JSON whose
-# additionalContext reaches the agent. Silent for every other command, and
-# for a merge that did not happen (refused, or left to auto-merge).
+# PostToolUse hook on Bash: after a `gh pr merge` that merged, send the agent
+# to the recheck-issues skill at once, naming every issue the pull request
+# refers to (CLAUDE.md, Git). skill-gates.ts holds the end of the turn to it.
+# stdout is JSON whose additionalContext reaches the agent. Silent for every
+# other command, and for a merge that did not happen (refused, or left to
+# auto-merge).
 set -u
 input="$(cat)"
 # Every shell command passes here: leave at once unless it is a merge.
@@ -47,11 +48,8 @@ if (!number) process.exit(0);
 const commit = view?.mergeCommit?.oid ? ` as ${view.mergeCommit.oid.slice(0, 7)}` : "";
 const issues = refs.length > 0 ? refs.join(", ") : "each issue the pull request refers to";
 const additionalContext =
-  `Pull request #${number} merged${commit}. Before anything else, check ${issues} against what landed ` +
-  "(its body, its comments, the maintainer's decisions in chat; CLAUDE.md, Git). An issue with " +
-  "nothing left: close it as completed, with a comment naming the pull request, the commit and " +
-  "the version. Otherwise comment what landed, what is left and whose move it is, and tick the " +
-  "boxes that landed. An umbrella issue stays open until its last piece.";
+  `Pull request #${number} merged${commit}. Before anything else, run the recheck-issues skill ` +
+  `with ${number}: it checks ${issues} against what landed, and closes each or says what is left.`;
 process.stdout.write(
   JSON.stringify({ hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext } }),
 );
