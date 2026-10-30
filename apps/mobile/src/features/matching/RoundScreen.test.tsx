@@ -13,8 +13,9 @@ import { RoundScreen } from "./RoundScreen";
 // leads to the conversation, block or report from the card, the end, an
 // empty round and one not built in their own words, and every refusal of the
 // routes said: a day that ended, a card gone, the day's likes and cards used
-// up, a like that made a match. A new day's round is never touched by the old
-// day's answers, and a round left open past midnight is read anew.
+// up, a like that made a match. The likes left are said beside the buttons. A
+// new day's round is never touched by the old day's answers, and a round left
+// open past midnight is read anew.
 
 const {
   __router: router,
@@ -69,6 +70,7 @@ const ROUND: RoundResponse = {
   day: DAY,
   entries: [entry(1, "Henna", "liked_you"), entry(2, "Katja"), entry(4, "Minna", "seen_before")],
   fishToSend: true,
+  likesLeft: 10,
 };
 
 type Call = { method: string; path: string; body: unknown };
@@ -92,7 +94,8 @@ function api(answer: Answer = () => undefined, round: RoundResponse = ROUND) {
     if (given) return given;
     if (call.path === "/rounds/today") return json(round);
     if (call.path.endsWith("/seen")) return noContent();
-    if (call.path.endsWith("/decision")) return json({ match: null, fishToSend: true });
+    if (call.path.endsWith("/decision"))
+      return json({ match: null, fishToSend: true, likesLeft: 10 });
     if (call.path === "/blocks") return noContent();
     return refusal("not_found", 404);
   }) as unknown as typeof fetch;
@@ -215,6 +218,7 @@ describe("today's round", () => {
       day: DAY,
       entries: [entry(1, "Henna", "liked_you", "pass"), entry(2, "Katja")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     expect(heading("Katja, 32")).toBeTruthy();
@@ -226,6 +230,7 @@ describe("today's round", () => {
       day: DAY,
       entries: [entry(1, "Henna", "liked_you", "like")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
@@ -241,6 +246,7 @@ describe("today's round", () => {
         day: DAY,
         entries: entries === null ? null : [...entries],
         fishToSend: true,
+        likesLeft: 10,
       });
       await show();
       expect(screen.getByText(words)).toBeTruthy();
@@ -255,7 +261,9 @@ describe("today's round", () => {
       if (call.path === "/rounds/today") {
         reads += 1;
         return json(
-          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+          reads === 1
+            ? ROUND
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true, likesLeft: 10 },
         );
       }
       if (call.path.startsWith(`/rounds/${DAY}/`) && call.path.endsWith("/decision")) {
@@ -277,7 +285,9 @@ describe("today's round", () => {
       if (call.path === "/rounds/today") {
         reads += 1;
         return json(
-          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+          reads === 1
+            ? ROUND
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true, likesLeft: 10 },
         );
       }
       if (call.path === `/rounds/${DAY}/entries/1/seen`) return refusal("round_expired", 409);
@@ -295,7 +305,7 @@ describe("today's round", () => {
     jest.spyOn(Date, "now").mockReturnValue(NOON);
     const sent = api((call) =>
       call.path === `/rounds/${DAY}/entries/1/decision`
-        ? json({ match: { conversationId: CONVERSATION }, fishToSend: true })
+        ? json({ match: { conversationId: CONVERSATION }, fishToSend: true, likesLeft: 10 })
         : undefined,
     );
     await show();
@@ -339,7 +349,7 @@ describe("today's round", () => {
   it("goes on with the round from a match without opening the conversation", async () => {
     api((call) =>
       call.path.endsWith("/decision")
-        ? json({ match: { conversationId: CONVERSATION }, fishToSend: true })
+        ? json({ match: { conversationId: CONVERSATION }, fishToSend: true, likesLeft: 10 })
         : undefined,
     );
     await show();
@@ -408,6 +418,7 @@ describe("today's round", () => {
       day: DAY,
       entries: [entry(2, "Katja"), entry(4, "Minna")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     const buttons = screen
@@ -434,7 +445,12 @@ describe("today's round", () => {
   ] as const)(
     "offers no fish on a card that %s, which a like answers (ADR-039 §2)",
     async (_what, reason, label) => {
-      api(undefined, { day: DAY, entries: [entry(1, "Henna", reason)], fishToSend: true });
+      api(undefined, {
+        day: DAY,
+        entries: [entry(1, "Henna", reason)],
+        fishToSend: true,
+        likesLeft: 10,
+      });
       await show();
       expect(screen.getByText(label)).toBeTruthy();
       expect(screen.getByRole("button", { name: "Like" })).toBeTruthy();
@@ -447,6 +463,7 @@ describe("today's round", () => {
       day: DAY,
       entries: [entry(2, "Katja"), entry(4, "Minna")],
       fishToSend: false,
+      likesLeft: 10,
     });
     await show();
     const buttons = screen
@@ -464,9 +481,14 @@ describe("today's round", () => {
       (call) => {
         if (!call.path.endsWith("/decision")) return undefined;
         fishSent = (call.body as { decision: string }).decision === "fish";
-        return json({ match: null, fishToSend: !fishSent });
+        return json({ match: null, fishToSend: !fishSent, likesLeft: 10 });
       },
-      { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")], fishToSend: true },
+      {
+        day: DAY,
+        entries: [entry(2, "Katja"), entry(4, "Minna")],
+        fishToSend: true,
+        likesLeft: 10,
+      },
     );
     await show();
     await press("Send a fish");
@@ -491,7 +513,7 @@ describe("today's round", () => {
         call.path.endsWith("/decision") && (call.body as { decision: string }).decision === "fish"
           ? refusal("fish_budget_exceeded", 429, { "retry-after": "43200" })
           : undefined,
-      { day: DAY, entries: [entry(2, "Katja")], fishToSend: true },
+      { day: DAY, entries: [entry(2, "Katja")], fishToSend: true, likesLeft: 10 },
     );
     await show();
     await press("Send a fish");
@@ -600,7 +622,9 @@ describe("today's round", () => {
       if (call.path === "/rounds/today") {
         reads += 1;
         return json(
-          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+          reads === 1
+            ? ROUND
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true, likesLeft: 10 },
         );
       }
       if (call.path === `/rounds/${DAY}/entries/1/seen`) {
@@ -642,10 +666,10 @@ describe("today's round", () => {
   });
 
   it.each([
-    ["a like recorded", () => json({ match: null, fishToSend: true })],
+    ["a like recorded", () => json({ match: null, fishToSend: true, likesLeft: 10 })],
     [
       "a like that made a match",
-      () => json({ match: { conversationId: CONVERSATION }, fishToSend: true }),
+      () => json({ match: { conversationId: CONVERSATION }, fishToSend: true, likesLeft: 10 }),
     ],
     ["the day ended", () => refusal("round_expired", 409)],
     ["the card gone", () => refusal("not_found", 404)],
@@ -666,6 +690,7 @@ describe("today's round", () => {
                   day: NEXT_DAY,
                   entries: [entry(1, "Riikka"), entry(2, "Saara")],
                   fishToSend: true,
+                  likesLeft: 10,
                 },
           );
         }
@@ -799,7 +824,7 @@ describe("today's round", () => {
     const sent = api((call) =>
       call.path.endsWith("/decision")
         ? new Promise<Response>((resolve) => {
-            release = () => resolve(json({ match: null, fishToSend: true }));
+            release = () => resolve(json({ match: null, fishToSend: true, likesLeft: 10 }));
           })
         : undefined,
     );
@@ -828,7 +853,7 @@ describe("today's round", () => {
     api((call) =>
       call.path.endsWith("/decision")
         ? new Promise<Response>((resolve) => {
-            release = () => resolve(json({ match: null, fishToSend: true }));
+            release = () => resolve(json({ match: null, fishToSend: true, likesLeft: 10 }));
           })
         : undefined,
     );
@@ -922,6 +947,7 @@ describe("today's round", () => {
       day: DAY,
       entries: [withPhoto, entry(2, "Katja")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
@@ -949,8 +975,8 @@ describe("today's round", () => {
         reads += 1;
         return json(
           reads === 1
-            ? { day: DAY, entries: [withPhoto], fishToSend: true }
-            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+            ? { day: DAY, entries: [withPhoto], fishToSend: true, likesLeft: 10 }
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true, likesLeft: 10 },
         );
       }
       if (call.path.endsWith("/decision")) return refusal("round_expired", 409);
@@ -975,7 +1001,9 @@ describe("a round left open past midnight", () => {
       if (call.path !== "/rounds/today") return undefined;
       reads += 1;
       return json(
-        reads === 1 ? first : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+        reads === 1
+          ? first
+          : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true, likesLeft: 10 },
       );
     });
   };
@@ -996,6 +1024,7 @@ describe("a round left open past midnight", () => {
         day: DAY,
         entries: entries === null ? null : [...entries],
         fishToSend: true,
+        likesLeft: 10,
       });
       await show();
       expect(screen.getByText(words)).toBeTruthy();
@@ -1017,6 +1046,7 @@ describe("a round left open past midnight", () => {
       day: DAY,
       entries: [entry(1, "Henna", "liked_you", "like")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     now.mockReturnValue(LATE_EVENING);
@@ -1033,6 +1063,7 @@ describe("a round left open past midnight", () => {
       day: NEXT_DAY,
       entries: [entry(1, "Henna", "liked_you", "like")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     await appBecomes("active");
@@ -1050,11 +1081,13 @@ describe("a round left open past midnight", () => {
       if (call.path === "/rounds/today") {
         reads += 1;
         return json(
-          reads === 1 ? ROUND : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true },
+          reads === 1
+            ? ROUND
+            : { day: NEXT_DAY, entries: [entry(1, "Riikka")], fishToSend: true, likesLeft: 10 },
         );
       }
       if (call.path === `/rounds/${DAY}/entries/1/decision`) {
-        return json({ match: { conversationId: CONVERSATION }, fishToSend: true });
+        return json({ match: { conversationId: CONVERSATION }, fishToSend: true, likesLeft: 10 });
       }
       return undefined;
     });
@@ -1082,6 +1115,7 @@ describe("where the decision buttons sit (#82)", () => {
     day: DAY,
     entries: [entry(2, "Katja"), entry(4, "Minna")],
     fishToSend: true,
+    likesLeft: 10,
   };
   const CONTROLS = ["Undo your last decision", "Send a fish", "Pass", "Like"];
   /** The round's own controls, in the order a screen reader meets them. */
@@ -1098,6 +1132,8 @@ describe("where the decision buttons sit (#82)", () => {
     }
     return false;
   };
+  /** The classes of the row that holds the likes left and the fish: justified to the hand's side. */
+  const onTheHandsSide = () => screen.getByTestId("round-likes-row").props.className;
   const placed = async (choice: object | null) => {
     if (choice) store.set(KEY, JSON.stringify(choice));
     api(undefined, STRANGERS);
@@ -1105,13 +1141,12 @@ describe("where the decision buttons sit (#82)", () => {
     await settle();
   };
 
-  it("places Pass at the left and Like at the right for the right hand, the default, with the fish above on the right", async () => {
+  it("places Pass at the left and Like at the right for the right hand, the default, with the fish above at the right", async () => {
     await placed(null);
     expect(controls()).toEqual(["Send a fish", "Pass", "Like"]);
     expect(column()).toBeNull();
-    expect(screen.getByRole("button", { name: "Send a fish" }).props.className).toMatch(
-      /\bself-end\b/,
-    );
+    expect(onTheHandsSide()).toMatch(/\bjustify-end\b/);
+    expect(onTheHandsSide()).not.toMatch(/\bflex-row-reverse\b/);
     await press("Pass");
     // Undo stays in the header, above the card, as before.
     expect(controls()).toEqual(["Undo your last decision", "Send a fish", "Pass", "Like"]);
@@ -1159,9 +1194,8 @@ describe("where the decision buttons sit (#82)", () => {
   it("mirrors them for the left hand: Like at the left, Pass at the right, the fish on the left", async () => {
     await placed({ hand: "left" });
     expect(controls()).toEqual(["Send a fish", "Like", "Pass"]);
-    expect(screen.getByRole("button", { name: "Send a fish" }).props.className).toMatch(
-      /\bself-start\b/,
-    );
+    expect(onTheHandsSide()).toMatch(/\bjustify-end\b/);
+    expect(onTheHandsSide()).toMatch(/\bflex-row-reverse\b/);
     // Each keeps its own shape: Like the pill, Pass the rectangle.
     expect(screen.getByRole("button", { name: "Like" }).props.className).toMatch(
       /\brounded-full\b/,
@@ -1196,7 +1230,7 @@ describe("where the decision buttons sit (#82)", () => {
     "keeps Undo at the thumb on the %s, one-handed, after the round's last decision, and it still takes it back",
     async (hand, side) => {
       store.set(KEY, JSON.stringify({ hand, oneHanded: true }));
-      api(undefined, { day: DAY, entries: [entry(2, "Katja")], fishToSend: true });
+      api(undefined, { day: DAY, entries: [entry(2, "Katja")], fishToSend: true, likesLeft: 10 });
       await show();
       await settle();
       await press("Pass");
@@ -1219,6 +1253,7 @@ describe("where the decision buttons sit (#82)", () => {
       day: DAY,
       entries: [entry(2, "Katja", "matches_filters", "pass")],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     await settle();
@@ -1227,9 +1262,47 @@ describe("where the decision buttons sit (#82)", () => {
     expect(column()).toBeNull();
   });
 
+  /** Whether the likes-left line is inside the one-handed column. */
+  const lineInColumn = () => {
+    for (let node = screen.getByText("10 likes left today").parent; node; node = node.parent) {
+      if (node.props.testID === "round-one-handed") return true;
+    }
+    return false;
+  };
+
+  it.each([
+    ["the right hand", { hand: "right" }, /\btext-right\b/],
+    ["the left hand", { hand: "left" }, /^(?!.*\btext-right\b)/],
+  ] as const)(
+    "says the likes left on the hand's side for %s, ahead of the buttons",
+    async (_, choice, side) => {
+      await placed(choice);
+      const line = screen.getByText("10 likes left today");
+      expect(line.props.className).toMatch(side);
+      expect(line.parent?.props.testID).toBe("round-likes-row");
+      expect(column()).toBeNull();
+      const tree = JSON.stringify(screen.toJSON());
+      expect(tree.indexOf("10 likes left today")).toBeLessThan(tree.indexOf("Send a fish"));
+    },
+  );
+
+  it.each([
+    ["right", /\btext-right\b/],
+    ["left", /^(?!.*\btext-right\b)/],
+  ] as const)("says the likes left in the column on the %s, one-handed", async (hand, side) => {
+    await placed({ hand, oneHanded: true });
+    expect(lineInColumn()).toBe(true);
+    expect(screen.getByText("10 likes left today").props.className).toMatch(side);
+  });
+
   it("leaves the fish out of the column on a card that answers a like", async () => {
     store.set(KEY, JSON.stringify({ oneHanded: true }));
-    api(undefined, { day: DAY, entries: [entry(1, "Henna", "liked_you")], fishToSend: true });
+    api(undefined, {
+      day: DAY,
+      entries: [entry(1, "Henna", "liked_you")],
+      fishToSend: true,
+      likesLeft: 10,
+    });
     await show();
     await settle();
     expect(controls()).toEqual(["Pass", "Like"]);
@@ -1316,6 +1389,130 @@ describe("where the decision buttons sit (#82)", () => {
   });
 });
 
+describe("the likes left (#524, ADR-036 §6)", () => {
+  const STRANGERS = { day: DAY, entries: [entry(2, "Katja"), entry(4, "Minna")] };
+  /** The API's decisions, answering these numbers in turn. */
+  const answering = (...left: number[]) => {
+    const each = left[Symbol.iterator]();
+    return (call: Call) =>
+      call.path.endsWith("/decision")
+        ? json({ match: null, fishToSend: true, likesLeft: each.next().value })
+        : undefined;
+  };
+
+  it("says how many are left from the first card, and follows each decision's answer with no read", async () => {
+    const sent = api(answering(2, 1), {
+      ...STRANGERS,
+      entries: [...STRANGERS.entries, entry(5, "Riikka")],
+      fishToSend: true,
+      likesLeft: 3,
+    });
+    await show();
+    expect(screen.getByText("3 likes left today")).toBeTruthy();
+    await press("Like");
+    expect(heading("Minna, 34")).toBeTruthy();
+    expect(screen.getByText("2 likes left today")).toBeTruthy();
+    expect(screen.queryByText("3 likes left today")).toBeNull();
+    await press("Like");
+    expect(screen.getByText("1 like left today")).toBeTruthy();
+    expect(sent.reads()).toBe(1);
+  });
+
+  it("gives a like back when Undo's card is changed to a pass, and not before", async () => {
+    const sent = api(answering(9, 10), { ...STRANGERS, fishToSend: true, likesLeft: 10 });
+    await show();
+    await press("Like");
+    expect(screen.getByText("9 likes left today")).toBeTruthy();
+    await press("Undo your last decision");
+    expect(heading("Katja, 32")).toBeTruthy();
+    // The decision stands until another replaces it, and the number with it.
+    expect(screen.getByText("9 likes left today")).toBeTruthy();
+    await press("Pass");
+    expect(screen.getByText("10 likes left today")).toBeTruthy();
+    expect(sent.reads()).toBe(1);
+  });
+
+  it("says plainly when none are left, with the buttons still there", async () => {
+    api(undefined, { ...STRANGERS, fishToSend: false, likesLeft: 0 });
+    await show();
+    expect(screen.getByText("No likes left today. New ones tomorrow.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Like" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Pass" })).toBeTruthy();
+    noProblems();
+  });
+
+  it("says none are left when another phone spent the day's last like, and keeps the card for a pass", async () => {
+    const sent = api(
+      (call) =>
+        call.path.endsWith("/decision") && (call.body as { decision: string }).decision === "like"
+          ? refusal("like_budget_exceeded", 429, { "retry-after": "3600" })
+          : undefined,
+      { ...STRANGERS, fishToSend: true, likesLeft: 1 },
+    );
+    await show();
+    await press("Like");
+    expect(screen.getByText(/You have used today's likes/)).toBeTruthy();
+    expect(screen.getByText("No likes left today. New ones tomorrow.")).toBeTruthy();
+    expect(heading("Katja, 32")).toBeTruthy();
+    expect(sent.reads()).toBe(1);
+  });
+
+  it("keeps the number where a like is refused for another reason", async () => {
+    api((call) => (call.path.endsWith("/decision") ? refusal("internal_error", 500) : undefined), {
+      ...STRANGERS,
+      fishToSend: true,
+      likesLeft: 4,
+    });
+    await show();
+    await press("Like");
+    expect(screen.getByText("4 likes left today")).toBeTruthy();
+  });
+
+  it("is plain text the screen reader reaches, never a live region, and nothing announces it", async () => {
+    api(answering(9), { ...STRANGERS, fishToSend: true, likesLeft: 10 });
+    await show();
+    const line = screen.getByText("10 likes left today");
+    expect(line.props.accessibilityLiveRegion).toBeUndefined();
+    expect(line.props.role).toBeUndefined();
+    expect(line.props.className).toMatch(/\btext-muted-foreground\b/);
+    await press("Like");
+    expect(screen.getByText("9 likes left today")).toBeTruthy();
+    expect(announced()).toEqual([]);
+  });
+
+  it("looks the same at ten as at one", async () => {
+    api(answering(1), { ...STRANGERS, fishToSend: true, likesLeft: 10 });
+    await show();
+    const at = screen.getByText("10 likes left today").props.className;
+    await press("Like");
+    expect(screen.getByText("1 like left today").props.className).toBe(at);
+  });
+
+  it("leaves with the buttons, so the end of the round has no count", async () => {
+    api(answering(9, 8), { ...STRANGERS, fishToSend: true, likesLeft: 10 });
+    await show();
+    await press("Like");
+    await press("Like");
+    expect(screen.getByText("That was today's round. The next one comes tomorrow.")).toBeTruthy();
+    expect(screen.queryByText(/likes? left today/)).toBeNull();
+  });
+
+  it.each([
+    ["fi", 2, "2 tykkäystä jäljellä tänään"],
+    ["fi", 1, "1 tykkäys jäljellä tänään"],
+    ["fi", 0, "Tykkäyksiä ei ole tänään enää jäljellä. Uusia tulee huomenna."],
+    ["sv", 2, "2 gillanden kvar i dag"],
+    ["sv", 1, "1 gillande kvar i dag"],
+    ["sv", 0, "Inga gillanden kvar i dag. Nya kommer i morgon."],
+    ["en", 1, "1 like left today"],
+  ] as const)("says it in %s for %i", async (languageTag, likesLeft, words) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    api(undefined, { ...STRANGERS, fishToSend: true, likesLeft });
+    await show();
+    expect(screen.getByText(words)).toBeTruthy();
+  });
+});
+
 describe("the short pool (#99, ADR-042)", () => {
   const RELAXATIONS = `/rounds/${DAY}/relaxations`;
   const offered = {
@@ -1326,7 +1523,7 @@ describe("the short pool (#99, ADR-042)", () => {
     ],
     relaxed: [],
   };
-  const EMPTY: RoundResponse = { day: DAY, entries: [], fishToSend: true };
+  const EMPTY: RoundResponse = { day: DAY, entries: [], fishToSend: true, likesLeft: 10 };
   const relaxedCard: RoundEntry = { ...entry(5, "Liisa", "relaxed"), relaxedField: "smoking" };
   const INCLUDE = "Include those who did not answer: Smoking. About 10 more people";
   const ASIDE = "Set aside for today: Smoking. A few more people";
@@ -1386,6 +1583,7 @@ describe("the short pool (#99, ADR-042)", () => {
         day: DAY,
         entries: [entry(1, "Henna", "matches_filters", "like"), relaxedCard],
         fishToSend: true,
+        likesLeft: 10,
       },
     );
     await show();
@@ -1437,6 +1635,7 @@ describe("the short pool (#99, ADR-042)", () => {
       day: DAY,
       entries: [{ ...entry(1, "Henna"), notAnswered: ["smoking", "languages"] }],
       fishToSend: true,
+      likesLeft: 10,
     });
     await show();
     expect(screen.getByText("Did not answer: Smoking")).toBeTruthy();
@@ -1504,6 +1703,7 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
     day: DAY,
     entries: [entry(1, "Henna", "matches_filters", "like"), { ...relaxedCard, decision }],
     fishToSend: true,
+    likesLeft: 10,
   });
 
   it.each([
@@ -1532,7 +1732,12 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
     api(
       (call) =>
         call.path === RELAXATIONS ? json({ short: false, offers: [], relaxed: [] }) : undefined,
-      { day: DAY, entries: [{ ...relaxedCard }, entry(6, "Saara")], fishToSend: true },
+      {
+        day: DAY,
+        entries: [{ ...relaxedCard }, entry(6, "Saara")],
+        fishToSend: true,
+        likesLeft: 10,
+      },
     );
     await show();
     await press("Like");
@@ -1554,7 +1759,7 @@ describe("undoing a relaxation from a card (#99, ADR-042 §6)", () => {
         if (call.path === RELAXATIONS) return refusal("relaxations_changed", 409);
         return undefined;
       },
-      { day: DAY, entries: [], fishToSend: true },
+      { day: DAY, entries: [], fishToSend: true, likesLeft: 10 },
     );
     await show();
 

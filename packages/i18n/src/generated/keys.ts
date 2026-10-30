@@ -1365,6 +1365,7 @@ export type MessageParams = {
   "round.gone": Record<never, never>;
   "round.home.open": Record<never, never>;
   "round.like": Record<never, never>;
+  "round.likesLeft": { "likes": number };
   "round.loading": Record<never, never>;
   "round.match.body": Record<never, never>;
   "round.match.continue": Record<never, never>;

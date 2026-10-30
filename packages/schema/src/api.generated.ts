@@ -6254,7 +6254,7 @@ export interface paths {
         };
         /**
          * Today's round
-         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many; the day's likes are not asked. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
+         * @description The Finnish day and its cards in order, each with why it is there and the caller's own decision. The first read of a day builds the caller's round once their matching has opened; entries null while they have none, an empty list for a round with nobody to show. A card that cannot be shown now is left out. fishToSend says whether the fish's budget lets the caller send one today, one of matching_config fish_budget in the calendar week (fish_window_days counted from a Monday) or an earned one, never how many. likesLeft says how many of the day's likes the caller has left, from matching_config like_budget_balanced down to zero, by the count that refuses a like. Serving a card writes the shown record and counts against matching_config exposure_cards_per_day (ADR-008).
          */
         get: {
             parameters: {
@@ -6388,7 +6388,7 @@ export interface paths {
         get?: never;
         /**
          * Like or pass a card
-         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend is the round's after this decision.
+         * @description Recorded, or replacing the day's earlier decision on the card; the same decision again writes nothing. A day that has ended answers round_expired. A like counts against the day's matching_config like_budget_balanced, except one on a liked_you or fish card; a pass never does. A like of somebody whose like of the caller stands is a match: the answer names its conversation, and that like is final. A fish is a like with a mark, matching_config fish_budget of them in each fish_window_days counted from a Monday, the calendar week; on a liked_you or fish card it is a like. Past either budget, a like or a fish the caller's invitations earned is used by itself, left out of the counts after, and given back when the decision changes the same day. The answer's fishToSend and likesLeft are the round's after this decision.
          */
         put: {
             parameters: {
@@ -8525,6 +8525,7 @@ export interface components {
             day: string;
             entries: components["schemas"]["RoundEntry"][] | null;
             fishToSend: boolean;
+            likesLeft: number;
         };
         RoundEntry: {
             position: number;
@@ -8540,6 +8541,7 @@ export interface components {
                 conversationId: string;
             } | null;
             fishToSend: boolean;
+            likesLeft: number;
         };
         RoundDecisionUpdate: {
             decision: components["schemas"]["RoundChoice"];

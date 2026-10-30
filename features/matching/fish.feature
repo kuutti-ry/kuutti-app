@@ -60,6 +60,11 @@ Feature: The fish, a like that says a little more
     When "A" sends a fish, then likes another card
     Then the like is refused as like_budget_exceeded
 
+  Scenario: A fish counts in the likes left
+    Given like_budget_balanced is 2
+    When "A" sends a fish
+    Then the answer says one like is left
+
   Scenario: A fish on a card of somebody whose like waits is a like
     Given "B" liked "A" yesterday, and "B" is in "A"'s round today as liked you
     When "A" sends "B" a fish

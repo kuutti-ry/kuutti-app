@@ -53,8 +53,9 @@ const finnishDay = (at: Date | number) => formatDate("fi", at, { timeZone: "Euro
  * (ADR-034 §5): Undo brings its card back, and the decision stands until
  * another one replaces it. A like that made a match is final (ADR-038 §3),
  * so nothing offers it back. Each card reports itself seen once. Whether a
- * fish can go today comes with the round and with every decision's answer
- * (#475), never from a read of its own (ADR-008).
+ * fish can go today and how many likes are left come with the round and with
+ * every decision's answer (#475, #524), never from a read of their own
+ * (ADR-008).
  *
  * A day that ended while the screen was open is read anew: the API refuses
  * the old day's writes (409 `round_expired`), and the screen says why it
@@ -217,7 +218,7 @@ export function useRound() {
         const answer = await decide(day, position, decision);
         const round = onDay(day);
         if (!round) return;
-        decided({ ...round, fishToSend: answer.fishToSend }, decision);
+        decided({ ...round, fishToSend: answer.fishToSend, likesLeft: answer.likesLeft }, decision);
         setRevisit(null);
         setLast(answer.match ? null : position);
         setMatch(answer.match?.conversationId ?? null);
@@ -238,6 +239,8 @@ export function useRound() {
           drop(day, position);
           setNotice("round.gone");
         } else if (code === "like_budget_exceeded") {
+          // Another phone spent the day's last like meanwhile (#524): the line says so too.
+          showRound({ ...round, likesLeft: 0 });
           setNotice("errors.like_budget_exceeded");
         } else if (code === "fish_budget_exceeded") {
           // Another phone sent the week's fish meanwhile (#475): the fish leaves the bar.

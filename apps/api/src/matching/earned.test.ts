@@ -131,6 +131,25 @@ describe("earned likes", () => {
     ]);
   });
 
+  test("an earned like is not in the likes left, and what it paid for stays out of the count", async ({
+    ctx,
+  }) => {
+    const [a, b, c] = await cast(ctx.client, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await likeBudget(ctx.client, 1);
+    await earnedUnits(ctx.client, a.accountId, { likes: 1 });
+    await roundOf(ctx.client, a, [b, c]);
+    const app = await appAt(ctx.client);
+    const likesLeftAfter = async (answer: Response) => {
+      expect(answer.status).toBe(200);
+      return RoundDecisionAnswer.parse(await answer.json()).likesLeft;
+    };
+
+    expect(await likesLeftAfter(await choose(app, a, 1, "like"))).toBe(0);
+    expect(await likesLeftAfter(await choose(app, a, 2, "like"))).toBe(0);
+    expect(await likesLeftAfter(await choose(app, a, 1, "pass"))).toBe(1);
+  });
+
   test("A like changed to a pass gives its earned like back", async ({ ctx }) => {
     const [a, b, c, d] = await cast(ctx.client, 4);
     if (!a || !b || !c || !d) throw new Error("cast not written");
@@ -371,7 +390,7 @@ describe("two devices", () => {
       const racing = watched(decide(deps(second), MATCHES, choice(3, "like")));
       expect(await waitsFor(pool, secondPid, firstPid, racing.settled)).toBe(true);
       await first.query("COMMIT");
-      expect(await racing.outcome).toEqual({ match: null, fishToSend: true });
+      expect(await racing.outcome).toEqual({ match: null, fishToSend: true, likesLeft: 0 });
       await second.query("COMMIT");
       expect(await decisionsOf(pool, entries)).toEqual(["like", "pass", "like"]);
       expect(await unitsOf(pool, a)).toEqual([{ kind: "like", spent: true, entryId: entries[2] }]);

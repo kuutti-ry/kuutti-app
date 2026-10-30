@@ -98,6 +98,39 @@ const LIKE_BUDGET_KEY = "like_budget_balanced";
 const FREE_LIKES: readonly RoundReason[] = ["liked_you", "fish"];
 
 /**
+ * The person's likes of the day against the budget, those a free card took or
+ * an earned like paid for left out: one count for the refusal and for the
+ * number the round says (#524), so the two never disagree.
+ */
+async function likesSent(
+  db: Queryable,
+  accountId: string,
+  today: string,
+): Promise<{ sent: number; budget: number }> {
+  const budget = await matchingConfigNumber(db, LIKE_BUDGET_KEY);
+  const { rows } = await db.query<{ n: number }>(
+    `SELECT count(*)::int AS n
+       FROM round_entries e JOIN rounds r ON r.id = e.round_id
+      WHERE r.account_id = $1 AND r.day = $2 AND e.decision = 'like'
+        AND e.reason <> ALL($3::round_reason[]) AND e.id <> ALL($4::uuid[])`,
+    [accountId, today, FREE_LIKES, await entriesPaidBy(db, accountId, "like")],
+  );
+  return { sent: rows[0]?.n ?? 0, budget };
+}
+
+/**
+ * How many of the day's likes the person has left (#524, ADR-036 §6), from the
+ * budget down to zero, a shadow-banned person's the same way.
+ */
+async function likesLeftOf(db: Queryable, accountId: string, today: string): Promise<number> {
+  // shortcut: an earned like is not in the number, so somebody holding one reads
+  // zero while their next like still goes. Nobody holds one while
+  // invitation_reward earns no likes; #503 settles what the number counts.
+  const { sent, budget } = await likesSent(db, accountId, today);
+  return Math.max(0, budget - sent);
+}
+
+/**
  * The fish (#378, ADR-039, the maintainer's of 20/10/2026): a like with a
  * mark, `fish_budget` of them in each period of `fish_window_days` counted
  * from a Monday, so 7 is the calendar week, Monday to Sunday in Finland (the
@@ -158,6 +191,18 @@ async function fishSent(
 async function fishToSendOf(db: Queryable, accountId: string, today: string): Promise<boolean> {
   const { sent, budget } = await fishSent(db, accountId, today);
   return sent < budget || (await earnedFishWaiting(db, accountId));
+}
+
+/** What the round and each decision's answer say of the person's own budgets, one read for both. */
+async function budgetsOf(
+  db: Queryable,
+  accountId: string,
+  today: string,
+): Promise<{ fishToSend: boolean; likesLeft: number }> {
+  return {
+    fishToSend: await fishToSendOf(db, accountId, today),
+    likesLeft: await likesLeftOf(db, accountId, today),
+  };
 }
 
 /** What a person reads back of their own decision: a like with the mark is a fish. */
@@ -298,14 +343,14 @@ export async function readTodaysRound(
       ORDER BY e.position`,
     [accountId, day],
   );
-  const fishToSend = await fishToSendOf(deps.db, accountId, day);
+  const budgets = await budgetsOf(deps.db, accountId, day);
   const round = rows[0];
-  if (!round) return { day, entries: null, fishToSend };
+  if (!round) return { day, entries: null, ...budgets };
   await deps.db.query(
     "UPDATE rounds SET opened_at = $3 WHERE id = $1 AND account_id = $2 AND opened_at IS NULL",
     [round.id, accountId, at],
   );
-  return { day, entries: await entriesOf(accountId, rows, cardOf, dealBreakers), fishToSend };
+  return { day, entries: await entriesOf(accountId, rows, cardOf, dealBreakers), ...budgets };
 }
 
 /** The day named, checked against today before anything is read: an ended day's round answers round_expired, a later one is nobody's yet. */
@@ -372,14 +417,15 @@ export async function markSeen(
  * A like or a fish past its budget spends a unit the person's invitations
  * earned, in this transaction, and a change of it gives the unit back (#107,
  * ADR-044 §8); the reward table is the rewards slice's, reached through its
- * index.ts. The answer says whether a fish can still go today, which a fish
- * sent or changed back moves (#475), read in this transaction after the write.
+ * index.ts. The answer says whether a fish can still go today (#475) and how
+ * many likes are left (#524), which the decision moves, read in this
+ * transaction after the write.
  */
 export async function decide(
   deps: RoundDeps,
   matches: Matches,
   input: { accountId: string; day: string; position: number; decision: RoundChoice },
-): Promise<{ match: string | null; fishToSend: boolean }> {
+): Promise<{ match: string | null; fishToSend: boolean; likesLeft: number }> {
   const { at, today } = todayOrRefuse(deps, input.day);
   const decision: RoundDecision = input.decision === "pass" ? "pass" : "like";
   const written = await transaction(deps.db, async (tx) => {
@@ -429,7 +475,7 @@ export async function decide(
     if (entry.decision === decision && entry.fish === fish) {
       return {
         match: decision === "like" ? standing : null,
-        fishToSend: await fishToSendOf(tx, input.accountId, today),
+        ...(await budgetsOf(tx, input.accountId, today)),
         decided: null,
       };
     }
@@ -442,15 +488,9 @@ export async function decide(
     // A like an earned like paid for is not counted; past the budget the like
     // takes the oldest one left, and is refused only with none.
     if (decision === "like" && entry.decision !== "like" && !FREE_LIKES.includes(entry.reason)) {
-      const budget = await matchingConfigNumber(tx, LIKE_BUDGET_KEY);
-      const liked = await tx.query<{ n: number }>(
-        `SELECT count(*)::int AS n FROM round_entries
-          WHERE round_id = $1 AND decision = 'like' AND reason <> ALL($2::round_reason[])
-            AND id <> ALL($3::uuid[])`,
-        [roundId, FREE_LIKES, await entriesPaidBy(tx, input.accountId, "like")],
-      );
+      const count = await likesSent(tx, input.accountId, today);
       if (
-        (liked.rows[0]?.n ?? 0) >= budget &&
+        count.sent >= count.budget &&
         !(await spendEarned(tx, {
           accountId: input.accountId,
           kind: "like",
@@ -541,7 +581,7 @@ export async function decide(
       match,
       // After this decision's write, under the round's lock: the answer says
       // what it left, and is known before any push of the match starts (ADR-055 §5).
-      fishToSend: await fishToSendOf(tx, input.accountId, today),
+      ...(await budgetsOf(tx, input.accountId, today)),
       decided: {
         reason: entry.reason,
         seenAt: entry.seen_at,
@@ -573,7 +613,7 @@ export async function decide(
       matches.made?.({ accountId: decided.candidateId });
     }
   }
-  return { match: written.match, fishToSend: written.fishToSend };
+  return { match: written.match, fishToSend: written.fishToSend, likesLeft: written.likesLeft };
 }
 
 /**

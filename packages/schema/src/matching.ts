@@ -4,8 +4,9 @@ import { ProfileCard } from "./profile.ts";
 
 // Today's round (#96, TD-11, TD-12, ADR-034): what one person is shown on one
 // Finnish calendar day, each card with why it is there and the person's own
-// decision, which may change until the day ends. No answer carries a count,
-// a score, a seen time or anybody's decision about the person.
+// decision, which may change until the day ends. No answer carries a score, a
+// seen time or anybody's decision about the person, and the one count it
+// carries is the person's own likes left today (#524).
 
 /** A round's most entries: a bound of the contract above round_size and liked-you's share (#95, #97), not a tunable. */
 export const ROUND_ENTRIES_MAX = 50;
@@ -124,12 +125,19 @@ export const RelaxationParams = z
 /**
  * Whether the fish's budget lets the caller send one today (#475, ADR-039
  * §3, §6): one of the week's own, or one their invitations earned waiting
- * (ADR-044 §8). The day's likes, which a fish counts in too, are not asked
- * (ADR-036 Open 1). The round offers Send a fish only while it is true, and
- * on the card that holds the fish. Never a count, nor anything of the fish
- * others sent.
+ * (ADR-044 §8). The day's likes, which a fish counts in too, are `likesLeft`'s.
+ * The round offers Send a fish only while it is true, and on the card that
+ * holds the fish. Never a count, nor anything of the fish others sent.
  */
 const fishToSend = z.boolean();
+
+/**
+ * How many of the day's likes the caller has left (#524, ADR-036 §6): from
+ * matching_config like_budget_balanced down to zero, by the count the refusal
+ * uses, so the screen can say so before the refusal does. Their own number,
+ * from their own decisions; nothing about anybody else.
+ */
+const likesLeft = z.int().min(0);
 
 /**
  * Today's round: the Finnish day it is, and its cards in order; null while
@@ -144,6 +152,7 @@ export const RoundResponse = z
     day: z.iso.date(),
     entries: z.array(RoundEntry).max(ROUND_ENTRIES_MAX).nullable(),
     fishToSend,
+    likesLeft,
   })
   .meta({ id: "RoundResponse" });
 export type RoundResponse = z.infer<typeof RoundResponse>;
@@ -166,11 +175,13 @@ export type RoundDecisionUpdate = z.infer<typeof RoundDecisionUpdate>;
  * that made none. Nothing says whether the other person liked, unless it is a
  * match. `fishToSend` as the round says it, after this decision: a fish sent
  * may spend the last, one changed to a like or a pass gives it back (#475).
+ * `likesLeft` likewise, so the screen follows each decision without a read.
  */
 export const RoundDecisionAnswer = z
   .object({
     match: z.object({ conversationId: z.uuid() }).strict().nullable(),
     fishToSend,
+    likesLeft,
   })
   .strict()
   .meta({ id: "RoundDecisionAnswer" });
