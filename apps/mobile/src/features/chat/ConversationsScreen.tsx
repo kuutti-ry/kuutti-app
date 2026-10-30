@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { SupportLink } from "@/components/SupportLink";
 import { Text } from "@/components/ui/text";
 import type { SafetyOutcome } from "@/features/safety";
 import { useT } from "@/lib/locale";
@@ -126,7 +127,7 @@ function Row({ conversation }: { conversation: ConversationSummary }) {
  * brings something new (#349), with a line at the top while it is lost. A
  * row opens the conversation. Back from a report, a block or an end in a
  * conversation (#351), the top says what happened, once, to a screen reader
- * too.
+ * too, with the way to the support page (#510).
  */
 export function ConversationsScreen() {
   const { t } = useT();
@@ -165,9 +166,13 @@ export function ConversationsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void pull()} />}
       >
         {notice && (
-          <Text testID="notice" accessibilityLiveRegion="polite">
-            {t(NOTICES[notice])}
-          </Text>
+          <View className="gap-1">
+            <Text testID="notice" accessibilityLiveRegion="polite">
+              {t(NOTICES[notice])}
+            </Text>
+            {/* Not for a conversation that was gone already: nothing went through. */}
+            {notice !== "gone" && <SupportLink />}
+          </View>
         )}
         {view.status === "loading" && (
           <Text accessibilityLiveRegion="polite">{t("chat.list.loading")}</Text>

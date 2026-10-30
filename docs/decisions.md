@@ -20,6 +20,7 @@ apps/api/src/safety/reports.ts
 apps/mobile/src/features/identity/agreements.ts
 apps/mobile/src/features/identity/lock/passcode.ts
 apps/mobile/src/features/identity/lock/store.ts
+apps/mobile/src/features/settings/support-lines.ts
 apps/mobile/src/features/profile/FieldEditor.tsx
 apps/mobile/src/lib/photo-descriptions.tsx
 apps/mobile/src/theme/a11y.ts
@@ -544,6 +545,7 @@ How people block and report, what a shadow ban and the automatic rules do, the s
 | A moderator can take down one approved profile photo with a reason chosen on purpose; nobody else is given it from then on, the owner keeps it with the reason and no appeal, and nothing is deleted. A photo sent in a conversation is never taken down. |  | `apps/api/src/media/admin-routes.ts` | ADR-006 §2 and History 27/10/2026; #477; PR #479; session 27/10/2026 | maintainer, 27/10/2026 | |
 | Open: a reason of its own for someone else's photo beside 'other', and whether a re-upload of a picture a person took down goes to a person rather than the check alone? Meanwhile 'other', and the check looks at it as at any upload. | 'other'; the check alone | `apps/api/src/media/admin-routes.ts` | ADR-006 History 27/10/2026; #477 | proposed, 27/10/2026 | |
 | Open: the panel's researcher role has no screen, since the research copy is read through AWS; should the panel's text say so? Meanwhile the panel's generic forbidden text. | generic text | `apps/admin/src` | ADR-029 Open; #106 | proposed, 17/10/2026 | |
+| Settings has a page of mental and emotional support, Support when it's hard, not help with the app: 112 above four services in a grid, MIELI Kriisipuhelin, Nollalinja, Rikosuhripäivystys and Tukinainen, each with its logo, number, hours and site. It works signed out, asks the API nothing, and no crash report names it. A link to it stands where a block or a report ends, and in an ended conversation, however it ended. The services are listed first and asked afterwards; one that says no is replaced. Numbers and hours come from each service's own site and are read again before each release. | four services and 112 | `apps/mobile/src/features/settings/support-lines.ts`, `apps/mobile/src/components/SupportLink.tsx`, `apps/mobile/src/lib/sentry.ts` | #510; #188; `apps/mobile/assets/support/NOTICE.md` | maintainer, 30/10/2026 | |
 
 ## Break and erasure
 

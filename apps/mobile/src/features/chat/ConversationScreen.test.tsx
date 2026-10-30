@@ -546,6 +546,34 @@ describe("one conversation", () => {
     noProblems();
   });
 
+  it.each<[string, Partial<ConversationDetail>, string]>([
+    ["ended", { closedHow: "unmatch", counterpart: null }, "This conversation has ended."],
+    [
+      "left by a deleted account",
+      { closedHow: "erasure", counterpart: { deleted: true } },
+      "This person deleted their account.",
+    ],
+  ])(
+    "offers the support page in a conversation %s, however it ended (#510)",
+    async (_how, closed, words) => {
+      conversation(detail({ state: "closed", ...closed }), [[message(1, "theirs", "Moi", DAY_1)]]);
+      await renderWithTheme(<ConversationScreen id={ID} />);
+      expect(await screen.findByText(words)).toBeTruthy();
+      noProblems();
+      await act(async () => {
+        fireEvent.press(screen.getByRole("link", { name: "Support when it's hard" }));
+      });
+      expect(router.push).toHaveBeenCalledWith("/settings/support");
+    },
+  );
+
+  it("offers no way to the support page while a conversation goes on (#510)", async () => {
+    conversation(detail(), [[message(1, "theirs", "Moi", DAY_1)]]);
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    expect(await screen.findByLabelText("Message")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Support when it's hard" })).toBeNull();
+  });
+
   it("heads an ended conversation Conversation ended, names nobody, and offers Report in More while the window holds (#351)", async () => {
     conversation(detail({ state: "closed", closedHow: "unmatch", counterpart: null }), [
       [message(2, "mine", "Kiitos", DAY_1_LATER), message(1, "theirs", "Moi", DAY_1)],

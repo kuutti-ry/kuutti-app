@@ -100,7 +100,7 @@ const photoChoices = () =>
     .map((radio) => radio.props.accessibilityLabel);
 const checked = (name: string) =>
   screen.getByRole("radio", { name }).props.accessibilityState?.checked === true;
-const press = (name: string | RegExp, role: "button" | "radio" = "button") =>
+const press = (name: string | RegExp, role: "button" | "radio" | "link" = "button") =>
   act(async () => {
     fireEvent.press(screen.getByRole(role, { name }));
     await new Promise<void>((resolve) => setTimeout(resolve, 20));
@@ -242,6 +242,70 @@ describe("SafetyActions", () => {
     expect(screen.getAllByRole("button", { name: "Done" })).toHaveLength(1);
     await press("Close");
     expect(gone).toHaveBeenCalledTimes(1);
+  });
+
+  describe("the way to the support page, where a block or a report ends (#510)", () => {
+    const { __router: router } = jest.requireMock("expo-router") as {
+      __router: { push: jest.Mock };
+    };
+    const LINK = "Support when it's hard";
+    const blockIt = async () => {
+      await press("Block");
+      await press("Block");
+      await screen.findByText("Blocked. You will not see each other again.");
+    };
+    const reportIt = async () => {
+      await press("Report and block");
+      await press("Harassing, threatening or hateful", "radio");
+      await press("Send report");
+      await screen.findByText(
+        "Thank you. A moderator will look at it, and you will not see each other again.",
+      );
+    };
+
+    beforeEach(() => router.push.mockReset());
+
+    it.each([
+      ["a block", blockIt],
+      ["a report", reportIt],
+    ])(
+      "offers it after %s, above Done, and closing the dialog hands the card back",
+      async (_what, finish) => {
+        api(done);
+        const gone = jest.fn();
+        await show(gone);
+        await press("Block or report");
+        await finish();
+        const flat = JSON.stringify(screen.toJSON());
+        expect(flat.indexOf(LINK)).toBeGreaterThan(-1);
+        expect(flat.indexOf(LINK)).toBeLessThan(flat.lastIndexOf("Done"));
+        noProblems();
+        await press(LINK, "link");
+        expect(router.push).toHaveBeenCalledWith("/settings/support");
+        expect(gone).toHaveBeenCalledTimes(1);
+        expect(gone).toHaveBeenCalledWith(SUBJECT);
+        expect(screen.queryByRole("link", { name: LINK })).toBeNull();
+      },
+    );
+
+    it("leaves it to the person: Done goes nowhere", async () => {
+      api(done);
+      await show();
+      await press("Block or report");
+      await blockIt();
+      await pressDone();
+      expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it("does not offer it for a card that was gone already: nothing went through", async () => {
+      api(() => refusal("not_found", 404));
+      await show();
+      await press("Block or report");
+      await press("Block");
+      await press("Block");
+      await screen.findByText(/no longer/);
+      expect(screen.queryByRole("link", { name: LINK })).toBeNull();
+    });
   });
 
   it("cancels a block at its confirmation with nothing sent, and opens at the choice again", async () => {

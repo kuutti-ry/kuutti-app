@@ -30,6 +30,7 @@ import FoundThemRoute from "../app/settings/found-them";
 import SettingsRoute from "../app/settings/index";
 import LicensesRoute from "../app/settings/licenses";
 import PackageLicenseRoute from "../app/settings/licenses/[id]";
+import SupportRoute from "../app/settings/support";
 import TechRoute from "../app/tech";
 
 // The route files of app/ (rules/layout.md: routes only, thin): each renders
@@ -130,6 +131,7 @@ jest.mock("@/features/settings", () => {
     PackageLicenseScreen: probe("PackageLicenseScreen"),
     ScreenReaderHint: probe("ScreenReaderHint"),
     SettingsScreen: probe("SettingsScreen"),
+    SupportScreen: probe("SupportScreen"),
     TechConfigScreen: probe("TechConfigScreen"),
   };
 });
@@ -175,6 +177,7 @@ describe("the screens without params", () => {
     ["/settings", SettingsRoute, "SettingsScreen"],
     ["/settings/found-them", FoundThemRoute, "FoundThemScreen"],
     ["/settings/licenses", LicensesRoute, "LicensesScreen"],
+    ["/settings/support", SupportRoute, "SupportScreen"],
     ["/tech", TechRoute, "TechConfigScreen"],
   ] as const)("%s renders its screen, with nothing to hand it", async (_path, Route, name) => {
     await render(<Route />);

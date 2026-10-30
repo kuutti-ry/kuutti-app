@@ -10255,3 +10255,150 @@ account.email.loadFailed:
   fi: "Sähköpostiosoitettasi ei voitu lukea."
   sv: "Din e-postadress kunde inte läsas."
   machine: { fi: true, sv: true }
+
+settings.support.label:
+  en: "Support when it's hard"
+  description: "Title of the Settings row and of the page it opens (#510): where to turn for mental and emotional support and in a personal crisis. Not help with the app. Stands on one line in the page's header, so short."
+  fi: "Tukea, kun on vaikeaa"
+  sv: "Stöd när det är svårt"
+  machine: { fi: true, sv: true }
+
+support.intro:
+  en: "You don't have to carry everything alone. Here you'll find people who listen. If a line is busy, try again in a moment."
+  description: "Support page (#510), the opening lines, above the emergency number and the four services. Warm and calm; it speaks to somebody who may be feeling very bad. Lines are often busy (most calls to MIELI's are not answered at the first try), so it says so before anybody hears the tone."
+  fi: "Kaikkea ei tarvitse kantaa yksin. Täältä löydät ihmisiä, jotka kuuntelevat. Jos linja on varattu, soita hetken päästä uudelleen."
+  sv: "Du behöver inte bära allt ensam. Här hittar du människor som lyssnar. Om linjen är upptagen, ring igen om en stund."
+  machine: { fi: true, sv: true }
+
+support.emergency:
+  en: "In immediate danger, call 112"
+  description: "Support page (#510), a button that calls the emergency number, above the four services."
+  fi: "Jos olet välittömässä vaarassa, soita 112"
+  sv: "Är du i omedelbar fara, ring 112"
+  machine: { fi: true, sv: true }
+
+support.call:
+  en: "Call {name}, {number}"
+  description: "Support page (#510), what a screen reader says for a service's number button. The name stands after a colon in fi and sv, so that it needs no inflection."
+  fi: "Soita: {name}, {number}"
+  sv: "Ring: {name}, {number}"
+  machine: { fi: true, sv: true }
+
+support.line.swedish:
+  en: "In Swedish"
+  description: "Support page (#510), above a number on a tile, where a service has a Swedish line of its own: shown only in Swedish, with the line that answers at any hour beside it."
+  fi: "Ruotsiksi"
+  sv: "På svenska"
+  machine: { fi: true, sv: true }
+
+support.line.finnish:
+  en: "In Finnish"
+  description: "Support page (#510), above a number on a tile, beside a Swedish line: the service's main line, open all hours."
+  fi: "Suomeksi"
+  sv: "På finska"
+  machine: { fi: true, sv: true }
+
+support.site:
+  en: "Website"
+  description: "Support page (#510), the link to a service's own site, on a tile. Space is tight."
+  fi: "Verkkosivut"
+  sv: "Webbplats"
+  machine: { fi: true, sv: true }
+
+support.site.label:
+  en: "{name}, website"
+  description: "Support page (#510), what a screen reader says for the link to a service's own site."
+  fi: "{name}, verkkosivut"
+  sv: "{name}, webbplats"
+  machine: { fi: true, sv: true }
+
+support.independent:
+  en: "These services are not part of Kuutti. Kuutti doesn't see who opens this page or who you call."
+  description: "Support page (#510), the line under the four services: they have no tie to Kuutti, and opening the page or calling leaves nothing with Kuutti."
+  fi: "Nämä palvelut eivät kuulu Kuuttiin. Kuutti ei näe, kuka avaa tämän sivun tai kenelle soitat."
+  sv: "De här tjänsterna hör inte till Kuutti. Kuutti ser inte vem som öppnar den här sidan eller vem du ringer."
+  machine: { fi: true, sv: true }
+
+support.mieli.name:
+  en: "MIELI Crisis Helpline"
+  description: "Support page (#510), a service's name as MIELI writes it in each language."
+  fi: "MIELI Kriisipuhelin"
+  sv: "MIELI Kristelefonen"
+  machine: { fi: true, sv: true }
+
+support.mieli.about:
+  en: "Worry, grief, loneliness, a breakup, thoughts of suicide."
+  description: "Support page (#510), what MIELI's crisis line is for, on a tile: a list, short. The line's page names worry, grief and self-destructive thoughts; MIELI's loneliness page and the line's fact page name loneliness and breakups."
+  fi: "Huoli, suru, yksinäisyys, ero, itsetuhoiset ajatukset."
+  sv: "Oro, sorg, ensamhet, separation, självdestruktiva tankar."
+  machine: { fi: true, sv: true }
+
+support.mieli.hours:
+  en: "Every day, all hours, in Finnish. You pay only your operator's call rate."
+  description: "Support page (#510), the line's hours and cost as MIELI prints them; read again before each release. In Swedish the tile has two numbers, the Swedish line's and the Finnish line's, so this names both. There has been no English line since 23.3.2026."
+  fi: "Joka päivä, ympäri vuorokauden. Maksat puhelusta vain operaattorisi hinnan."
+  sv: "Svenska linjen: må och ons kl. 16–20, tis, tors och fre kl. 9–13. Finska linjen: dygnet runt. Du betalar bara din operatörs vanliga samtalsavgift."
+  machine: { fi: true, sv: true }
+
+support.nollalinja.name:
+  en: "Nollalinja"
+  description: "Support page (#510), a service's name as it writes it in each language."
+  fi: "Nollalinja"
+  sv: "Nollinjen"
+  machine: { fi: true, sv: true }
+
+support.nollalinja.about:
+  en: "Violence, threats or stalking by a partner or someone close, whatever your gender. Being afraid is reason enough."
+  description: "Support page (#510), what Nollalinja is for, on a tile. Its site says it is for violence in close relationships regardless of gender, and that being worried or afraid is enough to call."
+  fi: "Väkivalta, uhkailu tai vaino parisuhteessa tai muussa läheisessä suhteessa, sukupuolesta riippumatta. Pelko riittää syyksi soittaa."
+  sv: "Våld, hot eller förföljelse av en partner eller någon närstående, oavsett kön. Det räcker att du är rädd."
+  machine: { fi: true, sv: true }
+
+support.nollalinja.hours:
+  en: "Every day, all hours, in Finnish, Swedish and English. Free and not on your phone bill, but it stays in your phone's call history."
+  description: "Support page (#510), the line's hours, languages and cost as its site prints them; read again before each release. That a call stays off the bill matters to somebody whose partner controls them, and such a partner may look at the phone itself, so the call history is said too."
+  fi: "Joka päivä, ympäri vuorokauden. Puhelu on maksuton eikä näy puhelinlaskussa, mutta jää puhelimen soittohistoriaan."
+  sv: "Alla dagar, dygnet runt, på svenska, finska och engelska. Gratis och syns inte på telefonräkningen, men stannar i telefonens samtalslogg."
+  machine: { fi: true, sv: true }
+
+support.riku.name:
+  en: "Victim Support Finland"
+  description: "Support page (#510), a service's name as RIKU writes it in each language."
+  fi: "Rikosuhripäivystys"
+  sv: "Brottsofferjouren"
+  machine: { fi: true, sv: true }
+
+support.riku.about:
+  en: "Harassment, stalking, threats, a scam or another crime, even if you only suspect it."
+  description: "Support page (#510), what Victim Support Finland is for, on a tile. Its site covers harassment, stalking and romance scams, and people who only suspect they are the victim of a crime: never read as being suspected of one."
+  fi: "Häirintä, vaino, uhkailu, huijaus tai muu rikos, myös jos vasta epäilet sitä."
+  sv: "Trakasserier, förföljelse, hot, bedrägeri eller annat brott, också om du bara misstänker det."
+  machine: { fi: true, sv: true }
+
+support.riku.hours:
+  en: "Mon–Thu 9–18, Fri 9–16, mainly in Finnish. For English, use the contact form on its site. Free."
+  description: "Support page (#510), the line's hours, language and cost as RIKU prints them; read again before each release. Its Swedish hours are its own, and its English pages send English speakers to the contact form."
+  fi: "Ma–to klo 9–18, pe klo 9–16. Maksuton."
+  sv: "På svenska må–fre kl. 12–14, på finska må–tors kl. 9–18 och fre kl. 9–16. Gratis."
+  machine: { fi: true, sv: true }
+
+support.tukinainen.name:
+  en: "Tukinainen"
+  description: "Support page (#510), a service's name: the same in every language. The rape crisis centre's own, and the about line below says it is for every gender, since the word holds the Finnish for woman."
+  fi: "Tukinainen"
+  sv: "Tukinainen"
+  machine: { fi: true, sv: true }
+
+support.tukinainen.about:
+  en: "Sexual violence or crossed boundaries, however long ago. For every gender, and for those close to you."
+  description: "Support page (#510), what Tukinainen is for, on a tile. Its page on the service says for all regardless of gender, and its crisis pages say whenever it happened, and for close ones too."
+  fi: "Seksuaaliväkivalta tai rajojen rikkominen, tapahtui se milloin tahansa. Kaikille sukupuolesta riippumatta, myös läheisille."
+  sv: "Sexuellt våld eller gränsöverskridande beteende, oavsett när det hände. För alla oavsett kön, också för närstående."
+  machine: { fi: true, sv: true }
+
+support.tukinainen.hours:
+  en: "Mon and Wed 12–15. Free. The hours may change around the turn of the year. Its services are in Finnish and English."
+  description: "Support page (#510), the line's hours and cost as Tukinainen prints them; read again before each release. It announced on 13.10.2026 that its phone hours change around the turn of the year: drop that sentence once they have settled. Its service languages are stated for its services in general, not for the line."
+  fi: "Ma ja ke klo 12–15. Maksuton. Ajat voivat muuttua vuodenvaihteessa."
+  sv: "Må och ons kl. 12–15. Gratis. Tiderna kan ändras kring årsskiftet. Tjänsterna är på finska och engelska."
+  machine: { fi: true, sv: true }

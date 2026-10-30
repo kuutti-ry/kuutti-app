@@ -1,5 +1,5 @@
 import type { ConversationList, ConversationSummary } from "@kuutti/schema";
-import { act, screen, userEvent } from "@testing-library/react-native";
+import { act, fireEvent, screen, userEvent } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import { AccessibilityInfo, AppState, Platform } from "react-native";
@@ -194,6 +194,28 @@ describe("the list of conversations", () => {
       await act(async () => focus());
       expect(screen.getByText(said)).toBeTruthy();
     }
+  });
+
+  it("offers the support page under what a report, a block or an end left to say (#510)", async () => {
+    api(() => json(LIST));
+    await renderWithTheme(<ConversationsScreen />);
+    const LINK = "Support when it's hard";
+    // Nothing to say, nothing offered.
+    expect(screen.queryByRole("link", { name: LINK })).toBeNull();
+    for (const outcome of ["reported", "blocked", "unmatched"] as const) {
+      leaveNotice(outcome);
+      await act(async () => focus());
+      expect(screen.getByRole("link", { name: LINK })).toBeTruthy();
+    }
+    await act(async () => {
+      fireEvent.press(screen.getByRole("link", { name: LINK }));
+    });
+    expect(router.push).toHaveBeenLastCalledWith("/settings/support");
+    // A conversation that was gone already: nothing went through.
+    leaveNotice("gone");
+    await act(async () => focus());
+    expect(screen.getByText("That conversation is no longer available.")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: LINK })).toBeNull();
   });
 
   it("says a photo's caption as the row's line, else Photo, with You: before one's own (#350)", async () => {
