@@ -47,8 +47,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pr-duties.ts\" gate",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gates.ts\" create",
             "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gates.ts\" edit",
+            "timeout": 10
           }
         ]
       }
@@ -70,7 +80,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/pr-duties.ts\" stop",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/skill-gates.ts\" stop",
             "timeout": 30
           }
         ]

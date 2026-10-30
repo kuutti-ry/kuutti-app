@@ -1,10 +1,13 @@
 /**
- * What a session owes for its pull requests (#525), read from its transcript
- * and from GitHub, so it holds however the agent got there. Two hooks run it:
+ * What a session owes the repository's skills (#525), read from its transcript
+ * and from GitHub, so it holds however the agent got there. Three hooks run it:
  *
- *   gate (PreToolUse on Bash): `gh pr create` is refused until the open-pr
- *     skill has run in the session, and write-tests too when the branch changes
- *     code.
+ *   edit (PreToolUse on the edit tools): a file of a product rule or of the
+ *     schema is refused until change-rule or personal-data has run in the
+ *     session: those two ask what to build, so they come before the edit.
+ *   create (PreToolUse on Bash): `gh pr create` is refused until open-pr has
+ *     run, and every skill of SKILLS whose paths the branch changes. This also
+ *     catches what a shell command wrote, which the edit gate never sees.
  *   stop (Stop): a turn does not end while a pull request the session opened
  *     has no Auto-fix, or one it opened or merged has merged with its issues
  *     unchecked. GitHub says what merged, so a merge on the website counts;
@@ -16,8 +19,8 @@
  * lint job holds the logic. A stop asks once: Claude Code marks the retry with
  * stop_hook_active, and answering it would loop on a duty that cannot be met.
  *
- * Usage: node .claude/hooks/pr-duties.ts gate|stop (hook input on stdin)
- *        node .claude/hooks/pr-duties.ts --self-test
+ * Usage: node .claude/hooks/skill-gates.ts edit|create|stop (hook input on stdin)
+ *        node .claude/hooks/skill-gates.ts --self-test
  * No dependencies. Needs Node 22.18+ (type stripping).
  */
 import { execFileSync } from "node:child_process";
@@ -32,7 +35,30 @@ const MERGE = new RegExp(`${AT_COMMAND}gh\\s+pr\\s+merge\\b([^;&|\\n]*)`, "g");
 const CD = /(?:^|&&\s*|;\s*)cd\s+("[^"]+"|'[^']+'|\S+)\s*(?:&&|;)/;
 const PR_URL = /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/;
 const REFS = /^\s*Refs\s+\S*#\d+/im;
-const CODE = /^(apps|packages|services|scripts|\.claude\/hooks)\/.+\.tsx?$|^features\//;
+
+// A diff names a file from the repository's root and an edit tool by its whole
+// path, so these match from any directory. A test alone changes no rule or screen.
+const AT_DIR = "(?:^|/)";
+const NOT_A_TEST = String.raw`(?!.*\.test\.tsx?$)`;
+const SCHEMA = new RegExp(`${AT_DIR}packages/db/(?:src/schema|drizzle)/`);
+const RULES = new RegExp(
+  `${AT_DIR}(?:(?:apps/api/src|apps/mobile/src/features|features)/(?:matching|pond|rewards|notifications|research)/${NOT_A_TEST}` +
+    `|apps/mobile/src/features/profile/${NOT_A_TEST}|packages/schema/src/research\\.ts$|docs/decisions\\.md$)`,
+);
+const CODE = new RegExp(
+  String.raw`${AT_DIR}(?:apps|packages|services|scripts|\.claude/hooks)/.+\.tsx?$|${AT_DIR}features/`,
+);
+const SCREENS = new RegExp(
+  `${AT_DIR}apps/(?:mobile/(?:app|src/(?:features|components))|admin/src)/${NOT_A_TEST}.+\\.tsx$`,
+);
+
+/** What a change to these paths owes, in the order the work meets it. */
+const SKILLS = [
+  { skill: "personal-data", paths: SCHEMA, beforeTheEdit: true },
+  { skill: "change-rule", paths: RULES, beforeTheEdit: true },
+  { skill: "write-tests", paths: CODE, beforeTheEdit: false },
+  { skill: "check-screen", paths: SCREENS, beforeTheEdit: false },
+];
 
 type Block = {
   type?: string;
@@ -47,8 +73,9 @@ type Block = {
 type HookInput = {
   transcript_path?: string;
   cwd?: string;
-  tool_input?: { command?: unknown };
+  tool_input?: { command?: unknown; file_path?: unknown; notebook_path?: unknown };
   stop_hook_active?: boolean;
+  agent_id?: string;
 };
 type Pull = { state: string; body: string };
 
@@ -124,13 +151,27 @@ function mergeTarget(rest: string): string | undefined {
   return number && repo ? `https://github.com/${repo}/pull/${number}` : number;
 }
 
+function named(skills: string[]): string {
+  const list = new Intl.ListFormat("en", { type: "conjunction" }).format(skills);
+  return `the ${list} skill${skills.length > 1 ? "s" : ""}`;
+}
+
 function refusal(session: Session, changedFiles: () => string[]): string | null {
-  const owed = [
-    !session.skills.has("write-tests") && changedFiles().some((f) => CODE.test(f)) && "write-tests",
-    !session.skills.has("open-pr") && "open-pr",
-  ].filter(Boolean);
+  const changed = changedFiles();
+  const owed = SKILLS.filter(({ paths }) => changed.some((file) => paths.test(file)))
+    .map(({ skill }) => skill)
+    .concat("open-pr")
+    .filter((skill) => !session.skills.has(skill));
   if (owed.length === 0) return null;
-  return `Run the ${owed.join(" and ")} skill${owed.length > 1 ? "s" : ""} first, then open the pull request (CLAUDE.md, Git).`;
+  return `Run ${named(owed)} first, then open the pull request (CLAUDE.md, Git).`;
+}
+
+function editRefusal(session: Session, file: string): string | null {
+  const owed = SKILLS.filter(({ paths, beforeTheEdit }) => beforeTheEdit && paths.test(file))
+    .map(({ skill }) => skill)
+    .filter((skill) => !session.skills.has(skill));
+  if (owed.length === 0) return null;
+  return `Run ${named(owed)} before editing this file (CLAUDE.md).`;
 }
 
 function duties(session: Session, desktop: boolean, view: (pr: string) => Pull | null): string[] {
@@ -197,19 +238,32 @@ function viewPull(pr: string, cwd: string): Pull | null {
   }
 }
 
-function gate(input: HookInput): void {
-  const command = String(input.tool_input?.command ?? "");
-  if (!CREATE.test(command)) return;
-  const session = sessionOf(input);
-  if (!session) return;
-  const reason = refusal(session, () => changedFiles(command, input.cwd ?? "."));
-  if (!reason) return;
+function deny(reason: string): void {
   const hookSpecificOutput = {
     hookEventName: "PreToolUse",
     permissionDecision: "deny",
     permissionDecisionReason: reason,
   };
   process.stdout.write(JSON.stringify({ hookSpecificOutput }));
+}
+
+function edit(input: HookInput): void {
+  // A subagent's Skill call lands in its own transcript, so it could never
+  // meet this; the branch still answers to the gate on `gh pr create`.
+  if (input.agent_id) return;
+  const file = String(input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? "");
+  if (!SKILLS.some(({ paths, beforeTheEdit }) => beforeTheEdit && paths.test(file))) return;
+  const session = sessionOf(input);
+  const reason = session && editRefusal(session, file);
+  if (reason) deny(reason);
+}
+
+function create(input: HookInput): void {
+  const command = String(input.tool_input?.command ?? "");
+  if (!CREATE.test(command)) return;
+  const session = sessionOf(input);
+  const reason = session && refusal(session, () => changedFiles(command, input.cwd ?? "."));
+  if (reason) deny(reason);
 }
 
 function stop(input: HookInput): void {
@@ -363,12 +417,75 @@ function selfTest(): void {
   same("write-tests alone", refusal(skills("write-tests"), docs), openOnly);
   same("both on code", refusal(skills("write-tests", "open-pr"), code), null);
   same("open-pr on docs", refusal(skills("open-pr"), docs), null);
+  const everything = () => [
+    "packages/db/src/schema/profile.ts",
+    "apps/api/src/matching/rounds.ts",
+    "apps/mobile/src/features/chat/Thread.tsx",
+  ];
+  same(
+    "every skill owed, in the order the work meets it",
+    refusal(none, everything),
+    `Run the personal-data, change-rule, write-tests, check-screen, and open-pr skills ${then}`,
+  );
+  same(
+    "none owed once each has run",
+    refusal(
+      skills("personal-data", "change-rule", "write-tests", "check-screen", "open-pr"),
+      everything,
+    ),
+    null,
+  );
+  for (const [file, expected] of [
+    ["packages/db/src/schema/profile.ts", "personal-data"],
+    ["packages/db/drizzle/0090_x.sql", "personal-data"],
+    ["/Users/x/kuutti-app/packages/db/src/schema/chat.ts", "personal-data"],
+    ["apps/api/src/matching/rounds.ts", "change-rule"],
+    ["apps/api/src/pond/routes.ts", "change-rule"],
+    ["apps/api/src/rewards/repo.ts", "change-rule"],
+    ["apps/api/src/notifications/push.ts", "change-rule"],
+    ["apps/api/src/research/track.ts", "change-rule"],
+    ["apps/mobile/src/features/matching/Round.tsx", "change-rule"],
+    ["apps/mobile/src/features/profile/Card.tsx", "change-rule"],
+    ["features/matching/rounds.feature", "change-rule"],
+    ["packages/schema/src/research.ts", "change-rule"],
+    ["docs/decisions.md", "change-rule"],
+    ["/Users/x/.claude/worktrees/a/apps/api/src/matching/rounds.ts", "change-rule"],
+    ["apps/api/src/matching/rounds.test.ts", null],
+    ["apps/mobile/src/features/profile/Card.test.tsx", null],
+    ["apps/api/src/chat/repo.ts", null],
+    ["apps/api/src/identity/erasure.ts", null],
+    ["packages/db/src/seed.ts", null],
+    ["docs/adr/README.md", null],
+    ["", null],
+  ] as const) {
+    same(
+      `the edit of ${file}`,
+      editRefusal(none, file),
+      expected && `Run the ${expected} skill before editing this file (CLAUDE.md).`,
+    );
+  }
+  same(
+    "an edit once its skill has run",
+    editRefusal(skills("change-rule"), "apps/api/src/matching/rounds.ts"),
+    null,
+  );
+  for (const [file, expected] of [
+    ["apps/mobile/app/(tabs)/index.tsx", true],
+    ["apps/mobile/src/features/chat/Thread.tsx", true],
+    ["apps/mobile/src/components/ui/button.tsx", true],
+    ["apps/admin/src/features/safety/Queue.tsx", true],
+    ["apps/mobile/src/features/chat/Thread.test.tsx", false],
+    ["apps/mobile/src/features/chat/client.ts", false],
+    ["apps/api/src/app.tsx", false],
+  ] as const) {
+    same(`${file} as a screen`, SCREENS.test(file), expected);
+  }
   for (const file of [
     "apps/admin/src/App.tsx",
     "packages/db/src/seed.ts",
     "services/x/a.ts",
     "scripts/e2e.ts",
-    ".claude/hooks/pr-duties.ts",
+    ".claude/hooks/skill-gates.ts",
     "features/pond/opening.feature",
   ]) {
     same(`${file} is code`, CODE.test(file), true);
@@ -435,7 +552,7 @@ function selfTest(): void {
   same("nothing owed asks GitHub nothing", views, 0);
 
   // The two hooks as Claude Code runs them, with a gh that answers from a file.
-  const dir = mkdtempSync(join(tmpdir(), "pr-duties-"));
+  const dir = mkdtempSync(join(tmpdir(), "skill-gates-"));
   const repo = join(dir, "repo");
   const answer = join(dir, "answer");
   const transcript = join(dir, "session.jsonl");
@@ -476,37 +593,65 @@ function selfTest(): void {
         permissionDecisionReason: reason,
       },
     });
-  const create = { ...asked, tool_input: { command: "gh pr create --fill" } };
+  const opening = { ...asked, tool_input: { command: "gh pr create --fill" } };
   writeFileSync(transcript, "");
-  same("gate: code on the branch", hook("gate", create), denied(both));
+  same("create: code on the branch", hook("create", opening), denied(both));
   same(
-    "gate: the directory of the command's cd",
-    hook("gate", {
-      ...create,
+    "create: the directory of the command's cd",
+    hook("create", {
+      ...opening,
       cwd: dir,
       tool_input: { command: `cd "${repo}" && gh pr create --fill` },
     }),
     denied(both),
   );
   same(
-    "gate: a relative cd",
-    hook("gate", { ...create, cwd: dir, tool_input: { command: "cd repo && gh pr create" } }),
+    "create: a relative cd",
+    hook("create", { ...opening, cwd: dir, tool_input: { command: "cd repo && gh pr create" } }),
     denied(both),
   );
-  same("gate: not a repository", hook("gate", { ...create, cwd: dir }), denied(openOnly));
+  same("create: not a repository", hook("create", { ...opening, cwd: dir }), denied(openOnly));
   same(
-    "gate: another command",
-    hook("gate", { ...asked, tool_input: { command: "gh pr view" } }),
+    "create: another command",
+    hook("create", { ...asked, tool_input: { command: "gh pr view" } }),
     "",
   );
-  same("gate: no command", hook("gate", asked), "");
-  same("gate: no transcript", hook("gate", { ...create, transcript_path: join(dir, "x") }), "");
-  same("gate: input that is no JSON", hook("gate", "nope"), "");
+  same("create: no command", hook("create", asked), "");
+  same(
+    "create: no transcript",
+    hook("create", { ...opening, transcript_path: join(dir, "x") }),
+    "",
+  );
+  same("create: input that is no JSON", hook("create", "nope"), "");
   writeFileSync(
     transcript,
     ["write-tests", "open-pr"].map((skill) => call(skill, "Skill", { skill })).join("\n"),
   );
-  same("gate: the skills have run", hook("gate", create), "");
+  same("create: the skills have run", hook("create", opening), "");
+
+  const editing = {
+    ...asked,
+    tool_input: { file_path: join(repo, "apps/api/src/matching/rounds.ts") },
+  };
+  const ruleFirst = "Run the change-rule skill before editing this file (CLAUDE.md).";
+  writeFileSync(transcript, "");
+  same("edit: a rule's file", hook("edit", editing), denied(ruleFirst));
+  same(
+    "edit: a notebook's path",
+    hook("edit", { ...asked, tool_input: { notebook_path: join(repo, "docs/decisions.md") } }),
+    denied(ruleFirst),
+  );
+  same("edit: a subagent is not held up", hook("edit", { ...editing, agent_id: "a" }), "");
+  same(
+    "edit: any other file",
+    hook("edit", { ...asked, tool_input: { file_path: join(repo, "README.md") } }),
+    "",
+  );
+  same("edit: no file", hook("edit", asked), "");
+  same("edit: no transcript", hook("edit", { ...editing, transcript_path: join(dir, "x") }), "");
+  same("edit: input that is no JSON", hook("edit", "nope"), "");
+  writeFileSync(transcript, call("c", "Skill", { skill: "change-rule" }));
+  same("edit: the skill has run", hook("edit", editing), "");
 
   writeFileSync(transcript, opened.join("\n"));
   const blocked = (reason: string) => JSON.stringify({ decision: "block", reason });
@@ -528,19 +673,18 @@ function selfTest(): void {
     for (const failure of failed) console.error(`✖ self-test, ${failure}`);
     process.exit(1);
   }
-  console.log("✔ pr-duties self-test");
+  console.log("✔ skill-gates self-test");
 }
 
 const mode = process.argv[2];
 if (mode === "--self-test") {
   selfTest();
-} else if (mode === "gate" || mode === "stop") {
+} else if (mode === "edit" || mode === "create" || mode === "stop") {
   let input: HookInput;
   try {
     input = JSON.parse(readFileSync(0, "utf8"));
   } catch {
     process.exit(0);
   }
-  if (mode === "gate") gate(input);
-  else stop(input);
+  ({ edit, create, stop })[mode](input);
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PostToolUse hook on Bash: after a `gh pr merge` that merged, send the agent
 # to the recheck-issues skill at once, naming every issue the pull request
-# refers to (CLAUDE.md, Git). pr-duties.ts holds the end of the turn to it.
+# refers to (CLAUDE.md, Git). skill-gates.ts holds the end of the turn to it.
 # stdout is JSON whose additionalContext reaches the agent. Silent for every
 # other command, and for a merge that did not happen (refused, or left to
 # auto-merge).
