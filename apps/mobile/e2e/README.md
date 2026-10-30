@@ -33,7 +33,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | flow | persona | what it holds |
 |---|---|---|
 | `sign-in-refusals` | Tapio, Ilona, Lauri, Venla, Eetu, Siiri | banned, cooldown and under-18 refused in their words; 18 and 99 let in |
-| `sign-in-links` | Sanna | a forged return link refused without touching the session; an unknown route goes home; every refusal code's text |
+| `sign-in-links` | Sanna | a forged return link refused without touching the session; an unknown route goes home; every refusal code's text, and which button stands under a lasting refusal and under one that may pass |
 | `onboarding` *once* | Onni | the eight steps in order, from the name; the norms and both texts before the bank, or on the welcome step with no number where the phone recorded them for an earlier sign-in (#418); a friend's invitation code offered before the name with no number and skipped (#107); the label after non-binary; the consent on the seek screen; closed at the intent and resumed there (#219); the steppers; two areas; three photos; bio; home, research having been asked before the bank |
 | `age-window-bounds` *once* | Siiri | the invitation code skipped; 94 to 99 at 99, neither end leaves the bounds; no label for a woman; two areas |
 | `identity-label-on-card` *once* | Eetu | the invitation code skipped; the label chosen after non-binary shows on the card after the gender |

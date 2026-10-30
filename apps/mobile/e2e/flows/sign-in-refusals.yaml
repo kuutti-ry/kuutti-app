@@ -40,7 +40,7 @@ name: The bank login refuses the banned, the recently deleted and those under 18
     when:
       true: ${new Date(Date.now() + 86400000).getDate() !== 1}
     commands:
-      # "Try again" clears the previous refusal, so the one shown after the bank is Venla's.
+      # The button clears the previous refusal, so the one shown after the bank is Venla's.
       - runFlow:
           file: ../common/bank-login.yaml
           env:

@@ -110,7 +110,9 @@ describe("BeforeSignIn: research", () => {
     expect(screen.getByText("Help us learn how matching works")).toBeTruthy();
     expect(screen.getByText("Research")).toBeTruthy();
     expect(screen.getByText("You can change this later, at any time.")).toBeTruthy();
-    expect(screen.getByText("Either answer takes you on to your bank.")).toBeTruthy();
+    expect(
+      screen.getByText("Either answer takes you on to the sign-in with your bank."),
+    ).toBeTruthy();
     expect(
       screen.getByRole("link", { name: `Read the full text on kuutti.app (version ${RESEARCH})` }),
     ).toBeTruthy();

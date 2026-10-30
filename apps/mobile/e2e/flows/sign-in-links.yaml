@@ -31,14 +31,17 @@ name: A sign-in link not asked for is refused without touching the session, and 
     timeout: 15000
 - assertNotVisible: "Unmatched Route"
 
-# Signed out, each refusal by its code.
+# Signed out, each refusal by its code. Under one that lasts the button is the
+# sign-in, under any other Try again (#466); it comes a moment after the words,
+# so the button that should be there is asked for first.
 - runFlow: ../common/sign-out.yaml
 - openLink: kuutti://auth?error=auth_suspended
 - extendedWaitUntil:
     visible: "This account is suspended for now\\.|Tämä tili on toistaiseksi jäädytetty\\.|Det här kontot är tills vidare avstängt\\."
     timeout: 15000
 - assertVisible: "Sign-in did not complete|Kirjautuminen ei onnistunut|Inloggningen slutfördes inte"
-- assertVisible: "Try again|Yritä uudelleen|Försök igen"
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+- assertNotVisible: "Try again|Yritä uudelleen|Försök igen"
 # A suspension with its day (#307, ADR-024 §5): the start of 9.11.2026 in
 # Finland, winter time, still the 8th in UTC, so the day is Finland's in every
 # zone the phone could be in.
@@ -50,6 +53,8 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - extendedWaitUntil:
     visible: "You cancelled the sign-in at your bank\\. Nothing was saved\\.|Peruutit kirjautumisen pankissasi\\. Mitään ei tallennettu\\.|Du avbröt inloggningen hos din bank\\. Inget sparades\\."
     timeout: 15000
+- assertVisible: "Try again|Yritä uudelleen|Försök igen"
+- assertNotVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
 - openLink: kuutti://auth?error=auth_state_mismatch
 - extendedWaitUntil:
     visible: "That sign-in attempt is unknown or has expired\\. Start again\\.|Tätä kirjautumisyritystä ei tunnisteta tai se on vanhentunut\\. Aloita alusta\\.|Det här inloggningsförsöket är okänt eller har gått ut\\. Börja om\\."
@@ -67,6 +72,8 @@ name: A sign-in link not asked for is refused without touching the session, and 
 - extendedWaitUntil:
     visible: ".*9\\.11\\.2026.*|.*11/9/2026.*|.*2026-11-09.*"
     timeout: 15000
+- assertVisible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"
+- assertNotVisible: "Try again|Yritä uudelleen|Försök igen"
 # A code the app does not know, named like a property every object has.
 - openLink: kuutti://auth?error=toString
 - extendedWaitUntil:

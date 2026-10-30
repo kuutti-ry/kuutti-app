@@ -1187,7 +1187,7 @@ export const sv: Readonly<Record<string, string>> = {
   "settings.title": "Inställningar",
   "settings.version.commit": "Bygge {commit}",
   "settings.version.label": "Version",
-  "signIn.agreements.research": "Vilket svar du än ger går du vidare till din bank.",
+  "signIn.agreements.research": "Vilket svar du än ger går du vidare till inloggningen med din bank.",
   "signIn.agreements.title": "Innan du loggar in",
   "signIn.button": "Logga in med din bank",
   "signIn.done": "Du är inloggad.",
