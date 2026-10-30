@@ -1,6 +1,7 @@
 import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
+import * as SecureStore from "expo-secure-store";
 import { Linking, ScrollView } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -189,4 +190,23 @@ describe("BeforeSignIn: research", () => {
       expect(onAgreed).toHaveBeenCalledWith(expect.objectContaining({ locale }));
     },
   );
+
+  it("shows somebody who chose Stadi the Finnish texts, as Finnish: no binding line, and fi on the record (#521)", async () => {
+    const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+    store.set("kuutti.preference.locale", "fi-x-stadi");
+    try {
+      const onAgreed = jest.fn();
+      await renderWithTheme(<BeforeSignIn onAgreed={onAgreed} />);
+      const accept = await screen.findByRole("button", {
+        name: "Olen mukana ja hyväksyn molemmat",
+      });
+      expect(screen.queryByText(/Suomenkielinen teksti on sitova/)).toBeNull();
+      await fireEvent.press(accept);
+      expect(screen.queryByText(/Suomenkielinen teksti on sitova/)).toBeNull();
+      await fireEvent.press(screen.getByRole("button", { name: "Kyllä, osallistun" }));
+      expect(onAgreed).toHaveBeenCalledWith(expect.objectContaining({ locale: "fi" }));
+    } finally {
+      store.delete("kuutti.preference.locale");
+    }
+  });
 });

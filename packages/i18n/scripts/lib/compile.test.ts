@@ -21,9 +21,18 @@ const base: Messages = {
 describe("the catalogues", () => {
   const out = compile(base);
 
-  it("are six modules and the native strings' JSON", () => {
+  it("are seven modules and the native strings' JSON", () => {
     expect(Object.keys(out).sort()).toEqual(
-      ["consent.ts", "en-XA.ts", "en.ts", "fi.ts", "keys.ts", "native.json", "sv.ts"].sort(),
+      [
+        "consent.ts",
+        "en-XA.ts",
+        "en.ts",
+        "fi.ts",
+        "keys.ts",
+        "native.json",
+        "slangi.ts",
+        "sv.ts",
+      ].sort(),
     );
     for (const [name, module] of Object.entries(out)) {
       if (!name.endsWith(".ts")) continue;
@@ -39,6 +48,24 @@ describe("the catalogues", () => {
     const en = out["en.ts"] ?? "";
     expect(en.indexOf('"admin.title"')).toBeLessThan(en.indexOf('"demo.count"'));
     expect(en.indexOf('"demo.count"')).toBeLessThan(en.indexOf('"demo.hello"'));
+  });
+
+  it("hold slang under slangi alone, and only the keys that have it (#521)", () => {
+    const withSlang = compile({
+      ...base,
+      "round.title": {
+        en: "Today's round",
+        description: "d",
+        fi: "Päivän kierros",
+        slangi: "Päivän rundi",
+        machine: { fi: true, slangi: true },
+      },
+    });
+    expect(withSlang["slangi.ts"]).toContain("export const slangi:");
+    expect(withSlang["slangi.ts"]).toContain('"round.title": "Päivän rundi",');
+    expect(withSlang["slangi.ts"]).not.toContain("demo.");
+    expect(withSlang["fi.ts"]).toContain('"round.title": "Päivän kierros",');
+    expect(withSlang["en.ts"]).not.toContain("rundi");
   });
 
   it("pseudo-localise the English but leave the English-only admin panel alone", () => {

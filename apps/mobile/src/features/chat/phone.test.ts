@@ -75,6 +75,20 @@ describe("the countries", () => {
     expect([...names].sort(new Intl.Collator("fi").compare)).toEqual(names);
   });
 
+  it("are named in Finnish in Stadi, and Intl is never asked for a language it has no data for", () => {
+    const real = Intl.DisplayNames;
+    const names = jest
+      .spyOn(Intl, "DisplayNames")
+      .mockImplementation((locales, options) => new real(locales, options));
+    try {
+      const sweden = countries("fi-x-stadi").find((country) => country.region === "SE");
+      expect(sweden?.name).toBe("Ruotsi");
+      expect(names.mock.calls.map(([locales]) => locales)).toEqual([["fi"], ["en"]]);
+    } finally {
+      names.mockRestore();
+    }
+  });
+
   it("are found by name in either language, folding case and accents, or by code", () => {
     const sv = countries("sv");
     expect(search(sv, "aland").map((c) => c.region)).toContain("AX");

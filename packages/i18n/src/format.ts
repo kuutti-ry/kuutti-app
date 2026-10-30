@@ -1,12 +1,13 @@
 import type { AnyLocale } from "./locales.ts";
-import { PSEUDO_LOCALE } from "./locales.ts";
+import { PSEUDO_LOCALE, realLocale } from "./locales.ts";
 
 /**
  * The Intl locale for a catalogue locale: Finland's, in every language. Bare
  * `en` is the United States (9/20/26, 5:14 PM) and bare `sv` is Sweden
  * (2026-09-20); `en-FI` and `sv-FI` are Finland's conventions (24-hour time,
  * space-grouped numbers with a decimal comma). The pseudo-locale has no Intl
- * data; it is English with odd letters.
+ * data; it is English with odd letters. Stadi has none either; it writes
+ * dates and numbers as Finnish does.
  */
 export function intlLocale(locale: AnyLocale | string): string {
   switch (locale) {
@@ -15,6 +16,8 @@ export function intlLocale(locale: AnyLocale | string): string {
       return "en-FI";
     case "sv":
       return "sv-FI";
+    case "fi-x-stadi":
+      return "fi-FI";
     default:
       return locale;
   }
@@ -101,6 +104,6 @@ export type PondName = { name: string; nameInessive: string };
  * use the nominative.
  */
 export function formatPond(pond: PondName, grammaticalCase: PondCase, locale: AnyLocale): string {
-  if (locale === "fi" && grammaticalCase === "inessive") return pond.nameInessive;
+  if (realLocale(locale) === "fi" && grammaticalCase === "inessive") return pond.nameInessive;
   return pond.name;
 }

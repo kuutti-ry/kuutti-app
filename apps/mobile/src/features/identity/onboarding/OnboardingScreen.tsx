@@ -1,4 +1,4 @@
-import { CONSENT_VERSIONS, formatDate, type PlainMessageKey } from "@kuutti/i18n";
+import { CONSENT_VERSIONS, formatDate, type PlainMessageKey, realLocale } from "@kuutti/i18n";
 import {
   AGE_MAX,
   AGE_MIN,
@@ -486,7 +486,9 @@ export function OnboardingScreen() {
               </CardHeader>
               <CardContent className="gap-2">
                 <Text>{t("legal.special_category.summary")}</Text>
-                {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
+                {realLocale(locale) !== "fi" && (
+                  <Text variant="muted">{t("onboarding.consents.binding")}</Text>
+                )}
                 <LegalTextLink kind="special_category" />
                 {specialOutdated ? (
                   <Text accessibilityLiveRegion="polite">

@@ -38,5 +38,7 @@ export {
   PSEUDO_LOCALE,
   parseAcceptLanguage,
   RELEASED_LOCALES,
+  type RealLocale,
+  realLocale,
   resolveLocale,
 } from "./locales.ts";

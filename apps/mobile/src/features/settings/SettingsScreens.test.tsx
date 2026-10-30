@@ -143,6 +143,17 @@ describe("the language's choices", () => {
     await waitFor(() => expect(store.get("kuutti.preference.locale")).toBeUndefined());
   });
 
+  it("lists Stadi under its own name, with no flag, and keeps the choice (#521)", async () => {
+    deviceLanguage("fi-FI", "en-US");
+    await renderWithTheme(<LanguageChoices />);
+    noProblems();
+    await fireEvent.press(screen.getByRole("radio", { name: "Stadi" }));
+    await waitFor(() => expect(store.get("kuutti.preference.locale")).toBe("fi-x-stadi"));
+    // Settings' own words here have no slang, so they stay Finnish.
+    expect(await screen.findByLabelText("Kieli")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "✓ Stadi" })).toBeTruthy();
+  });
+
   it("shows a flag in front of each language, but not in its accessible name", async () => {
     await renderWithTheme(<LanguageChoices />);
     const swedish = screen.getByRole("radio", { name: "Svenska" });

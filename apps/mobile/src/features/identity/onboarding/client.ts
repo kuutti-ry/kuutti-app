@@ -1,3 +1,4 @@
+import { realLocale } from "@kuutti/i18n";
 import {
   type ApiComponents,
   type ConsentKind,
@@ -41,9 +42,8 @@ export async function savePreferences(update: PreferencesUpdate): Promise<void> 
   if (!response.ok) throw failed(response, error, "preferences");
 }
 
-/** The consent texts exist in fi, sv and en; the pseudo-locale reads the English. */
-export const consentLocale = (locale: string): "fi" | "sv" | "en" =>
-  locale === "fi" || locale === "sv" ? locale : "en";
+/** The consent texts exist in fi, sv and en; Stadi reads the Finnish, the pseudo-locale the English. */
+export const consentLocale = realLocale;
 
 export async function fetchConsents(): Promise<ConsentsResponse> {
   const { data, error, response } = await api.GET("/consents");
