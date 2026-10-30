@@ -5,6 +5,9 @@
 #     description: what it is and where it shows, for translators and reviewers
 #     fi: Finnish (required: CI fails without it, except under admin.*)
 #     sv: Swedish (CI warns without it)
+#     slangi: Stadin slangi (fi-x-stadi, #521), optional: a key without it is the
+#       Finnish text. Allowed only where a joke is harmless (isSlangKey); the
+#       translator never fills it.
 #     machine: { fi: true, sv: true }
 #       text a machine or an agent wrote, or anyone other than a native reviewer;
 #       a release refuses it in a released language (RELEASED_LOCALES)
@@ -14,8 +17,8 @@
 #     max_length: 20
 #       optional: characters the text may take where the room is fixed
 #
-# Every fi and sv text carries machine or reviewed, except legal.*, which carries
-# neither (written by people, versioned by consent_version).
+# Every fi, sv and slangi text carries machine or reviewed, except legal.*, which
+# carries neither (written by people, versioned by consent_version).
 # docs/i18n/translation-review-guide.md is the review.
 #
 # Never inflect a dynamic value: proper nouns and user values stand in nominative
@@ -2718,7 +2721,8 @@ settings.title:
   description: "Title of the settings list."
   fi: Asetukset
   sv: Inställningar
-  machine: { fi: true, sv: true }
+  slangi: Säädöt
+  machine: { fi: true, sv: true, slangi: true }
 
 settings.close:
   en: Close settings
@@ -7871,7 +7875,8 @@ round.title:
   description: "Title of the round screen, in its header beside the back arrow (#379)."
   fi: "Päivän kierros"
   sv: "Dagens runda"
-  machine: { fi: true, sv: true }
+  slangi: "Päivän rundi"
+  machine: { fi: true, sv: true, slangi: true }
 
 round.back:
   en: "Back to home"
@@ -8012,16 +8017,18 @@ round.like:
   description: "Decision button on a round card, a filled pill with a heart (#379): the reader would like to talk to this person. By default at the right of the bottom bar; the person can mirror it for the left hand or stack it last in a one-handed column (#82). One word; see the glossary's like."
   fi: "Tykkää"
   sv: "Gilla"
+  slangi: "Digaan"
   max_length: 14
-  machine: { fi: true, sv: true }
+  machine: { fi: true, sv: true, slangi: true }
 
 round.pass:
   en: "Pass"
   description: "Decision button on a round card, an outlined rectangle with a cross (#379): not this time. By default at the left of the bottom bar; the person can mirror it for the left hand or stack it in a one-handed column (#82). Neutral and kind, never a rejection; see the glossary's pass. One word."
   fi: "Ohita"
   sv: "Hoppa över"
+  slangi: "Skippaan"
   max_length: 14
-  machine: { fi: true, sv: true }
+  machine: { fi: true, sv: true, slangi: true }
 
 round.undo:
   en: "Undo"
@@ -8106,7 +8113,8 @@ round.match.title:
   description: "Round screen after a like made a match (#100, ADR-038): both liked each other. A short headline, no exclamation mark; see the tone guide."
   fi: "Se on mätsi"
   sv: "Det är en match"
-  machine: { fi: true, sv: true }
+  slangi: "Nyt natsaa"
+  machine: { fi: true, sv: true, slangi: true }
 
 round.match.body:
   en: "You both liked each other, so a conversation is open for you two under Conversations."

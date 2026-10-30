@@ -10,8 +10,11 @@ import { isStale } from "./review-hash.ts";
 import {
   isAdminKey,
   isLegalKey,
+  isSlangKey,
   type Message,
   type Messages,
+  SLANG,
+  TEXT_LOCALES,
   TRANSLATED_LOCALES,
   type TranslatedLocale,
 } from "./schema.ts";
@@ -40,7 +43,7 @@ const RESERVED_ARGUMENTS = new Set([
 ]);
 
 /** The translated locales a release ships: a store build and the production API offer only these. */
-const RELEASED_TRANSLATIONS = TRANSLATED_LOCALES.filter((locale) =>
+const RELEASED_TRANSLATIONS: readonly string[] = TRANSLATED_LOCALES.filter((locale) =>
   (RELEASED_LOCALES as readonly string[]).includes(locale),
 );
 
@@ -71,7 +74,8 @@ export function isDraftLegal(message: Message): boolean {
  * (missing fi fails, missing sv warns; admin.* is English only), every locale
  * is valid ICU with the arguments and the plural and select branches it needs,
  * no dynamic value is inflected, and every translation is either flagged as
- * machine text or carries a native review that still matches it (#55). On a
+ * machine text or carries a native review that still matches it (#55). Slang
+ * is never missing and stands only where a joke is harmless (#521). On a
  * release, no text in a released locale is machine text, and no legal text is
  * a draft.
  */
@@ -109,10 +113,10 @@ export function checkMessages(messages: Messages, options: { release: boolean })
       errors.push(`${key}: en is over its max_length of ${message.max_length}`);
     }
 
-    for (const locale of TRANSLATED_LOCALES) {
+    for (const locale of TEXT_LOCALES) {
       const text = message[locale];
       if (text === undefined) {
-        if (isAdminKey(key)) continue;
+        if (locale === SLANG || isAdminKey(key)) continue;
         if (locale === "fi") errors.push(`${key}: no fi text (Finnish is required)`);
         else if (options.release && RELEASED_TRANSLATIONS.includes(locale)) {
           errors.push(`${key}: no ${locale} text, and ${locale} is a released language`);
@@ -122,6 +126,9 @@ export function checkMessages(messages: Messages, options: { release: boolean })
           );
         } else warnings.push(`${key}: no ${locale} text`);
         continue;
+      }
+      if (locale === SLANG && !isSlangKey(key)) {
+        errors.push(`${key}: slangi stands only where a joke is harmless (isSlangKey)`);
       }
       try {
         if (!sameArguments(source, argumentsOf(text))) {
@@ -134,7 +141,8 @@ export function checkMessages(messages: Messages, options: { release: boolean })
         for (const problem of inflectionProblems(text, locale)) {
           errors.push(`${key}: ${locale} ${problem}`);
         }
-        for (const problem of branchProblems(message.en, text, locale)) {
+        // Slang's plurals are Finnish's; Intl has never heard of it.
+        for (const problem of branchProblems(message.en, text, locale === SLANG ? "fi" : locale)) {
           errors.push(`${key}: ${locale} ${problem}`);
         }
       } catch (error) {

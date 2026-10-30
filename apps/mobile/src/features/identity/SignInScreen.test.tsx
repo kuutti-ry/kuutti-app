@@ -482,6 +482,21 @@ describe("SignInScreen", () => {
     }
   });
 
+  it("asks for the bank's chooser in Finnish in Stadi, which no bank speaks (#521)", async () => {
+    store.set("kuutti.preference.locale", "fi-x-stadi");
+    const openURL = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    try {
+      await renderWithTheme(<SignInScreen />);
+      await fireEvent.press(
+        await screen.findByRole("button", { name: "Kirjaudu pankkitunnuksilla" }),
+      );
+      expect(lastStart(openURL).url).toBe(`${apiBaseUrl()}/auth/start?platform=ios&locale=fi`);
+    } finally {
+      store.delete("kuutti.preference.locale");
+      openURL.mockRestore();
+    }
+  });
+
   it("says something went wrong when the browser cannot be opened, and offers to try again", async () => {
     const openURL = jest.spyOn(Linking, "openURL").mockRejectedValue(new Error("no browser"));
     try {

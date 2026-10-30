@@ -303,6 +303,13 @@ describe("the list of lines (#510)", () => {
     }
   });
 
+  it("reads Finnish in Stadi: the same page and the same number", () => {
+    for (const line of SUPPORT_LINES) {
+      expect(siteOf(line, "fi-x-stadi")).toBe(line.site.fi);
+      expect(numbersOf(line, "fi-x-stadi")).toEqual([{ number: line.phone }]);
+    }
+  });
+
   it("keeps a refusal quiet: a device that cannot call rejects, and nothing goes unhandled", async () => {
     const open = jest.spyOn(Linking, "openURL").mockRejectedValue(new Error("no calling here"));
     await expect(openQuietly("tel:112")).resolves.toBeUndefined();

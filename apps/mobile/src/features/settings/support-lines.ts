@@ -1,4 +1,4 @@
-import { type AnyLocale, type Locale, type PlainMessageKey, PSEUDO_LOCALE } from "@kuutti/i18n";
+import { type AnyLocale, type PlainMessageKey, type RealLocale, realLocale } from "@kuutti/i18n";
 import { Linking } from "react-native";
 
 /** The emergency number, above the services on the page. */
@@ -17,7 +17,7 @@ export type SupportLine = {
   /** A Swedish line of its own, where the service has one. */
   phoneSv?: string;
   /** Its page in each language, the nearest one where it has none. */
-  site: Record<Locale, string>;
+  site: Record<RealLocale, string>;
 };
 
 const MIELI_FI = "https://mieli.fi/tukea-ja-apua/kriisipuhelin/";
@@ -111,9 +111,9 @@ export const numbersOf = (
       ]
     : [{ number: line.phone }];
 
-/** The service's page in the language of the app; the pseudo-locale reads English. */
+/** The service's page in the language of the app; the pseudo-locale reads English, Stadi Finnish. */
 export const siteOf = (line: SupportLine, locale: AnyLocale): string =>
-  line.site[locale === PSEUDO_LOCALE ? "en" : locale];
+  line.site[realLocale(locale)];
 
 /**
  * Opens a number or a site. A refusal stays quiet: on a device that cannot

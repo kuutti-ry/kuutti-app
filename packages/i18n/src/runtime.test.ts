@@ -11,6 +11,8 @@ import {
   LOCALE_NAMES,
   LOCALES,
   parseAcceptLanguage,
+  RELEASED_LOCALES,
+  realLocale,
   resolveLocale,
   typedT,
 } from "./index.ts";
@@ -118,7 +120,7 @@ describe("dates and times at the edges of a day", () => {
     [Date.UTC(2026, 0, 1, 23, 59), "23.59"],
     [Date.UTC(2026, 0, 1, 12, 5), "12.05"],
   ])("write %i as %s in every language, 24 hours and two digits", (at, text) => {
-    for (const locale of ["en", "fi", "sv", "en-XA"] as const) {
+    for (const locale of ["en", "fi", "sv", "fi-x-stadi", "en-XA"] as const) {
       expect(formatTime(locale, at, { timeZone: "UTC" }), locale).toBe(text);
     }
   });
@@ -135,7 +137,7 @@ describe("numbers", () => {
     [1_000_000, `1${nbsp}000${nbsp}000`],
     [0.125, "0,125"],
   ])("write %d in Finland's convention in every language", (value, text) => {
-    for (const locale of ["en", "fi", "sv", "en-XA"] as const) {
+    for (const locale of ["en", "fi", "sv", "fi-x-stadi", "en-XA"] as const) {
       expect(formatNumber(locale, value), locale).toBe(text);
     }
   });
@@ -161,10 +163,11 @@ describe("numbers", () => {
   });
 
   it("map each catalogue to Finland's Intl locale, and leave any other tag as it is", () => {
-    expect(["en", "fi", "sv", "en-XA", "de-DE"].map(intlLocale)).toEqual([
+    expect(["en", "fi", "sv", "fi-x-stadi", "en-XA", "de-DE"].map(intlLocale)).toEqual([
       "en-FI",
       "fi",
       "sv-FI",
+      "fi-FI",
       "en-FI",
       "de-DE",
     ]);
@@ -175,6 +178,8 @@ describe("a pond's name", () => {
   it.each([
     ["fi", "inessive", "Helsingissä"],
     ["fi", "nominative", "Helsinki"],
+    ["fi-x-stadi", "inessive", "Helsingissä"],
+    ["fi-x-stadi", "nominative", "Helsinki"],
     ["sv", "inessive", "Helsinki"],
     ["en", "nominative", "Helsinki"],
     ["en-XA", "inessive", "Helsinki"],
@@ -200,6 +205,12 @@ describe("the language a request gets", () => {
     expect(resolveLocale(["de"], ["sv", "fi"])).toBe("sv");
   });
 
+  it("is never Stadi, here or in a release: a request naming it is Finnish, like a Finnish phone", () => {
+    expect(resolveLocale(["fi-x-stadi"])).toBe("fi");
+    expect(resolveLocale(["fi-x-stadi"], RELEASED_LOCALES)).toBe("fi");
+    expect(resolveLocale(["fi-FI"])).toBe("fi");
+  });
+
   it.each([
     ["sv, fi", ["sv", "fi"]],
     ["fi;q=0.5, sv;q=0.5, en;q=0.9", ["en", "fi", "sv"]],
@@ -221,6 +232,68 @@ describe("the language a request gets", () => {
 
 describe("the language picker", () => {
   it("lists every language under its own name", () => {
-    expect(LOCALES.map((locale) => LOCALE_NAMES[locale])).toEqual(["English", "Suomi", "Svenska"]);
+    expect(LOCALES.map((locale) => LOCALE_NAMES[locale])).toEqual([
+      "English",
+      "Suomi",
+      "Svenska",
+      "Stadi",
+    ]);
+  });
+});
+
+// Stadin slangi (#521): a made-up language over Finnish.
+describe("Stadi", () => {
+  const stadi = tIn("fi-x-stadi");
+
+  it("speaks slang where a key has a slangi text", () => {
+    expect(stadi("round.like")).toBe("Digaan");
+    expect(tIn("fi")("round.like")).toBe("Tykkää");
+  });
+
+  it.each([["onboarding.retry"], ["legal.terms.title"], ["push.round"]] as const)(
+    "is the Finnish text where a key has none: %s",
+    (key) => {
+      expect(stadi(key)).toBe(tIn("fi")(key));
+      expect(stadi(key)).not.toBe(tIn("en")(key));
+    },
+  );
+
+  it("keeps Finnish plurals in a Finnish text", () => {
+    expect(stadi("errors.rate_limited", { seconds: 1 })).toBe(
+      tIn("fi")("errors.rate_limited", { seconds: 1 }),
+    );
+    expect(stadi("errors.rate_limited", { seconds: 30 })).toBe(
+      tIn("fi")("errors.rate_limited", { seconds: 30 }),
+    );
+  });
+
+  it("falls back to Finnish and nowhere else, and leaves Finnish's own fallback as it was", () => {
+    expect(createI18n({ locale: "fi-x-stadi" }).languages).toEqual(["fi-x-stadi", "fi"]);
+    expect(createI18n({ locale: "fi" }).languages).toEqual(["fi", "en"]);
+    expect(createI18n({ locale: "sv" }).languages).toEqual(["sv", "en"]);
+    // English only, so a key in no language it falls back to stays a key.
+    expect(stadi("admin.title")).toBe("admin.title");
+  });
+
+  it("is the same for a t fixed to it on an instance in another language (the API's)", () => {
+    const fixed = typedT(createI18n({ locale: "en" }), "fi-x-stadi");
+    expect(fixed("round.like")).toBe("Digaan");
+    expect(fixed("onboarding.retry")).toBe("Yritä uudelleen");
+  });
+
+  it("stays out of a release", () => {
+    expect(RELEASED_LOCALES).not.toContain("fi-x-stadi");
+  });
+
+  it.each([
+    ["fi-x-stadi", "fi"],
+    ["fi", "fi"],
+    ["sv", "sv"],
+    ["en", "en"],
+    ["en-XA", "en"],
+    ["de", "en"],
+    ["", "en"],
+  ])("reads as a real language where one is needed: %j is %s", (locale, real) => {
+    expect(realLocale(locale)).toBe(real);
   });
 });

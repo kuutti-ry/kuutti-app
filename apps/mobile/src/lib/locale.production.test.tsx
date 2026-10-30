@@ -18,6 +18,7 @@ describe("a production build", () => {
   it("serves and offers only the released languages", () => {
     expect(SERVED_LOCALES).toEqual(["en", "fi"]);
     expect(OFFERED_LOCALES).not.toContain("sv");
+    expect(OFFERED_LOCALES).not.toContain("fi-x-stadi");
   });
 
   it("skips a language that is not released and takes the phone's next one", async () => {

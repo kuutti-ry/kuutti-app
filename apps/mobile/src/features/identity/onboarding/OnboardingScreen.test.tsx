@@ -687,6 +687,25 @@ describe("OnboardingScreen", () => {
     }
   });
 
+  it("asks somebody who chose Stadi for the sensitive answers' consent as Finnish: no line about a binding text, and fi on the record (#521)", async () => {
+    store.set("kuutti.preference.locale", "fi-x-stadi");
+    try {
+      const { server } = fakeApi();
+      server.consents.push(consented("terms"), consented("privacy"));
+      server.profile = { displayName: "Onni", bio: null, bioPreset: null, fields: {}, prompts: [] };
+      server.gender = "non_binary";
+      await show(<OnboardingScreen />);
+      await waitFor(() => expect(screen.getByText("Ketä etsit?")).toBeTruthy());
+      expect(screen.getByText("Arkaluonteiset tiedot")).toBeTruthy();
+      expect(screen.queryByText(/Suomenkielinen teksti on sitova/)).toBeNull();
+      await press(screen.getByLabelText("Annan Kuutille luvan tallentaa, kenen seuraa etsin"));
+      await flush();
+      expect(server.consents.at(-1)).toEqual({ ...consented("special_category"), locale: "fi" });
+    } finally {
+      store.delete("kuutti.preference.locale");
+    }
+  });
+
   it("stays at the welcome step, remembering nothing, when a consent there is refused", async () => {
     const { server } = fakeApi();
     const api = failingUntilOk("/consents");

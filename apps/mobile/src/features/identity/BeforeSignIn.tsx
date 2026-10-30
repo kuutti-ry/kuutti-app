@@ -1,3 +1,4 @@
+import { realLocale } from "@kuutti/i18n";
 import { useEffect, useRef, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,7 +29,9 @@ export function NormsAndConsents() {
         <Text>{t("onboarding.welcome.norm4")}</Text>
       </View>
       <Text>{t("onboarding.consents.explain")}</Text>
-      {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
+      {realLocale(locale) !== "fi" && (
+        <Text variant="muted">{t("onboarding.consents.binding")}</Text>
+      )}
       {(["terms", "privacy"] as const).map((kind) => (
         <Card key={kind}>
           <CardHeader>
@@ -86,7 +89,9 @@ export function BeforeSignIn({ onAgreed }: { onAgreed: (agreements: Agreements) 
         ) : (
           <View className="gap-4">
             <Text variant="h2">{t("onboarding.research.title")}</Text>
-            {locale !== "fi" && <Text variant="muted">{t("onboarding.consents.binding")}</Text>}
+            {realLocale(locale) !== "fi" && (
+              <Text variant="muted">{t("onboarding.consents.binding")}</Text>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle>{t("legal.research.title")}</CardTitle>

@@ -99,6 +99,8 @@ describe("agreementsOf", () => {
     ["fi", "fi"],
     ["sv", "sv"],
     ["en", "en"],
+    // Stadi reads the Finnish texts.
+    ["fi-x-stadi", "fi"],
     // The pseudo-locale reads the English texts, and so does anything unknown.
     ["en-XA", "en"],
     ["de", "en"],

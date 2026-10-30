@@ -172,4 +172,8 @@ describe("consentLocale", () => {
     expect(consentLocale("en")).toBe("en");
     expect(consentLocale("en-XA")).toBe("en");
   });
+
+  it("reads Stadi as Finnish: the consent texts are not in slang", () => {
+    expect(consentLocale("fi-x-stadi")).toBe("fi");
+  });
 });
