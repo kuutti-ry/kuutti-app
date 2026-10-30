@@ -8666,9 +8666,51 @@ chat.contact.piece:
 
 chat.contact.theirs:
   en: "{kind, select, phone {{name} shares a phone number: {value}} whatsapp {{name} shares WhatsApp: {value}} telegram {{name} shares Telegram: {value}} instagram {{name} shares Instagram: {value}} snapchat {{name} shares Snapchat: {value}} other {{name} shares: {value}}}"
-  description: "What a screen reader says for a line under a conversation's header (#103): the other person, by name in nominative, shares a contact with the reader, its value after the colon. The line itself shows chat.contact.piece; the value can be selected and copied, never a link."
+  description: "What a screen reader says for a line under a conversation's header (#103): the other person, by name in nominative, shares a contact with the reader, its value after the colon. The line itself shows chat.contact.piece; the value stays text that can be selected, with chat.contact.open and chat.contact.copy beside it."
   fi: "{kind, select, phone {{name} jakaa yhteystiedon. Puhelin: {value}} whatsapp {{name} jakaa yhteystiedon. WhatsApp: {value}} telegram {{name} jakaa yhteystiedon. Telegram: {value}} instagram {{name} jakaa yhteystiedon. Instagram: {value}} snapchat {{name} jakaa yhteystiedon. Snapchat: {value}} other {{name} jakaa yhteystiedon: {value}}}"
   sv: "{kind, select, phone {{name} delar en kontaktuppgift. Telefon: {value}} whatsapp {{name} delar en kontaktuppgift. WhatsApp: {value}} telegram {{name} delar en kontaktuppgift. Telegram: {value}} instagram {{name} delar en kontaktuppgift. Instagram: {value}} snapchat {{name} delar en kontaktuppgift. Snapchat: {value}} other {{name} delar en kontaktuppgift: {value}}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.open:
+  en: "{kind, select, phone {Call} other {Open}}"
+  description: "The button beside a line under a conversation's header that opens what the other person shares (#473): the phone's dialler for a number, otherwise the service's app or page. A verb, short: it stands on one line beside the contact. Its screen-reader name is chat.contact.openLabel, which starts with these words."
+  fi: "{kind, select, phone {Soita} other {Avaa}}"
+  sv: "{kind, select, phone {Ring} other {Öppna}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.openLabel:
+  en: "{kind, select, phone {Call {name}} whatsapp {Open WhatsApp: {name}} telegram {Open Telegram: {name}} instagram {Open Instagram: {name}} snapchat {Open Snapchat: {name}} other {Open: {name}}}"
+  description: "What a screen reader says for chat.contact.open (#473). Must start with the words of chat.contact.open, which is what the button shows. {name} is the other person, in nominative, never inflected; the value is never in it. The brand names stay as they are."
+  fi: "{kind, select, phone {Soita: {name}} whatsapp {Avaa WhatsApp: {name}} telegram {Avaa Telegram: {name}} instagram {Avaa Instagram: {name}} snapchat {Avaa Snapchat: {name}} other {Avaa: {name}}}"
+  sv: "{kind, select, phone {Ring: {name}} whatsapp {Öppna WhatsApp: {name}} telegram {Öppna Telegram: {name}} instagram {Öppna Instagram: {name}} snapchat {Öppna Snapchat: {name}} other {Öppna: {name}}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.copy:
+  en: "Copy"
+  description: "The button beside a line under a conversation's header that copies what the other person shares to the phone's clipboard (#473). A verb, short: it stands on one line beside the contact. Its screen-reader name is chat.contact.copyLabel, which starts with this word."
+  fi: "Kopioi"
+  sv: "Kopiera"
+  machine: { fi: true, sv: true }
+
+chat.contact.copyLabel:
+  en: "{kind, select, phone {Copy phone number: {name}} whatsapp {Copy WhatsApp: {name}} telegram {Copy Telegram: {name}} instagram {Copy Instagram: {name}} snapchat {Copy Snapchat: {name}} other {Copy: {name}}}"
+  description: "What a screen reader says for chat.contact.copy (#473). Must start with the word of chat.contact.copy, which is what the button shows. {name} is the other person, in nominative, never inflected; the value is never in it. The brand names stay as they are."
+  fi: "{kind, select, phone {Kopioi puhelinnumero: {name}} whatsapp {Kopioi WhatsApp: {name}} telegram {Kopioi Telegram: {name}} instagram {Kopioi Instagram: {name}} snapchat {Kopioi Snapchat: {name}} other {Kopioi: {name}}}"
+  sv: "{kind, select, phone {Kopiera telefonnummer: {name}} whatsapp {Kopiera WhatsApp: {name}} telegram {Kopiera Telegram: {name}} instagram {Kopiera Instagram: {name}} snapchat {Kopiera Snapchat: {name}} other {Kopiera: {name}}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.copied:
+  en: "{kind, select, phone {Phone number copied.} whatsapp {WhatsApp copied.} telegram {Telegram copied.} instagram {Instagram copied.} snapchat {Snapchat copied.} other {Copied.}}"
+  description: "Said under the lines of a conversation's header after Copy (#473), without interrupting. It names the kind, not the value, and stays until the next press."
+  fi: "{kind, select, phone {Puhelinnumero kopioitu.} whatsapp {WhatsApp kopioitu.} telegram {Telegram kopioitu.} instagram {Instagram kopioitu.} snapchat {Snapchat kopioitu.} other {Kopioitu.}}"
+  sv: "{kind, select, phone {Telefonnumret kopierat.} whatsapp {WhatsApp kopierat.} telegram {Telegram kopierat.} instagram {Instagram kopierat.} snapchat {Snapchat kopierat.} other {Kopierat.}}"
+  machine: { fi: true, sv: true }
+
+chat.contact.openRefused:
+  en: "This did not open on your phone. You can copy it instead."
+  description: "Said under the lines of a conversation's header when the phone refused to open a contact (#473): a tablet with no calls, a link nothing on the phone takes. Copy is still there beside it."
+  fi: "Tämä ei auennut puhelimessasi. Voit kopioida sen."
+  sv: "Det gick inte att öppna på din telefon. Du kan kopiera det i stället."
   machine: { fi: true, sv: true }
 
 chat.contact.share.open:

@@ -3,7 +3,7 @@ import { act, fireEvent, screen, userEvent, waitFor } from "@testing-library/rea
 import * as ImagePicker from "expo-image-picker";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
-import { AccessibilityInfo, AppState, Platform } from "react-native";
+import { AccessibilityInfo, AppState, Clipboard, Linking, Platform } from "react-native";
 import { pickPrepared } from "@/features/media";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
@@ -1001,13 +1001,31 @@ describe("contacts in a conversation (#103)", () => {
       expect(line.props.selectable).toBe(true);
       expect(line.props.accessibilityLabel).toBe(instagram);
       expect(screen.getByText(phoneLine).props.accessibilityLabel).toBe(phone);
-      // Text, never a link or a button: nothing more to press than without them.
+      // The buttons beside them name no value.
       expect(pressedLabels().filter((label) => /ville|358/.test(label))).toEqual([]);
       noProblems();
       // What was there when the screen opened is not announced.
       expect(announced()).toEqual([]);
     },
   );
+
+  it("Opening or copying a contact tells nobody", async () => {
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    const copied = jest.spyOn(Clipboard, "setString").mockImplementation(() => undefined);
+    const { calls } = contactsApi(
+      detail({ contacts: { mine: [], theirs: [{ kind: "instagram", value: "ville.k" }] } }),
+    );
+    await renderWithTheme(<ConversationScreen id={ID} />);
+    await screen.findByText("Instagram: ville.k");
+    await settle();
+    const before = calls.length;
+    await fireEvent.press(screen.getByRole("link", { name: "Open Instagram: Sanna" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Copy Instagram: Sanna" }));
+    await settle();
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(copied).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(before);
+  });
 });
 
 describe("one conversation, live over the socket", () => {
