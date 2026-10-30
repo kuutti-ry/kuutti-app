@@ -8023,6 +8023,13 @@ round.pass:
   max_length: 14
   machine: { fi: true, sv: true }
 
+round.likesLeft:
+  en: "{likes, plural, =0 {No likes left today. New ones tomorrow.} one {# like left today} other {# likes left today}}"
+  description: "Line beside the decision buttons on a round card (#524, ADR-036 §6): how many of the day's likes the reader has left, counting down from matching_config like_budget_balanced to zero; a fish counts in them. A plain fact in the same words at ten as at one: never urgent, never 'only one left'. =0: none are left and new ones come tomorrow, and passing stays possible. It wraps at large text sizes. The number is a tunable, so never write it out."
+  fi: "{likes, plural, =0 {Tykkäyksiä ei ole tänään enää jäljellä. Uusia tulee huomenna.} one {# tykkäys jäljellä tänään} other {# tykkäystä jäljellä tänään}}"
+  sv: "{likes, plural, =0 {Inga gillanden kvar i dag. Nya kommer i morgon.} one {# gillande kvar i dag} other {# gillanden kvar i dag}}"
+  machine: { fi: true, sv: true }
+
 round.undo:
   en: "Undo"
   description: "Button after a decision, in the round screen's header, or first in the bottom column in one-handed mode (#82): brings the last card back to decide again (ADR-034 §5, until midnight). One word."

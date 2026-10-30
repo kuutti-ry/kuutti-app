@@ -1364,6 +1364,7 @@ export const en: Readonly<Record<string, string>> = {
   "round.gone": "That card is no longer available.",
   "round.home.open": "Today's round",
   "round.like": "Like",
+  "round.likesLeft": "{likes, plural, =0 {No likes left today. New ones tomorrow.} one {# like left today} other {# likes left today}}",
   "round.loading": "Loading today's round…",
   "round.match.body": "You both liked each other, so a conversation is open for you two under Conversations.",
   "round.match.continue": "Back to the round",

@@ -1,5 +1,5 @@
 import type { Queryable } from "@kuutti/db";
-import { ErrorResponse, RoundResponse } from "@kuutti/schema";
+import { ErrorResponse, RoundDecisionAnswer, RoundResponse } from "@kuutti/schema";
 import { type App, createApp } from "../app.ts";
 import { conversationBetween, openConversation } from "../chat/index.ts";
 import { CURRENT_CONSENT_VERSIONS, eraseAccount, exportAccount } from "../identity/index.ts";
@@ -194,14 +194,24 @@ describe("reading today's round", () => {
     const [b] = await cast(ctx, 1);
     if (!b) throw new Error("cast not written");
     await roundFor(ctx.client, a, [b], YESTERDAY);
-    expect(await readToday(app, a)).toEqual({ day: TODAY, entries: null, fishToSend: true });
+    expect(await readToday(app, a)).toEqual({
+      day: TODAY,
+      entries: null,
+      fishToSend: true,
+      likesLeft: 10,
+    });
   });
 
   test("a round with no cards answers an empty list", async ({ ctx, app }) => {
     const [a] = await cast(ctx, 1);
     if (!a) throw new Error("cast not written");
     await roundFor(ctx.client, a, []);
-    expect(await readToday(app, a)).toEqual({ day: TODAY, entries: [], fishToSend: true });
+    expect(await readToday(app, a)).toEqual({
+      day: TODAY,
+      entries: [],
+      fishToSend: true,
+      likesLeft: 10,
+    });
   });
 
   test("a card budget used up answers 429 with its wait in Retry-After", async ({ ctx, app }) => {
@@ -693,6 +703,109 @@ describe("the day's likes (#98, ADR-036)", () => {
         { position: 2, decision: null },
       ]);
     });
+  });
+});
+
+/** What a decision's answer says of the caller's likes after it (#524). */
+async function likesLeftAfter(answer: Response) {
+  expect(answer.status).toBe(200);
+  return RoundDecisionAnswer.parse(await answer.json()).likesLeft;
+}
+
+describe("the likes left (#524, ADR-036 §6)", () => {
+  test("The round says how many of the day's likes are left, and each decision's answer says it again", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 2);
+    const [a, b, c, d] = await cast(ctx, 4);
+    if (!a || !b || !c || !d) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [b, c, d]);
+
+    expect((await readToday(app, a)).likesLeft).toBe(2);
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "like"))).toBe(1);
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 2, "like"))).toBe(0);
+    expect((await decideBy(app, a, TODAY, 3, "like")).status).toBe(429);
+
+    expect((await readToday(app, a)).likesLeft).toBe(0);
+  });
+
+  test("Before the day's round is built, all of the day's likes are left", async ({ ctx, app }) => {
+    await likeBudget(ctx.client, 3);
+    const [a] = await cast(ctx, 1);
+    if (!a) throw new Error("cast not written");
+    expect(await readToday(app, a)).toMatchObject({ entries: null, likesLeft: 3 });
+  });
+
+  test("A pass leaves the likes left as they were, and a like taken back gives one back", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 2);
+    const [a, b, c] = await cast(ctx, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [b, c]);
+
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "pass"))).toBe(2);
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 2, "like"))).toBe(1);
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 2, "pass"))).toBe(2);
+  });
+
+  test("A like back leaves the likes left as they were", async ({ ctx, app }) => {
+    await likeBudget(ctx.client, 1);
+    const [a, b] = await cast(ctx, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [{ person: b, reason: "liked_you" }]);
+
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "like"))).toBe(1);
+  });
+
+  test("The likes left are the person's own, of today", async ({ ctx, app }) => {
+    await likeBudget(ctx.client, 4);
+    const [a, b, c, e] = await cast(ctx, 4);
+    if (!a || !b || !c || !e) throw new Error("cast not written");
+    const yesterday = await roundFor(ctx.client, a, [b], YESTERDAY);
+    await ctx.client.query(
+      "UPDATE round_entries SET decision = 'like', decided_at = $2 WHERE round_id = $1",
+      [yesterday, T],
+    );
+    await roundFor(ctx.client, a, [c]);
+    await roundFor(ctx.client, e, [b]);
+
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "like"))).toBe(3);
+
+    expect((await readToday(app, a)).likesLeft).toBe(3);
+    expect((await readToday(app, e)).likesLeft).toBe(4);
+  });
+
+  test("the same like again says the same number, and a like made a fish spends no second", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 3);
+    const [a, b] = await cast(ctx, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [b]);
+
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "like"))).toBe(2);
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "like"))).toBe(2);
+    expect(await likesLeftAfter(await decideBy(app, a, TODAY, 1, "fish"))).toBe(2);
+  });
+
+  test("a budget lowered below the day's likes reads as none left, never fewer", async ({
+    ctx,
+    app,
+  }) => {
+    await likeBudget(ctx.client, 2);
+    const [a, b, c] = await cast(ctx, 3);
+    if (!a || !b || !c) throw new Error("cast not written");
+    await roundFor(ctx.client, a, [b, c]);
+    expect((await decideBy(app, a, TODAY, 1, "like")).status).toBe(200);
+    expect((await decideBy(app, a, TODAY, 2, "like")).status).toBe(200);
+
+    await likeBudget(ctx.client, 1);
+
+    expect((await readToday(app, a)).likesLeft).toBe(0);
   });
 });
 

@@ -100,3 +100,32 @@ Feature: Today's round, seen and decided
     Given like_budget_balanced is 1 and a round was built for "A" today with "B" and "C"
     When one device likes "B" while another likes "C"
     Then the second waits for the first, and its like is refused
+
+  # What the round says of the day's likes (#524; the maintainer, 30/10/2026):
+  # how many are left, from like_budget_balanced down to zero, by the count
+  # the refusal uses, in the round's answer and in every decision's.
+
+  Scenario: The round says how many of the day's likes are left, and each decision's answer says it again
+    Given like_budget_balanced is 2 and a round was built for "A" today with "B", "C" and "D"
+    When "A" reads today's round, likes "B" and "C", and is refused "D"
+    Then the round says two are left, the two answers one and none, and the round read again none
+
+  Scenario: Before the day's round is built, all of the day's likes are left
+    Given like_budget_balanced is 3 and no round was built for "A" today
+    When "A" reads today's round
+    Then the answer says three are left
+
+  Scenario: A pass leaves the likes left as they were, and a like taken back gives one back
+    Given like_budget_balanced is 2 and a round was built for "A" today with "B" and "C"
+    When "A" passes "B", likes "C", then changes "C" to a pass
+    Then the answers say two, one and two are left
+
+  Scenario: A like back leaves the likes left as they were
+    Given like_budget_balanced is 1 and a round was built for "A" today with "B" who liked "A"
+    When "A" likes "B"
+    Then the answer says one is left
+
+  Scenario: The likes left are the person's own, of today
+    Given "A" liked a card yesterday and today, and "E" liked none today
+    When "A" and "E" read today's round
+    Then "A" has one like fewer left, and "E" has all of theirs

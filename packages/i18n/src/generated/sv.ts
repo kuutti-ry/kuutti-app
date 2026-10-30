@@ -994,6 +994,7 @@ export const sv: Readonly<Record<string, string>> = {
   "round.gone": "Kortet är inte längre tillgängligt.",
   "round.home.open": "Dagens runda",
   "round.like": "Gilla",
+  "round.likesLeft": "{likes, plural, =0 {Inga gillanden kvar i dag. Nya kommer i morgon.} one {# gillande kvar i dag} other {# gillanden kvar i dag}}",
   "round.loading": "Läser in dagens runda…",
   "round.match.body": "Ni gillade varandra, så nu har ni ett samtal under Samtal.",
   "round.match.continue": "Tillbaka till rundan",
