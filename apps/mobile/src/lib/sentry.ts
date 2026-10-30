@@ -18,14 +18,29 @@ const namesOnly = (path: unknown): Touched[] =>
     : [];
 
 /**
+ * The route no report names (#510): that somebody opened the support page is
+ * nobody's business, a crash report's included. A number for tracesSampleRate,
+ * even 0, has the SDK follow the router, so its crumbs and the event's view
+ * name would say so.
+ */
+const SUPPORT_ROUTE = /settings\/support/;
+const namesSupport = (...values: unknown[]): boolean =>
+  values.some((value) => typeof value === "string" && SUPPORT_ROUTE.test(value));
+
+/**
  * Navigation breadcrumbs carry route params (a profile id, a chat id); http
  * ones carry URLs with query strings. Category and route name are enough to
  * read a crash, the payloads are not ours to ship. A touch's (and a rage
  * tap's) label is the accessibility label or the text the SDK read from the
  * touched component and every one around it: a message, a name, a shared
- * contact (#103). The components' names stay, nothing they say.
+ * contact (#103). The components' names stay, nothing they say. A crumb that
+ * names the support page goes altogether, on the way there and on the way back.
  */
-export function stripBreadcrumb(crumb: Breadcrumb): Breadcrumb {
+export function stripBreadcrumb(crumb: Breadcrumb): Breadcrumb | null {
+  if (crumb.category?.startsWith("navigation")) {
+    const { from, to } = (crumb.data ?? {}) as { from?: unknown; to?: unknown };
+    if (namesSupport(crumb.message, from, to)) return null;
+  }
   if (crumb.category === "touch" || crumb.category === "ui.multiClick") {
     const { path, clickCount } = (crumb.data ?? {}) as { path?: unknown; clickCount?: unknown };
     const names = namesOnly(path);
@@ -59,6 +74,16 @@ export function stripUser<E extends { user?: unknown }>(event: E): E {
   return { ...event, user: undefined };
 }
 
+/** The view an event happened on goes when it is the support page (#510). */
+export function stripSupportView<E extends { contexts?: { app?: Record<string, unknown> } }>(
+  event: E,
+): E {
+  const app = event.contexts?.app;
+  if (!app || !Array.isArray(app.view_names) || !namesSupport(...app.view_names)) return event;
+  const { view_names: _named, ...rest } = app;
+  return { ...event, contexts: { ...event.contexts, app: rest } };
+}
+
 /**
  * Error reporting only (TD-19, #11, rules/mobile.md: no analytics SDK): no
  * PII, no tracing, no session replay, no screenshots, no session tracking.
@@ -83,6 +108,6 @@ export function sentryOptions(input: {
     // Default integrations minus anything that records the screen or asks the user for input.
     integrations: (defaults) => defaults.filter((i) => !/replay|feedback/i.test(i.name)),
     beforeBreadcrumb: stripBreadcrumb,
-    beforeSend: (event) => stripUser(event),
+    beforeSend: (event) => stripSupportView(stripUser(event)),
   };
 }

@@ -15,6 +15,7 @@ import { AppState, KeyboardAvoidingView, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LoadFailed } from "@/components/LoadFailed";
 import { ScreenHeader } from "@/components/ScreenHeader";
+import { SupportLink } from "@/components/SupportLink";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -139,7 +140,8 @@ function withLive(
  * is said under it in words, the words kept in the field, and the same words
  * sent again keep their id, so a send whose answer was lost is not doubled.
  * An archived conversation says that writing brings it back; a closed one
- * says how it ended instead of the composer. Read again on focus, and marked
+ * says how it ended instead of the composer, with the way to the support page
+ * (#510). Read again on focus, and marked
  * read up to the newest message while on the screen. No gesture: earlier
  * messages are a button. Live (#349): what the socket brings joins what was
  * read, by sequence; the read mark and the state follow its frames; "Online"
@@ -606,9 +608,13 @@ export function ConversationScreen({ id }: { id: string }) {
           <View className="gap-2 border-t border-border p-4">
             {refusal && <Text accessibilityLiveRegion="assertive">{t(refusal)}</Text>}
             {detail.state === "closed" ? (
-              <Text accessibilityLiveRegion="polite">
-                {detail.closedHow === "erasure" ? t("chat.state.deleted") : t("chat.state.ended")}
-              </Text>
+              <>
+                <Text accessibilityLiveRegion="polite">
+                  {detail.closedHow === "erasure" ? t("chat.state.deleted") : t("chat.state.ended")}
+                </Text>
+                {/* However it ended: the link tells nothing of how. */}
+                <SupportLink />
+              </>
             ) : (
               <Composer
                 text={text}
