@@ -40,6 +40,15 @@ export type SeeksBands = {
   seeksWomen: number;
 };
 
+/** The band of whom somebody seeks; null when they seek neither women nor men. */
+export function seeksBand(seeks: readonly string[] | null): keyof SeeksBands | null {
+  const women = seeks?.includes("woman");
+  const men = seeks?.includes("man");
+  if (women && men) return "seeksEveryone";
+  if (women) return "seeksWomen";
+  return men ? "seeksMen" : null;
+}
+
 /** The exact counts of one pond: internal, never served as they are. */
 export type WaitlistCounts = SeeksBands & {
   /** Everyone who counts: a live account with this pond. */

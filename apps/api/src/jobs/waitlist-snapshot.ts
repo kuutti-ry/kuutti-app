@@ -1,5 +1,5 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { moveFigures, type SeeksBands, type WaitlistCounts } from "@kuutti/schema";
+import { moveFigures, seeksBand, type WaitlistCounts } from "@kuutti/schema";
 import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
@@ -73,15 +73,6 @@ const empty = (): WaitlistCounts => ({
   seeksWomen: 0,
 });
 
-/** The band of a finished profile (#507); non-binary in the seek set moves none. */
-function bandOf(seeks: readonly string[] | null): keyof SeeksBands | null {
-  const women = seeks?.includes("woman");
-  const men = seeks?.includes("man");
-  if (women && men) return "seeksEveryone";
-  if (women) return "seeksWomen";
-  return men ? "seeksMen" : null;
-}
-
 /**
  * A shadow-banned account counts exactly like an active one, here and in
  * `finishing`. Left out, its owner could find the ban out: move between two
@@ -142,7 +133,7 @@ export async function countPonds(
         ageWindow: preferences.ageWindow,
       }).complete;
     if (ready) {
-      const band = bands && row.seeks_consented ? bandOf(preferences.seeks) : null;
+      const band = bands && row.seeks_consented ? seeksBand(preferences.seeks) : null;
       if (band) counts[band] += 1;
     } else {
       counts.finishing += 1;

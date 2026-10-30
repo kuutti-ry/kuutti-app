@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { SEED_PONDS } from "@kuutti/db";
+// biome-ignore lint/style/noRestrictedImports: a test of the bar over the synthetic population.
+import { generatePopulation, POND_PLANS, writePopulation } from "@kuutti/db/demo";
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
 import { PondSeeksResponse, WaitlistResponse } from "@kuutti/schema";
 import { createApp } from "../app.ts";
+import { subjectsOfPond } from "../jobs/pond-gate.ts";
 import { takeSnapshot } from "../jobs/waitlist-snapshot.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import {
@@ -194,6 +199,30 @@ describe("the bar of whom a pond seeks (#507)", () => {
     await withMatchingConfig(ctx.client, { waitlist_k: "ten" });
     const response = await ctx.app.request("/ponds/seeks", { headers: person.headers });
     expect(response.status).toBe(500);
+  });
+
+  test("the demo population fills the bar, and stays out of every gate and round", {
+    timeout: 60_000,
+  }, async ({ ctx }) => {
+    for (const seeded of SEED_PONDS) {
+      await ctx.client.query(
+        `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ($1, $2, $3)
+         ON CONFLICT (slug) DO NOTHING`,
+        [seeded.slug, seeded.nameNominative, seeded.nameInessive],
+      );
+    }
+    const people = generatePopulation();
+    await writePopulation(ctx.client, people, CONSENT_VERSIONS);
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM ponds WHERE slug = $1",
+      [POND_PLANS[0]?.slug],
+    );
+    const pond = rows[0]?.id ?? "";
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 35, everyone: 25, women: 40 });
+    // Nobody here is a subject, so nobody is in a pool, on a card or in a round.
+    expect(await subjectsOfPond(ctx.client, pond, DAY)).toEqual([]);
   });
 
   test("The public waitlist says nothing of whom anybody seeks", async ({ ctx }) => {

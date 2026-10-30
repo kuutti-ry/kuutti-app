@@ -3,6 +3,7 @@ import {
   moveFigures,
   PondSeeksResponse,
   publishCounts,
+  seeksBand,
   seeksShares,
   WAITLIST_K_MIN,
   type WaitlistCounts,
@@ -249,6 +250,23 @@ describe("moveFigures", () => {
         ...bands,
       });
     });
+  });
+});
+
+describe("seeksBand", () => {
+  it("goes by women and men alone: non-binary in the set moves no band", () => {
+    expect(seeksBand(["man"])).toBe("seeksMen");
+    expect(seeksBand(["man", "non_binary"])).toBe("seeksMen");
+    expect(seeksBand(["woman"])).toBe("seeksWomen");
+    expect(seeksBand(["woman", "non_binary"])).toBe("seeksWomen");
+    expect(seeksBand(["woman", "man"])).toBe("seeksEveryone");
+    expect(seeksBand(["man", "woman", "non_binary"])).toBe("seeksEveryone");
+  });
+
+  it("gives no band to somebody who seeks neither, or nobody yet", () => {
+    expect(seeksBand(["non_binary"])).toBeNull();
+    expect(seeksBand([])).toBeNull();
+    expect(seeksBand(null)).toBeNull();
   });
 });
 
