@@ -16,6 +16,11 @@ Feature: Account deletion per the erasure table
     Then the account is deleted with a deletion time and no year or month of birth
     And the identity row has one more deletion and a cooldown of thirty days
 
+  Scenario: A break begun while the deletion is under way leaves no earlier state on the tombstone
+    Given "A" is shadow banned and deletes the account on one device
+    When "A" takes a break on another device just after the deletion has passed the session guard
+    Then the account is deleted and keeps no trace of the state before the break
+
   Scenario: A photo another account also uploaded keeps its objects
     Given "A" and "B" uploaded the same picture
     When "A" deletes the account
