@@ -86,7 +86,7 @@ Read on 27 and 28/10/2026, at version 0.73.0:
 ## Areas
 
 - [Sign-in and identity](#sign-in-and-identity) (28)
-- [Pond and gate](#pond-and-gate) (31)
+- [Pond and gate](#pond-and-gate) (38)
 - [Profile](#profile) (35)
 - [Photos](#photos) (38)
 - [Filters](#filters) (18)
@@ -154,6 +154,13 @@ Where a person waits: the ponds, the public waitlist counter, and the gate that 
 | A pool stays within one pond; ponds by postal code, as the field sheet proposes, and parent ponds that widen a pool wait for a later decision. |  | `apps/api/src/jobs/pond-gate.ts` | ADR-015 §2; ADR-010 §10, §12; #146 | proposed, 08/10/2026 | |
 | The waitlist is the people themselves, bank-verified accounts with a pond; no e-mail list and no web form. |  | `apps/api/src/pond/waitlist.ts` | ADR-013 §1; CLAUDE.md rule 8 | inherited, TD-1 | |
 | The public counter shows each pond's total, its gender split and those still finishing their profile, only when every published figure, the undeclared included, holds at least k people; below k a pond shows nothing. The app and the public see the same figures. | k = 10 | `packages/schema/src/waitlist.ts` | ADR-013 §3, §4; #54; session 24/09/2026 | maintainer, 24/09/2026 | |
+| The home card draws whom the people of the person's own pond seek as one bar, men at one end, women at the other and everyone in the middle as their overlap, in place of the gender split's line; the total and those finishing stay. |  | `apps/mobile/src/features/pond/SeeksBar.tsx` | ADR-013 §12; #507 | maintainer, 26/10/2026 | |
+| The bar counts finished profiles only: those who seek men and not women, both, or women and not men. Non-binary in the seek set moves no band, and somebody who seeks neither is in the total and in no band. | 3 bands | `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 §12; #507 | maintainer, 29/10/2026 | |
+| The bar says whole percentages, never counts, and only when every band holds at least k people; a band under k hides the whole bar. | whole percent; k = 10 | `packages/schema/src/waitlist.ts` | ADR-013 §13; #507; session 30/10/2026 | maintainer, 30/10/2026 | |
+| The bar's bands move on their own sum, once at least k finished profiles have come or gone, whether or not the total moved; moving with the total could say what one person who finished seeks. | steps of k | `packages/schema/src/waitlist.ts` | ADR-013 §14; #507 | assumption | |
+| The bar is read from a temporary signed-in route for the caller's own pond; the public counter carries no band. | `GET /ponds/seeks` | `apps/api/src/pond/routes.ts` | ADR-013 §15; #507; #500; session 30/10/2026 | maintainer, 30/10/2026 | |
+| Open: once the bar joins the counter with #500's rename, are its shares public, or still for the caller's own pond? Meanwhile behind the session. | behind the session | `apps/api/src/pond/routes.ts` | ADR-013 §15; #500; #507 | proposed, 30/10/2026 | |
+| Open: keep the gender split in the public answer, now that the card does not draw it and no reader of the route is known? Meanwhile it stays. | stays | `packages/schema/src/waitlist.ts` | ADR-013 Consequences; #507 | proposed, 30/10/2026 | |
 | The counter says a number only where at least k people stand behind it; k has a floor of 10 in code, which the panel may raise but never lower. | 10 | `waitlist_k`; `WAITLIST_K_MIN` in `packages/schema/src/waitlist.ts` | ADR-013 §5; .claude/rules/schema.md; migration 0017 | inherited, CLAUDE.md | |
 | Open: raise the counter's k above its floor? Meanwhile 10. | 10 | `waitlist_k` | ADR-013 Consequences; #54; #250 | proposed, 27/09/2026 | |
 | The counter counts registered, active and shadow-banned accounts in good standing with a pond, a shadow ban counting like active so it cannot be found out; suspended, banned and deleted accounts are left out. Open: should paused accounts count? Meanwhile they do not. | paused not counted | `apps/api/src/jobs/waitlist-snapshot.ts` | ADR-013 §2, Consequences; #54; #250 | proposed, 27/09/2026 | |

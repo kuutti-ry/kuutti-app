@@ -977,8 +977,12 @@ export type MessageParams = {
   "pond.waitlist.label": Record<never, never>;
   "pond.waitlist.loading": Record<never, never>;
   "pond.waitlist.retry": Record<never, never>;
+  "pond.waitlist.seeks.everyone": { "share": number };
+  "pond.waitlist.seeks.label": { "men": number; "everyone": number; "women": number };
+  "pond.waitlist.seeks.men": { "share": number };
+  "pond.waitlist.seeks.title": Record<never, never>;
+  "pond.waitlist.seeks.women": { "share": number };
   "pond.waitlist.small": { "k": number };
-  "pond.waitlist.split": { "women": number; "men": number; "nonBinary": number };
   "pond.waitlist.steps": { "k": number };
   "pond.waitlist.title": Record<never, never>;
   "pond.waitlist.verified": { "people": number };

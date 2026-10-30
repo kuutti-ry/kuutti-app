@@ -1,5 +1,5 @@
 import { type Queryable, transaction } from "@kuutti/db";
-import { moveFigures, type WaitlistCounts } from "@kuutti/schema";
+import { moveFigures, type SeeksBands, type WaitlistCounts } from "@kuutti/schema";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { preferencesFrom } from "../matching/index.ts";
@@ -46,7 +46,25 @@ type FactsRow = {
   age_window: unknown;
 };
 
-const empty = (): WaitlistCounts => ({ verified: 0, woman: 0, man: 0, nonBinary: 0, finishing: 0 });
+const empty = (): WaitlistCounts => ({
+  verified: 0,
+  woman: 0,
+  man: 0,
+  nonBinary: 0,
+  finishing: 0,
+  seeksMen: 0,
+  seeksEveryone: 0,
+  seeksWomen: 0,
+});
+
+/** The band of a finished profile (#507); non-binary in the seek set moves none. */
+function bandOf(seeks: readonly string[] | null): keyof SeeksBands | null {
+  const women = seeks?.includes("woman");
+  const men = seeks?.includes("man");
+  if (women && men) return "seeksEveryone";
+  if (women) return "seeksWomen";
+  return men ? "seeksMen" : null;
+}
 
 /**
  * A shadow-banned account counts exactly like an active one, here and in
@@ -98,7 +116,12 @@ export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCou
         seeks: preferences.seeks,
         ageWindow: preferences.ageWindow,
       }).complete;
-    if (!ready) counts.finishing += 1;
+    if (ready) {
+      const band = bandOf(preferences.seeks);
+      if (band) counts[band] += 1;
+    } else {
+      counts.finishing += 1;
+    }
     ponds.set(row.pond_id, counts);
   }
   return ponds;
@@ -142,13 +165,28 @@ export async function takeSnapshot(deps: WaitlistDeps): Promise<SnapshotResult> 
       if (next === was) continue;
       moved += 1;
       await tx.query(
-        `INSERT INTO waitlist_snapshot (pond_id, day, verified, woman, man, non_binary, finishing, taken_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO waitlist_snapshot (pond_id, day, verified, woman, man, non_binary, finishing,
+                                        seeks_men, seeks_everyone, seeks_women, taken_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (pond_id) DO UPDATE
            SET day = EXCLUDED.day, verified = EXCLUDED.verified, woman = EXCLUDED.woman,
                man = EXCLUDED.man, non_binary = EXCLUDED.non_binary,
-               finishing = EXCLUDED.finishing, taken_at = EXCLUDED.taken_at`,
-        [pond.id, day, next.verified, next.woman, next.man, next.nonBinary, next.finishing, at],
+               finishing = EXCLUDED.finishing, seeks_men = EXCLUDED.seeks_men,
+               seeks_everyone = EXCLUDED.seeks_everyone, seeks_women = EXCLUDED.seeks_women,
+               taken_at = EXCLUDED.taken_at`,
+        [
+          pond.id,
+          day,
+          next.verified,
+          next.woman,
+          next.man,
+          next.nonBinary,
+          next.finishing,
+          next.seeksMen,
+          next.seeksEveryone,
+          next.seeksWomen,
+          at,
+        ],
       );
     }
     // The ponds that did not move were counted too: the mark of the day's count is on every row.

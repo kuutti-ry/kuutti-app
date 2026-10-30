@@ -29,8 +29,19 @@ export function waitlistK(configured: number): number {
   return Math.max(WAITLIST_K_MIN, Math.ceil(configured));
 }
 
+/**
+ * The finished profiles by whom they seek (#507): men and not women, both, and
+ * women and not men. Non-binary in the seek set moves no band, and somebody who
+ * seeks neither women nor men stands in none.
+ */
+export type SeeksBands = {
+  seeksMen: number;
+  seeksEveryone: number;
+  seeksWomen: number;
+};
+
 /** The exact counts of one pond: internal, never served as they are. */
-export type WaitlistCounts = {
+export type WaitlistCounts = SeeksBands & {
   /** Everyone who counts: a live account with this pond. */
   verified: number;
   woman: number;
@@ -89,6 +100,27 @@ export const WaitlistResponse = z
   .meta({ id: "WaitlistResponse" });
 export type WaitlistResponse = z.infer<typeof WaitlistResponse>;
 
+/**
+ * A band's share of the three together, in whole percent. Never 0: a band said
+ * here holds at least k people, and 0 % would say it holds nobody.
+ */
+const BandShare = z.int().min(1).max(100);
+
+export const PondSeeks = z
+  .object({ men: BandShare, everyone: BandShare, women: BandShare })
+  .strict()
+  .meta({ id: "PondSeeks" });
+export type PondSeeks = z.infer<typeof PondSeeks>;
+
+export const PondSeeksResponse = z
+  .object({
+    /** Null without a pond, and until every band of the pond is at least k. */
+    seeks: PondSeeks.nullable(),
+  })
+  .strict()
+  .meta({ id: "PondSeeksResponse" });
+export type PondSeeksResponse = z.infer<typeof PondSeeksResponse>;
+
 export type PublishedCounts = Pick<WaitlistPond, "verified" | "split" | "finishing">;
 
 const NOTHING: PublishedCounts = { verified: null, split: null, finishing: null };
@@ -129,12 +161,36 @@ export function publishCounts(counts: WaitlistCounts | null, k: number): Publish
   };
 }
 
+/**
+ * What may be said of a pond's bands (#507, ADR-013 §12): whole percentages of
+ * the three together, or nothing. Pure, and the only place the rule lives. A
+ * band below k is not said and then neither are the others, since two shares
+ * give the third, so a bar is whole or absent. No count leaves here, so nothing
+ * can be subtracted from one: that is why the people in no band need no rule of
+ * their own, as the undeclared do in `publishCounts`. A k below the floor and
+ * bands that cannot be say nothing.
+ */
+export function seeksShares(bands: SeeksBands | null, k: number): PondSeeks | null {
+  if (!bands || !Number.isInteger(k) || k < WAITLIST_K_MIN) return null;
+  const { seeksMen, seeksEveryone, seeksWomen } = bands;
+  const cells = [seeksMen, seeksEveryone, seeksWomen];
+  if (cells.some((n) => !Number.isInteger(n) || n < k)) return null;
+  const all = cells.reduce((sum, n) => sum + n, 0);
+  const share = (n: number) => Math.max(1, Math.round((n / all) * 100));
+  return { men: share(seeksMen), everyone: share(seeksEveryone), women: share(seeksWomen) };
+}
+
 const sameCounts = (a: WaitlistCounts, b: WaitlistCounts) =>
   a.verified === b.verified &&
   a.woman === b.woman &&
   a.man === b.man &&
   a.nonBinary === b.nonBinary &&
-  a.finishing === b.finishing;
+  a.finishing === b.finishing &&
+  a.seeksMen === b.seeksMen &&
+  a.seeksEveryone === b.seeksEveryone &&
+  a.seeksWomen === b.seeksWomen;
+
+const inBands = (c: SeeksBands) => c.seeksMen + c.seeksEveryone + c.seeksWomen;
 
 /**
  * The counts the counter stands on after today's count: `standing` itself
@@ -150,7 +206,11 @@ const sameCounts = (a: WaitlistCounts, b: WaitlistCounts) =>
  *   least k since they were taken: whatever the difference between the old
  *   and the new says, it says of at least k people. `finishing` has no
  *   trigger of its own: a second one next to the first would let two
- *   published states lie a day and one person apart.
+ *   published states lie a day and one person apart;
+ * - the bands alone move on their own sum (#507). They count finished profiles,
+ *   so the total can move by k while they move by one, and that difference would
+ *   say what the one person who finished seeks. A move of at least k finished
+ *   profiles says of at least k people, whether or not the total moved.
  */
 export function moveFigures(
   standing: WaitlistCounts | null,
@@ -161,5 +221,9 @@ export function moveFigures(
   if (sameCounts(standing, today)) return standing;
   if (standing.verified < WAITLIST_K_MIN) return today;
   const step = Math.max(k, WAITLIST_K_MIN);
-  return Math.abs(today.verified - standing.verified) >= step ? today : standing;
+  const total = Math.abs(today.verified - standing.verified) >= step;
+  const bands = Math.abs(inBands(today) - inBands(standing)) >= step;
+  if (!total && !bands) return standing;
+  const { seeksMen, seeksEveryone, seeksWomen } = bands ? today : standing;
+  return { ...(total ? today : standing), seeksMen, seeksEveryone, seeksWomen };
 }

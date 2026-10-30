@@ -6,6 +6,8 @@ import { Text } from "@/components/ui/text";
 import { useT } from "@/lib/locale";
 import { useHapticTap } from "@/theme/haptics";
 import { pondName } from "./names";
+import { SeeksBar } from "./SeeksBar";
+import { usePondSeeks } from "./usePondSeeks";
 import { useWaitlist } from "./useWaitlist";
 
 /**
@@ -14,12 +16,14 @@ import { useWaitlist } from "./useWaitlist";
  * everywhere, and the card says why the numbers stand still for a while: they
  * move in steps of at least k people. The pond's name stands on a line of its
  * own, in the nominative and in the person's language (#174): no sentence is
- * built around it (TD-17).
+ * built around it (TD-17). The bar of whom the people there seek stands under
+ * the total, once the pond may say it (#507).
  */
 export function WaitlistCard({ pond }: { pond: PondSummary }) {
   const { t } = useT();
   const tap = useHapticTap();
   const waitlist = useWaitlist(pond.id);
+  const seeks = usePondSeeks(pond.id);
   const figures = waitlist.status === "ready" ? waitlist.figures : null;
 
   return (
@@ -49,15 +53,7 @@ export function WaitlistCard({ pond }: { pond: PondSummary }) {
             ) : (
               <>
                 <Text>{t("pond.waitlist.verified", { people: figures.verified })}</Text>
-                {figures.split && (
-                  <Text variant="muted">
-                    {t("pond.waitlist.split", {
-                      women: figures.split.woman,
-                      men: figures.split.man,
-                      nonBinary: figures.split.nonBinary,
-                    })}
-                  </Text>
-                )}
+                {seeks && <SeeksBar seeks={seeks} />}
                 {figures.finishing !== null && (
                   <Text>{t("pond.waitlist.finishing", { people: figures.finishing })}</Text>
                 )}
