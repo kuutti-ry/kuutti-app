@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import { DeviceEventEmitter, Keyboard, Platform, StyleSheet, Text, TextInput } from "react-native";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
+import { TOUCH_TARGET } from "@/theme/a11y";
 import {
   Dialog,
   DialogContent,
@@ -67,6 +68,52 @@ describe("Dialog", () => {
     expect(scrim.props.accessible).toBe(false);
     await fireEvent.press(scrim);
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("A dialog's title beside the close control (#530)", () => {
+  // The close lies over the corner, out of the flow, so nothing but the title's
+  // own room keeps its last word from under it. Jest resolves no classes, so this
+  // reads them on Tailwind's scale, where a step is a quarter of a rem.
+  const steps = (classes: unknown, utility: string) =>
+    Number(new RegExp(`(?:^| )${utility}-(\\d+)(?: |$)`).exec(String(classes))?.[1]) / 4;
+  const title = "Blocked. You will not see each other again.";
+
+  it.each([
+    ["a phone", 14],
+    ["the web preview", 16],
+  ])("wraps before the close control on %s, and the body keeps its width", async (_where, rem) => {
+    await renderWithTheme(
+      <Dialog open>
+        <DialogContent closeLabel="Close">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>It is final.</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>,
+    );
+    const [dialog] = screen.container.queryAll(
+      (node) => typeof node.type === "string" && node.props.role === "dialog",
+    );
+    const heading = screen.getByRole("heading", { name: title });
+    const close = screen.getByRole("button", { name: "Close" });
+    const titleStops = steps(dialog?.props.className, "p") + steps(heading.props.className, "pr");
+    const closeStarts = steps(close.props.className, "right");
+    expect(titleStops * rem).toBeGreaterThanOrEqual(closeStarts * rem + TOUCH_TARGET);
+    expect(screen.getByText("It is final.").props.className).not.toMatch(/\bpr-/);
+  });
+
+  it("keeps a title's width in a dialog with no close control", async () => {
+    await render(
+      <Dialog open>
+        <DialogOverlay>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogOverlay>
+      </Dialog>,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByRole("heading", { name: title }).props.className).not.toMatch(/\bpr-/);
   });
 });
 
