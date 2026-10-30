@@ -1276,6 +1276,7 @@ export type MessageParams = {
   "profile.option.religion.jewish": Record<never, never>;
   "profile.option.religion.lutheran": Record<never, never>;
   "profile.option.religion.muslim": Record<never, never>;
+  "profile.option.religion.non_religious": Record<never, never>;
   "profile.option.religion.orthodox": Record<never, never>;
   "profile.option.religion.other": Record<never, never>;
   "profile.option.religion.other_christian": Record<never, never>;

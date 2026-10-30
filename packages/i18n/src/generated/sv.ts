@@ -905,6 +905,7 @@ export const sv: Readonly<Record<string, string>> = {
   "profile.option.religion.jewish": "Judisk",
   "profile.option.religion.lutheran": "Lutheran",
   "profile.option.religion.muslim": "Muslim",
+  "profile.option.religion.non_religious": "Icke-religiös",
   "profile.option.religion.orthodox": "Ortodox",
   "profile.option.religion.other": "Något annat",
   "profile.option.religion.other_christian": "Annan kristen",

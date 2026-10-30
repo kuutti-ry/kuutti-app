@@ -117,6 +117,18 @@ describe("FieldEditor: several choices", () => {
     expect(fields).toEqual({ smoking: "vaping" });
   });
 
+  it("offers non-religious among the stances, between spiritual and agnostic (#509)", async () => {
+    await show("religion");
+    const stances = screen.getAllByText(/^(Spiritual|Non-religious|Agnostic)$/);
+    expect(stances.map((chip) => chip.props.children)).toEqual([
+      "Spiritual",
+      "Non-religious",
+      "Agnostic",
+    ]);
+    await fireEvent.press(screen.getByRole("button", { name: "Non-religious" }));
+    expect(fields).toEqual({ religion: "non_religious" });
+  });
+
   it("no longer offers the coffee party (#239)", async () => {
     await show("politics");
     expect(screen.queryByRole("button", { name: "The Coffee Party" })).toBeNull();

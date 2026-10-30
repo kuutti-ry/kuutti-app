@@ -436,6 +436,7 @@ export const PROFILE_FIELDS = {
       "hindu",
       "jewish",
       "spiritual",
+      "non_religious",
       "agnostic",
       "atheist",
       "other",

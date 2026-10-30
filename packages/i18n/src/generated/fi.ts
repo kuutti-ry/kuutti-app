@@ -913,6 +913,7 @@ export const fi: Readonly<Record<string, string>> = {
   "profile.option.religion.jewish": "Juutalainen",
   "profile.option.religion.lutheran": "Luterilainen",
   "profile.option.religion.muslim": "Muslimi",
+  "profile.option.religion.non_religious": "Uskonnoton",
   "profile.option.religion.orthodox": "Ortodoksi",
   "profile.option.religion.other": "Jokin muu",
   "profile.option.religion.other_christian": "Muu kristitty",
