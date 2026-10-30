@@ -28,6 +28,11 @@ const MINIMUM_TARGET = { minHeight: TOUCH_TARGET, minWidth: TOUCH_TARGET };
 // caller's own cap (a share of the window) holds while that space is larger.
 const SHRINK = { flexShrink: 1 };
 
+// The close control lies over the corner, out of the flow, so a title would run
+// under it (#530). DialogContent alone draws it, so only a title inside one
+// gives up width. The text below, lower than the control reaches, gives up none.
+const HasClose = React.createContext(false);
+
 const Dialog = DialogPrimitive.Root;
 
 const DialogPortal = DialogPrimitive.Portal;
@@ -148,7 +153,7 @@ function DialogContent({
           )}
           {...props}
         >
-          {children}
+          <HasClose.Provider value={true}>{children}</HasClose.Provider>
           <DialogPrimitive.Close
             accessibilityRole="button"
             accessibilityLabel={closeLabel}
@@ -185,9 +190,16 @@ function DialogFooter({ className, ...props }: ViewProps) {
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
+  const hasClose = React.useContext(HasClose);
   return (
     <DialogPrimitive.Title
-      className={cn("font-sans text-foreground text-lg font-semibold", className)}
+      // pr-8 ends the title where the close control starts: past the content's
+      // padding the control takes 26.5 pt on a phone (rem 14) and 24 on the web.
+      className={cn(
+        "font-sans text-foreground text-lg font-semibold",
+        hasClose && "pr-8",
+        className,
+      )}
       maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...props}
     />
