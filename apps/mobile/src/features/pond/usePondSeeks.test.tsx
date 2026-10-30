@@ -16,7 +16,7 @@ describe("usePondSeeks", () => {
       seen.push(new URL(request.url).pathname);
       return json({ seeks: SHARES });
     }) as unknown as typeof fetch;
-    const { result } = await renderHook(() => usePondSeeks("pond-1"));
+    const { result } = await renderHook(() => usePondSeeks("pond-1", 0));
     await waitFor(() => expect(result.current).toEqual(SHARES));
     expect(seen).toEqual(["/ponds/seeks"]);
   });
@@ -24,7 +24,7 @@ describe("usePondSeeks", () => {
   it("has nothing while the pond may not say", async () => {
     const asked = jest.fn(async () => json({ seeks: null }));
     globalThis.fetch = asked as unknown as typeof fetch;
-    const { result } = await renderHook(() => usePondSeeks("pond-1"));
+    const { result } = await renderHook(() => usePondSeeks("pond-1", 0));
     await waitFor(() => expect(asked).toHaveBeenCalled());
     expect(result.current).toBeNull();
   });
@@ -32,12 +32,24 @@ describe("usePondSeeks", () => {
   it("has nothing when the read fails, and asks again for another pond", async () => {
     const answers = [json({ error: { code: "internal_error" } }, 503), json({ seeks: SHARES })];
     globalThis.fetch = jest.fn(async () => answers.shift()) as unknown as typeof fetch;
-    const { result, rerender } = await renderHook(({ id }: { id: string }) => usePondSeeks(id), {
+    const { result, rerender } = await renderHook(({ id }: { id: string }) => usePondSeeks(id, 0), {
       initialProps: { id: "pond-1" },
     });
     await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
     expect(result.current).toBeNull();
     await rerender({ id: "pond-2" });
+    await waitFor(() => expect(result.current).toEqual(SHARES));
+  });
+
+  it("asks again on a new attempt", async () => {
+    const answers = [json({ error: { code: "internal_error" } }, 503), json({ seeks: SHARES })];
+    globalThis.fetch = jest.fn(async () => answers.shift()) as unknown as typeof fetch;
+    const { result, rerender } = await renderHook(
+      ({ attempt }: { attempt: number }) => usePondSeeks("pond-1", attempt),
+      { initialProps: { attempt: 0 } },
+    );
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    await rerender({ attempt: 1 });
     await waitFor(() => expect(result.current).toEqual(SHARES));
   });
 
@@ -49,7 +61,7 @@ describe("usePondSeeks", () => {
           waiting.push(resolve);
         }),
     ) as unknown as typeof fetch;
-    const { result, rerender } = await renderHook(({ id }: { id: string }) => usePondSeeks(id), {
+    const { result, rerender } = await renderHook(({ id }: { id: string }) => usePondSeeks(id, 0), {
       initialProps: { id: "pond-1" },
     });
     await rerender({ id: "pond-2" });
@@ -61,9 +73,9 @@ describe("usePondSeeks", () => {
     await rerender({ id: "pond-1" });
     await rerender({ id: "pond-2" });
     const [, , third, fourth] = waiting;
-    await act(async () => third?.(json({ error: { code: "internal_error" } }, 503)));
-    expect(result.current).toBeNull();
     await act(async () => fourth?.(json({ seeks: OTHER })));
+    expect(result.current).toEqual(OTHER);
+    await act(async () => third?.(json({ error: { code: "internal_error" } }, 503)));
     expect(result.current).toEqual(OTHER);
   });
 });

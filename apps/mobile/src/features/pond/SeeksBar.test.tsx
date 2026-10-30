@@ -21,7 +21,7 @@ describe("SeeksBar", () => {
     const bar = screen.getByRole("image");
     expect(bar.props.accessible).toBe(true);
     expect(bar.props.accessibilityLabel).toBe(
-      "Of the people with a finished profile, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
+      "Of the people with a finished profile who are looking for men or women, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
     );
     expect(screen.getByLabelText(bar.props.accessibilityLabel)).toBe(bar);
   });
@@ -38,17 +38,14 @@ describe("SeeksBar", () => {
     expect(screen.queryAllByTestId("strokes-rising")).toHaveLength(0);
   });
 
-  it("gives each band its share of the width, and a band too small to see a width of its own", async () => {
-    const screen = await renderWithTheme(<SeeksBar seeks={{ men: 1, everyone: 1, women: 98 }} />);
+  it("gives each band its share of the width", async () => {
+    const screen = await renderWithTheme(<SeeksBar seeks={{ men: 5, everyone: 5, women: 90 }} />);
     const bar = screen.getByRole("image").children[1];
     if (typeof bar !== "object") throw new Error("the bar is drawn");
     const bands = bar.children.flatMap((band) =>
       typeof band === "object" ? [StyleSheet.flatten(band.props.style)] : [],
     );
-    expect(bands.map((style) => style.flexGrow)).toEqual([1, 1, 98]);
-    for (const style of bands) {
-      expect(style.flexBasis).toBe(0);
-      expect(style.minWidth).toBeGreaterThanOrEqual(14);
-    }
+    expect(bands.map((style) => style.flexGrow)).toEqual([5, 5, 90]);
+    for (const style of bands) expect(style.flexBasis).toBe(0);
   });
 });

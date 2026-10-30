@@ -15,8 +15,6 @@ const Canvas = cssInterop(Svg, { className: "style" });
 const WIDTH = 480;
 const HEIGHT = 20;
 const SPACING = 6;
-/** A band stays wide enough for its pattern to read, however small its share. */
-const BAND_MIN_WIDTH = 14;
 
 const strokes = (fromY: number, toY: number) => {
   let d = "";
@@ -71,10 +69,11 @@ function Hatched({
 }
 
 /**
- * Whom the people of the area seek (#507, ADR-013 §12): one bar, those who seek
- * men at one end, those who seek women at the other, everyone in the middle. No
- * animation, and the bar holds no text: the labels below it wrap at any text
- * size. One element for a screen reader, which says the three figures in words.
+ * Whom the people of the area seek (#507, ADR-013 §12, §13): one bar, those who
+ * seek men at one end, those who seek women at the other, everyone in the
+ * middle. No animation, and the bar holds no text: the labels below it wrap at
+ * any text size. One element for a screen reader, which says the three figures
+ * in words.
  */
 export function SeeksBar({ seeks }: { seeks: PondSeeks }) {
   const { t } = useT();
@@ -100,7 +99,6 @@ export function SeeksBar({ seeks }: { seeks: PondSeeks }) {
               height: HEIGHT,
               flexGrow: seeks[band],
               flexBasis: 0,
-              minWidth: BAND_MIN_WIDTH,
             }}
           />
         ))}

@@ -23,7 +23,7 @@ export function WaitlistCard({ pond }: { pond: PondSummary }) {
   const { t } = useT();
   const tap = useHapticTap();
   const waitlist = useWaitlist(pond.id);
-  const seeks = usePondSeeks(pond.id);
+  const seeks = usePondSeeks(pond.id, waitlist.attempt);
   const figures = waitlist.status === "ready" ? waitlist.figures : null;
 
   return (

@@ -7697,30 +7697,30 @@ pond.waitlist.seeks.title:
 
 pond.waitlist.seeks.men:
   en: "{share, number} % men"
-  description: "Waitlist card, the bar's label for the people who seek men and not women. {share} is a whole percentage of the three bands together."
+  description: "Waitlist card, the bar's label for the people who seek men and not women. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % miehiä"
   sv: "{share, number} % män"
   machine: { fi: true, sv: true }
 
 pond.waitlist.seeks.everyone:
   en: "{share, number} % everyone"
-  description: "Waitlist card, the bar's label for the people who seek both women and men. It stands in the middle of the bar, as the overlap of the two others. {share} is a whole percentage of the three bands together."
+  description: "Waitlist card, the bar's label for the people who seek both women and men. It stands in the middle of the bar, as the overlap of the two others. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % kaikkia"
   sv: "{share, number} % alla"
   machine: { fi: true, sv: true }
 
 pond.waitlist.seeks.women:
   en: "{share, number} % women"
-  description: "Waitlist card, the bar's label for the people who seek women and not men. {share} is a whole percentage of the three bands together."
+  description: "Waitlist card, the bar's label for the people who seek women and not men. {share} is a share of the three bands together, in steps of five."
   fi: "{share, number} % naisia"
   sv: "{share, number} % kvinnor"
   machine: { fi: true, sv: true }
 
 pond.waitlist.seeks.label:
-  en: "Of the people with a finished profile, {men, number} percent are looking for men. {everyone, number} percent are looking for everyone. {women, number} percent are looking for women."
-  description: "Waitlist card, what a screen reader says for the whole bar: one element, three sentences. Each number is a whole percentage of the three bands together."
-  fi: "Valmiin profiilin tehneistä {men, number} prosenttia etsii miehiä. {everyone, number} prosenttia etsii kaikkia. {women, number} prosenttia etsii naisia."
-  sv: "Av personerna med färdig profil söker {men, number} procent män. {everyone, number} procent söker alla. {women, number} procent söker kvinnor."
+  en: "Of the people with a finished profile who are looking for men or women, {men, number} percent are looking for men. {everyone, number} percent are looking for everyone. {women, number} percent are looking for women."
+  description: "Waitlist card, what a screen reader says for the whole bar: one element, three sentences. Each number is a share of the three bands together, in steps of five, at least five."
+  fi: "Valmiin profiilin tehneistä miehiä tai naisia etsivistä {men, number} prosenttia etsii miehiä. {everyone, number} prosenttia etsii kaikkia. {women, number} prosenttia etsii naisia."
+  sv: "Av personerna med färdig profil som söker män eller kvinnor söker {men, number} procent män. {everyone, number} procent söker alla. {women, number} procent söker kvinnor."
   machine: { fi: true, sv: true }
 
 pond.waitlist.finishing:
@@ -7738,10 +7738,10 @@ pond.waitlist.small:
   machine: { fi: true, sv: true }
 
 pond.waitlist.steps:
-  en: "The numbers change only when at least {k, number} people have joined or left, so that one person joining or leaving does not show."
-  description: "Waitlist card, under the figures: why the numbers stand still for a while. {k} is the threshold (ten): the figures of an area move in steps of at least that many people, so one person's arrival or departure changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
-  fi: "Luvut muuttuvat vasta, kun vähintään {k, number} ihmistä on tullut tai lähtenyt, jotta yhden ihmisen tulo tai lähtö ei näy niistä."
-  sv: "Siffrorna ändras först när minst {k, number} personer har kommit eller lämnat, så att det inte syns när en enskild person kommer eller lämnar."
+  en: "The numbers change only in steps of at least {k, number} people, so that one person does not show."
+  description: "Waitlist card, under the figures and the bar: why they stand still for a while. {k} is the threshold (ten): the figures of an area move in steps of at least that many people, the total as people come and go, the bar as they finish a profile or change whom they seek, so one person changes nothing in them. It says what the numbers do, not that nothing can ever be inferred."
+  fi: "Luvut muuttuvat vain vähintään {k, number} ihmisen askelin, jotta yksittäinen ihminen ei näy niistä."
+  sv: "Siffrorna ändras bara i steg om minst {k, number} personer, så att en enskild person inte syns i dem."
   machine: { fi: true, sv: true }
 
 pond.waitlist.loading:

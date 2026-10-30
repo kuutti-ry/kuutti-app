@@ -52,15 +52,15 @@ describe("plurals in every language", () => {
   it.each([
     [
       "en",
-      "Of the people with a finished profile, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
+      "Of the people with a finished profile who are looking for men or women, 30 percent are looking for men. 20 percent are looking for everyone. 50 percent are looking for women.",
     ],
     [
       "fi",
-      "Valmiin profiilin tehneistä 30 prosenttia etsii miehiä. 20 prosenttia etsii kaikkia. 50 prosenttia etsii naisia.",
+      "Valmiin profiilin tehneistä miehiä tai naisia etsivistä 30 prosenttia etsii miehiä. 20 prosenttia etsii kaikkia. 50 prosenttia etsii naisia.",
     ],
     [
       "sv",
-      "Av personerna med färdig profil söker 30 procent män. 20 procent söker alla. 50 procent söker kvinnor.",
+      "Av personerna med färdig profil som söker män eller kvinnor söker 30 procent män. 20 procent söker alla. 50 procent söker kvinnor.",
     ],
   ] as const)("say the bar of a pond in three sentences in %s", (locale, text) => {
     const shares = { men: 30, everyone: 20, women: 50 };

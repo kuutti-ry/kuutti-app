@@ -10,7 +10,9 @@ export type WaitlistState =
   | { status: "failed"; error: unknown };
 
 /** What the public counter says of one pond (#54). */
-export function useWaitlist(pondId: string): WaitlistState & { retry: () => void } {
+export function useWaitlist(
+  pondId: string,
+): WaitlistState & { attempt: number; retry: () => void } {
   const [state, setState] = useState<WaitlistState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -30,5 +32,5 @@ export function useWaitlist(pondId: string): WaitlistState & { retry: () => void
     };
   }, [pondId, attempt]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
-  return { ...state, retry };
+  return { ...state, attempt, retry };
 }

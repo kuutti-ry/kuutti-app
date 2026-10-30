@@ -42,9 +42,10 @@ async function pondWithBands(
   [men, everyone, women]: [number, number, number],
 ) {
   const pond = await pondNamed(ctx.client, slug);
-  await people(ctx.client, pond, men, { complete: true, seeks: ["man"] });
-  await people(ctx.client, pond, everyone, { complete: true, seeks: ["woman", "man"] });
-  await people(ctx.client, pond, women, { complete: true, seeks: ["woman"] });
+  const finished = { complete: true, consented: true };
+  await people(ctx.client, pond, men, { ...finished, seeks: ["man"] });
+  await people(ctx.client, pond, everyone, { ...finished, seeks: ["woman", "man"] });
+  await people(ctx.client, pond, women, { ...finished, seeks: ["woman"] });
   return pond;
 }
 
@@ -58,7 +59,7 @@ describe("the bar of whom a pond seeks (#507)", () => {
   describe("The bar is said only when every band is at least k", () => {
     test.for([
       { men: 20, everyone: 10, women: 20, bar: { men: 40, everyone: 20, women: 40 } },
-      { men: 15, everyone: 15, women: 15, bar: { men: 33, everyone: 33, women: 33 } },
+      { men: 15, everyone: 15, women: 15, bar: { men: 35, everyone: 30, women: 35 } },
       { men: 20, everyone: 9, women: 20, bar: null },
       { men: 20, everyone: 0, women: 20, bar: null },
       { men: 0, everyone: 20, women: 20, bar: null },
@@ -79,25 +80,31 @@ describe("the bar of whom a pond seeks (#507)", () => {
     const person = await personOf(ctx, pond);
     await taken(ctx);
     const said = await askBar(ctx, person.headers);
-    expect(said).toEqual({ men: 33, everyone: 33, women: 33 });
+    expect(said).toEqual({ men: 35, everyone: 30, women: 35 });
     await people(ctx.client, pond, 9, { gender: "woman" });
-    await people(ctx.client, pond, 1, { complete: true, seeks: ["man"] });
+    await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: ["man"] });
     await taken(ctx, NEXT_DAY);
     expect(await totalOf(ctx, pond)).toBe(41);
-    // 11 of 31 would be 35 %: what the one who finished seeks, said out loud.
+    // 40, 30 and 30 would say what the one who finished seeks, out loud.
     expect(await askBar(ctx, person.headers)).toEqual(said);
   });
 
   test("The bar moves once k finished profiles have come or gone", async ({ ctx }) => {
     const pond = await pondWithBands(ctx, "test-bar-moves", [10, 10, 10]);
     const person = await personOf(ctx, pond);
-    const finishing = await people(ctx.client, pond, 10, { complete: true, seeks: ["man"] });
+    const finishing = await people(ctx.client, pond, 10, {
+      complete: true,
+      consented: true,
+      seeks: ["man"],
+    });
     await ctx.client.query("UPDATE account SET state = 'registered' WHERE id = ANY($1)", [
       finishing,
     ]);
     await taken(ctx);
     const said = await askBar(ctx, person.headers);
     expect(await totalOf(ctx, pond)).toBe(41);
+    const inPublic = async () => (await read(ctx)).ponds.find((p) => p.pond.id === pond);
+    const before = await inPublic();
 
     const finish = (ids: string[]) =>
       ctx.client.query("UPDATE account SET state = 'active' WHERE id = ANY($1)", [ids]);
@@ -108,6 +115,26 @@ describe("the bar of whom a pond seeks (#507)", () => {
     await finish(finishing.slice(9));
     await taken(ctx, DAY_AFTER);
     expect(await askBar(ctx, person.headers)).toEqual({ men: 50, everyone: 25, women: 25 });
+    // Nothing in public says that it moved, not even the day.
+    expect(await inPublic()).toEqual(before);
+  });
+
+  test("The bar moves once k people have changed band", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-bar-change");
+    const finished = { complete: true, consented: true };
+    const changing = await people(ctx.client, pond, 20, { ...finished, seeks: ["man"] });
+    await people(ctx.client, pond, 10, { ...finished, seeks: ["woman", "man"] });
+    await people(ctx.client, pond, 10, { ...finished, seeks: ["woman"] });
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 50, everyone: 25, women: 25 });
+    await ctx.client.query(
+      `UPDATE preferences SET value = '["woman"]'
+       WHERE field = 'seeks' AND account_id = ANY($1)`,
+      [changing.slice(0, 10)],
+    );
+    await taken(ctx, NEXT_DAY);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 25, everyone: 25, women: 50 });
     expect(await totalOf(ctx, pond)).toBe(41);
   });
 

@@ -101,10 +101,17 @@ export const WaitlistResponse = z
 export type WaitlistResponse = z.infer<typeof WaitlistResponse>;
 
 /**
- * A band's share of the three together, in whole percent. Never 0: a band said
- * here holds at least k people, and 0 % would say it holds nobody.
+ * The step of a band's share (#507, ADR-013 §13). A rule, not a tunable: near k
+ * a share in whole percent is a count in disguise (38, 31 and 31 can only be 12,
+ * 10 and 10), and the finished profiles minus it are the people in no band.
  */
-const BandShare = z.int().min(1).max(100);
+export const SEEKS_SHARE_STEP = 5;
+
+/**
+ * A band's share of the three together. Never 0: a band said here holds at
+ * least k people, and 0 % would say it holds nobody.
+ */
+const BandShare = z.int().min(SEEKS_SHARE_STEP).max(100).multipleOf(SEEKS_SHARE_STEP);
 
 export const PondSeeks = z
   .object({ men: BandShare, everyone: BandShare, women: BandShare })
@@ -162,13 +169,13 @@ export function publishCounts(counts: WaitlistCounts | null, k: number): Publish
 }
 
 /**
- * What may be said of a pond's bands (#507, ADR-013 §12): whole percentages of
- * the three together, or nothing. Pure, and the only place the rule lives. A
- * band below k is not said and then neither are the others, since two shares
- * give the third, so a bar is whole or absent. No count leaves here, so nothing
- * can be subtracted from one: that is why the people in no band need no rule of
- * their own, as the undeclared do in `publishCounts`. A k below the floor and
- * bands that cannot be say nothing.
+ * What may be said of a pond's bands (#507, ADR-013 §13): their shares of the
+ * three together, in steps of `SEEKS_SHARE_STEP`, adding up to 100, or nothing.
+ * Pure, and the only place the rule lives. A band below k is not said and then
+ * neither are the others, since two shares give the third, so a bar is whole or
+ * absent. The step is what keeps the shares from pinning the bands' sum: the
+ * finished profiles minus that sum are the people in no band, who have no cell
+ * of their own here. A k below the floor and bands that cannot be say nothing.
  */
 export function seeksShares(bands: SeeksBands | null, k: number): PondSeeks | null {
   if (!bands || !Number.isInteger(k) || k < WAITLIST_K_MIN) return null;
@@ -176,8 +183,16 @@ export function seeksShares(bands: SeeksBands | null, k: number): PondSeeks | nu
   const cells = [seeksMen, seeksEveryone, seeksWomen];
   if (cells.some((n) => !Number.isInteger(n) || n < k)) return null;
   const all = cells.reduce((sum, n) => sum + n, 0);
-  const share = (n: number) => Math.max(1, Math.round((n / all) * 100));
-  return { men: share(seeksMen), everyone: share(seeksEveryone), women: share(seeksWomen) };
+  const share = (n: number) =>
+    Math.max(SEEKS_SHARE_STEP, Math.round((n * 100) / all / SEEKS_SHARE_STEP) * SEEKS_SHARE_STEP);
+  const men = share(seeksMen);
+  const everyone = share(seeksEveryone);
+  const women = share(seeksWomen);
+  // The largest band takes what the others leave. It is at least a third, so it stays a share.
+  const largest = Math.max(...cells);
+  if (seeksEveryone === largest) return { men, everyone: 100 - men - women, women };
+  if (seeksMen === largest) return { men: 100 - everyone - women, everyone, women };
+  return { men, everyone, women: 100 - men - everyone };
 }
 
 const sameCounts = (a: WaitlistCounts, b: WaitlistCounts) =>
@@ -190,7 +205,20 @@ const sameCounts = (a: WaitlistCounts, b: WaitlistCounts) =>
   a.seeksEveryone === b.seeksEveryone &&
   a.seeksWomen === b.seeksWomen;
 
-const inBands = (c: SeeksBands) => c.seeksMen + c.seeksEveryone + c.seeksWomen;
+/**
+ * How many people a difference between two sets of bands speaks of, at least:
+ * each person adds at most one to what rose and one to what fell, so people
+ * changing band count as well as people coming or going.
+ */
+function peopleBehind(a: SeeksBands, b: SeeksBands): number {
+  const moves = [
+    b.seeksMen - a.seeksMen,
+    b.seeksEveryone - a.seeksEveryone,
+    b.seeksWomen - a.seeksWomen,
+  ];
+  const sum = (ns: number[]) => ns.reduce((total, n) => total + n, 0);
+  return Math.max(sum(moves.filter((n) => n > 0)), -sum(moves.filter((n) => n < 0)));
+}
 
 /**
  * The counts the counter stands on after today's count: `standing` itself
@@ -207,10 +235,10 @@ const inBands = (c: SeeksBands) => c.seeksMen + c.seeksEveryone + c.seeksWomen;
  *   and the new says, it says of at least k people. `finishing` has no
  *   trigger of its own: a second one next to the first would let two
  *   published states lie a day and one person apart;
- * - the bands alone move on their own sum (#507). They count finished profiles,
- *   so the total can move by k while they move by one, and that difference would
- *   say what the one person who finished seeks. A move of at least k finished
- *   profiles says of at least k people, whether or not the total moved.
+ * - the bands move on their own (#507). They count finished profiles, so the
+ *   total can move by k while they move by one, and that difference would say
+ *   what the one person who finished seeks. They move once at least k people have
+ *   come, gone or changed band, whether or not the total moved.
  */
 export function moveFigures(
   standing: WaitlistCounts | null,
@@ -222,7 +250,7 @@ export function moveFigures(
   if (standing.verified < WAITLIST_K_MIN) return today;
   const step = Math.max(k, WAITLIST_K_MIN);
   const total = Math.abs(today.verified - standing.verified) >= step;
-  const bands = Math.abs(inBands(today) - inBands(standing)) >= step;
+  const bands = peopleBehind(standing, today) >= step;
   if (!total && !bands) return standing;
   const { seeksMen, seeksEveryone, seeksWomen } = bands ? today : standing;
   return { ...(total ? today : standing), seeksMen, seeksEveryone, seeksWomen };

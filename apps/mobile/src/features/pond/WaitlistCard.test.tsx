@@ -65,7 +65,7 @@ describe("WaitlistCard", () => {
     expect(screen.getByText("17 people are still finishing their profile.")).toBeTruthy();
     expect(
       screen.getByText(
-        "The numbers change only when at least 10 people have joined or left, so that one person joining or leaving does not show.",
+        "The numbers change only in steps of at least 10 people, so that one person does not show.",
       ),
     ).toBeTruthy();
     // The public route: asked without the session's token.
@@ -86,22 +86,43 @@ describe("WaitlistCard", () => {
     expect(screen.queryByText(/non-binary/)).toBeNull();
   });
 
-  it("draws no bar while the pond may not say it, or when its read fails", async () => {
+  it("draws no bar while the pond may not say it", async () => {
     answering([() => json(waitlist({ verified: 30, finishing: 0 }))]);
-    const quiet = await renderWithTheme(<WaitlistCard pond={POND} />);
+    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
     await settle();
-    expect(quiet.getByText("30 people have identified with their bank")).toBeTruthy();
-    expect(quiet.queryByRole("image")).toBeNull();
-    await quiet.rerender(<></>);
+    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
+    expect(screen.queryByRole("image")).toBeNull();
+  });
 
+  it("leaves the bar out when its read fails, and the rest of the card as it is", async () => {
     answering([() => json(waitlist({ verified: 30, finishing: 0 }))], () =>
       json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
     );
-    const failed = await renderWithTheme(<WaitlistCard pond={POND} />);
+    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
     await settle();
-    expect(failed.getByText("30 people have identified with their bank")).toBeTruthy();
-    expect(failed.queryByRole("image")).toBeNull();
-    expect(failed.queryByText("The numbers could not be read.")).toBeNull();
+    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
+    expect(screen.queryByRole("image")).toBeNull();
+    expect(screen.queryByText("The numbers could not be read.")).toBeNull();
+  });
+
+  it("brings the bar back with the figures on Try again", async () => {
+    let online = false;
+    const down = () =>
+      json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500);
+    answering([() => (online ? json(waitlist({ verified: 30, finishing: 0 })) : down())], () =>
+      online ? BAR() : down(),
+    );
+    const screen = await renderWithTheme(<WaitlistCard pond={POND} />);
+    await settle();
+    expect(screen.getByText("The numbers could not be read.")).toBeTruthy();
+    online = true;
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "Try again" }));
+      await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    });
+    await settle();
+    expect(screen.getByText("30 people have identified with their bank")).toBeTruthy();
+    expect(screen.getByText("30 % men")).toBeTruthy();
   });
 
   it("draws no bar below the threshold, whatever the bar's route says", async () => {
@@ -122,7 +143,7 @@ describe("WaitlistCard", () => {
     ).toBeTruthy();
     expect(screen.queryByText(/identified with their bank/)).toBeNull();
     expect(screen.queryByText(/finishing their profile/)).toBeNull();
-    expect(screen.queryByText(/joined or left/)).toBeNull();
+    expect(screen.queryByText(/in steps of/)).toBeNull();
   });
 
   it("has words for nobody finishing", async () => {

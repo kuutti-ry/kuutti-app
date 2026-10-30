@@ -32,7 +32,7 @@ The account is active once the four matching answers and the two consents are th
 
 The home screen: "Kuutti", two cards and the way onward.
 
-- "People in your area": the counter of the pond, in tens, with the split by gender when every cell is at least ten, and "n people are still finishing their profile." (ADR-013). With the population written, the numbers are of a pond over the gate.
+- "People in your area": the counter of the pond, in tens, with the bar of whom people with a finished profile seek when every band holds at least ten, and "n people are still finishing their profile." (ADR-013). With the population written, the numbers are of a pond over the gate.
 - "Matching": where Aino stands. With her photos pending: "Matching opens for finished profiles. Yours still lacks something." Once her photos are approved: "Your profile is finished. Where you stand is counted tonight." After the count (the runbook runs it): "You are among the next 10 in line for your area." or "Matching is open for you." (ADR-015: the women of the population are the smaller group, so she is let in; a man of the larger group is told his place in line).
 - Below: "Your profile". The profile list holds the rest (#239): "Photos" and the sections, each with a check mark once done or how far it is filled, then "Your deal-breakers" (up to two, only on what she answered herself, #149) and, while a question is unanswered, "Fill in the rest while you wait" (the optional fields, one per screen, "Ask me later" on each, #148). The eye at the top opens her card.
 

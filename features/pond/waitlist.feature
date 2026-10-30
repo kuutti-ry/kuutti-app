@@ -79,6 +79,19 @@ Feature: The waitlist counter
       | women and non-binary          | the women's band  |
       | non-binary people             | no band           |
 
+  Scenario: A finished profile on an older consent stands in no band
+    Given two finished profiles that seek men, one with a consent of an older wording and one with none, and one with the current consent
+    When the figures are taken
+    Then the men's band holds one and nobody is finishing
+
+  Scenario: A count told to leave the bands out counts none
+    Given a pond with twelve finished profiles
+    When the figures are taken without the bands
+    Then the total is twelve and every band is empty
+
+  Scenario: Production counts no bands, every other environment does
+    Then the night counts bands in every environment but production
+
   Scenario: Only finished profiles stand in a band
     Given a pond with ten finished profiles and ten people still finishing theirs, all seeking men
     When the figures are taken
@@ -92,7 +105,7 @@ Feature: The waitlist counter
     Examples:
       | men | everyone | women | bar                  |
       | 20  | 10       | 20    | 40, 20 and 40 percent |
-      | 15  | 15       | 15    | 33, 33 and 33 percent |
+      | 15  | 15       | 15    | 35, 30 and 35 percent |
       | 20  | 9        | 20    | not said             |
       | 20  | 0        | 20    | not said             |
       | 0   | 20       | 20    | not said             |
@@ -107,6 +120,11 @@ Feature: The waitlist counter
     When nine of them finish and the figures are taken on the next day
     Then the bar says what it said
     When the tenth finishes and the figures are taken on the day after
+    Then the bar has moved, and everything public stands, the day included
+
+  Scenario: The bar moves once k people have changed band
+    Given a pond whose bar is said
+    When ten people there change whom they seek and the figures are taken on the next day
     Then the bar has moved and the total stands
 
   Scenario: The bar says shares of the caller's own pond and nothing else

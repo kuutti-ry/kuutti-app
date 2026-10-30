@@ -222,9 +222,18 @@ describe("moveFigures", () => {
       expect(moveFigures(said, today, 10)).toEqual(today);
     });
 
-    it("stands still when people only change band", () => {
-      const today = counts({ ...said, seeksMen: 10, seeksWomen: 30 });
-      expect(moveFigures(said, today, 10)).toBe(said);
+    it("moves once k people have changed band, and stands while fewer have", () => {
+      const nine = counts({ ...said, seeksMen: 11, seeksWomen: 29 });
+      expect(moveFigures(said, nine, 10)).toBe(said);
+      const ten = counts({ ...said, seeksMen: 10, seeksWomen: 30 });
+      expect(moveFigures(said, ten, 10)).toEqual({ ...said, seeksMen: 10, seeksWomen: 30 });
+    });
+
+    it("goes by the larger side of a mixed move, which is how few people it can be", () => {
+      const today = counts({ ...said, seeksMen: 26, seeksEveryone: 7, seeksWomen: 17 });
+      expect(moveFigures(said, today, 10)).toBe(said); // 6 rose, 6 fell
+      const further = counts({ ...said, seeksMen: 30, seeksEveryone: 7, seeksWomen: 17 });
+      expect(moveFigures(said, further, 10).seeksMen).toBe(30); // 10 rose, 6 fell
     });
 
     it("counts a shrinking sum as a move, and follows a raised k", () => {
@@ -250,10 +259,31 @@ describe("seeksShares", () => {
     seeksWomen,
   });
 
-  it("says whole percentages of the three together", () => {
+  it("says shares of the three together, in steps of five", () => {
     expect(seeksShares(bands(30, 20, 50), 10)).toEqual({ men: 30, everyone: 20, women: 50 });
-    expect(seeksShares(bands(10, 10, 10), 10)).toEqual({ men: 33, everyone: 33, women: 33 });
-    expect(seeksShares(bands(12, 11, 10), 10)).toEqual({ men: 36, everyone: 33, women: 30 });
+    expect(seeksShares(bands(47, 21, 32), 10)).toEqual({ men: 50, everyone: 20, women: 30 });
+    expect(seeksShares(bands(12, 10, 10), 10)).toEqual({ men: 40, everyone: 30, women: 30 });
+  });
+
+  it("adds up to 100, the largest band taking what the others leave", () => {
+    expect(seeksShares(bands(10, 10, 10), 10)).toEqual({ men: 35, everyone: 30, women: 35 });
+    expect(seeksShares(bands(12, 11, 10), 10)).toEqual({ men: 35, everyone: 35, women: 30 });
+    expect(seeksShares(bands(10, 12, 11), 10)).toEqual({ men: 30, everyone: 35, women: 35 });
+    expect(seeksShares(bands(10, 11, 12), 10)).toEqual({ men: 30, everyone: 35, women: 35 });
+    for (let men = 10; men < 90; men += 7) {
+      for (let everyone = 10; everyone < 90; everyone += 7) {
+        for (let women = 10; women < 90; women += 7) {
+          const shares = seeksShares(bands(men, everyone, women), 10);
+          expect(PondSeeksResponse.safeParse({ seeks: shares }).success).toBe(true);
+          expect((shares?.men ?? 0) + (shares?.everyone ?? 0) + (shares?.women ?? 0)).toBe(100);
+        }
+      }
+    }
+  });
+
+  it("does not turn back into counts near k", () => {
+    // Whole percents told these two apart: 38, 31, 31 could only be 12, 10 and 10.
+    expect(seeksShares(bands(12, 10, 10), 10)).toEqual(seeksShares(bands(13, 11, 10), 10));
   });
 
   it("says nothing unless every band is at least k", () => {
@@ -278,7 +308,7 @@ describe("seeksShares", () => {
 
   it("never says 0 % of a band that holds at least k people", () => {
     const shares = seeksShares(bands(10, 10, 5000), 10);
-    expect(shares).toEqual({ men: 1, everyone: 1, women: 100 });
+    expect(shares).toEqual({ men: 5, everyone: 5, women: 90 });
     expect(PondSeeksResponse.safeParse({ seeks: shares }).success).toBe(true);
   });
 
@@ -300,8 +330,8 @@ describe("the bar's answer", () => {
     expect(PondSeeksResponse.safeParse({ seeks: { ...valid, count: 12 } }).success).toBe(false);
   });
 
-  it("cannot carry a share that is none, more than the whole or a fraction", () => {
-    for (const men of [0, -1, 101, 30.5]) {
+  it("cannot carry a share that is none, more than the whole, or off the step", () => {
+    for (const men of [0, -1, 105, 30.5, 31, 1]) {
       expect(PondSeeksResponse.safeParse({ seeks: { ...valid, men } }).success).toBe(false);
     }
   });

@@ -1,5 +1,6 @@
 import { type Queryable, transaction } from "@kuutti/db";
 import { moveFigures, type SeeksBands, type WaitlistCounts } from "@kuutti/schema";
+import { CURRENT_CONSENT_VERSIONS } from "../identity/index.ts";
 import { finnishDay } from "../lib/finnish-day.ts";
 import type { Logger } from "../lib/logger.ts";
 import { preferencesFrom } from "../matching/index.ts";
@@ -22,7 +23,21 @@ import type { NightlyJob } from "./nightly.ts";
  * Queryable seam the test harness hands a rolled-back transaction through.
  * No statement here takes input from a request.
  */
-export type WaitlistDeps = { db: Queryable; logger: Logger; now: () => Date };
+export type WaitlistDeps = {
+  db: Queryable;
+  logger: Logger;
+  now: () => Date;
+  /** Whether the bar's bands are counted (`countsBands`); they are unless told otherwise. */
+  bands?: boolean;
+};
+
+/**
+ * shortcut: no bands in production (#507, ADR-013 §16). The consent says whom one
+ * seeks is stored only to match and never shown, and whether that wording or the
+ * bar changes is the maintainer's; his answer lifts this. Without bands the route
+ * says nothing, and the rest of the counter stands as it was.
+ */
+export const countsBands = (appEnv: string) => appEnv !== "production";
 
 /**
  * One count at a time, across every process that may run one (two containers
@@ -44,6 +59,7 @@ type FactsRow = {
   approved_photos: string;
   seeks: unknown;
   age_window: unknown;
+  seeks_consented: boolean;
 };
 
 const empty = (): WaitlistCounts => ({
@@ -79,9 +95,14 @@ const STANDS_AS_ACTIVE = new Set(["active", "shadow_banned"]);
  * aggregate, not a caller's data (rule 6 is about a session's own rows). The
  * tables are the shared ones of packages/db, read only. Whether a profile is
  * complete is decided by `completeness()` itself, from the same facts the
- * profile screen gathers, so the counter and the screen cannot disagree.
+ * profile screen gathers, so the counter and the screen cannot disagree. A band
+ * holds only somebody whose consent to the answer is current, as the gate asks:
+ * a finished profile on an older wording is finished, and in no band.
  */
-export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCounts>> {
+export async function countPonds(
+  db: Queryable,
+  bands = true,
+): Promise<Map<string, WaitlistCounts>> {
   const { rows } = await db.query<FactsRow>(
     `SELECT a.pond_id, a.gender, a.state, p.display_name, p.bio, p.bio_preset, p.prompts,
             (SELECT count(*) FROM photo ph
@@ -89,13 +110,17 @@ export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCou
             (SELECT r.value FROM preferences r
               WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'seeks') AS seeks,
             (SELECT r.value FROM preferences r
-              WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'age_window') AS age_window
+              WHERE r.account_id = a.id AND r.mode = 'hard' AND r.field = 'age_window') AS age_window,
+            EXISTS (SELECT 1 FROM consent c
+              WHERE c.account_id = a.id AND c.kind = 'special_category'
+                AND c.withdrawn_at IS NULL AND c.version = $1) AS seeks_consented
      FROM account a
      JOIN identity i ON i.id = a.identity_id
      LEFT JOIN profile p ON p.account_id = a.id
      WHERE a.pond_id IS NOT NULL
        AND a.state IN ('registered', 'active', 'shadow_banned')
        AND i.standing = 'ok'`,
+    [CURRENT_CONSENT_VERSIONS.special_category],
   );
   const ponds = new Map<string, WaitlistCounts>();
   for (const row of rows) {
@@ -117,7 +142,7 @@ export async function countPonds(db: Queryable): Promise<Map<string, WaitlistCou
         ageWindow: preferences.ageWindow,
       }).complete;
     if (ready) {
-      const band = bandOf(preferences.seeks);
+      const band = bands && row.seeks_consented ? bandOf(preferences.seeks) : null;
       if (band) counts[band] += 1;
     } else {
       counts.finishing += 1;
@@ -155,15 +180,19 @@ export async function takeSnapshot(deps: WaitlistDeps): Promise<SnapshotResult> 
       return { day, ponds: 0, moved: 0, counted: false };
     }
     const k = await readWaitlistK(tx);
-    const counts = await countPonds(tx);
+    const counts = await countPonds(tx, deps.bands);
     const standing = await readStandingFigures(tx);
     const ponds = await listPonds(tx);
     let moved = 0;
     for (const pond of ponds) {
-      const was = standing.get(pond.id)?.counts ?? null;
+      const had = standing.get(pond.id);
+      const was = had?.counts ?? null;
       const next = moveFigures(was, counts.get(pond.id) ?? empty(), k);
       if (next === was) continue;
       moved += 1;
+      // The public `day` belongs to the public figures: a move of the bands alone
+      // leaves it, or it would say in public that whom people seek has changed.
+      const movedOn = had && next.verified === had.counts.verified ? had.day : day;
       await tx.query(
         `INSERT INTO waitlist_snapshot (pond_id, day, verified, woman, man, non_binary, finishing,
                                         seeks_men, seeks_everyone, seeks_women, taken_at)
@@ -176,7 +205,7 @@ export async function takeSnapshot(deps: WaitlistDeps): Promise<SnapshotResult> 
                taken_at = EXCLUDED.taken_at`,
         [
           pond.id,
-          day,
+          movedOn,
           next.verified,
           next.woman,
           next.man,
