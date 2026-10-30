@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { PHOTOS_FOR_COMPLETENESS } from "@kuutti/schema";
 import type { Queryable } from "../pool.ts";
 import { transaction } from "../pool.ts";
 import { DEMO_LABEL_PREFIX, type SyntheticPerson } from "./population.ts";
@@ -34,6 +35,14 @@ export const demoHetuHmac = (label: string): string =>
 
 /** The versions the rows name: the two consents of onboarding and the special-category wording of the profile (ADR-019 §4). */
 export type ConsentVersions = Readonly<Record<"terms" | "privacy" | "special_category", string>>;
+
+/** The key of a photo with no picture behind it (`BAR_PEOPLE`): its row makes a profile finished, and nobody is ever shown it. */
+export const PLACEHOLDER_PHOTO_PREFIX = "demo-placeholder-";
+
+const PLACEHOLDER_BLURHASH = "LEHV6nWB2yk8pyo0adR*.7kCMdnj";
+
+/** What a consent of `olderWording` names: no wording there has ever been, so it reads as none. */
+const OLDER_WORDING = "demo-older-wording";
 
 /** `spared`: identities that carry the mark and are not synthetic; never touched. */
 export type RemoveResult = { removed: number; spared: number };
@@ -196,7 +205,7 @@ export async function writePopulation(
           [
             accountId,
             consent.kind,
-            consentVersions[consent.kind],
+            consent.olderWording ? OLDER_WORDING : consentVersions[consent.kind],
             consent.localeShown,
             consent.givenAt,
           ],
@@ -229,6 +238,20 @@ export async function writePopulation(
             JSON.stringify(person.profile.fields),
             JSON.stringify(person.profile.prompts),
             person.registeredAt,
+          ],
+        );
+      }
+      if (person.fillsTheBar) {
+        await tx.query(
+          `INSERT INTO photo (account_id, key, blurhash, width, height, state, position, created_at)
+           SELECT $1, $2 || n, $3, 800, 1067, 'approved', n, $4
+           FROM generate_series(0, $5::int - 1) n`,
+          [
+            accountId,
+            PLACEHOLDER_PHOTO_PREFIX,
+            PLACEHOLDER_BLURHASH,
+            person.registeredAt,
+            PHOTOS_FOR_COMPLETENESS,
           ],
         );
       }

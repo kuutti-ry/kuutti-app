@@ -3,6 +3,7 @@ import {
   AGE_MIN,
   BIO_PRESETS,
   type BioPreset,
+  bioOrPromptsComplete,
   GENDERS,
   type Gender,
   HOBBIES,
@@ -12,6 +13,8 @@ import {
   PROMPTS_MAX,
   type ProfileFields,
   type PromptAnswer,
+  type SeeksBands,
+  seeksBand,
 } from "@kuutti/schema";
 import { ageFromYearMonth } from "@kuutti-ry/tunnistus-oidc/hetu";
 import { createRandom, type Random } from "./rng.ts";
@@ -108,6 +111,8 @@ type SyntheticConsent = {
   kind: "terms" | "privacy" | "special_category";
   localeShown: Language;
   givenAt: Date;
+  /** Given to a wording that has since changed: it reads as none, as a person's would. */
+  olderWording?: boolean;
 };
 
 export type SyntheticProfile = {
@@ -133,6 +138,8 @@ export type SyntheticPerson = {
   preferences: { seeks: Gender[]; ageWindow: { min: number; max: number } } | null;
   consents: SyntheticConsent[];
   profile: SyntheticProfile | null;
+  /** One of `BAR_PEOPLE`: a finished profile, there for the counter's bar alone. */
+  fillsTheBar?: boolean;
 };
 
 export type PopulationOptions = { size?: number; seed?: number; epoch?: Date };
@@ -328,6 +335,48 @@ function onboarded(
   };
 }
 
+/**
+ * How many people fill each band of the home card's bar (#507). The bar counts
+ * finished profiles, and without a release of faces the population has none,
+ * so these get two photos that have no picture (`PLACEHOLDER_PHOTO_PREFIX`).
+ * They have not accepted the terms' latest wording, a state real people are in,
+ * so the night's count sees a finished profile, and no gate, round or card ever
+ * sees them. Nobody is added: they are people the generator drew anyway, picked
+ * by what they drew, which leaves everybody else as they were.
+ */
+export const BAR_PEOPLE: Readonly<Record<keyof SeeksBands, number>> = {
+  seeksMen: 18,
+  seeksEveryone: 12,
+  seeksWomen: 20,
+};
+
+/** How many of these people fill each band: `BAR_PEOPLE`, unless the population is too small to hold them. */
+export function barOf(people: readonly SyntheticPerson[]): Record<keyof SeeksBands, number> {
+  const bar = { seeksMen: 0, seeksEveryone: 0, seeksWomen: 0 };
+  for (const person of people) {
+    const band = seeksBand(person.preferences?.seeks ?? null);
+    if (band && person.fillsTheBar) bar[band] += 1;
+  }
+  return bar;
+}
+
+function fillTheBar(people: readonly SyntheticPerson[]): void {
+  const left = { ...BAR_PEOPLE };
+  for (const person of people) {
+    const band = seeksBand(person.preferences?.seeks ?? null);
+    const words = person.profile && {
+      ...person.profile,
+      answeredPrompts: person.profile.prompts.length,
+    };
+    if (band === null || left[band] === 0 || !words || !bioOrPromptsComplete(words)) continue;
+    left[band] -= 1;
+    person.fillsTheBar = true;
+    for (const consent of person.consents) {
+      if (consent.kind === "terms") consent.olderWording = true;
+    }
+  }
+}
+
 /** The same people for the same size, seed and epoch, on every machine. */
 export function generatePopulation(options: PopulationOptions = {}): SyntheticPerson[] {
   const size = options.size ?? DEMO_SIZE;
@@ -366,6 +415,7 @@ export function generatePopulation(options: PopulationOptions = {}): SyntheticPe
       profile: null,
     });
   }
+  fillTheBar(people);
   return people;
 }
 

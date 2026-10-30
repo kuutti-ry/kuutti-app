@@ -8,6 +8,7 @@ import { captureLogger, describe, expect, type TestContext, test } from "../test
 import { people, pondNamed } from "../test/people.ts";
 import {
   countPonds,
+  countsBands,
   ensureFirstSnapshot,
   takeSnapshot,
   WAITLIST_LOCK_KEY,
@@ -29,6 +30,11 @@ async function deps(ctx: TestContext, at: Date) {
 
 const taken = async (ctx: TestContext, at: Date) => takeSnapshot((await deps(ctx, at)).deps);
 
+const bandsOf = async (ctx: TestContext, pond: string) => {
+  const counts = (await countPonds(ctx.client)).get(pond);
+  return [counts?.seeksMen, counts?.seeksEveryone, counts?.seeksWomen];
+};
+
 const listed = async (ctx: TestContext, pond: string) =>
   WaitlistResponse.parse(await (await ctx.app.request("/waitlist")).json()).ponds.find(
     (p) => p.pond.id === pond,
@@ -49,7 +55,16 @@ describe("the figures", () => {
     await people(ctx.client, null, 1, { gender: "woman", state: "active" });
 
     const counts = (await countPonds(ctx.client)).get(pond);
-    expect(counts).toEqual({ verified: 10, woman: 6, man: 4, nonBinary: 0, finishing: 10 });
+    expect(counts).toEqual({
+      verified: 10,
+      woman: 6,
+      man: 4,
+      nonBinary: 0,
+      finishing: 10,
+      seeksMen: 0,
+      seeksEveryone: 0,
+      seeksWomen: 0,
+    });
   });
 
   test("a shadow-banned account with a complete profile is not finishing, like an active one", async ({
@@ -335,5 +350,130 @@ describe("two counts at once", () => {
         await pool.end();
       }
     });
+  });
+});
+
+describe("the bands of the bar (#507)", () => {
+  describe("Whom a finished profile seeks decides its band", () => {
+    test.for([
+      { seeks: ["man"], band: [1, 0, 0] },
+      { seeks: ["woman"], band: [0, 0, 1] },
+      { seeks: ["woman", "man"], band: [0, 1, 0] },
+      { seeks: ["woman", "man", "non_binary"], band: [0, 1, 0] },
+      { seeks: ["man", "non_binary"], band: [1, 0, 0] },
+      { seeks: ["woman", "non_binary"], band: [0, 0, 1] },
+      { seeks: ["non_binary"], band: [0, 0, 0] },
+    ] as const)("$seeks: $band", async ({ seeks, band }, { ctx }) => {
+      const pond = await pondNamed(ctx.client, `test-band-${seeks.join("-")}`);
+      await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: [...seeks] });
+      expect(await bandsOf(ctx, pond)).toEqual(band);
+      expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 1, finishing: 0 });
+    });
+  });
+
+  test("Only finished profiles stand in a band", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-band-finished");
+    await people(ctx.client, pond, 10, { complete: true, consented: true, seeks: ["man"] });
+    const finishing = await people(ctx.client, pond, 10, {
+      complete: true,
+      consented: true,
+      seeks: ["man"],
+    });
+    await ctx.client.query("UPDATE account SET state = 'registered' WHERE id = ANY($1)", [
+      finishing,
+    ]);
+    expect(await bandsOf(ctx, pond)).toEqual([10, 0, 0]);
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({
+      verified: 20,
+      finishing: 10,
+    });
+  });
+
+  test("a shadow-banned finished profile stands in its band like any other", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-band-shadow");
+    const [one] = await people(ctx.client, pond, 1, {
+      complete: true,
+      consented: true,
+      seeks: ["woman"],
+    });
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [one]);
+    expect(await bandsOf(ctx, pond)).toEqual([0, 0, 1]);
+  });
+
+  test("A finished profile on an older consent stands in no band", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-band-consent");
+    const [older] = await people(ctx.client, pond, 2, {
+      complete: true,
+      consented: true,
+      seeks: ["man"],
+    });
+    await ctx.client.query(
+      "UPDATE consent SET version = 'older' WHERE account_id = $1 AND kind = 'special_category'",
+      [older],
+    );
+    await people(ctx.client, pond, 1, { complete: true, seeks: ["man"] });
+    expect(await bandsOf(ctx, pond)).toEqual([1, 0, 0]);
+    // Finished all the same: the consent says nothing of the profile.
+    expect((await countPonds(ctx.client)).get(pond)).toMatchObject({ verified: 3, finishing: 0 });
+  });
+
+  test("A count told to leave the bands out counts none", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-band-none");
+    await people(ctx.client, pond, 12, { complete: true, consented: true, seeks: ["man"] });
+    const { deps: job } = await deps(ctx, DAY_1);
+    await takeSnapshot({ ...job, bands: false });
+    const { rows } = await ctx.client.query<{ verified: number; seeks_men: number }>(
+      "SELECT verified, seeks_men FROM waitlist_snapshot WHERE pond_id = $1",
+      [pond],
+    );
+    expect(rows[0]).toEqual({ verified: 12, seeks_men: 0 });
+  });
+
+  test("Production counts no bands, every other environment does", () => {
+    expect(countsBands("production")).toBe(false);
+    for (const env of ["development", "test", "preview", "staging"]) {
+      expect(countsBands(env)).toBe(true);
+    }
+  });
+
+  test("the job's log line says no band, as it says no figure", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-band-log");
+    await people(ctx.client, pond, 11, { complete: true, consented: true, seeks: ["man"] });
+    const { deps: job, lines } = await deps(ctx, DAY_1);
+    await takeSnapshot(job);
+    const logged = lines().filter((l) => l.msg === "waitlist snapshot");
+    expect(logged).toHaveLength(1);
+    // Its fields, every one, and not a search of its text: a number looked for
+    // there is also found in the process id, which failed CI once in a while.
+    expect(Object.keys(logged[0] ?? {}).sort()).toEqual([
+      "counted",
+      "day",
+      "hostname",
+      "level",
+      "moved",
+      "msg",
+      "pid",
+      "ponds",
+      "time",
+    ]);
+  });
+
+  test("a row from before the bands takes them at the next count, the total standing", async ({
+    ctx,
+  }) => {
+    const pond = await pondNamed(ctx.client, "test-band-before");
+    await people(ctx.client, pond, 12, { complete: true, consented: true, seeks: ["man"] });
+    await taken(ctx, DAY_1);
+    // As the migration leaves a row that was written before the bands.
+    await ctx.client.query(
+      "UPDATE waitlist_snapshot SET seeks_men = 0, seeks_everyone = 0, seeks_women = 0",
+    );
+    await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: ["man"] });
+    await taken(ctx, DAY_2);
+    const { rows } = await ctx.client.query<{ verified: number; seeks_men: number }>(
+      "SELECT verified, seeks_men FROM waitlist_snapshot WHERE pond_id = $1",
+      [pond],
+    );
+    expect(rows[0]).toEqual({ verified: 12, seeks_men: 13 });
   });
 });

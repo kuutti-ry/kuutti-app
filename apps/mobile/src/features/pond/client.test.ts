@@ -1,5 +1,5 @@
 import { saveSession } from "@/lib/session";
-import { choosePond, fetchGate, fetchPonds, fetchWaitlist } from "./client";
+import { choosePond, fetchGate, fetchPondSeeks, fetchPonds, fetchWaitlist } from "./client";
 
 // The pond as the app reads it (#54, #94, #174): each route parsed by its
 // contract, and an answer without data an ApiError with the status.
@@ -63,6 +63,24 @@ describe("the pond client", () => {
       status: 503,
       message: "gate answered 503",
     });
+  });
+
+  it("reads the shares of the bar with the session, null when the pond may not say", async () => {
+    const seeks = { men: 30, everyone: 20, women: 50 };
+    const seen = answering(json({ seeks }), json({ seeks: null }), refusal(503));
+    expect(await fetchPondSeeks()).toEqual(seeks);
+    expect(pathOf(seen[0])).toBe("/ponds/seeks");
+    expect(seen[0]?.headers.get("authorization")).toBe(`Bearer ${token("access")}`);
+    expect(await fetchPondSeeks()).toBeNull();
+    await expect(fetchPondSeeks()).rejects.toMatchObject({
+      status: 503,
+      message: "seeks answered 503",
+    });
+  });
+
+  it("refuses shares that break the contract", async () => {
+    answering(json({ seeks: { men: 0, everyone: 20, women: 80 } }));
+    await expect(fetchPondSeeks()).rejects.toThrow();
   });
 
   it("lists the ponds to choose from", async () => {

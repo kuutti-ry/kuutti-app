@@ -6045,6 +6045,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ponds/seeks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whom the people of the caller's pond seek
+         * @description Whole percentages of the three bands of the caller's own pond, from finished profiles: those who seek men, those who seek both women and men, and those who seek women. Null until every band holds at least k people. The bands move only once at least k finished profiles have come or gone. Counted once a day.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The shares, or null. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["PondSeeksResponse"];
+                    };
+                };
+                /** @description unauthenticated, session_expired or session_revoked. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/waitlist": {
         parameters: {
             query?: never;
@@ -8440,6 +8488,14 @@ export interface components {
         };
         /** @enum {string} */
         GateState: "incomplete" | "pending" | "waiting" | "closed" | "open";
+        PondSeeksResponse: {
+            seeks: components["schemas"]["PondSeeks"];
+        };
+        PondSeeks: {
+            men: number;
+            everyone: number;
+            women: number;
+        } | null;
         WaitlistResponse: {
             k: number;
             ponds: components["schemas"]["WaitlistPond"][];

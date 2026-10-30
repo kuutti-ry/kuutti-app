@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Kuutti API",
-    "version": "0.80.1",
+    "version": "0.81.0",
     "description": "Free, non-commercial dating app for Finland. Every account is verified through a Finnish bank. Source: AGPL-3.0 with App Store exception."
   },
   "components": {
@@ -6251,6 +6251,45 @@
           "open"
         ]
       },
+      "PondSeeksResponse": {
+        "type": "object",
+        "properties": {
+          "seeks": {
+            "$ref": "#/components/schemas/PondSeeks"
+          }
+        },
+        "required": [
+          "seeks"
+        ],
+        "additionalProperties": false
+      },
+      "PondSeeks": {
+        "type": "object",
+        "nullable": true,
+        "properties": {
+          "men": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100
+          },
+          "everyone": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100
+          },
+          "women": {
+            "type": "integer",
+            "minimum": 5,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "men",
+          "everyone",
+          "women"
+        ],
+        "additionalProperties": false
+      },
       "WaitlistResponse": {
         "type": "object",
         "properties": {
@@ -12328,6 +12367,39 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GateResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthenticated, session_expired or session_revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ponds/seeks": {
+      "get": {
+        "summary": "Whom the people of the caller's pond seek",
+        "description": "Whole percentages of the three bands of the caller's own pond, from finished profiles: those who seek men, those who seek both women and men, and those who seek women. Null until every band holds at least k people. The bands move only once at least k finished profiles have come or gone. Counted once a day.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The shares, or null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PondSeeksResponse"
                 }
               }
             }

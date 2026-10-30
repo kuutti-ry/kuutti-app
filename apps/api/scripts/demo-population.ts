@@ -40,6 +40,7 @@ import {
   assertDemoTarget,
   assertStagingProcess,
   assetsFor,
+  barOf,
   DEMO_LABEL_PREFIX,
   DEMO_SUBJECT_PREFIX,
   DemoCommandError,
@@ -48,6 +49,7 @@ import {
   facesForPopulation,
   generatePopulation,
   type PhotoAsset,
+  PLACEHOLDER_PHOTO_PREFIX,
   parseDemoCommand,
   plannedPonds,
   removePopulation,
@@ -139,13 +141,13 @@ function storeOf(
   return { media: media.deps, moderation: media.setup.moderation };
 }
 
-/** The content keys of the population's pictures: what a write or a removal would leave without a row. */
+/** The content keys of the population's pictures: what a write or a removal would leave without a row. A placeholder has no object to leave. */
 async function populationPhotoKeys(db: ReturnType<typeof createPool>): Promise<string[]> {
   const { rows } = await db.query<{ key: string }>(
     `SELECT DISTINCT p.key FROM photo p
        JOIN account a ON a.id = p.account_id JOIN identity i ON i.id = a.identity_id
-     WHERE i.broker_subject LIKE $1`,
-    [`${DEMO_SUBJECT_PREFIX}${DEMO_LABEL_PREFIX}%`],
+     WHERE i.broker_subject LIKE $1 AND p.key NOT LIKE $2`,
+    [`${DEMO_SUBJECT_PREFIX}${DEMO_LABEL_PREFIX}%`, `${PLACEHOLDER_PHOTO_PREFIX}%`],
   );
   return rows.map((r) => r.key);
 }
@@ -203,7 +205,10 @@ try {
       ...CURRENT_CONSENT_VERSIONS,
       special_category: SPECIAL_CATEGORY_CONSENT_VERSION,
     });
-    console.log(JSON.stringify({ msg: "demo population", env, size, seed, ...result, notShown }));
+    const bar = barOf(people);
+    console.log(
+      JSON.stringify({ msg: "demo population", env, size, seed, ...result, notShown, bar }),
+    );
     if (assets && store) {
       const faces = facesForPopulation(people, assetsFor(assets.manifest, "pool"), seed);
       const accounts = await accountsByLabel(pool, [...faces.keys()]);

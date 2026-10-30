@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { WaitlistResponse } from "@kuutti/schema";
+import { SEED_PONDS } from "@kuutti/db";
+// biome-ignore lint/style/noRestrictedImports: a test of the bar over the synthetic population.
+import { generatePopulation, POND_PLANS, writePopulation } from "@kuutti/db/demo";
+import { CONSENT_VERSIONS } from "@kuutti/i18n";
+import { PondSeeksResponse, WaitlistResponse } from "@kuutti/schema";
 import { createApp } from "../app.ts";
+import { subjectsOfPond } from "../jobs/pond-gate.ts";
 import { takeSnapshot } from "../jobs/waitlist-snapshot.ts";
 import { signedInAccount, withMatchingConfig } from "../test/account.ts";
 import {
@@ -18,14 +23,225 @@ import { WAITLIST_CACHE_CONTROL } from "./routes.ts";
 // features/pond/waitlist.feature (#54, ADR-013): what the public may read.
 
 const DAY = new Date("2026-10-05T01:00:00Z");
+const NEXT_DAY = new Date("2026-10-06T01:00:00Z");
+const DAY_AFTER = new Date("2026-10-07T01:00:00Z");
 
-async function taken(ctx: TestContext) {
+async function taken(ctx: TestContext, at = DAY) {
   const { logger } = await captureLogger();
-  await takeSnapshot({ db: ctx.client, logger, now: () => DAY });
+  await takeSnapshot({ db: ctx.client, logger, now: () => at });
 }
+
+/** A signed-in person of the pond, who stands in no band: they have no finished profile. */
+async function personOf(ctx: TestContext, pond: string) {
+  const person = await signedInAccount(ctx.client);
+  await ctx.client.query("UPDATE account SET pond_id = $1 WHERE id = $2", [pond, person.accountId]);
+  return person;
+}
+
+const askBar = async (ctx: TestContext, headers: Record<string, string>) =>
+  PondSeeksResponse.parse(await (await ctx.app.request("/ponds/seeks", { headers })).json()).seeks;
+
+async function pondWithBands(
+  ctx: TestContext,
+  slug: string,
+  [men, everyone, women]: [number, number, number],
+) {
+  const pond = await pondNamed(ctx.client, slug);
+  const finished = { complete: true, consented: true };
+  await people(ctx.client, pond, men, { ...finished, seeks: ["man"] });
+  await people(ctx.client, pond, everyone, { ...finished, seeks: ["woman", "man"] });
+  await people(ctx.client, pond, women, { ...finished, seeks: ["woman"] });
+  return pond;
+}
+
+const totalOf = async (ctx: TestContext, pond: string) =>
+  (await read(ctx)).ponds.find((p) => p.pond.id === pond)?.verified;
 
 const read = async (ctx: TestContext) =>
   WaitlistResponse.parse(await (await ctx.app.request("/waitlist")).json());
+
+describe("the bar of whom a pond seeks (#507)", () => {
+  describe("The bar is said only when every band is at least k", () => {
+    test.for([
+      { men: 20, everyone: 10, women: 20, bar: { men: 40, everyone: 20, women: 40 } },
+      { men: 15, everyone: 15, women: 15, bar: { men: 35, everyone: 30, women: 35 } },
+      { men: 20, everyone: 9, women: 20, bar: null },
+      { men: 20, everyone: 0, women: 20, bar: null },
+      { men: 0, everyone: 20, women: 20, bar: null },
+    ])("$men, $everyone, $women: $bar", async ({ men, everyone, women, bar }, { ctx }) => {
+      const pond = await pondWithBands(ctx, `test-bar-${men}-${everyone}-${women}`, [
+        men,
+        everyone,
+        women,
+      ]);
+      const person = await personOf(ctx, pond);
+      await taken(ctx);
+      expect(await askBar(ctx, person.headers)).toEqual(bar);
+    });
+  });
+
+  test("The bar does not move with a total that moved by k", async ({ ctx }) => {
+    const pond = await pondWithBands(ctx, "test-bar-total", [10, 10, 10]);
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    const said = await askBar(ctx, person.headers);
+    expect(said).toEqual({ men: 35, everyone: 30, women: 35 });
+    await people(ctx.client, pond, 9, { gender: "woman" });
+    await people(ctx.client, pond, 1, { complete: true, consented: true, seeks: ["man"] });
+    await taken(ctx, NEXT_DAY);
+    expect(await totalOf(ctx, pond)).toBe(41);
+    // 40, 30 and 30 would say what the one who finished seeks, out loud.
+    expect(await askBar(ctx, person.headers)).toEqual(said);
+  });
+
+  test("The bar moves once k finished profiles have come or gone", async ({ ctx }) => {
+    const pond = await pondWithBands(ctx, "test-bar-moves", [10, 10, 10]);
+    const person = await personOf(ctx, pond);
+    const finishing = await people(ctx.client, pond, 10, {
+      complete: true,
+      consented: true,
+      seeks: ["man"],
+    });
+    await ctx.client.query("UPDATE account SET state = 'registered' WHERE id = ANY($1)", [
+      finishing,
+    ]);
+    await taken(ctx);
+    const said = await askBar(ctx, person.headers);
+    expect(await totalOf(ctx, pond)).toBe(41);
+    const inPublic = async () => (await read(ctx)).ponds.find((p) => p.pond.id === pond);
+    const before = await inPublic();
+
+    const finish = (ids: string[]) =>
+      ctx.client.query("UPDATE account SET state = 'active' WHERE id = ANY($1)", [ids]);
+    await finish(finishing.slice(0, 9));
+    await taken(ctx, NEXT_DAY);
+    expect(await askBar(ctx, person.headers)).toEqual(said);
+
+    await finish(finishing.slice(9));
+    await taken(ctx, DAY_AFTER);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 50, everyone: 25, women: 25 });
+    // Nothing in public says that it moved, not even the day.
+    expect(await inPublic()).toEqual(before);
+  });
+
+  test("The bar moves once k people have changed band", async ({ ctx }) => {
+    const pond = await pondNamed(ctx.client, "test-bar-change");
+    const finished = { complete: true, consented: true };
+    const changing = await people(ctx.client, pond, 20, { ...finished, seeks: ["man"] });
+    await people(ctx.client, pond, 10, { ...finished, seeks: ["woman", "man"] });
+    await people(ctx.client, pond, 10, { ...finished, seeks: ["woman"] });
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 50, everyone: 25, women: 25 });
+    await ctx.client.query(
+      `UPDATE preferences SET value = '["woman"]'
+       WHERE field = 'seeks' AND account_id = ANY($1)`,
+      [changing.slice(0, 10)],
+    );
+    await taken(ctx, NEXT_DAY);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 25, everyone: 25, women: 50 });
+    expect(await totalOf(ctx, pond)).toBe(41);
+  });
+
+  test("The bar says shares of the caller's own pond and nothing else", async ({ ctx }) => {
+    const here = await pondWithBands(ctx, "test-bar-here", [20, 10, 20]);
+    const there = await pondWithBands(ctx, "test-bar-there", [10, 10, 30]);
+    const mine = await personOf(ctx, here);
+    const theirs = await personOf(ctx, there);
+    await taken(ctx);
+    expect(await askBar(ctx, mine.headers)).toEqual({ men: 40, everyone: 20, women: 40 });
+    expect(await askBar(ctx, theirs.headers)).toEqual({ men: 20, everyone: 20, women: 60 });
+
+    const response = await ctx.app.request("/ponds/seeks", { headers: mine.headers });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ seeks: { men: 40, everyone: 20, women: 40 } });
+    expect(text).not.toContain(here);
+    expect(text).not.toContain(mine.accountId);
+  });
+
+  test("Nobody hears a bar without a pond or without a session", async ({ ctx }) => {
+    await pondWithBands(ctx, "test-bar-nobody", [20, 10, 20]);
+    const nobody = await signedInAccount(ctx.client);
+    await taken(ctx);
+    expect(await askBar(ctx, nobody.headers)).toBeNull();
+
+    const refused = await ctx.app.request("/ponds/seeks");
+    expect(refused.status).toBe(401);
+    const stale = await ctx.app.request("/ponds/seeks", {
+      headers: { authorization: "Bearer not-a-session" },
+    });
+    expect(stale.status).toBe(401);
+  });
+
+  test("a pond nobody has counted yet has no bar", async ({ ctx }) => {
+    await ctx.client.query("DELETE FROM waitlist_snapshot");
+    const pond = await pondNamed(ctx.client, "test-bar-uncounted");
+    const person = await personOf(ctx, pond);
+    expect(await askBar(ctx, person.headers)).toBeNull();
+  });
+
+  test("a larger k says less, and a k below the floor no more", async ({ ctx }) => {
+    const pond = await pondWithBands(ctx, "test-bar-k", [12, 12, 12]);
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    await withMatchingConfig(ctx.client, { waitlist_k: 13 });
+    expect(await askBar(ctx, person.headers)).toBeNull();
+    await withMatchingConfig(ctx.client, { waitlist_k: 1 });
+    expect(await askBar(ctx, person.headers)).not.toBeNull();
+  });
+
+  test("a failure is answered as a failure, not as a pond with no bar", async ({ ctx }) => {
+    const pond = await pondWithBands(ctx, "test-bar-failure", [12, 12, 12]);
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    await withMatchingConfig(ctx.client, { waitlist_k: "ten" });
+    const response = await ctx.app.request("/ponds/seeks", { headers: person.headers });
+    expect(response.status).toBe(500);
+  });
+
+  test("the demo population fills the bar, and stays out of every gate and round", {
+    timeout: 60_000,
+  }, async ({ ctx }) => {
+    for (const seeded of SEED_PONDS) {
+      await ctx.client.query(
+        `INSERT INTO ponds (slug, name_nominative, name_inessive) VALUES ($1, $2, $3)
+         ON CONFLICT (slug) DO NOTHING`,
+        [seeded.slug, seeded.nameNominative, seeded.nameInessive],
+      );
+    }
+    const people = generatePopulation();
+    await writePopulation(ctx.client, people, CONSENT_VERSIONS);
+    const { rows } = await ctx.client.query<{ id: string }>(
+      "SELECT id FROM ponds WHERE slug = $1",
+      [POND_PLANS[0]?.slug],
+    );
+    const pond = rows[0]?.id ?? "";
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    expect(await askBar(ctx, person.headers)).toEqual({ men: 35, everyone: 25, women: 40 });
+    // Nobody here is a subject, so nobody is in a pool, on a card or in a round.
+    expect(await subjectsOfPond(ctx.client, pond, DAY)).toEqual([]);
+  });
+
+  test("The public waitlist says nothing of whom anybody seeks", async ({ ctx }) => {
+    const pond = await pondWithBands(ctx, "test-bar-public", [20, 10, 20]);
+    const person = await personOf(ctx, pond);
+    await taken(ctx);
+    expect(await askBar(ctx, person.headers)).not.toBeNull();
+    const text = await (await ctx.app.request("/waitlist")).text();
+    expect(text).not.toMatch(/seeks|everyone/i);
+    const listed = WaitlistResponse.parse(JSON.parse(text)).ponds.find((p) => p.pond.id === pond);
+    expect(Object.keys(listed ?? {}).sort()).toEqual([
+      "day",
+      "finishing",
+      "pond",
+      "split",
+      "verified",
+    ]);
+  });
+});
 
 describe("the waitlist", () => {
   test("A pond below k publishes no number", async ({ ctx }) => {

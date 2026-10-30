@@ -1,4 +1,10 @@
-import { GateResponse, PondList, WaitlistResponse } from "@kuutti/schema";
+import {
+  GateResponse,
+  PondList,
+  type PondSeeks,
+  PondSeeksResponse,
+  WaitlistResponse,
+} from "@kuutti/schema";
 import { ApiError, api } from "@/lib/api";
 
 // The pond as the app reads it, through the typed client; the zod contracts
@@ -9,6 +15,13 @@ export async function fetchWaitlist(): Promise<WaitlistResponse> {
   const { data, response } = await api.GET("/waitlist");
   if (!data) throw new ApiError(`waitlist answered ${response.status}`, response.status);
   return WaitlistResponse.parse(data);
+}
+
+/** The shares of the card's bar (#507): the caller's own pond, asked with their session. */
+export async function fetchPondSeeks(): Promise<PondSeeks | null> {
+  const { data, response } = await api.GET("/ponds/seeks");
+  if (!data) throw new ApiError(`seeks answered ${response.status}`, response.status);
+  return PondSeeksResponse.parse(data).seeks;
 }
 
 /** The person's own place at the gate (#94, ADR-015): asked with their session. */

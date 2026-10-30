@@ -1,6 +1,8 @@
 import type { Queryable } from "@kuutti/db";
 import {
+  type PondSeeks,
   publishCounts,
+  seeksShares,
   type WaitlistCounts,
   type WaitlistResponse,
   waitlistK,
@@ -35,6 +37,9 @@ type FiguresRow = {
   man: number;
   non_binary: number;
   finishing: number;
+  seeks_men: number;
+  seeks_everyone: number;
+  seeks_women: number;
 };
 
 export type StandingFigures = { day: string; counts: WaitlistCounts };
@@ -42,7 +47,8 @@ export type StandingFigures = { day: string; counts: WaitlistCounts };
 /** The figures every pond stands on, exact: for the job that moves them and the read that publishes them. */
 export async function readStandingFigures(db: Queryable): Promise<Map<string, StandingFigures>> {
   const { rows } = await db.query<FiguresRow>(
-    `SELECT pond_id, to_char(day, 'YYYY-MM-DD') AS day, verified, woman, man, non_binary, finishing
+    `SELECT pond_id, to_char(day, 'YYYY-MM-DD') AS day, verified, woman, man, non_binary, finishing,
+            seeks_men, seeks_everyone, seeks_women
      FROM waitlist_snapshot`,
   );
   return new Map(
@@ -56,6 +62,9 @@ export async function readStandingFigures(db: Queryable): Promise<Map<string, St
           man: row.man,
           nonBinary: row.non_binary,
           finishing: row.finishing,
+          seeksMen: row.seeks_men,
+          seeksEveryone: row.seeks_everyone,
+          seeksWomen: row.seeks_women,
         },
       },
     ]),
@@ -81,4 +90,28 @@ export async function readWaitlist(db: Queryable): Promise<WaitlistResponse> {
       };
     }),
   };
+}
+
+/**
+ * What the caller's own pond may say of whom its people seek (#507, ADR-013
+ * §12): null without a pond, and until every band is at least k. Scoped by the
+ * caller in the query: a pond's bands are read for one's own pond only, and
+ * only as shares.
+ */
+export async function readPondSeeks(db: Queryable, accountId: string): Promise<PondSeeks | null> {
+  const { rows } = await db.query<Pick<FiguresRow, "seeks_men" | "seeks_everyone" | "seeks_women">>(
+    `SELECT s.seeks_men, s.seeks_everyone, s.seeks_women
+     FROM account a
+     JOIN waitlist_snapshot s ON s.pond_id = a.pond_id
+     WHERE a.id = $1`,
+    [accountId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  const bands = {
+    seeksMen: row.seeks_men,
+    seeksEveryone: row.seeks_everyone,
+    seeksWomen: row.seeks_women,
+  };
+  return seeksShares(bands, await readWaitlistK(db));
 }
