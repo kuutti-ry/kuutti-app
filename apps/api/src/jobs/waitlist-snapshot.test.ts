@@ -441,10 +441,21 @@ describe("the bands of the bar (#507)", () => {
     await people(ctx.client, pond, 11, { complete: true, consented: true, seeks: ["man"] });
     const { deps: job, lines } = await deps(ctx, DAY_1);
     await takeSnapshot(job);
-    const said = JSON.stringify(lines());
-    expect(said).toContain("waitlist snapshot");
-    expect(said).not.toContain("seeks");
-    expect(said).not.toContain('":11');
+    const logged = lines().filter((l) => l.msg === "waitlist snapshot");
+    expect(logged).toHaveLength(1);
+    // Its fields, every one, and not a search of its text: a number looked for
+    // there is also found in the process id, which failed CI once in a while.
+    expect(Object.keys(logged[0] ?? {}).sort()).toEqual([
+      "counted",
+      "day",
+      "hostname",
+      "level",
+      "moved",
+      "msg",
+      "pid",
+      "ponds",
+      "time",
+    ]);
   });
 
   test("a row from before the bands takes them at the next count, the total standing", async ({
