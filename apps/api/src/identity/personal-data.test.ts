@@ -40,10 +40,9 @@ const REGISTER: Record<string, Entry> = {
     erasure: "stays",
     why: "The tombstone: the partial unique index then admits a new live account after the cooldown.",
     by: "tombstoneAccount",
-    // paused_from is the bug of #527: it should be cleared, and moves there with that fix.
-    stays: "id identity_id state state_changed_at paused_from registered_at deleted_at",
+    stays: "id identity_id state state_changed_at registered_at deleted_at",
     cleared:
-      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at pond_id sanctioned_from seeks_changed_at",
+      "birth_month birth_year email email_confirmed_at found_them_answered gender gender_changed_at paused_from pond_id sanctioned_from seeks_changed_at",
     exported: ["account"],
   },
   account_export: { erasure: "goes", by: "deleteExportsOfAccount", exported: ["exports"] },

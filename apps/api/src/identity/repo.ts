@@ -831,7 +831,7 @@ export async function tombstoneAccount(
     `UPDATE account SET state = 'deleted', state_changed_at = $2, deleted_at = $2,
        birth_year = NULL, birth_month = NULL, gender = NULL, pond_id = NULL,
        gender_changed_at = NULL, seeks_changed_at = NULL, email = NULL, email_confirmed_at = NULL,
-       sanctioned_from = NULL, found_them_answered = false
+       paused_from = NULL, sanctioned_from = NULL, found_them_answered = false
      WHERE id = $1 AND state <> 'deleted'`,
     [accountId, at],
   );

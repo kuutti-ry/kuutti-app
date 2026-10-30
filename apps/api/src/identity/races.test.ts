@@ -20,6 +20,7 @@ import { eraseAccount } from "./erasure.ts";
 import { deriveIdentity, hmacKeyFromHex } from "./hetu.ts";
 import { startLogin } from "./login.ts";
 import { CURRENT_CONSENT_VERSIONS } from "./onboarding.ts";
+import { pauseAccount } from "./pause.ts";
 import { sweepSessions } from "./sessions.ts";
 
 // What the slice answers when another request commits in the middle of one
@@ -146,6 +147,36 @@ async function accountRow(ctx: TestContext, accountId: string) {
   }>("SELECT state, email, gender, pond_id FROM account WHERE id = $1", [accountId]);
   return rows[0];
 }
+
+describe("a break that begins between the session guard and the erasure", () => {
+  // Pausing signs out every device, so the deletion route meets a paused account
+  // only here, or on the one session pause.ts's shortcut leaves (#527).
+  test("A break begun while the deletion is under way leaves no earlier state on the tombstone", async ({
+    ctx,
+  }) => {
+    const me = await signedInAccount(ctx.client);
+    await ctx.client.query("UPDATE account SET state = 'shadow_banned' WHERE id = $1", [
+      me.accountId,
+    ]);
+    const { logger } = await captureLogger();
+    const db = interleaved(ctx.client, { after: GUARD_LOOKUP }, () =>
+      pauseAccount({ db: ctx.client, logger, now: () => new Date() }, me.accountId),
+    );
+    const { app } = await appOn(db);
+    const res = await send(app, me.headers, {
+      method: "POST",
+      path: "/account/delete",
+      body: { confirm: true },
+    });
+    expect(db.ran()).toBe(true);
+    expect(res.status).toBe(204);
+    const { rows } = await ctx.client.query<{ state: string; paused_from: string | null }>(
+      "SELECT state, paused_from FROM account WHERE id = $1",
+      [me.accountId],
+    );
+    expect(rows[0]).toEqual({ state: "deleted", paused_from: null });
+  });
+});
 
 describe("an erasure that commits between the session guard and the handler", () => {
   test("the e-mail routes and the deletion answer 404 and write nothing for the tombstone", async ({
