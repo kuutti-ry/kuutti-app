@@ -1235,6 +1235,85 @@ describe("where the decision buttons sit (#82)", () => {
     expect(controls()).toEqual(["Pass", "Like"]);
     expect(inColumn("Like")).toBe(true);
   });
+
+  // The marks Like and Pass carry (#520): a style changes those two icons and
+  // nothing else, wherever the buttons sit.
+  /** The host nodes of a type inside a control. */
+  const inside = (name: string, type: string) => {
+    const search = (node: HostNode | string, found: boolean): HostNode[] => {
+      if (typeof node === "string") return [];
+      const within = found || node.props.accessibilityLabel === name;
+      return [
+        ...(within && node.type === type ? [node] : []),
+        ...(node.children ?? []).flatMap((child) => search(child, within)),
+      ];
+    };
+    return search(screen.toJSON() as HostNode, false);
+  };
+  const outlines = (name: string) => inside(name, "RNSVGPath").map((path) => String(path.props.d));
+  const OWN_ICON = /^(?!M23 12a11 )/;
+
+  describe.each([
+    ["Kuutti's own marks", "kuutti", OWN_ICON, OWN_ICON],
+    // Like on the mark that confirms, ✕ or A; Pass on the one that goes back, ○ or B.
+    ["the shapes", "shapes", /^M23 12a11 .+ZM12 10\.59L/, /^M23 12a11 .+ZM18\.5 12a6\.5/],
+    ["the letters", "letters", /^M23 12a11 .+ZM11\.06 5\.65A/, /^M23 12a11 .+ZM7 6A1/],
+  ] as const)("with %s", (_style, style, likeMark, passMark) => {
+    it.each([
+      ["the right hand", { hand: "right", oneHanded: false }, ["Send a fish", "Pass", "Like"]],
+      ["the left hand", { hand: "left", oneHanded: false }, ["Send a fish", "Like", "Pass"]],
+      [
+        "the right hand, one-handed",
+        { hand: "right", oneHanded: true },
+        ["Send a fish", "Pass", "Like"],
+      ],
+      [
+        "the left hand, one-handed",
+        { hand: "left", oneHanded: true },
+        ["Send a fish", "Pass", "Like"],
+      ],
+    ] as const)(
+      "keeps each button's shape, word, place and spoken name for %s",
+      async (_place, placement, order) => {
+        await placed({ ...placement, style });
+        expect(controls()).toEqual(order);
+        const like = screen.getByRole("button", { name: "Like" });
+        const pass = screen.getByRole("button", { name: "Pass" });
+        expect(like.props.className).toMatch(/\brounded-full\b/);
+        expect(pass.props.className).toMatch(/\brounded-md\b/);
+        expect(within(like).getByText("Like")).toBeTruthy();
+        expect(within(pass).getByText("Pass")).toBeTruthy();
+        expect(outlines("Like")[0]).toMatch(likeMark);
+        expect(outlines("Pass")[0]).toMatch(passMark);
+        // The mark is silent: the word is what a screen reader meets.
+        expect(screen.queryByRole("image")).toBeNull();
+        expect(inside("Like", "RNSVGSvgView")[0]?.props.accessibilityElementsHidden).toBe(true);
+        expect(inside("Pass", "RNSVGSvgView")[0]?.props.accessibilityElementsHidden).toBe(true);
+        noProblems();
+      },
+    );
+  });
+
+  it.each(["shapes", "letters"])(
+    "leaves the fish and Undo their own icons with the %s",
+    async (style) => {
+      await placed(null);
+      await press("Pass");
+      const own = [outlines("Send a fish"), outlines("Undo your last decision")];
+      expect(own.flat()).not.toEqual([]);
+      await placed({ style });
+      await press("Pass");
+      expect([outlines("Send a fish"), outlines("Undo your last decision")]).toEqual(own);
+    },
+  );
+
+  it("keeps the mark's size beside the word at the largest text, the buttons' targets with it", async () => {
+    atFontScale(2);
+    await placed({ style: "letters" });
+    expect(inside("Like", "RNSVGSvgView")[0]?.props.width).toBe(20);
+    expect(inside("Pass", "RNSVGSvgView")[0]?.props.width).toBe(20);
+    noProblems();
+  });
 });
 
 describe("the short pool (#99, ADR-042)", () => {

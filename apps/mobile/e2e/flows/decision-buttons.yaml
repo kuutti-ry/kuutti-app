@@ -1,10 +1,11 @@
 # The Decision buttons setting (#82): a row in Appearance and language that
 # opens in place (#511) and chooses the hand the round's Like and Pass are
-# placed for, and one-handed mode, each kept on the phone. Where the buttons
-# then sit on the round is the round screen's jest tests; this flow holds the
-# setting on a device: chosen, and kept when the row is opened again.
-# Sanna; the flow leaves the setting as it found it, right hand and two
-# hands, and the row closed.
+# placed for, one-handed mode and the marks they carry (#520), each kept on
+# the phone. Where the buttons then sit and what they carry on the round is
+# the round screen's jest tests: Sanna's matching has not opened, and a mark
+# is silent. This flow holds the setting on a device: chosen, and kept when
+# the row is opened again. Sanna; the flow leaves the setting as it found it,
+# right hand, two hands and Kuutti's style, and the row closed.
 appId: fi.kuutti.app
 name: The decision buttons setting places Like and Pass for either hand, and one-handed
 ---
@@ -39,6 +40,17 @@ name: The decision buttons setting places Like and Pass for either hand, and one
       text: "1|(One-handed|Yhdellä kädellä|Med en hand), on"
       rightOf: "One-handed|Yhdellä kädellä|Med en hand"
     timeout: 15000
+# The style may lie below the fold. The shapes' button shows ✕ and ○ and is
+# named in words, which is what Maestro reads, the screen reader's name.
+- scrollUntilVisible:
+    element: ".*✓.*Kuutti.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Cross and circle|Risti ja ympyrä|Kryss och cirkel"
+- extendedWaitUntil:
+    visible: ".*✓.*(Cross and circle|Risti ja ympyrä|Kryss och cirkel).*"
+    timeout: 15000
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:
@@ -63,6 +75,15 @@ name: The decision buttons setting places Like and Pass for either hand, and one
       rightOf: "One-handed|Yhdellä kädellä|Med en hand"
     timeout: 15000
 - assertVisible: ".*✓.*(Right hand|Oikea käsi|Höger hand).*"
+- scrollUntilVisible:
+    element: ".*✓.*(Cross and circle|Risti ja ympyrä|Kryss och cirkel).*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Kuutti"
+- extendedWaitUntil:
+    visible: ".*✓.*Kuutti.*"
+    timeout: 15000
 - runFlow:
     file: ../common/close-settings-row.yaml
     env:

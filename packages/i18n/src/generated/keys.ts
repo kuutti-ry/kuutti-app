@@ -1464,6 +1464,12 @@ export type MessageParams = {
   "settings.decisionButtons.oneHanded": Record<never, never>;
   "settings.decisionButtons.oneHandedHint": Record<never, never>;
   "settings.decisionButtons.right": Record<never, never>;
+  "settings.decisionButtons.style": Record<never, never>;
+  "settings.decisionButtons.style.kuutti": Record<never, never>;
+  "settings.decisionButtons.style.letters": Record<never, never>;
+  "settings.decisionButtons.style.shapes": Record<never, never>;
+  "settings.decisionButtons.style.shapes.spoken": Record<never, never>;
+  "settings.decisionButtons.styleHint": Record<never, never>;
   "settings.decisionButtons.withOneHanded": { "hand": string };
   "settings.email.label": Record<never, never>;
   "settings.email.none": Record<never, never>;

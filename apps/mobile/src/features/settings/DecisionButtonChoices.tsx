@@ -3,7 +3,7 @@ import { View } from "react-native";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
-import { type Hand, useDecisionButtons } from "@/lib/decision-buttons";
+import { type ButtonStyle, type Hand, useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
 import { Choice } from "./Choice";
 
@@ -13,12 +13,27 @@ const HANDS: ReadonlyArray<{ value: Hand; label: PlainMessageKey }> = [
   { value: "left", label: "settings.decisionButtons.left" },
 ];
 
+/** The marks Like and Pass can carry, Kuutti's own first and the default; none names a console (#520). */
+const STYLES: ReadonlyArray<{
+  value: ButtonStyle;
+  label: PlainMessageKey;
+  spoken?: PlainMessageKey;
+}> = [
+  { value: "kuutti", label: "settings.decisionButtons.style.kuutti" },
+  {
+    value: "shapes",
+    label: "settings.decisionButtons.style.shapes",
+    spoken: "settings.decisionButtons.style.shapes.spoken",
+  },
+  { value: "letters", label: "settings.decisionButtons.style.letters" },
+];
+
 /**
  * The decision buttons (#82), in their Settings row (#511): which hand the round's Like and Pass
- * are placed for, and one-handed mode, which puts Undo, the fish, Pass and
- * Like in one column on that side. Kept on the phone
- * (src/lib/decision-buttons.tsx); the buttons keep their words and shapes
- * wherever they sit.
+ * are placed for, one-handed mode, which puts Undo, the fish, Pass and Like
+ * in one column on that side, and the marks Like and Pass carry (#520). Kept
+ * on the phone (src/lib/decision-buttons.tsx); the buttons keep their words
+ * and shapes wherever they sit and whatever they carry.
  */
 export function DecisionButtonChoices() {
   const { t } = useT();
@@ -52,6 +67,24 @@ export function DecisionButtonChoices() {
           />
         </View>
         <Text variant="muted">{t("settings.decisionButtons.oneHandedHint")}</Text>
+      </View>
+      <View className="gap-2">
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel={t("settings.decisionButtons.style")}
+          className="flex-row flex-wrap gap-2"
+        >
+          {STYLES.map(({ value, label, spoken }) => (
+            <Choice
+              key={value}
+              label={t(label)}
+              spoken={spoken && t(spoken)}
+              chosen={settings.style === value}
+              onPress={() => set({ style: value })}
+            />
+          ))}
+        </View>
+        <Text variant="muted">{t("settings.decisionButtons.styleHint")}</Text>
       </View>
     </>
   );

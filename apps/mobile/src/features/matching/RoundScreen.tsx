@@ -2,9 +2,7 @@ import type { PlainMessageKey } from "@kuutti/i18n";
 import type { RoundChoice, RoundReason } from "@kuutti/schema";
 import { useFocusEffect, useRouter } from "expo-router";
 import Fish from "lucide-react-native/icons/fish";
-import Heart from "lucide-react-native/icons/heart";
 import Undo2 from "lucide-react-native/icons/undo-2";
-import X from "lucide-react-native/icons/x";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -25,6 +23,7 @@ import { useDecisionButtons } from "@/lib/decision-buttons";
 import { useT } from "@/lib/locale";
 import { cn } from "@/lib/utils";
 import { useHapticTap } from "@/theme/haptics";
+import { DECISION_ICONS, type DecisionIcons } from "./faceButtons";
 import { ShortPool } from "./ShortPool";
 import { type RoundCard, useRound } from "./useRound";
 
@@ -283,6 +282,7 @@ export function RoundScreen() {
           busy={round.busy}
           left={placement.hand === "left"}
           oneHanded={placement.oneHanded}
+          icons={DECISION_ICONS[placement.style]}
           undo={undo}
           onChoose={choose}
         />
@@ -317,6 +317,7 @@ function DecisionBar({
   busy,
   left,
   oneHanded,
+  icons,
   undo,
   onChoose,
 }: {
@@ -326,6 +327,8 @@ function DecisionBar({
   busy: boolean;
   left: boolean;
   oneHanded: boolean;
+  /** Like's and Pass's icons, in the person's style (#520); nothing else changes with it. */
+  icons: DecisionIcons;
   /** Undo, which comes down from the header in one-handed mode; nothing while there is nothing to undo. */
   undo: ReactNode;
   onChoose: (card: RoundCard, decision: RoundChoice) => void;
@@ -356,7 +359,7 @@ function DecisionBar({
       accessibilityState={{ selected: entry.decision === "pass" }}
       onPress={() => onChoose(card, "pass")}
     >
-      <Icon as={X} />
+      <Icon as={icons.pass} />
       <Text>{t("round.pass")}</Text>
     </Button>
   );
@@ -370,7 +373,7 @@ function DecisionBar({
       accessibilityState={{ selected: entry.decision === "like" }}
       onPress={() => onChoose(card, "like")}
     >
-      <Icon as={Heart} />
+      <Icon as={icons.like} />
       <Text>{t("round.like")}</Text>
     </Button>
   );

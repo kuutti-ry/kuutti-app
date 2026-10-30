@@ -26,22 +26,55 @@ describe("readDecisionButtons", () => {
     ["no object", "[1]"],
     ["null", "null"],
     ["a number", "7"],
-  ])("is the default where %s is stored: the right hand, not one-handed", (_what, raw) => {
-    expect(readDecisionButtons(raw)).toEqual({ hand: "right", oneHanded: false });
-  });
+  ])(
+    "is the default where %s is stored: the right hand, not one-handed, Kuutti's own marks",
+    (_what, raw) => {
+      expect(readDecisionButtons(raw)).toEqual({
+        hand: "right",
+        oneHanded: false,
+        style: "kuutti",
+      });
+    },
+  );
 
   it("takes each known value and the default for the rest", () => {
     expect(readDecisionButtons(JSON.stringify({ hand: "left" }))).toEqual({
       hand: "left",
       oneHanded: false,
+      style: "kuutti",
     });
     expect(readDecisionButtons(JSON.stringify({ oneHanded: true }))).toEqual({
       hand: "right",
       oneHanded: true,
+      style: "kuutti",
     });
     expect(readDecisionButtons(JSON.stringify({ hand: "middle", oneHanded: "yes" }))).toEqual(
       DEFAULT_DECISION_BUTTONS,
     );
+  });
+
+  // A phone that chose its hand before #520 holds no style at all.
+  it.each(["kuutti", "shapes", "letters"] as const)("reads the style %s", (style) => {
+    expect(readDecisionButtons(JSON.stringify({ hand: "left", style }))).toEqual({
+      hand: "left",
+      oneHanded: false,
+      style,
+    });
+  });
+
+  it.each([
+    ["a style it does not know", "console"],
+    ["a name in the wrong case", "Shapes"],
+    ["an empty name", ""],
+    ["a number", 1],
+    ["nothing", null],
+    ["a list", ["shapes"]],
+  ])("takes Kuutti's own marks for %s and keeps the rest", (_what, style) => {
+    expect(readDecisionButtons(JSON.stringify({ oneHanded: true, style }))).toEqual({
+      hand: "right",
+      oneHanded: true,
+      style: "kuutti",
+    });
   });
 });
 
@@ -51,10 +84,10 @@ describe("the provider", () => {
     const { result } = await renderHook(() => useDecisionButtons(), { wrapper });
     await waitFor(() => expect(result.current.settings.hand).toBe("left"));
     await act(async () => result.current.set({ oneHanded: true }));
-    expect(result.current.settings).toEqual({ hand: "left", oneHanded: true });
-    await waitFor(() =>
-      expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual({ hand: "left", oneHanded: true }),
-    );
+    await act(async () => result.current.set({ style: "shapes" }));
+    const kept = { hand: "left", oneHanded: true, style: "shapes" };
+    expect(result.current.settings).toEqual(kept);
+    await waitFor(() => expect(JSON.parse(store.get(KEY) ?? "{}")).toEqual(kept));
   });
 
   it("lets a stored choice that arrives after the provider has gone change nothing", async () => {
