@@ -1196,7 +1196,7 @@ export const fi: Readonly<Record<string, string>> = {
   "settings.title": "Asetukset",
   "settings.version.commit": "Koontiversio {commit}",
   "settings.version.label": "Versio",
-  "signIn.agreements.research": "Kumpi tahansa vastaus vie sinut eteenpäin pankkiin.",
+  "signIn.agreements.research": "Kumpi tahansa vastaus vie sinut eteenpäin kirjautumaan pankkitunnuksilla.",
   "signIn.agreements.title": "Ennen kuin kirjaudut",
   "signIn.button": "Kirjaudu pankkitunnuksilla",
   "signIn.done": "Olet kirjautunut sisään.",

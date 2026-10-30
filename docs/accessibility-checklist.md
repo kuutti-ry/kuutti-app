@@ -54,10 +54,10 @@ The screens before the bank (#418, ADR-010 §15) show on a phone that has not re
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
 | Before you sign in: the norms and the consents (#418) | `/` (Aino, on a phone's first sign-in) | Before you sign in a header; the four lines on how Kuutti does things; the explanation; outside Finnish the line that the Finnish text counts; the terms and privacy cards, each title, summary and version link in order; I'm in, and I accept both named; no bank button anywhere before it | | |
-| Before you sign in: research (#418) | `/`, after accepting both | the screen read from its top, the header first; the research card with its version link; the line that it can be changed later; the line that either answer goes on to the bank; Yes, I take part and Not now named, neither heard as selected; after either, the bank button | | |
+| Before you sign in: research (#418) | `/`, after accepting both | the screen read from its top, the header first; the research card with its version link; the line that it can be changed later; the line that either answer goes on to the sign-in with the bank; Yes, I take part and Not now named, neither heard as selected; after either, the bank button | | |
 | Start, signed out | `/` | the loading line said; the title a header; the explanation; Sign in with your bank, straight away on a phone that has recorded the current versions | | |
 | Back from the bank | `/auth?code=…` | the system browser and the bank's pages are not ours, so the walk resumes at the return; opening, signing in and done said as they change | | |
-| Refused | `/auth?error=…` (Tapio, Ilona, Lauri, Venla) | the card's title and its sentence, with the date where there is one; Try again named | | |
+| Refused | `/auth?error=…` (Tapio, Ilona, Lauri, Venla) | the card's title and its sentence, with the date where there is one; Sign in with your bank named, as these four's refusals last (#466); Try again named instead after one that may pass, such as a cancel at the bank | | |
 | Right after a break | `/` (Helmi, after Take a break) | the sign-in with the paused card: its title and text | | |
 | Signed out by the lock (#418) | `/` (Sanna, after Sign in with the bank instead on the lock screen, or five wrong passcodes) | the sign-in with the lock's card: its title and text, that the lock is off now; then Sign in with your bank | | |
 

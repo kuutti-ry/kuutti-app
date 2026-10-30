@@ -3261,7 +3261,7 @@ signIn.explain:
 
 signIn.button:
   en: Sign in with your bank
-  description: Sign-in screen, the button that opens the bank chooser in the system browser.
+  description: Sign-in screen, the button that opens the bank chooser in the system browser. Also the button after a refusal that lasts (deletion cooldown, ban, suspension, under 18), where trying again would only repeat it, but the phone may be somebody else's (#466).
   fi: Kirjaudu pankkitunnuksilla
   sv: Logga in med din bank
   machine: { fi: true, sv: true }
@@ -3358,10 +3358,10 @@ signIn.agreements.title:
   machine: { fi: true, sv: true }
 
 signIn.agreements.research:
-  en: "Either answer takes you on to your bank."
+  en: "Either answer takes you on to the sign-in with your bank."
   description: "Before the bank login, under the research question (#418): a yes and a no both lead on to the sign-in, and a no costs nothing (GDPR art. 7(4))."
-  fi: "Kumpi tahansa vastaus vie sinut eteenpäin pankkiin."
-  sv: "Vilket svar du än ger går du vidare till din bank."
+  fi: "Kumpi tahansa vastaus vie sinut eteenpäin kirjautumaan pankkitunnuksilla."
+  sv: "Vilket svar du än ger går du vidare till inloggningen med din bank."
   machine: { fi: true, sv: true }
 
 signIn.lock.title:
@@ -3702,7 +3702,7 @@ signIn.error.generic:
 
 signIn.tryAgain:
   en: Try again
-  description: Sign-in screen, the button in the error state; returns to the start.
+  description: Sign-in screen, the button after a refusal that may pass (a cancel, a failure, a link gone stale); opens the bank again. A refusal that lasts has signIn.button instead (#466).
   fi: Yritä uudelleen
   sv: Försök igen
   machine: { fi: true, sv: true }
