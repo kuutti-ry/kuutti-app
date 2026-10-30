@@ -1,3 +1,4 @@
+import { realLocale } from "@kuutti/i18n";
 import {
   CONTACT_INPUT_MAX,
   CONTACT_KINDS,
@@ -269,7 +270,8 @@ function ContactCard({
   );
 
   const answerWords = said === null ? null : wordsOf(t, kind, said.notice, codeOf(region));
-  const countryName = new Intl.DisplayNames([locale], { type: "region" }).of(region) ?? region;
+  const countryName =
+    new Intl.DisplayNames([realLocale(locale)], { type: "region" }).of(region) ?? region;
   const input = (
     <Input
       ref={field}

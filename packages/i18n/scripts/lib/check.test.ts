@@ -107,16 +107,156 @@ describe("the review lists", () => {
   });
 });
 
+// Stadin slangi (#521): never required, and never where a joke could hurt.
+describe("a slangi text", () => {
+  const slang = (fields: Partial<Messages[string]> = {}): Messages[string] =>
+    ok({ slangi: "Tallentsaa", machine: { fi: true, sv: true, slangi: true }, ...fields });
+  const REFUSED = "slangi stands only where a joke is harmless (isSlangKey)";
+
+  it("is never missing, by an error or a warning", () => {
+    expect(checkMessages({ "round.title": ok() }, { release: false })).toEqual({
+      errors: [],
+      warnings: [],
+    });
+    expect(checkMessages({ "round.title": ok() }, { release: true }).warnings).toEqual([]);
+  });
+
+  it.each([
+    ["round.title"],
+    ["round.match.title"],
+    ["round.empty"],
+    ["home.title"],
+    ["profile.section.work"],
+    ["settings.title"],
+  ])("stands on %s", (key) => {
+    expect(errorsOf({ [key]: slang() })).toEqual([]);
+  });
+
+  it.each([
+    // Outside the four namespaces.
+    ["legal.terms.title"],
+    ["legal.research.summary"],
+    ["errors.rate_limited"],
+    ["safety.block.title"],
+    ["notices.suspended"],
+    ["account.delete.title"],
+    ["account.break.title"],
+    ["onboarding.consents.explain"],
+    ["signIn.title"],
+    ["push.round"],
+    ["mail.code.subject"],
+    ["support.mieli.name"],
+    ["admin.title"],
+    ["nothing.of.ours"],
+    // A namespace is the whole first word.
+    ["homework.title"],
+    ["safety.home.title"],
+    // Inside them: a failure.
+    ["round.failed"],
+    ["round.decision.failed"],
+    ["home.gate.failed"],
+    ["profile.error.save"],
+    ["settings.invite.loadFailed"],
+    ["settings.contacts.invalid"],
+    ["settings.contacts.phoneInvalid"],
+    // Consent and a person's data.
+    ["settings.research.title"],
+    ["settings.sensitive.title"],
+    ["settings.export.label"],
+    // The way out of danger or of a session.
+    ["settings.support.label"],
+    ["round.report.open"],
+    ["round.block.open"],
+    ["settings.lock.label"],
+    ["settings.session.label"],
+    ["settings.logoutAll.confirm.title"],
+    // An answer that says who somebody is.
+    ["profile.option.gender.woman"],
+  ])("is refused on %s", (key) => {
+    expect(errorsOf({ [key]: slang() })).toEqual([`${key}: ${REFUSED}`]);
+  });
+
+  it("is held to the arguments, the tags, the room and the characters of any text", () => {
+    expect(errorsOf({ "round.title": slang({ slangi: "Moi {name}" }) })).toEqual([
+      "round.title: slangi does not use the same arguments as en",
+    ]);
+    expect(
+      errorsOf({
+        "round.title": slang({ en: "<b>Save</b>", fi: "<b>Tallenna</b>", sv: "<b>Spara</b>" }),
+      }),
+    ).toEqual(["round.title: slangi does not keep the tags of en"]);
+    expect(errorsOf({ "round.title": slang({ slangi: "{" }) })).toEqual([
+      expect.stringMatching(/^round\.title: slangi is not valid ICU \(/),
+    ]);
+    expect(errorsOf({ "round.title": slang({ slangi: "Tallentsaa", max_length: 8 }) })).toEqual([
+      "round.title: slangi is over its max_length of 8",
+    ]);
+    expect(errorsOf({ "round.title": slang({ slangi: "Sae‮" }) })).toEqual([
+      "round.title: slangi contains control, bidirectional or line-separator characters",
+    ]);
+  });
+
+  it("takes Finnish's plural forms, which Intl knows it by", () => {
+    const en = "{n, selectordinal, one {#st} two {#nd} few {#rd} other {#th}}";
+    const fi = "{n, selectordinal, other {#.}}";
+    expect(
+      errorsOf({
+        "round.title": slang({
+          en,
+          fi,
+          sv: "{n, selectordinal, one {#:a} other {#:e}}",
+          slangi: fi,
+        }),
+      }),
+    ).toEqual([]);
+  });
+
+  it("carries a machine flag like any text nobody native has read", () => {
+    expect(errorsOf({ "round.title": slang({ machine: { fi: true, sv: true } }) })).toEqual([
+      expect.stringContaining("round.title: slangi carries neither machine: nor reviewed:"),
+    ]);
+  });
+
+  it("keeps a release going as machine text, since no release speaks it", () => {
+    const released = ok({
+      slangi: "Tallentsaa",
+      machine: { sv: true, slangi: true },
+      reviewed: { fi: reviewHash("Save", "Tallenna") },
+    });
+    expect(errorsOf({ "round.title": released }, true)).toEqual([]);
+  });
+});
+
 describe("messages.yaml's schema", () => {
   it.each([
     ["fi", true],
     ["sv", true],
     ["en", false],
+    // So neither the translator nor the review sheet takes it.
+    ["slangi", false],
     ["FI", false],
     ["", false],
     [undefined, false],
   ])("takes %o as a translated locale: %s", (value, expected) => {
     expect(isTranslatedLocale(value)).toBe(expected);
+  });
+
+  it("refuses a machine flag or a review hash on slangi with no slangi text", () => {
+    expect(() =>
+      parseMessages("demo.save:\n  en: Save\n  description: d\n  machine: { slangi: true }\n"),
+    ).toThrow(/demo\.save: machine\.slangi is set but there is no slangi text/);
+    const hash = reviewHash("Save", "Sae");
+    expect(() =>
+      parseMessages(
+        `demo.save:\n  en: Save\n  description: d\n  reviewed: { slangi: "${hash}" }\n`,
+      ),
+    ).toThrow(/demo\.save: reviewed\.slangi is set but there is no slangi text/);
+  });
+
+  it("refuses an empty slangi text", () => {
+    expect(() => parseMessages('demo.save:\n  en: Save\n  description: d\n  slangi: ""\n')).toThrow(
+      /demo\.save\.slangi/,
+    );
   });
 
   it("refuses a consent_version outside legal.*", () => {

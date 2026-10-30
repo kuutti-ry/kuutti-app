@@ -1,6 +1,7 @@
 import type { ContactKind } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
+import * as SecureStore from "expo-secure-store";
 import { clearSession, saveSession } from "@/lib/session";
 import { UnsavedRow } from "@/lib/unsaved";
 import { a11yProblems, type HostNode, markBefore, pressables } from "@/test/a11y";
@@ -273,6 +274,25 @@ describe("Ways to reach you", () => {
       { value: "+358406601234" },
     ]);
     expect(field("Your phone number").props.value).toBe("40 6601234");
+  });
+
+  it("names the country in Finnish in Stadi, and never asks Intl for a language it has no data for (#521)", async () => {
+    const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
+    store.set("kuutti.preference.locale", "fi-x-stadi");
+    const real = Intl.DisplayNames;
+    const names = jest
+      .spyOn(Intl, "DisplayNames")
+      .mockImplementation((locales, options) => new real(locales, options));
+    try {
+      contactsApi();
+      await renderWithTheme(<YourContacts />);
+      const [code] = await screen.findAllByRole("button", { name: "Maatunnus" });
+      expect(code?.props.accessibilityValue).toEqual({ text: "Suomi, +358" });
+      expect(names.mock.calls.flatMap(([locales]) => locales)).not.toContain("fi-x-stadi");
+    } finally {
+      names.mockRestore();
+      store.delete("kuutti.preference.locale");
+    }
   });
 
   it("keeps a number typed with another country's code as that country's, and shows its code", async () => {

@@ -19,6 +19,7 @@ function Probe() {
   return (
     <>
       <Text testID="title">{t("settings.title")}</Text>
+      <Text testID="plain">{t("onboarding.retry")}</Text>
       <Text testID="preference">{settings.preference}</Text>
       <Text testID="device">{settings.deviceLocale}</Text>
       <Pressable
@@ -30,6 +31,11 @@ function Probe() {
         accessibilityRole="button"
         accessibilityLabel="choose Swedish"
         onPress={() => settings.setPreference("sv")}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="choose Stadi"
+        onPress={() => settings.setPreference("fi-x-stadi")}
       />
     </>
   );
@@ -89,6 +95,22 @@ describe("LocaleProvider", () => {
     await fireEvent.press(screen.getByLabelText("follow the phone"));
     await waitFor(() => expect(textOf("title")).toBe("Settings"));
     await waitFor(() => expect(store.has("kuutti.preference.locale")).toBe(false));
+  });
+
+  it("speaks Stadi once a person chooses it: its slang, and Finnish for the rest (#521)", async () => {
+    await show();
+    await fireEvent.press(screen.getByLabelText("choose Stadi"));
+    await waitFor(() => expect(textOf("title")).toBe("Säädöt"));
+    expect(textOf("plain")).toBe("Yritä uudelleen");
+    await waitFor(() => expect(store.get("kuutti.preference.locale")).toBe("fi-x-stadi"));
+  });
+
+  it("comes back to Stadi after a restart, while the phone stays what it is", async () => {
+    store.set("kuutti.preference.locale", "fi-x-stadi");
+    await show();
+    await waitFor(() => expect(textOf("title")).toBe("Säädöt"));
+    expect(textOf("preference")).toBe("fi-x-stadi");
+    expect(textOf("device")).toBe("en");
   });
 
   it("refuses to be read outside its provider", async () => {

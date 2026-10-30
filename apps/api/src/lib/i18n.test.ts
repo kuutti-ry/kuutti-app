@@ -41,8 +41,8 @@ describe("localised responses", () => {
     ctx,
   }) => {
     expect(servedLocales("production")).toEqual(["en", "fi"]);
-    expect(servedLocales("staging")).toEqual(["en", "fi", "sv"]);
-    expect(servedLocales("preview")).toEqual(["en", "fi", "sv"]);
+    expect(servedLocales("staging")).toEqual(["en", "fi", "sv", "fi-x-stadi"]);
+    expect(servedLocales("preview")).toEqual(["en", "fi", "sv", "fi-x-stadi"]);
     const production = new Hono<AppEnv>();
     production.use("*", requestLocale(servedLocales("production")));
     production.get("/x", (c) => c.text("ok"));
@@ -56,6 +56,20 @@ describe("localised responses", () => {
     // Staging and previews keep all three, so a reviewer can read Swedish there.
     const res = await ctx.app.request("/nope", { headers: { "accept-language": "sv" } });
     expect(res.headers.get("content-language")).toBe("sv");
+  });
+
+  test("a request naming Stadi is answered in Finnish everywhere: nothing the API says is in slang (#521)", async ({
+    ctx,
+  }) => {
+    const res = await ctx.app.request("/nope", { headers: { "accept-language": "fi-x-stadi" } });
+    expect(res.headers.get("content-language")).toBe("fi");
+    const body = ErrorResponse.parse(await res.json());
+    expect(body.error.message).toBe("Ei löytynyt.");
+    const production = new Hono<AppEnv>();
+    production.use("*", requestLocale(servedLocales("production")));
+    production.get("/x", (c) => c.text("ok"));
+    const answer = await production.request("/x", { headers: { "accept-language": "fi-x-stadi" } });
+    expect(answer.headers.get("content-language")).toBe("fi");
   });
 
   test("no header: English", async ({ ctx }) => {

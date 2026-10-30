@@ -1,4 +1,4 @@
-import { formatDate, type PlainMessageKey } from "@kuutti/i18n";
+import { formatDate, type PlainMessageKey, realLocale } from "@kuutti/i18n";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { AppState, Linking, Platform, ScrollView, View } from "react-native";
@@ -186,8 +186,9 @@ export function SignInScreen({ code, error, until }: SignInParams) {
       }
       await markLoginStarted(verifier, now);
       // The bank's chooser in the app's language, which can differ from the
-      // phone's and so from the browser's (#55); en-XA asks for English.
-      const bankLocale = locale === "fi" || locale === "sv" ? locale : "en";
+      // phone's and so from the browser's (#55); en-XA asks for English, Stadi
+      // for Finnish.
+      const bankLocale = realLocale(locale);
       await Linking.openURL(
         `${apiBaseUrl()}/auth/start?platform=${Platform.OS}&locale=${bankLocale}&code_challenge=${challengeOf(verifier)}`,
       );

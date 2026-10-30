@@ -1,3 +1,4 @@
+import { realLocale } from "@kuutti/i18n";
 import {
   type CountryCode,
   getCountries,
@@ -76,9 +77,10 @@ export type Country = { region: Region; code: string; name: string; english: str
 
 /** Every country a number can have, named in the app's language and in English, in the language's order. */
 export function countries(locale: string): Country[] {
-  const names = new Intl.DisplayNames([locale], { type: "region" });
+  const language = realLocale(locale);
+  const names = new Intl.DisplayNames([language], { type: "region" });
   const english = new Intl.DisplayNames(["en"], { type: "region" });
-  const order = new Intl.Collator(locale);
+  const order = new Intl.Collator(language);
   return getCountries()
     .map((region) => ({
       region,

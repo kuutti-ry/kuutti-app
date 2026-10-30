@@ -4,8 +4,15 @@ import { intlLocale } from "./format.ts";
 import { en } from "./generated/en.ts";
 import { fi } from "./generated/fi.ts";
 import type { MessageKey, MessageParams } from "./generated/keys.ts";
+import { slangi } from "./generated/slangi.ts";
 import { sv } from "./generated/sv.ts";
-import { type AnyLocale, DEFAULT_LOCALE, PSEUDO_LOCALE } from "./locales.ts";
+import {
+  type AnyLocale,
+  DEFAULT_LOCALE,
+  FICTIONAL_LOCALES,
+  LOCALES,
+  PSEUDO_LOCALE,
+} from "./locales.ts";
 
 /** Keys with ICU arguments demand them; keys without take none. */
 type ParamsOf<K extends MessageKey> = keyof MessageParams[K] extends never
@@ -33,8 +40,8 @@ export type CreateI18nOptions = {
 
 /**
  * An i18next instance over the compiled catalogues with ICU MessageFormat.
- * Keys are flat ("home.title"), fi and sv fall back to en, and init is
- * synchronous because every catalogue is already in the bundle.
+ * Keys are flat ("home.title"), fi and sv fall back to en, fi-x-stadi to fi,
+ * and init is synchronous because every catalogue is already in the bundle.
  */
 export function createI18n(options: CreateI18nOptions): i18n {
   const instance = i18next.createInstance();
@@ -44,12 +51,16 @@ export function createI18n(options: CreateI18nOptions): i18n {
     lng: options.locale,
     // ICU dates and numbers in Finland's locale for every language (format.ts).
     i18nFormat: { parseLngForICU: intlLocale },
-    fallbackLng: DEFAULT_LOCALE,
-    supportedLngs: options.pseudo ? ["en", "fi", "sv", PSEUDO_LOCALE] : ["en", "fi", "sv"],
+    fallbackLng: {
+      "fi-x-stadi": [FICTIONAL_LOCALES["fi-x-stadi"]],
+      default: [DEFAULT_LOCALE],
+    },
+    supportedLngs: options.pseudo ? [...LOCALES, PSEUDO_LOCALE] : LOCALES,
     resources: {
       en: { translation: en },
       fi: { translation: fi },
       sv: { translation: sv },
+      "fi-x-stadi": { translation: slangi },
       ...(options.pseudo ? { [PSEUDO_LOCALE]: { translation: options.pseudo } } : {}),
     },
     keySeparator: false,
