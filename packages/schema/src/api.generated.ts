@@ -7112,7 +7112,7 @@ export interface components {
             occupationTitle?: string;
             politics?: ("kesk" | "kok" | "kd" | "liik" | "ps" | "pp" | "rkp" | "sdp" | "vas" | "vihr" | "none_of_them")[];
             /** @enum {string} */
-            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "agnostic" | "atheist" | "other";
+            religion?: "lutheran" | "orthodox" | "other_christian" | "muslim" | "buddhist" | "hindu" | "jewish" | "spiritual" | "non_religious" | "agnostic" | "atheist" | "other";
             /** @enum {string} */
             zodiac?: "aries" | "taurus" | "gemini" | "cancer" | "leo" | "virgo" | "corgi" | "libra" | "scorpio" | "sagittarius" | "capricorn" | "aquarius" | "pisces";
         };

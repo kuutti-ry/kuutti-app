@@ -1275,6 +1275,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "profile.option.religion.jewish": "［Jééwííšh］",
   "profile.option.religion.lutheran": "［Lúúthéérááñ］",
   "profile.option.religion.muslim": "［Múúšlíím］",
+  "profile.option.religion.non_religious": "［Ñóóñ-réélíígííóóúúš］",
   "profile.option.religion.orthodox": "［ÓÓrthóódóóx］",
   "profile.option.religion.other": "［Šóómééthííñg éélšéé］",
   "profile.option.religion.other_christian": "［ÓÓthéér Çhrííštííááñ］",

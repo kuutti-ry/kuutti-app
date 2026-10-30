@@ -1275,6 +1275,7 @@ export const en: Readonly<Record<string, string>> = {
   "profile.option.religion.jewish": "Jewish",
   "profile.option.religion.lutheran": "Lutheran",
   "profile.option.religion.muslim": "Muslim",
+  "profile.option.religion.non_religious": "Non-religious",
   "profile.option.religion.orthodox": "Orthodox",
   "profile.option.religion.other": "Something else",
   "profile.option.religion.other_christian": "Other Christian",

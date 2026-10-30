@@ -1852,6 +1852,13 @@ profile.option.religion.spiritual:
   sv: "Andlig"
   machine: { fi: true, sv: true }
 
+profile.option.religion.non_religious:
+  en: "Non-religious"
+  description: "Option non_religious of the religion field: having no religion, whatever the person believes, so not the same as atheist (#509, ADR-019)."
+  fi: "Uskonnoton"
+  sv: "Icke-religiös"
+  machine: { fi: true, sv: true }
+
 profile.option.religion.agnostic:
   en: "Agnostic"
   description: "Option agnostic of the religion field (#145 registry, ADR-019)."
