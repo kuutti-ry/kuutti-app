@@ -79,11 +79,12 @@ overrides:
   # Remove this when the plugins are an optional peer.
   "@sentry/node>@sentry/bundler-plugins": "-"
 
-# pnpm audit: three advisories set aside, each with its reason. None has a
-# patched version for the copy that is left, and none of those copies is in
-# the API's image or the app's bundle. Remove an entry when a patched version
-# exists or the package is gone from the tree. Every other advisory still
-# fails the job.
+# pnpm audit: four advisories set aside, each with its reason. The first three
+# have no patched version for the copy that is left, and none of those copies
+# is in the API's image or the app's bundle; the fourth ships in the app and is
+# patched in place, which the audit cannot see. Remove one of the first three
+# when its copy can take a patched version or the package is gone from the
+# tree; the fourth says when. Every other advisory still fails the job.
 #
 # GHSA-86w9-cpqp-85rv (node-forge <= 1.4.0): a forged RSA PKCS#1 v1.5 signature
 # is accepted for keys with a low exponent. node-forge is asked for by
@@ -104,15 +105,29 @@ overrides:
 # developer's machine and in CI, which validates its own configuration and
 # manifests; zod 3 has no patched release. Remove this when @expo/cli moves to
 # zod 4.6.6 or later.
+#
+# GHSA-qr28-fpjm-wq7f (decode-uri-component <= 0.5.0): a string of many distinct
+# percent-encoded runs takes quadratic time to decode. 0.2.2 ships in the app's
+# bundle under query-string 7, which asks for ^0.2.2: expo-router builds paths
+# with it, and the React Navigation getStateFromPath it bundles would parse a
+# link's query with it, but expo-router passes its own, which reads the query
+# with URL. No link reaches the decoder today; the patch (below) keeps it safe
+# if one comes to. The one fixed release, 0.5.1, is an ES module: query-string
+# 7's require() would get its namespace, not the function it calls. The audit
+# reads the version alone and still counts it;
+# apps/mobile/src/decode-uri-component.test.ts holds the installed copy to the
+# fix. Remove this, and the patch, when query-string under expo-router asks for
+# 0.5.1 or later.
 auditConfig:
   ignoreGhsas:
     - GHSA-86w9-cpqp-85rv
     - GHSA-vfj7-8cjw-p6xm
     - GHSA-mrhx-c7xc-m3w5
+    - GHSA-qr28-fpjm-wq7f
 
 # Fixes taken from a newer release onto the version Expo's SDK pins, each with
-# its reason. Remove an entry once the pinned version carries the fix (pnpm
-# refuses to install while a patch goes unused).
+# its reason. Remove an entry once the pinned version carries the fix, or as its
+# own note says (pnpm refuses to install while a patch goes unused).
 #
 # react-native-screens: on Android a cold start or a reload registers the
 # screen-removal listener from two threads at once, and 4.26.2 makes it lazily
@@ -120,7 +135,17 @@ auditConfig:
 # MountingCoordinator::pullTransaction at the first render (#360). The patch is
 # 4.28.0's code (software-mansion/react-native-screens#4413) on 4.26.2; Expo
 # SDK 57 pins ~4.26. Patching the package moves the dev client's fingerprint.
+#
+# decode-uri-component: 0.5.1's decoder, one linear pass over the input, on
+# 0.2.2's own entry point (which, unlike 0.5.1, still reads `+` as a space), for
+# GHSA-qr28-fpjm-wq7f above; query-string 7 under expo-router pins ^0.2.2. It
+# answers every case of 0.2.2's own tests as 0.2.2 does, and every case of
+# 0.5.1's as 0.5.1 does, `+` aside. On four of those 0.2.2 itself was wrong:
+# three decode its own output again (%25C2%zz gives %C2%zz, where 0.2.2 gave
+# �%zz), and in %41%FE%FF its BOM rule replaced inside the run first, leaving
+# %41 undecoded. JavaScript only: the fingerprint does not move.
 patchedDependencies:
+  decode-uri-component@0.2.2: patches/decode-uri-component@0.2.2.patch
   react-native-screens@4.26.2: patches/react-native-screens@4.26.2.patch
 
 # The kit's first release, approved at the prompt on 2026-10-23, the day it
