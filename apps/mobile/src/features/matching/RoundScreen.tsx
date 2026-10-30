@@ -67,7 +67,8 @@ const WORDLESS_UNDO_FONT_SCALE = 1.3;
  * like, while a fish can go today and on the card that holds it (#475): once
  * the week's is sent it is left out, as on a liked-you card, and nothing says
  * when the next comes, which is Monday's (the maintainer's of 29/10/2026).
- * Undo in the header brings the last card back. Where they sit is the
+ * Beside them the bar says in words how many of the day's likes are left
+ * (#524). Undo in the header brings the last card back. Where they sit is the
  * person's (#82): for the right hand as above, or mirrored for the left; and
  * one-handed, Undo, the fish, Pass and Like in one column at the bottom on
  * that side, Undo brought down from the header, within a thumb's reach. A like that
@@ -280,6 +281,7 @@ export function RoundScreen() {
         <DecisionBar
           card={current}
           fishToSend={view.round.fishToSend}
+          likesLeft={view.round.likesLeft}
           busy={round.busy}
           left={placement.hand === "left"}
           oneHanded={placement.oneHanded}
@@ -309,11 +311,15 @@ export function RoundScreen() {
  * hand's side; one-handed, a column on that side, Undo first and Like last,
  * nearest the thumb. Each keeps its shape, word and icon wherever it sits.
  * The fish is there while one can go today, and on the card that holds it,
- * read back selected and open to change (#475).
+ * read back selected and open to change (#475). How many of the day's likes
+ * are left is plain text beside the fish, above it where the two do not fit
+ * on one row, the same at ten as at one: no colour, no motion, and nothing
+ * announces it after a decision (#524).
  */
 function DecisionBar({
   card,
   fishToSend,
+  likesLeft,
   busy,
   left,
   oneHanded,
@@ -323,6 +329,8 @@ function DecisionBar({
   card: RoundCard;
   /** Whether a fish can go today, as the round and each decision's answer say (#475). */
   fishToSend: boolean;
+  /** How many of the day's likes are left, as the round and each decision's answer say (#524). */
+  likesLeft: number;
   busy: boolean;
   left: boolean;
   oneHanded: boolean;
@@ -332,10 +340,15 @@ function DecisionBar({
 }) {
   const { t } = useT();
   const { entry } = card;
+  const likes = (
+    <Text variant="muted" className={cn(!left && "text-right")}>
+      {t("round.likesLeft", { likes: likesLeft })}
+    </Text>
+  );
   const fish = !ANSWERS_A_LIKE.has(entry.reason) && (fishToSend || entry.decision === "fish") && (
     <Button
       variant="secondary"
-      className={cn("rounded-lg", oneHanded ? "w-full" : left ? "self-start" : "self-end")}
+      className={cn("rounded-lg", oneHanded && "w-full")}
       disabled={busy}
       accessibilityLabel={t("round.fish")}
       accessibilityState={{ selected: entry.decision === "fish" }}
@@ -382,13 +395,23 @@ function DecisionBar({
           className={cn("w-2/3 gap-3", left ? "self-start" : "self-end")}
         >
           {undo}
+          {likes}
           {fish}
           {pass}
           {like}
         </View>
       ) : (
         <>
-          {fish}
+          <View
+            testID="round-likes-row"
+            className={cn(
+              "flex-row flex-wrap items-center justify-end gap-x-4 gap-y-3",
+              left && "flex-row-reverse",
+            )}
+          >
+            {likes}
+            {fish}
+          </View>
           <View className="flex-row gap-4">{left ? [like, pass] : [pass, like]}</View>
         </>
       )}

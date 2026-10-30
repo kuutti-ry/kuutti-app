@@ -83,20 +83,29 @@ describe("a decision", () => {
 describe("the answer to a decision", () => {
   it("names a match or none, and says whether a fish can still go (#475)", () => {
     const match = { conversationId: "7d8f3c2a-1b4e-4c6d-9e0f-2a3b4c5d6e7f" };
-    expect(RoundDecisionAnswer.parse({ match, fishToSend: false })).toEqual({
+    expect(RoundDecisionAnswer.parse({ match, fishToSend: false, likesLeft: 0 })).toEqual({
       match,
       fishToSend: false,
+      likesLeft: 0,
     });
-    expect(RoundDecisionAnswer.parse({ match: null, fishToSend: true })).toEqual({
+    expect(RoundDecisionAnswer.parse({ match: null, fishToSend: true, likesLeft: 7 })).toEqual({
       match: null,
       fishToSend: true,
+      likesLeft: 7,
     });
   });
 
   it.each([
-    ["no word on the fish", { match: null }, "invalid_type"],
-    ["the fish as a count", { match: null, fishToSend: 1 }, "invalid_type"],
-    ["anything else", { match: null, fishToSend: true, liked: true }, "unrecognized_keys"],
+    ["no word on the fish", { match: null, likesLeft: 7 }, "invalid_type"],
+    ["the fish as a count", { match: null, fishToSend: 1, likesLeft: 7 }, "invalid_type"],
+    ["no word on the likes", { match: null, fishToSend: true }, "invalid_type"],
+    ["the likes below zero", { match: null, fishToSend: true, likesLeft: -1 }, "too_small"],
+    ["the likes in part", { match: null, fishToSend: true, likesLeft: 1.5 }, "invalid_type"],
+    [
+      "anything else",
+      { match: null, fishToSend: true, likesLeft: 7, liked: true },
+      "unrecognized_keys",
+    ],
   ] as const)("refuses %s", (_, input, code) => {
     expect(codes(RoundDecisionAnswer, input)).toEqual([code]);
   });
@@ -104,25 +113,38 @@ describe("the answer to a decision", () => {
 
 describe("today's round", () => {
   it("names its day, and has no cards before it is built", () => {
-    expect(RoundResponse.parse({ day: "2026-10-19", entries: null, fishToSend: true })).toEqual({
-      day: "2026-10-19",
-      entries: null,
-      fishToSend: true,
-    });
-    expect(codes(RoundResponse, { day: "2026-10-19", fishToSend: true })).toEqual(["invalid_type"]);
+    const unbuilt = { day: "2026-10-19", entries: null, fishToSend: true, likesLeft: 10 };
+    expect(RoundResponse.parse(unbuilt)).toEqual(unbuilt);
+    expect(codes(RoundResponse, { day: "2026-10-19", fishToSend: true, likesLeft: 10 })).toEqual([
+      "invalid_type",
+    ]);
   });
 
   it("says whether a fish can go today, never how many (#475)", () => {
-    expect(codes(RoundResponse, { day: "2026-10-19", entries: null })).toEqual(["invalid_type"]);
-    expect(codes(RoundResponse, { day: "2026-10-19", entries: null, fishToSend: 0 })).toEqual([
-      "invalid_type",
-    ]);
+    const round = { day: "2026-10-19", entries: null, likesLeft: 10 };
+    expect(codes(RoundResponse, round)).toEqual(["invalid_type"]);
+    expect(codes(RoundResponse, { ...round, fishToSend: 0 })).toEqual(["invalid_type"]);
+  });
+
+  it.each([
+    ["no word on them", undefined, "invalid_type"],
+    ["below zero", -1, "too_small"],
+    ["in part", 1.5, "invalid_type"],
+    ["in words", "ten", "invalid_type"],
+  ] as const)("refuses the likes left %s (#524)", (_, likesLeft, code) => {
+    const round = { day: "2026-10-19", entries: null, fishToSend: true };
+    expect(codes(RoundResponse, { ...round, likesLeft })).toEqual([code]);
   });
 
   it("holds at most the round's most cards", () => {
     const tooMany = Array.from({ length: ROUND_ENTRIES_MAX + 1 }, () => ({}));
     expect(
-      codes(RoundResponse, { day: "2026-10-19", entries: tooMany, fishToSend: true }),
+      codes(RoundResponse, {
+        day: "2026-10-19",
+        entries: tooMany,
+        fishToSend: true,
+        likesLeft: 10,
+      }),
     ).toContain("too_big");
   });
 });

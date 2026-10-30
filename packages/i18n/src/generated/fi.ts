@@ -1002,6 +1002,7 @@ export const fi: Readonly<Record<string, string>> = {
   "round.gone": "Kortti ei ole enää saatavilla.",
   "round.home.open": "Päivän kierros",
   "round.like": "Tykkää",
+  "round.likesLeft": "{likes, plural, =0 {Tykkäyksiä ei ole tänään enää jäljellä. Uusia tulee huomenna.} one {# tykkäys jäljellä tänään} other {# tykkäystä jäljellä tänään}}",
   "round.loading": "Ladataan päivän kierrosta…",
   "round.match.body": "Tykkäsitte toisistanne, joten teillä on nyt keskustelu Keskusteluissa.",
   "round.match.continue": "Takaisin kierrokselle",

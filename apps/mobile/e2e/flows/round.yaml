@@ -34,6 +34,8 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     timeout: 15000
 - assertVisible: "Henna, \\d+"
 - assertNotVisible: "Send a fish|Lähetä kala|Skicka en fisk"
+# The day's likes, said beside the buttons from the first card (#524).
+- assertVisible: "10 likes left today|10 tykkäystä jäljellä tänään|10 gillanden kvar i dag"
 - waitForAnimationToEnd
 - tapOn: "Like|Tykkää|Gilla"
 - extendedWaitUntil:
@@ -71,6 +73,8 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
 - extendedWaitUntil:
     notVisible: "You passed on this person\\. You can change that until midnight\\.|Ohitit tämän henkilön\\. Voit muuttaa sitä keskiyöhön asti\\.|Du hoppade över den här personen\\. Du kan ändra det fram till midnatt\\."
     timeout: 15000
+# Her like of the card before is one of the day's: Henna's like back was free.
+- assertVisible: "9 likes left today|9 tykkäystä jäljellä tänään|9 gillanden kvar i dag"
 # Block or report is in the card's header, below the main photo, and may sit
 # at the fold above the decisions' bar: brought to the middle first (README).
 - scrollUntilVisible:
@@ -128,3 +132,4 @@ name: Today's round shows one card at a time, liking back makes a match, Undo ta
     timeout: 15000
 - assertNotVisible: "Like|Tykkää|Gilla"
 - assertNotVisible: "Pass|Ohita|Hoppa över"
+- assertNotVisible: "\\d+ likes? left today|\\d+ tykkäys(tä)? jäljellä tänään|\\d+ gillanden? kvar i dag"

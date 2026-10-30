@@ -1364,6 +1364,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "round.gone": "［Tháát çáárd ííš ñóó lóóñgéér áávááííláábléé.］",
   "round.home.open": "［Tóódááýý'š róóúúñd］",
   "round.like": "［Lííkéé］",
+  "round.likesLeft": "［{likes,plural,one{# lííkéé lééft tóódááýý} other{# lííkééš lééft tóódááýý} =0{Ñóó lííkééš lééft tóódááýý. Ñééw óóñééš tóómóórróów.}}］",
   "round.loading": "［Lóóáádííñg tóódááýý'š róóúúñd…］",
   "round.match.body": "［ÝÝóóúú bóóth lííkééd ééááçh óóthéér, šóó áá çóóñvééršáátííóóñ ííš óópééñ fóór ýýóóúú twóó úúñdéér Çóóñvééršáátííóóñš.］",
   "round.match.continue": "［Bááçk tóó théé róóúúñd］",

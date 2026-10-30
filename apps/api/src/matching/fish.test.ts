@@ -248,6 +248,19 @@ describe("the fish", () => {
     expect((await choose(app, a, 1, "fish")).status).toBe(200);
   });
 
+  test("A fish counts in the likes left", async ({ ctx }) => {
+    await setConfig(ctx.client, "like_budget_balanced", 2);
+    const [a, b] = await cast(ctx.client, 2);
+    if (!a || !b) throw new Error("cast not written");
+    await roundOf(ctx.client, a, [b]);
+    const app = await appAt(ctx.client);
+
+    const answer = await choose(app, a, 1, "fish");
+
+    expect(answer.status).toBe(200);
+    expect(RoundDecisionAnswer.parse(await answer.json()).likesLeft).toBe(1);
+  });
+
   test("A fish counts against the day's like budget", async ({ ctx }) => {
     await setConfig(ctx.client, "like_budget_balanced", 1);
     const [a, b, c] = await cast(ctx.client, 3);
