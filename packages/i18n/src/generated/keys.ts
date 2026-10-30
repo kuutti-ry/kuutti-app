@@ -496,9 +496,15 @@ export type MessageParams = {
   "chat.composer.removePhoto": Record<never, never>;
   "chat.composer.send": Record<never, never>;
   "chat.connection.lost": Record<never, never>;
+  "chat.contact.copied": { "kind": string };
+  "chat.contact.copy": Record<never, never>;
+  "chat.contact.copyLabel": { "kind": string; "name": string };
   "chat.contact.error.conversation_closed": Record<never, never>;
   "chat.contact.error.failed": Record<never, never>;
   "chat.contact.error.message_budget_exceeded": Record<never, never>;
+  "chat.contact.open": { "kind": string };
+  "chat.contact.openLabel": { "kind": string; "name": string };
+  "chat.contact.openRefused": Record<never, never>;
   "chat.contact.piece": { "kind": string; "value": string };
   "chat.contact.share.body": { "name": string };
   "chat.contact.share.close": Record<never, never>;

@@ -98,6 +98,10 @@ name: A contact kept in Settings is shared from a conversation's header and show
     visible: "Elina shares Instagram: elina\\.lukupiiri|Elina jakaa yhteystiedon\\. Instagram: elina\\.lukupiiri|Elina delar en kontaktuppgift\\. Instagram: elina\\.lukupiiri"
     timeout: 15000
 - assertNotVisible: "Share contact|Jaa yhteystieto|Dela kontaktuppgift"
+# Open and Copy stand by the line, named by the kind and the person (#473);
+# neither is pressed, so the flow stays in the app.
+- assertVisible: "Open Instagram: Elina|Avaa Instagram: Elina|Öppna Instagram: Elina"
+- assertVisible: "Copy Instagram: Elina|Kopioi Instagram: Elina|Kopiera Instagram: Elina"
 
 # Elina again: still marked shared. She stops sharing it, then removes it in
 # Settings, which leaves her as the stories have her.

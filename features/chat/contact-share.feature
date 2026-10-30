@@ -10,7 +10,9 @@ Feature: Contacts shared in a conversation
   share is withheld as a message is: across a block, a close, or a shadow
   ban still open when it began or when its piece last changed (ADR-024 §6,
   ADR-030). A value reaches no log line, error detail, event or socket
-  frame, and a share's record holds none.
+  frame, and a share's record holds none. The other person opens a shared
+  piece at its service or copies it with one press, and nobody hears of
+  either (#473, the maintainer's word of 30/10/2026).
 
   Scenario: A person keeps a contact of each kind in its one form, seen by nobody
     Given "A" keeps no contacts and is in a conversation with "B"
@@ -155,3 +157,35 @@ Feature: Contacts shared in a conversation
   Scenario: No contact reaches a log line, an error detail or an error report
     When "A" keeps a phone number and a username, is refused one, shares one, reads the conversation, and a fault interrupts a keep
     Then no value appears in any log line, error detail or report, and the refusal names the kind
+
+  Scenario Outline: A shared contact opens at its kind's own address
+    Given "A" shares <what> with "B"
+    When "B" presses <button> beside it
+    Then the phone opens <address>
+
+    Examples:
+      | what                  | button | address                              |
+      | a phone number        | Call   | tel:+358401234567                    |
+      | a WhatsApp number     | Open   | https://wa.me/358401234567           |
+      | a Telegram username   | Open   | https://t.me/ville_k                 |
+      | an Instagram username | Open   | https://www.instagram.com/ville.k/   |
+      | a Snapchat username   | Open   | https://www.snapchat.com/add/ville.k |
+
+  Scenario: A contact not in the one form of its kind opens nothing and can still be copied
+    Given "A" shares a contact whose value is not in the one form of its kind
+    Then "B" sees it as text with Copy beside it and no Open
+
+  Scenario: Copy puts the contact on the phone's clipboard and says so without the value
+    Given "A" shares an Instagram username with "B"
+    When "B" presses Copy beside it
+    Then the value is on the clipboard and the screen says Instagram was copied, with no value in the words
+
+  Scenario: A contact the phone cannot open says so in words, and Copy stays
+    Given "A" shares a phone number with "B", on a phone that makes no calls
+    When "B" presses Call beside it
+    Then the refusal is said in words with no value in them, nothing is logged, and Copy is still there
+
+  Scenario: Opening or copying a contact tells nobody
+    Given "A" shares an Instagram username with "B"
+    When "B" opens it and copies it
+    Then no request leaves B's phone, so "A" learns of neither and nothing counts them
