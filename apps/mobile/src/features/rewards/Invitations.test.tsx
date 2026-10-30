@@ -3,6 +3,7 @@ import type { Invitations as InvitationsAnswer } from "@kuutti/schema";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import { AccessibilityInfo, AppState, Platform, Share } from "react-native";
+import { RevealProvider } from "@/lib/reveal";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
@@ -212,6 +213,23 @@ describe("Invitations", () => {
     expect(flat.indexOf(made(NEW.createdAt))).toBeLessThan(flat.indexOf(made(OLDER.createdAt)));
     expect(button(withdrawLabel(NEW.createdAt))).toBeTruthy();
     noProblems();
+  });
+
+  it("brings the code just made into sight, below the button where it is drawn (#511)", async () => {
+    fakeApi(answer({ open: [OLDER] }));
+    const reveal = jest.fn();
+    await renderWithTheme(
+      <RevealProvider value={reveal}>
+        <Invitations share={jest.fn()} />
+      </RevealProvider>,
+    );
+    await settle();
+    expect(reveal).not.toHaveBeenCalled();
+    await press(await screen.findByRole("button", { name: "Make an invitation" }));
+    await settle();
+    // Once, with the card around the code and Share the code.
+    expect(reveal).toHaveBeenCalledTimes(1);
+    expect(reveal).toHaveBeenCalledWith(expect.anything());
   });
 
   it("is dimmed while an invitation is on its way", async () => {

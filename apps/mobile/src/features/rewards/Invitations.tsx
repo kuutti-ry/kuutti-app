@@ -19,6 +19,7 @@ import {
 import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
+import { useRevealOn } from "@/lib/reveal";
 import { useRowData } from "@/lib/row-data";
 import { useHapticTap } from "@/theme/haptics";
 import { fetchInvitations, makeInvitation, withdrawInvitation } from "./client";
@@ -97,6 +98,9 @@ export function Invitations({
   const [answers, setAnswers] = useState(0);
   const [withdrawing, setWithdrawing] = useState<OpenInvitation | null>(null);
   const [redeemed, setRedeemed] = useState(false);
+  // The code just made comes into sight: it is drawn below the button, and
+  // "Its code is below" must not point under the screen's edge (#511).
+  const codeCard = useRevealOn(made?.id ?? null);
 
   const say = (next: Notice) => {
     setNotice(next);
@@ -208,7 +212,12 @@ export function Invitations({
             )}
           </View>
           {made !== null && (
-            <View className="gap-3 rounded-lg border border-border p-4">
+            // Kept a native view on Android, so that the page can measure it.
+            <View
+              ref={codeCard}
+              collapsable={false}
+              className="gap-3 rounded-lg border border-border p-4"
+            >
               <Text variant="small">{t("settings.invite.code.label")}</Text>
               <Text
                 selectable
