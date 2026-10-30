@@ -683,6 +683,7 @@ export type MessageParams = {
   "lock.biometrics.cancel": Record<never, never>;
   "lock.biometrics.prompt": Record<never, never>;
   "lock.cover": Record<never, never>;
+  "lock.denied": Record<never, never>;
   "lock.failed.biometrics": Record<never, never>;
   "lock.failed.face": Record<never, never>;
   "lock.failed.fingerprint": Record<never, never>;
@@ -700,6 +701,7 @@ export type MessageParams = {
   "lock.passcode.wrong": { "left": number };
   "lock.settings.always": Record<never, never>;
   "lock.settings.biometrics": Record<never, never>;
+  "lock.settings.biometricsDenied": Record<never, never>;
   "lock.settings.biometricsFailed": Record<never, never>;
   "lock.settings.biometricsLockout": Record<never, never>;
   "lock.settings.biometricsMissing": Record<never, never>;

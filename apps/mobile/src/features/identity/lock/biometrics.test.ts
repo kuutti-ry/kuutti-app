@@ -2,9 +2,9 @@ import { Platform } from "react-native";
 import { askBiometrics, biometricsOnThisPhone } from "./biometrics";
 
 // The phone's own face or fingerprint (#418, ADR-045 §5): what this phone
-// offers, for the button's words, and the prompt, which never falls back to
-// the phone's own code and tells a cancel and the phone's pause apart from a
-// failure.
+// offers, for the button's words, or an iPhone keeping Face ID from Kuutti, and
+// the prompt, which never falls back to the phone's own code and tells a cancel,
+// the phone's pause and that iPhone apart from a failure.
 
 const auth = jest.requireMock("expo-local-authentication") as {
   AuthenticationType: { FINGERPRINT: number; FACIAL_RECOGNITION: number; IRIS: number };
@@ -56,19 +56,38 @@ describe("biometricsOnThisPhone", () => {
     await expect(biometricsOnThisPhone()).resolves.toBe(kind);
   });
 
-  it("is null on a phone without the hardware, and asks no further", async () => {
+  it("is null on an Android phone without the hardware, and asks no further", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    auth.hasHardwareAsync.mockResolvedValue(false);
     await expect(biometricsOnThisPhone()).resolves.toBeNull();
     expect(auth.hasHardwareAsync).toHaveBeenCalledTimes(1);
     expect(auth.isEnrolledAsync).not.toHaveBeenCalled();
     expect(auth.supportedAuthenticationTypesAsync).not.toHaveBeenCalled();
   });
 
-  it("is null when the hardware is there and nothing is enrolled", async () => {
-    auth.hasHardwareAsync.mockResolvedValue(true);
+  // Every iPhone that runs Kuutti has the hardware, so the module's "none" is
+  // iOS's biometryNotAvailable, whatever kind is then reported (#505).
+  it.each([
+    ["Face ID", [FACIAL_RECOGNITION]],
+    ["no kind", []],
+  ])("is denied on an iPhone that answers no hardware and reports %s", async (_, types) => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
     auth.isEnrolledAsync.mockResolvedValue(false);
-    await expect(biometricsOnThisPhone()).resolves.toBeNull();
-    expect(auth.supportedAuthenticationTypesAsync).not.toHaveBeenCalled();
+    auth.supportedAuthenticationTypesAsync.mockResolvedValue(types);
+    await expect(biometricsOnThisPhone()).resolves.toBe("denied");
   });
+
+  it.each(["ios", "android"] as const)(
+    "is null on %s when the hardware is there and nothing is enrolled",
+    async (os) => {
+      jest.replaceProperty(Platform, "OS", os);
+      auth.hasHardwareAsync.mockResolvedValue(true);
+      auth.isEnrolledAsync.mockResolvedValue(false);
+      await expect(biometricsOnThisPhone()).resolves.toBeNull();
+      expect(auth.supportedAuthenticationTypesAsync).not.toHaveBeenCalled();
+    },
+  );
 
   it.each(["hasHardwareAsync", "isEnrolledAsync", "supportedAuthenticationTypesAsync"] as const)(
     "is null when %s throws",
@@ -130,6 +149,19 @@ describe("askBiometrics", () => {
     await expect(askBiometrics(WORDS)).resolves.toBe("lockout");
   });
 
+  // Don't Allow at iOS's question, and every ask after it (#505).
+  it("answers denied when iOS says Face ID is not available to Kuutti", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await expect(askBiometrics(WORDS)).resolves.toBe("denied");
+  });
+
+  it("answers failed, not denied, when Android's sensor cannot run", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await expect(askBiometrics(WORDS)).resolves.toBe("failed");
+  });
+
   it.each(["lockout ", "Lockout", "unknown: -8, Biometry is locked out."])(
     "answers failed, not lockout, for the near miss %p",
     async (error) => {
@@ -141,7 +173,8 @@ describe("askBiometrics", () => {
   it.each([
     "authentication_failed",
     "not_enrolled",
-    "not_available",
+    // The module's answer on a Face ID phone in a build with no purpose string.
+    "missing_usage_description",
     "passcode_not_set",
     "user_fallback",
     "timeout",

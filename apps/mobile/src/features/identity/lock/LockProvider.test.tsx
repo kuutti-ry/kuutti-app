@@ -138,7 +138,7 @@ beforeEach(async () => {
   jest.spyOn(Date, "now").mockImplementation(() => now);
   fetchMock = jest.fn(async () => new Response(null, { status: 204 }));
   globalThis.fetch = fetchMock as unknown as typeof fetch;
-  auth.hasHardwareAsync.mockResolvedValue(false);
+  auth.hasHardwareAsync.mockResolvedValue(true);
   auth.isEnrolledAsync.mockResolvedValue(false);
   auth.supportedAuthenticationTypesAsync.mockResolvedValue([]);
   auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
@@ -560,6 +560,77 @@ describe("the phone's face or fingerprint on the lock", () => {
     expect(auth.authenticateAsync).not.toHaveBeenCalled();
   });
 
+  // iOS's biometryNotAvailable, which the module reads as no hardware (#505).
+  const DENIED = /^This iPhone does not let Kuutti use Face ID/;
+
+  it("The lock screen says why the face it was set with is gone", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.getByText(DENIED)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Unlock with/ })).toBeNull();
+    expect(screen.getByLabelText(FIELD)).toBeTruthy();
+    expect(screen.getByRole("button", { name: BANK })).toBeEnabled();
+    expect(auth.authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it("says nothing of Face ID to a lock set without it", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode() });
+    expect(lock.biometrics).toBe("denied");
+    expect(screen.getByText(LOCKED)).toBeTruthy();
+    expect(screen.queryByText(DENIED)).toBeNull();
+  });
+
+  // A reinstall keeps the keychain's lock and forgets the phone's yes, so its
+  // first ask is iOS's question, on the lock screen.
+  it("takes the button away as soon as an ask meets it, and says why", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+    expect(lock.biometrics).toBe("denied");
+    expect(screen.getByText(DENIED)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Unlock with/ })).toBeNull();
+    expect(screen.queryByText(/did not unlock/)).toBeNull();
+  });
+
+  it("gives the button back, and asks, once the phone lets Kuutti use Face ID again", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode({ biometrics: true, graceMinutes: 0 }) });
+    expect(screen.getByText(DENIED)).toBeTruthy();
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "user_cancel" });
+    await toApp("background");
+    await toApp("active");
+    expect(screen.queryByText(DENIED)).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock with your face" })).toBeEnabled();
+    expect(auth.authenticateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads no hardware as none on Android", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(lock.biometrics).toBeNull();
+    expect(screen.queryByText(DENIED)).toBeNull();
+  });
+
+  it("keeps the button on Android when the sensor cannot run, and calls it a failure", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    enrol();
+    auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });
+    await start({ lock: withPasscode({ biometrics: true }) });
+    expect(lock.biometrics).toBe("face");
+    expect(screen.queryByText(DENIED)).toBeNull();
+    expect(screen.getByRole("button", { name: "Unlock with your face" })).toBeEnabled();
+    expect(screen.getByText(/did not unlock/)).toBeTruthy();
+  });
+
   it("ignores what the prompt does to the app's state: no cover, no lock", async () => {
     enrol();
     const prompt = deferred<{ success: boolean; error?: string }>();
@@ -606,6 +677,7 @@ describe("the phone's face or fingerprint on the lock", () => {
     ["user_cancel", "failed"],
     ["authentication_failed", "failed"],
     ["lockout", "lockout"],
+    ["not_available", "denied"],
   ])(
     "leaves biometrics off when the confirming prompt ends with %s, answering %s",
     async (error, expected) => {

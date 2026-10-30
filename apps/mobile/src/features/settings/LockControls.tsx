@@ -1,6 +1,7 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
+import * as Sentry from "@sentry/react-native";
 import { useEffect, useState } from "react";
-import { AccessibilityInfo, AppState, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -82,12 +83,14 @@ export function LockControls() {
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<"failed" | "lockout" | null>(null);
   const biometricsOn = lock.settings?.biometrics ?? false;
+  const canOffer =
+    lock.biometrics !== undefined && lock.biometrics !== null && lock.biometrics !== "denied";
   // What the phone has now: a face or finger may have been set up or removed
   // since the app started, or in the phone's settings while this row
   // waited, which the lock asks about on return only while it is on (#464).
   // Back from the background only: iOS's Face ID prompt and its question
-  // whether Kuutti may use Face ID pass through "inactive" alone, and a
-  // refusal there would read as a phone without any.
+  // whether Kuutti may use Face ID pass through "inactive" alone, and what
+  // they answer is the ask's to say.
   const { recheck } = lock;
   useEffect(() => {
     void recheck();
@@ -108,7 +111,10 @@ export function LockControls() {
     setRefused(null);
     try {
       const answer = await lock.setBiometrics(wanted);
-      if (answer !== "ok") {
+      if (answer === "denied") {
+        // The line above takes the switch's place, and says it from here on.
+        announce(t("lock.settings.biometricsDenied"));
+      } else if (answer !== "ok") {
         setRefused(answer);
         announce(t(REFUSED[answer]));
       }
@@ -123,8 +129,23 @@ export function LockControls() {
       {lock.biometrics === null && (
         <Text variant="muted">{t("lock.settings.biometricsMissing")}</Text>
       )}
+      {lock.biometrics === "denied" && (
+        <View className="gap-2">
+          <Text>{t("lock.settings.biometricsDenied")}</Text>
+          <Button
+            variant="outline"
+            onPress={() => {
+              tap();
+              // A phone whose settings cannot be opened is reported, the error alone.
+              Linking.openSettings().catch((error: unknown) => Sentry.captureException(error));
+            }}
+          >
+            {t("notifications.phone.openSettings")}
+          </Button>
+        </View>
+      )}
       {/* Also while the phone no longer has any, if the lock still says so: it can then be turned off. */}
-      {((lock.biometrics !== null && lock.biometrics !== undefined) || biometricsOn) && (
+      {(canOffer || biometricsOn) && (
         <View className="gap-2">
           <View className="flex-row items-center justify-between gap-4">
             <Label

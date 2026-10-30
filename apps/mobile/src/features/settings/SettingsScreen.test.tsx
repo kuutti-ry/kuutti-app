@@ -713,7 +713,7 @@ describe("the lock's row (#418)", () => {
   afterEach(() => {
     jest.restoreAllMocks();
     // Back to the phone of jest.setup.js: neither face nor fingerprint.
-    auth.hasHardwareAsync.mockResolvedValue(false);
+    auth.hasHardwareAsync.mockResolvedValue(true);
     auth.isEnrolledAsync.mockResolvedValue(false);
     auth.supportedAuthenticationTypesAsync.mockResolvedValue([]);
     auth.authenticateAsync.mockResolvedValue({ success: false, error: "not_available" });

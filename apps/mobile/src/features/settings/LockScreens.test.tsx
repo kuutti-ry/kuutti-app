@@ -1,10 +1,11 @@
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, utf8ToBytes } from "@noble/hashes/utils.js";
+import * as Sentry from "@sentry/react-native";
 import { act, fireEvent, screen } from "@testing-library/react-native";
 import { useLocales } from "expo-localization";
 import * as SecureStore from "expo-secure-store";
 import type * as React from "react";
-import { AccessibilityInfo, AppState, Platform, View } from "react-native";
+import { AccessibilityInfo, AppState, Linking, Platform, View } from "react-native";
 import { clearSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme, underProviders } from "@/test/render";
@@ -42,6 +43,9 @@ const TEXT = {
   explain: /^Lock Kuutti on this phone, so that somebody else holding it/,
   missing:
     "This phone has no face or fingerprint unlock that Kuutti can use. A passcode works without one.",
+  denied:
+    "This iPhone does not let Kuutti use Face ID. You can allow it in the phone's settings. A passcode works without it.",
+  openSettings: "Open the phone's settings",
   biometrics: "Face or fingerprint",
   failed: "Your face or fingerprint was not confirmed, so it was not turned on.",
   paused:
@@ -117,8 +121,9 @@ beforeEach(async () => {
   (useLocales as jest.Mock).mockReturnValue([{ languageTag: "en-US" }]);
   router.replace.mockReset();
   (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  (Sentry.captureException as jest.Mock).mockClear();
   // The phone of jest.setup.js: neither face nor fingerprint.
-  auth.hasHardwareAsync.mockResolvedValue(false);
+  auth.hasHardwareAsync.mockResolvedValue(true);
   auth.isEnrolledAsync.mockResolvedValue(false);
   auth.supportedAuthenticationTypesAsync.mockResolvedValue([]);
   auth.authenticateAsync.mockReset();
@@ -405,13 +410,10 @@ describe("coming back to the app", () => {
     expect(biometricsSwitch()).toBeTruthy();
   });
 
-  it("asks nothing after a trip through inactive alone, so iOS's Face ID question keeps its refusal said", async () => {
+  it("asks nothing after a trip through inactive alone, so what iOS's prompt answered stays said", async () => {
     jest.replaceProperty(Platform, "OS", "ios");
-    // Don't Allow on iOS's question whether Kuutti may use Face ID: the
-    // prompt fails, and from then on the phone answers that it has none.
-    phoneWithFace({ success: false, error: "not_available" });
+    phoneWithFace({ success: false, error: "authentication_failed" });
     await showLock();
-    auth.hasHardwareAsync.mockResolvedValue(false);
     const asked = auth.hasHardwareAsync.mock.calls.length;
     await press(biometricsSwitch());
     await toApp("inactive");
@@ -419,10 +421,22 @@ describe("coming back to the app", () => {
     expect(auth.hasHardwareAsync).toHaveBeenCalledTimes(asked);
     expect(screen.getByText(TEXT.failed)).toBeTruthy();
     expect(checked(biometricsSwitch())).toBe(false);
-    expect(screen.queryByText(TEXT.missing)).toBeNull();
     // A later trip away asks again, and the phone's answer stands.
+    auth.isEnrolledAsync.mockResolvedValue(false);
     await awayAndBack();
     expect(screen.getByText(TEXT.missing)).toBeTruthy();
+  });
+
+  it("offers the switch once the phone's settings let Kuutti use Face ID again (#505)", async () => {
+    jest.replaceProperty(Platform, "OS", "ios");
+    auth.hasHardwareAsync.mockResolvedValue(false);
+    await showLock();
+    expect(screen.getByText(TEXT.denied)).toBeTruthy();
+    phoneWithFace({ success: true });
+    await awayAndBack();
+    expect(screen.queryByText(TEXT.denied)).toBeNull();
+    expect(screen.queryByRole("button", { name: TEXT.openSettings })).toBeNull();
+    expect(checked(biometricsSwitch())).toBe(false);
   });
 
   it("asks once for each trip away, however often it comes back active", async () => {
@@ -469,6 +483,97 @@ describe("a lock set with the face or finger the phone no longer has", () => {
     // Off, and the phone has none: nothing to turn on again from here but the passcode.
     expect(screen.queryByRole("switch", { name: TEXT.biometrics })).toBeNull();
     expect(graceGroup()).toBeNull();
+  });
+});
+
+describe("an iPhone not letting Kuutti use Face ID (#505)", () => {
+  // iOS's biometryNotAvailable, which the module reads as no hardware.
+  const denied = () => auth.hasHardwareAsync.mockResolvedValue(false);
+  beforeEach(() => jest.replaceProperty(Platform, "OS", "ios"));
+
+  it("Face ID kept from Kuutti is said as that, with the way to turn it on", async () => {
+    denied();
+    const open = jest.spyOn(Linking, "openSettings").mockResolvedValue();
+    await showLock();
+    expect(screen.getByText(TEXT.denied)).toBeTruthy();
+    expect(screen.queryByText(TEXT.missing)).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(button(TEXT.setPasscode)).toBeTruthy();
+    noProblems();
+    await press(button(TEXT.openSettings));
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(auth.authenticateAsync).not.toHaveBeenCalled();
+  });
+
+  it("reports settings that would not open, the error alone", async () => {
+    denied();
+    const error = new Error("no settings");
+    jest.spyOn(Linking, "openSettings").mockRejectedValue(error);
+    await showLock();
+    await press(button(TEXT.openSettings));
+    expect(Sentry.captureException).toHaveBeenCalledWith(error);
+  });
+
+  it("Don't Allow at iOS's question is said as that at once", async () => {
+    phoneWithFace({ success: false, error: "not_available" });
+    await showLock();
+    await press(biometricsSwitch());
+    expect(screen.getByText(TEXT.denied)).toBeTruthy();
+    expect(announced()).toEqual([TEXT.denied]);
+    expect(screen.queryByText(TEXT.failed)).toBeNull();
+    expect(screen.queryByText(TEXT.missing)).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(button(TEXT.openSettings)).toBeTruthy();
+    expect(stored()).toBeNull();
+  });
+
+  it("keeps the switch of a lock set with the face, so it can be turned off", async () => {
+    denied();
+    store.set("kuutti.lock", JSON.stringify({ biometrics: true, passcode: null, graceMinutes: 1 }));
+    await showLock();
+    expect(screen.getByText(TEXT.denied)).toBeTruthy();
+    expect(checked(biometricsSwitch())).toBe(true);
+    await press(biometricsSwitch());
+    expect(auth.authenticateAsync).not.toHaveBeenCalled();
+    expect(stored()).toBeNull();
+    expect(screen.queryByRole("switch", { name: TEXT.biometrics })).toBeNull();
+    expect(screen.getByText(TEXT.denied)).toBeTruthy();
+  });
+
+  it("says it on the lock's offer too, which has the same controls", async () => {
+    denied();
+    await show(<LockOfferScreen />);
+    expect(screen.getByText(TEXT.denied)).toBeTruthy();
+    expect(button(TEXT.openSettings)).toBeTruthy();
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it.each([
+    [
+      "fi-FI",
+      "Tämä iPhone ei anna Kuutin käyttää Face ID:tä. Voit sallia sen puhelimen asetuksista. Pääsykoodi toimii ilman sitä.",
+      "Avaa puhelimen asetukset",
+    ],
+    [
+      "sv-FI",
+      "Den här iPhonen låter inte Kuutti använda Face ID. Du kan tillåta det i telefonens inställningar. En lösenkod fungerar utan.",
+      "Öppna telefonens inställningar",
+    ],
+  ])("speaks %s", async (languageTag, words, settings) => {
+    (useLocales as jest.Mock).mockReturnValue([{ languageTag }]);
+    denied();
+    await showLock();
+    expect(screen.getByText(words)).toBeTruthy();
+    expect(button(settings)).toBeTruthy();
+  });
+
+  it("says the phone has none on Android, which has no such refusal", async () => {
+    jest.replaceProperty(Platform, "OS", "android");
+    denied();
+    await showLock();
+    expect(screen.getByText(TEXT.missing)).toBeTruthy();
+    expect(screen.queryByText(TEXT.denied)).toBeNull();
+    expect(screen.queryByRole("button", { name: TEXT.openSettings })).toBeNull();
   });
 });
 
