@@ -140,6 +140,8 @@ describe("the notices file", () => {
         name: "@scope/a",
         version: "1.0.0",
         license: "MIT",
+        // The app's list shows it (#512); the file below never does.
+        provider: "scope",
         licences: [
           {
             file: "LICENSE",
@@ -153,6 +155,7 @@ describe("the notices file", () => {
         name: "b",
         version: "2.0.0",
         license: "Apache-2.0",
+        provider: "Bee Oy",
         licences: [{ file: "LICENSE.md", copyright: [], text: "apache" }],
         notices: ["note"],
       },
@@ -160,6 +163,7 @@ describe("the notices file", () => {
         name: "c",
         version: "3.0.0",
         license: "MIT",
+        provider: null,
         licences: [
           {
             file: null,

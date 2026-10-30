@@ -1641,12 +1641,13 @@ export type MessageParams = {
   "tech.errorTest.send": Record<never, never>;
   "tech.errorTest.sent": Record<never, never>;
   "tech.licenses.from": { "address": string };
-  "tech.licenses.licence": Record<never, never>;
   "tech.licenses.licenceAt": { "place": number };
   "tech.licenses.notice": Record<never, never>;
   "tech.licenses.other": Record<never, never>;
+  "tech.licenses.packages": Record<never, never>;
+  "tech.licenses.provided": { "provider": string; "version": string; "license": string };
+  "tech.licenses.texts": Record<never, never>;
   "tech.licenses.title": Record<never, never>;
-  "tech.licenses.unknown": Record<never, never>;
   "tech.licenses.version": { "version": string; "license": string };
   "tech.title": Record<never, never>;
   "tech.unavailable": Record<never, never>;

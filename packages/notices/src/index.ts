@@ -23,7 +23,14 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
 /** The fields of a package.json read here. */
-export type Manifest = { name?: string; version?: string; license?: unknown; licenses?: unknown };
+export type Manifest = {
+  name?: string;
+  version?: string;
+  license?: unknown;
+  licenses?: unknown;
+  author?: unknown;
+  maintainers?: unknown;
+};
 
 /** The licence a package.json declares: `license`, or the old `licenses` list joined by OR; "unknown" when it names none. */
 export function licenseOf(manifest: Manifest): string {
@@ -38,6 +45,31 @@ export function licenseOf(manifest: Manifest): string {
       .join(" OR ");
   }
   return "unknown";
+}
+
+/**
+ * A person as a package.json names them, an object or the string form
+ * "Ann Example <ann@example.invalid> (https://example.invalid)": the name
+ * alone, since a screen shows it and their address is not ours to show. Null
+ * when there is no name.
+ */
+function personName(person: unknown): string | null {
+  const field =
+    typeof person === "object" && person !== null && "name" in person ? person.name : person;
+  if (typeof field !== "string") return null;
+  const end = field.search(/[<(]/);
+  return (end === -1 ? field : field.slice(0, end)).trim() || null;
+}
+
+/**
+ * Who provides a package (#512): its npm scope, else the package.json's
+ * `author`, else the first of its `maintainers`; null when it names nobody.
+ */
+export function providerOf(name: string, manifest: Manifest): string | null {
+  const scope = /^@([^/]+)\//.exec(name)?.[1];
+  if (scope) return scope;
+  const maintainers = Array.isArray(manifest.maintainers) ? manifest.maintainers : [];
+  return personName(manifest.author) ?? personName(maintainers[0]);
 }
 
 /**
@@ -191,6 +223,8 @@ export type PackageNotices = {
   version: string;
   /** The package.json's licence field. */
   license: string;
+  /** `providerOf`: null for a package that names nobody. */
+  provider: string | null;
   /** One or more. */
   licences: Licence[];
   /** The keys of its NOTICE files' texts. */
@@ -200,7 +234,13 @@ export type PackageNotices = {
 /** The packages, sorted by name and version, and every text they refer to by its key. */
 export type Notices = { texts: Record<string, string>; packages: PackageNotices[] };
 
-type Found = { name: string; version: string; license: string; dir: string };
+type Found = {
+  name: string;
+  version: string;
+  license: string;
+  provider: string | null;
+  dir: string;
+};
 
 function byNameAndVersion<T extends { name: string; version: string }>(a: T, b: T): number {
   return a.name === b.name ? a.version.localeCompare(b.version) : a.name.localeCompare(b.name);
@@ -226,7 +266,10 @@ export function collectNotices(
     const name = manifest.name ?? basename(dir);
     const version = manifest.version ?? "?";
     const key = `${name}@${version}`;
-    if (!found.has(key)) found.set(key, { name, version, license: licenseOf(manifest), dir });
+    if (!found.has(key)) {
+      const license = licenseOf(manifest);
+      found.set(key, { name, version, license, provider: providerOf(name, manifest), dir });
+    }
   }
 
   const texts = new Map<string, string>();
@@ -248,6 +291,7 @@ export function collectNotices(
       name: pkg.name,
       version: pkg.version,
       license: pkg.license,
+      provider: pkg.provider,
       licences: licences.map(({ file, text }) => {
         const split = splitNotice(text);
         return split
@@ -306,6 +350,7 @@ export function collectNotices(
       name: pkg.name,
       version: pkg.version,
       license: pkg.license,
+      provider: pkg.provider,
       licences,
       notices: pkg.notices,
     });
