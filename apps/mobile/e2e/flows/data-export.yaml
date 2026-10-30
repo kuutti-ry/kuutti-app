@@ -12,17 +12,13 @@ name: Download my data hands the person's file over
 ---
 - runFlow: ../common/sign-in.yaml
 - openLink: kuutti://settings
-# The export is on the account screen, behind its row (#287).
-# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "Your account|Tilisi|Ditt konto"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Your account|Tilisi|Ditt konto"
-- extendedWaitUntil:
-    visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
-    timeout: 15000
+# The export opens under its own row, A copy of your data, under Privacy and
+# security (#511), below the fold on a phone.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(A copy of your data|Kopio tiedoistasi|En kopia av dina uppgifter)(, .*)?"
+      INSIDE: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 - assertVisible: "A file with everything Kuutti holds about you, and nothing about anyone else\\.|Tiedosto, jossa on kaikki, mitä Kuutti tietää sinusta, eikä mitään kenestäkään muusta\\.|En fil med allt Kuutti har om dig, och inget om någon annan\\."
 - tapOn: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
 # The sheet, or the picker, covers the app.
@@ -44,7 +40,7 @@ name: Download my data hands the person's file over
       platform: Android
     commands:
       - back
-# The account screen comes back, the button still on it, and nothing says
+# Settings comes back, the row still open with its button, and nothing says
 # a file was saved.
 - extendedWaitUntil:
     visible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"

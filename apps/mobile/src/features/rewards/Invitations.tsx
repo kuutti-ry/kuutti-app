@@ -1,5 +1,9 @@
 import { formatDateTime, type PlainMessageKey } from "@kuutti/i18n";
-import type { InvitationCreated, OpenInvitation } from "@kuutti/schema";
+import type {
+  InvitationCreated,
+  Invitations as InvitationsAnswer,
+  OpenInvitation,
+} from "@kuutti/schema";
 import { useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Platform, Share, View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -15,8 +19,10 @@ import {
 import { Text } from "@/components/ui/text";
 import { ApiError } from "@/lib/api";
 import { useT } from "@/lib/locale";
+import { useRevealOn } from "@/lib/reveal";
+import { useRowData } from "@/lib/row-data";
 import { useHapticTap } from "@/theme/haptics";
-import { makeInvitation, withdrawInvitation } from "./client";
+import { fetchInvitations, makeInvitation, withdrawInvitation } from "./client";
 import { RedeemInvitation } from "./RedeemInvitation";
 import { useInvitations } from "./useInvitations";
 import { rewardParams } from "./words";
@@ -69,7 +75,14 @@ const spoken = (code: string) =>
  * injected, as the export's is (AccountActions), so tests see what it was
  * handed.
  */
-export function Invitations({ share = Share.share }: { share?: typeof Share.share }) {
+export function Invitations({
+  share = Share.share,
+  onStored,
+}: {
+  share?: typeof Share.share;
+  /** The invitations as read, again after each change, for the row above (#511). */
+  onStored?: (invitations: InvitationsAnswer) => void;
+}) {
   const { t, locale } = useT();
   const tap = useHapticTap();
   const view = useInvitations();
@@ -85,6 +98,9 @@ export function Invitations({ share = Share.share }: { share?: typeof Share.shar
   const [answers, setAnswers] = useState(0);
   const [withdrawing, setWithdrawing] = useState<OpenInvitation | null>(null);
   const [redeemed, setRedeemed] = useState(false);
+  // The code just made comes into sight: it is drawn below the button, and
+  // "Its code is below" must not point under the screen's edge (#511).
+  const codeCard = useRevealOn(made?.id ?? null);
 
   const say = (next: Notice) => {
     setNotice(next);
@@ -128,6 +144,11 @@ export function Invitations({ share = Share.share }: { share?: typeof Share.shar
         return "withdrawFailed";
       }
     });
+
+  const answer = view.status === "ready" ? view.invitations : null;
+  useEffect(() => {
+    if (answer !== null) onStored?.(answer);
+  }, [answer, onStored]);
 
   const listed = view.status === "ready" ? view.invitations.open : null;
   useEffect(() => {
@@ -191,7 +212,12 @@ export function Invitations({ share = Share.share }: { share?: typeof Share.shar
             )}
           </View>
           {made !== null && (
-            <View className="gap-3 rounded-lg border border-border p-4">
+            // Kept a native view on Android, so that the page can measure it.
+            <View
+              ref={codeCard}
+              collapsable={false}
+              className="gap-3 rounded-lg border border-border p-4"
+            >
               <Text variant="small">{t("settings.invite.code.label")}</Text>
               <Text
                 selectable
@@ -210,9 +236,7 @@ export function Invitations({ share = Share.share }: { share?: typeof Share.shar
           )}
           {open.length > 0 && (
             <View className="gap-3">
-              <Text variant="h4" accessibilityRole="header">
-                {t("settings.invite.open.title")}
-              </Text>
+              <Text variant="title">{t("settings.invite.open.title")}</Text>
               {open.map((invitation) => {
                 const date = formatDateTime(locale, new Date(invitation.createdAt));
                 return (
@@ -253,9 +277,7 @@ export function Invitations({ share = Share.share }: { share?: typeof Share.shar
       {/* A code from a friend, until the profile first passes the gate's test (ADR-044 §6). */}
       {(redeemable || redeemed) && (
         <View className="gap-3">
-          <Text variant="h4" accessibilityRole="header">
-            {t("invite.redeem.title")}
-          </Text>
+          <Text variant="title">{t("invite.redeem.title")}</Text>
           {redeemed ? (
             <Text accessibilityLiveRegion="polite">{t("invite.redeem.done")}</Text>
           ) : (
@@ -299,4 +321,18 @@ export function Invitations({ share = Share.share }: { share?: typeof Share.shar
       )}
     </View>
   );
+}
+
+/**
+ * The Invitations row's value in Settings (#376, #511): how many wait to be
+ * used, once the person may invite; nothing before, where the row's panel
+ * says when they may.
+ */
+export function useInvitationsSummary(enabled: boolean) {
+  const { t } = useT();
+  const { data, stored } = useRowData(fetchInvitations, enabled);
+  const summary = data?.canInvite
+    ? t("settings.invite.waiting", { waiting: data.open.length })
+    : undefined;
+  return { summary, stored };
 }

@@ -155,6 +155,23 @@ describe("ConsentSwitch", () => {
     });
   });
 
+  it("hands what a change stored to the row above it, and nothing when the change fails (#511)", async () => {
+    consentsApi({ research: false });
+    const stored = jest.fn();
+    await show(<ConsentSwitch kind="research" onStored={stored} />);
+    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
+    await waitFor(() => expect(stored).toHaveBeenCalledTimes(1));
+    expect(stored.mock.calls[0]?.[0].consents).toEqual([
+      expect.objectContaining({ kind: "research", withdrawnAt: null }),
+    ]);
+    stored.mockClear();
+    consentsApi({ research: false, failGive: true });
+    await show(<ConsentSwitch kind="research" onStored={stored} />);
+    await fireEvent(await screen.findByLabelText("Take part in research"), "press");
+    expect(await screen.findByText(/^The research choice could not be saved/)).toBeTruthy();
+    expect(stored).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["research", "Take part in research", "https://kuutti.app/legal/privacy/#research-"],
     [
@@ -347,23 +364,43 @@ describe("useConsentStates", () => {
   it("says each consent's state for its row: on, off, or outdated for a wording newer than the app's", async () => {
     newerStatesApi();
     const result = await states();
-    expect(result.current).toEqual({ research: "on", special_category: "outdated" });
+    expect(result.current.states).toEqual({ research: "on", special_category: "outdated" });
   });
 
   it("is unavailable for both when the read fails", async () => {
     fetchMock([
       () => json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500),
     ]);
-    expect((await states()).current).toEqual({
+    expect((await states()).current.states).toEqual({
       research: "unavailable",
       special_category: "unavailable",
     });
   });
 
+  it("takes what a switch stored, so its row says it at once (#511)", async () => {
+    newerStatesApi();
+    const result = await states();
+    await act(async () => {
+      result.current.stored({
+        consents: [],
+        currentVersions: {
+          terms: CONSENT_VERSIONS.terms ?? "",
+          privacy: CONSENT_VERSIONS.privacy ?? "",
+          research: CONSENT_VERSIONS.research ?? "",
+          special_category: CONSENT_VERSIONS.special_category ?? "",
+        },
+      });
+    });
+    expect(result.current.states).toEqual({ research: "off", special_category: "off" });
+  });
+
   it("is loading without a session, and reads nothing", async () => {
     await clearSession();
     const calls = fetchMock([]);
-    expect((await states()).current).toEqual({ research: "loading", special_category: "loading" });
+    expect((await states()).current.states).toEqual({
+      research: "loading",
+      special_category: "loading",
+    });
     expect(calls).toHaveLength(0);
   });
 

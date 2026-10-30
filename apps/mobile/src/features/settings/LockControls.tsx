@@ -83,7 +83,7 @@ export function LockControls() {
   const [refused, setRefused] = useState<"failed" | "lockout" | null>(null);
   const biometricsOn = lock.settings?.biometrics ?? false;
   // What the phone has now: a face or finger may have been set up or removed
-  // since the app started, or in the phone's settings while this screen
+  // since the app started, or in the phone's settings while this row
   // waited, which the lock asks about on return only while it is on (#464).
   // Back from the background only: iOS's Face ID prompt and its question
   // whether Kuutti may use Face ID pass through "inactive" alone, and a

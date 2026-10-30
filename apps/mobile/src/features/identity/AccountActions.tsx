@@ -1,10 +1,10 @@
 import type { PlainMessageKey } from "@kuutti/i18n";
 import { Directory, File, Paths } from "expo-file-system";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { AccessibilityInfo, Platform, Share, View } from "react-native";
+import { type ReactNode, useState } from "react";
+import { Platform, Share, View } from "react-native";
+import { Notice as Said } from "@/components/Notice";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,8 +22,6 @@ import { type ExportFile, useSession } from "./session";
 /** Days before the same person may register again (TD-7); the API's constant, repeated for the text. */
 const REREGISTER_COOLDOWN_DAYS = 30;
 
-/** `choosing`: Android's folder picker is open and nothing is fetched yet, so nothing is said (#465). */
-type Busy = { kind: "idle" } | { kind: "choosing" } | { kind: "exporting" } | { kind: "deleting" };
 type Notice = "export_saved" | "export_failed" | "export_limited" | "delete_failed";
 
 const NOTICE: Record<Notice, PlainMessageKey> = {
@@ -91,129 +89,160 @@ export async function shareExport(
   }
 }
 
+/** What the last change came to, said under its button (#511): in words, and aloud on iOS. */
+function useSaid() {
+  const [said, setSaid] = useState<{ notice: Notice; answer: number } | null>(null);
+  const say = (notice: Notice | null) =>
+    setSaid((was) => (notice === null ? null : { notice, answer: (was?.answer ?? 0) + 1 }));
+  return { said, say };
+}
+
 /**
- * The account card (#51, ADR-007; #170, ADR-022), on its own screen behind
- * the "Your account" row of Settings (#287): the data export, "Löysin hänet"
- * (#83, ADR-040), the break and the deletion. "Löysin hänet" and the break
- * have screens of their own; deletion is a button behind a
- * confirmation that names the cooldown; never a swipe, never colour alone
- * (CLAUDE.md Accessibility).
+ * A copy of what Kuutti holds about the person (#51, ADR-007; #237, #465),
+ * under its row of Settings (#511): what the file is, and the one button
+ * that hands it over, as the system offers it.
  */
-export function AccountActions({ share }: { share?: typeof Share.share }) {
+export function ExportData({ share }: { share?: typeof Share.share }) {
   const { t } = useT();
   const session = useSession();
-  const router = useRouter();
-  const tap = useHapticTap();
-  const [busy, setBusy] = useState<Busy>({ kind: "idle" });
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const words = notice === null ? null : t(NOTICE[notice]);
-  // iOS has no live regions; Android's below speak the same words already.
-  // After a save the system's sheet or picker has just closed (#465).
-  useEffect(() => {
-    if (words !== null && Platform.OS === "ios") AccessibilityInfo.announceForAccessibility(words);
-  }, [words]);
-
+  // `choosing`: Android's folder picker is open and nothing is fetched yet, so nothing is said (#465).
+  const [busy, setBusy] = useState<"idle" | "choosing" | "exporting">("idle");
+  const { said, say } = useSaid();
   if (session.status !== "signed-in") return null;
 
   const exportData = async () => {
-    tap();
-    setNotice(null);
-    setBusy({ kind: "choosing" });
+    say(null);
+    setBusy("choosing");
     const getFile = () => {
-      setBusy({ kind: "exporting" });
+      setBusy("exporting");
       return session.exportData();
     };
     try {
       const handed = await shareExport(getFile, t("account.export.title"), share);
       // Backing out is the person's own answer and needs no line (#237).
-      if (handed === "saved") setNotice("export_saved");
+      if (handed === "saved") say("export_saved");
     } catch (error) {
       // The day's copies are used up (#237): said as the API says it, not as a failure.
       const limited = error instanceof ApiError && error.code === "export_budget_exceeded";
-      setNotice(limited ? "export_limited" : "export_failed");
+      say(limited ? "export_limited" : "export_failed");
     } finally {
-      setBusy({ kind: "idle" });
-    }
-  };
-
-  const deleteAccount = async () => {
-    setConfirming(false);
-    setNotice(null);
-    setBusy({ kind: "deleting" });
-    try {
-      await session.deleteAccount();
-      // The provider flips to signed-out; this card unmounts with it.
-    } catch {
-      setNotice("delete_failed");
-      setBusy({ kind: "idle" });
+      setBusy("idle");
     }
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <View className="gap-6">
-        {/* The screen carries the title (#287); the card says what the export is. */}
-        <CardHeader>
-          <CardDescription>{t("account.export.explain")}</CardDescription>
-        </CardHeader>
-        <CardContent className="gap-3">
-          {words !== null && (
-            <Text accessibilityLiveRegion={notice === "export_saved" ? "polite" : "assertive"}>
-              {words}
-            </Text>
-          )}
-          {(busy.kind === "exporting" || busy.kind === "deleting") && (
-            <Text accessibilityLiveRegion="polite">
-              {busy.kind === "exporting"
-                ? t("account.export.working")
-                : t("account.delete.working")}
-            </Text>
-          )}
-          <Button
-            variant="outline"
-            accessibilityLabel={t("account.export.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => void exportData()}
-          >
-            <Text>{t("account.export.button")}</Text>
-          </Button>
-          {/* "Löysin hänet" (#83): telling Kuutti one found somebody, which changes nothing else. */}
-          <Button
-            variant="outline"
-            accessibilityLabel={t("account.foundThem.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => {
-              tap();
-              router.push("/settings/found-them");
-            }}
-          >
-            <Text>{t("account.foundThem.button")}</Text>
-          </Button>
-          {/* Taking a break (#170): the screen says what happens before anything does. */}
-          <Button
-            variant="outline"
-            accessibilityLabel={t("account.break.button")}
-            disabled={busy.kind !== "idle"}
-            onPress={() => {
-              tap();
-              router.push("/account/break");
-            }}
-          >
-            <Text>{t("account.break.button")}</Text>
-          </Button>
+    <View className="gap-3">
+      <Text>{t("account.export.explain")}</Text>
+      {busy === "exporting" && (
+        <Text accessibilityLiveRegion="polite">{t("account.export.working")}</Text>
+      )}
+      <Button
+        variant="outline"
+        accessibilityLabel={t("account.export.button")}
+        disabled={busy !== "idle"}
+        onPress={() => void exportData()}
+      >
+        <Text>{t("account.export.button")}</Text>
+      </Button>
+      {said !== null && (
+        <Said
+          words={t(NOTICE[said.notice])}
+          refused={said.notice !== "export_saved"}
+          answer={said.answer}
+        />
+      )}
+    </View>
+  );
+}
+
+/**
+ * The account (#170, ADR-022; #83, ADR-040; ADR-007), under the "Your
+ * account" row of Settings (#287, #511): "Löysin hänet", the break and the
+ * deletion, in that order, each with what it does under it, the deletion
+ * last, below a hairline. "Löysin hänet" and the break have screens of
+ * their own; deletion is a button behind a confirmation that names the
+ * cooldown; never a swipe, never colour alone (CLAUDE.md Accessibility).
+ */
+export function AccountActions() {
+  const { t } = useT();
+  const session = useSession();
+  const router = useRouter();
+  const tap = useHapticTap();
+  const [deleting, setDeleting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const { said, say } = useSaid();
+  if (session.status !== "signed-in") return null;
+
+  const deleteAccount = async () => {
+    setConfirming(false);
+    say(null);
+    setDeleting(true);
+    try {
+      await session.deleteAccount();
+      // The provider flips to signed-out; this card unmounts with it.
+    } catch {
+      say("delete_failed");
+      setDeleting(false);
+    }
+  };
+
+  /** A button and, under it, what it does. */
+  const action = (button: ReactNode, consequence: string) => (
+    <View className="gap-1.5">
+      {button}
+      <Text variant="muted">{consequence}</Text>
+    </View>
+  );
+
+  return (
+    <View className="gap-4">
+      {/* "Löysin hänet" (#83): telling Kuutti one found somebody, which changes nothing else. */}
+      {action(
+        <Button
+          variant="outline"
+          accessibilityLabel={t("account.foundThem.button")}
+          disabled={deleting}
+          onPress={() => {
+            tap();
+            router.push("/settings/found-them");
+          }}
+        >
+          <Text>{t("account.foundThem.button")}</Text>
+        </Button>,
+        t("account.found.consequence"),
+      )}
+      {/* Taking a break (#170): the screen says what happens before anything does. */}
+      {action(
+        <Button
+          variant="outline"
+          accessibilityLabel={t("account.break.button")}
+          disabled={deleting}
+          onPress={() => {
+            tap();
+            router.push("/account/break");
+          }}
+        >
+          <Text>{t("account.break.button")}</Text>
+        </Button>,
+        t("account.break.consequence"),
+      )}
+      <View className="mt-3 gap-3 border-t border-border pt-4">
+        {deleting && <Text accessibilityLiveRegion="polite">{t("account.delete.working")}</Text>}
+        {action(
           <Button
             variant="destructive"
             accessibilityLabel={t("account.delete.button")}
-            disabled={busy.kind !== "idle"}
+            disabled={deleting}
             onPress={() => {
               tap();
               setConfirming(true);
             }}
           >
             <Text>{t("account.delete.button")}</Text>
-          </Button>
-        </CardContent>
+          </Button>,
+          t("account.delete.consequence", { days: REREGISTER_COOLDOWN_DAYS }),
+        )}
+        {said !== null && <Said refused words={t(NOTICE[said.notice])} answer={said.answer} />}
       </View>
 
       <Dialog open={confirming} onOpenChange={(open) => !open && setConfirming(false)}>
@@ -234,6 +263,6 @@ export function AccountActions({ share }: { share?: typeof Share.share }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </View>
   );
 }

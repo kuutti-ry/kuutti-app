@@ -5,15 +5,31 @@ appId: fi.kuutti.app
 name: Log out everywhere ends this device's session, and reopening the app does not bring it back
 ---
 - runFlow: ../common/sign-in.yaml
-# This device's session has a screen of its own (#287), opened by its link as
-# common/sign-out.yaml opens it: on Android a swipe through Settings can pass
-# over its row (CI, 27/10/2026: thirty swipes, the row never seen, Settings
-# left at its foot). sign-in-links taps the row itself.
-- openLink: kuutti://settings/device
+# Logging out opens under its row (#511), by its link as common/sign-out.yaml
+# opens it: on Android a swipe through Settings can pass over its row (CI,
+# 27/10/2026: thirty swipes, the row never seen, Settings left at its foot).
+# sign-in-links taps the row itself. Log out everywhere asks first (the
+# maintainer, 29/10/2026), and the question's own button carries it out.
+# The scroll goes to the line under the button, which puts the whole button
+# in sight (the row is the list's foot, where nothing can be centred), and
+# the list's own scroll to the row ends before the tap.
+- openLink: kuutti://settings?open=device
 - extendedWaitUntil:
-    visible: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
+    visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
+- scrollUntilVisible:
+    element: "Every phone logged in as you, this one too.*|Kaikki puhelimet, joilla olet kirjautuneena.*|Alla telefoner där du är inloggad.*"
+    direction: DOWN
+    timeout: 60000
+- waitForAnimationToEnd
 - tapOn: "Log out everywhere|Kirjaudu ulos kaikkialta|Logga ut överallt"
+- extendedWaitUntil:
+    visible: "Log out on every phone\\?|Kirjaudutaanko ulos kaikilla puhelimilla\\?|Logga ut på alla telefoner\\?"
+    timeout: 15000
+# The question's own button answers it in its words, a name of its own: on
+# Android the row's button behind the dialog, and its text, are matches too
+# for the row's words.
+- tapOn: "Log out on every phone|Kirjaudu ulos kaikilla puhelimilla|Logga ut på alla telefoner"
 - openLink: kuutti://
 - extendedWaitUntil:
     visible: "Sign in with your bank|Kirjaudu pankkitunnuksilla|Logga in med din bank"

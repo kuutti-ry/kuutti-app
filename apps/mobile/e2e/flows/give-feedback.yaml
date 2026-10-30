@@ -10,20 +10,19 @@ name: Feedback sent from Settings is thanked, the kind chosen in words
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Account, below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "Give feedback|Anna palautetta|Ge respons"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Give feedback|Anna palautetta|Ge respons"
-- extendedWaitUntil:
-    visible: "What is it about\\?|Mistä on kyse\\?|Vad gäller det\\?"
-    timeout: 15000
+# The row sits under Community (#511), below the fold on a phone, and opens in place.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "Give feedback|Anna palautetta|Ge respons"
+      INSIDE: "What is it about\\?|Mistä on kyse\\?|Vad gäller det\\?"
 # The kind is a radio button whose label ticks it in words, never a colour alone.
 - tapOn: "An idea|Idea|En idé"
 - assertVisible: "✓ An idea|✓ Idea|✓ En idé"
-- tapOn: "Your feedback|Palautteesi|Din respons"
+# The field's name stands over it too: the second of the two is the field.
+- tapOn:
+    text: "Your feedback|Palautteesi|Din respons"
+    index: 1
 - inputText: "A flow left this line to see that feedback lands"
 # A tap on the question, which is no button, closes the keyboard (README, the keyboard).
 - tapOn: "What is it about\\?|Mistä on kyse\\?|Vad gäller det\\?"
@@ -32,5 +31,9 @@ name: Feedback sent from Settings is thanked, the kind chosen in words
     visible: "Thank you|Kiitos|Tack"
     timeout: 15000
 - assertVisible: "The moderators will read it\\. Nobody is mailed\\.|Moderaattorit lukevat sen\\. Kenellekään ei lähetetä sähköpostia\\.|Moderatorerna läser den\\. Ingen får e-post\\."
-- tapOn: "Back|Takaisin|Tillbaka"
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "Give feedback|Anna palautetta|Ge respons"
+      INSIDE: "Thank you|Kiitos|Tack"
 - assertVisible: "Settings|Asetukset|Inställningar"

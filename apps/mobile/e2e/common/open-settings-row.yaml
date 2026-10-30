@@ -1,0 +1,29 @@
+# Opens a row of Settings that holds its setting in place (#511), unless it is
+# open already: the app remembers the row left open while it runs and the
+# session lasts, so a row may come back open from earlier in this flow (a
+# flow that signs in anew finds every row closed). ROW is the row's pattern,
+# as Maestro reads its title and value; INSIDE is what its open panel shows at
+# once, right under the row (its loading line too, for a panel that reads the
+# API first), and never the row's own value, which is part of its name. The
+# list may come back scrolled anywhere, down to Logging out
+# where common/sign-out.yaml left it: up to its top first, then down to the
+# row.
+appId: fi.kuutti.app
+---
+- scrollUntilVisible:
+    element: "Appearance and language|Ulkoasu ja kieli|Utseende och språk"
+    direction: UP
+    timeout: 60000
+- scrollUntilVisible:
+    element: ${ROW}
+    direction: DOWN
+    centerElement: true
+    timeout: 60000
+- runFlow:
+    when:
+      notVisible: ${INSIDE}
+    commands:
+      - tapOn: ${ROW}
+- extendedWaitUntil:
+    visible: ${INSIDE}
+    timeout: 15000

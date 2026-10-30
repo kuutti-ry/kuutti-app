@@ -34,15 +34,23 @@ appId: fi.kuutti.app
     when:
       visible: "Your area|Alueesi|Ditt område|Welcome to Kuutti|Tervetuloa Kuuttiin|Välkommen till Kuutti"
     commands:
-      # This device's session has a screen of its own (#287), opened by its
-      # link rather than scrolled to: a swipe through Settings could pass over
-      # its row once the list grew (#107's Invitations row did), and the flows
-      # that test the row itself scroll to it. The screen says when there is
-      # no session.
-      - openLink: kuutti://settings/device
+      # Logging out opens under its row (#511), by a link that names it rather
+      # than a scroll to it: a swipe through Settings could pass over its row
+      # once the list grew (#107's Invitations row did), and the flows that
+      # test the row itself scroll to it. The list brings the opened row into
+      # sight; the scroll is for a list still settling, to the line under Log
+      # out, which puts the whole button in sight (the row is the list's
+      # foot, where nothing can be centred), and the list's own scroll ends
+      # before the tap. The row says when there is no session.
+      - openLink: kuutti://settings?open=device
       - extendedWaitUntil:
-          visible: "Log out|Kirjaudu ulos|Logga ut|No session on this device\\.|Tällä laitteella ei ole istuntoa\\.|Ingen session på den här enheten\\."
+          visible: "Settings|Asetukset|Inställningar"
           timeout: 15000
+      - scrollUntilVisible:
+          element: "This phone only\\..*|Vain tämä puhelin\\..*|Bara den här telefonen\\..*|No session on this device\\.|Tällä laitteella ei ole istuntoa\\.|Ingen session på den här enheten\\."
+          direction: DOWN
+          timeout: 60000
+      - waitForAnimationToEnd
       # A session the reset erased is already gone: Settings says so and has no button.
       - runFlow:
           when:

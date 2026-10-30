@@ -5,7 +5,7 @@ import { AccessibilityInfo, Platform, Share } from "react-native";
 import { clearSession, currentSession, saveSession } from "@/lib/session";
 import { a11yProblems, type HostNode, pressables } from "@/test/a11y";
 import { renderWithTheme } from "@/test/render";
-import { AccountActions, shareExport } from "./AccountActions";
+import { AccountActions, ExportData, shareExport } from "./AccountActions";
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock };
@@ -45,8 +45,11 @@ const exportFile = () => jest.fn(async () => ({ name: ZIP_NAME, bytes: ZIP }));
 const exportRequests = (requests: Request[]) =>
   requests.filter((r) => new URL(r.url).pathname === "/account/export");
 const SAVED = "Done. The file is where you chose.";
+// Said aloud through the shared Notice, queued behind what is being said (#511).
 const announced = () =>
-  (AccessibilityInfo.announceForAccessibility as jest.Mock).mock.calls.map(([words]) => words);
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mock.calls.map(
+    ([words]) => words,
+  );
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -74,28 +77,46 @@ const show = async (ui: React.ReactElement) => {
 
 beforeEach(async () => {
   await saveSession(session);
-  (AccessibilityInfo.announceForAccessibility as jest.Mock).mockClear();
+  (AccessibilityInfo.announceForAccessibilityWithOptions as jest.Mock).mockClear();
 });
 afterEach(async () => {
   await clearSession();
 });
 
 describe("AccountActions", () => {
-  it("shows the four labelled buttons and nothing pressable is unlabelled or too small", async () => {
+  it("shows its three labelled buttons, each with what it does, the deletion last, and nothing pressable is unlabelled or too small", async () => {
     fetchMock([]);
     await show(<AccountActions />);
+    // Its row carries the title (#287, #511): the panel does not repeat it.
+    expect(screen.queryByText("Your account")).toBeNull();
+    const found = pressables(screen.toJSON() as HostNode);
+    expect(found.map((node) => node.props.accessibilityLabel)).toEqual([
+      "I found someone",
+      "Take a break",
+      "Delete my account",
+    ]);
+    expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
+    expect(screen.getByText("Changes nothing else.")).toBeTruthy();
+    expect(screen.getByText("You are hidden and logged out. Nothing is deleted.")).toBeTruthy();
     expect(
-      await screen.findByText(
+      screen.getByText(/^Your account goes for good\. A new one is possible after 30 days\.$/),
+    ).toBeTruthy();
+    // The export is a row of its own now (#511), and the consents the app's settings (#170).
+    expect(screen.queryByRole("button", { name: "Download my data" })).toBeNull();
+    expect(screen.queryByLabelText("Take part in research")).toBeNull();
+  });
+
+  it("says what the copy of one's data is, beside its one button (#511)", async () => {
+    fetchMock([]);
+    await show(<ExportData />);
+    expect(
+      screen.getByText(
         "A file with everything Kuutti holds about you, and nothing about anyone else.",
       ),
     ).toBeTruthy();
-    // Its screen carries the title (#287): the card does not repeat it.
-    expect(screen.queryByText("Your account")).toBeNull();
     const found = pressables(screen.toJSON() as HostNode);
-    expect(found).toHaveLength(4);
+    expect(found.map((node) => node.props.accessibilityLabel)).toEqual(["Download my data"]);
     expect(found.flatMap((node) => a11yProblems(node))).toEqual([]);
-    // The consents are the app's settings now, not the account's (#170).
-    expect(screen.queryByLabelText("Take part in research")).toBeNull();
   });
 
   it("opens the found-them screen from its button, and nothing happens before that (#83)", async () => {
@@ -127,7 +148,7 @@ describe("AccountActions", () => {
       whileOpen = bytesOf(cache.get(`file:///cache/${ZIP_NAME}`));
       return { action: "sharedAction" as const };
     });
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(share).toHaveBeenCalled());
     expect(share.mock.calls[0]).toEqual([
@@ -142,7 +163,7 @@ describe("AccountActions", () => {
   it("says the file went where the person chose once the sheet shares it, aloud on iOS (#465)", async () => {
     fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.fn(async () => ({ action: "sharedAction" as const }));
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     expect(screen.queryByText(SAVED)).toBeNull();
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     const line = await screen.findByText(SAVED);
@@ -157,7 +178,7 @@ describe("AccountActions", () => {
   it("says nothing when the sheet is closed without sharing, and deletes the cached copy (#465)", async () => {
     fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.fn(async () => ({ action: "dismissedAction" as const }));
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(share).toHaveBeenCalled());
     await settle();
@@ -173,7 +194,7 @@ describe("AccountActions", () => {
     const share = jest.fn(async () => {
       throw new Error("no sheet");
     });
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(await screen.findByText("The download did not work. Try again.")).toBeTruthy();
     expect(cache.has(`file:///cache/${ZIP_NAME}`)).toBe(false);
@@ -187,7 +208,7 @@ describe("AccountActions", () => {
           : null,
     ]);
     const share = jest.fn();
-    await show(<AccountActions share={share as never} />);
+    await show(<ExportData share={share as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
       await screen.findByText(
@@ -205,7 +226,7 @@ describe("AccountActions", () => {
           ? json({ error: { code: "internal_error", message: "x", requestId: "r" } }, 500)
           : null,
     ]);
-    await show(<AccountActions share={jest.fn() as never} />);
+    await show(<ExportData share={jest.fn() as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     const line = await screen.findByText("The download did not work. Try again.");
     expect(line.props.accessibilityLiveRegion).toBe("assertive");
@@ -272,24 +293,24 @@ describe("AccountActions", () => {
   it("hands the export to the phone's own share sheet when no other is given", async () => {
     fetchMock([(req) => (new URL(req.url).pathname === "/account/export" ? zip() : null)]);
     const share = jest.spyOn(Share, "share").mockResolvedValue({ action: "sharedAction" });
-    await show(<AccountActions />);
+    await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
     share.mockRestore();
   });
 
-  it("says it is preparing the data while the export runs, and holds both buttons", async () => {
+  it("says it is preparing the data while the export runs, and holds its button", async () => {
     fetchMock([
       (req) =>
         new URL(req.url).pathname === "/account/export"
           ? (new Promise<Response>(() => undefined) as unknown as Response)
           : null,
     ]);
-    await show(<AccountActions share={jest.fn() as never} />);
+    await show(<ExportData share={jest.fn() as never} />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(await screen.findByText("Preparing your data…")).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Delete my account" }).props.accessibilityState?.disabled,
+      screen.getByRole("button", { name: "Download my data" }).props.accessibilityState?.disabled,
     ).toBe(true);
   });
 
@@ -316,7 +337,7 @@ describe("AccountActions", () => {
   });
 });
 
-describe("AccountActions on Android", () => {
+describe("ExportData on Android", () => {
   let os: jest.ReplaceProperty<typeof Platform.OS>;
   beforeEach(() => {
     os = jest.replaceProperty(Platform, "OS", "android");
@@ -337,7 +358,7 @@ describe("AccountActions on Android", () => {
         code: "ERR_PICKER_CANCELLED",
       }),
     );
-    await show(<AccountActions />);
+    await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(pickDirectory).toHaveBeenCalledTimes(1));
     await settle();
@@ -362,13 +383,13 @@ describe("AccountActions on Android", () => {
           choose = resolve;
         }),
     );
-    await show(<AccountActions />);
+    await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     await waitFor(() => expect(pickDirectory).toHaveBeenCalledTimes(1));
     await settle();
     expect(screen.queryByText("Preparing your data…")).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Delete my account" }).props.accessibilityState?.disabled,
+      screen.getByRole("button", { name: "Download my data" }).props.accessibilityState?.disabled,
     ).toBe(true);
     expect(exportRequests(requests)).toHaveLength(0);
     await act(async () => choose(new Directory("content://picked")));
@@ -380,7 +401,7 @@ describe("AccountActions on Android", () => {
     const requests = fetchMock([
       (req) => (new URL(req.url).pathname === "/account/export" ? zip() : null),
     ]);
-    await show(<AccountActions />);
+    await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     const line = await screen.findByText(SAVED);
     expect(line.props.accessibilityLiveRegion).toBe("polite");
@@ -400,7 +421,7 @@ describe("AccountActions on Android", () => {
           ? json({ error: { code: "export_budget_exceeded", message: "x", requestId: "r" } }, 429)
           : null,
     ]);
-    await show(<AccountActions />);
+    await show(<ExportData />);
     await fireEvent.press(screen.getByRole("button", { name: "Download my data" }));
     expect(
       await screen.findByText(

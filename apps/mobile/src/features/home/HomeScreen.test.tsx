@@ -21,10 +21,31 @@ jest.mock("@/features/identity", () => ({
   useOnboardingGate: () => ({ ...mockGate, retry: mockRetry }),
 }));
 const mockRetry = jest.fn();
+// A dev build unless a test says it is the store's.
+let mockProduction = false;
+jest.mock("@/lib/environment", () => ({
+  ...jest.requireActual("@/lib/environment"),
+  isProduction: () => mockProduction,
+}));
 
 const { __router: router } = jest.requireMock("expo-router") as {
   __router: { push: jest.Mock; replace: jest.Mock };
 };
+
+/** The two places of the row above the screen, left to right, as drawn. */
+function topRow(): HostNode[] {
+  const find = (node: HostNode | string): HostNode | null => {
+    if (typeof node === "string") return null;
+    if (String(node.props.className ?? "").startsWith("flex-row justify-between")) return node;
+    for (const child of node.children ?? []) {
+      const found = find(child);
+      if (found) return found;
+    }
+    return null;
+  };
+  const row = find(screen.toJSON() as HostNode);
+  return (row?.children ?? []).filter((child): child is HostNode => typeof child !== "string");
+}
 
 const POND: PondSummary = {
   id: "0b4f3a0e-7c2f-4e2b-9a9a-1a2b3c4d5e6f",
@@ -52,6 +73,7 @@ const tokens = {
 beforeEach(async () => {
   router.push.mockReset();
   mockRetry.mockReset();
+  mockProduction = false;
   mockGate = { status: "complete", pond: POND };
   globalThis.fetch = jest.fn(async (input: Request | string) => {
     const url = new URL(input instanceof Request ? input.url : input);
@@ -83,6 +105,24 @@ describe("HomeScreen", () => {
     expect(pressables(screen.toJSON() as HostNode).flatMap((node) => a11yProblems(node))).toEqual(
       [],
     );
+  });
+
+  it("puts the wrench on the left and the gear on the right (#511)", async () => {
+    await renderWithTheme(<HomeScreen />);
+    expect(topRow().map((place) => place.props.accessibilityLabel)).toEqual([
+      "Tech config",
+      "Settings",
+    ]);
+  });
+
+  it("keeps the gear on the right in production, alone", async () => {
+    mockProduction = true;
+    await renderWithTheme(<HomeScreen />);
+    expect(screen.queryByRole("button", { name: "Tech config" })).toBeNull();
+    expect(topRow().map((place) => place.props.accessibilityLabel)).toEqual([
+      undefined,
+      "Settings",
+    ]);
   });
 
   it("offers to check again when the account setup could not be read, and shows nothing that needs it", async () => {

@@ -3,7 +3,7 @@
 # opens her conversation with Jussi, shares it with the header's Share contact
 # and sees it marked shared. Jussi signs in and finds it under the
 # conversation's header. Elina signs in again, stops sharing it and removes it
-# in Settings, so the flow runs again without a reset. The stories give the
+# in Settings, closing its row, so the flow runs again without a reset. The stories give the
 # pair their conversation (packages/db/src/seed/conversations.ts), which no
 # other flow reads. A run that stops half-way leaves the username kept, or
 # shared: `pnpm demo:reset` forgets it.
@@ -18,13 +18,12 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Account, below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
+# The row sits under Notifications and contacts, below the fold on a phone, and opens in place (#511).
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
+      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
 # The cards come once what is kept has been read, the phone number's first;
 # Instagram's is the fourth of five, below the fold. A field is its label.
 - extendedWaitUntil:
@@ -35,17 +34,14 @@ name: A contact kept in Settings is shared from a conversation's header and show
     direction: DOWN
     centerElement: true
     timeout: 60000
-- assertVisible:
-    text: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
-    enabled: false
 - tapOn: "Your Instagram username|Instagram-käyttäjänimesi|Ditt användarnamn på Instagram"
 - inputText: "elina.lukupiiri"
-# The page keeps the focused field in sight just above the keyboard, with the
-# card's title above it (the hint between them is Telegram's too); Save stays
-# under the keyboard. A tap on the title, which is no button and the brand's
-# name in every language, closes it (README, the keyboard).
+# There is no Save (#511): leaving the field keeps it. The page keeps the
+# focused field in sight just above the keyboard, with the kind's title
+# above it (the hint between them is Telegram's too). A tap on the title,
+# which is no button and the brand's name in every language, closes the
+# keyboard and leaves the field (README, the keyboard).
 - tapOn: "Instagram"
-- tapOn: "Save your Instagram username|Tallenna Instagram-käyttäjänimesi|Spara ditt användarnamn på Instagram"
 - extendedWaitUntil:
     visible: "Saved\\.|Tallennettu\\.|Sparat\\."
     timeout: 15000
@@ -139,12 +135,12 @@ name: A contact kept in Settings is shared from a conversation's header and show
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-- scrollUntilVisible:
-    element: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
+# Signed in anew, she finds every row closed (#511): the row is opened again.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
+      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"
 - extendedWaitUntil:
     visible: "Your phone number|Puhelinnumerosi|Ditt telefonnummer"
     timeout: 15000
@@ -158,3 +154,8 @@ name: A contact kept in Settings is shared from a conversation's header and show
     visible: "Removed\\. Wherever you shared it, it is gone now\\.|Poistettu\\. Se on poistunut myös sieltä, missä jaoit sen\\.|Borttaget\\. Det är borta även där du delade det\\."
     timeout: 15000
 - assertNotVisible: "Remove your Instagram username|Poista Instagram-käyttäjänimesi|Ta bort ditt användarnamn på Instagram"
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "Ways to reach you|Mistä sinut tavoittaa|Hur man når dig"
+      INSIDE: "Loading your contact details…|Ladataan yhteystietojasi…|Laddar dina kontaktuppgifter…|Keep the ways to reach you outside the app here\\..*|Pidä täällä yhteystiedot, joilla sinut tavoittaa sovelluksen ulkopuolella\\..*|Spara här hur man når dig utanför appen\\..*"

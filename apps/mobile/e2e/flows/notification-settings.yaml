@@ -1,11 +1,12 @@
 # Notification choices (#176, ADR-032; #102, ADR-055 §9): a row under Account
-# in Settings whose screen says that the choices decide what Kuutti tells the
-# phones, then whether this phone lets Kuutti notify it, which on the emulator
+# in Settings that opens in place (#511) and says that the choices decide what
+# Kuutti tells the phones, then whether this phone lets Kuutti notify it, which on the emulator
 # and the simulator is never asked (no flow answers the phone's question), and
 # holds a switch per kind, each on until switched off and kept on the server.
 # Asking, allowing and refusing are the jest tests' (PhoneLine). Sanna switches
 # Messages off, leaves, finds it kept when she comes back by way of home,
-# and switches it on again, so the flow leaves her as it found her. The
+# where the row is still open, read again, and switches it on again, so the
+# flow leaves her as it found her, the row closed. The
 # other kinds work alike (the jest tests and the API's).
 appId: fi.kuutti.app
 name: The messages switch in Settings, Notifications, goes off, is kept on the server, and goes on again
@@ -15,16 +16,12 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
 - extendedWaitUntil:
     visible: "Settings|Asetukset|Inställningar"
     timeout: 15000
-# The row sits under Account, below the fold on a phone; it is read by its title and summary.
-- scrollUntilVisible:
-    element: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-- extendedWaitUntil:
-    visible: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
-    timeout: 15000
+# The row sits under Account, below the fold on a phone; it is read by its title.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+      INSIDE: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
 # The phone's line comes once the phone has been read.
 - extendedWaitUntil:
     visible: "This phone has not been asked yet whether Kuutti may notify it\\.|Tältä puhelimelta ei ole vielä kysytty, saako Kuutti lähettää sille ilmoituksia\\.|Den här telefonen har inte frågats än om Kuutti får skicka aviseringar till den\\."
@@ -48,18 +45,18 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
     timeout: 15000
 - assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
 
-# Kept on the server: home first, so the screen is read again rather than shown as it was.
+# Kept on the server: home first, so Settings is read again rather than shown
+# as it was; the row comes back open, as it was left.
 - openLink: kuutti://
 - extendedWaitUntil:
     visible: "Your area|Alueesi|Ditt område"
     timeout: 15000
 - openLink: kuutti://settings
-- scrollUntilVisible:
-    element: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+      INSIDE: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"
 - extendedWaitUntil:
     visible:
       text: "0|(Messages|Viestit|Meddelanden), off"
@@ -74,3 +71,8 @@ name: The messages switch in Settings, Notifications, goes off, is kept on the s
       above: "That there is a new message, never what it says or who sent it\\.|Että sinulle on uusi viesti, ei koskaan mitä siinä lukee tai kuka sen lähetti\\.|Att det finns ett nytt meddelande, aldrig vad det säger eller vem som skickade det\\."
     timeout: 15000
 - assertNotVisible: "The change was not saved\\. Try again\\.|Muutosta ei tallennettu\\. Yritä uudelleen\\.|Ändringen sparades inte\\. Försök igen\\."
+- runFlow:
+    file: ../common/close-settings-row.yaml
+    env:
+      ROW: "(Notifications|Ilmoitukset|Aviseringar)(, .*)?"
+      INSIDE: "What you choose here decides what Kuutti tells your phones\\..*|Valintasi ratkaisevat, mistä Kuutti kertoo puhelimillesi\\..*|Det du väljer här avgör vad Kuutti berättar för dina telefoner\\..*"

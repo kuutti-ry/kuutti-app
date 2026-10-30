@@ -4,6 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { LoadFailed } from "@/components/LoadFailed";
+import { Notice } from "@/components/Notice";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Text } from "@/components/ui/text";
@@ -32,12 +33,23 @@ function stateOf(kind: WithdrawableConsentKind, consents: ConsentsResponse): Con
   return active ? "on" : "off";
 }
 
+const statesOf = (consents: ConsentsResponse): Record<WithdrawableConsentKind, ConsentState> => ({
+  research: stateOf("research", consents),
+  special_category: stateOf("special_category", consents),
+});
+
 /**
  * One consent as a switch: a change is a POST or a DELETE, both answered
- * with the consents as stored. Withdrawing the special-category consent takes
- * the seek answer with it, and onboarding asks it again (ADR-019 §4).
+ * with the consents as stored, which go to `onStored` too. Withdrawing the
+ * special-category consent takes the seek answer with it, and onboarding asks
+ * it again (ADR-019 §4).
  */
-function useConsentSwitch(kind: WithdrawableConsentKind, signedIn: boolean, locale: string) {
+function useConsentSwitch(
+  kind: WithdrawableConsentKind,
+  signedIn: boolean,
+  locale: string,
+  onStored?: (consents: ConsentsResponse) => void,
+) {
   const [state, setState] = useState<ConsentState>("loading");
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -72,13 +84,14 @@ function useConsentSwitch(kind: WithdrawableConsentKind, signedIn: boolean, loca
           ? await giveConsent(kind, bundledVersion(kind), consentLocale(locale))
           : await withdrawConsent(kind);
         if (mounted.current) setState(stateOf(kind, consents));
+        onStored?.(consents);
       } catch {
         if (mounted.current) setFailed(true);
       } finally {
         if (mounted.current) setBusy(false);
       }
     },
-    [kind, locale],
+    [kind, locale, onStored],
   );
   return { state, error, busy, failed, set, read };
 }
@@ -97,18 +110,25 @@ const FAILED = {
 } as const;
 
 /**
- * One withdrawable consent on its own screen (#46, #146, #287): a choice
+ * One withdrawable consent under its row of Settings (#46, #146, #287, #511): a choice
  * about the app, not an action on the account. It says when it is being read
  * and when it could not be read, with a way to read it again; nothing for a
- * signed-out device, whose screen says there is no session. A yes here is
+ * signed-out device, which has no such row. A yes here is
  * given to the version this app carries, so its text is a link away, as on
- * the onboarding steps (#208, ADR-010 §4).
+ * the onboarding steps (#208, ADR-010 §4). What a change stored goes to
+ * `onStored`, for the row above it to say (#511).
  */
-export function ConsentSwitch({ kind }: { kind: WithdrawableConsentKind }) {
+export function ConsentSwitch({
+  kind,
+  onStored,
+}: {
+  kind: WithdrawableConsentKind;
+  onStored?: (consents: ConsentsResponse) => void;
+}) {
   const { t, locale } = useT();
   const tap = useHapticTap();
   const session = useSession();
-  const consent = useConsentSwitch(kind, session.status === "signed-in", locale);
+  const consent = useConsentSwitch(kind, session.status === "signed-in", locale, onStored);
   if (session.status !== "signed-in") return null;
   if (consent.state === "loading") {
     return (
@@ -133,7 +153,11 @@ export function ConsentSwitch({ kind }: { kind: WithdrawableConsentKind }) {
     void consent.set(on);
   };
   return (
-    <View className="gap-2">
+    <View className="gap-3">
+      {/* What it is first, as every row of Settings says it (#511). */}
+      <Text>
+        {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : t(EXPLAIN[kind])}
+      </Text>
       {/* The words toggle the switch too, as the high-contrast row's do: a
           thumb or a test reaches them without aiming at the thumb-sized
           switch at the screen's edge. */}
@@ -146,22 +170,23 @@ export function ConsentSwitch({ kind }: { kind: WithdrawableConsentKind }) {
           onCheckedChange={set}
         />
       </View>
-      <Text variant="muted">
-        {consent.state === "outdated" ? t("onboarding.consents.outdatedApp") : t(EXPLAIN[kind])}
-      </Text>
       <LegalTextLink kind={kind} />
-      {consent.failed && <Text accessibilityLiveRegion="assertive">{t(FAILED[kind])}</Text>}
+      {consent.failed && <Notice refused words={t(FAILED[kind])} />}
     </View>
   );
 }
 
 /**
- * Both consents' states, for the rows of the settings list that open them
- * (#287): read once, and again whenever the list is back in front, so a
- * change made on a consent's screen shows there. "loading" before a person
- * signs in and while the read is on its way, "unavailable" when it failed.
+ * Both consents' states, for the rows of the settings list that hold them
+ * (#287, #511): read once, and again whenever the list is back in front;
+ * `stored` takes what a switch under a row stored, so the row says it at
+ * once. "loading" before a person signs in and while the read is on its way,
+ * "unavailable" when it failed.
  */
-export function useConsentStates(): Record<WithdrawableConsentKind, ConsentState> {
+export function useConsentStates(): {
+  states: Record<WithdrawableConsentKind, ConsentState>;
+  stored: (consents: ConsentsResponse) => void;
+} {
   const session = useSession();
   const signedIn = session.status === "signed-in";
   const [states, setStates] = useState<Record<WithdrawableConsentKind, ConsentState>>({
@@ -173,12 +198,7 @@ export function useConsentStates(): Record<WithdrawableConsentKind, ConsentState
       if (!signedIn) return;
       let live = true;
       fetchConsents().then(
-        (consents) =>
-          live &&
-          setStates({
-            research: stateOf("research", consents),
-            special_category: stateOf("special_category", consents),
-          }),
+        (consents) => live && setStates(statesOf(consents)),
         () => live && setStates({ research: "unavailable", special_category: "unavailable" }),
       );
       return () => {
@@ -186,5 +206,6 @@ export function useConsentStates(): Record<WithdrawableConsentKind, ConsentState
       };
     }, [signedIn]),
   );
-  return states;
+  const stored = useCallback((consents: ConsentsResponse) => setStates(statesOf(consents)), []);
+  return { states, stored };
 }

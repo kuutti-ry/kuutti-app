@@ -13,18 +13,18 @@ name: Deleting the account asks first, signs the person out, and the next login 
       PERSONA: Aino Virtanen
 # Settings is reachable before onboarding is done.
 - openLink: kuutti://settings
-# The deletion is on the account screen, behind its row (#287), last of its buttons.
-# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
+# The deletion opens under Your account, the last row of the list (#287,
+# #511), last of its buttons below a hairline.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Your account|Tilisi|Ditt konto)(, .*)?"
+      INSIDE: "I found someone|Löysin hänet|Jag hittade någon"
 - scrollUntilVisible:
-    element: "Your account|Tilisi|Ditt konto"
+    element: "Delete my account|Poista tilini|Ta bort mitt konto"
     direction: DOWN
     centerElement: true
-    timeout: 60000
-- tapOn: "Your account|Tilisi|Ditt konto"
-- extendedWaitUntil:
-    visible: "Delete my account|Poista tilini|Ta bort mitt konto"
-    timeout: 15000
-- assertVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+    timeout: 30000
 
 # Asked first; keeping the account deletes nothing.
 - tapOn: "Delete my account|Poista tilini|Ta bort mitt konto"
@@ -32,7 +32,7 @@ name: Deleting the account asks first, signs the person out, and the next login 
 - assertVisible: ".*30.*"
 - tapOn: "Keep my account|Säilytä tilini|Behåll mitt konto"
 - assertNotVisible: "Delete your account\\?|Poistetaanko tilisi\\?|Ta bort ditt konto\\?"
-- assertVisible: "Download my data|Lataa tietoni|Ladda ner mina uppgifter"
+- assertVisible: "Delete my account|Poista tilini|Ta bort mitt konto"
 
 # Deleted: signed out at once.
 - tapOn: "Delete my account|Poista tilini|Ta bort mitt konto"

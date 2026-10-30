@@ -14,16 +14,12 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
       PERSONA: Aino Virtanen
 # Settings is reachable before onboarding is done.
 - openLink: kuutti://settings
-# The row is the last of the list, below the fold on a phone: scrolled to, then tapped.
-- scrollUntilVisible:
-    element: "Your account|Tilisi|Ditt konto"
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-- tapOn: "Your account|Tilisi|Ditt konto"
-- extendedWaitUntil:
-    visible: "I found someone|Löysin hänet|Jag hittade någon"
-    timeout: 15000
+# Your account is the last row of the list (#511), below the fold on a phone.
+- runFlow:
+    file: ../common/open-settings-row.yaml
+    env:
+      ROW: "(Your account|Tilisi|Ditt konto)(, .*)?"
+      INSIDE: "I found someone|Löysin hänet|Jag hittade någon"
 - tapOn: "I found someone|Löysin hänet|Jag hittade någon"
 - extendedWaitUntil:
     visible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
@@ -42,10 +38,12 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
     timeout: 15000
 - assertNotVisible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
 
-# Opened again: thanked at once, nothing asked.
+# Opened again: thanked at once, nothing asked. Settings comes back with the
+# row open, told by the line under its button: the screen's own title has the
+# button's words.
 - tapOn: "Back|Takaisin|Tillbaka"
 - extendedWaitUntil:
-    visible: "Delete my account|Poista tilini|Ta bort mitt konto"
+    visible: "Changes nothing else\\.|Ei muuta mitään muuta\\.|Ändrar inget annat\\."
     timeout: 15000
 - tapOn: "I found someone|Löysin hänet|Jag hittade någon"
 - extendedWaitUntil:
@@ -53,4 +51,6 @@ name: I found someone tells Kuutti the reason once, thanks the person, and asks 
     timeout: 15000
 - assertNotVisible: "Which is it\\?|Mikä on kyseessä\\?|Vilket gäller\\?"
 - tapOn: "Back|Takaisin|Tillbaka"
-- assertVisible: "Delete my account|Poista tilini|Ta bort mitt konto"
+- extendedWaitUntil:
+    visible: "Changes nothing else\\.|Ei muuta mitään muuta\\.|Ändrar inget annat\\."
+    timeout: 15000

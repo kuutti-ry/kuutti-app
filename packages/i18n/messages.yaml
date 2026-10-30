@@ -2735,10 +2735,10 @@ settings.theme.label:
   machine: { fi: true, sv: true }
 
 settings.theme.system:
-  en: System
-  description: Settings sheet, theme choice that follows the phone's light or dark setting. Keep it short, it sits on a button.
-  fi: Järjestelmä
-  sv: System
+  en: "Same as the phone"
+  description: "The theme option that follows the phone's light or dark setting, and the Theme row's value while it is chosen (#143, #511)."
+  fi: "Sama kuin puhelimessa"
+  sv: "Samma som telefonen"
   machine: { fi: true, sv: true }
 
 settings.theme.light:
@@ -2777,10 +2777,10 @@ settings.language.label:
   machine: { fi: true, sv: true }
 
 settings.language.system:
-  en: Phone's language
-  description: Settings sheet, language choice that follows the phone's language setting.
-  fi: Puhelimen kieli
-  sv: Telefonens språk
+  en: "Same as the phone"
+  description: "The language option that follows the phone's language, and the Language row's value while it is chosen (#13, #511)."
+  fi: "Sama kuin puhelimessa"
+  sv: "Samma som telefonen"
   machine: { fi: true, sv: true }
 
 about.source.title:
@@ -3708,10 +3708,10 @@ signIn.tryAgain:
   machine: { fi: true, sv: true }
 
 settings.session.label:
-  en: This device
-  description: "Settings, title of the row and of the screen with the log-out buttons, under Account (#287)."
-  fi: Tämä laite
-  sv: Den här enheten
+  en: "Logging out"
+  description: "Title of the row under Account in Settings with Log out and Log out everywhere (#35, #511); named for what it holds, it was This device."
+  fi: "Uloskirjautuminen"
+  sv: "Utloggning"
   machine: { fi: true, sv: true }
 
 settings.group.account:
@@ -3740,6 +3740,62 @@ settings.logoutAll:
   description: Settings sheet, ends every device's session; the recovery for a lost phone.
   fi: Kirjaudu ulos kaikkialta
   sv: Logga ut överallt
+  machine: { fi: true, sv: true }
+
+settings.logout.explain:
+  en: "This phone only. You log in again with your bank."
+  description: "Under Log out in Settings › Logging out (#511, #35)."
+  fi: "Vain tämä puhelin. Kirjaudut uudelleen pankkitunnuksilla."
+  sv: "Bara den här telefonen. Du loggar in igen med din bank."
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.explain:
+  en: "Every phone logged in as you, this one too: for a lost or lent phone."
+  description: "Under Log out everywhere in Settings › Logging out (#511, #35)."
+  fi: "Kaikki puhelimet, joilla olet kirjautuneena, myös tämä: kadonnutta tai lainattua puhelinta varten."
+  sv: "Alla telefoner där du är inloggad, även den här: för en borttappad eller utlånad telefon."
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.title:
+  en: "Log out on every phone?"
+  description: "Title of the question before logging out everywhere (#511; the maintainer, 29/10/2026)."
+  fi: "Kirjaudutaanko ulos kaikilla puhelimilla?"
+  sv: "Logga ut på alla telefoner?"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.body:
+  en: "Every phone, this one too, needs your bank to log in again."
+  description: "Text of the question before logging out everywhere (#511)."
+  fi: "Jokainen puhelin, myös tämä, tarvitsee taas pankkitunnuksesi kirjautumiseen."
+  sv: "Varje telefon, även den här, behöver din bank för att logga in igen."
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.yes:
+  en: "Log out on every phone"
+  description: "The question's button that logs out everywhere (#511): an outline, the deletion alone is red. It answers the title in its words, and its name differs from the row's button behind the question, which a screen reader and the end-to-end flows tell apart by name."
+  fi: "Kirjaudu ulos kaikilla puhelimilla"
+  sv: "Logga ut på alla telefoner"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.no:
+  en: "Stay logged in"
+  description: "The question's button that changes nothing (#511)."
+  fi: "Pysy kirjautuneena"
+  sv: "Förbli inloggad"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.confirm.close:
+  en: "Close"
+  description: "Screen-reader label of the question's close control (#511): closing it changes nothing."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
+settings.logoutAll.failed:
+  en: "Not logged out everywhere. Check your connection and try again."
+  description: "Said under Log out everywhere when the API did not end the sessions (#511): this phone stays logged in."
+  fi: "Uloskirjautuminen kaikkialta ei onnistunut. Tarkista yhteys ja yritä uudelleen."
+  sv: "Utloggningen överallt lyckades inte. Kontrollera anslutningen och försök igen."
   machine: { fi: true, sv: true }
 
 admin.title:
@@ -7169,10 +7225,10 @@ account.delete.title:
   machine: { fi: true, sv: true }
 
 account.delete.body:
-  en: "Your photos, your devices and your data go now and cannot be brought back. A new account is possible after {days, plural, one {# day} other {# days}}."
-  description: Deletion confirmation, text; {days} is the cooldown before the same person may register again.
-  fi: "Kuvasi, laitteesi ja tietosi poistuvat nyt, eikä niitä voi palauttaa. Uuden tilin voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
-  sv: "Dina foton, dina enheter och dina uppgifter försvinner nu och kan inte tas tillbaka. Ett nytt konto är möjligt efter {days, plural, one {# dag} other {# dagar}}."
+  en: "Your profile, photos, matches and contacts go now and cannot be brought back. Messages you sent stay with the people who received them, under 'Deleted user'. What safety and the law require is kept for a time, as the privacy policy says. A new account is possible after {days, plural, one {# day} other {# days}}."
+  description: "Deletion confirmation, text (#51, ADR-007; reworded #511): says only what an erasure does, the messages kept for their receivers under 'Deleted user' (chat's counterpart name) and what safety and law keep; {days} is the cooldown before the same person may register again."
+  fi: "Profiilisi, kuvasi, matchisi ja yhteystietosi poistuvat nyt, eikä niitä voi palauttaa. Lähettämäsi viestit jäävät vastaanottajille nimellä 'Poistettu käyttäjä'. Se, mitä turvallisuus ja laki vaativat, säilytetään jonkin aikaa, kuten tietosuojaseloste kertoo. Uuden tilin voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
+  sv: "Din profil, dina foton, matcher och kontaktuppgifter försvinner nu och kan inte tas tillbaka. Meddelanden du skickat stannar hos dem som fick dem, under 'Raderad användare'. Det som säkerheten och lagen kräver sparas en tid, som dataskyddsbeskrivningen säger. Ett nytt konto är möjligt efter {days, plural, one {# dag} other {# dagar}}."
   machine: { fi: true, sv: true }
 
 account.delete.confirm:
@@ -7437,10 +7493,10 @@ account.email.label:
   machine: { fi: true, sv: true }
 
 account.email.save:
-  en: "Save the address"
-  description: "Button that saves the e-mail (#148)."
-  fi: "Tallenna osoite"
-  sv: "Spara adressen"
+  en: "Send a confirmation code"
+  description: "Button that keeps the e-mail typed and mails a code to confirm it (#148, #385); named for what it does, since it mails one (the maintainer, 29/10/2026, #511). The only button of the e-mail: Settings has no Save buttons."
+  fi: "Lähetä vahvistuskoodi"
+  sv: "Skicka en bekräftelsekod"
   machine: { fi: true, sv: true }
 
 account.email.clear:
@@ -8923,13 +8979,6 @@ settings.section.appearance:
   sv: "Utseende och språk"
   machine: { fi: true, sv: true }
 
-settings.section.agreements:
-  en: "Legal"
-  description: "Settings, heading of the section with the two consents and the terms and privacy texts (#287)."
-  fi: "Oikeudellista"
-  sv: "Juridiskt"
-  machine: { fi: true, sv: true }
-
 settings.theme.withContrast:
   en: "{theme}, high contrast"
   description: "Summary of the theme row while high contrast is on (#287); {theme} is the chosen theme's name."
@@ -8972,6 +9021,20 @@ settings.email.label:
   sv: "E-post"
   machine: { fi: true, sv: true }
 
+settings.email.none:
+  en: "None given"
+  description: "Value of the E-mail row in Settings while no address is kept (#511, #376): the row's second line and what a screen reader hears as its value."
+  fi: "Ei annettu"
+  sv: "Ingen angiven"
+  machine: { fi: true, sv: true }
+
+settings.email.unconfirmed:
+  en: "{address}, not confirmed yet"
+  description: "Value of the E-mail row in Settings while the address waits for its code (#511, #385); {address} is the e-mail address as typed, never inflected. A confirmed address is the value alone."
+  fi: "{address}, ei vielä vahvistettu"
+  sv: "{address}, inte bekräftad än"
+  machine: { fi: true, sv: true }
+
 settings.contacts.label:
   en: "Ways to reach you"
   description: "Title of the row under Account in Settings and of the screen it opens (#103): the phone number and the usernames a person keeps to share in a conversation. Never \"contacts\" alone, which reads as the phone's address book (the maintainer, 28/10/2026); the screens that point here use these words."
@@ -8979,11 +9042,46 @@ settings.contacts.label:
   sv: "Hur man når dig"
   machine: { fi: true, sv: true }
 
+settings.contacts.none:
+  en: "None kept"
+  description: "Value of the Ways to reach you row in Settings while no contact is kept (#511, #376)."
+  fi: "Ei yhtään tallennettu"
+  sv: "Inget sparat"
+  machine: { fi: true, sv: true }
+
+settings.contacts.separator:
+  en: ", "
+  description: "Between the names of the kinds kept, in the Ways to reach you row's value (#511): \"Phone number, Instagram\"."
+  fi: ", "
+  sv: ", "
+  machine: { fi: true, sv: true }
+
 settings.notifications.label:
   en: "Notifications"
   description: "Title of the row under Account in Settings and of the screen it opens (#176): which kinds of notification the person allows. Short."
   fi: "Ilmoitukset"
   sv: "Aviseringar"
+  machine: { fi: true, sv: true }
+
+settings.notifications.allOn:
+  en: "All on"
+  description: "Value of the Notifications row in Settings while every kind is on (#511, #376)."
+  fi: "Kaikki päällä"
+  sv: "Alla på"
+  machine: { fi: true, sv: true }
+
+settings.notifications.allOff:
+  en: "All off"
+  description: "Value of the Notifications row in Settings while every kind is off (#511, #376)."
+  fi: "Kaikki pois päältä"
+  sv: "Alla av"
+  machine: { fi: true, sv: true }
+
+settings.notifications.someOn:
+  en: "{on, number} on, {off, number} off"
+  description: "Value of the Notifications row in Settings while some kinds are on and some off (#511, #376); {on} and {off} are how many kinds, each at least 1."
+  fi: "{on, number} päällä, {off, number} pois"
+  sv: "{on, number} på, {off, number} av"
   machine: { fi: true, sv: true }
 
 notifications.intro:
@@ -9218,6 +9316,13 @@ settings.invite.label:
   fi: "Kutsut"
   sv: "Inbjudningar"
   max_length: 24
+  machine: { fi: true, sv: true }
+
+settings.invite.waiting:
+  en: "{waiting, plural, =0 {None waiting to be used} one {One waiting to be used} other {# waiting to be used}}"
+  description: "Value of the Invitations row in Settings once the person may invite (#511, #376): how many invitations they made wait to be used."
+  fi: "{waiting, plural, =0 {Ei yhtään odottamassa} one {Yksi odottaa käyttöä} other {# odottaa käyttöä}}"
+  sv: "{waiting, plural, =0 {Ingen väntar på att användas} one {En väntar på att användas} other {# väntar på att användas}}"
   machine: { fi: true, sv: true }
 
 settings.invite.loading:
@@ -9515,10 +9620,10 @@ settings.contacts.title:
   machine: { fi: true, sv: true }
 
 settings.contacts.hint:
-  en: "{kind, select, phone {A number with its country code, or a Finnish one starting with 0.} whatsapp {The number your WhatsApp uses, with its country code or starting with 0.} telegram {Your username, with or without the @ before it.} instagram {Your username, with or without the @ before it.} snapchat {Your username, with or without the @ before it.} other {A way to reach you.}}"
-  description: "Under the title of one card on the Ways to reach you screen (#103): what to type. The app stores a number as +358…, a username without its @ (an Instagram or Snapchat one in lower case)."
-  fi: "{kind, select, phone {Numero maatunnuksen kanssa tai suomalainen numero, joka alkaa nollalla.} whatsapp {Numero, jota WhatsApp käyttää, maatunnuksen kanssa tai nollalla alkavana.} telegram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} instagram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} snapchat {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} other {Tapa tavoittaa sinut.}}"
-  sv: "{kind, select, phone {Ett nummer med landsnummer, eller ett finskt nummer som börjar med 0.} whatsapp {Numret som WhatsApp använder, med landsnummer eller med 0 först.} telegram {Ditt användarnamn, med eller utan @ före.} instagram {Ditt användarnamn, med eller utan @ före.} snapchat {Ditt användarnamn, med eller utan @ före.} other {Ett sätt att nå dig.}}"
+  en: "{kind, select, phone {With or without the 0 at the start. For another country's number, choose its code first.} whatsapp {The number your WhatsApp uses. With or without the 0 at the start.} telegram {Your username, with or without the @ before it.} instagram {Your username, with or without the @ before it.} snapchat {Your username, with or without the @ before it.} other {A way to reach you.}}"
+  description: "Under the title of one kind under the Ways to reach you row (#103, #511): what to type. A number is typed after its country code, which stands beside the field (+358 unless another is chosen), with or without the 0 a country dials at home; the app stores it as +358…, a username without its @ (an Instagram or Snapchat one in lower case). No example number: one that looks real belongs to someone."
+  fi: "{kind, select, phone {Alun nollan kanssa tai ilman. Toisen maan numerolle valitse ensin sen maatunnus.} whatsapp {Numero, jota WhatsApp käyttää. Alun nollan kanssa tai ilman.} telegram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} instagram {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} snapchat {Käyttäjänimesi. Sen eteen saa kirjoittaa @ tai jättää sen pois.} other {Tapa tavoittaa sinut.}}"
+  sv: "{kind, select, phone {Med eller utan 0 först. För ett nummer från ett annat land, välj först dess landsnummer.} whatsapp {Numret som WhatsApp använder. Med eller utan 0 först.} telegram {Ditt användarnamn, med eller utan @ före.} instagram {Ditt användarnamn, med eller utan @ före.} snapchat {Ditt användarnamn, med eller utan @ före.} other {Ett sätt att nå dig.}}"
   machine: { fi: true, sv: true }
 
 settings.contacts.input:
@@ -9526,20 +9631,6 @@ settings.contacts.input:
   description: "Accessible name of the text field of one card on the Ways to reach you screen (#103)."
   fi: "{kind, select, phone {Puhelinnumerosi} whatsapp {WhatsApp-numerosi} telegram {Telegram-käyttäjänimesi} instagram {Instagram-käyttäjänimesi} snapchat {Snapchat-käyttäjänimesi} other {Yhteystietosi}}"
   sv: "{kind, select, phone {Ditt telefonnummer} whatsapp {Ditt WhatsApp-nummer} telegram {Ditt användarnamn på Telegram} instagram {Ditt användarnamn på Instagram} snapchat {Ditt användarnamn på Snapchat} other {Din kontaktuppgift}}"
-  machine: { fi: true, sv: true }
-
-settings.contacts.save:
-  en: "Save"
-  description: "The button of one card on the Ways to reach you screen that keeps what was typed (#103). Short; its screen-reader name is settings.contacts.saveLabel, which starts with these words."
-  fi: "Tallenna"
-  sv: "Spara"
-  machine: { fi: true, sv: true }
-
-settings.contacts.saveLabel:
-  en: "{kind, select, phone {Save your phone number} whatsapp {Save your WhatsApp number} telegram {Save your Telegram username} instagram {Save your Instagram username} snapchat {Save your Snapchat username} other {Save}}"
-  description: "What a screen reader says for the Save button of one card on the Ways to reach you screen (#103). Must start with the words of settings.contacts.save."
-  fi: "{kind, select, phone {Tallenna puhelinnumerosi} whatsapp {Tallenna WhatsApp-numerosi} telegram {Tallenna Telegram-käyttäjänimesi} instagram {Tallenna Instagram-käyttäjänimesi} snapchat {Tallenna Snapchat-käyttäjänimesi} other {Tallenna}}"
-  sv: "{kind, select, phone {Spara ditt telefonnummer} whatsapp {Spara ditt WhatsApp-nummer} telegram {Spara ditt användarnamn på Telegram} instagram {Spara ditt användarnamn på Instagram} snapchat {Spara ditt användarnamn på Snapchat} other {Spara}}"
   machine: { fi: true, sv: true }
 
 settings.contacts.remove:
@@ -9570,6 +9661,13 @@ settings.contacts.removed:
   sv: "Borttaget. Det är borta även där du delade det."
   machine: { fi: true, sv: true }
 
+settings.contacts.stillSaved:
+  en: "Still saved. Remove takes it away."
+  description: "Said under a contact's field of Settings when it was emptied and left (#511): an emptied field takes nothing away, the kept one comes back, and Remove is the way to take it away, since a removal ends every share of it (the maintainer, 29/10/2026)."
+  fi: "Yhä tallennettu. Poista vie sen pois."
+  sv: "Fortfarande sparat. Ta bort tar bort det."
+  machine: { fi: true, sv: true }
+
 settings.contacts.invalid:
   en: "{kind, select, phone {That does not look like a phone number. Write it with its country code (+358…) or as a Finnish number starting with 0.} whatsapp {That does not look like a phone number. Write it with its country code (+358…) or as a Finnish number starting with 0.} telegram {That does not look like a Telegram username: 5 to 32 letters, digits and underscores, starting with a letter.} instagram {That does not look like an Instagram username: up to 30 letters, digits, dots and underscores, never a dot first, last or two in a row.} snapchat {That does not look like a Snapchat username: 3 to 15 letters, digits, dots, underscores and hyphens, starting with a letter and ending with a letter or a digit.} other {Check what you typed.}}"
   description: "Said on a card of the Ways to reach you screen when what was typed is not one of its kind (#103): the phone checks first, the API's contact_invalid says the same. Nothing was saved; the words stay in the field."
@@ -9584,6 +9682,97 @@ settings.contacts.failed:
   sv: "Inget ändrades. Kontrollera anslutningen och försök igen."
   machine: { fi: true, sv: true }
 
+settings.contacts.retry:
+  en: "Try again"
+  description: "Under a contact's field of Settings after a save that failed or went past the minute's messages (#511): sends the words again."
+  fi: "Yritä uudelleen"
+  sv: "Försök igen"
+  machine: { fi: true, sv: true }
+
+settings.contacts.country:
+  en: "Country code"
+  description: "Screen-reader label of the country code beside a number's field (#511), and the title of the list of countries it opens."
+  fi: "Maatunnus"
+  sv: "Landsnummer"
+  machine: { fi: true, sv: true }
+
+settings.contacts.countryValue:
+  en: "{country}, {code}"
+  description: "The country code as heard (#511): {country} is the country's name in the app's language, nominative, {code} its calling code (+358)."
+  fi: "{country}, {code}"
+  sv: "{country}, {code}"
+  machine: { fi: true, sv: true }
+
+settings.contacts.countryHint:
+  en: "Opens the list of countries"
+  description: "Screen-reader hint of the country code beside a number's field (#511)."
+  fi: "Avaa maiden luettelon"
+  sv: "Öppnar listan över länder"
+  machine: { fi: true, sv: true }
+
+settings.contacts.phoneShort:
+  en: "A digit or more seems to be missing."
+  description: "Said under a number's field when it is too short for its country code (#511); nothing was saved, the words stay."
+  fi: "Numerosta näyttää puuttuvan numero tai useampi."
+  sv: "Det verkar saknas en siffra eller fler."
+  machine: { fi: true, sv: true }
+
+settings.contacts.phoneLong:
+  en: "The number has too many digits."
+  description: "Said under a number's field when it is too long for its country code (#511)."
+  fi: "Numerossa on liian monta numeroa."
+  sv: "Numret har för många siffror."
+  machine: { fi: true, sv: true }
+
+settings.contacts.phoneInvalid:
+  en: "That is not a phone number with the code {code}. Check it, or choose another code."
+  description: "Said under a number's field when it is no number under the code chosen (#511); {code} is the calling code (+358), never a country's name, which Finnish would inflect."
+  fi: "Tämä ei ole puhelinnumero maatunnuksella {code}. Tarkista se tai valitse toinen maatunnus."
+  sv: "Det är inget telefonnummer med landsnumret {code}. Kontrollera det, eller välj ett annat landsnummer."
+  machine: { fi: true, sv: true }
+
+settings.country.search:
+  en: "Search"
+  description: "Visible label over the search field of the list of countries (#511)."
+  fi: "Hae"
+  sv: "Sök"
+  machine: { fi: true, sv: true }
+
+settings.country.searchLabel:
+  en: "Search by country or code"
+  description: "Screen-reader label of the search field of the list of countries (#511): a name in the app's language or in English, or the code's digits."
+  fi: "Hae maan tai maatunnuksen mukaan"
+  sv: "Sök på land eller landsnummer"
+  machine: { fi: true, sv: true }
+
+settings.country.none:
+  en: "No country matches. Search by name or by code, such as 46."
+  description: "Said in the list of countries when a search finds none (#511)."
+  fi: "Yksikään maa ei vastaa hakua. Hae nimellä tai maatunnuksella, esimerkiksi 46."
+  sv: "Inget land matchar. Sök på namn eller landsnummer, till exempel 46."
+  machine: { fi: true, sv: true }
+
+settings.country.near:
+  en: "Near Finland"
+  description: "Heading of the first part of the list of countries (#511): Finland, Sweden, Estonia and Norway."
+  fi: "Suomen lähellä"
+  sv: "Nära Finland"
+  machine: { fi: true, sv: true }
+
+settings.country.all:
+  en: "All countries"
+  description: "Heading of the list of every country a number can have (#511), alphabetical in the app's language."
+  fi: "Kaikki maat"
+  sv: "Alla länder"
+  machine: { fi: true, sv: true }
+
+settings.country.close:
+  en: "Close"
+  description: "Label of the list of countries' close control (#511): the code stays as it was."
+  fi: "Sulje"
+  sv: "Stäng"
+  machine: { fi: true, sv: true }
+
 feedback.title:
   en: "Give feedback"
   description: "Title of the feedback row in Settings and of the screen it opens (#171)."
@@ -9592,10 +9781,10 @@ feedback.title:
   machine: { fi: true, sv: true }
 
 feedback.explain:
-  en: "A few lines to the moderators: what went wrong, what you would like, what bothers you, or what works. Sent with the app's version, the platform and your language, nothing else. Nobody is mailed."
-  description: "Feedback screen, the line above the form (#171): what is sent along with the words, and that no mail follows."
-  fi: "Muutama rivi moderaattoreille: mikä meni pieleen, mitä toivoisit, mikä häiritsee tai mikä toimii. Mukana lähtevät sovelluksen versio, alusta ja kielesi, ei muuta. Kenellekään ei lähetetä sähköpostia."
-  sv: "Några rader till moderatorerna: vad som gick fel, vad du önskar, vad som stör eller vad som fungerar. Med följer appens version, plattformen och ditt språk, inget annat. Ingen får e-post."
+  en: "A few lines to the moderators: what went wrong, what you would like, what bothers you, or what works. The moderators see that it came from your account; nobody else does. The app's version, the platform and your language go with it. Nobody is mailed."
+  description: "Feedback, the line above the form (#171, #511): who sees the sender (the moderators see the account, ADR-023 §6), what is sent along with the words, and that no mail follows."
+  fi: "Muutama rivi moderaattoreille: mikä meni pieleen, mitä toivoisit, mikä häiritsee tai mikä toimii. Moderaattorit näkevät, että viesti tuli tililtäsi; kukaan muu ei näe. Mukana lähtevät sovelluksen versio, alusta ja kielesi. Kenellekään ei lähetetä sähköpostia."
+  sv: "Några rader till moderatorerna: vad som gick fel, vad du önskar, vad som stör dig eller vad som fungerar. Moderatorerna ser att det kom från ditt konto; ingen annan gör det. Appens version, plattformen och ditt språk följer med. Ingen får e-post."
   machine: { fi: true, sv: true }
 
 feedback.kind.label:
@@ -9897,6 +10086,97 @@ settings.sensitive.title:
   description: "Settings, title of the special-category consent's row and of the screen with its switch (#287)."
   fi: "Arkaluonteiset vastaukset"
   sv: "Känsliga svar"
+  machine: { fi: true, sv: true }
+
+row.state.open:
+  en: "open"
+  description: "Said on iOS after the value of a row of Settings that is open (#511): iOS says expanded for an open row but nothing for a closed one, so the state is said in words. Lower case: it follows the value after a comma."
+  fi: "auki"
+  sv: "öppen"
+  machine: { fi: true, sv: true }
+
+row.state.closed:
+  en: "closed"
+  description: "Said on iOS after the value of a row of Settings that is closed (#511); see row.state.open."
+  fi: "kiinni"
+  sv: "stängd"
+  machine: { fi: true, sv: true }
+
+row.state.withValue:
+  en: "{value}, {state}"
+  description: "A row's value and its state as iOS says them (#511): {value} is the row's value (the theme chosen, a consent on or off), {state} row.state.open or row.state.closed."
+  fi: "{value}, {state}"
+  sv: "{value}, {state}"
+  machine: { fi: true, sv: true }
+
+settings.row.unsaved:
+  en: "Not saved"
+  description: "Value of a row of Settings whose panel holds something not saved (#511): a contact refused or not sent, an address typed and not sent, feedback not sent; marked beside it."
+  fi: "Ei tallennettu"
+  sv: "Inte sparat"
+  machine: { fi: true, sv: true }
+
+account.found.consequence:
+  en: "Changes nothing else."
+  description: "Under the I found someone button in Settings › Your account (#511, #83): what pressing it does beyond telling Kuutti."
+  fi: "Ei muuta mitään muuta."
+  sv: "Ändrar inget annat."
+  machine: { fi: true, sv: true }
+
+account.break.consequence:
+  en: "You are hidden and logged out. Nothing is deleted."
+  description: "Under the Take a break button in Settings › Your account (#511, #170)."
+  fi: "Sinut piilotetaan ja kirjataan ulos. Mitään ei poisteta."
+  sv: "Du döljs och loggas ut. Inget raderas."
+  machine: { fi: true, sv: true }
+
+account.delete.consequence:
+  en: "Your account goes for good. A new one is possible after {days, plural, one {# day} other {# days}}."
+  description: "Under the Delete my account button in Settings › Your account (#511); {days} is the cooldown before the same person may register again."
+  fi: "Tilisi poistuu pysyvästi. Uuden voi luoda {days, plural, one {# päivän} other {# päivän}} kuluttua."
+  sv: "Ditt konto försvinner för gott. Ett nytt är möjligt efter {days, plural, one {# dag} other {# dagar}}."
+  machine: { fi: true, sv: true }
+
+settings.export.label:
+  en: "A copy of your data"
+  description: "Title of the row under Privacy and security in Settings that hands over the export (#511, #51)."
+  fi: "Kopio tiedoistasi"
+  sv: "En kopia av dina uppgifter"
+  machine: { fi: true, sv: true }
+
+settings.section.contact:
+  en: "Notifications and contacts"
+  description: "Heading of the Settings section with the notifications, the e-mail and the contacts to share (#511)."
+  fi: "Ilmoitukset ja yhteystiedot"
+  sv: "Aviseringar och kontaktuppgifter"
+  machine: { fi: true, sv: true }
+
+settings.section.security:
+  en: "Privacy and security"
+  description: "Settings, heading of the third section (#511): the lock, the two consents and a copy of one's data."
+  fi: "Yksityisyys ja turvallisuus"
+  sv: "Integritet och säkerhet"
+  machine: { fi: true, sv: true }
+
+settings.section.community:
+  en: "Community"
+  description: "Heading of the Settings section with the invitations and the feedback to the moderators (#511)."
+  fi: "Yhteisö"
+  sv: "Gemenskap"
+  machine: { fi: true, sv: true }
+
+settings.notifications.blocked:
+  en: "Not allowed on this phone"
+  description: "Value of the Notifications row while this phone does not let Kuutti notify it (#511, #102): whatever the choices, nothing arrives."
+  fi: "Estetty tässä puhelimessa"
+  sv: "Inte tillåtet på den här telefonen"
+  machine: { fi: true, sv: true }
+
+settings.notifications.notAsked:
+  en: "Not asked on this phone yet"
+  description: "Value of the Notifications row while this phone has not been asked whether Kuutti may notify it (#511, #102)."
+  fi: "Ei vielä kysytty tässä puhelimessa"
+  sv: "Inte frågat på den här telefonen än"
   machine: { fi: true, sv: true }
 
 settings.state.on:
