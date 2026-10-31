@@ -44,7 +44,7 @@ variable "dokploy_version" {
 }
 
 variable "swap_mb" {
-  description = "Size of the box's /swapfile in MiB, 0 for none (#77, ADR-046). Set by each environment: swap may page the API's memory, a hetu in flight during a callback included, to the root volume, which ADR-046 leaves to the maintainer for production (rule 1)."
+  description = "Size of the box's /swapfile in MiB, 0 for none (#77, ADR-046). Set by each environment: swap may page the API's memory, a hetu in flight during a callback included, to the root volume, so production has none (rule 1, ADR-046)."
   type        = number
 
   validation {

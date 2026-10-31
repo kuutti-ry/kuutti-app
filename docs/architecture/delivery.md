@@ -3,6 +3,7 @@
 <!-- draws
 .github/workflows/build.yml
 .github/workflows/deploy.yml
+.github/workflows/admin-deploy.yml
 .github/workflows/release.yml
 .github/workflows/preview.yml
 .github/workflows/preview-cleanup.yml
@@ -92,6 +93,8 @@ flowchart TB
     n15["image: kuutti-api:SHA and :main, with provenance and an SBOM"]
     n16["attest: a signed provenance attestation"]
     n17["deploy staging: calls deploy.yml"]
+  end
+  subgraph adminyml["admin-deploy.yml, environment staging, called by build.yml"]
     n18["admin panel: built against the staging API, no credential"]
     n19["admin staging: the bucket's root, the invalidation and the checks, kuutti-ci-apply"]
   end
@@ -129,7 +132,7 @@ flowchart TB
 15. `build.yml`, job `image`: the same build and smoke test, then the push of `ghcr.io/kuutti-ry/kuutti-api` under the full commit hash and `main`, with BuildKit's provenance and an SBOM. The API reports its version as the root `package.json`'s with the short commit, `0.y.z-<sha7>` (ADR-028).
 16. Job `attest`: a provenance attestation of the pushed digest, signed through Sigstore and kept by GitHub and beside the image (`id-token: write` and `attestations: write`, no AWS role). `gh attestation verify` checks it before any deploy by hand (`infra/README.md`, Build provenance).
 17. Job `deploy staging`, while the repository variable `STAGING_ENABLED` is `true`: it calls `deploy.yml` with the environment `staging`, the image by its commit and the short commit `/health` must report. It hands its secrets on with `inherit`, since environment secrets reach only the called job.
-18. Job `admin panel`, after the deploy: in the environment `staging` for its variables only, with no role and no secret, it builds the panel with `VITE_API_URL` set to the staging API. Until `ADMIN_URL`, `ADMIN_BUCKET` and `ADMIN_DISTRIBUTION_ID` are set it stops green and the next job is skipped.
+18. `admin-deploy.yml`, which `build.yml` calls after the deploy, job `admin panel`: in the environment `staging` for its variables only, with no role and no secret, it builds the panel with `VITE_API_URL` set to the staging API. Until `ADMIN_URL`, `ADMIN_BUCKET` and `ADMIN_DISTRIBUTION_ID` are set it stops green and the next job is skipped.
 19. Job `admin staging`: in the environment `staging` as `kuutti-ci-apply`, installing nothing, it writes the build to the root of the panel's bucket (the hashed files first, then `index.html` without caching, never under `pr-` nor `fonts/`, where the maintainer puts Saiga by hand, ADR-052), invalidates `/*` and waits, then reads the served pages' headers back, `font-src 'self'` among them, and checks that the API's CORS admits the panel's origin and refuses another (ADR-025 §5).
 20. `deploy.yml` in the environment `staging`: with `DOKPLOY_TOKEN`, Dokploy's API points the `api` application at the image and deploys it; the step waits up to ten minutes for Dokploy to finish. The box pulls the image without a credential. While the environment has no `DOKPLOY_URL` the job stops green and deploys nothing.
 21. It polls `API_URL/health` for up to five minutes until it reports this commit with the database reachable: the deploy is done when the running bytes are the built ones.
@@ -146,12 +149,12 @@ flowchart TB
 ```mermaid
 flowchart TB
   accTitle: Delivery, part 3: a release tag
-  accDescr: A v tag runs the release checks, retags the image main built for that commit and attests it, then deploys it to production through deploy.yml and drafts the release. Beside it infra-prod.yml applies production and eas-build.yml makes the production builds. Every job in the prod environment waits for the maintainer's approval. Production's first apply ran on 2026-10-24 from a rehearsal tag, on which the release gate stopped the image, the deploy and the builds.
+  accDescr: A v tag runs the release checks, retags the image main built for that commit and attests it, then deploys it to production through deploy.yml, the panel through admin-deploy.yml, and drafts the release. Beside it infra-prod.yml applies production and eas-build.yml makes the production builds. Every job in the prod environment waits for the maintainer's approval. Production's first apply ran on 2026-10-24 from a rehearsal tag, on which the release gate stopped the image, the deploy and the builds.
   n29["The maintainer pushes a tag vX.Y.Z"]
   subgraph buildtag["build.yml on the tag"]
     n30["image: no machine Finnish, then main's image for this commit retagged vX.Y.Z"]
     n31["attest: the tag's attestation"]
-    n32["deploy prod: deploy.yml in environment prod, after the reviewer"]
+    n32["deploy prod: deploy.yml in environment prod, after the reviewer, then admin prod: admin-deploy.yml"]
     n33["release: release.yml drafts the release with the image's digest"]
   end
   n34["infra-prod.yml: applies prod as kuutti-ci-apply, environment prod, after the reviewer"]
@@ -172,11 +175,11 @@ flowchart TB
 29. The maintainer pushes a tag `vX.Y.Z`. The tag ruleset in `infra/README.md` lets only repository admins create, move or delete a `v*` tag, since a tag deploys production. Before it, the version was bumped in the pull request that carried the change (ADR-028).
 30. `build.yml`, job `image`: first `pnpm i18n:check --release`, so that no image is tagged while a Finnish text is still machine-translated. Then, if `main` already built this commit, its image is retagged `vX.Y.Z` and not rebuilt, so production runs the bytes staging ran; a tag off `main`, such as a hotfix, is built and pushed as on `main`.
 31. Job `attest`: the attestation again, under the tag's ref, so that a recovery can verify the release's image by its tag.
-32. Job `deploy prod`: `deploy.yml` in the environment `prod`, which waits for the maintainer's approval, then Dokploy, `/health`, and the EAS Update to the channel `production` with production's EAS environment, and its source maps, with the `prod` environment's own `DOKPLOY_TOKEN`, `EXPO_TOKEN` and `SENTRY_AUTH_TOKEN`. Production's Dokploy and its four values (`DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `API_URL`, `DOKPLOY_TOKEN`) exist since 2026-10-24 (ADR-049). `prod` holds no `SENTRY_AUTH_TOKEN` yet (#201), so production's source maps are not uploaded until it does.
+32. Job `deploy prod`: `deploy.yml` in the environment `prod`, which waits for the maintainer's approval, then Dokploy, `/health`, and the EAS Update to the channel `production` with production's EAS environment, and its source maps, with the `prod` environment's own `DOKPLOY_TOKEN`, `EXPO_TOKEN` and `SENTRY_AUTH_TOKEN`. Production's Dokploy and its four values (`DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `API_URL`, `DOKPLOY_TOKEN`) exist since 2026-10-24 (ADR-049). `prod` holds no `SENTRY_AUTH_TOKEN` yet (#201), so production's source maps are not uploaded until it does. After it, job `admin prod` calls `admin-deploy.yml` in the environment `prod`, against production's API: steps 18 and 19, each of the two jobs behind the maintainer's approval. Until `prod` holds `ADMIN_URL`, `ADMIN_BUCKET` and `ADMIN_DISTRIBUTION_ID` it stops green.
 33. Job `release`: `release.yml`, with `contents: write`, drafts a GitHub release with notes generated from the commits since the last tag and the image's digest. The maintainer reads the draft and publishes it.
 34. `infra-prod.yml`: plan and apply of `envs/prod` as `kuutti-ci-apply` in the environment `prod`, after the reviewer. It has its own concurrency group and shares no cache with pull-request runs.
 35. `eas-build.yml` on the tag: its release check of the Finnish texts first, in a job without an environment, so that it answers before the reviewer is asked; then the `production` profile for both platforms in the environment `prod`, with `prod`'s `EXPO_TOKEN`.
-36. Production was first applied on 2026-10-24 by the rehearsal tag `v0.64.8-rehearsal.1` (ADR-049): step 34 ran, while the release gate stopped steps 30 to 33 and 35, as it stops any tag while Finnish texts wait for review. The API was then deployed to production by hand, pinned to a verified commit. Planned, #25: steps 29 to 35 in full, CI's deploy of production among them, at the first release.
+36. Production was first applied on 2026-10-24 by the rehearsal tag `v0.64.8-rehearsal.1` (ADR-049): step 34 ran, while the release gate stopped steps 30 to 33 and 35, as it stops any tag while Finnish texts wait for review. The API was then deployed to production by hand, pinned to a verified commit. From the next tag on, the maintainer starts `admin-deploy.yml` by hand from a rehearsal tag for production's panel, since the gate stops `deploy prod` before it (ADR-049 §2). Planned, #25: steps 29 to 35 in full, CI's deploy of production among them, at the first release.
 
 ## Part 4: a store build by hand
 
@@ -212,8 +215,8 @@ flowchart TB
 | `build.yml`, `image` | every push and pull request | none | none | `GITHUB_TOKEN`, `packages: write` | none |
 | `build.yml`, `attest` | `main`, `v*` tags | none | none (its OIDC token goes to Sigstore) | `GITHUB_TOKEN`, `attestations: write` | none |
 | `build.yml`, `deploy staging` → `deploy.yml` | `main` | `staging` | none | `DOKPLOY_TOKEN`, `EXPO_TOKEN`, `SENTRY_AUTH_TOKEN` | `STAGING_ENABLED`, `EAS_ENABLED`; `DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `API_URL` |
-| `build.yml`, `admin panel` | `main`, after the deploy | `staging`, variables only | none | none | `ADMIN_URL`, `ADMIN_BUCKET`, `ADMIN_DISTRIBUTION_ID`, `API_URL` |
-| `build.yml`, `admin staging` | `main` | `staging` | `kuutti-ci-apply` | none | the same, `AWS_APPLY_ROLE_ARN` |
+| `admin-deploy.yml`, `admin panel` | after each deploy of `build.yml`; by hand from `main` or a `v*` tag | `staging`, or `prod` behind its reviewer, variables only | none | none | `ADMIN_URL`, `ADMIN_BUCKET`, `ADMIN_DISTRIBUTION_ID`, `API_URL` |
+| `admin-deploy.yml`, `admin staging`, `admin prod` | the same | `staging`, or `prod` behind its reviewer | `kuutti-ci-apply` | none | the same, `AWS_APPLY_ROLE_ARN` |
 | `build.yml`, `deploy prod` → `deploy.yml` | `v*` tags | `prod`, reviewer | none | `DOKPLOY_TOKEN`, `EXPO_TOKEN`, `SENTRY_AUTH_TOKEN` (prod's) | `EAS_ENABLED`; prod's `DOKPLOY_URL`, `DOKPLOY_APPLICATION_ID`, `API_URL` |
 | `build.yml`, `release` → `release.yml` | `v*` tags | none | none | `GITHUB_TOKEN`, `contents: write` | `EAS_BUILDS_ISSUE` |
 | `preview.yml`, `api` | pull requests from this repository | `preview` | none | `DOKPLOY_TOKEN`; `GITHUB_TOKEN`, `packages: read`, `pull-requests: write` | `PREVIEWS_ENABLED`; `DOKPLOY_URL`, `DOKPLOY_ENVIRONMENT_ID`, `PREVIEW_API_DOMAIN`, `EAS_HOSTING_SUBDOMAIN` |
@@ -239,7 +242,7 @@ The workflows read `EXPO_TOKEN` and `DOKPLOY_TOKEN` from the environments `stagi
 
 ## Where it lives
 
-- Workflows: [build.yml](../../.github/workflows/build.yml), [deploy.yml](../../.github/workflows/deploy.yml), [release.yml](../../.github/workflows/release.yml), [preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [infra.yml](../../.github/workflows/infra.yml), [infra-prod.yml](../../.github/workflows/infra-prod.yml), [infra-oidc.yml](../../.github/workflows/infra-oidc.yml), [eas-build.yml](../../.github/workflows/eas-build.yml), [ci.yml](../../.github/workflows/ci.yml), [dco.yml](../../.github/workflows/dco.yml), [secret-scan.yml](../../.github/workflows/secret-scan.yml), [e2e.yml](../../.github/workflows/e2e.yml), [e2e-admin.yml](../../.github/workflows/e2e-admin.yml), [auto-approve.yml](../../.github/workflows/auto-approve.yml)
+- Workflows: [build.yml](../../.github/workflows/build.yml), [deploy.yml](../../.github/workflows/deploy.yml), [admin-deploy.yml](../../.github/workflows/admin-deploy.yml), [release.yml](../../.github/workflows/release.yml), [preview.yml](../../.github/workflows/preview.yml), [preview-cleanup.yml](../../.github/workflows/preview-cleanup.yml), [infra.yml](../../.github/workflows/infra.yml), [infra-prod.yml](../../.github/workflows/infra-prod.yml), [infra-oidc.yml](../../.github/workflows/infra-oidc.yml), [eas-build.yml](../../.github/workflows/eas-build.yml), [ci.yml](../../.github/workflows/ci.yml), [dco.yml](../../.github/workflows/dco.yml), [secret-scan.yml](../../.github/workflows/secret-scan.yml), [e2e.yml](../../.github/workflows/e2e.yml), [e2e-admin.yml](../../.github/workflows/e2e-admin.yml), [auto-approve.yml](../../.github/workflows/auto-approve.yml)
 - Scripts: [.github/scripts](../../.github/scripts) (`aws-oidc.sh`, the OIDC exchange with no third-party action; `dokploy-deploy.sh`; `dokploy-preview.sh`; `wait-healthy.sh`; `check-workflow-permissions.py`)
 - The roles and their trust: [infra/bootstrap/main.tf](../../infra/bootstrap/main.tf); the environments, the rulesets and the variables: [infra/README.md](../../infra/README.md) (After bootstrap: GitHub; Environments, CI; Previews; Admin panel)
 - The app's channels and profiles: [apps/mobile/eas.json](../../apps/mobile/eas.json), [apps/mobile/app.json](../../apps/mobile/app.json)

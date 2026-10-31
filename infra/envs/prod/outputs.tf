@@ -43,6 +43,21 @@ output "dokploy_url" {
   value       = "https://dokploy.${var.domain}"
 }
 
+output "admin_url" {
+  description = "GitHub environment variable ADMIN_URL, in the environment prod: the moderation panel's host (#313, ADR-025)."
+  value       = module.admin.url
+}
+
+output "admin_bucket" {
+  description = "GitHub environment variable ADMIN_BUCKET, in the environment prod (ADR-025 §5)."
+  value       = module.admin.bucket
+}
+
+output "admin_distribution_id" {
+  description = "GitHub environment variable ADMIN_DISTRIBUTION_ID, in the environment prod: the panel's deploy invalidates it (ADR-025 §4)."
+  value       = module.admin.distribution_id
+}
+
 output "alerts_topic_arn" {
   description = "Alarm notifications (#11); the email subscription is confirmed from the mailbox."
   value       = module.observability.alerts_topic_arn

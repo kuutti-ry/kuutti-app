@@ -4,8 +4,9 @@ variable "vpc_cidr" {
 }
 
 variable "instance_type" {
-  type    = string
-  default = "t4g.small"
+  description = "4 GB, so that production can go without swap (ADR-046); staging's 1.8 GB leans on 2 GB of it."
+  type        = string
+  default     = "t4g.medium"
 }
 
 variable "db_instance_class" {

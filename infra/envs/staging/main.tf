@@ -93,9 +93,9 @@ module "research" {
 
 # The moderation panel's host (#313, ADR-025): a bucket and a distribution of
 # its own on admin.staging, the host admin-app-url and cors-allowed-origins
-# name (variables.tf). build.yml syncs main's build to its root, preview.yml a
-# pull request's to pr-<n>/; both call this environment's API, since only it
-# can sign staff in (ADR-014 §1).
+# name (variables.tf). admin-deploy.yml syncs main's build to its root,
+# preview.yml a pull request's to pr-<n>/; both call this environment's API,
+# since only it can sign staff in (ADR-014 §1).
 module "admin" {
   source = "../../modules/admin"
   providers = {
