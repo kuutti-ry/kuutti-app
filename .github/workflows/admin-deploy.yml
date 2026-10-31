@@ -75,13 +75,14 @@ jobs:
           pnpm --filter @kuutti/admin exec vite build
 
       # overwrite: a re-run of this job, once the variables are set, uploads
-      # under the same name in the same run.
+      # under the same name in the same run. A week: on prod the next job waits
+      # for the reviewer, and a lost artifact asks for both approvals again.
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: steps.ready.outputs.ready == 'true'
         with:
           name: admin-dist
           path: apps/admin/dist
-          retention-days: 1
+          retention-days: 7
           if-no-files-found: error
           overwrite: true
 
@@ -90,15 +91,21 @@ jobs:
     needs: admin
     if: needs.admin.outputs.ready == 'true'
     runs-on: ubuntu-24.04-arm
+    # One writer of a bucket at a time: build.yml's group does not reach a run
+    # started by hand, and one run's --delete under another's index.html is a
+    # blank panel.
+    concurrency:
+      group: admin-${{ inputs.environment }}
+      cancel-in-progress: false
     environment:
       name: ${{ inputs.environment }}
       url: ${{ vars.ADMIN_URL }}
     permissions:
       contents: read
       id-token: write
-    # The environment's role (kuutti-ci-apply), as the infrastructure apply has
-    # it: the bucket's root and the invalidation are the environment's to
-    # write, and the plan role may write pr-* alone (ADR-025 §7).
+    # kuutti-ci-apply, as the infrastructure apply has it. It is one role for
+    # both environments, so prod's reviewer gates this job and not the role
+    # (ADR-025, Open). The plan role may write pr-* alone (§7).
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ROLE_ARN: ${{ vars.AWS_APPLY_ROLE_ARN }}

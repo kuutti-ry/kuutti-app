@@ -406,7 +406,7 @@ jobs:
       - if: steps.open.outputs.open == 'true'
         run: .github/scripts/aws-oidc.sh
 
-      # As main's build is written (build.yml): the assets, then the
+      # As main's build is written (admin-deploy.yml): the assets, then the
       # licences and index.html, uncached under their fixed names, then the
       # assets of the push before go. The trailing slash keeps pr-1/ from
       # reaching pr-12/.
