@@ -12,7 +12,7 @@ import { invitationCountJob } from "./invitation-count.ts";
 import { runNightly } from "./nightly.ts";
 
 // The night's count of invitations (#107, ADR-044 §7): an invitation counts
-// the first night its redeemer has a gate row, once, with the units
+// the first night its redeemer's profile is complete, once, with the units
 // invitation_reward says that night and one notice for its inviter (ADR-032),
 // read back on the home screen; open invitations and redeemers without a row
 // wait; the log line holds counts; a broken reward stops the count; and an

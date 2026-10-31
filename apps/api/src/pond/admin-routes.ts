@@ -45,7 +45,7 @@ const matchingRoute = createRoute({
   path: "/admin/ponds/{id}/matching",
   summary: "Open or close matching in a pond",
   description:
-    "Sets the pond's switch. Open, the night and the day's first read build rounds for its complete people; closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.",
+    "Sets the pond's switch. Open, its complete people are told so, and the night and the day's first read build their rounds (not in production yet: ADR-035 Open 1); closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.",
   ...bearer,
   request: { params: PondIdParams, body: { required: true, ...json(PondMatchingChange) } },
   responses: {

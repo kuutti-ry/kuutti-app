@@ -8,9 +8,9 @@ import { pausedOf } from "./deal-breakers.ts";
  * inside the other's window, the two want the same thing, or one of them is
  * open to either and the other is no dance partner (ADR-015 §10, §13),
  * neither has blocked the other (#84, ADR-030 §2), and each one's answers
- * pass the other's deal-breakers (#149, #87). The pond gate counts a
- * person's pool with this (#94) and the round builder draws its candidates
- * through it (#95), so that no caller can show somebody a filter excludes.
+ * pass the other's deal-breakers (#149, #87). The round builder draws its
+ * candidates through this (#95), so that no caller can show somebody a filter
+ * excludes.
  * The soft preferences only order what passes (`soft.ts`); hiding from one's
  * own field is a setting the round builder reads (ADR-019 §5), not a filter.
  *

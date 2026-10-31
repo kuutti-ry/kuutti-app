@@ -55,7 +55,7 @@ export function laterProgress(fields: Record<string, unknown>): {
 
 /**
  * The optional fields, one per screen, in the field sheet's order (#148,
- * TD-16): asked while the person waits at the gate, each with "Ask me
+ * TD-16): asked after onboarding, each with "Ask me
  * later", which writes nothing, and "Save and continue", which saves the
  * whole document and moves on. The article 9 fields carry no note on their
  * consent: Settings is the one place for it (#239). The last screen leads to

@@ -1151,7 +1151,7 @@ export interface paths {
         put?: never;
         /**
          * Take a break: pause this account
-         * @description The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences, the consents and the place at the gate stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.
+         * @description The account goes to paused (#170, ADR-022): the profile leaves every pool, counter and round, and every session of the account ends, this one included. Nothing is erased: the profile, the photos, the preferences and the consents stay as they are, and the next bank login brings the account back as it was. The body confirms; the screen asks first.
          */
         post: {
             parameters: {
@@ -6065,7 +6065,7 @@ export interface paths {
         put?: never;
         /**
          * Open or close matching in a pond
-         * @description Sets the pond's switch. Open, the night and the day's first read build rounds for its complete people; closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.
+         * @description Sets the pond's switch. Open, its complete people are told so, and the night and the day's first read build their rounds (not in production yet: ADR-035 Open 1); closed, they build none, and rounds already built and conversations stay. Nothing else turns it. A press that finds the switch as it asks changes nothing and writes nothing. Admins only; written to audit_log.
          */
         post: {
             parameters: {
@@ -8074,9 +8074,9 @@ export interface components {
             platform: components["schemas"]["PushPlatform"];
         };
         Invitations: {
-            /** @description True once the person's profile has passed the pond gate's test. */
+            /** @description True while the person's profile and onboarding are complete. */
             canInvite: boolean;
-            /** @description True while the person may still type a code: before their profile first passed the gate's test, with the current consents, no code used, and an identity never erased. */
+            /** @description True while the person may type a code: their profile is not complete, with the current consents, no code used, and an identity never erased. */
             redeemable: boolean;
             /** @description What an invitation earns today (matching_config invitation_reward), for the app's words. */
             reward: {

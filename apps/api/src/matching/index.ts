@@ -2,7 +2,7 @@
 // #46 brings the two hard rows of onboarding; #94 what they mean between two
 // people; the rounds and their rules are the rest of M4.
 
-// The gate's count reads every person's deal-breakers as the person's own read does (#87).
+// The round builder reads every person's deal-breakers as the person's own read does (#87).
 export {
   type DealBreakerRow,
   dealBreakersFrom,

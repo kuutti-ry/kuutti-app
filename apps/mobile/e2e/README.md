@@ -46,7 +46,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `deal-breaker-paused` | Sanna | her own answer taken back pauses it in words; answering lifts it |
 | `deal-breaker-height` | Sanna | four buttons, no switch: one relation at a time, kept when saved, Everyone takes it off |
 | `card` | Sanna | photo, name with the age, the information fields, nothing soft |
-| `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the gate and the profile wait; the hidden field leaves the card |
+| `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the home card and the profile wait; the hidden field leaves the card |
 | `photos-screen` | Sanna | states in words; full size and back; a caption on and off again (#296); removal asked (the drag and its actions are jest's, #179) |
 | `profile-sections` | Sanna | the list of sections; an answer saved by going back, on the card, hidden from it and shown again (#515), and off again (#227) |
 | `profile-contact-details` | Sanna | a phone number in the bio refused on leaving the basics, with the reason |
@@ -99,4 +99,4 @@ Mikael is left out: given the moderator role on a machine, he is spared by `pnpm
 
 ## Not here yet
 
-A flow across both apps, the moderator's decision on Noa's photos seen in the app and the gate opening (the panel's own flows are Playwright's, `apps/admin/e2e`, and ADR-051 lists this one among what it left out); iOS in CI (macOS runners have no Docker); a dev-only sign-in link should the system browser prove flaky under Maestro; the 15-minute token refresh and the two-device logout; Larger Text and dark mode as a whole-app pass, which only a screenshot judges. ADR-020 lists the rest.
+A flow across both apps, the moderator's decision on Noa's photos seen in the app and matching opening (the panel's own flows are Playwright's, `apps/admin/e2e`, and ADR-051 lists this one among what it left out); iOS in CI (macOS runners have no Docker); a dev-only sign-in link should the system browser prove flaky under Maestro; the 15-minute token refresh and the two-device logout; Larger Text and dark mode as a whole-app pass, which only a screenshot judges. ADR-020 lists the rest.

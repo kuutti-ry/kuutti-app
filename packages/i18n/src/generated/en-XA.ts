@@ -278,7 +278,7 @@ export const enXA: Readonly<Record<string, string>> = {
   "admin.ponds.closedNow": "{pond}: matching is now closed.",
   "admin.ponds.confirm.close.effect": "No new rounds are built here from now on. Rounds already built stay for the day, and conversations go on. People with a finished profile are told that matching has not opened in their area yet.",
   "admin.ponds.confirm.close.title": "{pond}: close matching?",
-  "admin.ponds.confirm.open.effect": "From tonight everybody with a finished profile in this pond gets a round each day, and anybody who opens the app today gets one at once. Nothing else opens or closes the pond.",
+  "admin.ponds.confirm.open.effect": "Everybody with a finished profile in this pond is told that matching is open, and gets a round each night, or when they next open the app. Production builds no rounds yet, so there they are told it is open and no round comes.",
   "admin.ponds.confirm.open.title": "{pond}: open matching?",
   "admin.ponds.error": "The ponds could not be loaded.",
   "admin.ponds.explain": "Matching in a pond opens when an admin turns it on here, and nothing else opens or closes it. People with a finished profile in a closed pond are told that it has not opened yet.",

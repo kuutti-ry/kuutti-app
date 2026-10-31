@@ -28,7 +28,7 @@ The steps in the order the sheet asks them (ADR-010, #146), one screen each, "Co
 
 The account is active once the four matching answers and the two consents are there (ADR-010 §6); the profile steps may be finished later.
 
-## Scene 3: The gate (1 min)
+## Scene 3: Home (1 min)
 
 The home screen: "Kuutti", two cards and the way onward.
 
@@ -47,7 +47,7 @@ Sign out (Settings, "Log out") and sign in as Sanna Korhonen (locally her button
 
 ## Scene 5: Today's round (3 min)
 
-Locally only. Sign out and sign in as Iida Mattila (her button). She and the four women of her round exist at the mock bank only: on staging the job gives their stories and her round too, and nobody signs in as any of them there (ADR-018 §1), so this scene has no staging version. A round on staging for a persona of Telia's bed, whom the phone can sign in as, is the maintainer's open decision (ADR-014, Open 1). Her story is complete: a profile, three approved photos (release v3 of the pictures), and her gate opened by the stories, since four people are no pool the night's count would open a gate for (`gate_k`, ADR-015). The four women of her round, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida yesterday (#379).
+Locally only. Sign out and sign in as Iida Mattila (her button). She and the four women of her round exist at the mock bank only: on staging the job gives their stories and her round too, and nobody signs in as any of them there (ADR-018 §1), so this scene has no staging version. A round on staging for a persona of Telia's bed, whom the phone can sign in as, is the maintainer's open decision (ADR-014, Open 1). Her story is complete: a profile, three approved photos (release v3 of the pictures), and a round for the day, which the stories give her. The four women of her round, Henna, Katja, Minna and Riikka, have stories too, and Henna liked Iida yesterday (#379).
 
 Her round is right only on the Finnish day of the reset that built it. On a later day the builder makes her a round of Henna alone: Katja, Minna and Riikka were shown on the reset's day and wait out `shown_cooldown_days` (thirty, TD-12), and Henna's like still waits while Iida has not decided on her card (once she has, the round is empty). So the reset for this scene is run on the morning of the demo, and the morning's checks sign in as Iida (`runbook.md`).
 
@@ -66,7 +66,7 @@ Noa Salmi's story uploaded two faces and four more pictures for the check (#142)
 
 1. The admin panel (the runbook says where; locally for this scene): sign in as the moderator through the bank.
 2. The queue lists Noa's pictures: what the check saw (labels, faces), the picture, "Approve" and "Reject" with a reason from the list (no person, several people, text with contact details, and so on). Reject the one without a face as "no person".
-3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your profile" → "Photos" shows the rejection with its reason in her language; on staging her three pictures say the same kind of thing without anybody having looked ("A profile photo has to show you", "A profile photo shows you alone"). On staging her card shows her faces and the EXIF one, and her profile is complete; locally her card shows the one approved face and the gate says her profile still lacks something (one of two).
+3. In the app, as Noa (locally her button; on staging Nordea `DEMOUSER3`): "Your profile" → "Photos" shows the rejection with its reason in her language; on staging her three pictures say the same kind of thing without anybody having looked ("A profile photo has to show you", "A profile photo shows you alone"). On staging her card shows her faces and the EXIF one, and her profile is complete; locally her card shows the one approved face and the home card says her profile still lacks something (one of two).
 
 ## Scene 7: Refusals (1 min)
 

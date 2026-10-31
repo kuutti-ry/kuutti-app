@@ -11,7 +11,7 @@ import { fetchRelaxations } from "./client";
 /**
  * The short pool (#99, ADR-042), at the end of a short round or an empty one:
  * what the person may relax for today, each a button that says the
- * deal-breaker, the way and how much it widens their pool (in the gate's
+ * deal-breaker, the way and how much it widens their pool (in the counter's
  * steps, `waitlist_k`, never a count of cards), and what is relaxed today, each undone by one tap.
  * Read when it comes into sight, as the offers are counted on asking, and
  * again after each tap. Nothing relaxes but the person's tap; a read that

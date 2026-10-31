@@ -453,7 +453,7 @@ describe("when a round is built", () => {
     expect(candidates(await roundOf(ctx.client, a))).toEqual([b]);
   });
 
-  test("nobody's round is built whose profile is no longer complete, though their gate is open", async ({
+  test("nobody's round is built whose profile is no longer complete, though their pond is open", async ({
     ctx,
   }) => {
     const { women } = await pondOf(ctx, "test-rounds-incomplete", 1, 1);
@@ -930,12 +930,11 @@ describe("the fish (#378, ADR-039)", () => {
 });
 
 describe("over the synthetic population", () => {
-  // Three hundred people, the gate's count and every round: about twelve
+  // Three hundred people and every round: about twelve
   // seconds here and more under CI's coverage, past the default fifteen.
   test("every open person gets a round, and nobody a candidate a hard filter excludes, in either direction", {
     timeout: 60_000,
   }, async ({ ctx }) => {
-    await setConfig(ctx.client, "gate_k", 5);
     // The population lives in the seed's ponds, which this database has not been given.
     for (const pond of SEED_PONDS) {
       await ctx.client.query(

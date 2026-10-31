@@ -727,7 +727,7 @@ profile.dealBreakers.open:
 
 profile.later.title:
   en: "While you wait"
-  description: "Heading of the optional fields' screens after the gate (#148, TD-16)."
+  description: "Heading of the optional fields' screens after onboarding (#148, TD-16)."
   fi: "Odotellessasi"
   sv: "Medan du väntar"
   machine: { fi: true, sv: true }
@@ -3167,7 +3167,7 @@ errors.like_budget_exceeded:
 
 errors.invitation_not_yet:
   en: "You can invite friends once your profile is complete."
-  description: "Invitations (409, #107, ADR-044 §1): only a person whose profile has passed the pond gate's completeness test may make an invitation. Nothing was saved."
+  description: "Invitations (409, #107, ADR-044 §1): only a person whose profile is complete may make an invitation. Nothing was saved."
   fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
   sv: "Du kan bjuda in vänner när din profil är klar."
   machine: { fi: true, sv: true }
@@ -3181,7 +3181,7 @@ errors.invitations_full:
 
 errors.invitation_not_for_you:
   en: "This account cannot use an invitation code. A code is for someone new, before their profile is complete, and works once."
-  description: "Typing an invitation code (409, #107, ADR-044 §6): the person cannot use one: their profile has passed the gate's test already, they used a code before, the current terms are not accepted, or their identity had an account deleted before. Must not say which, and says nothing of the code, which was not looked up."
+  description: "Typing an invitation code (409, #107, ADR-044 §6): the person cannot use one: their profile is complete, they used a code before, the current terms are not accepted, or their identity had an account deleted before. Must not say which, and says nothing of the code, which was not looked up."
   fi: "Tällä tilillä ei voi käyttää kutsukoodia. Koodi on uudelle käyttäjälle ennen kuin profiili on valmis, ja se toimii vain kerran."
   sv: "Det här kontot kan inte använda en inbjudningskod. En kod är för någon ny, innan profilen är klar, och fungerar bara en gång."
   machine: { fi: true, sv: true }
@@ -6718,8 +6718,8 @@ admin.ponds.confirm.open.title:
   description: "Admin panel, ponds: the confirm step's heading when opening a pond."
 
 admin.ponds.confirm.open.effect:
-  en: "From tonight everybody with a finished profile in this pond gets a round each day, and anybody who opens the app today gets one at once. Nothing else opens or closes the pond."
-  description: "Admin panel, ponds: the effect of opening a pond in words (rules/admin.md). The night builds rounds, and the day's first read builds a missing one (ADR-035 §5)."
+  en: "Everybody with a finished profile in this pond is told that matching is open, and gets a round each night, or when they next open the app. Production builds no rounds yet, so there they are told it is open and no round comes."
+  description: "Admin panel, ponds: the effect of opening a pond in words (rules/admin.md). The night builds rounds, and the day's first read builds a missing one (ADR-035 §5), but neither in production until the maintainer has set how long rounds are kept (ADR-034 Open 2, ADR-035 Open 1); take that sentence out with that shortcut."
 
 admin.ponds.confirm.close.title:
   en: "{pond}: close matching?"
@@ -8181,7 +8181,7 @@ round.short.aside:
 
 round.short.more:
   en: "{more, plural, =0 {A few more people} one {About # more person} other {About # more people}}"
-  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the gate's step (matching_config waitlist_k, ten or more, ADR-015 §6); zero means fewer than a step. Never a count of cards."
+  description: "Under a short-pool button (#99, ADR-042 §4): how much the relaxation widens the reader's pool, rounded down to the counter's step (matching_config waitlist_k, ten or more); zero means fewer than a step. Never a count of cards."
   fi: "{more, plural, =0 {Muutama ihminen lisää} one {Noin # ihminen lisää} other {Noin # ihmistä lisää}}"
   sv: "{more, plural, =0 {Några fler personer} one {Ungefär # person till} other {Ungefär # fler personer}}"
   machine: { fi: true, sv: true }
@@ -9643,7 +9643,7 @@ settings.invite.earns:
 
 settings.invite.notYet:
   en: "You can invite friends once your profile is complete."
-  description: "The Invitations screen for a person whose profile has not passed the pond gate's test yet (#107, ADR-044 §1): no Make an invitation until then."
+  description: "The Invitations screen for a person whose profile is not complete (#107, ADR-044 §1): no Make an invitation until then."
   fi: "Voit kutsua ystäviä, kun profiilisi on valmis."
   sv: "Du kan bjuda in vänner när din profil är klar."
   machine: { fi: true, sv: true }
@@ -9816,7 +9816,7 @@ invite.redeem.title:
 
 invite.redeem.explain:
   en: "If a friend gave you a code, type it here. Their invitation counts once your profile is complete."
-  description: "The Invitations screen, under Have an invitation code? (#107, ADR-044 §7): the friend's invitation counts the night the person's profile first passes the gate's test."
+  description: "The Invitations screen, under Have an invitation code? (#107, ADR-044 §7): the friend's invitation counts the first night the person's profile is complete."
   fi: "Jos ystävä antoi sinulle koodin, kirjoita se tähän. Hänen kutsunsa lasketaan, kun profiilisi on valmis."
   sv: "Om en vän gav dig en kod, skriv in den här. Vännens inbjudan räknas när din profil är klar."
   machine: { fi: true, sv: true }
@@ -9859,7 +9859,7 @@ invite.step.title:
 
 invite.step.explain:
   en: "If a friend gave you an invitation code, type it here. You can also skip this and type it later in Settings, until your profile is complete."
-  description: "Onboarding's invitation step, under its title (#107): optional; Settings › Invitations takes the code until the profile passes the gate's test."
+  description: "Onboarding's invitation step, under its title (#107): optional; Settings › Invitations takes the code while the profile is not complete."
   fi: "Jos ystävä antoi sinulle kutsukoodin, kirjoita se tähän. Voit myös ohittaa tämän ja kirjoittaa koodin myöhemmin asetuksissa, kunnes profiilisi on valmis."
   sv: "Om en vän gav dig en inbjudningskod, skriv in den här. Du kan också hoppa över det här och skriva in koden senare i inställningarna, tills din profil är klar."
   machine: { fi: true, sv: true }

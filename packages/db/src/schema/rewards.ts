@@ -13,12 +13,12 @@ import { account } from "./identity.ts";
 import { roundEntries } from "./matching.ts";
 
 /**
- * An invitation (#107, ADR-044): a code a person whose profile passed the
- * gate's test gives a friend, who types it after their bank login. Only the
+ * An invitation (#107, ADR-044): a code a person whose profile is complete
+ * gives a friend, who types it after their bank login. Only the
  * SHA-256 of the normalised code is kept: the code is shown once, in the
  * answer that made it, and is in no row, log or export. Single use: once
  * redeemed it names its redeemer, and the night's count sets `counted_at` the
- * first night the redeemer has a gate row, when the inviter earns the reward.
+ * first night the redeemer is complete, when the inviter earns the reward.
  *
  * Erasure (ADR-007, ADR-044 §10): an erased inviter's open invitations go,
  * and their reward rows and notices with the account; the redeemed ones stay

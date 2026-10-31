@@ -22,8 +22,8 @@ import { useHapticTap } from "@/theme/haptics";
 const MARK = require("../../../assets/logo-mark.png");
 
 /**
- * The home screen of a signed-in person (#143): where their pond and their
- * gate stand, the way to the profile (which holds the photos, the
+ * The home screen of a signed-in person (#143): how their pond stands and
+ * whether matching is open, the way to the profile (which holds the photos, the
  * deal-breakers and the later questions, #239), and the settings. The
  * technical view (the API, the commits, a test error) is one tap away outside
  * production and absent in the store's build. An account that has not
