@@ -52,7 +52,14 @@ overrides:
   "brace-expansion@1": ">=1.1.20 <2"
   "brace-expansion@2": ">=2.1.6 <3"
   "brace-expansion@5": ">=5.0.11 <6"
-  "joi@17": ">=17.13.7 <18"
+  "joi@17": ">=17.13.9 <18"
+  # node-forge under the Expo tooling's code signing and eas-cli, and joi
+  # above: GHSA-7wch-p9px-956x, GHSA-jc66-7q78-782g, GHSA-8hrf-8g6f-7xwp,
+  # GHSA-hqq3-7jhf-c5jx and GHSA-5x38-2vff-x55p, and for joi GHSA-4528-x5fx-h6hg,
+  # failing the audit gate since 2026-10-31 (#541). Both are patched within
+  # their major. 1.4.1 also fixes GHSA-86w9-cpqp-85rv (CVE-2026-85393), which
+  # auditConfig below set aside until a patched version existed.
+  "node-forge@1": ">=1.4.1 <2"
   # shell-quote under react-devtools-core (react-native's developer tooling)
   # and source-map-js under postcss (vite: the admin panel's build and the
   # tests): GHSA-pqg4-j6r4-53mv and GHSA-68fv-2mgg-jv7q, failing the audit
@@ -79,19 +86,12 @@ overrides:
   # Remove this when the plugins are an optional peer.
   "@sentry/node>@sentry/bundler-plugins": "-"
 
-# pnpm audit: four advisories set aside, each with its reason. The first three
-# have no patched version for the copy that is left, and none of those copies
-# is in the API's image or the app's bundle; the fourth ships in the app and is
-# patched in place, which the audit cannot see. Remove one of the first three
-# when its copy can take a patched version or the package is gone from the
-# tree; the fourth says when. Every other advisory still fails the job.
-#
-# GHSA-86w9-cpqp-85rv (node-forge <= 1.4.0): a forged RSA PKCS#1 v1.5 signature
-# is accepted for keys with a low exponent. node-forge is asked for by
-# @expo/code-signing-certificates, @expo/pkcs12 and eas-cli only: tooling on a
-# developer's machine and in CI, which checks certificates and signatures it
-# made itself. The app verifies an update's signature with the platform's own
-# cryptography, not with this package.
+# pnpm audit: three advisories set aside, each with its reason. The first two
+# have no patched version for the copy that is left, and neither copy is in the
+# API's image or the app's bundle; the third ships in the app and is patched in
+# place, which the audit cannot see. Remove one of the first two when its copy
+# can take a patched version or the package is gone from the tree; the third
+# says when. Every other advisory still fails the job.
 #
 # GHSA-vfj7-8cjw-p6xm (braces <= 3.0.3): a deeply nested brace pattern
 # exhausts the stack. braces is asked for by micromatch only, under fast-glob,
@@ -120,7 +120,6 @@ overrides:
 # 0.5.1 or later.
 auditConfig:
   ignoreGhsas:
-    - GHSA-86w9-cpqp-85rv
     - GHSA-vfj7-8cjw-p6xm
     - GHSA-mrhx-c7xc-m3w5
     - GHSA-qr28-fpjm-wq7f
