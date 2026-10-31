@@ -47,7 +47,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `card` | Sanna | photo, name with the age, the information fields, nothing soft |
 | `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the gate and the profile wait; the hidden field leaves the card |
 | `photos-screen` | Sanna | states in words; full size and back; a caption on and off again (#296); removal asked (the drag and its actions are jest's, #179) |
-| `profile-sections` | Sanna | the list of sections; an answer saved by going back, on the card, and off again (#227) |
+| `profile-sections` | Sanna | the list of sections; an answer saved by going back, on the card, hidden from it and shown again (#515), and off again (#227) |
 | `profile-contact-details` | Sanna | a phone number in the bio refused on leaving the basics, with the reason |
 | `later-fields-ask-later` | Sanna | the unanswered fields in order; Ask me later writes nothing |
 | `later-multi-choice-cap` | Sanna | field and work take as many as apply (#178, #239); the search box |

@@ -1068,6 +1068,14 @@ export type MessageParams = {
   "profile.field.smoking": Record<never, never>;
   "profile.field.wantsKids": Record<never, never>;
   "profile.field.zodiac": Record<never, never>;
+  "profile.hide.action": Record<never, never>;
+  "profile.hide.actionLabel": { "field": string };
+  "profile.hide.hidden": Record<never, never>;
+  "profile.hide.hiddenMatching": Record<never, never>;
+  "profile.hide.never": Record<never, never>;
+  "profile.hide.show": Record<never, never>;
+  "profile.hide.showLabel": { "field": string };
+  "profile.hide.shown": Record<never, never>;
   "profile.hobbyGroup.animals": Record<never, never>;
   "profile.hobbyGroup.creative": Record<never, never>;
   "profile.hobbyGroup.culture": Record<never, never>;

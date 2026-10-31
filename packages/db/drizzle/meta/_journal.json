@@ -631,6 +631,20 @@
       "when": 1793359954163,
       "tag": "0089_waitlist_seeks",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1793429804017,
+      "tag": "0090_profile_hidden_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1793430633398,
+      "tag": "0091_profile_drop_consent_copy",
+      "breakpoints": true
     }
   ]
 }

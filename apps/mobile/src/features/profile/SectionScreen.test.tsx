@@ -215,6 +215,28 @@ describe("SectionScreen", () => {
     expect(navigation.dispatch).not.toHaveBeenCalled();
   });
 
+  it("saves a Hide on leaving, as any other change, with the answer kept (#515)", async () => {
+    const { puts } = fakeApi({ profile: stored({ smoking: "never" }) });
+    const view = await show(<SectionScreen section="lifestyle" />);
+    await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Hide from your card: Smoking" }));
+    // Nothing goes before the leaving: each save is a research event (ADR-011).
+    expect(puts).toEqual([]);
+    await leaveAndGo(view);
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toMatchObject({ fields: { smoking: "never" }, hiddenFields: ["smoking"] });
+  });
+
+  it("saves nothing when a Hide was taken back before leaving (#515)", async () => {
+    const { puts } = fakeApi({ profile: stored({ smoking: "never" }) });
+    const view = await show(<SectionScreen section="lifestyle" />);
+    await waitFor(() => expect(screen.getByText("Smoking")).toBeTruthy());
+    await press(screen.getByRole("button", { name: "Hide from your card: Smoking" }));
+    await press(screen.getByRole("button", { name: "Show on your card: Smoking" }));
+    await leaveAndGo(view);
+    expect(puts).toEqual([]);
+  });
+
   it("saves an answered prompt on leaving the prompts", async () => {
     const { puts } = fakeApi();
     const view = await show(<SectionScreen section="prompts" />);

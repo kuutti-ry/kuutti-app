@@ -7,7 +7,9 @@ Feature: The filters, hard both ways, and the soft preferences that only order
   one is here for are features/pond/gate.feature's examples; a block is
   features/safety/blocks.feature's. The deal-breakers are here. A
   deal-breaker (#149) filters on a field the holder answered themselves; with
-  that answer taken back it is paused and filters nothing. The soft
+  that answer taken back it is paused and filters nothing. An answer the
+  person hid from their card is still an answer (#515): only the card leaves it
+  out. The soft
   preferences (education, drinking, the attitude to drugs) are a person's own
   answers. They only order a round, counted where the two are similar from
   both sides. They never take anybody out of a pool, and never reach a card,
@@ -42,6 +44,22 @@ Feature: The filters, hard both ways, and the soft preferences that only order
     When the first takes their own smoking answer back
     Then the two are in each other's pool, asked from either side
     And answering again takes them out of it once more
+
+  Scenario Outline: A hidden answer counts under a deal-breaker as a shown one does
+    Given "A"'s deal-breaker on smoking accepts never, <unknown> people who did not answer
+    And "B" smokes regularly and "C" never, and both hid it from their cards
+    When the night builds the rounds
+    Then "C" is in "A"'s round and "B" is not
+
+    Examples:
+      | unknown |
+      | with    |
+      | without |
+
+  Scenario: Hiding one's own answer leaves a deal-breaker on it in force
+    Given "A"'s deal-breaker on smoking accepts never, and "B" smokes regularly and "C" never
+    When "A" hides their own smoking answer from their card
+    Then the deal-breaker is not paused, "C" is in "A"'s round and "B" is not
 
   Scenario: The gate's count leaves a pair a deal-breaker excludes out of each other's pool
     Given thirty-one people of one pond, each in every other's pool

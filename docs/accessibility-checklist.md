@@ -132,6 +132,7 @@ Sanna; Helmi and Noa where it says.
 
 | screen or step | route | listen for in particular | iOS, VoiceOver | Android, TalkBack |
 |---|---|---|---|---|
+| Hide and Show on a field (#515) | every section and later question, on an answered field | Hide named with the field, Show the same once hidden; each said after the press, what hiding did or that the answer is back; heard before the field's choices; education, drinking and drugs say they are never on the card, with nothing to press | | |
 | Profile | `/profile` | back and See your card named; what the card still needs (Helmi, or Noa locally); each row heard by its title with its progress in words as its value, the ring, the count and the chevron silent | | |
 | Basics | `/profile/section/basics` | the name field, the identity label's choices where one was given in onboarding (no persona has one: a sign-up that chose non-binary and a label), the bio and its ready lines, height as a stepper, languages with the search box; leaving by the back button saves; a refusal (a phone number in the bio) brings the section back with the reason said | | |
 | Prompts | `/profile/section/prompts` | how many of three are answered; each prompt picked, answered and taken away | | |

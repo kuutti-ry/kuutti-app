@@ -15,7 +15,7 @@ import {
   ProfileUpdate,
   PromptAnswer,
 } from "./profile.ts";
-import { PROFILE_FIELDS } from "./profile-fields.ts";
+import { CARD_FIELD_KEYS, PROFILE_FIELDS } from "./profile-fields.ts";
 
 // The profile as written and the card as seen (#47, ADR-009): trimmed text at
 // its bounds, a bio or a placeholder, each prompt once, and a card that says
@@ -152,6 +152,7 @@ describe("the profile as its owner reads it back", () => {
     bioPreset: null,
     fields: { smoking: "never" },
     prompts: [{ key: "sunday", answer: "sauna" }],
+    hiddenFields: ["smoking"],
     specialCategoryConsent: { version: "2026-09-01", at },
     updatedAt: at,
   };
@@ -321,5 +322,37 @@ describe("the words that count for completeness", () => {
     expect(words(null)).toBe(false);
     expect(words("")).toBe(false);
     expect(words("x".repeat(49), null, 1)).toBe(false);
+  });
+});
+
+describe("the hidden fields of a profile (#515)", () => {
+  const document = {
+    displayName: "Aino",
+    bio: null,
+    bioPreset: null,
+    fields: {},
+    prompts: [],
+    specialCategoryConsent: null,
+    updatedAt: "2026-10-31T10:00:00.000Z",
+  };
+  const update = { displayName: "Aino", bio: null, bioPreset: null, fields: {}, prompts: [] };
+
+  it("reads an answer without them as none hidden", () => {
+    expect(ProfileDocument.parse(document).hiddenFields).toEqual([]);
+  });
+
+  it("takes an update without them, which leaves what is stored, and tells that from an empty list", () => {
+    expect(ProfileUpdate.parse(update).hiddenFields).toBeUndefined();
+    expect(ProfileUpdate.parse({ ...update, hiddenFields: [] }).hiddenFields).toEqual([]);
+  });
+
+  it("refuses to hide what no card carries, and more than a card carries", () => {
+    expect(ProfileUpdate.safeParse({ ...update, hiddenFields: ["education"] }).success).toBe(false);
+    expect(ProfileUpdate.safeParse({ ...update, hiddenFields: [...CARD_FIELD_KEYS] }).success).toBe(
+      true,
+    );
+    expect(
+      ProfileUpdate.safeParse({ ...update, hiddenFields: [...CARD_FIELD_KEYS, "intent"] }).success,
+    ).toBe(false);
   });
 });

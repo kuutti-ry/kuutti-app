@@ -1,5 +1,6 @@
 import { formatHeight, type PlainMessageKey } from "@kuutti/i18n";
 import {
+  CARD_FIELD_KEYS,
   HOBBY_GROUP_KEYS,
   HOBBY_GROUPS,
   PROFILE_FIELDS,
@@ -7,10 +8,13 @@ import {
   type ProfileFields,
   type ProfileUpdate,
 } from "@kuutti/schema";
+import Eye from "lucide-react-native/icons/eye";
+import EyeOff from "lucide-react-native/icons/eye-off";
 import type React from "react";
 import { useState } from "react";
-import { View } from "react-native";
+import { AccessibilityInfo, View } from "react-native";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { Switch } from "@/components/ui/switch";
@@ -64,7 +68,7 @@ export function toggled(
   return [...current.filter((o) => !spec.alone.includes(o)), option];
 }
 
-type Draft = Pick<ProfileUpdate, "fields">;
+type Draft = Pick<ProfileUpdate, "fields" | "hiddenFields">;
 type Update = (patch: Partial<Draft>) => void;
 
 /**
@@ -120,10 +124,89 @@ export function Chip({
 }
 
 /**
+ * What a field's title says about the card (#515). Everything a card can
+ * carry shows until the person says otherwise, so the one thing to do here is
+ * "Hide", and only once there is an answer: a long form stays a form, with no
+ * row of switches to go through. A hidden answer says so, and says that
+ * matching still reads it only where it does: nothing reads a height or a
+ * religion. A soft field never reaches a card, by the service's decision
+ * (ADR-019 §2), and says that instead, since it has no "Hide" to ask about.
+ * The title's row keeps its height, so the first answer moves no chip from
+ * under the finger.
+ */
+function FieldHeading({
+  field,
+  draft,
+  update,
+}: {
+  field: ProfileFieldKey;
+  draft: Draft;
+  update: Update;
+}) {
+  const { t } = useT();
+  const tap = useHapticTap();
+  const onCards = (CARD_FIELD_KEYS as readonly ProfileFieldKey[]).includes(field);
+  const answered = (draft.fields as Record<string, unknown>)[field] !== undefined;
+  const hiddenFields = draft.hiddenFields ?? [];
+  const chose = hiddenFields.includes(field);
+  // Under "hide me from my field" the card leaves the field out whatever this says (#150).
+  const bySetting = field === "field" && draft.fields.hideFromField === true;
+  const hidden = answered && (chose || bySetting);
+  const label = t(fieldLabelKey(field));
+  const hiddenNote =
+    PROFILE_FIELDS[field].preferenceAbout === "none"
+      ? t("profile.hide.hidden")
+      : t("profile.hide.hiddenMatching");
+  const toggle = () => {
+    tap();
+    update({
+      hiddenFields: chose ? hiddenFields.filter((key) => key !== field) : [...hiddenFields, field],
+    });
+    AccessibilityInfo.announceForAccessibility(chose ? t("profile.hide.shown") : hiddenNote);
+  };
+
+  if (!onCards) {
+    return (
+      <>
+        <FieldLabel field={field} />
+        <Text variant="muted">{t("profile.hide.never")}</Text>
+      </>
+    );
+  }
+  return (
+    <>
+      {/* A 44 pt row around a line of small text: the margins keep the title with its answers. */}
+      <View className="-my-2 min-h-touch flex-row flex-wrap content-center items-center justify-between gap-x-3">
+        <FieldLabel field={field} className="shrink" />
+        {answered && !bySetting && (
+          <Button
+            variant="ghost"
+            className="-mr-2 px-2"
+            accessibilityLabel={t(chose ? "profile.hide.showLabel" : "profile.hide.actionLabel", {
+              field: label,
+            })}
+            onPress={toggle}
+          >
+            <View className="flex-row items-center gap-1">
+              <Icon as={chose ? Eye : EyeOff} size={16} />
+              <Text className="text-sm font-medium">
+                {t(chose ? "profile.hide.show" : "profile.hide.action")}
+              </Text>
+            </View>
+          </Button>
+        )}
+      </View>
+      {hidden && <Text variant="muted">{hiddenNote}</Text>}
+    </>
+  );
+}
+
+/**
  * One field of the registry as the person answers it (#47, #148, ADR-019):
  * choices as chips, with a search box over a long list, the first languages
  * before it and the hobbies in their groups; a number as a stepper; a short
- * text; a setting as a switch.
+ * text; a setting as a switch; with its title, what the card does with the
+ * answer (FieldHeading).
  * Nothing here is particular to a field beyond the widget its kind asks for
  * and the one adaptive text of the sheet. The profile screen and the later
  * screens share it; the draft and its update are the caller's.
@@ -209,7 +292,7 @@ export function FieldEditor({
 
   return (
     <View className="gap-2">
-      <FieldLabel field={field} />
+      <FieldHeading field={field} draft={draft} update={update} />
       {spec.kind === "text" && (
         <>
           <Input

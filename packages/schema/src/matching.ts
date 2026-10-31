@@ -50,9 +50,9 @@ export const RoundEntry = z
     /** The deal-breaker a `relaxed` card came in by (#99, ADR-042 §9); absent on every other card. */
     relaxedField: DealBreakerField.optional(),
     /**
-     * The person's own deal-breakers, not paused, whose field the card's person
-     * left unanswered (#99, ADR-042 §8): "Did not answer: {field}". Absent on an
-     * older API.
+     * The person's own deal-breakers, not paused, whose field the card says
+     * nothing on, unanswered or hidden alike (#99, ADR-042 §8, #515): "Doesn't
+     * say: {field}". Absent on an older API.
      */
     notAnswered: z.array(DealBreakerField).max(DEAL_BREAKERS_CAP).optional(),
   })

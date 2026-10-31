@@ -557,6 +557,62 @@ profile.clear:
   sv: "Rensa svaret"
   machine: { fi: true, sv: true }
 
+profile.hide.action:
+  en: "Hide"
+  description: "Quiet button at the end of an answered field's title in the profile and the later questions (#515): keeps the answer off the person's card. Space is tight."
+  fi: "Piilota"
+  sv: "Dölj"
+  machine: { fi: true, sv: true }
+
+profile.hide.actionLabel:
+  en: "Hide from your card: {field}"
+  description: "What a screen reader says for profile.hide.action, and it has to start with that word (#515). {field} is the field's label, after a colon so nothing is inflected."
+  fi: "Piilota kortiltasi: {field}"
+  sv: "Dölj från ditt kort: {field}"
+  machine: { fi: true, sv: true }
+
+profile.hide.show:
+  en: "Show"
+  description: "The same button once the answer is hidden: puts it back on the person's card (#515). Space is tight."
+  fi: "Näytä"
+  sv: "Visa"
+  machine: { fi: true, sv: true }
+
+profile.hide.showLabel:
+  en: "Show on your card: {field}"
+  description: "What a screen reader says for profile.hide.show, and it has to start with that word (#515). {field} is the field's label, after a colon so nothing is inflected."
+  fi: "Näytä kortillasi: {field}"
+  sv: "Visa på ditt kort: {field}"
+  machine: { fi: true, sv: true }
+
+profile.hide.hidden:
+  en: "Hidden from your card."
+  description: "Under the title of a hidden answer that nothing in matching reads, such as height or religion (#515). It must not say matching uses it: it does not."
+  fi: "Piilotettu kortiltasi."
+  sv: "Dolt från ditt kort."
+  machine: { fi: true, sv: true }
+
+profile.hide.hiddenMatching:
+  en: "Hidden from your card. Still used for matching."
+  description: "Under the title of a hidden answer that matching does read: what one is here for, and the fields deal-breakers can be set on (#515)."
+  fi: "Piilotettu kortiltasi. Käytetään silti yhdistämiseen."
+  sv: "Dolt från ditt kort. Används ändå för matchning."
+  machine: { fi: true, sv: true }
+
+profile.hide.shown:
+  en: "Back on your card."
+  description: "Said by a screen reader alone, right after a person shows a hidden answer again (#515)."
+  fi: "Taas kortillasi."
+  sv: "Tillbaka på ditt kort."
+  machine: { fi: true, sv: true }
+
+profile.hide.never:
+  en: "Never on your card. Only used for matching."
+  description: "Under the title of a field the service keeps off every card: education, drinking and the attitude to drugs (ADR-019 §2, #515). There is no Hide button on these, and this says why."
+  fi: "Ei koskaan kortillasi. Käytetään vain yhdistämiseen."
+  sv: "Aldrig på ditt kort. Används bara för matchning."
+  machine: { fi: true, sv: true }
+
 profile.dealBreakers.title:
   en: "Deal-breakers"
   description: "Heading of the deal-breakers screen (#149)."
@@ -8005,10 +8061,10 @@ round.reason.relaxedField:
   machine: { fi: true, sv: true }
 
 round.notAnswered:
-  en: "Did not answer: {field}"
-  description: "Above a card of today's round (TD-12, #99, ADR-042 §8): this person left unanswered the field of one of the reader's own deal-breakers, which lets such people through. {field} is the field's label, after a colon so nothing is inflected."
-  fi: "Ei vastannut: {field}"
-  sv: "Svarade inte: {field}"
+  en: "Doesn't say: {field}"
+  description: "Above a card of today's round (TD-12, #99, ADR-042 §8): this card says nothing on the field of one of the reader's own deal-breakers. The person left it unanswered or hid it, and the text must fit both without telling which (#515). {field} is the field's label, after a colon so nothing is inflected."
+  fi: "Ei kerro: {field}"
+  sv: "Berättar inte: {field}"
   machine: { fi: true, sv: true }
 
 round.relaxed.undo:

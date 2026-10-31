@@ -1638,8 +1638,8 @@ describe("the short pool (#99, ADR-042)", () => {
       likesLeft: 10,
     });
     await show();
-    expect(screen.getByText("Did not answer: Smoking")).toBeTruthy();
-    expect(screen.getByText("Did not answer: Languages")).toBeTruthy();
+    expect(screen.getByText("Doesn't say: Smoking")).toBeTruthy();
+    expect(screen.getByText("Doesn't say: Languages")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Undo for today/ })).toBeNull();
   });
 

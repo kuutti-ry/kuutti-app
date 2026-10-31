@@ -69,3 +69,8 @@ Feature: The short pool: coming back, relaxing a deal-breaker for the day, and w
     Given "A"'s deal-breaker on smoking lets through those who did not answer, "B" did not answer it and "C" did
     When "A" reads today's round
     Then "B"'s card says smoking was not answered, and "C"'s says nothing
+
+  Scenario: A hidden answer reads on a card as one not given
+    Given "A"'s deal-breaker on smoking lets through those who did not answer, "B" did not answer it and "C" answered it and hid it
+    When "A" reads today's round
+    Then neither card shows an answer on smoking, and both say so in the same words

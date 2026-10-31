@@ -294,9 +294,10 @@ type EntryRow = {
  * The entries' cards in order, each through the card builder, which writes
  * the shown record and counts the day's cards (ADR-008); a card it refuses (a
  * block either way, a sanction, a profile no longer complete) is left out.
- * Each says which of the person's own deal-breakers, not paused, its person
- * left unanswered (ADR-042 §8): every deal-breaker field is a card field, and
- * the card leaves an unanswered one out.
+ * Each says which of the person's own deal-breakers, not paused, its card
+ * says nothing on (ADR-042 §8): every deal-breaker field is a card field, and
+ * the card leaves out an unanswered one and a hidden one alike, so the label
+ * never tells them apart (#515).
  */
 async function entriesOf(
   accountId: string,
