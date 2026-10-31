@@ -45,6 +45,7 @@ const storedRows = async (ctx: TestContext, accountId: string) =>
 
 const smoking = { field: "smoking", accept: ["never"], includeUnknown: false };
 const kids = { field: "hasKids", accept: ["no"], includeUnknown: true };
+const taller = { field: "height", accept: ["taller"], includeUnknown: true };
 
 describe("A deal-breaker the rule refuses is not stored", () => {
   test.for([
@@ -69,6 +70,16 @@ describe("A deal-breaker the rule refuses is not stored", () => {
       400,
     ],
     ["the same field twice", [smoking, { ...smoking, accept: ["quitting"] }], 400],
+    [
+      "a deal-breaker on height accepting no relation of height",
+      [{ ...taller, accept: ["180"] }],
+      400,
+    ],
+    [
+      "a deal-breaker on height accepting two relations",
+      [{ ...taller, accept: ["taller", "shorter"] }],
+      400,
+    ],
   ] as const)("%s", async ([, dealBreakers, status], { ctx }) => {
     await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
     const a = await signedInAccount(ctx.client);
@@ -77,6 +88,7 @@ describe("A deal-breaker the rule refuses is not stored", () => {
       smoking: "never",
       hasKids: "no",
       monogamy: "monogamous",
+      height: 170,
     });
     expect(own.status).toBe(200);
     const response = await putDealBreakers(ctx.app, a.headers, { dealBreakers });
@@ -153,6 +165,105 @@ describe("deal-breakers", () => {
         .filter((line) => line.msg === "deal-breakers saved")
         .map((line) => line.dealBreakers),
     ).toEqual([2, 1]);
+  });
+
+  test("A deal-breaker on height is stored as one relation to the person's own height", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+    expect((await answer(ctx.app, a.headers, { height: 170 })).status).toBe(200);
+
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [taller] })).status).toBe(
+      200,
+    );
+    expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
+      dealBreakers: [{ ...taller, paused: false }],
+      max: 2,
+    });
+    expect(await storedRows(ctx, a.accountId)).toEqual([{ field: "height", mode: "hard" }]);
+
+    // Another relation replaces the first, with the switch for those who did not answer.
+    const shorter = { field: "height", accept: ["shorter"], includeUnknown: false };
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [shorter] })).status).toBe(
+      200,
+    );
+    expect((await readDealBreakers(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...shorter, paused: false },
+    ]);
+    expect(await storedRows(ctx, a.accountId)).toEqual([{ field: "height", mode: "hard" }]);
+    expect((await exportOf(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...shorter, paused: false },
+    ]);
+
+    // Everyone is having none: the set without it.
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [] })).status).toBe(200);
+    expect(await storedRows(ctx, a.accountId)).toEqual([]);
+
+    expect(JSON.stringify(ctx.logs())).not.toMatch(/shorter|taller/);
+  });
+
+  test("a deal-breaker on height waits for the person's own height, and keeps its relation", async ({
+    ctx,
+  }) => {
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 2 });
+    const a = await signedInAccount(ctx.client);
+
+    const refused = await putDealBreakers(ctx.app, a.headers, { dealBreakers: [taller] });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ error: { code: "filter_unanswered" } });
+
+    expect((await answer(ctx.app, a.headers, { height: 170 })).status).toBe(200);
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [taller] })).status).toBe(
+      200,
+    );
+    // The height taken back: paused, and nothing is deleted.
+    expect((await answer(ctx.app, a.headers, {})).status).toBe(200);
+    expect((await readDealBreakers(ctx.app, a.headers)).dealBreakers).toEqual([
+      { ...taller, paused: true },
+    ]);
+    // Paused, another relation waits for the answer too.
+    const changed = await putDealBreakers(ctx.app, a.headers, {
+      dealBreakers: [{ ...taller, accept: ["shorter"] }],
+    });
+    expect(changed.status).toBe(409);
+  });
+
+  test("how many a person may hold is the config's, up to one per field (#508)", async ({
+    ctx,
+  }) => {
+    const a = await signedInAccount(ctx.client);
+    expect(
+      (
+        await answer(ctx.app, a.headers, {
+          monogamy: "monogamous",
+          hasKids: "no",
+          wantsKids: "want",
+          smoking: "never",
+          languages: ["fi"],
+          height: 170,
+        })
+      ).status,
+    ).toBe(200);
+    const all = [
+      smoking,
+      kids,
+      taller,
+      { field: "monogamy", accept: ["monogamous"], includeUnknown: false },
+      { field: "wantsKids", accept: ["want"], includeUnknown: false },
+      { field: "languages", accept: ["fi"], includeUnknown: false },
+    ];
+
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 5 });
+    const over = await putDealBreakers(ctx.app, a.headers, { dealBreakers: all });
+    expect(over.status).toBe(400);
+    expect(await storedRows(ctx, a.accountId)).toEqual([]);
+
+    await withMatchingConfig(ctx.client, { deal_breakers_max: 6 });
+    expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: all })).status).toBe(200);
+    const read = await readDealBreakers(ctx.app, a.headers);
+    expect(read.max).toBe(6);
+    expect(read.dealBreakers.map((d) => d.field).sort()).toEqual(all.map((d) => d.field).sort());
   });
 
   test("a paused deal-breaker sent back as it stands is kept, and the others save around it", async ({
@@ -241,7 +352,7 @@ describe("deal-breakers", () => {
     }
     expect(await readDealBreakers(ctx.app, a.headers)).toEqual({
       dealBreakers: [{ ...smoking, paused: false }],
-      max: 5,
+      max: 6,
     });
     // The next save sends the set as read: the row with nothing left goes with it.
     expect((await putDealBreakers(ctx.app, a.headers, { dealBreakers: [smoking] })).status).toBe(

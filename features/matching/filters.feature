@@ -9,11 +9,12 @@ Feature: The filters, hard both ways, and the soft preferences that only order
   deal-breaker (#149) filters on a field the holder answered themselves; with
   that answer taken back it is paused and filters nothing. An answer the
   person hid from their card is still an answer (#515): only the card leaves it
-  out. The soft
-  preferences (education, drinking, the attitude to drugs) are a person's own
-  answers. They only order a round, counted where the two are similar from
-  both sides. They never take anybody out of a pool, and never reach a card,
-  an event or a log line as a number.
+  out. One on height (#508) accepts no list of answers: it is one relation of
+  the other person's height to the holder's own, and everyone is having none.
+  The soft preferences (education, drinking, the attitude to drugs) are a
+  person's own answers. They only order a round, counted where the two are
+  similar from both sides. They never take anybody out of a pool, and never
+  reach a card, an event or a log line as a number.
 
   Scenario Outline: A deal-breaker lets through only the answers its holder accepts, asked from either side
     Given a person with a deal-breaker on <field> accepting <accept>, <unknown> people who did not answer
@@ -33,6 +34,37 @@ Feature: The filters, hard both ways, and the soft preferences that only order
       | languages | fi             | with    | nothing         | in     |
       | hasKids   | no             | without | yes_not_with_me | not in |
       | monogamy  | monogamous     | without | monogamous      | in     |
+
+  Scenario Outline: A height deal-breaker compares the other person's height with the holder's own, asked from either side
+    Given a person of 170 cm with a deal-breaker on height, <relation>, <unknown> people who did not answer
+    And another person whose height is <theirs>, the two otherwise in each other's pool
+    Then they are <in> each other's pool, asked from either side, whichever of them holds it
+
+    Examples:
+      | relation      | unknown | theirs  | in     |
+      | taller        | without | 171     | in     |
+      | taller        | without | 170     | not in |
+      | taller        | without | 169     | not in |
+      | at_least_mine | without | 171     | in     |
+      | at_least_mine | without | 170     | in     |
+      | at_least_mine | without | 169     | not in |
+      | shorter       | without | 169     | in     |
+      | shorter       | without | 170     | not in |
+      | shorter       | without | 171     | not in |
+      | taller        | without | nothing | not in |
+      | taller        | with    | nothing | in     |
+      | shorter       | with    | 171     | not in |
+
+  Scenario: Two height deal-breakers are each asked from their holder's own height
+    Given a person of 165 cm who asks for somebody taller and a person of 180 cm who asks for somebody shorter
+    Then they are in each other's pool, asked from either side
+    And two people who both ask for somebody taller are never in each other's pool, whatever their heights
+
+  Scenario: A height deal-breaker waits for its holder's own height
+    Given a person of 170 cm with a deal-breaker on height, taller, and a person of 165 cm
+    When the first takes their own height back
+    Then the two are in each other's pool, asked from either side
+    And answering again takes them out of it once more
 
   Scenario: The deal-breakers of both people are asked, each against the other's answers
     Given two people, each with a deal-breaker the other's answer passes

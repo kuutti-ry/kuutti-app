@@ -97,11 +97,16 @@ const text = (maxLength: number, r: Roles) => ({
   schema: z.string().trim().min(1).max(maxLength),
 });
 
-/** A whole number inside a closed range; the unit is in the text. */
-const integer = (min: number, max: number, r: Roles) => ({
+/**
+ * A whole number inside a closed range; the unit is in the text. `relations`
+ * are what a deal-breaker on it may accept (#508): how the other person's
+ * number stands to the holder's own, where a list field has its options.
+ */
+const integer = (min: number, max: number, relations: Options, r: Roles) => ({
   kind: "number" as const,
   min,
   max,
+  relations,
   ...roles(r),
   schema: z.int().min(min).max(max),
 });
@@ -361,8 +366,11 @@ export const PROFILE_FIELDS = {
     preferenceAbout: "soft",
   }),
   hobbies: multi(HOBBIES, { role: "info", preferenceAbout: "none" }),
-  /** Centimetres; display only, never filterable. */
-  height: integer(HEIGHT_MIN_CM, HEIGHT_MAX_CM, { role: "info", preferenceAbout: "none" }),
+  /** Centimetres. A deal-breaker on it is one relation to the holder's own height (#508); everyone is having none. */
+  height: integer(HEIGHT_MIN_CM, HEIGHT_MAX_CM, ["taller", "at_least_mine", "shorter"], {
+    role: "info",
+    preferenceAbout: "deal_breaker",
+  }),
   exercise: single(["never", "sometimes", "weekly", "daily"], {
     role: "info",
     preferenceAbout: "none",

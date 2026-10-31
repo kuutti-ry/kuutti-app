@@ -44,6 +44,7 @@ Each flow has a persona to itself where it changes something that another flow r
 | `deal-breakers-limit` | Sanna | an accepted answer before saving; two at most, the third refused |
 | `deal-breakers-own-answer` | Noa | only on what she answered; Answer it opens the field |
 | `deal-breaker-paused` | Sanna | her own answer taken back pauses it in words; answering lifts it |
+| `deal-breaker-height` | Sanna | four buttons, no switch: one relation at a time, kept when saved, Everyone takes it off |
 | `card` | Sanna | photo, name with the age, the information fields, nothing soft |
 | `photos-gate-and-hidden-field` | Noa | one approved photo, the other in review: the gate and the profile wait; the hidden field leaves the card |
 | `photos-screen` | Sanna | states in words; full size and back; a caption on and off again (#296); removal asked (the drag and its actions are jest's, #179) |

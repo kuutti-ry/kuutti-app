@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEAL_BREAKER_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
+import { DEAL_BREAKER_FIELDS, PROFILE_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
 
 /**
  * Deal-breakers (#149, TD-16, the field sheet's disclose-to-filter rule):
@@ -10,18 +10,25 @@ import { DEAL_BREAKER_FIELDS, type ProfileFieldKey } from "./profile-fields.ts";
  * both ways.
  */
 
-/** The contract's ceiling; the rule is the tunable (2 at launch). */
-export const DEAL_BREAKERS_CAP = 5;
+/** One per field is the contract's ceiling; the number is the tunable's alone (the maintainer, #508). */
+export const DEAL_BREAKERS_CAP = DEAL_BREAKER_FIELDS.length;
 
 export const DealBreakerField = z
   .enum(DEAL_BREAKER_FIELDS as unknown as [ProfileFieldKey, ...ProfileFieldKey[]])
   .meta({ id: "DealBreakerField" });
 export type DealBreakerField = z.infer<typeof DealBreakerField>;
 
+/** What a deal-breaker on the field may accept: the options of a list, the relations of a number (#508). */
+export function dealBreakerOptions(field: DealBreakerField): readonly string[] {
+  const spec = PROFILE_FIELDS[field];
+  if (spec.kind === "number") return spec.relations;
+  return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
+}
+
 export const DealBreaker = z
   .object({
     field: DealBreakerField,
-    /** The answers of others the person accepts; at least one, each an option of the field (the API holds that). */
+    /** The answers of others the person accepts; at least one, each an option of the field, and one alone on a number (the API holds that). */
     accept: z.array(z.string().min(1).max(40)).min(1).max(60),
     /** Whether a person who left the field unanswered passes. */
     includeUnknown: z.boolean(),

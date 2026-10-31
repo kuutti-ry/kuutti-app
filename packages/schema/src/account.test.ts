@@ -10,6 +10,7 @@ import {
   EMAIL_MAX,
   ExportedPhoto,
 } from "./account.ts";
+import { DEAL_BREAKERS_CAP } from "./deal-breakers.ts";
 
 // The account's own lifecycle (#51, #148): the optional e-mail, the deletion
 // request and the export, at their boundaries.
@@ -388,7 +389,7 @@ describe("the account export", () => {
   it.each<[string, number, () => unknown]>([
     [
       "dealBreakers",
-      5,
+      DEAL_BREAKERS_CAP,
       () => ({ field: "smoking", accept: ["never"], includeUnknown: true, paused: false }),
     ],
     ["photos", 50, () => photo(0)],

@@ -115,7 +115,7 @@
             "items": {
               "$ref": "#/components/schemas/StoredDealBreaker"
             },
-            "maxItems": 5
+            "maxItems": 6
           },
           "consents": {
             "type": "array",
@@ -496,7 +496,8 @@
           "hasKids",
           "wantsKids",
           "smoking",
-          "languages"
+          "languages",
+          "height"
         ]
       },
       "ConsentRecord": {
@@ -2147,7 +2148,7 @@
             "items": {
               "$ref": "#/components/schemas/ExportedRelaxation"
             },
-            "maxItems": 5
+            "maxItems": 6
           },
           "entries": {
             "type": "array",
@@ -6496,7 +6497,7 @@
             "items": {
               "$ref": "#/components/schemas/DealBreakerField"
             },
-            "maxItems": 5
+            "maxItems": 6
           }
         },
         "required": [
@@ -6561,14 +6562,14 @@
             "items": {
               "$ref": "#/components/schemas/RelaxationOffer"
             },
-            "maxItems": 10
+            "maxItems": 12
           },
           "relaxed": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Relaxation"
             },
-            "maxItems": 5
+            "maxItems": 6
           }
         },
         "required": [
@@ -6657,12 +6658,12 @@
             "items": {
               "$ref": "#/components/schemas/StoredDealBreaker"
             },
-            "maxItems": 5
+            "maxItems": 6
           },
           "max": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 5
+            "maximum": 6
           }
         },
         "required": [
@@ -6678,7 +6679,7 @@
             "items": {
               "$ref": "#/components/schemas/DealBreaker"
             },
-            "maxItems": 5
+            "maxItems": 6
           }
         },
         "required": [

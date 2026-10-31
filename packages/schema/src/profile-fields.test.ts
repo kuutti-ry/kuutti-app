@@ -46,6 +46,7 @@ describe("the profile field registry (ADR-019)", () => {
       "wantsKids",
       "smoking",
       "languages",
+      "height",
     ]);
     expect(PROFILE_FIELDS.intent).toMatchObject({ role: "hard", preferenceAbout: "hard" });
   });

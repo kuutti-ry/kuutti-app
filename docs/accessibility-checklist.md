@@ -142,7 +142,7 @@ Sanna; Helmi and Noa where it says.
 | Hobbies | `/profile/section/hobbies` | the hobbies in their groups, the search box, as many chosen as apply, each heard as selected | | |
 | Beliefs | `/profile/section/beliefs` | politics with "none of them", which stands alone; religion; star sign | | |
 | Your card | `/profile/card` | the explanation; the photo in front heard as its place, the owner's caption, then the automatic description, once (the caption under it is not heard twice, #296); on a card with more than one, Previous photo and Next photo named, at least 44 points, dimmed at the first and the last, and the photo that comes said (#513); the bars above it silent; the name and age, the gender and label; answers both share said in words; a photo refused for the day's budget said under the card; what is still missing | | |
-| Deal-breakers | `/profile/deal-breakers` | one switch per field, named with the field, on or off; an unanswered field says to share one's own first, with its button (Noa); a paused one said in words; the accepted answers with the search box; the switch for people who did not answer; the save, then saved or failed said; the limit refused in words | | |
+| Deal-breakers | `/profile/deal-breakers` | one switch per list, named with the field, on or off; height's four buttons, Everyone first, each saying whether it is chosen; an unanswered field says to share one's own first, with its button (Noa); a paused one said in words; the accepted answers with the search box; the switch for people who did not answer; the save, then saved or failed said; the limit refused in words | | |
 
 ### The later questions
 

@@ -669,6 +669,13 @@ profile.dealBreakers.accept:
   sv: "Okej för mig"
   machine: { fi: true, sv: true }
 
+profile.dealBreakers.everyone:
+  en: "Everyone"
+  description: "First button of the height row of the deal-breakers (#508): no filter on height. Short: the row holds four buttons."
+  fi: "Kaikki"
+  sv: "Alla"
+  machine: { fi: true, sv: true }
+
 profile.dealBreakers.includeUnknown:
   en: "Also people who did not answer"
   description: "Label of the switch that lets an unanswered field pass (#149)."
@@ -1577,6 +1584,27 @@ profile.option.hobbies.other:
   description: "Option other of the hobbies field (#145 registry, ADR-019)."
   fi: "Jotain muuta"
   sv: "Något annat"
+  machine: { fi: true, sv: true }
+
+profile.option.height.taller:
+  en: "Taller than me"
+  description: "Button of the height row of the deal-breakers (#508): show only people taller than the person. The comparison is with the person's own height."
+  fi: "Minua pidempi"
+  sv: "Längre än jag"
+  machine: { fi: true, sv: true }
+
+profile.option.height.at_least_mine:
+  en: "My height or taller"
+  description: "Button of the height row of the deal-breakers (#508): show people of the person's own height or taller."
+  fi: "Yhtä pitkä tai pidempi"
+  sv: "Lika lång eller längre"
+  machine: { fi: true, sv: true }
+
+profile.option.height.shorter:
+  en: "Shorter than me"
+  description: "Button of the height row of the deal-breakers (#508): show only people shorter than the person. The comparison is with the person's own height."
+  fi: "Minua lyhyempi"
+  sv: "Kortare än jag"
   machine: { fi: true, sv: true }
 
 profile.option.exercise.never:

@@ -1,7 +1,7 @@
 # Deal-breakers (#149, TD-16, features/matching/preferences.feature): at most
 # deal_breakers_max (2) of them, each on a field the person answered
 # themselves; one with no accepted answer cannot be saved, and a third is
-# refused in words and stays off. Sanna answered all five fields and has none
+# refused in words and stays off. Sanna answered all six fields and has none
 # set; the flow saves nothing, so it leaves her as it found her.
 appId: fi.kuutti.app
 name: At most two deal-breakers, each with an accepted answer; a third is refused in words

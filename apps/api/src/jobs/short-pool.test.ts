@@ -699,6 +699,58 @@ describe("a person's own hidden answer", () => {
   });
 });
 
+describe("a deal-breaker on height through the night (#508)", () => {
+  /** "A", a woman of 170 cm who asks for somebody taller and lets through who did not answer, and the men of the pond. */
+  async function taller(ctx: TestContext, slug: string) {
+    const pond = await pondNamed(ctx.client, slug);
+    const [a] = await people(ctx.client, pond, 1, { ...HER, fields: { height: 170 } });
+    if (!a) throw new Error("A not written");
+    await dealBreaker(ctx.client, a, "height", ["taller"], true);
+    const [tall] = await people(ctx.client, pond, 1, men({ height: 171 }));
+    const [same] = await people(ctx.client, pond, 1, men({ height: 170 }));
+    const [open] = await people(ctx.client, pond, 1, men({}));
+    if (!tall || !same || !open) throw new Error("people not written");
+    await opened(ctx.client, pond, [a, tall, same, open]);
+    return { a, tall, same, open };
+  }
+
+  test("holds in the round both ways, and a card says a person did not answer height", async ({
+    ctx,
+  }) => {
+    const { a, tall, same, open } = await taller(ctx, "test-height-round");
+    await buildRounds(await deps(ctx.client));
+
+    const hers = (await roundOf(ctx.client, a)).map((e) => e.candidate_id);
+    expect(new Set(hers)).toEqual(new Set([tall, open]));
+    // Both ways: she is the one woman of the pond, and her filter keeps her off his round.
+    expect((await roundOf(ctx.client, same)).map((e) => e.candidate_id)).toEqual([]);
+    expect((await roundOf(ctx.client, tall)).map((e) => e.candidate_id)).toEqual([a]);
+
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+    const { entries } = await readToday(app, headers);
+    const byPerson = new Map(
+      (await roundOf(ctx.client, a)).map((e, index) => [e.candidate_id, entries?.[index]]),
+    );
+    expect(byPerson.get(open)?.notAnswered).toEqual(["height"]);
+    expect(byPerson.get(tall)?.notAnswered).toEqual([]);
+  });
+
+  test("a short round offers to set it aside for the day", async ({ ctx }) => {
+    const { a, same } = await taller(ctx, "test-height-relaxed");
+    await buildRounds(await deps(ctx.client));
+    const app = await appAt(ctx.client);
+    const { headers } = await signInAs(ctx.client, a);
+
+    const aside = { field: "height", kind: "aside" } as const;
+    const { offers: offered } = await offers(app, headers);
+    expect(offered.map(({ field, kind }) => ({ field, kind }))).toEqual([aside]);
+    await added(await relax(app, headers, aside));
+    const relaxed = (await roundOf(ctx.client, a)).find((e) => e.candidate_id === same);
+    expect(relaxed).toMatchObject({ reason: "relaxed", relaxed_field: "height" });
+  });
+});
+
 describe("the routes' edges", () => {
   test("the relaxation routes need a session", async ({ ctx }) => {
     const app = await appAt(ctx.client);

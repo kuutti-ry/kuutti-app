@@ -3,6 +3,7 @@ import {
   AGE_MIN,
   DEAL_BREAKER_FIELDS,
   type DealBreaker,
+  dealBreakerOptions,
   GENDERS,
   PROFILE_FIELD_KEYS,
   PROFILE_FIELDS,
@@ -262,22 +263,25 @@ describe("The sheet's examples of who is shown to whom, by gender and seek", () 
   );
 });
 
-/** A field's options; every deal-breaker field and every soft field has them. */
-const optionsOf = (key: ProfileFieldKey): readonly string[] => {
-  const spec = PROFILE_FIELDS[key];
-  return "options" in spec ? spec.options : [];
-};
 const SOFT_FIELDS = PROFILE_FIELD_KEYS.filter(
   (key) => PROFILE_FIELDS[key].preferenceAbout === "soft",
 );
 
-/** A few of a field's options, at least one: what a deal-breaker accepts, or a list's answer. */
-const someOf = (key: ProfileFieldKey) =>
-  fc.subarray([...optionsOf(key)], { minLength: 1, maxLength: Math.min(3, optionsOf(key).length) });
+const { min: HEIGHT_MIN, max: HEIGHT_MAX, relations: HEIGHT_RELATIONS } = PROFILE_FIELDS.height;
+const heightArb = fc.integer({ min: HEIGHT_MIN, max: HEIGHT_MAX });
 
-/** An answer as the registry takes it: one option, or for a list one or more of them. */
-const answerArb = (key: ProfileFieldKey): fc.Arbitrary<unknown> =>
-  PROFILE_FIELDS[key].kind === "multi" ? someOf(key) : fc.constantFrom(...optionsOf(key));
+/** A few of a list's options, at least one: what a deal-breaker accepts, or the list's answer. */
+const someOf = (key: ProfileFieldKey) => {
+  const options = dealBreakerOptions(key);
+  return fc.subarray([...options], { minLength: 1, maxLength: Math.min(3, options.length) });
+};
+
+/** An answer as the registry takes it: one option, for a list one or more of them, a number in its range. */
+const answerArb = (key: ProfileFieldKey): fc.Arbitrary<unknown> => {
+  const spec = PROFILE_FIELDS[key];
+  if (spec.kind === "number") return fc.integer({ min: spec.min, max: spec.max });
+  return spec.kind === "multi" ? someOf(key) : fc.constantFrom(...dealBreakerOptions(key));
+};
 /** Any of the given fields answered or left open: an open one is a missing key, as the registry reads it. */
 const answersArb = (keys: readonly ProfileFieldKey[]) =>
   fc.record(Object.fromEntries(keys.map((key) => [key, answerArb(key)])), { requiredKeys: [] });
@@ -286,7 +290,9 @@ const dealBreakerArb: fc.Arbitrary<DealBreaker> = fc
   .chain((field) =>
     fc.record({
       field: fc.constant(field),
-      accept: someOf(field),
+      // A number's deal-breaker is one relation (#508), a list's as many options as one accepts.
+      accept:
+        field === "height" ? fc.constantFrom(...HEIGHT_RELATIONS).map((r) => [r]) : someOf(field),
       includeUnknown: fc.boolean(),
     }),
   );
@@ -306,7 +312,8 @@ const personArb: fc.Arbitrary<PoolPerson> = fc
     identityId: identityArb,
     blocks: fc.uniqueArray(identityArb, { maxLength: 3 }),
     answers: answersArb([...DEAL_BREAKER_FIELDS, ...SOFT_FIELDS]),
-    // Up to the cap's two, each on a field of its own (#149); paused when the field is open.
+    // Up to two, each on a field of its own (#149), which leaves pairs in each other's pool to
+    // ask the rules of; paused when the field is open. The number is the config's (#508).
     dealBreakers: fc.uniqueArray(dealBreakerArb, { maxLength: 2, selector: (d) => d.field }),
   })
   .map(({ gender, age, seeks, a, b, intent, identityId, blocks, answers, dealBreakers }) => ({
@@ -389,8 +396,9 @@ describe("the pool, for any two people", () => {
           [b, a],
         ] as const) {
           for (const dealBreaker of holder.dealBreakers) {
-            if (holder.fields[dealBreaker.field] === undefined) continue;
-            expect(accepts(dealBreaker, other.fields[dealBreaker.field])).toBe(true);
+            const own = holder.fields[dealBreaker.field];
+            if (own === undefined) continue;
+            expect(accepts(dealBreaker, other.fields[dealBreaker.field], own)).toBe(true);
           }
         }
         if (a.intent !== b.intent) {
@@ -429,7 +437,9 @@ describe("the pool, for any two people", () => {
       fc.property(personArb, personArb, (a, b) => {
         const excludes = (holder: PoolPerson, other: PoolPerson) =>
           holder.dealBreakers.some(
-            (d) => holder.fields[d.field] !== undefined && !accepts(d, other.fields[d.field]),
+            (d) =>
+              holder.fields[d.field] !== undefined &&
+              !accepts(d, other.fields[d.field], holder.fields[d.field]),
           );
         if (excludes(a, b) || excludes(b, a)) {
           expect(inEachOthersPool(a, b)).toBe(false);
@@ -517,6 +527,7 @@ describe("deal-breakers", () => {
     languages: ["fi"],
     hasKids: "no",
     monogamy: "monogamous",
+    height: 170,
   };
   const answered = (field: string, answer: string) =>
     answer === "nothing" ? {} : { [field]: field === "languages" ? answer.split(",") : answer };
@@ -553,6 +564,111 @@ describe("deal-breakers", () => {
         expect(inEachOthersPool(other, holder)).toBe(expected === "in");
       },
     );
+  });
+
+  describe("A height deal-breaker compares the other person's height with the holder's own, asked from either side", () => {
+    it.each([
+      ["taller", "without", 171, "in"],
+      ["taller", "without", 170, "not in"],
+      ["taller", "without", 169, "not in"],
+      ["at_least_mine", "without", 171, "in"],
+      ["at_least_mine", "without", 170, "in"],
+      ["at_least_mine", "without", 169, "not in"],
+      ["shorter", "without", 169, "in"],
+      ["shorter", "without", 170, "not in"],
+      ["shorter", "without", 171, "not in"],
+      ["taller", "without", "nothing", "not in"],
+      ["taller", "with", "nothing", "in"],
+      ["shorter", "with", 171, "not in"],
+    ] as const)(
+      "a holder of 170 cm accepting %s, %s people who did not answer, and the other's height %s: %s",
+      (relation, unknown, theirs, expected) => {
+        const [first, second] = pair();
+        if (!first || !second) throw new Error("no pair");
+        const holder: PoolPerson = {
+          ...first,
+          fields: { ...first.fields, height: 170 },
+          dealBreakers: [
+            { field: "height", accept: [relation], includeUnknown: unknown === "with" },
+          ],
+        };
+        const other: PoolPerson = {
+          ...second,
+          fields: theirs === "nothing" ? second.fields : { ...second.fields, height: theirs },
+        };
+        // The holder first and second: the same answer from either side.
+        expect(inEachOthersPool(holder, other)).toBe(expected === "in");
+        expect(inEachOthersPool(other, holder)).toBe(expected === "in");
+      },
+    );
+  });
+
+  const asking = (base: PoolPerson, height: number, relation: string): PoolPerson => ({
+    ...base,
+    fields: { ...base.fields, height },
+    dealBreakers: [{ field: "height", accept: [relation], includeUnknown: false }],
+  });
+
+  it("Two height deal-breakers are each asked from their holder's own height", () => {
+    const [first, second] = pair();
+    if (!first || !second) throw new Error("no pair");
+    const shorter = asking(first, 165, "taller");
+    const taller = asking(second, 180, "shorter");
+    expect(inEachOthersPool(shorter, taller)).toBe(true);
+    expect(inEachOthersPool(taller, shorter)).toBe(true);
+    // Whatever the heights, one of two who both ask for somebody taller is refused.
+    fc.assert(
+      fc.property(heightArb, heightArb, (a, b) => {
+        expect(inEachOthersPool(asking(first, a, "taller"), asking(second, b, "taller"))).toBe(
+          false,
+        );
+      }),
+    );
+  });
+
+  it("A height deal-breaker waits for its holder's own height", () => {
+    const [first, second] = pair();
+    if (!first || !second) throw new Error("no pair");
+    const holder = asking(first, 170, "taller");
+    const other: PoolPerson = { ...second, fields: { ...second.fields, height: 165 } };
+    expect(inEachOthersPool(holder, other)).toBe(false);
+    // The holder takes their own height back: there is nothing to compare with, and the filter waits.
+    const paused: PoolPerson = { ...holder, fields: { intent: holder.intent } };
+    expect(inEachOthersPool(paused, other)).toBe(true);
+    expect(inEachOthersPool(other, paused)).toBe(true);
+    // Answering again takes it up again.
+    const again: PoolPerson = { ...paused, fields: { ...paused.fields, height: 170 } };
+    expect(inEachOthersPool(again, other)).toBe(false);
+    expect(inEachOthersPool(other, again)).toBe(false);
+  });
+
+  it("reads the three relations of any two heights as one comparison (#508)", () => {
+    const relation = (accept: string) => ({
+      field: "height" as const,
+      accept: [accept],
+      includeUnknown: false,
+    });
+    const taller = relation("taller");
+    const mine = relation("at_least_mine");
+    const shorter = relation("shorter");
+    fc.assert(
+      fc.property(heightArb, heightArb, (theirs, own) => {
+        // Taller seen from one side is shorter seen from the other.
+        expect(accepts(taller, theirs, own)).toBe(accepts(shorter, own, theirs));
+        // My height or taller is everything shorter than me is not.
+        expect(accepts(mine, theirs, own)).toBe(!accepts(shorter, theirs, own));
+        // And it is taller, or the very same number.
+        expect(accepts(mine, theirs, own)).toBe(accepts(taller, theirs, own) || theirs === own);
+      }),
+    );
+  });
+
+  it("refuses a height against a relation that left the registry, and a holder with no number (#508)", () => {
+    const retired = { field: "height" as const, accept: ["much_taller"], includeUnknown: true };
+    expect(accepts(retired, 180, 170)).toBe(false);
+    // A pause keeps this from the pool (`passesFiltersOf`); asked anyway, it refuses.
+    const taller = { field: "height" as const, accept: ["taller"], includeUnknown: true };
+    expect(accepts(taller, 180, undefined)).toBe(false);
   });
 
   it("The deal-breakers of both people are asked, each against the other's answers", () => {

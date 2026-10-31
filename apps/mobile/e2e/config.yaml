@@ -31,6 +31,7 @@ executionOrder:
     - The parties screen lists the parties and none of them, which stands alone, with no note and no search
     - At most two deal-breakers, each with an accepted answer; a third is refused in words
     - Taking one's own answer back pauses the deal-breaker on it, and answering again lifts the pause
+    - Height takes one relation of its four buttons, kept when saved, and Everyone takes it off
     - Home names the area with its numbers and the gate in words, and the wrench names the API
     - A malformed e-mail is refused in words, a valid one is saved, and it can be removed
     - The research switch in Settings records the opt-in and withdraws it again

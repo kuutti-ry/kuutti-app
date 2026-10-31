@@ -4,6 +4,7 @@ import {
   DEAL_BREAKERS_CAP,
   type DealBreaker,
   type DealBreakersUpdate,
+  dealBreakerOptions,
   PROFILE_FIELDS,
   type StoredDealBreaker,
 } from "@kuutti/schema";
@@ -32,18 +33,13 @@ export async function dealBreakersMax(db: Queryable): Promise<number> {
   return Math.min(await matchingConfigNumber(db, DEAL_BREAKERS_MAX_KEY), DEAL_BREAKERS_CAP);
 }
 
-const optionsOf = (field: DealBreaker["field"]): readonly string[] => {
-  const spec = PROFILE_FIELDS[field];
-  return spec.kind === "single" || spec.kind === "multi" ? spec.options : [];
-};
-
 /** A filter waits while the person's own answer on its field is missing: read, never stored. The pool asks the same (#87). */
 export const pausedOf = (field: string, own: Record<string, unknown>): boolean =>
   own[field] === undefined;
 
 /** The first accepted answer that is no option of the field, or null when every one is. */
 function invalidAccept(dealBreaker: DealBreaker): string | null {
-  const options = optionsOf(dealBreaker.field);
+  const options = dealBreakerOptions(dealBreaker.field);
   return dealBreaker.accept.find((option) => !options.includes(option)) ?? null;
 }
 
@@ -61,7 +57,7 @@ export function dealBreakersFrom(rows: readonly DealBreakerRow[]): DealBreaker[]
   return rows.flatMap((row) => {
     if (!WHITELIST.includes(row.field)) return [];
     const field = row.field as DealBreaker["field"];
-    const options = optionsOf(field);
+    const options = dealBreakerOptions(field);
     const accept = (Accept.safeParse(row.value).data ?? []).filter((o) => options.includes(o));
     return accept.length === 0 ? [] : [{ field, accept, includeUnknown: row.include_unknown }];
   });
@@ -93,12 +89,12 @@ const sameFilter = (a: DealBreaker, b: DealBreaker): boolean =>
 
 /**
  * The whole set, replaced: at most `max`, each on a distinct whitelisted
- * field, accepting options the field has. A filter set or changed on what the
- * person will not say about themselves is refused as `filter_unanswered`,
- * with the field, so the screen can ask for the answer instead; a paused one
- * sent back as it stands is kept, since the screen sends the whole set and a
- * pause deletes nothing (ADR-009 §1). Nothing of onboarding's two rows is
- * touched.
+ * field, accepting options the field has, or one relation of a number (#508).
+ * A filter set or changed on what the person will not say about themselves is
+ * refused as `filter_unanswered`, with the field, so the screen can ask for
+ * the answer instead; a paused one sent back as it stands is kept, since the
+ * screen sends the whole set and a pause deletes nothing (ADR-009 §1). Nothing
+ * of onboarding's two rows is touched.
  */
 export async function saveDealBreakers(
   db: Queryable,
@@ -119,6 +115,11 @@ export async function saveDealBreakers(
     const unknown = invalidAccept(dealBreaker);
     if (unknown !== null) {
       throw new AppError(400, "validation_failed", "Not an option of the field", {
+        field: dealBreaker.field,
+      });
+    }
+    if (PROFILE_FIELDS[dealBreaker.field].kind === "number" && dealBreaker.accept.length > 1) {
+      throw new AppError(400, "validation_failed", "One relation at most", {
         field: dealBreaker.field,
       });
     }
